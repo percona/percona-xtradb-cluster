@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2020, Oracle and/or its affiliates.
+/* Copyright (c) 2000, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -32,11 +32,13 @@
 
 #include <string.h>
 
+#include <cstdint>  // std::uintptr_t
 #include <memory>
 #include <new>
 #include <type_traits>
 #include <utility>
 
+#include "memory_debugging.h"
 #include "my_compiler.h"
 #include "my_dbug.h"
 #include "my_inttypes.h"
@@ -163,13 +165,18 @@ struct MEM_ROOT {
   }
 
   /**
-    Allocate “num” objects of type T, and default-construct them.
+    Allocate “num” objects of type T, and initialize them to a default value
+    that is created by passing the supplied args to T's constructor. If args
+    is empty, value-initialization is used. For primitive types, like int and
+    pointers, this means the elements will be set to the equivalent of 0
+    (or false or nullptr).
+
     If the constructor throws an exception, behavior is undefined.
 
     We don't use new[], as it can put extra data in front of the array.
    */
-  template <class T>
-  T *ArrayAlloc(size_t num) {
+  template <class T, class... Args>
+  T *ArrayAlloc(size_t num, Args... args) {
     static_assert(alignof(T) <= 8, "MEM_ROOT only returns 8-aligned memory.");
     if (num * sizeof(T) < num) {
       // Overflow.
@@ -181,10 +188,9 @@ struct MEM_ROOT {
       return nullptr;
     }
 
-    // Default-construct all elements. For primitive types like int,
-    // the entire loop will be optimized away.
+    // Initialize all elements.
     for (size_t i = 0; i < num; ++i) {
-      new (&ret[i]) T;
+      new (&ret[i]) T(args...);
     }
 
     return ret;
@@ -195,7 +201,7 @@ struct MEM_ROOT {
    * schema. Use when transferring responsibility for a MEM_ROOT from one thread
    * to another.
    */
-  void Claim();
+  void Claim(bool claim);
 
   /**
    * Deallocate all the RAM used. The MEM_ROOT itself continues to be valid,
@@ -286,6 +292,59 @@ struct MEM_ROOT {
     m_block_size = m_orig_block_size = block_size;
   }
 
+  /**
+   * @name Raw interface
+   * Peek(), ForceNewBlock() and RawCommit() together define an
+   * alternative interface to MEM_ROOT, for special uses. The raw interface
+   * gives direct access to the underlying blocks, allowing a user to bypass the
+   * normal alignment requirements and to write data directly into them without
+   * knowing beforehand exactly how long said data is going to be, while still
+   * retaining the convenience of block management and automatic freeing. It
+   * generally cannot be combined with calling Alloc() as normal; see RawCommit.
+   *
+   * The raw interface, unlike Alloc(), is not affected by running under
+   * ASan or Valgrind.
+   *
+   * @{
+   */
+
+  /**
+   * Get the bounds of the currently allocated memory block. Assuming no other
+   * MEM_ROOT calls are made in the meantime, you can start writing into this
+   * block and then call RawCommit() once you know how many bytes you actually
+   * needed. (This is useful when e.g. packing rows.)
+   */
+  std::pair<char *, char *> Peek() const {
+    return {m_current_free_start, m_current_free_end};
+  }
+
+  /**
+   * Allocate a new block of at least “minimum_length” bytes; usually more.
+   * This holds no matter how many bytes are free in the current block.
+   * The new black will always become the current block, ie., the next call
+   * to Peek() will return the newlyy allocated block. (This is different
+   * from Alloc(), where it is possible to allocate a new block that is
+   * not made into the current block.)
+   *
+   * @return true Allocation failed (possibly due to size restrictions).
+   */
+  bool ForceNewBlock(size_t minimum_length);
+
+  /**
+   * Mark the first N bytes as the current block as used.
+   *
+   * WARNING: If you use RawCommit() with a length that is not a multiple of 8,
+   * you cannot use Alloc() afterwards! The exception is that if EnsureSpace()
+   * has just returned, you've got a new block, and can use Alloc() again.
+   */
+  void RawCommit(size_t length) {
+    assert(static_cast<size_t>(m_current_free_end - m_current_free_start) >=
+           length);
+    m_current_free_start += length;
+  }
+
+  /// @}
+
  private:
   /**
    * Something to point on that exists solely to never return nullptr
@@ -295,9 +354,12 @@ struct MEM_ROOT {
 
   /**
     Allocate a new block of the given length (plus overhead for the block
-    header).
+    header). If the MEM_ROOT is near capacity, it may allocate less memory
+    than wanted_length, but if it cannot allocate at least minimum_length,
+    will return nullptr.
   */
-  Block *AllocBlock(size_t length);
+  std::pair<Block *, size_t> AllocBlock(size_t wanted_length,
+                                        size_t minimum_length);
 
   /** Allocate memory that doesn't fit into the current free block. */
   void *AllocSlow(size_t length);
@@ -341,14 +403,6 @@ struct MEM_ROOT {
   PSI_memory_key m_psi_key = 0;
 };
 
-// Legacy C thunks. Do not use in new code.
-static inline void init_alloc_root(PSI_memory_key key, MEM_ROOT *root,
-                                   size_t block_size, size_t) {
-  ::new (root) MEM_ROOT(key, block_size);
-}
-
-void free_root(MEM_ROOT *root, myf flags);
-
 /**
  * Allocate an object of the given type. Use like this:
  *
@@ -363,15 +417,15 @@ void free_root(MEM_ROOT *root, myf flags);
  * a MEM_ROOT using regular placement new. We should make a less ambiguous
  * syntax, e.g. new (On(mem_root)) Foo().
  */
-inline void *operator new(
-    size_t size, MEM_ROOT *mem_root,
-    const std::nothrow_t &arg MY_ATTRIBUTE((unused)) = std::nothrow) noexcept {
+inline void *operator new(size_t size, MEM_ROOT *mem_root,
+                          const std::nothrow_t &arg
+                          [[maybe_unused]] = std::nothrow) noexcept {
   return mem_root->Alloc(size);
 }
 
-inline void *operator new[](
-    size_t size, MEM_ROOT *mem_root,
-    const std::nothrow_t &arg MY_ATTRIBUTE((unused)) = std::nothrow) noexcept {
+inline void *operator new[](size_t size, MEM_ROOT *mem_root,
+                            const std::nothrow_t &arg
+                            [[maybe_unused]] = std::nothrow) noexcept {
   return mem_root->Alloc(size);
 }
 
@@ -408,7 +462,10 @@ inline void destroy_array(T *ptr, size_t count) {
 template <class T>
 class Destroy_only {
  public:
-  void operator()(T *ptr) const { destroy(ptr); }
+  void operator()(T *ptr) const {
+    destroy(ptr);
+    TRASH(const_cast<std::remove_const_t<T> *>(ptr), sizeof(T));
+  }
 };
 
 /** std::unique_ptr, but only destroying. */

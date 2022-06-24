@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2021, Oracle and/or its affiliates.
 
    This library is free software; you can redistribute it and/or
    modify it under the terms of the GNU Library General Public
@@ -30,6 +30,7 @@
 
 #include "my_config.h"
 
+#include <assert.h>
 #include <errno.h>
 #include <string.h>
 #include <sys/types.h>
@@ -39,7 +40,7 @@
 #include "m_ctype.h"
 #include "my_byteorder.h"
 #include "my_compiler.h"
-#include "my_dbug.h"
+
 #include "my_inttypes.h"
 #include "my_macros.h"
 #include "my_uctype.h"  // IWYU pragma: keep
@@ -4976,7 +4977,7 @@ Pointee *add_with_saturate(Pointee *ptr, Offset offset) {
 
 static size_t my_strxfrm_pad_nweights_unicode(uchar *str, uchar *strend,
                                               size_t nweights) {
-  DBUG_ASSERT(str && str <= strend);
+  assert(str && str <= strend);
   strend = std::min(
       strend, add_with_saturate(add_with_saturate(str, nweights), nweights));
 
@@ -5010,7 +5011,7 @@ static size_t my_strxfrm_pad_nweights_unicode(uchar *str, uchar *strend,
 
 static size_t my_strxfrm_pad_unicode(uchar *str, uchar *strend) {
   uchar *str0 = str;
-  DBUG_ASSERT(str && str <= strend);
+  assert(str && str <= strend);
   for (; str < strend;) {
     *str++ = 0x00;
     if (str < strend) *str++ = 0x20;
@@ -5033,7 +5034,7 @@ static inline size_t my_strnxfrm_unicode_tmpl(const CHARSET_INFO *cs,
   uchar *dst0 = dst;
   uchar *de = dst + dstlen;
   const uchar *se = src + srclen;
-  DBUG_ASSERT(src || srclen == 0);
+  assert(src || srclen == 0);
 
   // We manually hoist this if test out of the loop; seemingly GCC
   // (at least 6.1.1) isn't smart enough to do it on its own.
@@ -5137,8 +5138,8 @@ size_t my_strnxfrm_unicode_full_bin(const CHARSET_INFO *cs, uchar *dst,
   uchar *de = dst + dstlen;
   const uchar *se = src + srclen;
 
-  DBUG_ASSERT(src || srclen == 0);
-  DBUG_ASSERT(cs->state & MY_CS_BINSORT);
+  assert(src || srclen == 0);
+  assert(cs->state & MY_CS_BINSORT);
 
   for (; dst < de && nweights; nweights--) {
     int res;
@@ -5262,8 +5263,8 @@ static int my_mb_wc_utf8_no_range(my_wc_t *pwc, const uchar *s) {
 }
 
 extern "C" {
-static int my_uni_utf8(const CHARSET_INFO *cs MY_ATTRIBUTE((unused)),
-                       my_wc_t wc, uchar *r, uchar *e) {
+static int my_uni_utf8(const CHARSET_INFO *cs [[maybe_unused]], my_wc_t wc,
+                       uchar *r, uchar *e) {
   int count;
 
   if (r >= e) return MY_CS_TOOSMALL;
@@ -5287,11 +5288,13 @@ static int my_uni_utf8(const CHARSET_INFO *cs MY_ATTRIBUTE((unused)),
     case 3:
       r[2] = (uchar)(0x80 | (wc & 0x3f));
       wc = wc >> 6;
-      wc |= 0x800;  // Fall through.
+      wc |= 0x800;
+      [[fallthrough]];
     case 2:
       r[1] = (uchar)(0x80 | (wc & 0x3f));
       wc = wc >> 6;
-      wc |= 0xc0;  // Fall through.
+      wc |= 0xc0;
+      [[fallthrough]];
     case 1:
       r[0] = (uchar)wc;
   }
@@ -5302,7 +5305,7 @@ static int my_uni_utf8(const CHARSET_INFO *cs MY_ATTRIBUTE((unused)),
 /*
   The same as above, but without range check.
 */
-static int my_uni_utf8_no_range(const CHARSET_INFO *cs MY_ATTRIBUTE((unused)),
+static int my_uni_utf8_no_range(const CHARSET_INFO *cs [[maybe_unused]],
                                 my_wc_t wc, uchar *r) {
   int count;
 
@@ -5319,11 +5322,13 @@ static int my_uni_utf8_no_range(const CHARSET_INFO *cs MY_ATTRIBUTE((unused)),
     case 3:
       r[2] = (uchar)(0x80 | (wc & 0x3f));
       wc = wc >> 6;
-      wc |= 0x800;  // Fall through.
+      wc |= 0x800;
+      [[fallthrough]];
     case 2:
       r[1] = (uchar)(0x80 | (wc & 0x3f));
       wc = wc >> 6;
-      wc |= 0xc0;  // Fall through.
+      wc |= 0xc0;
+      [[fallthrough]];
     case 1:
       r[0] = (uchar)wc;
   }
@@ -5351,7 +5356,7 @@ static size_t my_caseup_utf8(const CHARSET_INFO *cs, char *src, size_t srclen,
   int srcres, dstres;
   char *srcend = src + srclen, *dstend = dst + dstlen, *dst0 = dst;
   const MY_UNICASE_INFO *uni_plane = cs->caseinfo;
-  DBUG_ASSERT(src != dst || cs->caseup_multiply == 1);
+  assert(src != dst || cs->caseup_multiply == 1);
 
   while ((src < srcend) &&
          (srcres = my_mb_wc_utf8(&wc, (uchar *)src, (uchar *)srcend)) > 0) {
@@ -5400,7 +5405,7 @@ static size_t my_caseup_str_utf8(const CHARSET_INFO *cs, char *src) {
   int srcres, dstres;
   char *dst = src, *dst0 = src;
   const MY_UNICASE_INFO *uni_plane = cs->caseinfo;
-  DBUG_ASSERT(cs->caseup_multiply == 1);
+  assert(cs->caseup_multiply == 1);
 
   while (*src && (srcres = my_mb_wc_utf8_no_range(&wc, (uchar *)src)) > 0) {
     my_toupper_utf8mb3(uni_plane, &wc);
@@ -5418,7 +5423,7 @@ static size_t my_casedn_utf8(const CHARSET_INFO *cs, char *src, size_t srclen,
   int srcres, dstres;
   char *srcend = src + srclen, *dstend = dst + dstlen, *dst0 = dst;
   const MY_UNICASE_INFO *uni_plane = cs->caseinfo;
-  DBUG_ASSERT(src != dst || cs->casedn_multiply == 1);
+  assert(src != dst || cs->casedn_multiply == 1);
 
   while ((src < srcend) &&
          (srcres = my_mb_wc_utf8(&wc, (uchar *)src, (uchar *)srcend)) > 0) {
@@ -5436,7 +5441,7 @@ static size_t my_casedn_str_utf8(const CHARSET_INFO *cs, char *src) {
   int srcres, dstres;
   char *dst = src, *dst0 = src;
   const MY_UNICASE_INFO *uni_plane = cs->caseinfo;
-  DBUG_ASSERT(cs->casedn_multiply == 1);
+  assert(cs->casedn_multiply == 1);
 
   while (*src && (srcres = my_mb_wc_utf8_no_range(&wc, (uchar *)src)) > 0) {
     my_tolower_utf8mb3(uni_plane, &wc);
@@ -5671,7 +5676,7 @@ static int my_wildcmp_utf8(const CHARSET_INFO *cs, const char *str,
                             w_many, uni_plane);
 }
 
-static size_t my_strnxfrmlen_utf8(const CHARSET_INFO *cs MY_ATTRIBUTE((unused)),
+static size_t my_strnxfrmlen_utf8(const CHARSET_INFO *cs [[maybe_unused]],
                                   size_t len) {
   // We really ought to have len % 3 == 0, but not all calling code conforms.
   return ((len + 2) / 3) * 2;
@@ -5704,8 +5709,7 @@ static uint my_ismbchar_utf8(const CHARSET_INFO *, const char *b,
   return (res > 1) ? res : 0;
 }
 
-static uint my_mbcharlen_utf8(const CHARSET_INFO *cs MY_ATTRIBUTE((unused)),
-                              uint c) {
+static uint my_mbcharlen_utf8(const CHARSET_INFO *cs [[maybe_unused]], uint c) {
   if (c < 0x80)
     return 1;
   else if (c < 0xc2)
@@ -6914,7 +6918,7 @@ static const char filename_safe_char[128] = {
 #define MY_FILENAME_ESCAPE '@'
 
 extern "C" {
-static int my_mb_wc_filename(const CHARSET_INFO *cs MY_ATTRIBUTE((unused)),
+static int my_mb_wc_filename(const CHARSET_INFO *cs [[maybe_unused]],
                              my_wc_t *pwc, const uchar *s, const uchar *e) {
   int byte1, byte2;
   if (s >= e) return MY_CS_TOOSMALL;
@@ -6958,7 +6962,7 @@ static int my_mb_wc_filename(const CHARSET_INFO *cs MY_ATTRIBUTE((unused)),
   return MY_CS_ILSEQ;
 }
 
-static int my_wc_mb_filename(const CHARSET_INFO *cs MY_ATTRIBUTE((unused)),
+static int my_wc_mb_filename(const CHARSET_INFO *cs [[maybe_unused]],
                              my_wc_t wc, uchar *s, uchar *e) {
   int code;
   char hex[] = "0123456789abcdef";
@@ -7203,8 +7207,8 @@ extern "C" {
   @return The number of bytes read from s, or a value <= 0 for failure
     (see m_ctype.h).
 */
-int my_mb_wc_utf8_thunk(const CHARSET_INFO *cs MY_ATTRIBUTE((unused)),
-                        my_wc_t *pwc, const uchar *s, const uchar *e) {
+int my_mb_wc_utf8_thunk(const CHARSET_INFO *cs [[maybe_unused]], my_wc_t *pwc,
+                        const uchar *s, const uchar *e) {
   return my_mb_wc_utf8(pwc, s, e);
 }
 
@@ -7219,7 +7223,7 @@ int my_mb_wc_utf8_thunk(const CHARSET_INFO *cs MY_ATTRIBUTE((unused)),
   @return The number of bytes read from s, or a value <= 0 for failure
     (see m_ctype.h).
 */
-int my_mb_wc_utf8mb4_thunk(const CHARSET_INFO *cs MY_ATTRIBUTE((unused)),
+int my_mb_wc_utf8mb4_thunk(const CHARSET_INFO *cs [[maybe_unused]],
                            my_wc_t *pwc, const uchar *s, const uchar *e) {
   return my_mb_wc_utf8mb4(pwc, s, e);
 }
@@ -7230,16 +7234,15 @@ int my_mb_wc_utf8mb4_thunk(const CHARSET_INFO *cs MY_ATTRIBUTE((unused)),
   The same as above, but without range check
   for example, for a null-terminated string
 */
-static int my_mb_wc_utf8mb4_no_range(const CHARSET_INFO *cs
-                                         MY_ATTRIBUTE((unused)),
+static int my_mb_wc_utf8mb4_no_range(const CHARSET_INFO *cs [[maybe_unused]],
                                      my_wc_t *pwc, const uchar *s) {
   return my_mb_wc_utf8_prototype</*RANGE_CHECK=*/false, /*SUPPORT_MB4=*/true>(
       pwc, s, nullptr);
 }
 
 extern "C" {
-static int my_wc_mb_utf8mb4(const CHARSET_INFO *cs MY_ATTRIBUTE((unused)),
-                            my_wc_t wc, uchar *r, uchar *e) {
+static int my_wc_mb_utf8mb4(const CHARSET_INFO *cs [[maybe_unused]], my_wc_t wc,
+                            uchar *r, uchar *e) {
   int count;
 
   if (r >= e) return MY_CS_TOOSMALL;
@@ -7261,15 +7264,18 @@ static int my_wc_mb_utf8mb4(const CHARSET_INFO *cs MY_ATTRIBUTE((unused)),
     case 4:
       r[3] = (uchar)(0x80 | (wc & 0x3f));
       wc = wc >> 6;
-      wc |= 0x10000;  // Fall through.
+      wc |= 0x10000;
+      [[fallthrough]];
     case 3:
       r[2] = (uchar)(0x80 | (wc & 0x3f));
       wc = wc >> 6;
-      wc |= 0x800;  // Fall through.
+      wc |= 0x800;
+      [[fallthrough]];
     case 2:
       r[1] = (uchar)(0x80 | (wc & 0x3f));
       wc = wc >> 6;
-      wc |= 0xc0;  // Fall through.
+      wc |= 0xc0;
+      [[fallthrough]];
     case 1:
       r[0] = (uchar)wc;
   }
@@ -7280,8 +7286,8 @@ static int my_wc_mb_utf8mb4(const CHARSET_INFO *cs MY_ATTRIBUTE((unused)),
 /*
   The same as above, but without range check.
 */
-static int my_wc_mb_utf8mb4_no_range(
-    const CHARSET_INFO *cs MY_ATTRIBUTE((unused)), my_wc_t wc, uchar *r) {
+static int my_wc_mb_utf8mb4_no_range(const CHARSET_INFO *cs [[maybe_unused]],
+                                     my_wc_t wc, uchar *r) {
   int count;
 
   if (wc < 0x80)
@@ -7299,15 +7305,18 @@ static int my_wc_mb_utf8mb4_no_range(
     case 4:
       r[3] = (uchar)(0x80 | (wc & 0x3f));
       wc = wc >> 6;
-      wc |= 0x10000;  // Fall through.
+      wc |= 0x10000;
+      [[fallthrough]];
     case 3:
       r[2] = (uchar)(0x80 | (wc & 0x3f));
       wc = wc >> 6;
-      wc |= 0x800;  // Fall through.
+      wc |= 0x800;
+      [[fallthrough]];
     case 2:
       r[1] = (uchar)(0x80 | (wc & 0x3f));
       wc = wc >> 6;
-      wc |= 0xc0;  // Fall through.
+      wc |= 0xc0;
+      [[fallthrough]];
     case 1:
       r[0] = (uchar)wc;
   }
@@ -7337,7 +7346,7 @@ static size_t my_caseup_utf8mb4(const CHARSET_INFO *cs, char *src,
   int srcres, dstres;
   char *srcend = src + srclen, *dstend = dst + dstlen, *dst0 = dst;
   const MY_UNICASE_INFO *uni_plane = cs->caseinfo;
-  DBUG_ASSERT(src != dst || cs->caseup_multiply == 1);
+  assert(src != dst || cs->caseup_multiply == 1);
 
   while ((src < srcend) &&
          (srcres = my_mb_wc_utf8mb4(&wc, (uchar *)src, (uchar *)srcend)) > 0) {
@@ -7404,7 +7413,7 @@ static size_t my_caseup_str_utf8mb4(const CHARSET_INFO *cs, char *src) {
   int srcres, dstres;
   char *dst = src, *dst0 = src;
   const MY_UNICASE_INFO *uni_plane = cs->caseinfo;
-  DBUG_ASSERT(cs->caseup_multiply == 1);
+  assert(cs->caseup_multiply == 1);
 
   while (*src &&
          (srcres = my_mb_wc_utf8mb4_no_range(cs, &wc, (uchar *)src)) > 0) {
@@ -7423,7 +7432,7 @@ static size_t my_casedn_utf8mb4(const CHARSET_INFO *cs, char *src,
   int srcres, dstres;
   char *srcend = src + srclen, *dstend = dst + dstlen, *dst0 = dst;
   const MY_UNICASE_INFO *uni_plane = cs->caseinfo;
-  DBUG_ASSERT(src != dst || cs->casedn_multiply == 1);
+  assert(src != dst || cs->casedn_multiply == 1);
 
   while ((src < srcend) &&
          (srcres = my_mb_wc_utf8mb4(&wc, (uchar *)src, (uchar *)srcend)) > 0) {
@@ -7441,7 +7450,7 @@ static size_t my_casedn_str_utf8mb4(const CHARSET_INFO *cs, char *src) {
   int srcres, dstres;
   char *dst = src, *dst0 = src;
   const MY_UNICASE_INFO *uni_plane = cs->caseinfo;
-  DBUG_ASSERT(cs->casedn_multiply == 1);
+  assert(cs->casedn_multiply == 1);
 
   while (*src &&
          (srcres = my_mb_wc_utf8mb4_no_range(cs, &wc, (uchar *)src)) > 0) {
@@ -7654,16 +7663,17 @@ static int my_wildcmp_utf8mb4(const CHARSET_INFO *cs, const char *str,
                             w_many, cs->caseinfo);
 }
 
-static size_t my_strnxfrmlen_utf8mb4(
-    const CHARSET_INFO *cs MY_ATTRIBUTE((unused)), size_t len) {
+static size_t my_strnxfrmlen_utf8mb4(const CHARSET_INFO *cs [[maybe_unused]],
+                                     size_t len) {
   // We really ought to have len % 4 == 0, but not all calling code conforms.
   return ((len + 3) / 4) * 2;
 }
 }  // extern "C"
 
-static ALWAYS_INLINE int my_valid_mbcharlen_utf8mb4(
-    const CHARSET_INFO *cs MY_ATTRIBUTE((unused)), const uchar *s,
-    const uchar *e) {
+static ALWAYS_INLINE int my_valid_mbcharlen_utf8mb4(const CHARSET_INFO *cs
+                                                    [[maybe_unused]],
+                                                    const uchar *s,
+                                                    const uchar *e) {
   my_wc_t wc;  // Ignored.
   return my_mb_wc_utf8_prototype</*RANGE_CHECK=*/true, /*SUPPORT_MB4=*/true>(
       &wc, s, e);
@@ -7725,7 +7735,7 @@ size_t my_charpos_mb4(const CHARSET_INFO *cs, const char *pos, const char *end,
   return (size_t)(length ? end + 2 - start : pos - start);
 }
 
-static uint my_mbcharlen_utf8mb4(const CHARSET_INFO *cs MY_ATTRIBUTE((unused)),
+static uint my_mbcharlen_utf8mb4(const CHARSET_INFO *cs [[maybe_unused]],
                                  uint c) {
   if (c < 0x80) return 1;
   if (c < 0xc2) return 0; /* Illegal mb head */

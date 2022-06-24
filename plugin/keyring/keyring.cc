@@ -1,4 +1,4 @@
-/* Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2016, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -25,6 +25,7 @@
 #include <mysql/plugin_keyring.h>
 #include <memory>
 
+#include <my_rnd.h>
 #include <mysql/components/my_service.h>
 #include <mysql/components/services/log_builtins.h>
 #include <openssl/err.h>
@@ -33,6 +34,7 @@
 #include "my_inttypes.h"
 #include "my_io.h"
 #include "my_psi_config.h"
+#include "mysql/psi/mysql_rwlock.h"
 #include "mysqld_error.h"
 #include "plugin/keyring/buffered_file_io.h"
 #include "plugin/keyring/common/keyring.h"
@@ -51,8 +53,8 @@ using keyring::Logger;
 
 mysql_rwlock_t LOCK_keyring;
 
-int check_keyring_file_data(MYSQL_THD thd MY_ATTRIBUTE((unused)),
-                            SYS_VAR *var MY_ATTRIBUTE((unused)), void *save,
+int check_keyring_file_data(MYSQL_THD thd [[maybe_unused]],
+                            SYS_VAR *var [[maybe_unused]], void *save,
                             st_mysql_value *value) {
   char buff[FN_REFLEN + 1];
   const char *keyring_filename;
@@ -106,7 +108,7 @@ static SERVICE_TYPE(registry) *reg_srv = nullptr;
 SERVICE_TYPE(log_builtins) *log_bi = nullptr;
 SERVICE_TYPE(log_builtins_string) *log_bs = nullptr;
 
-static int keyring_init(MYSQL_PLUGIN plugin_info MY_ATTRIBUTE((unused))) {
+static int keyring_init(MYSQL_PLUGIN plugin_info [[maybe_unused]]) {
   if (init_logging_service_for_plugin(&reg_srv, &log_bi, &log_bs)) return true;
 
   try {
@@ -150,7 +152,7 @@ static int keyring_init(MYSQL_PLUGIN plugin_info MY_ATTRIBUTE((unused))) {
   }
 }
 
-static int keyring_deinit(void *arg MY_ATTRIBUTE((unused))) {
+static int keyring_deinit(void *arg [[maybe_unused]]) {
 // not taking a lock here as the calls to keyring_deinit are serialized by
 // the plugin framework
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
@@ -161,7 +163,7 @@ static int keyring_deinit(void *arg MY_ATTRIBUTE((unused))) {
   CRYPTO_cleanup_all_ex_data();
   keys.reset();
   logger.reset();
-  keyring_file_data.reset();
+  delete_keyring_file_data();
   mysql_rwlock_destroy(&LOCK_keyring);
 
   deinit_logging_service_for_plugin(&reg_srv, &log_bi, &log_bs);

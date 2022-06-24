@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -32,7 +32,7 @@ FUNCTION(MYSQL_ADD_EXECUTABLE target_arg)
   SET(EXECUTABLE_OPTIONS
     ENABLE_EXPORTS
     EXCLUDE_FROM_ALL   # add target, but do not build it by default
-    EXCLUDE_ON_SOLARIS # do not build by default on Solaris
+    EXCLUDE_FROM_PGO   # add target, but do not build for PGO
     SKIP_INSTALL       # do not install it
     )
   SET(EXECUTABLE_ONE_VALUE_KW
@@ -42,7 +42,10 @@ FUNCTION(MYSQL_ADD_EXECUTABLE target_arg)
     RUNTIME_OUTPUT_DIRECTORY
     )
   SET(EXECUTABLE_MULTI_VALUE_KW
+    COMPILE_DEFINITIONS # for TARGET_COMPILE_DEFINITIONS
+    COMPILE_OPTIONS     # for TARGET_COMPILE_OPTIONS
     DEPENDENCIES
+    INCLUDE_DIRECTORIES # for TARGET_INCLUDE_DIRECTORIES
     LINK_LIBRARIES
     )
   CMAKE_PARSE_ARGUMENTS(ARG
@@ -67,7 +70,7 @@ FUNCTION(MYSQL_ADD_EXECUTABLE target_arg)
 
   ADD_EXECUTABLE(${target} ${sources})
 
-  SET_PATH_TO_SSL(${target} ${TARGET_RUNTIME_OUTPUT_DIRECTORY})
+  SET_PATH_TO_CUSTOM_SSL_FOR_APPLE(${target})
 
   IF(ARG_DEPENDENCIES)
     ADD_DEPENDENCIES(${target} ${ARG_DEPENDENCIES})
@@ -76,16 +79,19 @@ FUNCTION(MYSQL_ADD_EXECUTABLE target_arg)
     ADD_DEPENDENCIES(mysqlrouter_all ${target})
   ENDIF()
 
+  IF(ARG_INCLUDE_DIRECTORIES)
+    TARGET_INCLUDE_DIRECTORIES(${target} PRIVATE ${ARG_INCLUDE_DIRECTORIES})
+  ENDIF()
   IF(ARG_LINK_LIBRARIES)
     TARGET_LINK_LIBRARIES(${target} ${ARG_LINK_LIBRARIES})
   ENDIF()
 
-  IF(SOLARIS AND ARG_EXCLUDE_ON_SOLARIS)
-    MESSAGE(WARNING
-      "Likely link failure for this compiler, skipping target ${target}")
-    SET(ARG_EXCLUDE_FROM_ALL TRUE)
-    SET(ARG_SKIP_INSTALL TRUE)
-    UNSET(ARG_ADD_TEST)
+  IF(ARG_EXCLUDE_FROM_PGO)
+    IF(FPROFILE_GENERATE OR FPROFILE_USE)
+      SET(ARG_EXCLUDE_FROM_ALL TRUE)
+      SET(ARG_SKIP_INSTALL TRUE)
+      UNSET(ARG_ADD_TEST)
+    ENDIF()
   ENDIF()
 
   IF(ARG_ENABLE_EXPORTS)
@@ -103,6 +109,14 @@ FUNCTION(MYSQL_ADD_EXECUTABLE target_arg)
   SET_TARGET_PROPERTIES(${target} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${TARGET_RUNTIME_OUTPUT_DIRECTORY})
 
+  IF(ARG_COMPILE_DEFINITIONS)
+    TARGET_COMPILE_DEFINITIONS(${target} PRIVATE ${ARG_COMPILE_DEFINITIONS})
+  ENDIF()
+
+  IF(ARG_COMPILE_OPTIONS)
+    TARGET_COMPILE_OPTIONS(${target} PRIVATE ${ARG_COMPILE_OPTIONS})
+  ENDIF()
+
   IF(WIN32_CLANG AND WITH_ASAN)
     TARGET_LINK_LIBRARIES(${target} "${ASAN_LIB_DIR}/clang_rt.asan-x86_64.lib")
     TARGET_LINK_LIBRARIES(${target} "${ASAN_LIB_DIR}/clang_rt.asan_cxx-x86_64.lib")
@@ -115,6 +129,11 @@ FUNCTION(MYSQL_ADD_EXECUTABLE target_arg)
     ADD_TEST(${ARG_ADD_TEST}
       ${TARGET_RUNTIME_OUTPUT_DIRECTORY}/${target})
     SET(ARG_SKIP_INSTALL TRUE)
+  ENDIF()
+
+  IF(COMPRESS_DEBUG_SECTIONS)
+    MY_TARGET_LINK_OPTIONS(${target}
+      "LINKER:--compress-debug-sections=zlib")
   ENDIF()
 
   # tell CPack where to install

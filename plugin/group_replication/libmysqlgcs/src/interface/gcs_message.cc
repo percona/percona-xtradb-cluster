@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -227,8 +227,7 @@ bool Gcs_message_data::encode(uchar *buffer, uint64_t *buffer_len) const {
   assert(static_cast<uint64_t>(slider - buffer) <= *buffer_len);
 
   MYSQL_GCS_DEBUG_EXECUTE(
-      uint64_t MY_ATTRIBUTE((unused)) encoded_header_size =
-          get_encode_header_size();
+      [[maybe_unused]] uint64_t encoded_header_size = get_encode_header_size();
       MYSQL_GCS_LOG_TRACE(
           "Encoded message: (header)= %llu (payload)= %llu",
           static_cast<unsigned long long>(encoded_header_size),

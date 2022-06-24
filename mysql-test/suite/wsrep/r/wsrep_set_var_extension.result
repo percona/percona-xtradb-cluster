@@ -1,0 +1,86 @@
+CREATE PROCEDURE test_hint (hint_str VARCHAR(255), var_str VARCHAR(64))
+BEGIN
+SET @orig_q= CONCAT("SELECT VARIABLE_VALUE INTO @before_val FROM performance_schema.session_variables where VARIABLE_NAME = '",  var_str, "'");
+SET @hint_q= CONCAT("SELECT /*+ ", hint_str,
+"*/ VARIABLE_VALUE" ,
+" INTO @hint_val FROM performance_schema.session_variables where VARIABLE_NAME = '",  var_str, "'");
+SET @after_q= CONCAT("SELECT VARIABLE_VALUE INTO @after_val FROM performance_schema.session_variables where VARIABLE_NAME = '",  var_str, "'");
+PREPARE orig_stmt FROM @orig_q;
+PREPARE hint_stmt FROM @hint_q;
+PREPARE after_stmt FROM @after_q;
+EXECUTE orig_stmt;
+EXECUTE hint_stmt;
+EXECUTE after_stmt;
+SELECT  hint_str;
+SELECT @before_val, @hint_val, @after_val;
+DEALLOCATE PREPARE orig_stmt;
+DEALLOCATE PREPARE hint_stmt;
+DEALLOCATE PREPARE after_stmt;
+END\\
+#########################################
+# Test SET_VAR hint for wsrep variables #
+#########################################
+
+# Test 1: wsrep_sync_wait
+CALL test_hint("SET_VAR(wsrep_sync_wait=4)", "wsrep_sync_wait");
+hint_str
+SET_VAR(wsrep_sync_wait=4)
+@before_val	@hint_val	@after_val
+0	4	0
+SET wsrep_sync_wait=2;
+CALL test_hint("SET_VAR(wsrep_sync_wait=4)", "wsrep_sync_wait");
+hint_str
+SET_VAR(wsrep_sync_wait=4)
+@before_val	@hint_val	@after_val
+2	4	2
+SET wsrep_sync_wait=default;
+
+# Test 2: wsrep_dirty_reads
+CALL test_hint("SET_VAR(wsrep_dirty_reads=ON)", "wsrep_dirty_reads");
+hint_str
+SET_VAR(wsrep_dirty_reads=ON)
+@before_val	@hint_val	@after_val
+OFF	ON	OFF
+SET wsrep_dirty_reads=1;
+CALL test_hint("SET_VAR(wsrep_dirty_reads=OFF)", "wsrep_dirty_reads");
+hint_str
+SET_VAR(wsrep_dirty_reads=OFF)
+@before_val	@hint_val	@after_val
+ON	OFF	ON
+SET wsrep_dirty_reads=default;
+
+# Test 3: wsrep_trx_fragment_unit
+CALL test_hint("SET_VAR(wsrep_trx_fragment_unit='statements')", "wsrep_trx_fragment_unit");
+hint_str
+SET_VAR(wsrep_trx_fragment_unit='statements')
+@before_val	@hint_val	@after_val
+bytes	statements	bytes
+SET wsrep_trx_fragment_unit='statements';
+CALL test_hint("SET_VAR(wsrep_trx_fragment_unit=rows)", "wsrep_trx_fragment_unit");
+hint_str
+SET_VAR(wsrep_trx_fragment_unit=rows)
+@before_val	@hint_val	@after_val
+statements	rows	statements
+SET wsrep_trx_fragment_unit=default;
+
+# Test 4: wsrep_trx_fragment_size
+CALL test_hint("SET_VAR(wsrep_trx_fragment_size=100)", "wsrep_trx_fragment_size");
+hint_str
+SET_VAR(wsrep_trx_fragment_size=100)
+@before_val	@hint_val	@after_val
+0	100	0
+SET wsrep_trx_fragment_size=111;
+CALL test_hint("SET_VAR(wsrep_trx_fragment_size=0)", "wsrep_trx_fragment_size");
+hint_str
+SET_VAR(wsrep_trx_fragment_size=0)
+@before_val	@hint_val	@after_val
+111	0	111
+SET wsrep_trx_fragment_size=default;
+
+# Test 5: wsrep_on is not hint updatable.
+CALL test_hint("SET_VAR(wsrep_on=0)", "wsrep_on");
+hint_str
+SET_VAR(wsrep_on=0)
+@before_val	@hint_val	@after_val
+ON	ON	ON
+DROP PROCEDURE test_hint;

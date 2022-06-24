@@ -1,5 +1,5 @@
 #ifndef RPL_TRX_TRACKING_INCLUDED
-/* Copyright (c) 2017, 2020, Oracle and/or its affiliates.
+/* Copyright (c) 2017, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -23,12 +23,13 @@
 
 #define RPL_TRX_TRACKING_INCLUDED
 
+#include <assert.h>
 #include <sys/types.h>
 #include <atomic>
 #include <map>
 
 #include "libbinlogevents/include/binlog_event.h"
-#include "my_dbug.h"
+
 #include "my_inttypes.h"
 
 class THD;
@@ -68,11 +69,11 @@ class Logical_clock {
     the assignement.
   */
   void update_offset(int64 new_offset) {
-    DBUG_ASSERT(offset <= new_offset);
+    assert(offset <= new_offset);
 
     offset = new_offset;
   }
-  ~Logical_clock() {}
+  ~Logical_clock() = default;
 };
 
 /**
@@ -135,8 +136,8 @@ class Writeset_trx_dependency_tracker {
 
   void rotate(int64 start);
 
-  /* option opt_binlog_transaction_dependency_history_size */
-  ulong m_opt_max_history_size;
+  /* Atomic variable - opt_binlog_transaction_dependency_history_size */
+  std::atomic<ulong> m_opt_max_history_size;
 
  private:
   /*
@@ -230,10 +231,7 @@ class Transaction_dependency_tracker {
 
  public:
   /* option opt_binlog_transaction_dependency_tracking */
-  std::atomic<long> m_opt_tracking_mode;
-
-  /* option opt_binlog_transaction_dependency_tracking associated with sysvar */
-  long m_opt_tracking_mode_value;
+  long m_opt_tracking_mode;
 
   Writeset_trx_dependency_tracker *get_writeset() { return &m_writeset; }
 

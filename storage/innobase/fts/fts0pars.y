@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2007, 2014, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 2007, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -241,7 +241,7 @@ fts_lexer_create(
 	ulint		query_len)
 {
 	fts_lexer_t*	fts_lexer = static_cast<fts_lexer_t*>(
-		ut_malloc_nokey(sizeof(fts_lexer_t)));
+		ut::malloc_withkey(UT_NEW_THIS_FILE_PSI_KEY, sizeof(fts_lexer_t)));
 
 	if (boolean_mode) {
 		fts0blex_init(&fts_lexer->yyscanner);
@@ -272,7 +272,7 @@ fts_lexer_free(
 		fts0tlex_destroy(fts_lexer->yyscanner);
 	}
 
-	ut_free(fts_lexer);
+	ut::free(fts_lexer);
 }
 
 /********************************************************************

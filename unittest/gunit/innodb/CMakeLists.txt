@@ -1,4 +1,4 @@
-# Copyright (c) 2013, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -33,12 +33,28 @@ SET(TESTS
   ha_innodb
   log0log
   mem0mem
+  os0file
   os0thread-create
+  srv0conc
+  sync0rw
   ut0crc32
   ut0lock_free_hash
   ut0mem
   ut0new
 )
+
+# Treat warnings as errors on MSVC for InnoDB's unittests
+IF(MSVC AND NOT WIN32_CLANG)
+  ADD_COMPILE_OPTIONS("/WX")
+ENDIF()
+
+# Fixes "C1128: number of sections exceeded object file format limit" in MSVC
+IF(MSVC)
+  ADD_COMPILE_FLAGS(
+    ut0new-t.cc
+    COMPILE_FLAGS "/bigobj"
+    )
+ENDIF()
 
 SET(ALL_INNODB_TESTS)
 FOREACH(test ${TESTS})
@@ -50,12 +66,8 @@ IF(WIN32)
 ENDIF()
 MYSQL_ADD_EXECUTABLE(merge_innodb_tests-t ${ALL_INNODB_TESTS}
   ENABLE_EXPORTS
-  EXCLUDE_ON_SOLARIS
-  ADD_TEST merge_innodb_tests-t)
-
-TARGET_LINK_LIBRARIES(merge_innodb_tests-t
-  gunit_large
-  server_unittest_library
+  ADD_TEST merge_innodb_tests-t
+  LINK_LIBRARIES gunit_large server_unittest_library
   )
 
 # Download TBB from https://www.threadingbuildingblocks.org
@@ -72,14 +84,12 @@ FOREACH(test ${TESTS})
     LIST(APPEND SRC_FILES ../../../sql/nt_servc.cc)
   ENDIF()
   MYSQL_ADD_EXECUTABLE(${test}-t ${SRC_FILES}
-    ENABLE_EXPORTS SKIP_INSTALL EXCLUDE_FROM_ALL)
-
-  TARGET_LINK_LIBRARIES(${test}-t
-    gunit_large
-    server_unittest_library
+    ENABLE_EXPORTS
+    EXCLUDE_FROM_ALL
+    SKIP_INSTALL
+    LINK_LIBRARIES gunit_large server_unittest_library
+    DEPENDENCIES GenError
     )
-  ADD_DEPENDENCIES(${test}-t GenError)
-
 ENDFOREACH()
 
 ADD_SUBDIRECTORY(lob)

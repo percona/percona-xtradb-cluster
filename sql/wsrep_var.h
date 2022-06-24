@@ -32,6 +32,8 @@ class set_var;
 class THD;
 
 int wsrep_init_vars();
+int get_provider_option_value(const char *opts, const char *opt_name,
+                              ulong *opt_value);
 
 #define CHECK_ARGS (sys_var * self, THD * thd, set_var * var)
 #define UPDATE_ARGS (sys_var * self, THD * thd, enum_var_type type)

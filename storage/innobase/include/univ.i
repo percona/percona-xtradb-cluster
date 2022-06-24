@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1994, 2019, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1994, 2021, Oracle and/or its affiliates.
 Copyright (c) 2008, Google Inc.
 
 Portions of this file contain modifications contributed and copyrighted by
@@ -55,7 +55,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #define INNODB_VERSION_BUGFIX MYSQL_VERSION_PATCH
 
 #ifndef PERCONA_INNODB_VERSION
-#define PERCONA_INNODB_VERSION 12
+#define PERCONA_INNODB_VERSION 18
 #endif
 
 /* The following is the InnoDB version as shown in
@@ -197,7 +197,7 @@ command. */
 #define UNIV_DEBUG_VALGRIND
 #endif /* HAVE_VALGRIND */
 
-#ifdef DBUG_OFF
+#ifdef NDEBUG
 #undef UNIV_DEBUG
 #elif !defined UNIV_DEBUG
 #define UNIV_DEBUG
@@ -271,12 +271,6 @@ rarely invoked function for size instead for speed. */
 #else
 #define UNIV_COLD /* empty */
 #endif
-
-#ifdef UNIV_HOTBACKUP
-#define UNIV_INLINE inline
-#else /* UNIV_HOTBACKUP */
-#define UNIV_INLINE static inline
-#endif /* UNIV_HOTBACKUP */
 
 #ifdef _WIN32
 #ifdef _WIN64
@@ -389,7 +383,7 @@ only (NONE | ZLIB | LZ4). */
 */
 
 /* Note that inside MySQL 'byte' is defined as char on Linux! */
-#define byte unsigned char
+using byte = unsigned char;
 
 /* Another basic type we use is unsigned long integer which should be equal to
 the word size of the machine, that is on a 32-bit platform 32 bits, and on a
@@ -488,20 +482,19 @@ has the SQL NULL as its value. NOTE that because we assume that the length
 of a field is a 32-bit integer when we store it, for example, to an undo log
 on disk, we must have also this number fit in 32 bits, also in 64-bit
 computers! */
-#define UNIV_SQL_NULL UINT32_UNDEFINED
+constexpr uint32_t UNIV_SQL_NULL = UINT32_UNDEFINED;
 
 /** Flag to indicate a field which was added instantly */
-#define UNIV_SQL_ADD_COL_DEFAULT (UINT32_UNDEFINED - 1)
+constexpr auto UNIV_SQL_ADD_COL_DEFAULT = UNIV_SQL_NULL - 1;
 
 /** The following number as the length of a logical field means that no
 attribute value for the multi-value index exists in the JSON doc */
-#define UNIV_NO_INDEX_VALUE (UINT32_UNDEFINED - 2)
+constexpr auto UNIV_NO_INDEX_VALUE = UNIV_SQL_ADD_COL_DEFAULT - 1;
 
 /** The follwoing number as the length marker of a logical field, which
 is only used for multi-value field data, means the data itself of the
-field is actually an array. Define it as 0 to prevent any conflict with
-normal data length */
-#define UNIV_MULTI_VALUE_ARRAY_MARKER 0
+field is actually an array. */
+const uint32_t UNIV_MULTI_VALUE_ARRAY_MARKER = UNIV_NO_INDEX_VALUE - 1;
 
 /** Lengths which are not UNIV_SQL_NULL, but bigger than the following
 number indicate that a field contains a reference to an externally
@@ -510,12 +503,8 @@ contains the sum of the following flag and the locally stored len. */
 
 #define UNIV_EXTERN_STORAGE_FIELD (UNIV_SQL_NULL - UNIV_PAGE_SIZE_DEF)
 
-#if defined(__GNUC__)
 /* Tell the compiler that variable/function is unused. */
-#define UNIV_UNUSED MY_ATTRIBUTE((unused))
-#else
-#define UNIV_UNUSED
-#endif /* CHECK FOR GCC VER_GT_2 */
+#define UNIV_UNUSED [[maybe_unused]]
 
 /* Some macros to improve branch prediction and reduce cache misses */
 #if defined(COMPILER_HINTS) && defined(__GNUC__)
@@ -530,23 +519,6 @@ it is read. */
 it is read or written. */
 #define UNIV_PREFETCH_RW(addr) __builtin_prefetch(addr, 1, 3)
 
-/* Sun Studio includes sun_prefetch.h as of version 5.9 */
-#elif (defined(__SUNPRO_C) || defined(__SUNPRO_CC))
-
-#include <sun_prefetch.h>
-
-#define UNIV_EXPECT(expr, value) (expr)
-#define UNIV_LIKELY_NULL(expr) (expr)
-
-#if defined(COMPILER_HINTS)
-//# define UNIV_PREFETCH_R(addr) sun_prefetch_read_many((void*) addr)
-#define UNIV_PREFETCH_R(addr) ((void)0)
-#define UNIV_PREFETCH_RW(addr) sun_prefetch_write_many(addr)
-#else
-#define UNIV_PREFETCH_R(addr) ((void)0)
-#define UNIV_PREFETCH_RW(addr) ((void)0)
-#endif /* COMPILER_HINTS */
-
 #elif defined __WIN__ && defined COMPILER_HINTS
 #include <xmmintrin.h>
 
@@ -558,8 +530,8 @@ it is read or written. */
 #define UNIV_PREFETCH_RW(addr) _mm_prefetch((char *)addr, _MM_HINT_T0)
 #else
 /* Dummy versions of the macros */
-#define UNIV_EXPECT(expr, value) (expr)
-#define UNIV_LIKELY_NULL(expr) (expr)
+#define UNIV_EXPECT(expr, value) expr
+#define UNIV_LIKELY_NULL(expr) expr
 #define UNIV_PREFETCH_R(addr) ((void)0)
 #define UNIV_PREFETCH_RW(addr) ((void)0)
 #endif
@@ -720,4 +692,24 @@ as a standalone library. */
 
 #endif /* UNIV_LIBRARY && !UNIV_NO_ERR_MSGS */
 
-#endif
+#ifdef UNIV_DEBUG
+#define IF_DEBUG(...) __VA_ARGS__
+#define IF_ENABLED(s, ...)        \
+  if (Sync_point::enabled((s))) { \
+    __VA_ARGS__                   \
+  }
+#else
+
+/* Expand the macro if we are generating Doxygen documentation. */
+#ifdef DOXYGEN_IF_DEBUG
+#define IF_DEBUG(...) __VA_ARGS__
+#else
+#define IF_DEBUG(...)
+#endif /* DOXYGEN_IF_DEBUG */
+
+#define IF_ENABLED(s, ...)
+#endif /* UNIV_DEBUG */
+
+using Col_offsets_t = ulint;
+
+#endif /* univ_i */

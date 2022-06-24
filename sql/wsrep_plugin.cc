@@ -37,8 +37,8 @@ mysql_declare_plugin(wsrep){
     &wsrep_storage_engine,
     "wsrep",
     "Codership Oy",
-    "A pseudo storage engine to represent transactions in multi-master "
-    "synchornous replication",
+    "A pseudo storage engine for transactions in multi-master "
+    "synchronous replication",
     PLUGIN_LICENSE_GPL,
     wsrep_plugin_init,   /* Plugin Init */
     NULL,                /* Plugin Check uninstall */

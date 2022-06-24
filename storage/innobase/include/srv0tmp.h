@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2018, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2018, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -212,7 +212,7 @@ Once a session disconnects, the tablespaces are truncated and released
 to the pool. */
 class Tablespace_pool {
  public:
-  using Pool = std::list<Tablespace *, ut_allocator<Tablespace *>>;
+  using Pool = std::list<Tablespace *, ut::allocator<Tablespace *>>;
 
   /** Tablespace_pool constructor
   @param[in]    init_size    Initial size of the tablespace pool */

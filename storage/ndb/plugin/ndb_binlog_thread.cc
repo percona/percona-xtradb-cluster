@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2014, 2020, Oracle and/or its affiliates.
+   Copyright (c) 2014, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -28,13 +28,17 @@
 #include <cstdint>
 
 // Using
-#include "m_string.h"          // NullS
+#include "m_string.h"  // NullS
+#include "my_dbug.h"
 #include "mysql/status_var.h"  // enum_mysql_show_type
 #include "sql/current_thd.h"   // current_thd
+#include "storage/ndb/include/ndbapi/NdbError.hpp"
+#include "storage/ndb/plugin/ndb_apply_status_table.h"
 #include "storage/ndb/plugin/ndb_global_schema_lock_guard.h"  // Ndb_global_schema_lock_guard
 #include "storage/ndb/plugin/ndb_local_connection.h"
 #include "storage/ndb/plugin/ndb_log.h"
 #include "storage/ndb/plugin/ndb_metadata_change_monitor.h"
+#include "storage/ndb/plugin/ndb_share.h"
 
 int Ndb_binlog_thread::do_init() {
   if (!binlog_hooks.register_hooks(do_after_reset_master)) {
@@ -72,12 +76,16 @@ int Ndb_binlog_thread::do_after_reset_master(void *) {
   return 0;
 }
 
-void Ndb_binlog_thread::validate_sync_blacklist(THD *thd) {
-  metadata_sync.validate_blacklist(thd);
+void Ndb_binlog_thread::validate_sync_excluded_objects(THD *thd) {
+  metadata_sync.validate_excluded_objects(thd);
 }
 
-void Ndb_binlog_thread::validate_sync_retry_list(THD *thd) {
-  metadata_sync.validate_retry_list(thd);
+void Ndb_binlog_thread::clear_sync_excluded_objects() {
+  metadata_sync.clear_excluded_objects();
+}
+
+void Ndb_binlog_thread::clear_sync_retry_objects() {
+  metadata_sync.clear_retry_objects();
 }
 
 bool Ndb_binlog_thread::add_logfile_group_to_check(
@@ -99,13 +107,13 @@ bool Ndb_binlog_thread::add_table_to_check(const std::string &db_name,
   return metadata_sync.add_table(db_name, table_name);
 }
 
-void Ndb_binlog_thread::retrieve_sync_blacklist(
+void Ndb_binlog_thread::retrieve_sync_excluded_objects(
     Ndb_sync_excluded_objects_table *excluded_table) {
-  metadata_sync.retrieve_blacklist(excluded_table);
+  metadata_sync.retrieve_excluded_objects(excluded_table);
 }
 
-unsigned int Ndb_binlog_thread::get_sync_blacklist_count() {
-  return metadata_sync.get_blacklist_count();
+unsigned int Ndb_binlog_thread::get_sync_excluded_objects_count() {
+  return metadata_sync.get_excluded_objects_count();
 }
 
 void Ndb_binlog_thread::retrieve_sync_pending_objects(
@@ -166,8 +174,8 @@ void Ndb_binlog_thread::synchronize_detected_object(THD *thd) {
       } else if (temp_error) {
         if (metadata_sync.retry_limit_exceeded(schema_name, object_name,
                                                object_type)) {
-          metadata_sync.add_object_to_blacklist(schema_name, object_name,
-                                                object_type, error_msg);
+          metadata_sync.exclude_object_from_sync(schema_name, object_name,
+                                                 object_type, error_msg);
         } else {
           log_info(
               "Failed to synchronize logfile group '%s' due to a temporary "
@@ -177,8 +185,8 @@ void Ndb_binlog_thread::synchronize_detected_object(THD *thd) {
       } else {
         log_error("Failed to synchronize logfile group '%s'",
                   object_name.c_str());
-        metadata_sync.add_object_to_blacklist(schema_name, object_name,
-                                              object_type, error_msg);
+        metadata_sync.exclude_object_from_sync(schema_name, object_name,
+                                               object_type, error_msg);
         increment_metadata_synced_count();
       }
       break;
@@ -194,8 +202,8 @@ void Ndb_binlog_thread::synchronize_detected_object(THD *thd) {
       } else if (temp_error) {
         if (metadata_sync.retry_limit_exceeded(schema_name, object_name,
                                                object_type)) {
-          metadata_sync.add_object_to_blacklist(schema_name, object_name,
-                                                object_type, error_msg);
+          metadata_sync.exclude_object_from_sync(schema_name, object_name,
+                                                 object_type, error_msg);
         } else {
           log_info(
               "Failed to synchronize tablespace '%s' due to a temporary error",
@@ -203,8 +211,8 @@ void Ndb_binlog_thread::synchronize_detected_object(THD *thd) {
         }
       } else {
         log_error("Failed to synchronize tablespace '%s'", object_name.c_str());
-        metadata_sync.add_object_to_blacklist(schema_name, object_name,
-                                              object_type, error_msg);
+        metadata_sync.exclude_object_from_sync(schema_name, object_name,
+                                               object_type, error_msg);
         increment_metadata_synced_count();
       }
       break;
@@ -218,16 +226,16 @@ void Ndb_binlog_thread::synchronize_detected_object(THD *thd) {
       } else if (temp_error) {
         if (metadata_sync.retry_limit_exceeded(schema_name, object_name,
                                                object_type)) {
-          metadata_sync.add_object_to_blacklist(schema_name, object_name,
-                                                object_type, error_msg);
+          metadata_sync.exclude_object_from_sync(schema_name, object_name,
+                                                 object_type, error_msg);
         } else {
           log_info("Failed to synchronize schema '%s' due to a temporary error",
                    schema_name.c_str());
         }
       } else {
         log_error("Failed to synchronize schema '%s'", schema_name.c_str());
-        metadata_sync.add_object_to_blacklist(schema_name, object_name,
-                                              object_type, error_msg);
+        metadata_sync.exclude_object_from_sync(schema_name, object_name,
+                                               object_type, error_msg);
         increment_metadata_synced_count();
       }
       break;
@@ -243,8 +251,8 @@ void Ndb_binlog_thread::synchronize_detected_object(THD *thd) {
       } else if (temp_error) {
         if (metadata_sync.retry_limit_exceeded(schema_name, object_name,
                                                object_type)) {
-          metadata_sync.add_object_to_blacklist(schema_name, object_name,
-                                                object_type, error_msg);
+          metadata_sync.exclude_object_from_sync(schema_name, object_name,
+                                                 object_type, error_msg);
         } else {
           log_info(
               "Failed to synchronize table '%s.%s' due to a temporary error",
@@ -253,15 +261,52 @@ void Ndb_binlog_thread::synchronize_detected_object(THD *thd) {
       } else {
         log_error("Failed to synchronize table '%s.%s'", schema_name.c_str(),
                   object_name.c_str());
-        metadata_sync.add_object_to_blacklist(schema_name, object_name,
-                                              object_type, error_msg);
+        metadata_sync.exclude_object_from_sync(schema_name, object_name,
+                                               object_type, error_msg);
         increment_metadata_synced_count();
       }
       break;
     }
     default: {
       // Unexpected type, should never happen
-      DBUG_ASSERT(false);
+      assert(false);
     }
+  }
+}
+
+#ifndef NDEBUG
+void Ndb_binlog_thread::dbug_sync_setting() const {
+  char global_value[256];
+  DBUG_EXPLAIN_INITIAL(global_value, sizeof(global_value));
+  char local_value[256];
+  DBUG_EXPLAIN(local_value, sizeof(local_value));
+
+  // Detect change, log and set
+  if (std::string(global_value) != std::string(local_value)) {
+    log_info("Setting debug='%s'", global_value);
+    DBUG_SET(global_value);
+  }
+}
+#endif
+
+void Ndb_binlog_thread::log_ndb_error(const NdbError &ndberr) const {
+  log_error("Got NDB error '%d - %s'", ndberr.code, ndberr.message);
+}
+
+bool Ndb_binlog_thread::acquire_apply_status_reference() {
+  DBUG_TRACE;
+
+  m_apply_status_share = NDB_SHARE::acquire_reference(
+      Ndb_apply_status_table::DB_NAME.c_str(),
+      Ndb_apply_status_table::TABLE_NAME.c_str(), "m_apply_status_share");
+  return m_apply_status_share != nullptr;
+}
+
+void Ndb_binlog_thread::release_apply_status_reference() {
+  DBUG_TRACE;
+
+  if (m_apply_status_share != nullptr) {
+    NDB_SHARE::release_reference(m_apply_status_share, "m_apply_status_share");
+    m_apply_status_share = nullptr;
   }
 }

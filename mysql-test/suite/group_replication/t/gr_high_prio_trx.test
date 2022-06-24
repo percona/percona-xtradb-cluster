@@ -74,6 +74,8 @@ UPDATE t1 SET c1=1 WHERE c1=0;
 # was aborted
 SET DEBUG_SYNC='now SIGNAL waiting1';
 
+SET DEBUG_SYNC='RESET';
+
 ####### SIGCON #######
 --echo [connection sigcon]
 --let $rpl_connection_name= sigcon

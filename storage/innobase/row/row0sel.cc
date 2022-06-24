@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1997, 2020, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1997, 2021, Oracle and/or its affiliates.
 Copyright (c) 2008, Google Inc.
 
 Portions of this file contain modifications contributed and copyrighted by
@@ -241,13 +241,13 @@ static dberr_t row_sel_sec_rec_is_for_clust_rec(
       vfield = innobase_get_computed_value(
           row, v_col, clust_index, &heap, heap, nullptr,
           thr_get_trx(thr)->mysql_thd, thr->prebuilt->m_mysql_table, nullptr,
-          nullptr, nullptr, thr->prebuilt);
+          nullptr, nullptr, &thr->prebuilt->compress_heap);
 
       if (vfield == nullptr) {
         /* This may happen e.g. when this statement is executed in
-         * read-uncommited isolation and value (like json function)
-         * depends on an externally stored lob (like json) which
-         * was not written yet. */
+        read-uncommited isolation and value (like json function)
+        depends on an externally stored lob (like json) which
+        was not written yet. */
         err = DB_COMPUTE_VALUE_FAILED;
         goto func_exit;
       }
@@ -385,8 +385,8 @@ void sel_node_free_private(sel_node_t *node) /*!< in: select node struct */
 
 /** Evaluates the values in a select list. If there are aggregate functions,
  their argument value is added to the aggregate total. */
-UNIV_INLINE
-void sel_eval_select_list(sel_node_t *node) /*!< in: select node */
+static inline void sel_eval_select_list(
+    sel_node_t *node) /*!< in: select node */
 {
   que_node_t *exp;
 
@@ -401,10 +401,10 @@ void sel_eval_select_list(sel_node_t *node) /*!< in: select node */
 
 /** Assigns the values in the select list to the possible into-variables in
  SELECT ... INTO ... */
-UNIV_INLINE
-void sel_assign_into_var_values(sym_node_t *var,  /*!< in: first variable in a
-                                                  list of  variables */
-                                sel_node_t *node) /*!< in: select node */
+static inline void sel_assign_into_var_values(
+    sym_node_t *var,  /*!< in: first variable in a
+                      list of  variables */
+    sel_node_t *node) /*!< in: select node */
 {
   que_node_t *exp;
 
@@ -424,8 +424,8 @@ void sel_assign_into_var_values(sym_node_t *var,  /*!< in: first variable in a
 
 /** Resets the aggregate value totals in the select list of an aggregate type
  query. */
-UNIV_INLINE
-void sel_reset_aggregate_vals(sel_node_t *node) /*!< in: select node */
+static inline void sel_reset_aggregate_vals(
+    sel_node_t *node) /*!< in: select node */
 {
   func_node_t *func_node;
 
@@ -441,19 +441,13 @@ void sel_reset_aggregate_vals(sel_node_t *node) /*!< in: select node */
 }
 
 /** Copies the input variable values when an explicit cursor is opened. */
-UNIV_INLINE
-void row_sel_copy_input_variable_vals(sel_node_t *node) /*!< in: select node */
+static inline void row_sel_copy_input_variable_vals(
+    sel_node_t *node) /*!< in: select node */
 {
-  sym_node_t *var;
-
-  var = UT_LIST_GET_FIRST(node->copy_variables);
-
-  while (var) {
+  for (auto var : node->copy_variables) {
     eval_node_copy_val(var, var->alias);
 
     var->indirection = nullptr;
-
-    var = UT_LIST_GET_NEXT(col_var_list, var);
   }
 }
 
@@ -503,9 +497,9 @@ static void row_sel_fetch_columns(trx_t *trx, dict_index_t *index,
         if (data == nullptr) {
           /* This means that the externally stored field was not written yet.
           This record should only be seen by following situations:
-           * Read uncommitted transactions (TRX_ISO_READ_UNCOMMITTED)
-           * During crash recovery [trx_rollback_or_clean_all_recovered().]
-           * During lock-less consistent read, when the trx reads LOB even
+          - Read uncommitted transactions (TRX_ISO_READ_UNCOMMITTED)
+          - During crash recovery [trx_rollback_or_clean_all_recovered().]
+          - During lock-less consistent read, when the trx reads LOB even
              though the clust_rec is not to be seen. */
           ut_ad(allow_null_lob);
           len = UNIV_SQL_NULL;
@@ -545,8 +539,8 @@ static void sel_col_prefetch_buf_alloc(
 
   ut_ad(que_node_get_type(column) == QUE_NODE_SYMBOL);
 
-  column->prefetch_buf = static_cast<sel_buf_t *>(
-      ut_malloc_nokey(SEL_MAX_N_PREFETCH * sizeof(sel_buf_t)));
+  column->prefetch_buf = static_cast<sel_buf_t *>(ut::malloc_withkey(
+      UT_NEW_THIS_FILE_PSI_KEY, SEL_MAX_N_PREFETCH * sizeof(sel_buf_t)));
 
   for (i = 0; i < SEL_MAX_N_PREFETCH; i++) {
     sel_buf = column->prefetch_buf + i;
@@ -569,11 +563,11 @@ void sel_col_prefetch_buf_free(
     sel_buf = prefetch_buf + i;
 
     if (sel_buf->val_buf_size > 0) {
-      ut_free(sel_buf->data);
+      ut::free(sel_buf->data);
     }
   }
 
-  ut_free(prefetch_buf);
+  ut::free(prefetch_buf);
 }
 
 /** Pops the column values for a prefetched, cached row from the column prefetch
@@ -581,7 +575,6 @@ void sel_col_prefetch_buf_free(
 static void sel_dequeue_prefetched_row(
     plan_t *plan) /*!< in: plan node for a table */
 {
-  sym_node_t *column;
   sel_buf_t *sel_buf;
   dfield_t *val;
   byte *data;
@@ -590,9 +583,7 @@ static void sel_dequeue_prefetched_row(
 
   ut_ad(plan->n_rows_prefetched > 0);
 
-  column = UT_LIST_GET_FIRST(plan->columns);
-
-  while (column) {
+  for (auto column : plan->columns) {
     val = que_node_get_val(column);
 
     if (!column->copy_val) {
@@ -603,7 +594,7 @@ static void sel_dequeue_prefetched_row(
       ut_ad(que_node_get_val_buf_size(column) == 0);
       ut_d(dfield_set_null(val));
 
-      goto next_col;
+      continue;
     }
 
     ut_ad(column->prefetch_buf);
@@ -625,8 +616,6 @@ static void sel_dequeue_prefetched_row(
 
     dfield_set_data(val, data, len);
     que_node_set_val_buf_size(column, val_buf_size);
-  next_col:
-    column = UT_LIST_GET_NEXT(col_var_list, column);
   }
 
   plan->n_rows_prefetched--;
@@ -636,10 +625,9 @@ static void sel_dequeue_prefetched_row(
 
 /** Pushes the column values for a prefetched, cached row to the column prefetch
  buffers from the val fields in the column nodes. */
-UNIV_INLINE
-void sel_enqueue_prefetched_row(plan_t *plan) /*!< in: plan node for a table */
+static inline void sel_enqueue_prefetched_row(
+    plan_t *plan) /*!< in: plan node for a table */
 {
-  sym_node_t *column;
   sel_buf_t *sel_buf;
   dfield_t *val;
   byte *data;
@@ -663,8 +651,7 @@ void sel_enqueue_prefetched_row(plan_t *plan) /*!< in: plan node for a table */
 
   ut_ad(pos < SEL_MAX_N_PREFETCH);
 
-  for (column = UT_LIST_GET_FIRST(plan->columns); column != nullptr;
-       column = UT_LIST_GET_NEXT(col_var_list, column)) {
+  for (auto column : plan->columns) {
     if (!column->copy_val) {
       /* There is no sense to push pointers to database
       page fields when we do not keep latch on the page! */
@@ -700,7 +687,7 @@ void sel_enqueue_prefetched_row(plan_t *plan) /*!< in: plan node for a table */
 
 /** Builds a previous version of a clustered index record for a consistent read
  @return DB_SUCCESS or error code */
-static MY_ATTRIBUTE((warn_unused_result)) dberr_t row_sel_build_prev_vers(
+[[nodiscard]] static dberr_t row_sel_build_prev_vers(
     ReadView *read_view,        /*!< in: read view */
     dict_index_t *index,        /*!< in: plan node for table */
     rec_t *rec,                 /*!< in: record in a clustered index */
@@ -761,19 +748,15 @@ static void row_sel_build_committed_vers_for_mysql(
 /** Tests the conditions which determine when the index segment we are searching
  through has been exhausted.
  @return true if row passed the tests */
-UNIV_INLINE
-ibool row_sel_test_end_conds(
+static inline ibool row_sel_test_end_conds(
     plan_t *plan) /*!< in: plan for the table; the column values must
                   already have been retrieved and the right sides of
                   comparisons evaluated */
 {
-  func_node_t *cond;
-
   /* All conditions in end_conds are comparisons of a column to an
   expression */
 
-  for (cond = UT_LIST_GET_FIRST(plan->end_conds); cond != nullptr;
-       cond = UT_LIST_GET_NEXT(cond_list, cond)) {
+  for (auto cond : plan->end_conds) {
     /* Evaluate the left side of the comparison, i.e., get the
     column value if there is an indirection */
 
@@ -791,23 +774,16 @@ ibool row_sel_test_end_conds(
 
 /** Tests the other conditions.
  @return true if row passed the tests */
-UNIV_INLINE
-ibool row_sel_test_other_conds(
+static inline ibool row_sel_test_other_conds(
     plan_t *plan) /*!< in: plan for the table; the column values must
                   already have been retrieved */
 {
-  func_node_t *cond;
-
-  cond = UT_LIST_GET_FIRST(plan->other_conds);
-
-  while (cond) {
+  for (auto cond : plan->other_conds) {
     eval_exp(cond);
 
     if (!eval_node_get_ibool_val(cond)) {
       return (FALSE);
     }
-
-    cond = UT_LIST_GET_NEXT(cond_list, cond);
   }
 
   return (TRUE);
@@ -816,7 +792,7 @@ ibool row_sel_test_other_conds(
 /** Retrieves the clustered index record corresponding to a record in a
  non-clustered index. Does the necessary locking.
  @return DB_SUCCESS or error code */
-static MY_ATTRIBUTE((warn_unused_result)) dberr_t row_sel_get_clust_rec(
+[[nodiscard]] static dberr_t row_sel_get_clust_rec(
     sel_node_t *node, /*!< in: select_node */
     plan_t *plan,     /*!< in: plan node for table */
     rec_t *rec,       /*!< in: record in a non-clustered index */
@@ -982,11 +958,10 @@ nature of splitting)
 @param[in]	thr		query thread
 @param[in]	mtr		mtr
 @return DB_SUCCESS, DB_SUCCESS_LOCKED_REC, or error code */
-UNIV_INLINE
-dberr_t sel_set_rtr_rec_lock(btr_pcur_t *pcur, const rec_t *first_rec,
-                             dict_index_t *index, const ulint *offsets,
-                             select_mode sel_mode, ulint mode, ulint type,
-                             que_thr_t *thr, mtr_t *mtr) {
+static inline dberr_t sel_set_rtr_rec_lock(
+    btr_pcur_t *pcur, const rec_t *first_rec, dict_index_t *index,
+    const ulint *offsets, select_mode sel_mode, ulint mode, ulint type,
+    que_thr_t *thr, mtr_t *mtr) {
   matched_rec_t *match = pcur->m_btr_cur.rtr_info->matches;
   mem_heap_t *heap = nullptr;
   dberr_t err = DB_SUCCESS;
@@ -1158,11 +1133,11 @@ nature of splitting)
 @param[in]	thr		query thread
 @param[in]	mtr		mtr
 @return DB_SUCCESS, DB_SUCCESS_LOCKED_REC, or error code */
-UNIV_INLINE
-dberr_t sel_set_rec_lock(btr_pcur_t *pcur, const rec_t *rec,
-                         dict_index_t *index, const ulint *offsets,
-                         select_mode sel_mode, ulint mode, ulint type,
-                         que_thr_t *thr, mtr_t *mtr) {
+static inline dberr_t sel_set_rec_lock(btr_pcur_t *pcur, const rec_t *rec,
+                                       dict_index_t *index,
+                                       const ulint *offsets,
+                                       select_mode sel_mode, ulint mode,
+                                       ulint type, que_thr_t *thr, mtr_t *mtr) {
   trx_t *trx;
   dberr_t err = DB_SUCCESS;
   const buf_block_t *block;
@@ -1170,12 +1145,9 @@ dberr_t sel_set_rec_lock(btr_pcur_t *pcur, const rec_t *rec,
   block = btr_pcur_get_block(pcur);
 
   trx = thr_get_trx(thr);
-  trx_mutex_enter(trx);
   ut_ad(trx_can_be_handled_by_current_thread(trx));
-  bool too_many_locks = (UT_LIST_GET_LEN(trx->lock.trx_locks) > 10000);
-  trx_mutex_exit(trx);
 
-  if (too_many_locks) {
+  if (UT_LIST_GET_LEN(trx->lock.trx_locks) > 10000) {
     if (buf_LRU_buf_pool_running_out()) {
       return (DB_LOCK_TABLE_FULL);
     }
@@ -1214,7 +1186,6 @@ static void row_sel_open_pcur(plan_t *plan, /*!< in: table plan */
                               mtr_t *mtr) /*!< in: mtr */
 {
   dict_index_t *index;
-  func_node_t *cond;
   que_node_t *exp;
   ulint n_fields;
   ulint has_search_latch = 0; /* RW_S_LATCH or 0 */
@@ -1230,12 +1201,8 @@ static void row_sel_open_pcur(plan_t *plan, /*!< in: table plan */
   get their expressions evaluated when we evaluate the right sides of
   end_conds */
 
-  cond = UT_LIST_GET_FIRST(plan->end_conds);
-
-  while (cond) {
+  for (auto cond : plan->end_conds) {
     eval_exp(que_node_get_next(cond->args));
-
-    cond = UT_LIST_GET_NEXT(cond_list, cond);
   }
 
   if (plan->tuple) {
@@ -1360,8 +1327,7 @@ static ibool row_sel_restore_pcur_pos(plan_t *plan, /*!< in: table plan */
 }
 
 /** Resets a plan cursor to a closed state. */
-UNIV_INLINE
-void plan_reset_cursor(plan_t *plan) /*!< in: plan */
+static inline void plan_reset_cursor(plan_t *plan) /*!< in: plan */
 {
   plan->pcur_is_open = FALSE;
   plan->cursor_at_end = FALSE;
@@ -1470,9 +1436,8 @@ func_exit:
 
 /** Performs a select step.
  @return DB_SUCCESS or error code */
-static MY_ATTRIBUTE((warn_unused_result)) dberr_t
-    row_sel(sel_node_t *node, /*!< in: select node */
-            que_thr_t *thr)   /*!< in: query thread */
+[[nodiscard]] static dberr_t row_sel(sel_node_t *node, /*!< in: select node */
+                                     que_thr_t *thr)   /*!< in: query thread */
 {
   dict_index_t *index;
   plan_t *plan;
@@ -2555,7 +2520,7 @@ mysql_col_len, mbminlen, mbmaxlen
 /**
 @param[in]	data		data to store
 @param[in]	len		length of the data
-@param[in]	prebuilt	use prebuilt->compress_heap only here */
+@param[in]	compress_heap */
 #ifdef UNIV_DEBUG
 /**
 @param[in]	sec_field	secondary index field no if the secondary index
@@ -2570,7 +2535,7 @@ void row_sel_field_store_in_mysql_format_func(byte *dest,
                                               ulint field_no,
 #endif /* UNIV_DEBUG */
                                               const byte *data, ulint len,
-                                              row_prebuilt_t *prebuilt
+                                              mem_heap_t **compress_heap
 #ifdef UNIV_DEBUG
                                               ,
                                               ulint sec_field
@@ -2629,7 +2594,7 @@ void row_sel_field_store_in_mysql_format_func(byte *dest,
           data = row_decompress_column(
               data, &len,
               reinterpret_cast<const byte *>(templ->zip_dict_data.str),
-              templ->zip_dict_data.length, prebuilt);
+              templ->zip_dict_data.length, compress_heap);
 
         /* This is a >= 5.0.3 type true VARCHAR. Store the
         length of the data to the first byte or the first
@@ -2683,7 +2648,7 @@ void row_sel_field_store_in_mysql_format_func(byte *dest,
       row_mysql_store_blob_ref(
           dest, templ->mysql_col_len, data, len, templ->compressed,
           reinterpret_cast<const byte *>(templ->zip_dict_data.str),
-          templ->zip_dict_data.length, prebuilt);
+          templ->zip_dict_data.length, compress_heap);
       break;
 
     case DATA_POINT:
@@ -2699,16 +2664,20 @@ void row_sel_field_store_in_mysql_format_func(byte *dest,
       ut_ad(mysql_col_len >= len);
       ut_ad(templ->mbmaxlen >= templ->mbminlen);
 
-      /* If field_no equals to templ->icp_rec_field_no,
-      we are examining a row pointed by "icp_rec_field_no".
-      There is possibility that icp_rec_field_no refers to
-      a field in a secondary index while templ->rec_field_no
-      points to field in a primary index. The length
-      should still be equal, unless the field pointed
-      by icp_rec_field_no has a prefix or this is a virtual
-      column */
+      /* If field_no equals to templ->icp_rec_field_no, we are examining a row
+      pointed by "icp_rec_field_no". There is possibility that icp_rec_field_no
+      refers to a field in a secondary index while templ->rec_field_no points
+      to field in a primary index. The length should still be equal, unless the
+      field pointed by icp_rec_field_no has a prefix or this is a virtual
+      column.
+      For end range condition check of secondary index with cluster index
+      template (clust_templ_for_sec), the index column data length (len)
+      could be smaller than the actual column length (mysql_col_len) if index
+      is on column prefix. This is not a real issue because the end range check
+      would only need the prefix part. The length check assert is relaxed for
+      clust_templ_for_sec. */
       ut_ad(templ->is_virtual || templ->mbmaxlen > templ->mbminlen ||
-            mysql_col_len == len ||
+            mysql_col_len == len || clust_templ_for_sec ||
             (field_no == templ->icp_rec_field_no && field->prefix_len > 0));
 
       /* The following assertion would fail for old tables
@@ -2792,7 +2761,7 @@ void row_sel_field_store_in_mysql_format_func(byte *dest,
 @param[in]      lob_undo        the LOB undo information.
 @param[in,out]  blob_heap       If not null then use this heap for BLOBs */
 // clang-format on
-static MY_ATTRIBUTE((warn_unused_result)) bool row_sel_store_mysql_field_func(
+[[nodiscard]] static bool row_sel_store_mysql_field_func(
     byte *mysql_rec, row_prebuilt_t *prebuilt, const rec_t *rec,
     const dict_index_t *rec_index, const dict_index_t *prebuilt_index,
     const ulint *offsets, ulint field_no, const mysql_row_templ_t *templ,
@@ -2893,7 +2862,7 @@ static MY_ATTRIBUTE((warn_unused_result)) bool row_sel_store_mysql_field_func(
 
     row_sel_field_store_in_mysql_format(mysql_rec + templ->mysql_col_offset,
                                         templ, rec_index, field_no, data, len,
-                                        prebuilt, ULINT_UNDEFINED);
+                                        &prebuilt->compress_heap, ULINT_UNDEFINED);
 
     if (heap != blob_heap) {
       mem_heap_free(heap);
@@ -2949,7 +2918,7 @@ static MY_ATTRIBUTE((warn_unused_result)) bool row_sel_store_mysql_field_func(
 
     row_sel_field_store_in_mysql_format(mysql_rec + templ->mysql_col_offset,
                                         templ, rec_index, field_no, data, len,
-                                        prebuilt, sec_field_no);
+                                        &prebuilt->compress_heap, sec_field_no);
   }
 
   ut_ad(rec_field_not_null_not_add_col_def(len));
@@ -2977,12 +2946,14 @@ bool row_sel_store_mysql_rec(byte *mysql_rec, row_prebuilt_t *prebuilt,
   ut_ad(rec_clust || rec_index == prebuilt_index);
   ut_ad(!rec_clust || rec_index->is_clustered());
 
-  if (blob_heap != nullptr) {
+  /* If blob_heap provided by the caller is not that of prebuilt's blob heap
+  then the onus would be on the caller to empty the blob heap if required. */
+  if (blob_heap != nullptr && blob_heap == prebuilt->blob_heap) {
     mem_heap_empty(blob_heap);
   }
 
   if (UNIV_LIKELY_NULL(prebuilt->compress_heap))
-    mem_heap_empty(prebuilt->compress_heap);
+    row_mysql_prebuilt_free_compress_heap(prebuilt);
 
   if (clust_templ_for_sec) {
     /* Store all clustered index column of secondary index record. */
@@ -3048,7 +3019,7 @@ bool row_sel_store_mysql_rec(byte *mysql_rec, row_prebuilt_t *prebuilt,
         row_sel_field_store_in_mysql_format(
             mysql_rec + templ->mysql_col_offset, templ, rec_index,
             templ->clust_rec_field_no, (const byte *)dfield->data, dfield->len,
-            prebuilt, ULINT_UNDEFINED);
+            &prebuilt->compress_heap, ULINT_UNDEFINED);
         if (templ->mysql_null_bit_mask) {
           mysql_rec[templ->mysql_null_byte_offset] &=
               ~(byte)templ->mysql_null_bit_mask;
@@ -3121,17 +3092,14 @@ bool row_sel_store_mysql_rec(byte *mysql_rec, row_prebuilt_t *prebuilt,
                                 exist in the view: i.e., it was freshly
                                 inserted afterwards
 @param[out]	vrow		dtuple to hold old virtual column data
-@param[in]	mtr		the mini transaction context.
+@param[in]	mtr		the mini-transaction context.
 @param[in,out]	lob_undo	Undo information for BLOBs.
 @return DB_SUCCESS or error code */
-static MY_ATTRIBUTE((warn_unused_result)) dberr_t
-    row_sel_build_prev_vers_for_mysql(ReadView *read_view,
-                                      dict_index_t *clust_index,
-                                      row_prebuilt_t *prebuilt,
-                                      const rec_t *rec, ulint **offsets,
-                                      mem_heap_t **offset_heap,
-                                      rec_t **old_vers, const dtuple_t **vrow,
-                                      mtr_t *mtr, lob::undo_vers_t *lob_undo) {
+[[nodiscard]] static dberr_t row_sel_build_prev_vers_for_mysql(
+    ReadView *read_view, dict_index_t *clust_index, row_prebuilt_t *prebuilt,
+    const rec_t *rec, ulint **offsets, mem_heap_t **offset_heap,
+    rec_t **old_vers, const dtuple_t **vrow, mtr_t *mtr,
+    lob::undo_vers_t *lob_undo) {
   DBUG_TRACE;
 
   dberr_t err;
@@ -3188,8 +3156,8 @@ class Row_sel_get_clust_rec_for_mysql {
 /** Retrieve the clustered index record corresponding to a record in a
 non-clustered index. Does the necessary locking.
   @return DB_SUCCESS, DB_SUCCESS_LOCKED_REC, or error code */
-MY_ATTRIBUTE((warn_unused_result))
-dberr_t Row_sel_get_clust_rec_for_mysql::operator()(
+
+[[nodiscard]] dberr_t Row_sel_get_clust_rec_for_mysql::operator()(
     row_prebuilt_t *prebuilt, dict_index_t *sec_index, const rec_t *rec,
     que_thr_t *thr, const rec_t **out_rec, ulint **offsets,
     mem_heap_t **offset_heap, const dtuple_t **vrow, mtr_t *mtr,
@@ -3616,8 +3584,7 @@ static Record_buffer *row_sel_get_record_buffer(
 }
 
 /** Pops a cached row for MySQL from the fetch cache. */
-UNIV_INLINE
-void row_sel_dequeue_cached_row_for_mysql(
+static inline void row_sel_dequeue_cached_row_for_mysql(
     byte *buf,                /*!< in/out: buffer where to copy the
                               row */
     row_prebuilt_t *prebuilt) /*!< in: prebuilt struct */
@@ -3679,8 +3646,7 @@ void row_sel_dequeue_cached_row_for_mysql(
 }
 
 /** Initialise the prefetch cache. */
-UNIV_INLINE
-void row_sel_prefetch_cache_init(
+static inline void row_sel_prefetch_cache_init(
     row_prebuilt_t *prebuilt) /*!< in/out: prebuilt struct */
 {
   ulint i;
@@ -3693,7 +3659,7 @@ void row_sel_prefetch_cache_init(
 
   /* Reserve space for the magic number. */
   sz = UT_ARR_SIZE(prebuilt->fetch_cache) * (prebuilt->mysql_row_len + 8);
-  ptr = static_cast<byte *>(ut_malloc_nokey(sz));
+  ptr = static_cast<byte *>(ut::malloc_withkey(UT_NEW_THIS_FILE_PSI_KEY, sz));
 
   for (i = 0; i < UT_ARR_SIZE(prebuilt->fetch_cache); i++) {
     /* A user has reported memory corruption in these
@@ -3713,8 +3679,7 @@ void row_sel_prefetch_cache_init(
 
 /** Get the last fetch cache buffer from the queue.
  @return pointer to buffer. */
-UNIV_INLINE
-byte *row_sel_fetch_last_buf(
+static inline byte *row_sel_fetch_last_buf(
     row_prebuilt_t *prebuilt) /*!< in/out: prebuilt struct */
 {
   const auto record_buffer = row_sel_get_record_buffer(prebuilt);
@@ -3747,8 +3712,7 @@ byte *row_sel_fetch_last_buf(
 }
 
 /** Pushes a row for MySQL to the fetch cache. */
-UNIV_INLINE
-void row_sel_enqueue_cache_row_for_mysql(
+static inline void row_sel_enqueue_cache_row_for_mysql(
     byte *mysql_rec,          /*!< in/out: MySQL record */
     row_prebuilt_t *prebuilt) /*!< in/out: prebuilt struct */
 {
@@ -3981,10 +3945,10 @@ static bool row_search_end_range_check(byte *mysql_rec, const rec_t *rec,
 }
 
 /** Traverse to next/previous record.
-@param[in]	moves_up	if true, move to next record else previous
+@param[in]	moves_up	If true, move to next record else previous
 @param[in]	match_mode	0 or ROW_SEL_EXACT or ROW_SEL_EXACT_PREFIX
-@param[in,out]	pcur		cursor to record
-@param[in]	mtr		mini transaction
+@param[in,out]	pcur		Cursor to record
+@param[in]	mtr		Mini-transaction
 
 @return DB_SUCCESS or error code */
 static dberr_t row_search_traverse(bool moves_up, ulint match_mode,
@@ -4432,6 +4396,28 @@ static row_to_range_relation_t row_compare_row_to_range(
   return (row_to_range_relation);
 }
 
+#ifdef UNIV_DEBUG
+/** If the record is not old version, copies an initial segment
+of a physical record to be compared later for debug assertion code.
+@param[in]      pcur            cursor whose position has been stored
+@param[in]      index           index
+@param[in]      rec             record for which to copy prefix
+@param[out]     n_fields        number of fields copied
+@param[in,out]  buf             memory buffer for the copied prefix, or nullptr
+@param[in,out]  buf_size        buffer size
+@return pointer to the prefix record if not old version. or nullptr if old */
+static inline rec_t *row_search_debug_copy_rec_order_prefix(
+    const btr_pcur_t *pcur, const dict_index_t *index, const rec_t *rec,
+    ulint *n_fields, byte **buf, size_t *buf_size) {
+  if (btr_pcur_get_rec(pcur) == rec) {
+    return dict_index_copy_rec_order_prefix(index, rec, n_fields, buf,
+                                            buf_size);
+  } else {
+    return nullptr;
+  }
+}
+#endif /* UNIV_DEBUG */
+
 /** Searches for rows in the database using cursor.
 Function is mainly used for tables that are shared accorss connection and
 so it employs technique that can help re-construct the rows that
@@ -4467,6 +4453,12 @@ dberr_t row_search_mvcc(byte *buf, page_cur_mode_t mode,
   bool clust_templ_for_sec;
   que_thr_t *thr;
   const rec_t *prev_rec = nullptr;
+#ifdef UNIV_DEBUG
+  const rec_t *prev_rec_debug = nullptr;
+  ulint prev_rec_debug_n_fields = 0;
+  byte *prev_rec_debug_buf = nullptr;
+  size_t prev_rec_debug_buf_size = 0;
+#endif /* UNIV_DEBUG */
   const rec_t *rec = nullptr;
   byte *end_range_cache = nullptr;
   const dtuple_t *prev_vrow = nullptr;
@@ -4788,9 +4780,12 @@ dberr_t row_search_mvcc(byte *buf, page_cur_mode_t mode,
   thread that is currently serving the transaction. Because we
   are that thread, we can read trx->state without holding any
   mutex. */
-  ut_ad(prebuilt->sql_stat_start || trx->state == TRX_STATE_ACTIVE);
 
-  ut_ad(!trx_is_started(trx) || trx->state == TRX_STATE_ACTIVE);
+  ut_ad(prebuilt->sql_stat_start ||
+        trx->state.load(std::memory_order_relaxed) == TRX_STATE_ACTIVE);
+
+  ut_ad(!trx_is_started(trx) ||
+        trx->state.load(std::memory_order_relaxed) == TRX_STATE_ACTIVE);
 
   ut_ad(prebuilt->sql_stat_start || prebuilt->select_lock_type != LOCK_NONE ||
         MVCC::is_view_active(trx->read_view) || srv_read_only_mode);
@@ -4799,7 +4794,7 @@ dberr_t row_search_mvcc(byte *buf, page_cur_mode_t mode,
 
   if (prebuilt->table->skip_gap_locks() ||
       (trx->skip_gap_locks() && prebuilt->select_lock_type != LOCK_NONE &&
-       trx->mysql_thd != nullptr && thd_is_select(trx->mysql_thd))) {
+       trx->mysql_thd != nullptr && thd_is_query_block(trx->mysql_thd))) {
     /* It is a plain locking SELECT and the isolation
     level is low: do not lock gaps */
 
@@ -4884,6 +4879,8 @@ dberr_t row_search_mvcc(byte *buf, page_cur_mode_t mode,
 
     ibool need_to_process = sel_restore_position_for_mysql(
         &same_user_rec, BTR_SEARCH_LEAF, pcur, moves_up, &mtr);
+
+    ut_ad(prev_rec == nullptr);
 
     if (UNIV_UNLIKELY(need_to_process)) {
       if (UNIV_UNLIKELY(prebuilt->row_read_type ==
@@ -5012,8 +5009,8 @@ rec_loop:
       dict_index_t *key_index = prebuilt->index;
 
       if (end_range_cache == nullptr) {
-        end_range_cache =
-            static_cast<byte *>(ut_malloc_nokey(prebuilt->mysql_row_len));
+        end_range_cache = static_cast<byte *>(ut::malloc_withkey(
+            UT_NEW_THIS_FILE_PSI_KEY, prebuilt->mysql_row_len));
       }
 
       if (clust_templ_for_sec) {
@@ -5161,6 +5158,9 @@ rec_loop:
   }
 
   prev_rec = rec;
+  ut_d(prev_rec_debug = row_search_debug_copy_rec_order_prefix(
+           pcur, index, prev_rec, &prev_rec_debug_n_fields, &prev_rec_debug_buf,
+           &prev_rec_debug_buf_size));
 
   /* Note that we cannot trust the up_match value in the cursor at this
   place because we can arrive here after moving the cursor! Thus
@@ -5278,7 +5278,7 @@ rec_loop:
           prebuilt->new_rec_lock[row_prebuilt_t::LOCK_PCUR] = true;
         }
         err = DB_SUCCESS;
-        // Fall through
+        [[fallthrough]];
       case DB_SUCCESS:
         if (row_to_range_relation.row_must_be_at_end) {
           prebuilt->m_stop_tuple_found = true;
@@ -5339,6 +5339,9 @@ rec_loop:
         did_semi_consistent_read = TRUE;
         rec = old_vers;
         prev_rec = rec;
+        ut_d(prev_rec_debug = row_search_debug_copy_rec_order_prefix(
+                 pcur, index, prev_rec, &prev_rec_debug_n_fields,
+                 &prev_rec_debug_buf, &prev_rec_debug_buf_size));
         break;
       case DB_RECORD_NOT_FOUND:
         if (dict_index_is_spatial(index)) {
@@ -5393,6 +5396,9 @@ rec_loop:
 
         rec = old_vers;
         prev_rec = rec;
+        ut_d(prev_rec_debug = row_search_debug_copy_rec_order_prefix(
+                 pcur, index, prev_rec, &prev_rec_debug_n_fields,
+                 &prev_rec_debug_buf, &prev_rec_debug_buf_size));
       }
     } else {
       /* We are looking into a non-clustered index,
@@ -5931,6 +5937,8 @@ next_rec:
     order if we would access a different clustered
     index page right away without releasing the previous. */
 
+    bool is_pcur_rec = (btr_pcur_get_rec(pcur) == prev_rec);
+
     /* No need to do store restore for R-tree */
     if (!spatial_search) {
       btr_pcur_store_position(pcur, &mtr);
@@ -5939,12 +5947,45 @@ next_rec:
     mtr_commit(&mtr);
     mtr_has_extra_clust_latch = FALSE;
 
+    DEBUG_SYNC_C("row_search_before_mtr_restart_for_extra_clust");
+
     mtr_start(&mtr);
 
-    if (!spatial_search &&
-        sel_restore_position_for_mysql(&same_user_rec, BTR_SEARCH_LEAF, pcur,
-                                       moves_up, &mtr)) {
-      goto rec_loop;
+    if (!spatial_search) {
+      const ibool result = sel_restore_position_for_mysql(
+          &same_user_rec, BTR_SEARCH_LEAF, pcur, moves_up, &mtr);
+
+      if (result) {
+        prev_rec = nullptr;
+        goto rec_loop;
+      }
+
+      ut_ad(same_user_rec);
+
+      if (is_pcur_rec && btr_pcur_get_rec(pcur) != prev_rec) {
+        /* prev_rec is invalid. */
+        prev_rec = nullptr;
+      }
+
+#ifdef UNIV_DEBUG
+      if (prev_rec != nullptr && prev_rec_debug != nullptr) {
+        const ulint *offsets1;
+        const ulint *offsets2;
+
+        auto heap_tmp = mem_heap_create(256);
+
+        offsets1 = rec_get_offsets(prev_rec_debug, index, nullptr,
+                                   prev_rec_debug_n_fields, &heap_tmp);
+
+        offsets2 = rec_get_offsets(prev_rec, index, nullptr,
+                                   prev_rec_debug_n_fields, &heap_tmp);
+
+        ut_ad(!cmp_rec_rec(prev_rec_debug, prev_rec, offsets1, offsets2, index,
+                           page_is_spatial_non_leaf(prev_rec, index), nullptr,
+                           false));
+        mem_heap_free(heap_tmp);
+      }
+#endif /* UNIV_DEBUG */
     }
   }
 
@@ -6023,6 +6064,7 @@ lock_table_wait:
     if (!dict_index_is_spatial(index)) {
       sel_restore_position_for_mysql(&same_user_rec, BTR_SEARCH_LEAF, pcur,
                                      moves_up, &mtr);
+      prev_rec = nullptr;
     }
 
     if (!same_user_rec && trx->allow_semi_consistent()) {
@@ -6100,12 +6142,18 @@ func_exit:
   trx->op_info = "";
 
   if (end_range_cache != nullptr) {
-    ut_free(end_range_cache);
+    ut::free(end_range_cache);
   }
 
   if (heap != nullptr) {
     mem_heap_free(heap);
   }
+
+#ifdef UNIV_DEBUG
+  if (prev_rec_debug_buf != nullptr) {
+    ut::free(prev_rec_debug_buf);
+  }
+#endif /* UNIV_DEBUG */
 
   /* Set or reset the "did semi-consistent read" flag on return.
   The flag did_semi_consistent_read is set if and only if
@@ -6207,7 +6255,8 @@ dberr_t row_count_rtree_recs(
   prebuilt->search_tuple = entry;
 
   ulint bufsize = ut_max(UNIV_PAGE_SIZE, prebuilt->mysql_row_len);
-  buf = static_cast<byte *>(ut_malloc_nokey(bufsize));
+  buf = static_cast<byte *>(
+      ut::malloc_withkey(UT_NEW_THIS_FILE_PSI_KEY, bufsize));
 
   ulint cnt = 1000;
 
@@ -6244,7 +6293,7 @@ loop:
       prebuilt->rtr_info->is_dup = nullptr;
 
       prebuilt->search_tuple = search_entry;
-      ut_free(buf);
+      ut::free(buf);
       mem_heap_free(heap);
 
       return (ret);
@@ -6301,8 +6350,8 @@ func_exit:
 }
 
 /** Get the maximum and non-delete-marked record in an index.
-@param[in]	index	index tree
-@param[in,out]	mtr	mini-transaction (may be committed and restarted)
+@param[in]	index	Index tree
+@param[in,out]	mtr	Mini-transaction (may be committed and restarted)
 @return maximum record, page s-latched in mtr
 @retval NULL if there are no records, or if all of them are delete-marked */
 static const rec_t *row_search_get_max_rec(dict_index_t *index, mtr_t *mtr) {

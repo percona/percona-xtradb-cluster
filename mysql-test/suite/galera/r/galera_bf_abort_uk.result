@@ -1,0 +1,37 @@
+CREATE TABLE t1 (f1 INT PRIMARY KEY, f2 INT UNIQUE KEY, origin VARCHAR(6));
+START TRANSACTION;
+INSERT INTO t1 VALUES (1, 1, "node_1");
+INSERT INTO t1 VALUES (2, 1, "node_2");
+COMMIT;
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+SELECT * FROM t1;
+f1	f2	origin
+2	1	node_2
+START TRANSACTION;
+UPDATE t1 SET f2 = 2, origin = "node_1" WHERE f1 = 2;
+INSERT INTO t1 VALUES (3, 2, "node_2");
+COMMIT;
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+SELECT * FROM t1;
+f1	f2	origin
+2	1	node_2
+3	2	node_2
+START TRANSACTION;
+INSERT INTO t1 VALUES (4, 3, "node_1");
+UPDATE t1 SET f2 = 3, origin = "node_2" WHERE f1 = 2;
+COMMIT;
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+SELECT * FROM t1;
+f1	f2	origin
+2	3	node_2
+3	2	node_2
+START TRANSACTION;
+UPDATE t1 SET f2 = 4, origin = "node_1" WHERE f1 = 2;
+UPDATE t1 SET f2 = 4, origin = "node_2" WHERE f1 = 3;
+COMMIT;
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+SELECT * FROM t1;
+f1	f2	origin
+2	3	node_2
+3	4	node_2
+DROP TABLE t1;

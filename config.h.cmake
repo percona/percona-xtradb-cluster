@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, 2020, Oracle and/or its affiliates.
+/* Copyright (c) 2009, 2021, Oracle and/or its affiliates.
  
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License, version 2.0,
@@ -30,7 +30,6 @@
 /* Libraries */
 #cmakedefine HAVE_LIBM 1
 #cmakedefine HAVE_LIBNSL 1
-#cmakedefine HAVE_LIBCRYPT 1
 #cmakedefine HAVE_LIBSOCKET 1
 #cmakedefine HAVE_LIBDL 1
 #cmakedefine HAVE_LIBRT 1
@@ -107,11 +106,15 @@
 #cmakedefine HAVE_PTHREAD_CONDATTR_SETCLOCK 1
 #cmakedefine HAVE_PTHREAD_GETAFFINITY_NP 1
 #cmakedefine HAVE_PTHREAD_SIGMASK 1
+#cmakedefine HAVE_PTHREAD_SETNAME_NP_LINUX 1
+#cmakedefine HAVE_PTHREAD_SETNAME_NP_MACOS 1
+#cmakedefine HAVE_SET_THREAD_DESCRIPTION 1
 #cmakedefine HAVE_SLEEP 1
 #cmakedefine HAVE_STPCPY 1
 #cmakedefine HAVE_STPNCPY 1
 #cmakedefine HAVE_STRLCPY 1
 #cmakedefine HAVE_STRLCAT 1
+#cmakedefine HAVE_STRPTIME 1
 #cmakedefine HAVE_STRSIGNAL 1
 #cmakedefine HAVE_TELL 1
 #cmakedefine HAVE_VASPRINTF 1
@@ -198,9 +201,11 @@
 #cmakedefine HAVE_LINUX_LARGE_PAGES 1
 #cmakedefine HAVE_SOLARIS_LARGE_PAGES 1
 #cmakedefine HAVE_SOLARIS_ATOMIC 1
+#cmakedefine WITH_SYSTEMD_DEBUG
 #define SYSTEM_TYPE "@SYSTEM_TYPE@"
 /* This should mean case insensitive file system */
 #cmakedefine FN_NO_CASE_SENSE 1
+#cmakedefine APPLE_ARM 1
 
 /*
  * From main CMakeLists.txt
@@ -218,6 +223,8 @@
 #cmakedefine ENABLED_LOCAL_INFILE 1
 #cmakedefine KERBEROS_LIB_CONFIGURED
 #cmakedefine SCRAM_LIB_CONFIGURED
+#cmakedefine WITH_HYPERGRAPH_OPTIMIZER
+#cmakedefine KERBEROS_LIB_SSPI
 
 /* Lock Order */
 #cmakedefine WITH_LOCK_ORDER 1
@@ -304,6 +311,7 @@
  * CPU info
  */
 #cmakedefine CPU_LEVEL1_DCACHE_LINESIZE @CPU_LEVEL1_DCACHE_LINESIZE@
+#cmakedefine CPU_PAGE_SIZE @CPU_PAGE_SIZE@
 
 /*
  * NDB
@@ -352,9 +360,16 @@
 /* coredumper library */
 #cmakedefine01 HAVE_LIBCOREDUMPER
 
+/* From libmysql/CMakeLists.txt */
+#cmakedefine HAVE_UNIX_DNS_SRV @HAVE_UNIX_DNS_SRV@
+#cmakedefine HAVE_WIN32_DNS_SRV @HAVE_WIN32_DNS_SRV@
+
 /*
  * Needed by wsrep (WITH_WSREP)
  */
 #define HAVE_GETIFADDRS 1
+
+/* ARM crc32 support */
+#cmakedefine HAVE_ARMV8_CRC32_INTRINSIC @HAVE_ARMV8_CRC32_INTRINSIC@
 
 #endif

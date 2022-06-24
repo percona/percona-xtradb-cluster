@@ -1,4 +1,4 @@
-/* Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2016, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -163,11 +163,10 @@ int Delayed_initialization_thread::initialization_thread_handler() {
   thd->release_resources();
   global_thd_manager_remove_thd(thd);
   delete thd;
+  my_thread_end();
   delayed_thd_state.set_terminated();
   mysql_cond_broadcast(&run_cond);
   mysql_mutex_unlock(&run_lock);
-
-  my_thread_end();
 
   return error;
 }

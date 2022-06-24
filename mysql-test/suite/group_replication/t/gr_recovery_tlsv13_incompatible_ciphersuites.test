@@ -12,6 +12,7 @@
 ################################################################################
 
 --source include/have_tlsv13.inc
+--source include/have_group_replication_xcom_communication_stack.inc
 --source include/have_group_replication_plugin.inc
 --let $rpl_skip_group_replication_start= 1
 --source include/group_replication.inc
@@ -69,7 +70,7 @@ SET GLOBAL tls_ciphersuites='TLS_AES_128_CCM_8_SHA256';
 ALTER INSTANCE RELOAD TLS;
 
 --disable_warnings
-CHANGE MASTER TO MASTER_USER="rec_ssl_user" FOR CHANNEL "group_replication_recovery";
+CHANGE REPLICATION SOURCE TO SOURCE_USER="rec_ssl_user" FOR CHANNEL "group_replication_recovery";
 --enable_warnings
 
 SET @group_replication_recovery_use_ssl_saved= @@GLOBAL.group_replication_recovery_use_ssl;

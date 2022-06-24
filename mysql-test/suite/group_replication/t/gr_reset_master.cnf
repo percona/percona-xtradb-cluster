@@ -1,0 +1,7 @@
+!include ../my.cnf
+
+[mysqld.1]
+group_replication_gtid_assignment_block_size=1
+
+[mysqld.2]
+group_replication_gtid_assignment_block_size=1

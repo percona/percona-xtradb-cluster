@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2020, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2020, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -50,6 +50,9 @@ not handle over-aligned types.
 template <typename T>
 struct Cacheline_padded : public T {
   char pad[INNODB_CACHE_LINE_SIZE];
+
+  template <class... Args>
+  Cacheline_padded(Args &&... args) : T{std::forward<Args>(args)...} {}
 };
 } /* namespace ut */
 

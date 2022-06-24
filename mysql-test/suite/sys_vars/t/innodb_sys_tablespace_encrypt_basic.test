@@ -1,8 +1,8 @@
 #
 # exists as global only
 #
---echo Valid values are 'ON' and 'OFF'
-select @@global.innodb_sys_tablespace_encrypt in (0, 1);
+--echo Valid values are 'OFF', 'ON' and 'RE_ENCRYPTING_TO_KEYRING'
+select @@global.innodb_sys_tablespace_encrypt in ('OFF', 'ON', 'RE_ENCRYPTING_TO_KEYRING');
 select @@global.innodb_sys_tablespace_encrypt;
 --error ER_INCORRECT_GLOBAL_LOCAL_VAR
 select @@session.innodb_sys_tablespace_encrypt;
@@ -24,13 +24,22 @@ select * from performance_schema.global_variables where variable_name='innodb_sy
 select * from performance_schema.session_variables where variable_name='innodb_sys_tablespace_encrypt';
 
 --error ER_WRONG_VALUE_FOR_VAR
-set @@global.innodb_sys_tablespace_encrypt=0;
+set global innodb_sys_tablespace_encrypt=1;
 select @@global.innodb_sys_tablespace_encrypt;
 select * from performance_schema.global_variables where variable_name='innodb_sys_tablespace_encrypt';
 select * from performance_schema.session_variables where variable_name='innodb_sys_tablespace_encrypt';
 
+--error ER_GLOBAL_VARIABLE
+set @@session.innodb_sys_tablespace_encrypt='ON';
+
 --error ER_WRONG_VALUE_FOR_VAR
-set global innodb_sys_tablespace_encrypt=1;
+set global innodb_sys_tablespace_encrypt='RE_ENCRYPTING_TO_KEYRING';
+select @@global.innodb_sys_tablespace_encrypt;
+
+#
+# By default innodb_sys_tablespace_encrypt is OFF, so setting it to OFF again is OK 
+#
+set @@global.innodb_sys_tablespace_encrypt=0;
 select @@global.innodb_sys_tablespace_encrypt;
 select * from performance_schema.global_variables where variable_name='innodb_sys_tablespace_encrypt';
 select * from performance_schema.session_variables where variable_name='innodb_sys_tablespace_encrypt';
@@ -43,9 +52,6 @@ select * from performance_schema.session_variables where variable_name='innodb_s
 --error ER_GLOBAL_VARIABLE
 set session innodb_sys_tablespace_encrypt='OFF';
 
---error ER_GLOBAL_VARIABLE
-set @@session.innodb_sys_tablespace_encrypt='ON';
-
 #
 # incorrect types
 #
@@ -56,7 +62,7 @@ set global innodb_sys_tablespace_encrypt=1.1;
 set global innodb_sys_tablespace_encrypt=1e1;
 
 --error ER_WRONG_VALUE_FOR_VAR
-set global innodb_sys_tablespace_encrypt=2;
+set global innodb_sys_tablespace_encrypt=3;
 
 --error ER_WRONG_VALUE_FOR_VAR
 set global innodb_sys_tablespace_encrypt=-3;

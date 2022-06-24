@@ -1,0 +1,14 @@
+module percona-xtradb-cluster 1.0;
+
+require {
+	type mysqld_t;
+
+	class capability dac_override;
+	class process setpgid;
+}
+
+#============= mysqld_t ==============
+# posix_spawnp is used by wsrep_utils.c process::execute()
+allow mysqld_t self:capability dac_override;
+allow mysqld_t self:process setpgid;
+

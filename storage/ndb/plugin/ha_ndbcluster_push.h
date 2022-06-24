@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2011, 2020, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2011, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -22,7 +22,8 @@
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 */
 
-#include "my_dbug.h"
+#include <assert.h>
+
 #include "sql/sql_bitmap.h"
 #include "storage/ndb/include/ndbapi/NdbDictionary.hpp"
 #include "storage/ndb/plugin/ha_ndbcluster.h"
@@ -40,10 +41,6 @@ class Join_plan;
 class Table_access;
 }  // namespace AQP
 
-void ndbcluster_build_key_map(const NdbDictionary::Table *table,
-                              const NDB_INDEX_DATA &index, const KEY *key_def,
-                              uint ix_map[]);
-
 /**
  * This type is used in conjunction with AQP::Join_plan and represents a set
  * of the table access operations of the join plan.
@@ -56,11 +53,7 @@ class ndb_table_access_map : public table_bitmap {
  public:
   explicit ndb_table_access_map() : table_bitmap() {}
 
-  void add(const ndb_table_access_map
-               &table_map) {  // Require const_cast as signature of class
-                              // Bitmap::merge is not const correct
-    merge(table_map);
-  }
+  void add(const ndb_table_access_map &table_map) { merge(table_map); }
   void add(uint table_no) { set_bit(table_no); }
 
   bool contain(const ndb_table_access_map &table_map) const {
@@ -113,7 +106,7 @@ class ndb_pushed_join {
 
   /** Get the table that is accessed by the i'th table access operation.*/
   TABLE *get_table(uint i) const {
-    DBUG_ASSERT(i < m_operation_count);
+    assert(i < m_operation_count);
     return m_tables[i];
   }
 
@@ -121,24 +114,30 @@ class ndb_pushed_join {
    * This is the maximal number of fields in the key of any pushed table
    * access operation.
    */
-  static const uint MAX_KEY_PART = MAX_KEY;
+  static constexpr uint MAX_KEY_PART = MAX_KEY;
   /**
    * In a pushed join, fields in lookup keys and scan bounds may refer to
    * result fields of table access operation that execute prior to the pushed
    * join. This constant specifies the maximal number of such references for
    * a query.
    */
-  static const uint MAX_REFERRED_FIELDS = 16;
+  static constexpr uint MAX_REFERRED_FIELDS = 16;
   /**
    * For each table access operation in a pushed join, this is the maximal
-   * number of key fields that may refer to the fields of the parent operation.
+   * number of key fields that may refer to the fields from ancestor operation.
    */
-  static const uint MAX_LINKED_KEYS = MAX_KEY;
+  static constexpr uint MAX_LINKED_KEYS = MAX_KEY;
+  /**
+   * Pushed conditions within the pushed join may refer Field values from
+   * ancestor operations. This is the maximum number of such linkedValues
+   * supported.
+   */
+  static constexpr uint MAX_LINKED_PARAMS = 16;
   /**
    * This is the maximal number of table access operations there can be in a
    * single pushed join.
    */
-  static const uint MAX_PUSHED_OPERATIONS = MAX_TABLES;
+  static constexpr uint MAX_PUSHED_OPERATIONS = MAX_TABLES;
 
  private:
   const NdbQueryDef *const m_query_def;  // Definition of pushed join query

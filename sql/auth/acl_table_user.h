@@ -1,4 +1,4 @@
-/* Copyright (c) 2018, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2018, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License, version 2.0,
@@ -38,7 +38,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 #include "my_alloc.h"
 #include "sql/auth/acl_table_base.h"
 #include "sql/auth/partial_revokes.h"
+#include "sql/auth/sql_mfa.h" /* I_multi_factor_auth */
 #include "sql/auth/user_table.h"
+#include "sql/json_dom.h"
 
 class ACL_USER;
 class RowIterator;
@@ -53,7 +55,8 @@ enum class User_attribute_type {
   RESTRICTIONS,
   PASSWORD_LOCKING,
   METADATA,
-  COMMENT
+  COMMENT,
+  MULTI_FACTOR_AUTHENTICATION_DATA
 };
 
 struct Password_lock {
@@ -78,6 +81,128 @@ struct Password_lock {
   Password_lock(Password_lock &&other);
 };
 
+/**
+  Class to handle information stored in mysql.user.user_attributes
+*/
+class Acl_user_attributes {
+ public:
+  /**
+    Default constructor.
+  */
+  Acl_user_attributes(MEM_ROOT *mem_root, bool read_restrictions,
+                      Auth_id &auth_id, ulong global_privs);
+
+  Acl_user_attributes(MEM_ROOT *mem_root, bool read_restrictions,
+                      Auth_id &auth_id, Restrictions *m_restrictions,
+                      I_multi_factor_auth *mfa);
+
+  ~Acl_user_attributes();
+
+ public:
+  /**
+    Obtain info from JSON representation of user attributes
+
+    @param [in] json_object JSON object that holds user attributes
+
+    @returns status of parsing json_object
+      @retval false Success
+      @retval true  Error parsing the JSON object
+  */
+  bool deserialize(const Json_object &json_object);
+
+  /**
+    Create JSON object from user attributes
+
+    @param [out] json_object Object to store serialized user attributes
+
+    @returns status of serialization
+      @retval false Success
+      @retval true  Error serializing user attributes
+  */
+  bool serialize(Json_object &json_object) const;
+
+  /**
+    Update second password for user. We replace existing one if any.
+
+    @param [in] credential Second password
+
+    @returns status of password update
+      @retval false Success
+      @retval true  Error. Second password is empty
+  */
+  bool update_additional_password(std::string &credential);
+
+  /**
+    Discard second password.
+  */
+  void discard_additional_password();
+
+  /**
+    Get second password
+
+    @returns second password
+  */
+  const std::string get_additional_password() const;
+
+  /**
+    Get the restriction list for the user
+
+    @returns Restriction list
+  */
+  Restrictions get_restrictions() const;
+
+  void update_restrictions(const Restrictions &restricitions);
+
+  auto get_failed_login_attempts() const {
+    return m_password_lock.failed_login_attempts;
+  }
+  auto get_password_lock_time_days() const {
+    return m_password_lock.password_lock_time_days;
+  }
+  auto get_password_lock() const { return m_password_lock; }
+  void set_password_lock(Password_lock password_lock) {
+    m_password_lock = password_lock;
+  }
+
+  I_multi_factor_auth *get_mfa() { return m_mfa; }
+  void set_mfa(I_multi_factor_auth *mfa) { m_mfa = mfa; }
+
+  /**
+    Take over ownership of the json pointer.
+    @return Error state
+      @retval true An error occurred
+      @retval false Success
+  */
+  bool consume_user_attributes_json(Json_dom_ptr json);
+
+ private:
+  void report_and_remove_invalid_db_restrictions(
+      DB_restrictions &db_restrictions, ulong mask, enum loglevel level,
+      ulonglong errcode);
+  bool deserialize_password_lock(const Json_object &json_object);
+  bool deserialize_multi_factor(const Json_object &json_object);
+
+ private:
+  /** Mem root */
+  MEM_ROOT *m_mem_root;
+  /** Operation for restrictions */
+  bool m_read_restrictions;
+  /** Auth ID */
+  Auth_id m_auth_id;
+  /** Second password for user */
+  std::string m_additional_password;
+  /** Restrictions_list on certain databases for user */
+  Restrictions m_restrictions;
+  /** Global static privileges */
+  ulong m_global_privs;
+  /** password locking */
+  Password_lock m_password_lock;
+  /** multi factor auth info */
+  I_multi_factor_auth *m_mfa;
+  /** Save the original json object */
+  Json_dom_ptr m_user_attributes_json;
+};
+
 // Forward and alias declarations
 using acl_table_user_writer_status =
     std::pair<Table_op_error_code, struct timeval>;
@@ -88,17 +213,19 @@ using acl_table_user_writer_status =
 
 class Acl_table_user_writer_status {
  public:
-  Acl_table_user_writer_status(MEM_ROOT *mem_root);
+  Acl_table_user_writer_status();
   Acl_table_user_writer_status(bool skip, ulong rights, Table_op_error_code err,
                                struct timeval pwd_timestamp, std::string cred,
-                               MEM_ROOT *mem_root, Password_lock &password_lock)
+                               Password_lock &password_lock,
+                               I_multi_factor_auth *multi_factor)
       : skip_cache_update(skip),
         updated_rights(rights),
         error(err),
         password_change_timestamp(pwd_timestamp),
         second_cred(cred),
-        restrictions(mem_root),
-        password_lock(password_lock) {}
+        restrictions(),
+        password_lock(password_lock),
+        multi_factor(multi_factor) {}
 
   bool skip_cache_update;
   ulong updated_rights;
@@ -107,6 +234,7 @@ class Acl_table_user_writer_status {
   std::string second_cred;
   Restrictions restrictions;
   Password_lock password_lock;
+  I_multi_factor_auth *multi_factor;
 };
 
 class Acl_table_user_writer : public Acl_table {
@@ -114,9 +242,9 @@ class Acl_table_user_writer : public Acl_table {
   Acl_table_user_writer(THD *thd, TABLE *table, LEX_USER *combo, ulong rights,
                         bool revoke_grant, bool can_create_user,
                         Pod_user_what_to_update what_to_update,
-                        Restrictions *restrictions);
-  virtual ~Acl_table_user_writer();
-  virtual Acl_table_op_status finish_operation(Table_op_error_code &error);
+                        Restrictions *restrictions, I_multi_factor_auth *mfa);
+  ~Acl_table_user_writer() override;
+  Acl_table_op_status finish_operation(Table_op_error_code &error) override;
   Acl_table_user_writer_status driver();
 
   bool setup_table(int &error, bool &builtin_password);
@@ -141,6 +269,7 @@ class Acl_table_user_writer : public Acl_table {
 
  private:
   bool update_user_application_user_metadata();
+  bool write_user_attributes_column(const Acl_user_attributes &user_attributes);
   bool m_has_user_application_user_metadata;
   LEX_USER *m_combo;
   ulong m_rights;
@@ -149,6 +278,7 @@ class Acl_table_user_writer : public Acl_table {
   Pod_user_what_to_update m_what_to_update;
   User_table_schema *m_table_schema;
   Restrictions *m_restrictions;
+  I_multi_factor_auth *m_mfa;
   std::function<bool(TABLE *table)> m_user_application_user_metadata;
 };
 
@@ -160,11 +290,11 @@ class Acl_table_user_writer : public Acl_table {
 class Acl_table_user_reader : public Acl_table {
  public:
   Acl_table_user_reader(THD *thd, TABLE *table);
-  ~Acl_table_user_reader();
+  ~Acl_table_user_reader() override;
   bool driver();
   bool setup_table(bool &is_old_db_layout);
   bool read_row(bool &is_old_db_layout, bool &super_users_with_empty_plugin);
-  virtual Acl_table_op_status finish_operation(Table_op_error_code &error);
+  Acl_table_op_status finish_operation(Table_op_error_code &error) override;
 
   /* Set of function to read user table data */
   void reset_acl_user(ACL_USER &user);
@@ -186,11 +316,11 @@ class Acl_table_user_reader : public Acl_table {
   void add_row_to_acl_users(ACL_USER &user);
 
  private:
-  User_table_schema *m_table_schema;
+  User_table_schema *m_table_schema = nullptr;
   unique_ptr_destroy_only<RowIterator> m_iterator;
   MEM_ROOT m_mem_root;
-  Restrictions *m_restrictions;
-  Json_object *m_user_application_user_metadata_json;
+  Restrictions *m_restrictions = nullptr;
+  Json_object *m_user_application_user_metadata_json = nullptr;
 };
 
 }  // namespace acl_table

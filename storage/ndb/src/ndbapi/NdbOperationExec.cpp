@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2003, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -56,7 +56,7 @@
 class OldNdbApiSectionIterator: public GenericSectionIterator
 {
 private :
-  STATIC_CONST(KeyAndAttrInfoHeaderLength = 3);
+  static constexpr Uint32 KeyAndAttrInfoHeaderLength = 3;
 
   const Uint32 firstSigDataLen; // Num words in first signal
   Uint32* firstDataPtr;         // Ptr to start of data in first signal
@@ -85,15 +85,15 @@ public :
     assert((dataOffset + dataLen) <= NdbApiSignal::MaxSignalWords);
   }
   
-  ~OldNdbApiSectionIterator()
+  ~OldNdbApiSectionIterator() override
   {}
 
-  void reset()
+  void reset() override
   {
     currentPos= firstDataPtr;
   }
 
-  const Uint32* getNextWords(Uint32& sz)
+  const Uint32* getNextWords(Uint32& sz) override
   {
     /* In first TCKEY/INDXREQ, data is at offset depending
      * on whether it's KEYINFO or ATTRINFO
@@ -164,7 +164,7 @@ NdbOperation::setRequestInfoTCKEYREQ(bool lastFlag,
   TcKeyReq::setDistributionKeyFlag(requestInfo, theDistrKeyIndicator_);
   TcKeyReq::setScanIndFlag(requestInfo, theScanInfo & 1);
   TcKeyReq::setReadCommittedBaseFlag(requestInfo,
-                                 theReadCommittedBaseIndicator & longSignal);
+                                 theReadCommittedBaseIndicator & static_cast<Uint8>(longSignal));
   TcKeyReq::setNoWaitFlag(requestInfo,
                           (m_flags & OF_NOWAIT) != 0);
   req->requestInfo = requestInfo;

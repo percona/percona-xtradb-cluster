@@ -66,3 +66,83 @@ show create table wsrep_cluster;
 #
 use mysql;
 select count(*) from wsrep_cluster;
+
+#
+# Test scenario:
+# 1) unload wsrep_provider
+# 2) lock tables/instance for backup
+# 3) start transaction
+# 4) execute statement that causes WSREP transaction rollback, but does not
+#    involve any storage engine
+# 5) check that backup lock is still present
+#
+
+--let $no_backup_locks_txt = No backup locks expected
+--let $backup_locks_txt = One backup lock expected
+
+--connection node_2
+--let $wsrep_provider_orig = `SELECT @@wsrep_provider`
+--let $wsrep_cluster_address_orig = `SELECT @@wsrep_cluster_address`
+
+SET GLOBAL wsrep_provider='none';
+
+
+--let $assert_text = $no_backup_locks_txt
+--let $assert_cond = [SELECT COUNT(*) FROM performance_schema.metadata_locks WHERE OBJECT_TYPE="BACKUP TABLES"] = 0
+--source include/assert.inc
+LOCK TABLES FOR BACKUP;
+--let $assert_text = $backup_locks_txt
+--let $assert_cond = [SELECT COUNT(*) FROM performance_schema.metadata_locks WHERE OBJECT_TYPE="BACKUP TABLES"] = 1
+--source include/assert.inc
+BEGIN;
+--error ER_INCORRECT_GLOBAL_LOCAL_VAR
+SET GLOBAL log_bin='wrong value';
+--error ER_LOCK_DEADLOCK
+SELECT COUNT(*) FROM performance_schema.metadata_locks WHERE OBJECT_TYPE='BACKUP TABLES';
+
+--let $assert_text = $backup_locks_txt
+--let $assert_cond = [SELECT COUNT(*) FROM performance_schema.metadata_locks WHERE OBJECT_TYPE="BACKUP TABLES"] = 1
+--source include/assert.inc
+UNLOCK TABLES;
+--let $assert_text = $no_backup_locks_txt
+--let $assert_cond = [SELECT COUNT(*) FROM performance_schema.metadata_locks WHERE OBJECT_TYPE="BACKUP TABLES"] = 0
+--source include/assert.inc
+
+# MySQL transaction is still ongoing, only WSREP transaction was aborted.
+# Finish it before reloading wsrep provider.
+ROLLBACK;
+
+
+--let $assert_text = $no_backup_locks_txt
+--let $assert_cond = [SELECT COUNT(*) FROM performance_schema.metadata_locks WHERE OBJECT_TYPE="BACKUP LOCK"] = 0
+--source include/assert.inc
+LOCK INSTANCE FOR BACKUP;
+--let $assert_text = $backup_locks_txt
+--let $assert_cond = [SELECT COUNT(*) FROM performance_schema.metadata_locks WHERE OBJECT_TYPE="BACKUP LOCK"] = 1
+--source include/assert.inc
+BEGIN;
+--error ER_INCORRECT_GLOBAL_LOCAL_VAR
+SET GLOBAL log_bin='wrong value';
+--error ER_LOCK_DEADLOCK
+SELECT COUNT(*) FROM performance_schema.metadata_locks WHERE OBJECT_TYPE='BACKUP LOCK';
+
+--let $assert_text = $backup_locks_txt
+--let $assert_cond = [SELECT COUNT(*) FROM performance_schema.metadata_locks WHERE OBJECT_TYPE="BACKUP LOCK"] = 1
+--source include/assert.inc
+UNLOCK INSTANCE;
+--let $assert_text = $no_backup_locks_txt
+--let $assert_cond = [SELECT COUNT(*) FROM performance_schema.metadata_locks WHERE OBJECT_TYPE="BACKUP LOCK"] = 0
+--source include/assert.inc
+
+# MySQL transaction is still ongoing, only WSREP transaction was aborted.
+# Finish it before reloading wsrep provider.
+ROLLBACK;
+
+# Cleanup
+--disable_query_log
+--eval SET GLOBAL wsrep_provider = '$wsrep_provider_orig';
+--eval SET GLOBAL wsrep_cluster_address = '$wsrep_cluster_address_orig';
+--enable_query_log
+--source include/wait_until_connected_again.inc
+--source include/galera_wait_ready.inc
+

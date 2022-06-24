@@ -6,10 +6,10 @@ Perfomance Schema Instrumentation
 
 To improve monitoring |Percona XtraDB Cluster| has implemented an
 infrastructure to expose Galera instruments (mutexes, cond-variables, files,
-threads) as a part of ``PERFOMANCE_SCHEMA``.
+threads) as a part of ``PERFORMANCE_SCHEMA``.
 
 Although mutexes and condition variables from ``wsrep`` were already part of
-``PERFORMANCE_SCHEMA`` threads weren't.
+``PERFORMANCE_SCHEMA`` threads were not.
 
 Mutexes, condition variables, threads, and files from Galera library also were
 not part of the ``PERFORMANCE_SCHEMA``.
@@ -75,3 +75,40 @@ creation. This process vector is 65K in size and there are two such vectors per
 monitor. That is 128K * 3 = 384K condition variables. These are not tracked to
 avoid hogging ``PERFORMANCE_SCHEMA`` limits and sidelining of the main crucial
 information.
+
+.. _pxc_cluster_view:
+
+Using ``pxc_cluster_view``
+----------------------------
+
+The ``pxc_cluster_view`` - provides a unified view of the cluster. The table is in the Performance_Schema database.
+
+This table has the following definition:
+
+.. sourcecode:: mysql
+
+  DESCRIBE pxc_cluster_view;
+  +-------------+--------------+------+-----+---------+-------+
+  | Field       | Type         | Null | Key | Default | Extra |
+  +-------------+--------------+------+-----+---------+-------+
+  | HOST_NAME   | char(64)     | NO   |     | NULL    |       |
+  | UUID        | char(36)     | NO   |     | NULL    |       |
+  | STATUS      | char(64)     | NO   |     | NULL    |       |
+  | LOCAL_INDEX | int unsigned | NO   |     | NULL    |       |
+  | SEGMENT     | int unsigned | NO   |     | NULL    |       |
+  +-------------+--------------+------+-----+---------+-------+
+  5 rows in set (0.00 sec)
+
+To view the table, run the following query:
+
+.. sourcecode:: mysql
+
+    SELECT * FROM pxc_cluster_view;
+    +-----------+--------------------------------------+--------+-------------+---------+
+    | HOST_NAME | UUID                                 | STATUS | LOCAL_INDEX | SEGMENT |
+    +-----------+--------------------------------------+--------+-------------+---------+
+    | node1     | 22b9d47e-c215-11eb-81f7-7ed65a9d253b | SYNCED |           0 |       0 |
+    | node3     | 29c51cf5-c216-11eb-9101-1ba3a28e377a | SYNCED |           1 |       0 |
+    | node2     | 982cdb03-c215-11eb-9865-0ae076a59c5c | SYNCED |           2 |       0 |
+    +-----------+--------------------------------------+--------+-------------+---------+
+    3 rows in set (0.00 sec)

@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2012, 2020, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 2012, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -43,8 +43,6 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <windows.h>
 #endif /* _WIN32 */
 
-#include <list>
-
 /** The number of microseconds in a second. */
 static const uint64_t MICROSECS_IN_A_SECOND = 1000000;
 
@@ -58,9 +56,6 @@ typedef CONDITION_VARIABLE os_cond_t;
 /** Native condition variable */
 typedef pthread_cond_t os_cond_t;
 #endif /* _WIN32 */
-
-typedef std::list<os_event_t, ut_allocator<os_event_t>> os_event_list_t;
-typedef os_event_list_t::iterator event_iter_t;
 
 /** InnoDB condition variable. */
 struct os_event {
@@ -142,13 +137,11 @@ struct os_event {
   reset_sig_count. */
   void wait_low(int64_t reset_sig_count) UNIV_NOTHROW;
 
-  /**
-  Waits for an event object until it is in the signaled state or
+  /** Waits for an event object until it is in the signaled state or
   a timeout is exceeded.
-  @param time_in_usec timeout in microseconds,
-                  or OS_SYNC_INFINITE_TIME
-  @param reset_sig_count zero or the value returned by
-                  previous call of os_event_reset().
+  @param  time_in_usec    Timeout in microseconds, or OS_SYNC_INFINITE_TIME
+  @param  reset_sig_count Zero or the value returned by previous call of
+  os_event_reset().
   @return	0 if success, OS_SYNC_TIME_EXCEEDED if timeout was exceeded */
   ulint wait_time_low(ulint time_in_usec, int64_t reset_sig_count) UNIV_NOTHROW;
 
@@ -276,9 +269,6 @@ struct os_event {
   static std::atomic_size_t n_objects_alive;
 #endif /* UNIV_DEBUG */
 
- public:
-  event_iter_t event_iter; /*!< For O(1) removal from
-                           list */
  protected:
   // Disable copying
   os_event(const os_event &);
@@ -398,7 +388,7 @@ struct timespec os_event::get_wait_timelimit(ulint time_in_usec) {
                   strerror(errno_clock_gettime));
 #endif /* !UNIV_NO_ERR_MSGS */
 
-        os_thread_sleep(100000); /* 0.1 sec */
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
         errno = errno_clock_gettime;
 
       } else {
@@ -423,7 +413,7 @@ struct timespec os_event::get_wait_timelimit(ulint time_in_usec) {
         ib::error(ER_IB_MSG_1213, strerror(errno_gettimeofday));
 #endif /* !UNIV_NO_ERR_MSGS */
 
-        os_thread_sleep(100000); /* 0.1 sec */
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
         errno = errno_gettimeofday;
 
       } else {
@@ -447,12 +437,11 @@ struct timespec os_event::get_wait_timelimit(ulint time_in_usec) {
 
 #endif /* !_WIN32 */
 
-/**
-Waits for an event object until it is in the signaled state or
+/** Waits for an event object until it is in the signaled state or
 a timeout is exceeded.
-@param time_in_usec - timeout in microseconds, or OS_SYNC_INFINITE_TIME
-@param reset_sig_count - zero or the value returned by previous call
-        of os_event_reset().
+@param  time_in_usec    Timeout in microseconds, or OS_SYNC_INFINITE_TIME
+@param  reset_sig_count Zero or the value returned by previous call of
+os_event_reset().
 @return	0 if success, OS_SYNC_TIME_EXCEEDED if timeout was exceeded */
 ulint os_event::wait_time_low(ulint time_in_usec,
                               int64_t reset_sig_count) UNIV_NOTHROW {
@@ -532,7 +521,7 @@ states: signaled and nonsignaled. The created event is manual reset: it
 must be reset explicitly by calling sync_os_reset_event.
 @return	the event handle */
 os_event_t os_event_create() {
-  os_event_t ret = (UT_NEW_NOKEY(os_event()));
+  os_event_t ret = (ut::new_withkey<os_event>(UT_NEW_THIS_FILE_PSI_KEY));
 /**
  On SuSE Linux we get spurious EBUSY from pthread_mutex_destroy()
  unless we grab and release the mutex here. Current OS version:
@@ -611,7 +600,7 @@ void os_event_destroy(os_event_t &event) /*!< in/own: event to free */
 
 {
   if (event != nullptr) {
-    UT_DELETE(event);
+    ut::delete_(event);
     event = nullptr;
   }
 }

@@ -4,8 +4,8 @@
 Percona XtraDB Cluster threading model
 ======================================
 
-|PXC| creates a set of threads to service its operations,
-which are not related to existing |MySQL| threads.
+Percona XtraDB Cluster creates a set of threads to service its operations,
+which are not related to existing MySQL threads.
 There are three main groups of threads:
 
 .. contents::
@@ -18,7 +18,7 @@ Applier threads apply write-sets that the node receives from other nodes.
 Write messages are directed through ``gcv_recv_thread``.
 
 The number of applier threads is controlled
-using the :variable:`wsrep_slave_threads` variable.
+using the ``wsrep_slave_threads`` variable or the ``wsrep_applier_threads`` variable. The ``wsrep_slave_threads`` variable was deprecated in the Percona XtraDB Cluster 8.0.26-16 release. 
 The default value is ``1``,
 which means at least one wsrep applier thread exists to process the request.
 

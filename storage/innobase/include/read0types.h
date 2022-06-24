@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1997, 2019, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1997, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -57,12 +57,10 @@ class ReadView {
 
     /**
     Destructor */
-    ~ids_t() { UT_DELETE_ARRAY(m_ptr); }
+    ~ids_t() { ut::delete_arr(m_ptr); }
 
-    /**
-    Try and increase the size of the array. Old elements are
-    copied across. It is a no-op if n is < current size.
-
+    /** Try and increase the size of the array. Old elements are copied across.
+    It is a no-op if n is < current size.
     @param n 		Make space for n elements */
     void reserve(ulint n);
 
@@ -162,8 +160,8 @@ class ReadView {
   @param[in]	id	transaction id to check against the view
   @param[in]	name	table name
   @return whether the view sees the modifications of id. */
-  bool changes_visible(trx_id_t id, const table_name_t &name) const
-      MY_ATTRIBUTE((warn_unused_result)) {
+  [[nodiscard]] bool changes_visible(trx_id_t id,
+                                     const table_name_t &name) const {
     ut_ad(id > 0);
 
     if (id < m_up_limit_id || id == m_creator_trx_id) {

@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -747,8 +747,7 @@ uint hp_rb_pack_key(const HP_KEYDEF *keydef, uchar *key, const uchar *old,
   return (uint)(key - start_key);
 }
 
-uint hp_rb_key_length(HP_KEYDEF *keydef,
-                      const uchar *key MY_ATTRIBUTE((unused))) {
+uint hp_rb_key_length(HP_KEYDEF *keydef, const uchar *key [[maybe_unused]]) {
   return keydef->length;
 }
 
@@ -860,7 +859,7 @@ void heap_update_auto_increment(HP_INFO *info, const uchar *record) {
       value = uint8korr(key);
       break;
     default:
-      DBUG_ASSERT(0);
+      assert(0);
       value = 0; /* Error */
       break;
   }

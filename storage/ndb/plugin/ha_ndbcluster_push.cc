@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2011, 2020, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2011, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -45,8 +45,6 @@
 #include "storage/ndb/src/ndbapi/NdbQueryBuilder.hpp"
 #include "storage/ndb/src/ndbapi/NdbQueryOperation.hpp"
 
-typedef NdbDictionary::Table NDBTAB;
-
 /**
  * antijoin_null_cond is inserted by the optimizer when it create the
  * special antijoin-NULL-condition. It serves as a token to uniquely
@@ -69,13 +67,13 @@ extern const char *antijoin_null_cond;
 
 static inline const char *get_referred_field_name(
     const Item_field *field_item) {
-  DBUG_ASSERT(field_item->type() == Item::FIELD_ITEM);
+  assert(field_item->type() == Item::FIELD_ITEM);
   return field_item->field->field_name;
 }
 
 static const char *get_referred_table_access_name(
     const Item_field *field_item) {
-  DBUG_ASSERT(field_item->type() == Item::FIELD_ITEM);
+  assert(field_item->type() == Item::FIELD_ITEM);
   return field_item->field->table->alias;
 }
 
@@ -142,14 +140,14 @@ ndb_pushed_join::ndb_pushed_join(const ndb_pushed_builder_ctx &builder,
     : m_query_def(query_def),
       m_operation_count(0),
       m_field_count(builder.m_fld_refs) {
-  DBUG_ASSERT(query_def != NULL);
-  DBUG_ASSERT(builder.m_fld_refs <= MAX_REFERRED_FIELDS);
+  assert(query_def != NULL);
+  assert(builder.m_fld_refs <= MAX_REFERRED_FIELDS);
   ndb_table_access_map searched;
   for (uint tab_no = 0; searched != builder.m_join_scope; tab_no++) {
     const AQP::Table_access *const join_tab =
         builder.m_plan.get_table_access(tab_no);
     if (builder.m_join_scope.contain(tab_no)) {
-      DBUG_ASSERT(m_operation_count < MAX_PUSHED_OPERATIONS);
+      assert(m_operation_count < MAX_PUSHED_OPERATIONS);
       m_tables[m_operation_count++] = join_tab->get_table();
       searched.add(tab_no);
     }
@@ -183,13 +181,13 @@ bool ndb_pushed_join::match_definition(int type,  // NdbQueryOperationDef::Type,
   // Check that we still use the same index as when the query was prepared.
   switch (def_type) {
     case NdbQueryOperationDef::PrimaryKeyAccess:
-      DBUG_ASSERT(idx != NULL);
-      DBUG_ASSERT(idx->unique_index == expected_index);
+      assert(idx != NULL);
+      assert(idx->unique_index == expected_index);
       break;
 
     case NdbQueryOperationDef::UniqueIndexAccess:
-      DBUG_ASSERT(idx != NULL);
-      // DBUG_ASSERT(idx->unique_index == expected_index);
+      assert(idx != NULL);
+      // assert(idx->unique_index == expected_index);
       if (idx->unique_index != expected_index) {
         DBUG_PRINT("info",
                    ("Actual index %s differs from expected index %s."
@@ -200,12 +198,12 @@ bool ndb_pushed_join::match_definition(int type,  // NdbQueryOperationDef::Type,
       break;
 
     case NdbQueryOperationDef::TableScan:
-      DBUG_ASSERT(idx == NULL && expected_index == NULL);
+      assert(idx == NULL && expected_index == NULL);
       break;
 
     case NdbQueryOperationDef::OrderedIndexScan:
-      DBUG_ASSERT(idx != NULL);
-      // DBUG_ASSERT(idx->index == expected_index);
+      assert(idx != NULL);
+      // assert(idx->index == expected_index);
       if (idx->index != expected_index) {
         DBUG_PRINT("info", ("Actual index %s differs from expected index %s. "
                             "Therefore, join cannot be pushed.",
@@ -215,7 +213,7 @@ bool ndb_pushed_join::match_definition(int type,  // NdbQueryOperationDef::Type,
       break;
 
     default:
-      DBUG_ASSERT(false);
+      assert(false);
       break;
   }
 
@@ -314,7 +312,7 @@ NdbQuery *ndb_pushed_join::make_query_instance(
     // our pushed join: These are expected to be supplied as paramValues()
     for (uint i = 0; i < outer_fields; i++) {
       Field *field = m_referred_fields[i];
-      DBUG_ASSERT(!field->is_real_null());  // Checked by ::check_if_pushable()
+      assert(!field->is_real_null());  // Checked by ::check_if_pushable()
       uchar *raw = field->field_ptr();
 
 #ifdef WORDS_BIGENDIAN
@@ -329,7 +327,7 @@ NdbQuery *ndb_pushed_join::make_query_instance(
       }
 #else
       // Little endian platforms are expected to be only 'low_byte_first'
-      DBUG_ASSERT(field->table->s->db_low_byte_first);
+      assert(field->table->s->db_low_byte_first);
 #endif
 
       new (extendedParams + paramCnt + i) NdbQueryParamValue(raw, false);
@@ -368,7 +366,7 @@ ndb_pushed_builder_ctx::~ndb_pushed_builder_ctx() {
 }
 
 const NdbError &ndb_pushed_builder_ctx::getNdbError() const {
-  DBUG_ASSERT(m_builder);
+  assert(m_builder);
   return m_builder->getNdbError();
 }
 
@@ -404,7 +402,7 @@ bool ndb_pushed_builder_ctx::maybe_pushable(AQP::Table_access *table,
 
   switch (table->get_access_type()) {
     case AQP::AT_VOID:
-      DBUG_ASSERT(false);
+      assert(false);
       reason = "UNKNOWN";
       break;
 
@@ -432,7 +430,7 @@ bool ndb_pushed_builder_ctx::maybe_pushable(AQP::Table_access *table,
   }  // switch
 
   if (reason != nullptr) {
-    DBUG_ASSERT(!allowed);
+    assert(!allowed);
     EXPLAIN_NO_PUSH("Table '%s' is not pushable: %s", tab->alias, reason);
   }
   table->set_table_properties(pushable | PUSHABILITY_KNOWN);
@@ -443,7 +441,7 @@ bool ndb_pushed_builder_ctx::maybe_pushable(AQP::Table_access *table,
  * Get *internal* table_no of table referred by 'key_item'
  */
 uint ndb_pushed_builder_ctx::get_table_no(const Item *key_item) const {
-  DBUG_ASSERT(key_item->type() == Item::FIELD_ITEM);
+  assert(key_item->type() == Item::FIELD_ITEM);
   const uint count = m_plan.get_access_count();
   const table_map bitmap = key_item->used_tables();
 
@@ -452,7 +450,7 @@ uint ndb_pushed_builder_ctx::get_table_no(const Item *key_item) const {
     if (table != nullptr && table->pos_in_table_list != nullptr) {
       const table_map map = table->pos_in_table_list->map();
       if (bitmap & map) {
-        DBUG_ASSERT((bitmap & ~map) == 0);  // No other tables in 'bitmap'
+        assert((bitmap & ~map) == 0);  // No other tables in 'bitmap'
         return i;
       }
     }
@@ -475,7 +473,7 @@ static ndb_table_access_map get_tables_in_range(uint first, uint last) {
  * Translate a table_map from external to internal table enumeration
  */
 ndb_table_access_map ndb_pushed_builder_ctx::get_table_map(
-    table_map external_map) const {
+    const table_map external_map) const {
   ndb_table_access_map internal_map;
   const uint count = m_plan.get_access_count();
   table_map bitmap = (external_map & ~PSEUDO_TABLE_BITS);
@@ -490,7 +488,7 @@ ndb_table_access_map ndb_pushed_builder_ctx::get_table_map(
       }
     }
   }
-  DBUG_ASSERT(bitmap == 0);
+  assert(bitmap == 0);
   return internal_map;
 }
 
@@ -561,7 +559,7 @@ uint internal_operation_count(AQP::enum_access_type accessType) {
 
     default:
       // Other access types are not pushable, so seeing them here is an error.
-      DBUG_ASSERT(false);
+      assert(false);
       return 2;
   }
 }
@@ -580,7 +578,7 @@ bool ndb_pushed_builder_ctx::is_pushable_with_root() {
 
   const uint root_no = m_join_root->get_access_no();
   const AQP::enum_access_type access_type = m_join_root->get_access_type();
-  DBUG_ASSERT(access_type != AQP::AT_VOID);
+  assert(access_type != AQP::AT_VOID);
 
   if (access_type == AQP::AT_MULTI_UNIQUE_KEY) {
     EXPLAIN_NO_PUSH(
@@ -621,8 +619,8 @@ bool ndb_pushed_builder_ctx::is_pushable_with_root() {
    */
   {
     const uint last_table = m_plan.get_access_count() - 1;
-    DBUG_ASSERT(m_plan.get_table_access(0)->get_first_inner() == 0);
-    DBUG_ASSERT(m_plan.get_table_access(0)->get_last_inner() == last_table);
+    assert(m_plan.get_table_access(0)->get_first_inner() == 0);
+    assert(m_plan.get_table_access(0)->get_last_inner() == last_table);
 
     ndb_table_access_map upper_nests;
     ndb_table_access_map inner_nest;
@@ -651,7 +649,7 @@ bool ndb_pushed_builder_ctx::is_pushable_with_root() {
         // Still in the join-nest starting at 'first_inner'
         m_tables[tab_no] = m_tables[first_inner];
       } else {
-        DBUG_ASSERT(table->get_first_inner() == tab_no);
+        assert(table->get_first_inner() == tab_no);
 
         // Enter new inner nest
         upper_nests = m_tables[first_inner].m_upper_nests;
@@ -736,10 +734,22 @@ bool ndb_pushed_builder_ctx::is_pushable_with_root() {
           validate_join_nest(inner_nest, first_inner, tab_no, "outer");
         }
 
-        // The upper_nest becomes our new inner_nest when we 'unwind'.
-        ndb_table_access_map upper_nest(upper_nests);
-        upper_nest.subtract(m_tables[first_upper].m_upper_nests);
-        inner_nest = upper_nest;
+        /**
+         * We leave the current 'first_inner' nest and unwind to 'first_upper'
+         * nest, which then become our new 'inner_nest'. The content of the
+         * inner_nest need to be recalculated.
+         */
+        inner_nest.clear_all();
+        uint i = first_inner;
+        while (i > (uint)first_upper && i > root_no) {
+          i--;
+          if (m_tables[i].m_first_inner == (uint)first_upper) {
+            // Found last table in first_upper nest.
+            inner_nest = m_tables[i].m_inner_nest;
+            inner_nest.add(i);
+            break;
+          }
+        }
         upper_nests = m_tables[first_upper].m_upper_nests;
         first_inner = first_upper;
 
@@ -753,9 +763,9 @@ bool ndb_pushed_builder_ctx::is_pushable_with_root() {
 
       }  // while 'leaving a nest'
     }    // for tab_no [root_no..last_table]
-    DBUG_ASSERT(upper_nests.is_clear_all());
+    assert(upper_nests.is_clear_all());
   }
-  DBUG_ASSERT(m_join_scope.contain(root_no));
+  assert(m_join_scope.contain(root_no));
   return (m_join_scope.last_table() > root_no);  // Anything pushed?
 }  // ndb_pushed_builder_ctx::is_pushable_with_root()
 
@@ -781,13 +791,12 @@ bool ndb_pushed_builder_ctx::is_pushable_as_child(AQP::Table_access *table) {
   DBUG_TRACE;
   const uint root_no = m_join_root->get_access_no();
   const uint tab_no = table->get_access_no();
-  DBUG_ASSERT(tab_no > root_no);
+  assert(tab_no > root_no);
 
   if (!maybe_pushable(table, PUSHABLE_AS_CHILD)) {
     return false;
   }
 
-  const AQP::enum_access_type root_type = m_join_root->get_access_type();
   const AQP::enum_access_type access_type = table->get_access_type();
 
   if (!(ndbcluster_is_lookup_operation(access_type) ||
@@ -802,7 +811,7 @@ bool ndb_pushed_builder_ctx::is_pushable_as_child(AQP::Table_access *table) {
 
   // There is a limitation in not allowing LOOKUP - (index)SCAN operations
   if (access_type == AQP::AT_ORDERED_INDEX_SCAN &&
-      ndbcluster_is_lookup_operation(root_type)) {
+      !m_scan_operations.contain(root_no)) {
     EXPLAIN_NO_PUSH(
         "Push of table '%s' as scan-child "
         "with lookup-root '%s' not implemented",
@@ -870,8 +879,8 @@ bool ndb_pushed_builder_ctx::is_pushable_as_child(AQP::Table_access *table) {
     const Item *const key_item = table->get_key_field(key_part_no);
     const KEY_PART_INFO *key_part = table->get_key_part_info(key_part_no);
 
-    if (key_item->const_item())  // REF is a literal or field from const-table
-    {
+    if (key_item->const_for_execution()) {
+      // REF is a literal or field from const-table
       DBUG_PRINT("info", (" Item type:%d is 'const_item'", key_item->type()));
       if (!is_const_item_pushable(key_item, key_part)) {
         return false;
@@ -918,16 +927,101 @@ bool ndb_pushed_builder_ctx::is_pushable_as_child(AQP::Table_access *table) {
    * evaluate later. The existence of such conditions may effect the join
    * pushability of tables, so we need to try to push conditions first.
    */
+  ndb_table_access_map parents_of_condition;
   const Item *pending_cond = table->get_condition();
   if (pending_cond != nullptr &&
       current_thd->optimizer_switch_flag(
           OPTIMIZER_SWITCH_ENGINE_CONDITION_PUSHDOWN)) {
+    /**
+     * Calculate full set of possible ancestors for this table in
+     * the query tree. Note that they do not become mandatory ancestors
+     * before being added to the m_ancestors bitmap (Further below)
+     */
+    ndb_table_access_map all_ancestors(all_parents);
+    for (uint i = tab_no - 1; i > root_no; i--) {
+      if (all_ancestors.contain(i)) {
+        AQP::Table_access *ancestor = m_plan.get_table_access(i);
+
+        for (uint key_part_no = 0;
+             key_part_no < ancestor->get_no_of_key_fields(); key_part_no++) {
+          all_ancestors.add(m_tables[i].m_key_parents[key_part_no]);
+          assert(m_join_scope.contain(all_ancestors));
+        }
+        all_ancestors.add(m_tables[i].m_ancestors);  // Add enforced ancestors
+      }
+    }
+    /**
+     * Calculate the set of tables where the referred Field values may be
+     * handled as either constant or parameter values from a pushed condition.
+     *
+     * 1) const_expr_tables:
+     *    Values from all tables prior to the query root has been evalued
+     *    when the query is pushed. Thus their Field values are known and can
+     *    be used to evaluated any expression they are part of into constants.
+     *
+     *    Note that we do not allow const_expr_tables if:
+     *    - Pushed join root is a lookup, where its EQRefIterator::Read
+     *      may detect equal keys and optimize away the read of pushed join.
+     *      (Note a similar limitation for keys in ::is_field_item_pushable())
+     *      TODO?: Integrate with setting of TABLE_REF::disable_cache and lift
+     *      these limitations when 'cache' is disabled.
+     *    - The entire (root of the) pushed join is being stored into a
+     *      join-cached (-> hash or BKA join).
+     *
+     *    Leave both of these limitation for WL#14370(or later), when most of
+     *    this code need to be rewritten anyway.
+     *
+     * 2) param_expr_tables:
+     *    The pushed join, including any pushed conditions embedded within it,
+     *    is generated when the root of the pushed join is sent for execution.
+     *    At this point in time the value of any Field from ancestor tables
+     *    within the pushed join is still not known. However, when the
+     *    SPJ block sends the REQuests to the LDMs, all ancestor tables in
+     *    the pushed join are  available. This allows us to a build
+     *    a parameter set containing the referred Field values, and supply
+     *    it to the LDM's together with a pushed condition referring the
+     *    parameters.
+     */
+    table_map const_expr_tables(0);
+    if (m_scan_operations.contain(root_no) && !m_join_root->uses_join_cache()) {
+      for (uint i = 0; i < root_no; i++) {
+        const TABLE *table = m_plan.get_table_access(i)->get_table();
+        if (table != nullptr && table->pos_in_table_list != nullptr) {
+          const_expr_tables |= table->pos_in_table_list->map();
+        }
+      }
+    }
+    table_map param_expr_tables(0);
+    if (ndbd_support_param_cmp(m_thd_ndb->ndb->getMinDbNodeVersion())) {
+      for (uint i = root_no; i < tab_no; i++) {
+        if (all_ancestors.contain(i)) {
+          const TABLE *table = m_plan.get_table_access(i)->get_table();
+          param_expr_tables |= table->pos_in_table_list->map();
+        }
+      }
+    }
     ha_ndbcluster *handler =
         down_cast<ha_ndbcluster *>(table->get_table()->file);
-
-    const bool other_tbls_ok = false;
-    handler->m_cond.prep_cond_push(pending_cond, other_tbls_ok);
+    handler->m_cond.prep_cond_push(pending_cond, const_expr_tables,
+                                   param_expr_tables);
     pending_cond = handler->m_cond.m_remainder_cond;
+
+    if (handler->m_cond.m_pushed_cond != nullptr) {
+      const List<const Ndb_param> params =
+          handler->m_cond.get_interpreter_params();
+      if (unlikely(params.size() > ndb_pushed_join::MAX_LINKED_PARAMS)) {
+        DBUG_PRINT("info",
+                   ("Too many parameter Field refs ( >= MAX_LINKED_PARAMS) "
+                    "encountered"));
+        return false;
+      }
+      /* Force an ancestor dependency on tables referred as a parameter. */
+      table_map used_tables(handler->m_cond.m_pushed_cond->used_tables());
+      used_tables &= param_expr_tables;
+      parents_of_condition = get_table_map(used_tables);
+      m_tables[tab_no].m_ancestors.add(parents_of_condition);
+      all_parents.add(parents_of_condition);
+    }
   }
   if (pending_cond != nullptr) {
     /**
@@ -959,19 +1053,23 @@ bool ndb_pushed_builder_ctx::is_pushable_as_child(AQP::Table_access *table) {
      */
     for (uint i = 0; i < no_of_key_fields; i++) {
       if (!key_parents[i].is_clear_all()) {  // Key refers a parent field
-#ifndef DBUG_OFF
+#ifndef NDEBUG
         // Verify requirement that all field_parents are from within same nest
         {
           const uint last = key_parents[i].last_table(tab_no);
           ndb_table_access_map nest(m_tables[last].m_inner_nest);
           nest.add(last);
-          DBUG_ASSERT(nest.contain(key_parents[i]));
+          assert(nest.contain(key_parents[i]));
         }
 #endif
         const uint first = key_parents[i].first_table();
         depend_parents.add(first);
       }
     }
+
+    /* We will also depend on any parents referred from the pushed conditions.
+     */
+    depend_parents.add(parents_of_condition);
 
     /**
      * In the (unlikely) case of parent references to tables not
@@ -1025,7 +1123,8 @@ bool ndb_pushed_builder_ctx::is_pushable_as_child(AQP::Table_access *table) {
       }
     }
     m_tables[first_inner].m_ancestors.add(depend_parents);
-    DBUG_ASSERT(!m_tables[first_inner].m_ancestors.contain(first_inner));
+    assert(!m_tables[first_inner].m_ancestors.contain(first_inner));
+    assert(!m_tables[first_inner].m_ancestors.is_overlapping(inner_nest));
   }
 
   m_join_scope.add(tab_no);
@@ -1131,7 +1230,7 @@ bool ndb_pushed_builder_ctx::is_pushable_within_nest(
     const AQP::Table_access *table, ndb_table_access_map nest,
     const char *nest_type) {
   DBUG_TRACE;
-  DBUG_ASSERT(!ndbcluster_is_lookup_operation(table->get_access_type()));
+  assert(!ndbcluster_is_lookup_operation(table->get_access_type()));
   const uint tab_no = table->get_access_no();
 
   // Logic below assume that 'this' table is not part of the 'nest'.
@@ -1185,7 +1284,7 @@ bool ndb_pushed_builder_ctx::is_pushable_within_nest(
 bool ndb_pushed_builder_ctx::is_pushable_as_child_scan(
     const AQP::Table_access *table, const ndb_table_access_map all_parents) {
   DBUG_TRACE;
-  DBUG_ASSERT(!ndbcluster_is_lookup_operation(table->get_access_type()));
+  assert(!ndbcluster_is_lookup_operation(table->get_access_type()));
 
   const uint root_no = m_join_root->get_access_no();
   const uint tab_no = table->get_access_no();
@@ -1290,7 +1389,7 @@ bool ndb_pushed_builder_ctx::is_pushable_as_child_scan(
       NdbQueryBuilder::outerJoinedScanSupported(m_thd_ndb->ndb)) {
     // 'table' is part of a semi-join
     // (We support semi-join only if firstMatch strategy is used)
-    DBUG_ASSERT(m_tables[tab_no].m_sj_nest.contain(table->get_access_no()));
+    assert(m_tables[tab_no].m_sj_nest.contain(tab_no));
 
     if (!is_pushable_within_nest(table, m_tables[tab_no].m_sj_nest, "semi")) {
       return false;
@@ -1298,20 +1397,22 @@ bool ndb_pushed_builder_ctx::is_pushable_as_child_scan(
     if (table->get_first_sj_inner() == (int)tab_no) {
       /**
        * In order to do correct firstmatch duplicate elimination in
-       * SPJ, we need to ensure that the table to eliminate duplicates
-       * from is the parent of the firstmast-sj-nest -> enforce it
-       * as a mandatory ancestor of the sj-nest.
+       * SPJ, we need to ensure that there are no scans in between this
+       * semi-join nest and the 'last_parent' candidate. See reasoning
+       * above wrt returning 'ancestor-scan rowset multiple times'.
        */
-      const int firstmatch_return = table->get_firstmatch_return();
-      if (!all_parents.contain(firstmatch_return)) {
-        EXPLAIN_NO_PUSH(
-            "Can't push table '%s' as child of '%s', "
-            "the FirstMatch-return '%s' can not be made the parent of sj-nest",
-            table->get_table()->alias, m_join_root->get_table()->alias,
-            m_plan.get_table_access(firstmatch_return)->get_table()->alias);
-        return false;
+      const uint last_parent = all_parents.last_table(tab_no - 1);
+      for (uint ancestor = last_parent + 1; ancestor < tab_no; ancestor++) {
+        if (m_join_scope.contain(ancestor) &&
+            m_scan_operations.contain(ancestor)) {
+          EXPLAIN_NO_PUSH(
+              "Can't push table '%s' as child of '%s', "
+              "there is the scan '%s' in between the parent and sj-nest",
+              table->get_table()->alias, m_join_root->get_table()->alias,
+              m_plan.get_table_access(ancestor)->get_table()->alias);
+          return false;
+        }
       }
-      m_tables[tab_no].m_ancestors.add(firstmatch_return);
     }
   } else if (!m_tables[tab_no].m_sj_nest.is_clear_all()) {
     if (!m_tables[tab_no].m_sj_nest.contain(m_join_scope)) {
@@ -1384,9 +1485,8 @@ bool ndb_pushed_builder_ctx::is_outer_nests_referable(
 
   const uint tab_no = table->get_access_no();
   const uint first_inner = m_tables[tab_no].m_first_inner;
-  const ndb_table_access_map embedding_nests(
-      m_tables[tab_no].embedding_nests());
-  DBUG_ASSERT(!embedding_nests.contain(depend_parents));
+  // Check that embedding nests does not already contain dependent parents
+  assert(!m_tables[tab_no].embedding_nests().contain(depend_parents));
 
   /**
    * Include nest-level ancestor dependencies already enforced.
@@ -1422,9 +1522,9 @@ bool ndb_pushed_builder_ctx::is_outer_nests_referable(
      * Allow all tables in the referred parents nest to become
      * part of the set of later referrable upper_nests.
      */
-    if (parent_no < first_inner) {
+    if (unlikely(parent_no < first_inner)) {
       // referred nest is not embedded within current inner_nest
-      DBUG_ASSERT(m_tables[parent_no].m_last_inner < tab_no);
+      assert(m_tables[parent_no].m_last_inner < tab_no);
 
       /**
        * Referring the outer-joined parent, introduce the requirement
@@ -1601,7 +1701,7 @@ void ndb_pushed_builder_ctx::validate_join_nest(ndb_table_access_map inner_nest,
       for (uint tab_no = m_scan_operations.first_table(first_inner);
            tab_no <= last_inner;
            tab_no = m_scan_operations.first_table(tab_no + 1)) {
-        DBUG_ASSERT(m_join_scope.contain(tab_no));
+        assert(m_join_scope.contain(tab_no));
         const AQP::Table_access *const table = m_plan.get_table_access(tab_no);
 
         /**
@@ -1650,7 +1750,7 @@ void ndb_pushed_builder_ctx::remove_pushable(const AQP::Table_access *table) {
   DBUG_TRACE;
 
   const uint me = table->get_access_no();
-  DBUG_ASSERT(m_join_scope.contain(me));
+  assert(m_join_scope.contain(me));
   m_join_scope.clear_bit(me);
 
   // Cascade remove of tables depending on 'me'
@@ -1699,7 +1799,7 @@ bool ndb_pushed_builder_ctx::is_field_item_pushable(
     const KEY_PART_INFO *key_part, ndb_table_access_map &field_parents) {
   DBUG_TRACE;
   const uint tab_no = table->get_access_no();
-  DBUG_ASSERT(key_item->type() == Item::FIELD_ITEM);
+  assert(key_item->type() == Item::FIELD_ITEM);
 
   const Item_field *const key_item_field =
       static_cast<const Item_field *>(key_item);
@@ -1785,7 +1885,7 @@ bool ndb_pushed_builder_ctx::is_field_item_pushable(
   if (m_const_scope.contain(referred_table_no)) {
     // This key item is const. and did not cause the set of possible parents
     // to be recalculated. Reuse what we had before this key item.
-    DBUG_ASSERT(field_parents.is_clear_all());
+    assert(field_parents.is_clear_all());
 
     /**
      * Field referrence is a 'paramValue' to a column value evaluated
@@ -1829,7 +1929,7 @@ bool ndb_pushed_builder_ctx::is_field_item_pushable(
               get_referred_field_name(key_item_field));
           return false;
         }
-        DBUG_ASSERT(access_no > 0);
+        assert(access_no > 0);
         access_no--;
       } while (m_plan.get_table_access(access_no)->get_table() != referred_tab);
 
@@ -1849,7 +1949,7 @@ bool ndb_pushed_builder_ctx::is_field_item_pushable(
 bool ndb_pushed_builder_ctx::is_const_item_pushable(
     const Item *key_item, const KEY_PART_INFO *key_part) {
   DBUG_TRACE;
-  DBUG_ASSERT(key_item->const_item());
+  assert(key_item->const_for_execution());
 
   /**
    * Propagate Items constant value to Field containing the value of this
@@ -1919,7 +2019,7 @@ int ndb_pushed_builder_ctx::optimize_query_plan() {
 
     for (uint i = 0;
          i < m_plan.get_table_access(tab_no)->get_no_of_key_fields(); i++) {
-      DBUG_ASSERT(m_join_scope.contain(key_parents[i]));
+      assert(m_join_scope.contain(key_parents[i]));
       if (!key_parents[i].is_clear_all()) {  // Key refers a parent field
         /**
          * Calculate 'common_parents' as the set of possible 'field_parents'
@@ -1992,8 +2092,20 @@ int ndb_pushed_builder_ctx::optimize_query_plan() {
         parent_no = depends_on_parent;
       }
     }
-    DBUG_ASSERT(parent_no < tab_no);
+    assert(parent_no < tab_no);
     table.m_parent = parent_no;
+
+    /**
+     * If parent is in an upper nest(s), the join-nest itself become
+     * dependent on any ancestors outside of the nests.
+     * Such nest-level dependencies are recorded in the first_inner
+     * of the join-nests.
+     */
+    for (uint first_in_nest = table.m_first_inner; first_in_nest > parent_no;
+         first_in_nest = m_tables[first_in_nest].m_first_upper) {
+      depend_parents.intersect(m_tables[first_in_nest].m_upper_nests);
+      m_tables[first_in_nest].m_ancestors.add(depend_parents);
+    }
 
     /**
      * Any remaining ancestor dependencies for this table has to be
@@ -2002,13 +2114,6 @@ int ndb_pushed_builder_ctx::optimize_query_plan() {
      */
     depend_parents.clear_bit(parent_no);
     m_tables[parent_no].m_ancestors.add(depend_parents);
-
-    /**
-     * Similar for nest-level dependencies: Any dependencies to tables outside
-     * of this inner nest are enforces as mandatory nest-ancestor dependencies.
-     */
-    depend_parents.subtract(table.m_inner_nest);
-    m_tables[table.m_first_inner].m_ancestors.add(depend_parents);
   }
 
   /* Collect the full set of ancestors available through the selected 'm_parent'
@@ -2032,8 +2137,8 @@ void ndb_pushed_builder_ctx::collect_key_refs(const AQP::Table_access *table,
   const uint parent_no = m_tables[tab_no].m_parent;
   const ndb_table_access_map ancestors = m_tables[tab_no].m_ancestors;
 
-  DBUG_ASSERT(m_join_scope.contain(ancestors));
-  DBUG_ASSERT(ancestors.contain(parent_no));
+  assert(m_join_scope.contain(ancestors));
+  assert(ancestors.contain(parent_no));
 
   /**
    * If there are any key_fields with 'current_parents' different from
@@ -2045,7 +2150,8 @@ void ndb_pushed_builder_ctx::collect_key_refs(const AQP::Table_access *table,
     const Item *const key_item = table->get_key_field(key_part_no);
     key_refs[key_part_no] = key_item;
 
-    DBUG_ASSERT(key_item->const_item() || key_item->type() == Item::FIELD_ITEM);
+    assert(key_item->const_for_execution() ||
+           key_item->type() == Item::FIELD_ITEM);
 
     if (key_item->type() == Item::FIELD_ITEM) {
       const Item_field *join_item = static_cast<const Item_field *>(key_item);
@@ -2073,7 +2179,7 @@ void ndb_pushed_builder_ctx::collect_key_refs(const AQP::Table_access *table,
             key_refs[key_part_no] = join_item = substitute_field;
             break;
           } else if (ancestors.contain(substitute_table_no)) {
-            DBUG_ASSERT(substitute_table_no <= parent_no);
+            assert(substitute_table_no <= parent_no);
 
             //////////////////////////////////////////////////////////////////////
             // Second best is to replace join_item with closest grandparent ref.
@@ -2099,10 +2205,10 @@ void ndb_pushed_builder_ctx::collect_key_refs(const AQP::Table_access *table,
           }
         }  // while (substitute...
 
-        DBUG_ASSERT(referred_table_no == parent_no ||
-                    ancestors.contain(referred_table_no) ||
-                    m_const_scope.contain(
-                        referred_table_no));  // Is a 'const' paramValue
+        assert(referred_table_no == parent_no ||
+               ancestors.contain(referred_table_no) ||
+               m_const_scope.contain(
+                   referred_table_no));  // Is a 'const' paramValue
       }
     }  // Item::FIELD_ITEM
   }
@@ -2140,7 +2246,7 @@ int ndb_pushed_builder_ctx::build_key(const AQP::Table_access *table,
                                       const NdbQueryOperand *op_key[],
                                       NdbQueryOptions *key_options) {
   DBUG_TRACE;
-  DBUG_ASSERT(m_join_scope.contain(table->get_access_no()));
+  assert(m_join_scope.contain(table->get_access_no()));
 
   const KEY *const key = &table->get_table()->key_info[table->get_index_no()];
   op_key[0] = NULL;
@@ -2157,14 +2263,14 @@ int ndb_pushed_builder_ctx::build_key(const AQP::Table_access *table,
     }
   } else {
     const uint key_fields = table->get_no_of_key_fields();
-    DBUG_ASSERT(key_fields > 0 && key_fields <= key->user_defined_key_parts);
+    assert(key_fields > 0 && key_fields <= key->user_defined_key_parts);
     uint map[ndb_pushed_join::MAX_LINKED_KEYS + 1];
 
     if (ndbcluster_is_lookup_operation(table->get_access_type())) {
       const ha_ndbcluster *handler =
           down_cast<ha_ndbcluster *>(table->get_table()->file);
-      ndbcluster_build_key_map(
-          handler->m_table, handler->m_index[table->get_index_no()], key, map);
+      const NDB_INDEX_DATA &index = handler->m_index[table->get_index_no()];
+      index.fill_column_map(key, map);
     } else {
       for (uint ix = 0; ix < key_fields; ix++) {
         map[ix] = ix;
@@ -2180,14 +2286,13 @@ int ndb_pushed_builder_ctx::build_key(const AQP::Table_access *table,
       const Item *const item = join_items[i];
       op_key[map[i]] = NULL;
 
-      DBUG_ASSERT(item->const_item() == item->const_for_execution());
-      if (item->const_item()) {
+      if (item->const_for_execution()) {
         /**
          * Propagate Items constant value to Field containing the value of this
          * key_part:
          */
         Field *const field = key_part->field;
-        DBUG_ASSERT(!field->is_real_null());
+        assert(!field->is_real_null());
         const uchar *const ptr =
             (field->real_type() == MYSQL_TYPE_VARCHAR)
                 ? field->field_ptr() + field->get_length_bytes()
@@ -2195,7 +2300,7 @@ int ndb_pushed_builder_ctx::build_key(const AQP::Table_access *table,
 
         op_key[map[i]] = m_builder->constValue(ptr, field->data_length());
       } else {
-        DBUG_ASSERT(item->type() == Item::FIELD_ITEM);
+        assert(item->type() == Item::FIELD_ITEM);
         const Item_field *const field_item =
             static_cast<const Item_field *>(item);
         const uint referred_table_no = get_table_no(field_item);
@@ -2206,13 +2311,13 @@ int ndb_pushed_builder_ctx::build_key(const AQP::Table_access *table,
           // May refer any of the preceding parent tables
           const NdbQueryOperationDef *const parent_op =
               m_tables[referred_table_no].m_op;
-          DBUG_ASSERT(parent_op != NULL);
+          assert(parent_op != NULL);
 
           // TODO use field_index ??
-          op_key[map[i]] =
-              m_builder->linkedValue(parent_op, field_item->field_name);
+          op_key[map[i]] = m_builder->linkedValue(
+              parent_op, field_item->original_field_name());
         } else {
-          DBUG_ASSERT(m_const_scope.contain(referred_table_no));
+          assert(m_const_scope.contain(referred_table_no));
           // Outside scope of join plan, Handle as parameter as its value
           // will be known when we are ready to execute this query.
           if (unlikely(m_fld_refs >= ndb_pushed_join::MAX_REFERRED_FIELDS)) {
@@ -2236,7 +2341,7 @@ int ndb_pushed_builder_ctx::build_key(const AQP::Table_access *table,
     const uint parent_no = m_tables[tab_no].m_parent;
     if (!referred_parents.contain(parent_no)) {
       // Add the parent as a new dependency
-      DBUG_ASSERT(m_tables[parent_no].m_op != NULL);
+      assert(m_tables[parent_no].m_op != NULL);
       key_options->setParent(m_tables[parent_no].m_op);
     }
   }
@@ -2254,7 +2359,7 @@ int ndb_pushed_builder_ctx::build_query() {
   DBUG_EXECUTE("info", m_join_root->dbug_print(););
 
   const uint root_no = m_join_root->get_access_no();
-  DBUG_ASSERT(m_join_scope.contain(root_no));
+  assert(m_join_scope.contain(root_no));
 
   if (m_builder == NULL) {
     m_builder = NdbQueryBuilder::create();
@@ -2279,7 +2384,7 @@ int ndb_pushed_builder_ctx::build_query() {
     }
 
     if (table != m_join_root) {
-      DBUG_ASSERT(m_tables[tab_no].m_parent != MAX_TABLES);
+      assert(m_tables[tab_no].m_parent != MAX_TABLES);
       const uint parent_no = m_tables[tab_no].m_parent;
 
       if (m_tables[tab_no].isInnerJoined(m_tables[parent_no])) {
@@ -2306,7 +2411,7 @@ int ndb_pushed_builder_ctx::build_query() {
       }
 
       if (table->is_antijoin()) {
-        DBUG_ASSERT(m_tables[tab_no].isOuterJoined(m_tables[parent_no]));
+        assert(m_tables[tab_no].isOuterJoined(m_tables[parent_no]));
         const ndb_table_access_map antijoin_scope(
             get_tables_in_range(tab_no, m_tables[tab_no].m_last_inner));
 
@@ -2404,6 +2509,40 @@ int ndb_pushed_builder_ctx::build_query() {
       }
     }  // if '!m_join_root'
 
+    /**
+     * The NdbQuery API need any parameters referred in pushed conditions to
+     * be represented as linkedValues. Create these from the List-of-Ndb_param
+     * set up when the pushed condition was prepared.
+     */
+    if (tab_no > root_no) {  // Is a child
+      const NdbQueryOperand *parameters[ndb_pushed_join::MAX_LINKED_PARAMS + 1];
+      uint cnt = 0;
+
+      const Ndb_param *ndb_param;
+      List<const Ndb_param> params = handler->m_cond.get_interpreter_params();
+      List_iterator<const Ndb_param> li(params);
+      assert(params.size() <= ndb_pushed_join::MAX_LINKED_PARAMS);
+
+      // Iterate over the list of Ndb_params
+      while ((ndb_param = li++)) {
+        // Get Field and ancestor operation being referred by Ndb_parm
+        const Item_field *item_field =
+            handler->m_cond.get_param_item(ndb_param);
+        const uint referred_table_no = get_table_no(item_field);
+        const NdbQueryOperationDef *const ancestor_op =
+            m_tables[referred_table_no].m_op;
+
+        // Convert into array of linkedValue's
+        parameters[cnt++] = m_builder->linkedValue(
+            ancestor_op, item_field->original_field_name());
+      }
+
+      if (cnt > 0) {
+        parameters[cnt] = nullptr;
+        options.setParameters(parameters);
+      }
+    }
+
     const NdbQueryOperationDef *query_op = NULL;
     if (ndbcluster_is_lookup_operation(access_type)) {
       // Primary key access assumed
@@ -2412,11 +2551,11 @@ int ndb_pushed_builder_ctx::build_query() {
         DBUG_PRINT("info", ("Operation is 'primary-key-lookup'"));
         query_op = m_builder->readTuple(handler->m_table, op_key, &options);
       } else {
-        DBUG_ASSERT(access_type == AQP::AT_UNIQUE_KEY);
+        assert(access_type == AQP::AT_UNIQUE_KEY);
         DBUG_PRINT("info", ("Operation is 'unique-index-lookup'"));
         const NdbDictionary::Index *const index =
             handler->m_index[table->get_index_no()].unique_index;
-        DBUG_ASSERT(index);
+        assert(index);
         query_op =
             m_builder->readTuple(index, handler->m_table, op_key, &options);
       }
@@ -2430,8 +2569,8 @@ int ndb_pushed_builder_ctx::build_query() {
      */
     else if (access_type == AQP::AT_ORDERED_INDEX_SCAN ||
              access_type == AQP::AT_MULTI_MIXED) {
-      DBUG_ASSERT(table->get_index_no() >= 0);
-      DBUG_ASSERT(handler->m_index[table->get_index_no()].index != NULL);
+      assert(table->get_index_no() >= 0);
+      assert(handler->m_index[table->get_index_no()].index != NULL);
 
       DBUG_PRINT("info", ("Operation is 'equal-range-lookup'"));
       DBUG_PRINT(
@@ -2447,7 +2586,7 @@ int ndb_pushed_builder_ctx::build_query() {
       DBUG_PRINT("info", ("Operation is 'table scan'"));
       query_op = m_builder->scanTable(handler->m_table, &options);
     } else {
-      DBUG_ASSERT(false);
+      assert(false);
     }
 
     if (unlikely(!query_op)) return -1;
@@ -2458,50 +2597,3 @@ int ndb_pushed_builder_ctx::build_query() {
 
   return 0;
 }  // ndb_pushed_builder_ctx::build_query()
-
-/**
- * Fill in ix_map[] to map from KEY_PART_INFO[] order into
- * primary key / unique key order of key fields.
- */
-void ndbcluster_build_key_map(const NDBTAB *table, const NDB_INDEX_DATA &index,
-                              const KEY *key_def, uint ix_map[]) {
-  uint ix;
-
-  if (index.unique_index_attrid_map)  // UNIQUE_ORDERED_INDEX or UNIQUE_INDEX
-  {
-    for (ix = 0; ix < key_def->user_defined_key_parts; ix++) {
-      ix_map[ix] = index.unique_index_attrid_map[ix];
-    }
-  } else  // Primary key does not have a 'unique_index_attrid_map'
-  {
-    KEY_PART_INFO *key_part;
-    uint key_pos = 0;
-    int columnnr = 0;
-    assert(index.type == PRIMARY_KEY_ORDERED_INDEX ||
-           index.type == PRIMARY_KEY_INDEX);
-
-    for (ix = 0, key_part = key_def->key_part;
-         ix < key_def->user_defined_key_parts; ix++, key_part++) {
-      // As NdbColumnImpl::m_keyInfoPos isn't available through
-      // NDB API we have to calculate it ourself, else we could:
-      // ix_map[ix]= table->getColumn(key_part->fieldnr-1)->m_impl.m_keyInfoPos;
-
-      if (key_part->fieldnr < columnnr) {
-        // PK columns are not in same order as the columns are defined in the
-        // table, Restart PK search from first column:
-        key_pos = 0;
-        columnnr = 0;
-      }
-
-      while (columnnr < key_part->fieldnr - 1) {
-        if (table->getColumn(columnnr++)->getPrimaryKey()) key_pos++;
-      }
-
-      assert(table->getColumn(columnnr)->getPrimaryKey());
-      ix_map[ix] = key_pos;
-
-      columnnr++;
-      key_pos++;
-    }
-  }
-}  // ndbcluster_build_key_map

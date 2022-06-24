@@ -1,0 +1,38 @@
+#
+# PXC-3777 : Server crashes due to a deadlock detection of mutexes
+#
+CREATE TABLE t1(a INT PRIMARY KEY, b VARCHAR(10));
+INSERT INTO t1 VALUES (1, 'hi');
+# connection node_1a
+# Lock the record in this session node_1a
+BEGIN;
+SELECT * FROM t1 WHERE a = 1 FOR UPDATE;
+a	b
+1	hi
+# connection node_1b
+# This update will be waiting for lock that is
+# acquired by node_1a. When TRUNCATE TABLE DDL
+# arrives, this node_1b or node_1c connection
+# will be victim that is waiting for lock
+SET SESSION innodb_lock_wait_timeout=100;
+UPDATE t1 SET b = 'hello' WHERE a = 1;
+# connection node_1c
+# This update will be waiting for lock that is
+# acquired by node_1a. When TRUNCATE TABLE DDL
+# arrives, this node_1b or node_1c connection
+# will be victim that is waiting for lock
+SET SESSION innodb_lock_wait_timeout=100;
+UPDATE t1 SET b = 'hello' WHERE a = 1;
+# connection node_1
+# DDL in TOI will try to kill all conflicting trxs
+# i.e all trxs that acquired conflicting MDLs
+# on table t1 (taken by node_1a,1b,1c)
+# 1b and 1c are victims that are in waiting state
+TRUNCATE TABLE t1;
+COMMIT;
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+COMMIT;
+COMMIT;
+SELECT * FROM t1;
+a	b
+DROP TABLE t1;

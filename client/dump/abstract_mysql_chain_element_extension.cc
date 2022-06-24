@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2015, 2019, Oracle and/or its affiliates. All rights reserved.
+  Copyright (c) 2015, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -26,8 +26,8 @@
 
 #include <stddef.h>
 #include <boost/algorithm/string.hpp>
-#include <boost/bind.hpp>
 #include <functional>
+#include <optional>
 #include <sstream>
 
 #include "m_ctype.h"
@@ -81,7 +81,7 @@ int Abstract_mysql_chain_element_extension::
   return my_strcasecmp(&my_charset_latin1, latin_name.c_str(), db_name.c_str());
 }
 
-Mysql::Nullable<std::string>
+std::optional<std::string>
 Abstract_mysql_chain_element_extension::get_create_statement(
     Mysql::Tools::Base::Mysql_query_runner *runner,
     const std::string &database_name, const std::string &object_name,
@@ -93,7 +93,7 @@ Abstract_mysql_chain_element_extension::get_create_statement(
           this->get_quoted_object_full_name(database_name, object_name),
       &result);
 
-  Mysql::Nullable<std::string> res;
+  std::optional<std::string> res;
   if (result.size() > 0) {
     if (object_type == "FUNCTION" || object_type == "PROCEDURE" ||
         object_type == "TRIGGER")

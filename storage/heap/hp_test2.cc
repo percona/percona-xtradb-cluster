@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -571,7 +571,7 @@ static int rnd(int max_value) {
   return (int)((rand() & 32767) / 32767.0 * max_value);
 } /* rnd */
 
-static void endprog(int sig_number MY_ATTRIBUTE((unused))) {
+static void endprog(int sig_number [[maybe_unused]]) {
   {
     hp_panic(HA_PANIC_CLOSE);
     my_end(1);

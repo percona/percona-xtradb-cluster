@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2017, 2019, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2017, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -42,28 +42,29 @@ class Sdi_Compressor {
   Sdi_Compressor(uint32_t src_len, const void *sdi)
       : m_src_len(src_len), m_comp_len(), m_sdi(sdi), m_comp_sdi() {}
 
-  ~Sdi_Compressor() { ut_free(m_comp_sdi); }
+  ~Sdi_Compressor() { ut::free(m_comp_sdi); }
 
   /** Compress the SDI */
   inline void compress() {
     uLongf zlen = compressBound(static_cast<uLong>(m_src_len));
     auto src = reinterpret_cast<const Bytef *>(m_sdi);
 
-    m_comp_sdi = static_cast<byte *>(ut_malloc_nokey(zlen));
+    m_comp_sdi =
+        static_cast<byte *>(ut::malloc_withkey(UT_NEW_THIS_FILE_PSI_KEY, zlen));
     ut_ad(m_comp_sdi != nullptr);
 
     switch (
         compress2(m_comp_sdi, &zlen, src, static_cast<uLong>(m_src_len), 6)) {
       case Z_BUF_ERROR:
-        ib::fatal(ER_IB_MSG_FAILED_SDI_Z_BUF_ERROR);
+        ib::fatal(UT_LOCATION_HERE, ER_IB_MSG_FAILED_SDI_Z_BUF_ERROR);
         break;
 
       case Z_MEM_ERROR:
-        ib::fatal(ER_IB_MSG_FAILED_SDI_Z_MEM_ERROR);
+        ib::fatal(UT_LOCATION_HERE, ER_IB_MSG_FAILED_SDI_Z_MEM_ERROR);
         break;
 
       case Z_STREAM_ERROR:
-        ib::fatal(ER_IB_MSG_SDI_Z_STREAM_ERROR);
+        ib::fatal(UT_LOCATION_HERE, ER_IB_MSG_SDI_Z_STREAM_ERROR);
         break;
 
       case Z_OK:
@@ -71,7 +72,7 @@ class Sdi_Compressor {
         break;
 
       default:
-        ib::fatal(ER_IB_MSG_SDI_Z_UNKNOWN_ERROR);
+        ib::fatal(UT_LOCATION_HERE, ER_IB_MSG_SDI_Z_UNKNOWN_ERROR);
         break;
     }
   }
@@ -124,7 +125,7 @@ bool dict_sdi_get_keys(const dd::Tablespace &tablespace, sdi_vector_t &vector);
 @param[in,out]	sdi_len		in:  size of memory allocated
                                 out: actual length of SDI
 @retval		false		success
-@retval		true		incase of failures like record not found,
+@retval		true		in case of failures like record not found,
                                 sdi_len is UINT64MAX_T, else sdi_len is
                                 actual length of SDI */
 bool dict_sdi_get(const dd::Tablespace &tablespace, const sdi_key_t *sdi_key,

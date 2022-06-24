@@ -1,4 +1,4 @@
-/* Copyright (c) 2007, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2007, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -98,8 +98,8 @@ struct LF_PINS {
   we'll enable it on GCC only, which supports zero-length arrays.
 */
 #if defined(__GNUC__) && defined(MY_LF_EXTRA_DEBUG)
-#define LF_REQUIRE_PINS(N)                                                   \
-  static const char require_pins[LF_PINBOX_PINS - N] MY_ATTRIBUTE((unused)); \
+#define LF_REQUIRE_PINS(N)                                             \
+  static const char require_pins[LF_PINBOX_PINS - N] [[maybe_unused]]; \
   static const int LF_NUM_PINS_IN_THIS_FILE = N;
 #else
 #define LF_REQUIRE_PINS(N)

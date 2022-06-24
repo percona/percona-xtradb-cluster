@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2003, 2020, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2003, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -50,6 +50,23 @@
 #include <NodeBitmask.hpp>
 #include <NdbMutex.h>
 
+#ifndef _WIN32
+/*
+ * Shared memory (SHM) transporter is not implemented on Windows.
+ *
+ * This macro is not intended for turning SHM transporter feature on and off,
+ * it should always be on for any platform that supports it.
+ *
+ * If one still want to try and build without full SHM transporter, partly
+ * simulate a Windows build, support one also need to remove:
+ *
+ *   SET(EXTRA_SRC SHM_Transporter.unix.cpp SHM_Transporter.cpp)
+ *
+ * from CMakeLists.txt
+ */
+#define NDB_SHM_TRANSPORTER_SUPPORTED 1
+#endif
+
 // A transporter is always in an IOState.
 // NoHalt is used initially and as long as it is no restrictions on
 // sending or receiving.
@@ -88,7 +105,7 @@ public:
   {
     m_transporter_registry= t;
   }
-  SocketServer::Session * newSession(NDB_SOCKET_TYPE socket);
+  SocketServer::Session * newSession(NDB_SOCKET_TYPE socket) override;
 };
 
 /**
@@ -397,7 +414,7 @@ public:
    * correct.
    */
   Uint64 get_total_max_send_buffer() {
-    DBUG_ASSERT(m_total_max_send_buffer > 0);
+    assert(m_total_max_send_buffer > 0);
     return m_total_max_send_buffer;
   } 
 
@@ -450,9 +467,13 @@ private:
                          Uint8 prio,
                          const Uint32 *signalData,
                          NodeId nodeId,
-                         TrpId &trp_id,
+                         Transporter* t,
                          AnySectionArg section);
 
+  Transporter* prepareSend_getTransporter(const SignalHeader *signalHeader,
+                                          NodeId nodeId,
+                                          TrpId &trp_id,
+                                          SendStatus& status);
 
 public:
   SendStatus prepareSend(TransporterSendBufferHandle *sendHandle,
@@ -478,7 +499,15 @@ public:
                          const Uint32 *signalData,
                          NodeId nodeId,
                          const GenericSectionPtr ptr[3]);
-  
+
+  SendStatus prepareSendOverAllLinks(
+                         TransporterSendBufferHandle *sendHandle,
+                         const SignalHeader *signalHeader,
+                         Uint8 prio,
+                         const Uint32 *signalData,
+                         NodeId nodeId,
+                         TrpBitmask &trp_mask);
+
   /* Send on a specific transporter */
   bool performSend(TrpId id, bool need_wakeup = true);
   /* performSendNode is only used from NDB API */
@@ -501,7 +530,7 @@ public:
   Transporter* get_transporter(TrpId id) const;
   Transporter* get_node_transporter(NodeId nodeId) const;
   bool is_shm_transporter(NodeId nodeId);
-  struct in_addr get_connect_address(NodeId node_id) const;
+  struct in6_addr get_connect_address(NodeId node_id) const;
 
   Uint64 get_bytes_sent(NodeId nodeId) const;
   Uint64 get_bytes_received(NodeId nodeId) const;
@@ -544,8 +573,10 @@ private:
   Transporter**     allTransporters;
   Multi_Transporter** theMultiTransporters;
   TCP_Transporter** theTCPTransporters;
+#ifdef NDB_SHM_TRANSPORTER_SUPPORTED
   SHM_Transporter** theSHMTransporters;
-  
+#endif
+
   /**
    * Array, indexed by nodeId, holding all transporters
    */
@@ -624,7 +655,9 @@ private:
   Uint32 check_TCP(TransporterReceiveHandle&, Uint32 timeoutMillis);
   Uint32 spin_check_transporters(TransporterReceiveHandle&);
 
+#ifdef NDB_SHM_TRANSPORTER_SUPPORTED
   int m_shm_own_pid;
+#endif
   Uint32 m_transp_count;
 
 public:

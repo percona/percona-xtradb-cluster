@@ -116,8 +116,7 @@ enum mysql_trx_stat_type {
   MYSQL_TRX_STAT_ACCESS_PAGE_ID
 };
 void thd_report_innodb_stat(void * thd, unsigned long long trx_id,
-                            enum mysql_trx_stat_type type,
-                            unsigned long long value);
+                            enum mysql_trx_stat_type type, uint64_t value);
 unsigned long thd_log_slow_verbosity(const void * thd);
 int thd_opt_slow_log();
 int thd_is_background_thread(const void * thd);
@@ -138,6 +137,9 @@ int thd_command(const void * thd);
 long long thd_start_time(const void * thd);
 void thd_kill(unsigned long id);
 int thd_get_ft_query_extra_word_chars(void);
+typedef bool (*ssl_reload_callback_t)(void *);
+bool register_ssl_reload_callback(ssl_reload_callback_t);
+bool deregister_ssl_reload_callback(ssl_reload_callback_t);
 #include "plugin_auth_common.h"
 struct MYSQL_PLUGIN_VIO_INFO {
   enum {
@@ -168,6 +170,11 @@ typedef struct MYSQL_PLUGIN_VIO {
       struct MYSQL_PLUGIN_VIO *vio, const unsigned char *pkt, int pkt_len,
       int *result);
 } MYSQL_PLUGIN_VIO;
+struct auth_factor_desc {
+  const char *auth_string;
+  unsigned long auth_string_length;
+  unsigned int is_registration_required;
+};
 struct MYSQL_SERVER_AUTH_INFO {
   char *user_name;
   unsigned int user_name_length;
@@ -180,6 +187,8 @@ struct MYSQL_SERVER_AUTH_INFO {
   unsigned int host_or_ip_length;
   const char *additional_auth_string;
   unsigned long additional_auth_string_length;
+  unsigned int current_auth_factor;
+  auth_factor_desc *multi_factor_auth_info;
 };
 typedef int (*authenticate_user_t)(MYSQL_PLUGIN_VIO *vio,
                                    MYSQL_SERVER_AUTH_INFO *info);

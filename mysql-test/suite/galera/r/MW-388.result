@@ -11,7 +11,7 @@ END;
 INSERT INTO t1 VALUES (1, 'node 1'),(2, 'node 1');
 INSERT INTO t1 VALUES (3, 'node 1');
 END|
-SET GLOBAL wsrep_slave_threads = 2;
+SET GLOBAL wsrep_applier_threads = 2;
 SET GLOBAL DEBUG = "d,sync.wsrep_apply_cb";
 INSERT INTO t1 VALUES (1, 'node 2');;
 SET SESSION DEBUG_SYNC = "now WAIT_FOR sync.wsrep_apply_cb_reached";
@@ -49,7 +49,7 @@ END;
 INSERT INTO t1 VALUES (1, 'node 1'),(2, 'node 1');
 INSERT INTO t1 VALUES (3, 'node 1');
 END|
-SET GLOBAL wsrep_slave_threads = 2;
+SET GLOBAL wsrep_applier_threads = 2;
 SET GLOBAL DEBUG = "d,sync.wsrep_apply_cb";
 INSERT INTO t1 VALUES (1, 'node 2');;
 SET SESSION DEBUG_SYNC = "now WAIT_FOR sync.wsrep_apply_cb_reached";
@@ -72,6 +72,6 @@ f1	f2
 1	node 2
 3	node 1
 SET DEBUG_SYNC = "reset";
-SET GLOBAL wsrep_slave_threads = DEFAULT;
+SET GLOBAL wsrep_applier_threads = DEFAULT;
 DROP TABLE t1;
 DROP PROCEDURE insert_proc;

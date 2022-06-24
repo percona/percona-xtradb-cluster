@@ -125,8 +125,7 @@ enum mysql_trx_stat_type {
   MYSQL_TRX_STAT_ACCESS_PAGE_ID
 };
 void thd_report_innodb_stat(void * thd, unsigned long long trx_id,
-                            enum mysql_trx_stat_type type,
-                            unsigned long long value);
+                            enum mysql_trx_stat_type type, uint64_t value);
 unsigned long thd_log_slow_verbosity(const void * thd);
 int thd_opt_slow_log();
 int thd_is_background_thread(const void * thd);
@@ -147,6 +146,9 @@ int thd_command(const void * thd);
 long long thd_start_time(const void * thd);
 void thd_kill(unsigned long id);
 int thd_get_ft_query_extra_word_chars(void);
+typedef bool (*ssl_reload_callback_t)(void *);
+bool register_ssl_reload_callback(ssl_reload_callback_t);
+bool deregister_ssl_reload_callback(ssl_reload_callback_t);
 #include <mysql/components/services/bits/plugin_audit_connection_types.h>
 typedef enum {
   MYSQL_AUDIT_CONNECTION_CONNECT = 1 << 0,
@@ -189,6 +191,7 @@ enum enum_server_command {
   COM_BINLOG_DUMP_GTID,
   COM_RESET_CONNECTION,
   COM_CLONE,
+  COM_SUBSCRIBE_GROUP_REPLICATION_STREAM,
   COM_END
 };
 #include "my_sqlcommand.h"

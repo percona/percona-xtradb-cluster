@@ -1,4 +1,4 @@
-/* Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2016, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -91,11 +91,21 @@ enum class Stage_code : unsigned int {
   ST_SPLIT_V2 = 3,
 
   /*
+   This type represents the compression stage v2.
+   */
+  ST_LZ4_V3 = 4,
+
+  /*
+     This type represents the split stage v2.
+   */
+  ST_SPLIT_V3 = 5,
+
+  /*
    No valid state codes can appear after this one. If a stage code is to
    be added, this value needs to be incremented and the lowest type code
    available be assigned to the new stage.
    */
-  ST_MAX_STAGES = 4
+  ST_MAX_STAGES = 6
 };
 
 /**
@@ -605,15 +615,15 @@ class Gcs_empty_stage_metadata final : public Gcs_stage_metadata {
  public:
   Gcs_empty_stage_metadata() = default;
 
-  std::unique_ptr<Gcs_stage_metadata> clone() final override;
+  std::unique_ptr<Gcs_stage_metadata> clone() final;
 
-  unsigned long long calculate_encode_length() const final override;
+  unsigned long long calculate_encode_length() const final;
 
-  unsigned long long encode(unsigned char *) const final override;
+  unsigned long long encode(unsigned char *) const final;
 
-  unsigned long long decode(unsigned char const *) final override;
+  unsigned long long decode(unsigned char const *) final;
 
-  void dump(std::ostringstream &) const final override;
+  void dump(std::ostringstream &) const final;
 
   Gcs_empty_stage_metadata(Gcs_empty_stage_metadata &&) = default;
   Gcs_empty_stage_metadata &operator=(Gcs_empty_stage_metadata &&) = default;

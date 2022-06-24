@@ -1,4 +1,4 @@
-/* Copyright (c) 2012, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2012, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -22,16 +22,20 @@
 
 #include <assert.h>
 #include <stdlib.h>
+#ifdef _MSC_VER
+#include <stdint.h>
+#endif
 
 #include "xcom/task_debug.h"
+#include "xcom/xcom_memory.h"
 #include "xcom/xcom_profile.h"
 #include "xdr_gen/xcom_vp.h"
 
 bit_set *new_bit_set(uint32_t bits) {
-  bit_set *bs = (bit_set *)malloc(sizeof(*bs));
+  bit_set *bs = (bit_set *)xcom_malloc(sizeof(*bs));
   bs->bits.bits_len = howmany_words(bits, MASK_BITS);
   bs->bits.bits_val =
-      (bit_mask *)malloc(bs->bits.bits_len * sizeof(*bs->bits.bits_val));
+      (bit_mask *)xcom_malloc(bs->bits.bits_len * sizeof(*bs->bits.bits_val));
   BIT_ZERO(bs);
   return bs;
 }
@@ -39,10 +43,10 @@ bit_set *new_bit_set(uint32_t bits) {
 bit_set *clone_bit_set(bit_set *orig) {
   if (!orig) return orig;
   {
-    bit_set *bs = (bit_set *)malloc(sizeof(*bs));
+    bit_set *bs = (bit_set *)xcom_malloc(sizeof(*bs));
     bs->bits.bits_len = orig->bits.bits_len;
     bs->bits.bits_val =
-        (bit_mask *)malloc(bs->bits.bits_len * sizeof(*bs->bits.bits_val));
+        (bit_mask *)xcom_malloc(bs->bits.bits_len * sizeof(*bs->bits.bits_val));
     memcpy(bs->bits.bits_val, orig->bits.bits_val,
            bs->bits.bits_len * sizeof(*bs->bits.bits_val));
     return bs;
@@ -53,6 +57,8 @@ void free_bit_set(bit_set *bs) {
   free(bs->bits.bits_val);
   free(bs);
 }
+
+#ifdef XCOM_STANDALONE
 /* purecov: begin deadcode */
 
 void bit_set_or(bit_set *x, bit_set const *y) {
@@ -62,6 +68,7 @@ void bit_set_or(bit_set *x, bit_set const *y) {
     x->bits.bits_val[i] |= y->bits.bits_val[i];
   }
 }
+#endif
 
 #if 0
 void bit_set_and(bit_set *x, bit_set const *y)

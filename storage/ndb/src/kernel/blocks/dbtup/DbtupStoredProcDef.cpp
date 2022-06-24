@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2003, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -174,6 +174,7 @@ void Dbtup::scanProcedure(Signal* signal,
   handle->clear();
   storedPtr.p->storedCode = (isCopy)? ZCOPY_PROCEDURE : ZSCAN_PROCEDURE;
   storedPtr.p->storedProcIVal= handle->m_ptr[0].i;
+  storedPtr.p->storedParamNo = 0;
 
   set_trans_state(regOperPtr, TRANS_IDLE);
   

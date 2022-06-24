@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2017, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -77,7 +77,7 @@ PFS_engine_table *table_log_status::create(PFS_engine_table_share *) {
 table_log_status::table_log_status()
     : PFS_engine_table(&m_share, &m_pos), m_pos(0), m_next_pos(0) {}
 
-table_log_status::~table_log_status() {}
+table_log_status::~table_log_status() = default;
 
 void table_log_status::reset_position(void) {
   m_pos.m_index = 0;
@@ -97,7 +97,7 @@ int table_log_status::rnd_next(void) {
   return res;
 }
 
-int table_log_status::rnd_pos(const void *pos MY_ATTRIBUTE((unused))) {
+int table_log_status::rnd_pos(const void *pos [[maybe_unused]]) {
   int res = HA_ERR_RECORD_DELETED;
 
   set_position(pos);
@@ -119,7 +119,7 @@ static bool iter_storage_engines_register(THD *, plugin_ref plugin, void *arg) {
   handlerton *hton = plugin_data<handlerton *>(plugin);
   bool result = false;
 
-  DBUG_ASSERT(plugin_state(plugin) == PLUGIN_IS_READY);
+  assert(plugin_state(plugin) == PLUGIN_IS_READY);
 
   /* The storage engine must implement all three functions to be supported */
   if (hton->lock_hton_log && hton->unlock_hton_log &&
@@ -222,7 +222,8 @@ int table_log_status::make_row() {
   */
   {
     Log_resource *res;
-    res = Log_resource_factory::get_wrapper(gtid_state, &json_local);
+    res = Log_resource_factory::get_wrapper(gtid_state, &mysql_bin_log,
+                                            &json_local);
     if ((error = DBUG_EVALUATE_IF("log_status_oom_gtid", 1, !res))) {
       my_error(ER_UNABLE_TO_COLLECT_LOG_STATUS, MYF(0), "LOCAL",
                "failed to allocate memory to collect "
@@ -310,13 +311,13 @@ end:
   return error ? HA_ERR_RECORD_DELETED : 0;
 }
 
-int table_log_status::read_row_values(TABLE *table MY_ATTRIBUTE((unused)),
-                                      unsigned char *buf MY_ATTRIBUTE((unused)),
-                                      Field **fields MY_ATTRIBUTE((unused)),
-                                      bool read_all MY_ATTRIBUTE((unused))) {
+int table_log_status::read_row_values(TABLE *table [[maybe_unused]],
+                                      unsigned char *buf [[maybe_unused]],
+                                      Field **fields [[maybe_unused]],
+                                      bool read_all [[maybe_unused]]) {
   Field *f;
 
-  DBUG_ASSERT(table->s->null_bytes == 0);
+  assert(table->s->null_bytes == 0);
   buf[0] = 0;
 
   for (; (f = *fields); fields++) {
@@ -335,7 +336,7 @@ int table_log_status::read_row_values(TABLE *table MY_ATTRIBUTE((unused)),
           set_field_json(f, &m_row.w_storage_engines);
           break;
         default:
-          DBUG_ASSERT(false);
+          assert(false);
       }
     }
   }

@@ -213,15 +213,15 @@ auto	string	mediumblob_col	new_field
 select distinct flags from t1;
 flags
 
-one,two,tree
 one
 one,two
+one,two,tree
 select flags from t1 where find_in_set("two",flags)>0;
 flags
-one,two,tree
-one,two,tree
 one,two
 one,two
+one,two,tree
+one,two,tree
 select flags from t1 where find_in_set("unknown",flags)>0;
 flags
 select options,flags from t1 where options="ONE" and flags="ONE";
@@ -297,6 +297,10 @@ auto	auto
 16	16
 drop table t2;
 create table t2 (primary key (auto)) select auto+1 as auto,1 as t1, 'a' as t2, repeat('a',256) as t3, binary repeat('b',256) as t4, repeat('a',4096) as t5, binary repeat('b',4096) as t6, '' as t7, binary '' as t8 from t1;
+Warnings:
+Warning	1287	'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
+Warning	1287	'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
+Warning	1287	'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
 show full columns from t2;
 Field	Type	Collation	Null	Key	Default	Extra	Privileges	Comment
 auto	int unsigned	NULL	NO	PRI	NULL		select,insert,update,references	

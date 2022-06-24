@@ -1,4 +1,4 @@
-/* Copyright (c) 2015, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2015, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -27,15 +27,15 @@
 #include <stdlib.h>
 #include <sys/types.h>
 
-#include <mysql/components/my_service.h>
-#include <mysql/components/services/log_builtins.h>
-#include <mysqld_error.h>
+#include "mysql/components/my_service.h"
+#include "mysql/components/services/log_builtins.h"
 
-#include "my_dbug.h"
-#include "my_inttypes.h"
-#include "my_io.h"
-#include "my_sys.h"  // my_write, my_malloc
-#include "template_utils.h"
+#include "my_dbug.h"         // NOLINT(build/include_subdir)
+#include "my_inttypes.h"     // NOLINT(build/include_subdir)
+#include "my_io.h"           // NOLINT(build/include_subdir)
+#include "my_sys.h"          // NOLINT(build/include_subdir)
+#include "mysqld_error.h"    // NOLINT(build/include_subdir)
+#include "template_utils.h"  // NOLINT(build/include_subdir)
 
 static const char *log_filename = "test_x_sessions_init";
 
@@ -45,11 +45,11 @@ static const char *log_filename = "test_x_sessions_init";
 
 #define WRITE_STR(format)                         \
   snprintf(buffer, sizeof(buffer), "%s", format); \
-  my_write(outfile, (uchar *)buffer, strlen(buffer), MYF(0))
+  my_write(outfile, reinterpret_cast<uchar *>(buffer), strlen(buffer), MYF(0))
 
 #define WRITE_VAL(format, value)                   \
   snprintf(buffer, sizeof(buffer), format, value); \
-  my_write(outfile, (uchar *)buffer, strlen(buffer), MYF(0))
+  my_write(outfile, reinterpret_cast<uchar *>(buffer), strlen(buffer), MYF(0))
 
 static const char *sep =
     "========================================================================"
@@ -100,7 +100,8 @@ const struct st_command_service_cbs sql_cbs = {
     nullptr,  // sql_get_string,
     nullptr,  // sql_handle_ok,
     nullptr,  // sql_handle_error,
-    nullptr   // sql_shutdown,
+    nullptr,  // sql_shutdown,
+    nullptr,  // sql_alive,
 };
 
 static SERVICE_TYPE(registry) *reg_srv = nullptr;
@@ -139,7 +140,7 @@ static void test_session(void *p) {
   }
 }
 
-static void test_session_non_reverse(void *p MY_ATTRIBUTE((unused))) {
+static void test_session_non_reverse(void *p [[maybe_unused]]) {
   char buffer[STRING_BUFFER_SIZE];
   DBUG_TRACE;
 
@@ -171,7 +172,7 @@ static void test_session_non_reverse(void *p MY_ATTRIBUTE((unused))) {
   WRITE_VAL("Number of open sessions: %d\n", session_count);
 }
 
-static void test_session_only_open(void *p MY_ATTRIBUTE((unused))) {
+static void test_session_only_open(void *p [[maybe_unused]]) {
   char buffer[STRING_BUFFER_SIZE];
   DBUG_TRACE;
 
@@ -192,6 +193,7 @@ static void test_session_only_open(void *p MY_ATTRIBUTE((unused))) {
   struct st_plugin_ctx *pctx = (struct st_plugin_ctx *)ctx;
   COM_DATA cmd;
   pctx->reset();
+  memset(&cmd, 0, sizeof(cmd));
   cmd.com_query.query = "SELECT * FROM test.t_int";
   cmd.com_query.length = strlen(cmd.com_query.query);
   command_service_run_command(NULL, COM_QUERY, &cmd,
@@ -280,7 +282,7 @@ static int test_session_service_plugin_init(void *p) {
   return 0;
 }
 
-static int test_session_service_plugin_deinit(void *p MY_ATTRIBUTE((unused))) {
+static int test_session_service_plugin_deinit(void *p [[maybe_unused]]) {
   DBUG_TRACE;
   LogPluginErr(INFORMATION_LEVEL, ER_LOG_PRINTF_MSG, "Uninstallation.");
   deinit_logging_service_for_plugin(&reg_srv, &log_bi, &log_bs);

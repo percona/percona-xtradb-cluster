@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2015, 2019, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2015, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -42,7 +42,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "os0numa.h"  /* os_numa_*() */
 #include "ut0mutex.h" /* ib_mutex_t */
-#include "ut0new.h"   /* UT_NEW*(), UT_DELETE*() */
+#include "ut0new.h"   /* UT_NEW*(), ut::delete_*() */
 #include "ut0rnd.h"   /* ut_fold_ull() */
 
 /** An interface class to a basic hash table, that ut_lock_free_hash_t is. */
@@ -53,7 +53,7 @@ class ut_hash_interface_t {
   static const int64_t NOT_FOUND = INT64_MAX;
 
   /** Destructor. */
-  virtual ~ut_hash_interface_t() {}
+  virtual ~ut_hash_interface_t() = default;
 
   /** Get the value mapped to a given key.
   @param[in]	key	key to look for
@@ -113,8 +113,9 @@ class ut_lock_free_cnt_t {
       m_cnt_size = 256;
     }
 
-    m_cnt = UT_NEW_ARRAY(std::atomic<int64_t> *, m_cnt_size,
-                         mem_key_ut_lock_free_hash_t);
+    m_cnt = ut::new_arr_withkey<std::atomic<int64_t> *>(
+        ut::make_psi_memory_key(mem_key_ut_lock_free_hash_t),
+        ut::Count{m_cnt_size});
 
     for (size_t i = 0; i < m_cnt_size; i++) {
       const size_t s = sizeof(std::atomic<int64_t>);
@@ -125,7 +126,8 @@ class ut_lock_free_cnt_t {
 
         mem = os_numa_alloc_onnode(s, node);
       } else {
-        mem = ut_malloc(s, mem_key_ut_lock_free_hash_t);
+        mem = ut::malloc_withkey(
+            ut::make_psi_memory_key(mem_key_ut_lock_free_hash_t), s);
       }
 
       ut_a(mem != nullptr);
@@ -146,11 +148,11 @@ class ut_lock_free_cnt_t {
       if (m_numa_available) {
         os_numa_free(m_cnt[i], sizeof(std::atomic<int64_t>));
       } else {
-        ut_free(m_cnt[i]);
+        ut::free(m_cnt[i]);
       }
     }
 
-    UT_DELETE_ARRAY(m_cnt);
+    ut::delete_arr(m_cnt);
   }
 
   /** Increment the counter. */
@@ -220,13 +222,15 @@ class ut_lock_free_list_node_t {
   @param[in]	n_elements	number of elements to create */
   explicit ut_lock_free_list_node_t(size_t n_elements)
       : m_n_base_elements(n_elements), m_pending_free(false), m_next(nullptr) {
-    m_base = UT_NEW_ARRAY(T, m_n_base_elements, mem_key_ut_lock_free_hash_t);
+    m_base = ut::new_arr_withkey<T>(
+        ut::make_psi_memory_key(mem_key_ut_lock_free_hash_t),
+        ut::Count{m_n_base_elements});
 
     ut_ad(n_elements > 0);
   }
 
   /** Destructor. */
-  ~ut_lock_free_list_node_t() { UT_DELETE_ARRAY(m_base); }
+  ~ut_lock_free_list_node_t() { ut::delete_arr(m_base); }
 
   /** Create and append a new array to this one and store a pointer
   to it in 'm_next'. This is done in a way that multiple threads can
@@ -251,8 +255,8 @@ class ut_lock_free_list_node_t {
       new_size = m_n_base_elements * 2;
     }
 
-    next_t new_arr = UT_NEW(ut_lock_free_list_node_t<T>(new_size),
-                            mem_key_ut_lock_free_hash_t);
+    next_t new_arr = ut::new_withkey<ut_lock_free_list_node_t<T>>(
+        ut::make_psi_memory_key(mem_key_ut_lock_free_hash_t), new_size);
 
     /* Publish the allocated entry. If somebody did this in the
     meantime then just discard the allocated entry and do
@@ -261,7 +265,7 @@ class ut_lock_free_list_node_t {
     if (!m_next.compare_exchange_strong(expected, new_arr,
                                         std::memory_order_relaxed)) {
       /* Somebody just did that. */
-      UT_DELETE(new_arr);
+      ut::delete_(new_arr);
 
       /* 'expected' has the current value which
       must be != NULL because the CAS failed. */
@@ -437,18 +441,20 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
     ut_a(initial_size > 0);
     ut_a(ut_is_2pow(initial_size));
 
-    m_data.store(UT_NEW(arr_node_t(initial_size), mem_key_ut_lock_free_hash_t),
-                 std::memory_order_relaxed);
+    m_data.store(
+        ut::new_withkey<arr_node_t>(
+            ut::make_psi_memory_key(mem_key_ut_lock_free_hash_t), initial_size),
+        std::memory_order_relaxed);
 
     mutex_create(LATCH_ID_LOCK_FREE_HASH, &m_optimize_latch);
 
-    m_hollow_objects =
-        UT_NEW(hollow_t(hollow_alloc_t(mem_key_ut_lock_free_hash_t)),
-               mem_key_ut_lock_free_hash_t);
+    m_hollow_objects = ut::new_withkey<hollow_t>(
+        ut::make_psi_memory_key(mem_key_ut_lock_free_hash_t),
+        hollow_alloc_t(mem_key_ut_lock_free_hash_t));
   }
 
   /** Destructor. Not thread safe. */
-  ~ut_lock_free_hash_t() {
+  ~ut_lock_free_hash_t() override {
     mutex_destroy(&m_optimize_latch);
 
     arr_node_t *arr = m_data.load(std::memory_order_relaxed);
@@ -456,22 +462,22 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
     do {
       arr_node_t *next = arr->m_next.load(std::memory_order_relaxed);
 
-      UT_DELETE(arr);
+      ut::delete_(arr);
 
       arr = next;
     } while (arr != nullptr);
 
     while (!m_hollow_objects->empty()) {
-      UT_DELETE(m_hollow_objects->front());
+      ut::delete_(m_hollow_objects->front());
       m_hollow_objects->pop_front();
     }
-    UT_DELETE(m_hollow_objects);
+    ut::delete_(m_hollow_objects);
   }
 
   /** Get the value mapped to a given key.
   @param[in]	key	key to look for
   @return the value that corresponds to key or NOT_FOUND. */
-  int64_t get(uint64_t key) const {
+  int64_t get(uint64_t key) const override {
     ut_ad(key != UNUSED);
     ut_ad(key != AVOID);
 
@@ -533,7 +539,7 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
   present with value either val_a or val_b.
   @param[in]	key	key whose value to set
   @param[in]	val	value to be set */
-  void set(uint64_t key, int64_t val) {
+  void set(uint64_t key, int64_t val) override {
     ut_ad(key != UNUSED);
     ut_ad(key != AVOID);
     ut_ad(val != NOT_FOUND);
@@ -561,7 +567,7 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
   It is undefined which one of [1] or [2] will happen. It is up to the
   caller to accept this behavior or prevent it at a higher level.
   @param[in]	key	key whose pair to delete */
-  void del(uint64_t key) {
+  void del(uint64_t key) override {
     ut_ad(key != UNUSED);
     ut_ad(key != AVOID);
 
@@ -631,7 +637,7 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
   Thread 2: set(key, val)
   when both have finished the value will be either val or val + 1.
   @param[in]	key	key whose value to increment or insert as 1 */
-  void inc(uint64_t key) {
+  void inc(uint64_t key) override {
     ut_ad(key != UNUSED);
     ut_ad(key != AVOID);
 
@@ -645,7 +651,7 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
   that the calls will execute in isolation, but the order in which they
   will execute is undeterministic.
   @param[in]	key	key whose value to decrement */
-  void dec(uint64_t key) {
+  void dec(uint64_t key) override {
     ut_ad(key != UNUSED);
     ut_ad(key != AVOID);
 
@@ -1007,8 +1013,8 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
         ;
       }
 
-      UT_DELETE_ARRAY(arr->m_base);
-      /* The destructor of arr will call UT_DELETE_ARRAY()
+      ut::delete_arr(arr->m_base);
+      /* The destructor of arr will call ut::delete_arr()
       on m_base again. Make sure it is a noop and avoid
       double free. */
       arr->m_base = nullptr;
@@ -1100,7 +1106,7 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
   /** Storage for the (key, val) tuples. */
   std::atomic<arr_node_t *> m_data;
 
-  typedef ut_allocator<arr_node_t *> hollow_alloc_t;
+  typedef ut::allocator<arr_node_t *> hollow_alloc_t;
   typedef std::list<arr_node_t *, hollow_alloc_t> hollow_t;
 
   /** Container for hollow (semi-destroyed) objects that have been

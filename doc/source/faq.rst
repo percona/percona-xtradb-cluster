@@ -19,9 +19,9 @@ Please submit ``error.log`` files from **all** the nodes.
 How do I solve locking issues like auto-increment?
 ==================================================
 
-For auto-increment, |PXC| changes ``auto_increment_offset`` for each new node.
-In a single-node workload, locking is handled in the same way as |InnoDB|.
-In case of write load on several nodes, |PXC| uses `optimistic locking <http://en.wikipedia.org/wiki/Optimistic_concurrency_control>`_
+For auto-increment, Percona XtraDB Cluster changes ``auto_increment_offset`` for each new node.
+In a single-node workload, locking is handled in the same way as InnoDB.
+In case of write load on several nodes, Percona XtraDB Cluster uses `optimistic locking <http://en.wikipedia.org/wiki/Optimistic_concurrency_control>`_
 and the application may receive lock error in response to ``COMMIT`` query.
 
 What if a node crashes and InnoDB recovery rolls back some transactions?
@@ -99,7 +99,7 @@ In case node isn't synced or if it is offline, status will look like: ::
 How does Percona XtraDB Cluster handle big transactions?
 ========================================================
 
-|PXC| populates write set in memory before replication,
+Percona XtraDB Cluster populates write set in memory before replication,
 and this sets the limit for the size of transactions that make sense.
 There are wsrep variables for maximum row count
 and maximum size of write set
@@ -117,7 +117,7 @@ However, it will work for MEMORY tables.
 What if a node fails or there is a network issue between nodes?
 ===============================================================
 
-The quorum mechanism in |PXC| will decide which nodes can accept traffic
+The quorum mechanism in Percona XtraDB Cluster will decide which nodes can accept traffic
 and will shut down the nodes that do not belong to the quorum.
 Later when the failure is fixed,
 the nodes will need to copy data from the working cluster.
@@ -136,7 +136,7 @@ How would the quorum mechanism handle split brain?
 
 The quorum mechanism cannot handle split brain.
 If there is no way to decide on the primary component,
-|PXC| has no way to resolve a |split brain|.
+Percona XtraDB Cluster has no way to resolve a |split brain|.
 The minimal recommendation is to have 3 nodes.
 However, it is possibile to allow a node to handle traffic
 with the following option: ::
@@ -189,7 +189,7 @@ You may need to open up to four ports if you are using a firewall:
 Is there "async" mode or only "sync" commits are supported?
 ===========================================================
 
-|PXC| does not support "async" mode, all commits are synchronous on all nodes.
+Percona XtraDB Cluster does not support "async" mode, all commits are synchronous on all nodes.
 To be precise, the commits are "virtually" synchronous,
 which means that the transaction should pass *certification* on nodes,
 not physical commit.
@@ -214,7 +214,7 @@ Try to disable SELinux with the following command:
 What does "nc: invalid option -- 'd'" in the sst.err log file mean?
 ===================================================================
 
-This error is specific to Debian and Ubuntu.  |PXC| uses ``netcat-openbsd``
-package. This dependency has been fixed.  Future releases of |PXC| will be
+This error is specific to Debian and Ubuntu.  Percona XtraDB Cluster uses ``netcat-openbsd``
+package. This dependency has been fixed.  Future releases of Percona XtraDB Cluster will be
 compatible with any ``netcat`` (see bug :jirabug:`PXC-941`).
 

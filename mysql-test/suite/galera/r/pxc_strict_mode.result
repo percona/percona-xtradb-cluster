@@ -34,6 +34,7 @@ call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of ALTER command"
 call mtr.add_suppression("Percona-XtraDB-Cluster prohibits changing storage engine of a table");
 call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of INSERT");
 call mtr.add_suppression("WSREP doesn't support XA transaction");
+call mtr.add_suppression("Event 1 Query apply failed");
 set global pxc_strict_mode='ENFORCING';
 #node-2
 set global pxc_strict_mode='DISABLED';

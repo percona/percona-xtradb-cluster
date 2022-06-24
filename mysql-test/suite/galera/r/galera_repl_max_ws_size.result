@@ -8,3 +8,79 @@ COUNT(*) = 0
 DROP TABLE t1;
 CALL mtr.add_suppression("Transaction/Write-set size limit.*");
 CALL mtr.add_suppression("Failed to create write-set from binlog.*");
+SET SESSION wsrep_sync_wait = 0;
+
+# Test-1: Verify that value of wsrep_max_ws_size picked from cnf file is
+#         also updated in the provider on server startup.
+#
+# Shutdown node2
+[connection node_2]
+# Shutting down node2
+# restarting node2
+# restart: --defaults-file=CONFIG_FILE
+SET SESSION wsrep_sync_wait = 0;
+SELECT @@wsrep_max_ws_size;
+@@wsrep_max_ws_size
+8192
+SELECT SUBSTRING_INDEX(SUBSTR(@@wsrep_provider_options, LOCATE('repl.max_ws_size =', @@wsrep_provider_options) + LENGTH('repl.max_ws_size = ')), '; ', 1) AS provider_value;
+provider_value
+8192
+include/assert.inc [Both wsrep_max_ws_size and repl.max_ws_size have same values]
+
+# Test-2: Verify that value of wsrep_max_ws_size set during runtime is
+#         also updated in the provider immediately.
+#
+SET GLOBAL wsrep_max_ws_size = 40960;
+SELECT @@wsrep_max_ws_size;
+@@wsrep_max_ws_size
+40960
+SELECT SUBSTRING_INDEX(SUBSTR(@@wsrep_provider_options, LOCATE('repl.max_ws_size =', @@wsrep_provider_options) + LENGTH('repl.max_ws_size = ')), '; ', 1) AS provider_value;
+provider_value
+40960
+include/assert.inc [Both wsrep_max_ws_size and repl.max_ws_size have same values]
+
+# Test-3: Verify that value of repl.max_ws_size provider option set
+#         during runtime is also updated in the server variable
+#         immediately.
+#
+SET GLOBAL wsrep_provider_options = 'repl.max_ws_size = 204800';
+SELECT @@wsrep_max_ws_size;
+@@wsrep_max_ws_size
+204800
+SELECT SUBSTRING_INDEX(SUBSTR(@@wsrep_provider_options, LOCATE('repl.max_ws_size =', @@wsrep_provider_options) + LENGTH('repl.max_ws_size = ')), '; ', 1) AS provider_value;
+provider_value
+204800
+include/assert.inc [Both wsrep_max_ws_size and repl.max_ws_size have same values]
+
+# Test-4: Verify that value of repl.max_ws_size picked from command line is
+#         also updated in the provider on server startup.
+#
+# Shutdown node2
+[connection node_2]
+# Shutting down node2
+SET SESSION wsrep_sync_wait = 0;
+SELECT @@wsrep_max_ws_size;
+@@wsrep_max_ws_size
+102400
+SELECT SUBSTRING_INDEX(SUBSTR(@@wsrep_provider_options, LOCATE('repl.max_ws_size =', @@wsrep_provider_options) + LENGTH('repl.max_ws_size = ')), '; ', 1) AS provider_value;
+provider_value
+102400
+include/assert.inc [Both wsrep_max_ws_size and repl.max_ws_size have same values]
+
+# Test-5: Verify that value of repl.max_ws_size is chosen when both
+#         wsrep_max_ws_size and repl.max_ws_size is passed to the
+#         server.
+#
+# Shutdown node2
+[connection node_2]
+# Shutting down node2
+# restarting node2 with repl.max_ws_size=204800
+SET SESSION wsrep_sync_wait = 0;
+SELECT @@wsrep_max_ws_size;
+@@wsrep_max_ws_size
+204800
+SELECT SUBSTRING_INDEX(SUBSTR(@@wsrep_provider_options, LOCATE('repl.max_ws_size =', @@wsrep_provider_options) + LENGTH('repl.max_ws_size = ')), '; ', 1) AS provider_value;
+provider_value
+204800
+include/assert.inc [Both wsrep_max_ws_size and repl.max_ws_size have same values]
+# restart

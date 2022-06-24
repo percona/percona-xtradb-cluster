@@ -4,10 +4,9 @@
 Quick Start Guide for Percona XtraDB Cluster
 ============================================
 
-This guide describes the procedure for setting up |PXC|.
+This guide describes the procedure for setting up Percona XtraDB Cluster.
 
-Examples provided in this guide assume there are three |PXC| nodes,
-as a common choice for trying out and testing:
+Examples provided in this guide assume there are three Percona XtraDB Cluster nodes, as a common choice for trying out and testing:
 
 +--------+-----------+---------------+
 | Node   | Host      | IP            |
@@ -66,6 +65,6 @@ with links to details for every step:
 Percona Monitoring and Management
 =================================
 
-|PMM|_ is the best choice for managing and monitoring |PXC| performance.
+`Percona Monitoring and Management <https://www.percona.com/software/database-tools/percona-monitoring-and-management>`__ is the best choice for managing and monitoring Percona XtraDB Cluster performance.
 It provides visibility for the cluster and enables efficient troubleshooting.
 

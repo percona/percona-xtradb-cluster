@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1995, 2020, Oracle and/or its affiliates.
+Copyright (c) 1995, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -265,6 +265,7 @@ enum latch_level_t {
   SYNC_LOG_CLOSER,
   SYNC_LOG_CHECKPOINTER,
   SYNC_LOG_SN,
+  SYNC_LOG_SN_MUTEX,
   SYNC_PAGE_ARCH,
   SYNC_PAGE_ARCH_CLIENT,
   SYNC_LOG_ARCH,
@@ -272,12 +273,14 @@ enum latch_level_t {
   SYNC_LOG_ONLINE,
 
   SYNC_PAGE_CLEANER,
-  SYNC_PURGE_QUEUE,
   SYNC_TRX_SYS_HEADER,
+  SYNC_TRX_SYS_SERIALISATION,
+  SYNC_PURGE_QUEUE,
   SYNC_THREADS,
   SYNC_TRX,
   SYNC_POOL,
   SYNC_POOL_MANAGER,
+  SYNC_TRX_SYS_SHARD,
   SYNC_TRX_SYS,
   SYNC_LOCK_SYS_SHARDED,
   SYNC_LOCK_SYS_GLOBAL,
@@ -361,6 +364,8 @@ enum latch_id_t {
   LATCH_ID_BUF_POOL_ZIP_HASH,
   LATCH_ID_BUF_POOL_FLUSH_STATE,
   LATCH_ID_DBLWR,
+  LATCH_ID_DBLWR_SPACE_CACHE,
+  LATCH_ID_DDL_AUTOINC,
   LATCH_ID_CACHE_LAST_READ,
   LATCH_ID_DICT_FOREIGN_ERR,
   LATCH_ID_DICT_SYS,
@@ -382,6 +387,7 @@ enum latch_id_t {
   LATCH_ID_LOCK_SYS_TABLE,
   LATCH_ID_LOCK_SYS_WAIT,
   LATCH_ID_LOG_SN,
+  LATCH_ID_LOG_SN_MUTEX,
   LATCH_ID_LOG_CHECKPOINTER,
   LATCH_ID_LOG_CLOSER,
   LATCH_ID_LOG_WRITER,
@@ -413,7 +419,6 @@ enum latch_id_t {
   LATCH_ID_RTR_MATCH_MUTEX,
   LATCH_ID_RTR_PATH_MUTEX,
   LATCH_ID_RW_LOCK_LIST,
-  LATCH_ID_RW_LOCK_MUTEX,
   LATCH_ID_SRV_INNODB_MONITOR,
   LATCH_ID_SRV_MISC_TMPFILE,
   LATCH_ID_SRV_MONITOR_FILE,
@@ -425,6 +430,8 @@ enum latch_id_t {
   LATCH_ID_TEMP_POOL_TBLSP,
   LATCH_ID_TRX,
   LATCH_ID_TRX_SYS,
+  LATCH_ID_TRX_SYS_SHARD,
+  LATCH_ID_TRX_SYS_SERIALISATION,
   LATCH_ID_SRV_SYS,
   LATCH_ID_SRV_SYS_TASKS,
   LATCH_ID_PAGE_ZIP_STAT_PER_INDEX,
@@ -507,7 +514,7 @@ struct OSMutex {
   OSMutex &operator=(const OSMutex &) = default;
 
   /** Destructor */
-  ~OSMutex() {}
+  ~OSMutex() = default;
 
   /** Destroy the mutex */
   void destroy() UNIV_NOTHROW {
@@ -593,9 +600,9 @@ Used for mutexes which have PFS keys defined under UNIV_PFS_MUTEX.
 @param[in]	id		Latch id
 @param[in]	level		Latch level
 @param[in]	key		PFS key */
-#define LATCH_ADD_MUTEX(id, level, key) \
-  latch_meta[LATCH_ID_##id] =           \
-      UT_NEW_NOKEY(latch_meta_t(LATCH_ID_##id, #id, level, #level, key))
+#define LATCH_ADD_MUTEX(id, level, key)                      \
+  latch_meta[LATCH_ID_##id] = ut::new_withkey<latch_meta_t>( \
+      UT_NEW_THIS_FILE_PSI_KEY, LATCH_ID_##id, #id, level, #level, key)
 
 #ifdef UNIV_PFS_RWLOCK
 /** Latch element.
@@ -603,22 +610,23 @@ Used for rwlocks which have PFS keys defined under UNIV_PFS_RWLOCK.
 @param[in]	id		Latch id
 @param[in]	level		Latch level
 @param[in]	key		PFS key */
-#define LATCH_ADD_RWLOCK(id, level, key) \
-  latch_meta[LATCH_ID_##id] =            \
-      UT_NEW_NOKEY(latch_meta_t(LATCH_ID_##id, #id, level, #level, key))
+#define LATCH_ADD_RWLOCK(id, level, key)                     \
+  latch_meta[LATCH_ID_##id] = ut::new_withkey<latch_meta_t>( \
+      UT_NEW_THIS_FILE_PSI_KEY, LATCH_ID_##id, #id, level, #level, key)
 #else
-#define LATCH_ADD_RWLOCK(id, level, key)    \
-  latch_meta[LATCH_ID_##id] = UT_NEW_NOKEY( \
-      latch_meta_t(LATCH_ID_##id, #id, level, #level, PSI_NOT_INSTRUMENTED))
+#define LATCH_ADD_RWLOCK(id, level, key)                                     \
+  latch_meta[LATCH_ID_##id] =                                                \
+      ut::new_withkey<latch_meta_t>(UT_NEW_THIS_FILE_PSI_KEY, LATCH_ID_##id, \
+                                    #id, level, #level, PSI_NOT_INSTRUMENTED)
 #endif /* UNIV_PFS_RWLOCK */
 
 #else
-#define LATCH_ADD_MUTEX(id, level, key) \
-  latch_meta[LATCH_ID_##id] =           \
-      UT_NEW_NOKEY(latch_meta_t(LATCH_ID_##id, #id, level, #level))
-#define LATCH_ADD_RWLOCK(id, level, key) \
-  latch_meta[LATCH_ID_##id] =            \
-      UT_NEW_NOKEY(latch_meta_t(LATCH_ID_##id, #id, level, #level))
+#define LATCH_ADD_MUTEX(id, level, key)                      \
+  latch_meta[LATCH_ID_##id] = ut::new_withkey<latch_meta_t>( \
+      UT_NEW_THIS_FILE_PSI_KEY, LATCH_ID_##id, #id, level, #level)
+#define LATCH_ADD_RWLOCK(id, level, key)                     \
+  latch_meta[LATCH_ID_##id] = ut::new_withkey<latch_meta_t>( \
+      UT_NEW_THIS_FILE_PSI_KEY, LATCH_ID_##id, #id, level, #level)
 #endif /* UNIV_PFS_MUTEX */
 
 /** Default latch counter */
@@ -658,11 +666,8 @@ class LatchCounter {
   ~LatchCounter() UNIV_NOTHROW {
     m_mutex.destroy();
 
-    for (Counters::iterator it = m_counters.begin(); it != m_counters.end();
-         ++it) {
-      Count *count = *it;
-
-      UT_DELETE(count);
+    for (Count *count : m_counters) {
+      ut::delete_(count);
     }
   }
 
@@ -673,10 +678,8 @@ class LatchCounter {
   void reset() UNIV_NOTHROW {
     m_mutex.enter();
 
-    Counters::iterator end = m_counters.end();
-
-    for (Counters::iterator it = m_counters.begin(); it != end; ++it) {
-      (*it)->reset();
+    for (Count *count : m_counters) {
+      count->reset();
     }
 
     m_mutex.exit();
@@ -689,7 +692,7 @@ class LatchCounter {
     Count *count;
 
     if (m_counters.empty()) {
-      count = UT_NEW_NOKEY(Count());
+      count = ut::new_withkey<Count>(UT_NEW_THIS_FILE_PSI_KEY);
       m_counters.push_back(count);
     } else {
       ut_a(m_counters.size() == 1);
@@ -703,7 +706,7 @@ class LatchCounter {
 
   /** Deregister the count. We don't do anything
   @param[in]	count		The count instance to deregister */
-  void sum_deregister(Count *count) UNIV_NOTHROW { /* Do nothing */
+  void sum_deregister(Count *count) const UNIV_NOTHROW { /* Do nothing */
   }
 
   /** Register a single instance counter */
@@ -728,22 +731,20 @@ class LatchCounter {
 
   /** Iterate over the counters */
   template <typename Callback>
-  void iterate(Callback &callback) const UNIV_NOTHROW {
-    Counters::const_iterator end = m_counters.end();
-
-    for (Counters::const_iterator it = m_counters.begin(); it != end; ++it) {
-      callback(*it);
+  void iterate(Callback &&callback) const UNIV_NOTHROW {
+    m_mutex.enter();
+    for (const Count *count : m_counters) {
+      std::forward<Callback>(callback)(count);
     }
+    m_mutex.exit();
   }
 
   /** Disable the monitoring */
   void enable() UNIV_NOTHROW {
     m_mutex.enter();
 
-    Counters::const_iterator end = m_counters.end();
-
-    for (Counters::const_iterator it = m_counters.begin(); it != end; ++it) {
-      (*it)->m_enabled = true;
+    for (Count *count : m_counters) {
+      count->m_enabled = true;
     }
 
     m_active = true;
@@ -755,10 +756,8 @@ class LatchCounter {
   void disable() UNIV_NOTHROW {
     m_mutex.enter();
 
-    Counters::const_iterator end = m_counters.end();
-
-    for (Counters::const_iterator it = m_counters.begin(); it != end; ++it) {
-      (*it)->m_enabled = false;
+    for (Count *count : m_counters) {
+      count->m_enabled = false;
     }
 
     m_active = false;
@@ -779,7 +778,7 @@ class LatchCounter {
   typedef std::vector<Count *> Counters;
 
   /** Mutex protecting m_counters */
-  Mutex m_mutex;
+  mutable Mutex m_mutex;
 
   /** Counters for the latches */
   Counters m_counters;
@@ -812,7 +811,7 @@ class LatchMeta {
   }
 
   /** Destructor */
-  ~LatchMeta() {}
+  ~LatchMeta() = default;
 
   /** Constructor
   @param[in]	id		Latch id
@@ -889,7 +888,8 @@ class LatchMeta {
 };
 
 typedef LatchMeta<LatchCounter> latch_meta_t;
-typedef std::vector<latch_meta_t *, ut_allocator<latch_meta_t *>> LatchMetaData;
+typedef std::vector<latch_meta_t *, ut::allocator<latch_meta_t *>>
+    LatchMetaData;
 
 /** Note: This is accessed without any mutex protection. It is initialised
 at startup and elements should not be added to or removed from it after
@@ -954,7 +954,7 @@ std::string sync_mutex_to_string(latch_id_t id, const std::string &created);
 
 /** Get the latch name from a sync level
 @param[in]	level		Latch level to lookup
-@return 0 if not found. */
+@return nullptr if not found. */
 const char *sync_latch_get_name(latch_level_t level);
 
 /** Print the filename "basename"
@@ -993,7 +993,7 @@ struct latch_t {
   latch_t &operator=(const latch_t &) = default;
 
   /** Destructor */
-  virtual ~latch_t() UNIV_NOTHROW {}
+  virtual ~latch_t() UNIV_NOTHROW = default;
 
   /** @return the latch ID */
   latch_id_t get_id() const { return (m_id); }
@@ -1065,7 +1065,7 @@ struct latch_t {
 
 /** Subclass this to iterate over a thread's acquired latch levels. */
 struct sync_check_functor_t {
-  virtual ~sync_check_functor_t() {}
+  virtual ~sync_check_functor_t() = default;
   virtual bool operator()(const latch_level_t) = 0;
   virtual bool result() const = 0;
 };
@@ -1078,12 +1078,12 @@ struct btrsea_sync_check : public sync_check_functor_t {
       : m_result(), m_has_search_latch(has_search_latch) {}
 
   /** Destructor */
-  ~btrsea_sync_check() override {}
+  ~btrsea_sync_check() override = default;
 
   /** Called for every latch owned by the calling thread.
   @param[in]	level		Level of the existing latch
   @return true if the predicate check fails */
-  virtual bool operator()(const latch_level_t level) override {
+  bool operator()(const latch_level_t level) override {
     /* If calling thread doesn't hold search latch then
     check if there are latch level exception provided.
 
@@ -1122,7 +1122,7 @@ struct btrsea_sync_check : public sync_check_functor_t {
   }
 
   /** @return result from the check */
-  virtual bool result() const override { return (m_result); }
+  bool result() const override { return (m_result); }
 
  private:
   /** True if all OK */
@@ -1141,11 +1141,11 @@ struct dict_sync_check : public sync_check_functor_t {
       : m_result(), m_dict_mutex_allowed(dict_mutex_allowed) {}
 
   /** Destructor */
-  ~dict_sync_check() override {}
+  ~dict_sync_check() override = default;
 
   /** Check the latching constraints
   @param[in]	level		The level held by the thread */
-  virtual bool operator()(const latch_level_t level) override {
+  bool operator()(const latch_level_t level) override {
     if (!m_dict_mutex_allowed ||
         (level != SYNC_DICT && level != SYNC_UNDO_SPACES &&
          level != SYNC_FTS_CACHE && level != SYNC_DICT_OPERATION &&
@@ -1191,10 +1191,9 @@ struct sync_allowed_latches : public sync_check_functor_t {
 
   @param[in]	level	The latch level to check
   @return true if there is a latch ordering violation */
-  virtual bool operator()(const latch_level_t level) {
-    for (latches_t::const_iterator it = m_latches.begin();
-         it != m_latches.end(); ++it) {
-      if (level == *it) {
+  virtual bool operator()(const latch_level_t level) override {
+    for (latch_level_t allowed_level : m_latches) {
+      if (level == allowed_level) {
         m_result = false;
 
         /* No violation */
@@ -1213,14 +1212,14 @@ struct sync_allowed_latches : public sync_check_functor_t {
   }
 
   /** @return the result of the check */
-  virtual bool result() const { return (m_result); }
+  virtual bool result() const override { return (m_result); }
 
  private:
   /** Save the result of validation check here
   True if all OK */
   bool m_result;
 
-  typedef std::vector<latch_level_t, ut_allocator<latch_level_t>> latches_t;
+  typedef std::vector<latch_level_t, ut::allocator<latch_level_t>> latches_t;
 
   /** List of latch levels that are allowed to be held */
   latches_t m_latches;
@@ -1228,7 +1227,7 @@ struct sync_allowed_latches : public sync_check_functor_t {
 
 /** Get the latch id from a latch name.
 @param[in]	name	Latch name
-@return LATCH_ID_NONE. */
+@return latch id if found else LATCH_ID_NONE. */
 latch_id_t sync_latch_get_id(const char *name);
 
 typedef ulint rw_lock_flags_t;

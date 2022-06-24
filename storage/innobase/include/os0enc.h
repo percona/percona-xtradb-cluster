@@ -1,6 +1,6 @@
 /***********************************************************************
 
-Copyright (c) 2019, 2020, Oracle and/or its affiliates.
+Copyright (c) 2019, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License, version 2.0,
@@ -30,23 +30,33 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 #ifndef os0enc_h
 #define os0enc_h
 
+#include <mysql/components/my_service.h>
+
 #include "keyring_encryption_key_info.h"
-#include "page0types.h"
 #include "template_utils.h"
 
 #include "univ.i"
 
+namespace innobase {
+namespace encryption {
+
+bool init_keyring_services(SERVICE_TYPE(registry) * reg_srv);
+
+void deinit_keyring_services(SERVICE_TYPE(registry) * reg_srv);
+
+bool generate_key(const char *key_id, const char *key_type, size_t key_length);
+void remove_key(const char *key_id);
+bool store_key(const char *key_id, const unsigned char *key, size_t key_length,
+               const char *key_type);
+int read_key(const char *key_id, unsigned char **key, size_t *key_length,
+             char **key_type);
+
+}  // namespace encryption
+}  // namespace innobase
+
 // Forward declaration.
 class IORequest;
-struct fil_space_t;
-namespace file {
-struct Block;
-struct Block_deleter;
-using Block_ptr = std::unique_ptr<Block, Block_deleter>;
-}  // namespace file
-
-/** Disk sector size of aligning write buffer for DIRECT_IO */
-extern ulint os_io_ptr_align;
+struct Encryption_key;
 
 enum class Encryption_rotation : std::uint8_t {
   NO_ROTATION,
@@ -89,6 +99,28 @@ class Encryption {
     VERSION_3 = 2,
   };
 
+  /** Encryption progress type. */
+  enum class Progress {
+    /* Space encryption in progress */
+    ENCRYPTION,
+    /* Space decryption in progress */
+    DECRYPTION,
+    /* Nothing in progress */
+    NONE
+  };
+
+  /** Encryption operation resume point after server restart. */
+  enum class Resume_point {
+    /* Resume from the beginning. */
+    INIT,
+    /* Resume processing. */
+    PROCESS,
+    /* Operation has ended. */
+    END,
+    /* All done. */
+    DONE
+  };
+
   /** Encryption magic bytes for 5.7.11, it's for checking the encryption
   information version. */
   static constexpr char KEY_MAGIC_V1[] = "lCA";
@@ -118,11 +150,11 @@ class Encryption {
   /** Encryption master key prifix */
   static constexpr char MASTER_KEY_PREFIX[] = "INNODBKey";
 
-  /** Default master key for bootstrap */
-  static constexpr char DEFAULT_MASTER_KEY[] = "DefaultMasterKey";
-
   /** Encryption key length */
   static constexpr size_t KEY_LEN = 32;
+
+  /** Default master key for bootstrap */
+  static constexpr char DEFAULT_MASTER_KEY[] = "DefaultMasterKey";
 
   /** Encryption magic bytes size */
   static constexpr size_t MAGIC_SIZE = 3;
@@ -161,7 +193,7 @@ class Encryption {
   static constexpr size_t INFO_MAX_SIZE = INFO_SIZE + sizeof(uint32);
 
   /** Default master key id for bootstrap */
-  static constexpr size_t DEFAULT_MASTER_KEY_ID = 0;
+  static constexpr uint32_t DEFAULT_MASTER_KEY_ID = 0;
 
   /** (De)Encryption Operation information size */
   static constexpr size_t OPERATION_INFO_SIZE = 1;
@@ -175,12 +207,14 @@ class Encryption {
   /** Decryption in progress. */
   static constexpr size_t DECRYPT_IN_PROGRESS = 1 << 1;
 
+  /** Tablespaces whose key needs to be reencrypted */
+  static std::vector<space_id_t> s_tablespaces_to_reencrypt;
+
   /** Default constructor */
   Encryption() noexcept
       : m_type(NONE),
         m_key(nullptr),
         m_klen(0),
-        m_key_allocated(false),
         m_iv(nullptr),
         m_tablespace_key(nullptr),
         m_key_version(0),
@@ -241,7 +275,7 @@ class Encryption {
 
   ~Encryption();
 
-  void set_key(byte *key, ulint key_len) noexcept;
+  void set_key(const byte *key, ulint key_len) noexcept;
 
   void set_key_versions_cache(
       std::map<uint, byte *> *key_versions_cache) noexcept;
@@ -249,27 +283,24 @@ class Encryption {
   /** Check if page is encrypted page or not
   @param[in]  page  page which need to check
   @return true if it is an encrypted page */
-  static bool is_encrypted_page(const byte *page) noexcept
-      MY_ATTRIBUTE((warn_unused_result));
+  [[nodiscard]] static bool is_encrypted_page(const byte *page) noexcept;
 
   /** Check if a log block is encrypted or not
   @param[in]  block block which need to check
   @return true if it is an encrypted block */
-  static bool is_encrypted_log(const byte *block) noexcept
-      MY_ATTRIBUTE((warn_unused_result));
+  [[nodiscard]] static bool is_encrypted_log(const byte *block) noexcept;
 
   /** Check the encryption option and set it
   @param[in]      option      encryption option
   @param[in,out]  type        The encryption type
   @return DB_SUCCESS or DB_UNSUPPORTED */
-  dberr_t set_algorithm(const char *option, Encryption *type) noexcept
-      MY_ATTRIBUTE((warn_unused_result));
+  [[nodiscard]] dberr_t set_algorithm(const char *option,
+                                      Encryption *type) noexcept;
 
   /** Validate the algorithm string.
   @param[in]  option  Encryption option
   @return DB_SUCCESS or error code */
-  static dberr_t validate(const char *option) noexcept
-      MY_ATTRIBUTE((warn_unused_result));
+  [[nodiscard]] static dberr_t validate(const char *option) noexcept;
 
   /** Validate the algorithm string for tablespace
   @param[in]	option		Encryption option
@@ -280,42 +311,35 @@ class Encryption {
   /** Convert to a "string".
   @param[in]  type  The encryption type
   @return the string representation */
-  static const char *to_string(Type type) noexcept
-      MY_ATTRIBUTE((warn_unused_result));
+  [[nodiscard]] static const char *to_string(Type type) noexcept;
 
   /** Check if the string is "" or "n".
   @param[in]  algorithm  Encryption algorithm to check
   @return true if no algorithm requested */
-  static bool is_none(const char *algorithm) noexcept
-      MY_ATTRIBUTE((warn_unused_result));
+  [[nodiscard]] static bool is_none(const char *algorithm) noexcept;
 
   /** Check if the NO algorithm was explicitly specified.
   @param[in]      explicit_encryption was ENCRYPTION clause
                   specified explicitly
   @param[in]      algorithm       Encryption algorithm to check
   @return true if no algorithm explicitly requested */
-  static bool none_explicitly_specified(
-      bool explicit_encryption,
-      const char *algorithm) noexcept MY_ATTRIBUTE((warn_unused_result));
+  MY_NODISCARD static bool none_explicitly_specified(
+      bool explicit_encryption, const char *algorithm) noexcept;
 
   /** Check if the string is "y" or "Y".
   @param[in]      algorithm       Encryption algorithm to check
   @return true if no algorithm requested */
-  static bool is_master_key_encryption(
-      const char *algorithm) noexcept MY_ATTRIBUTE((warn_unused_result));
+  MY_NODISCARD static bool is_master_key_encryption(
+      const char *algorithm) noexcept;
 
-  static bool is_empty(const char *algorithm) noexcept MY_ATTRIBUTE(
-      (warn_unused_result));
+  MY_NODISCARD static bool is_empty(const char *algorithm) noexcept;
 
-  static bool is_keyring(const char *algoritm) noexcept MY_ATTRIBUTE(
-      (warn_unused_result));
+  MY_NODISCARD static bool is_keyring(const char *algoritm) noexcept;
 
-  static bool is_online_encryption_on() noexcept MY_ATTRIBUTE(
-      (warn_unused_result));
+  MY_NODISCARD static bool is_online_encryption_on() noexcept;
 
-  static bool should_be_keyring_encrypted(
-      bool explicit_encryption,
-      const char *algorithm) noexcept MY_ATTRIBUTE((warn_unused_result));
+  MY_NODISCARD static bool should_be_keyring_encrypted(
+      bool explicit_encryption, const char *algorithm) noexcept;
 
   /** Generate random encryption value for key and iv.
   @param[in,out]  value Encryption value */
@@ -353,23 +377,18 @@ class Encryption {
                                  uint tablespace_key_version,
                                  byte **tablespace_key, size_t *key_len);
 
-  /** Create tablespace key
-  @param[in]	key_id          keyring encryption key info
-  @return true  failure
-          false success */
-  static bool create_tablespace_key(const EncryptionKeyId key_id);
-
   /** Get master key by key id.
   @param[in]      master_key_id master key id
   @param[in]      srv_uuid      uuid of server instance
   @param[in,out]  master_key    master key */
-  static void get_master_key(ulint master_key_id, char *srv_uuid,
+  static void get_master_key(uint32_t master_key_id, char *srv_uuid,
                              byte **master_key) noexcept;
 
   /** Get current master key and key id.
   @param[in,out]  master_key_id master key id
   @param[in,out]  master_key    master key */
-  static void get_master_key(ulint *master_key_id, byte **master_key) noexcept;
+  static void get_master_key(uint32_t *master_key_id,
+                             byte **master_key) noexcept;
 
   /** Checks if keyring is installed and it is operational.
    *  This is done by trying to fetch/create
@@ -387,8 +406,9 @@ class Encryption {
   @param[in]      is_boot       if it's for bootstrap
   @param[in]      encrypt_key   encrypt with master key
   @return true if success. */
-  static bool fill_encryption_info(byte *key, byte *iv, byte *encrypt_info,
-                                   bool is_boot, bool encrypt_key) noexcept;
+  static bool fill_encryption_info(const byte *key, const byte *iv,
+                                   byte *encrypt_info, bool is_boot,
+                                   bool encrypt_key) noexcept;
 
   static bool fill_encryption_info(uint key_version, byte *iv,
                                    byte *encrypt_info);
@@ -406,12 +426,13 @@ class Encryption {
                                         byte **master_key) noexcept;
 
   /** Decoding the encryption info from the first page of a tablespace.
-  @param[in,out]  key             key
-  @param[in,out]  iv              iv
+  @param[in]      space_id        Tablespace id
+  @param[in,out]  e_key           key, iv
   @param[in]      encryption_info encryption info
   @param[in]      decrypt_key     decrypt key using master key
   @return true if success */
-  static bool decode_encryption_info(byte *key, byte *iv, byte *encryption_info,
+  static bool decode_encryption_info(space_id_t space_id, Encryption_key &e_key,
+                                     byte *encryption_info,
                                      bool decrypt_key) noexcept;
 
   /** Encrypt the redo log block.
@@ -441,8 +462,8 @@ class Encryption {
   @param[in,out]  dst       destination area
   @param[in,out]  dst_len   size of the destination in bytes
   @return buffer data, dst_len will have the length of the data */
-  byte *encrypt(const IORequest &type, byte *src, ulint src_len, byte *dst,
-                ulint *dst_len) noexcept MY_ATTRIBUTE((warn_unused_result));
+  [[nodiscard]] byte *encrypt(const IORequest &type, byte *src, ulint src_len,
+                              byte *dst, ulint *dst_len) noexcept;
 
   /** Decrypt the log block.
   @param[in]      type  IORequest
@@ -475,8 +496,8 @@ class Encryption {
   @param[in,out]  dst     scratch area to use for decrypt
   @param[in]  dst_len     size of the scratch area in bytes
   @return DB_SUCCESS or error code */
-  dberr_t decrypt(const IORequest &type, byte *src, ulint src_len, byte *dst,
-                  ulint dst_len) noexcept MY_ATTRIBUTE((warn_unused_result));
+  [[nodiscard]] dberr_t decrypt(const IORequest &type, byte *src, ulint src_len,
+                                byte *dst, ulint dst_len) noexcept;
 
   /** Check if keyring plugin loaded. */
   MY_NODISCARD static bool check_keyring() noexcept;
@@ -485,19 +506,21 @@ class Encryption {
   @return encryption type **/
   Type get_type() const;
 
+  /** Check if the encryption algorithm is NONE.
+  @return true if no algorithm is set, false otherwise. */
+  [[nodiscard]] bool is_none() const noexcept { return m_type == NONE; }
+
   /** Set encryption type
   @param[in]  type  encryption type **/
   void set_type(Type type);
-
-  /** Get encryption key
-  @return encryption key **/
-  byte *get_key() const;
 
   std::map<uint, byte *> *get_key_versions_cache() const;
 
   /** Set encryption key
   @param[in]  key  encryption key **/
-  void set_key(byte *key);
+  void set_key(const byte *key);
+
+  bool has_key() const noexcept { return m_key != nullptr; }
 
   /** Get key length
   @return  key length **/
@@ -507,13 +530,9 @@ class Encryption {
   @param[in]  klen  key length **/
   void set_key_length(ulint klen);
 
-  /** Get initial vector
-  @return initial vector **/
-  byte *get_initial_vector() const;
-
   /** Set initial vector
   @param[in]  iv  initial_vector **/
-  void set_initial_vector(byte *iv);
+  void set_initial_vector(const byte *iv);
 
   /** Get tablespace encryption key
   @return tablespace encryption key **/
@@ -557,43 +576,33 @@ class Encryption {
 
   /** Get master key id
   @return master key id **/
-  static ulint get_master_key_id();
-
-  /** Encrypt a page in doublewerite buffer. The page is
-  encrypted using its tablespace key.
-  @param[in]	space_id	tablespace id
-  @param[in]	in_page		unencrypted page
-  @param[out]	enc_block	encrypted block
-  @param[out]	enc_block_len	encrypted block len
-  @return true if encrypted, else false */
-  static bool dblwr_encrypt_page(fil_space_t *space, page_t *in_page,
-                                 file::Block_ptr &enc_block,
-                                 ulint &enc_block_len);
-
-  /** Decrypt a page from doublewrite buffer. Tablespace object
-  (fil_space_t) must have encryption key, iv set properly.
-  The decrpyted page will be written in the same buffer of input page.
-  @param[in]		space	tablespace obejct
-  @param[in,out]	page	in: encrypted page
-                                out: decrypted page
-  @return true on success, false on failure */
-  static bool dblwr_decrypt_page(fil_space_t *space, page_t *in_page);
+  static uint32_t get_master_key_id();
 
  private:
+  /** Encrypt the page data contents. Page type can't be
+  FIL_PAGE_ENCRYPTED, FIL_PAGE_COMPRESSED_AND_ENCRYPTED,
+  FIL_PAGE_ENCRYPTED_RTREE.
+  @param[in]  type      IORequest
+  @param[in]  src       page data which need to encrypt
+  @param[in]  src_len   size of the source in bytes
+  @param[in,out]  dst       destination area
+  @param[in,out]  dst_len   size of the destination in bytes
+  @return true if operation successful, false otherwise. */
+  [[nodiscard]] bool encrypt_low(const IORequest &type, byte *src,
+                                 ulint src_len, byte *dst,
+                                 ulint *dst_len) noexcept;
+
   /** Encrypt type */
   Type m_type;
 
   /** Encrypt key */
-  byte *m_key;
+  const byte *m_key;
 
   /** Encrypt key length*/
   ulint m_klen;
 
-  /** Encrypt key allocated */
-  bool m_key_allocated;
-
   /** Encrypt initial vector */
-  byte *m_iv;
+  const byte *m_iv;
 
   byte *m_tablespace_key;
 
@@ -611,7 +620,7 @@ class Encryption {
   std::map<uint, byte *> *m_key_versions_cache;
 
   /** Current master key id */
-  static ulint s_master_key_id;
+  static uint32_t s_master_key_id;
 
   /** Current uuid of server instance */
   static char s_uuid[SERVER_UUID_LEN + 1];
@@ -629,13 +638,14 @@ class Encryption {
                             uint key_version);
 };
 
-/** Encrypt a page in doublewerite buffer. The page is
-encrypted using its tablespace key.
-@param[in]	space_id	tablespace id
-@param[in]	page		unencrypted page
-@param[out]	enc_block	encrypted block
-@param[out]	enc_block_len	encrypted block len
-@return true if encrypted, else false */
-bool os_dblwr_encrypt_page(space_id_t space_id, page_t *in_page,
-                           file::Block_ptr &enc_block, ulint &enc_block_len);
+struct Encryption_key {
+  /** Encrypt key */
+  byte *m_key;
+
+  /** Encrypt initial vector */
+  byte *m_iv;
+
+  /** Master key id */
+  uint32_t m_master_key_id{Encryption::DEFAULT_MASTER_KEY_ID};
+};
 #endif /* os0enc_h */

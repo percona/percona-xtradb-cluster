@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1994, 2019, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1994, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -64,8 +64,8 @@ bool dtuple_coll_eq(const dtuple_t *tuple1, const dtuple_t *tuple2) {
 
   ut_ad(tuple1 != nullptr);
   ut_ad(tuple2 != nullptr);
-  ut_ad(tuple1->magic_n == DATA_TUPLE_MAGIC_N);
-  ut_ad(tuple2->magic_n == DATA_TUPLE_MAGIC_N);
+  ut_ad(tuple1->magic_n == dtuple_t::MAGIC_N);
+  ut_ad(tuple2->magic_n == dtuple_t::MAGIC_N);
   ut_ad(dtuple_check_typed(tuple1));
   ut_ad(dtuple_check_typed(tuple2));
 
@@ -146,7 +146,7 @@ static bool dtuple_check_typed_no_assert(const dtuple_t *tuple) {
 bool dfield_check_typed(const dfield_t *field) {
   if (dfield_get_type(field)->mtype > DATA_MTYPE_CURRENT_MAX ||
       dfield_get_type(field)->mtype < DATA_MTYPE_CURRENT_MIN) {
-    ib::fatal(ER_IB_MSG_158)
+    ib::fatal(UT_LOCATION_HERE, ER_IB_MSG_158)
         << "Data field type " << dfield_get_type(field)->mtype << ", len "
         << dfield_get_len(field);
   }
@@ -168,7 +168,7 @@ bool dtuple_check_typed(const dtuple_t *tuple) {
 }
 
 bool dtuple_validate(const dtuple_t *tuple) {
-  ut_ad(tuple->magic_n == DATA_TUPLE_MAGIC_N);
+  ut_ad(tuple->magic_n == dtuple_t::MAGIC_N);
 
   auto n_fields = dtuple_get_n_fields(tuple);
 
@@ -330,7 +330,7 @@ void dfield_print_also_hex(const dfield_t *dfield) {
       }
 
       data = static_cast<byte *>(dfield_get_data(dfield));
-      /* fall through */
+      [[fallthrough]];
 
     case DATA_BINARY:
     default:
@@ -824,7 +824,7 @@ bool is_multi_value_clust_and_sec_equal(const byte *clust_field,
     return (false);
   }
 
-  ut_ad(clust_len == 0);
+  ut_ad(clust_len == UNIV_MULTI_VALUE_ARRAY_MARKER);
 
   const multi_value_data *multi_value =
       reinterpret_cast<const multi_value_data *>(clust_field);

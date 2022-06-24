@@ -1065,7 +1065,7 @@ show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `a` text CHARACTER SET utf8 COLLATE utf8_general_ci
-) ENGINE=InnoDB DEFAULT CHARSET=utf8
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3
 drop table t1;
 create table t1 (a mediumtext character set latin1);
 alter table t1 convert to character set utf8;
@@ -1075,7 +1075,7 @@ show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `a` longtext CHARACTER SET utf8 COLLATE utf8_general_ci
-) ENGINE=InnoDB DEFAULT CHARSET=utf8
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3
 drop table t1;
 End of 5.0 tests
 create table t1 (i int);
@@ -2003,16 +2003,12 @@ CREATE TABLE db (dummy int) ENGINE=memory;
 ERROR HY000: Storage engine 'MEMORY' does not support system tables. [mysql.db]
 CREATE TABLE user (dummy int) ENGINE=memory;
 ERROR HY000: Storage engine 'MEMORY' does not support system tables. [mysql.user]
-CREATE TABLE func (dummy int) ENGINE=csv;
-ERROR HY000: Storage engine 'CSV' does not support system tables. [mysql.func]
 CREATE TABLE servers (dummy int) ENGINE=merge;
 ERROR HY000: Storage engine 'MRG_MYISAM' does not support system tables. [mysql.servers]
 CREATE TABLE procs_priv (dummy int) ENGINE=memory;
 ERROR HY000: Storage engine 'MEMORY' does not support system tables. [mysql.procs_priv]
 CREATE TABLE tables_priv (dummy int) ENGINE=heap;
 ERROR HY000: Storage engine 'MEMORY' does not support system tables. [mysql.tables_priv]
-CREATE TABLE columns_priv (dummy int) ENGINE=csv;
-ERROR HY000: Storage engine 'CSV' does not support system tables. [mysql.columns_priv]
 CREATE TABLE time_zone (dummy int) ENGINE=merge;
 ERROR HY000: Storage engine 'MRG_MYISAM' does not support system tables. [mysql.time_zone]
 CREATE TABLE help_topic (dummy int) ENGINE=merge;
@@ -3006,7 +3002,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `fld1` int NOT NULL,
   PRIMARY KEY (`fld1`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3
 # Without fix, the temporary .frm file is not cleaned up.
 DROP TABLE t1;
 # Test cases added for coverage.
@@ -3028,7 +3024,7 @@ t1	CREATE TABLE `t1` (
   `fld1` int NOT NULL,
   `fld2` char(10) CHARACTER SET gbk DEFAULT NULL,
   PRIMARY KEY (`fld1`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3
 DROP TABLE t1;
 #
 # Bug#22227958: ASSERT IN DD::FILL_DD_TABLE_FROM_CREATE_INFO, DDL
@@ -3956,13 +3952,13 @@ Warnings:
 Warning	1265	Data truncated for column 'my_t3_fld1' at row 1
 SELECT LENGTH(my_t1_fld1) FROM t1;
 LENGTH(my_t1_fld1)
-44
+255
 SELECT LENGTH(my_t2_fld1) FROM t2;
 LENGTH(my_t2_fld1)
-144
+65535
 SELECT LENGTH(my_t3_fld1) FROM t3;
 LENGTH(my_t3_fld1)
-84
+16777215
 DROP TABLE t1, t2, t3;
 SET SQL_MODE=default;
 SET GLOBAL max_allowed_packet=default;

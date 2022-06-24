@@ -1,4 +1,4 @@
-/* Copyright (c) 2015, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2015, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -191,7 +191,8 @@ static int sql_start_result_metadata(void *ctx, uint num_cols, uint,
   struct st_plugin_ctx *pctx = (struct st_plugin_ctx *)ctx;
   DBUG_TRACE;
   DBUG_PRINT("info", ("resultcs->number: %d", resultcs->number));
-  DBUG_PRINT("info", ("resultcs->csname: %s", resultcs->csname));
+  DBUG_PRINT("info",
+             ("resultcs->csname: %s", replace_utf8_utf8mb3(resultcs->csname)));
   DBUG_PRINT("info", ("resultcs->name: %s", resultcs->name));
   pctx->num_cols = num_cols;
   pctx->resultcs = resultcs;
@@ -455,6 +456,7 @@ const struct st_command_service_cbs protocol_callbacks = {
     sql_handle_ok,
     sql_handle_error,
     sql_shutdown,
+    nullptr,
 };
 
 #define WRITE_DASHED_LINE() \
@@ -584,7 +586,8 @@ static void dump_cs_info(const CHARSET_INFO *cs) {
   }
 
   WRITE_VAL("\t\t[meta][charset result] number: %d\n", cs->number);
-  WRITE_VAL("\t\t[meta][charset result] name: %s\n", cs->csname);
+  WRITE_VAL("\t\t[meta][charset result] name: %s\n",
+            replace_utf8_utf8mb3(cs->csname));
   WRITE_VAL("\t\t[meta][charset result] collation: %s\n", cs->name);
   WRITE_VAL("\t\t[meta][charset result] sort order: %s\n", cs->sort_order);
 }
@@ -703,6 +706,7 @@ static void dump_closing_ok(struct st_plugin_ctx *ctx) {
 static void set_query_in_com_data(const char *query, union COM_DATA *cmd) {
   char buffer[STRING_BUFFER_SIZE];
 
+  memset(cmd, 0, sizeof(union COM_DATA));
   cmd->com_query.query = query;
   cmd->com_query.length = strlen(query);
   WRITE_VAL2("EXECUTING:[%u][%s]\n", cmd->com_query.length, query);
@@ -710,7 +714,7 @@ static void set_query_in_com_data(const char *query, union COM_DATA *cmd) {
 
 static void run_statement(MYSQL_SESSION session, const char *query,
                           struct st_plugin_ctx *ctx, bool generates_result_set,
-                          void *p MY_ATTRIBUTE((unused))) {
+                          void *p [[maybe_unused]]) {
   char buffer[STRING_BUFFER_SIZE];
   COM_DATA cmd;
 
@@ -748,7 +752,7 @@ again:
 
 void static change_current_db(MYSQL_SESSION session, const char *db,
                               struct st_plugin_ctx *ctx,
-                              void *p MY_ATTRIBUTE((unused))) {
+                              void *p [[maybe_unused]]) {
   char buffer[STRING_BUFFER_SIZE];
   COM_DATA cmd;
   cmd.com_init_db.db_name = db;
@@ -889,7 +893,7 @@ static int test_sql_service_plugin_init(void *p) {
   return 0;
 }
 
-static int test_sql_service_plugin_deinit(void *p MY_ATTRIBUTE((unused))) {
+static int test_sql_service_plugin_deinit(void *p [[maybe_unused]]) {
   DBUG_TRACE;
   LogPluginErr(INFORMATION_LEVEL, ER_LOG_PRINTF_MSG, "Uninstallation.");
   deinit_logging_service_for_plugin(&reg_srv, &log_bi, &log_bs);

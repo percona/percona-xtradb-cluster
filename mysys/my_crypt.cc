@@ -107,7 +107,7 @@ MyEncryptionCTX::~MyEncryptionCTX() {
 
 int MyEncryptionCTX::init(const my_aes_mode mode, int encrypt, const uchar *key,
                           size_t klen, const uchar *iv,
-                          size_t ivlen MY_ATTRIBUTE((unused))) noexcept {
+                          size_t ivlen [[maybe_unused]]) noexcept {
   if (unlikely(!ciphers[static_cast<int>(mode)](klen)))
     return MY_AES_BAD_KEYSIZE;
 
@@ -115,21 +115,25 @@ int MyEncryptionCTX::init(const my_aes_mode mode, int encrypt, const uchar *key,
                          iv, encrypt))
     return MY_AES_OPENSSL_ERROR;
 
-  DBUG_ASSERT(EVP_CIPHER_CTX_key_length(ctx) == (int)klen);
-  DBUG_ASSERT(EVP_CIPHER_CTX_iv_length(ctx) <= (int)ivlen);
+  assert(EVP_CIPHER_CTX_key_length(ctx) == (int)klen);
+  assert(EVP_CIPHER_CTX_iv_length(ctx) <= (int)ivlen);
 
   return MY_AES_OK;
 }
 
 int MyEncryptionCTX::update(const uchar *src, size_t slen, uchar *dst,
                             size_t *dlen) noexcept {
-  if (!EVP_CipherUpdate(ctx, dst, (int *)dlen, src, slen))
+  int out_len;
+  if (!EVP_CipherUpdate(ctx, dst, &out_len, src, slen))
     return MY_AES_OPENSSL_ERROR;
+  *dlen = out_len;
   return MY_AES_OK;
 }
 
 int MyEncryptionCTX::finish(uchar *dst, size_t *dlen) {
-  if (!EVP_CipherFinal_ex(ctx, dst, (int *)dlen)) return MY_AES_BAD_DATA;
+  int out_len;
+  if (!EVP_CipherFinal_ex(ctx, dst, &out_len)) return MY_AES_BAD_DATA;
+  *dlen = out_len;
   return MY_AES_OK;
 }
 
@@ -138,18 +142,18 @@ typedef MyEncryptionCTX MyEncryptionCTX_ctr;
 class MyEncryptionCTX_nopad final : public MyEncryptionCTX {
  public:
   MyEncryptionCTX_nopad() : MyEncryptionCTX() {}
-  virtual ~MyEncryptionCTX_nopad() {}
+  ~MyEncryptionCTX_nopad() override {}
 
   int init(const my_aes_mode mode, int encrypt, const uchar *key, size_t klen,
-           const uchar *iv, size_t ivlen) noexcept {
+           const uchar *iv, size_t ivlen) noexcept override {
     this->key = key;
     this->klen = klen;
     this->buf_len = 0;
     if (iv) {
       memcpy(oiv, iv, ivlen);
-      DBUG_ASSERT(ivlen == sizeof(oiv));
+      assert(ivlen == sizeof(oiv));
     } else {
-      DBUG_ASSERT(ivlen == 0);
+      assert(ivlen == 0);
     }
 
     int res = MyEncryptionCTX::init(mode, encrypt, key, klen, iv, ivlen);
@@ -157,12 +161,13 @@ class MyEncryptionCTX_nopad final : public MyEncryptionCTX {
     return res;
   }
 
-  int update(const uchar *src, size_t slen, uchar *dst, size_t *dlen) noexcept {
+  int update(const uchar *src, size_t slen, uchar *dst,
+             size_t *dlen) noexcept override {
     buf_len += slen;
     return MyEncryptionCTX::update(src, slen, dst, dlen);
   }
 
-  int finish(uchar *dst, size_t *dlen) {
+  int finish(uchar *dst, size_t *dlen) override {
     buf_len %= MY_AES_BLOCK_SIZE;
     if (buf_len) {
       uchar *buf = EVP_CIPHER_CTX_buf_noconst(ctx);
@@ -182,7 +187,7 @@ class MyEncryptionCTX_nopad final : public MyEncryptionCTX {
           my_aes_mode::ECB, ENCRYPTION_FLAG_ENCRYPT | ENCRYPTION_FLAG_NOPAD,
           oiv, sizeof(mask), mask, &mlen, key, klen, nullptr, 0);
       if (result != MY_AES_OK) return result;
-      DBUG_ASSERT(mlen == sizeof(mask));
+      assert(mlen == sizeof(mask));
 
       for (uint i = 0; i < buf_len; i++) dst[i] = buf[i] ^ mask[i];
     }
@@ -207,10 +212,10 @@ class MyEncryptionCTX_nopad final : public MyEncryptionCTX {
 class MyEncryptionCTX_gcm final : public MyEncryptionCTX {
  public:
   MyEncryptionCTX_gcm() : MyEncryptionCTX() {}
-  virtual ~MyEncryptionCTX_gcm() {}
+  ~MyEncryptionCTX_gcm() override {}
 
   int init(const my_aes_mode mode, int encrypt, const uchar *key, size_t klen,
-           const uchar *iv, size_t ivlen) noexcept {
+           const uchar *iv, size_t ivlen) noexcept override {
     int res = MyEncryptionCTX::init(mode, encrypt, key, klen, iv, ivlen);
     int real_ivlen = EVP_CIPHER_CTX_iv_length(ctx);
     aad = iv + real_ivlen;
@@ -218,7 +223,8 @@ class MyEncryptionCTX_gcm final : public MyEncryptionCTX {
     return res;
   }
 
-  int update(const uchar *src, size_t slen, uchar *dst, size_t *dlen) noexcept {
+  int update(const uchar *src, size_t slen, uchar *dst,
+             size_t *dlen) noexcept override {
     /*
       note that this GCM class cannot do streaming decryption, because
       it needs the tag (which is located at the end of encrypted data)
@@ -240,10 +246,10 @@ class MyEncryptionCTX_gcm final : public MyEncryptionCTX {
     return MyEncryptionCTX::update(src, slen, dst, dlen);
   }
 
-  int finish(uchar *dst, size_t *dlen) noexcept {
+  int finish(uchar *dst, size_t *dlen) noexcept override {
     int fin;
     if (!EVP_CipherFinal_ex(ctx, dst, &fin)) return MY_AES_BAD_DATA;
-    DBUG_ASSERT(fin == 0);
+    assert(fin == 0);
 
     if (EVP_CIPHER_CTX_encrypting(ctx)) {
       if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, MY_AES_BLOCK_SIZE,
@@ -281,7 +287,8 @@ int my_aes_crypt_init(MyEncryptionCTX *&ctx, const my_aes_mode mode, int flags,
     ctx = (flags & ENCRYPTION_FLAG_NOPAD) ? new MyEncryptionCTX_nopad()
                                           : new MyEncryptionCTX();
 
-  int ctx_init_result = ctx->init(mode, flags & 1, key, klen, iv, ivlen);
+  int ctx_init_result =
+      ctx->init(mode, flags & ENCRYPTION_FLAG_ENCRYPT, key, klen, iv, ivlen);
   if (ctx_init_result != MY_AES_OK) {
     delete ctx;
     ctx = NULL;
@@ -328,7 +335,7 @@ int my_aes_crypt(const my_aes_mode mode, int flags, const uchar *src,
   Without padding (ENCRYPTION_FLAG_NOPAD) cyphertext has the same length
   as the plaintext
 */
-size_t my_aes_crypt_get_size(enum my_aes_mode mode MY_ATTRIBUTE((unused)),
+size_t my_aes_crypt_get_size(enum my_aes_mode mode [[maybe_unused]],
                              size_t source_length) noexcept {
 #ifdef HAVE_EncryptAes128Ctr
   if (mode == MY_AES_CTR) return source_length;

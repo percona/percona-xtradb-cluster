@@ -12,6 +12,7 @@ binary_log_transaction_compression_stats
 cond_instances
 data_lock_waits
 data_locks
+error_log
 events_errors_summary_by_account_by_error
 events_errors_summary_by_host_by_error
 events_errors_summary_by_thread_by_error
@@ -61,8 +62,11 @@ global_status
 global_variables
 host_cache
 hosts
+keyring_component_status
 keyring_keys
 log_status
+malloc_stats
+malloc_stats_totals
 memory_summary_by_account_by_event_name
 memory_summary_by_host_by_event_name
 memory_summary_by_thread_by_event_name
@@ -74,12 +78,16 @@ objects_summary_global_by_type
 performance_timers
 persisted_variables
 prepared_statements_instances
+processlist
+pxc_cluster_view
 replication_applier_configuration
 replication_applier_filters
 replication_applier_global_filters
 replication_applier_status
 replication_applier_status_by_coordinator
 replication_applier_status_by_worker
+replication_asynchronous_connection_failover
+replication_asynchronous_connection_failover_managed
 replication_connection_configuration
 replication_connection_status
 replication_group_member_stats
@@ -409,13 +417,13 @@ events_statements_summary_by_digest	CREATE TABLE `events_statements_summary_by_d
   `SUM_SORT_SCAN` bigint unsigned NOT NULL,
   `SUM_NO_INDEX_USED` bigint unsigned NOT NULL,
   `SUM_NO_GOOD_INDEX_USED` bigint unsigned NOT NULL,
-  `FIRST_SEEN` timestamp(6) NOT NULL DEFAULT '0000-00-00 00:00:00.000000',
-  `LAST_SEEN` timestamp(6) NOT NULL DEFAULT '0000-00-00 00:00:00.000000',
+  `FIRST_SEEN` timestamp(6) NOT NULL,
+  `LAST_SEEN` timestamp(6) NOT NULL,
   `QUANTILE_95` bigint unsigned NOT NULL,
   `QUANTILE_99` bigint unsigned NOT NULL,
   `QUANTILE_999` bigint unsigned NOT NULL,
   `QUERY_SAMPLE_TEXT` longtext,
-  `QUERY_SAMPLE_SEEN` timestamp(6) NOT NULL DEFAULT '0000-00-00 00:00:00.000000',
+  `QUERY_SAMPLE_SEEN` timestamp(6) NOT NULL,
   `QUERY_SAMPLE_TIMER_WAIT` bigint unsigned NOT NULL,
   UNIQUE KEY `SCHEMA_NAME` (`SCHEMA_NAME`,`DIGEST`)
 ) ENGINE=PERFORMANCE_SCHEMA DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
@@ -1114,10 +1122,10 @@ host_cache	CREATE TABLE `host_cache` (
   `COUNT_INIT_CONNECT_ERRORS` bigint NOT NULL,
   `COUNT_LOCAL_ERRORS` bigint NOT NULL,
   `COUNT_UNKNOWN_ERRORS` bigint NOT NULL,
-  `FIRST_SEEN` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `LAST_SEEN` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `FIRST_ERROR_SEEN` timestamp NULL DEFAULT '0000-00-00 00:00:00',
-  `LAST_ERROR_SEEN` timestamp NULL DEFAULT '0000-00-00 00:00:00',
+  `FIRST_SEEN` timestamp NOT NULL,
+  `LAST_SEEN` timestamp NOT NULL,
+  `FIRST_ERROR_SEEN` timestamp NULL DEFAULT NULL,
+  `LAST_ERROR_SEEN` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`IP`),
   KEY `HOST` (`HOST`)
 ) ENGINE=PERFORMANCE_SCHEMA DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
@@ -1128,6 +1136,25 @@ hosts	CREATE TABLE `hosts` (
   `CURRENT_CONNECTIONS` bigint NOT NULL,
   `TOTAL_CONNECTIONS` bigint NOT NULL,
   UNIQUE KEY `HOST` (`HOST`)
+) ENGINE=PERFORMANCE_SCHEMA DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+show create table malloc_stats;
+Table	Create Table
+malloc_stats	CREATE TABLE `malloc_stats` (
+  `TYPE` char(8) NOT NULL,
+  `ALLOCATED` bigint unsigned NOT NULL,
+  `NMALLOC` bigint unsigned NOT NULL,
+  `NDALLOC` bigint unsigned NOT NULL,
+  `NREQUESTS` bigint unsigned NOT NULL
+) ENGINE=PERFORMANCE_SCHEMA DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+show create table malloc_stats_totals;
+Table	Create Table
+malloc_stats_totals	CREATE TABLE `malloc_stats_totals` (
+  `ALLOCATED` bigint unsigned NOT NULL,
+  `ACTIVE` bigint unsigned NOT NULL,
+  `MAPPED` bigint unsigned NOT NULL,
+  `RESIDENT` bigint unsigned NOT NULL,
+  `RETAINED` bigint unsigned NOT NULL,
+  `METADATA` bigint unsigned NOT NULL
 ) ENGINE=PERFORMANCE_SCHEMA DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 show create table mutex_instances;
 Table	Create Table

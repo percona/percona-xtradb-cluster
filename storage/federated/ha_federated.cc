@@ -1,4 +1,4 @@
-/* Copyright (c) 2004, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2004, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -459,8 +459,8 @@ static PSI_memory_info all_federated_memory[] = {
 
 #ifdef HAVE_PSI_INTERFACE
 static void init_federated_psi_keys(void) {
-  const char *category MY_ATTRIBUTE((unused)) = "federated";
-  int count MY_ATTRIBUTE((unused));
+  const char *category [[maybe_unused]] = "federated";
+  int count [[maybe_unused]];
 
 #ifdef HAVE_PSI_MUTEX_INTERFACE
   count = static_cast<int>(array_elements(all_federated_mutexes));
@@ -1371,7 +1371,7 @@ bool ha_federated::create_where_from_key(String *to, KEY *key_info,
             }
             break;
           }
-          // Fall through.
+          [[fallthrough]];
         case HA_READ_KEY_OR_NEXT:
           DBUG_PRINT("info", ("federated HA_READ_KEY_OR_NEXT %d", i));
           if (emit_key_part_name(&tmp, key_part) ||
@@ -1390,7 +1390,7 @@ bool ha_federated::create_where_from_key(String *to, KEY *key_info,
               goto err;
             break;
           }
-          // Fall through.
+          [[fallthrough]];
         case HA_READ_KEY_OR_PREV:
           DBUG_PRINT("info", ("federated HA_READ_KEY_OR_PREV %d", i));
           if (emit_key_part_name(&tmp, key_part) ||
@@ -1408,7 +1408,7 @@ bool ha_federated::create_where_from_key(String *to, KEY *key_info,
     prepare_for_next_key_part:
       if (store_length >= length) break;
       DBUG_PRINT("info", ("remainder %d", remainder));
-      DBUG_ASSERT(remainder > 1);
+      assert(remainder > 1);
       length -= store_length;
       /*
         For nullable columns, null-byte is already skipped before, that is
@@ -1449,7 +1449,6 @@ static FEDERATED_SHARE *get_share(const char *table_name, TABLE *table) {
   Field **field;
   String query(query_buffer, sizeof(query_buffer), &my_charset_bin);
   FEDERATED_SHARE *share = nullptr, tmp_share;
-  MEM_ROOT mem_root;
   DBUG_TRACE;
 
   /*
@@ -1458,7 +1457,7 @@ static FEDERATED_SHARE *get_share(const char *table_name, TABLE *table) {
   */
   query.length(0);
 
-  init_alloc_root(fe_key_memory_federated_share, &mem_root, 256, 0);
+  MEM_ROOT mem_root(fe_key_memory_federated_share, 256);
 
   mysql_mutex_lock(&federated_mutex);
 
@@ -1530,7 +1529,7 @@ static int free_share(FEDERATED_SHARE *share) {
     thr_lock_delete(&share->lock);
     mysql_mutex_destroy(&share->mutex);
     MEM_ROOT mem_root = std::move(share->mem_root);
-    free_root(&mem_root, MYF(0));
+    mem_root.Clear();
   }
   mysql_mutex_unlock(&federated_mutex);
 
@@ -1566,7 +1565,7 @@ int ha_federated::open(const char *name, int, uint, const dd::Table *) {
   if (!(share = get_share(name, table))) return 1;
   thr_lock_data_init(&share->lock, &lock, nullptr);
 
-  DBUG_ASSERT(mysql == nullptr);
+  assert(mysql == nullptr);
 
   ref_length = sizeof(MYSQL_RES *) + sizeof(MYSQL_ROW_OFFSET);
   DBUG_PRINT("info", ("ref_length: %u", ref_length));
@@ -1865,7 +1864,7 @@ void ha_federated::start_bulk_insert(ha_rows rows) {
 
   page_size = (uint)my_getpagesize();
 
-  if (init_dynamic_string(&bulk_insert, nullptr, page_size, page_size)) return;
+  if (init_dynamic_string(&bulk_insert, nullptr, page_size)) return;
 
   bulk_insert.length = 0;
 }
@@ -2340,7 +2339,7 @@ int ha_federated::read_range_first(const key_range *start_key,
   String sql_query(sql_query_buffer, sizeof(sql_query_buffer), &my_charset_bin);
   DBUG_TRACE;
 
-  DBUG_ASSERT(!(start_key == nullptr && end_key == nullptr));
+  assert(!(start_key == nullptr && end_key == nullptr));
 
   sql_query.length(0);
   sql_query.append(share->select_query);
@@ -2538,10 +2537,10 @@ int ha_federated::read_next(uchar *buf, MYSQL_RES *result) {
   @param[in]  record  record data (unused)
 */
 
-void ha_federated::position(const uchar *record MY_ATTRIBUTE((unused))) {
+void ha_federated::position(const uchar *record [[maybe_unused]]) {
   DBUG_TRACE;
 
-  DBUG_ASSERT(stored_result);
+  assert(stored_result);
 
   position_called = true;
   /* Store result set address. */
@@ -2569,7 +2568,7 @@ int ha_federated::rnd_pos(uchar *buf, uchar *pos) {
 
   /* Get stored result set. */
   memcpy(&result, pos, sizeof(MYSQL_RES *));
-  DBUG_ASSERT(result);
+  assert(result);
   /* Set data cursor position. */
   memcpy(&result->data_cursor, pos + sizeof(MYSQL_RES *),
          sizeof(MYSQL_ROW_OFFSET));
@@ -2777,7 +2776,7 @@ int ha_federated::reset(void) {
   Item_sum_count_distinct::clear(), and Item_func_group_concat::clear().
   Called from sql_delete.cc by mysql_delete().
   Called from sql_select.cc by JOIN::reinit().
-  Called from sql_union.cc by st_select_lex_unit::exec().
+  Called from sql_union.cc by st_query_block_query_expression::exec().
 */
 
 int ha_federated::delete_all_rows() {
@@ -2924,7 +2923,7 @@ int ha_federated::real_connect() {
   */
   mysql_mutex_assert_not_owner(&LOCK_open);
 
-  DBUG_ASSERT(mysql == nullptr);
+  assert(mysql == nullptr);
 
   if (!(mysql = mysql_init(nullptr))) {
     remote_error_number = HA_ERR_OUT_OF_MEM;

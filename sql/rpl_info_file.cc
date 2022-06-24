@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -466,10 +466,7 @@ char *Rpl_info_file::do_get_description_info() { return info_fname; }
 
 bool Rpl_info_file::do_is_transactional() { return false; }
 
-bool Rpl_info_file::do_update_is_transactional() {
-  DBUG_EXECUTE_IF("simulate_update_is_transactional_error", { return true; });
-  return false;
-}
+bool Rpl_info_file::do_update_is_transactional() { return false; }
 
 uint Rpl_info_file::do_get_rpl_info_type() { return INFO_REPOSITORY_FILE; }
 

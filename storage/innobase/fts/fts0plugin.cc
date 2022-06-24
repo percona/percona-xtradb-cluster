@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2013, 2019, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2013, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -112,7 +112,7 @@ static int fts_query_add_word_for_parser(
       if (cur_node->type != FTS_AST_PARSER_PHRASE_LIST) {
         break;
       }
-      // Fall through.
+      [[fallthrough]];
 
     case FT_TOKEN_WORD:
       term_node = fts_ast_create_node_term_for_parser(state, word, word_len);

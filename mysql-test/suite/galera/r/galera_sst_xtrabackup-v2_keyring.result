@@ -1,3 +1,4 @@
+include/assert_grep.inc [Keyring plugin requires SST encryption]
 SELECT 1;
 1
 1
@@ -9,6 +10,14 @@ PRIMARY KEY (id)
 ) ENCRYPTION='Y';
 INSERT INTO e1(text) VALUES('aaaaa');
 INSERT INTO e1(text) VALUES('bbbbb');
+Restarting node 2 ...
+# restart
+select * from e1;
+id	text
+1	aaaaa
+2	bbbbb
+Killing server ...
+ALTER INSTANCE ROTATE INNODB MASTER KEY;
 Restarting node 2 ...
 # restart
 select * from e1;

@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+  Copyright (c) 2018, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -44,14 +44,14 @@ using mysql_harness::DynamicState;
 
 class DynamicConfigTest : public ::testing::Test {
  protected:
-  virtual void SetUp() {}
+  void SetUp() override {}
 };
 
 namespace {
 
 std::string conf_to_str(DynamicState &conf, bool pretty = false) {
   std::stringstream ss;
-  conf.save_to_stream(ss, pretty);
+  conf.save_to_stream(ss, false, pretty);
   return ss.str();
 }
 

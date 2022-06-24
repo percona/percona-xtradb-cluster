@@ -1,4 +1,4 @@
-/* Copyright (c) 2006, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2006, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -42,8 +42,8 @@
 #include "sql/log.h"
 #include "sql/mysqld.h"  // sync_masterinfo_period
 #include "sql/rpl_info_handler.h"
-#include "sql/rpl_msr.h"    // channel_map
-#include "sql/rpl_slave.h"  // master_retry_count
+#include "sql/rpl_msr.h"      // channel_map
+#include "sql/rpl_replica.h"  // master_retry_count
 #include "sql/sql_class.h"
 
 enum {
@@ -100,8 +100,14 @@ enum {
   /* line for tls_ciphersuites */
   LINE_FOR_TLS_CIPHERSUITES = 31,
 
+  /* line for source_connection_auto_failover */
+  LINE_FOR_SOURCE_CONNECTION_AUTO_FAILOVER = 32,
+
+  /* line for gtid_only */
+  LINE_FOR_GTID_ONLY = 33,
+
   /* Number of lines currently used when saving master info file */
-  LINES_IN_MASTER_INFO = LINE_FOR_TLS_CIPHERSUITES
+  LINES_IN_MASTER_INFO = LINE_FOR_GTID_ONLY
 
 };
 
@@ -140,7 +146,9 @@ const char *info_mi_fields[] = {"number_of_lines",
                                 "network_namespace",
                                 "master_compression_algorithm",
                                 "master_zstd_compression_level",
-                                "tls_ciphersuites"};
+                                "tls_ciphersuites",
+                                "source_connection_auto_failover",
+                                "gtid_only"};
 
 const uint info_mi_table_pk_field_indexes[] = {
     LINE_FOR_CHANNEL - 1,
@@ -189,7 +197,9 @@ Master_info::Master_info(
       auto_position(false),
       transaction_parser(
           Transaction_boundary_parser::TRX_BOUNDARY_PARSER_RECEIVER),
-      reset(false) {
+      reset(false),
+      m_gtid_only_mode(false),
+      m_is_receiver_position_info_invalid(false) {
   host[0] = 0;
   user[0] = 0;
   bind_addr[0] = 0;
@@ -265,8 +275,7 @@ void Master_info::request_rotate(THD *thd) {
          transaction to end.
     */
     const char dbug_signal[] = "now SIGNAL signal.rpl_requested_for_a_flush";
-    DBUG_ASSERT(
-        !debug_sync_set_action(current_thd, STRING_WITH_LEN(dbug_signal)));
+    assert(!debug_sync_set_action(current_thd, STRING_WITH_LEN(dbug_signal)));
   });
 
   while (this->rotate_requested.load() && !thd->killed)
@@ -289,8 +298,7 @@ void Master_info::clear_rotate_requests() {
            the deferred flushing of the relay log.
       */
       const char dbug_signal[] = "now SIGNAL signal.rpl_broadcasted_rotate_end";
-      DBUG_ASSERT(
-          !debug_sync_set_action(current_thd, STRING_WITH_LEN(dbug_signal)));
+      assert(!debug_sync_set_action(current_thd, STRING_WITH_LEN(dbug_signal)));
     });
   }
 }
@@ -611,7 +619,7 @@ bool Master_info::read_info(Rpl_info_handler *from) {
                algorithm_name, channel);
         strcpy(compression_algorithm, COMPRESSION_ALGORITHM_UNCOMPRESSED);
       } else {
-        DBUG_ASSERT(strlen(algorithm_name) < sizeof(compression_algorithm));
+        assert(strlen(algorithm_name) < sizeof(compression_algorithm));
         strcpy(compression_algorithm, algorithm_name);
       }
     }
@@ -643,14 +651,27 @@ bool Master_info::read_info(Rpl_info_handler *from) {
       tls_ciphersuites.first = true;
       tls_ciphersuites.second.clear();
     } else {
-      DBUG_ASSERT(
-          status ==
-          Rpl_info_handler::enum_field_get_status::FIELD_VALUE_NOT_NULL);
+      assert(status ==
+             Rpl_info_handler::enum_field_get_status::FIELD_VALUE_NOT_NULL);
       tls_ciphersuites.first = false;
       tls_ciphersuites.second.assign(buffer);
     }
   }
 
+  if (lines >= LINE_FOR_SOURCE_CONNECTION_AUTO_FAILOVER) {
+    auto temp_source_connection_auto_failover{0};
+    if (!!from->get_info(&temp_source_connection_auto_failover, 0)) return true;
+    m_source_connection_auto_failover = temp_source_connection_auto_failover;
+  }
+
+  auto temp_gtid_only{0};
+  if (lines >= LINE_FOR_GTID_ONLY) {
+    if (!!from->get_info(&temp_gtid_only, 0)) return true;
+  } else {
+    if (channel_map.is_group_replication_channel_name(channel))
+      temp_gtid_only = 1;
+  }
+  m_gtid_only_mode = temp_gtid_only;
   return false;
 }
 
@@ -689,7 +710,9 @@ bool Master_info::write_info(Rpl_info_handler *to) {
       to->set_info(network_namespace) || to->set_info(compression_algorithm) ||
       to->set_info((int)zstd_compression_level) ||
       to->set_info(tls_ciphersuites.first ? nullptr
-                                          : tls_ciphersuites.second.c_str()))
+                                          : tls_ciphersuites.second.c_str()) ||
+      to->set_info((int)m_source_connection_auto_failover) ||
+      to->set_info((int)m_gtid_only_mode))
     return true;
 
   return false;
@@ -698,7 +721,7 @@ bool Master_info::write_info(Rpl_info_handler *to) {
 void Master_info::set_password(const char *password_arg) {
   DBUG_TRACE;
 
-  DBUG_ASSERT(password_arg);
+  assert(password_arg);
 
   if (password_arg && start_user_configured)
     strmake(start_password, password_arg, sizeof(start_password) - 1);
@@ -741,6 +764,11 @@ void Master_info::channel_wrlock() {
   m_channel_lock->wrlock();
 }
 
+int Master_info::channel_trywrlock() {
+  channel_map.assert_some_lock();
+  return m_channel_lock->trywrlock();
+}
+
 void Master_info::wait_until_no_reference(THD *thd) {
   PSI_stage_info *old_stage = nullptr;
 
@@ -772,3 +800,17 @@ void Master_info::get_flushed_relay_log_info(LOG_INFO *linfo) {
           sizeof(linfo->log_file_name) - 1);
   linfo->pos = flushed_relay_log_info.pos;
 }
+
+void Master_info::set_receiver_position_info_invalid(bool invalid) {
+  m_is_receiver_position_info_invalid = invalid;
+}
+
+bool Master_info::is_receiver_position_info_invalid() const {
+  return m_is_receiver_position_info_invalid;
+}
+
+void Master_info::set_gtid_only_mode(bool gtid_only_mode) {
+  m_gtid_only_mode = gtid_only_mode;
+}
+
+bool Master_info::is_gtid_only_mode() const { return m_gtid_only_mode; }

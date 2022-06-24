@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2003, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -375,12 +375,10 @@ int runTestMgmApiGetConfigTimeout(NDBT_Context* ctx, NDBT_Step* step)
 
     ndb_mgm_set_timeout(h,2500);
 
-    struct ndb_mgm_configuration *c= ndb_mgm_get_configuration(h,0);
+    // Get configuration, will fail when error has been inserted
+    const ndb_mgm::config_ptr c(ndb_mgm_get_configuration(h, 0));
 
-    if(c!=NULL)
-      free(c);
-
-    if(error_ins!=0 && c!=NULL)
+    if (error_ins!=0 && c)
     {
       ndbout << "FAILED: got a ndb_mgm_configuration back" << endl;
       result= NDBT_FAILED;
@@ -574,7 +572,8 @@ int runTestMgmApiStructEventTimeout(NDBT_Context* ctx, NDBT_Step* step)
     int filter[] = { 15, NDB_MGM_EVENT_CATEGORY_BACKUP,
                      1, NDB_MGM_EVENT_CATEGORY_STARTUP,
                      0 };
-    NdbLogEventHandle le_handle= ndb_mgm_create_logevent_handle(h, filter);
+    const ndb_mgm::logevent_handle_ptr le_handle(
+        ndb_mgm_create_logevent_handle(h, filter));
 
     struct ndb_logevent le;
     for(int i=0; i<20; i++)
@@ -595,7 +594,7 @@ int runTestMgmApiStructEventTimeout(NDBT_Context* ctx, NDBT_Step* step)
 
         ndb_mgm_report_event(h, theData, 6);
       }
-      int r= ndb_logevent_get_next(le_handle, &le, 2500);
+      const int r= ndb_logevent_get_next(le_handle.get(), &le, 2500);
       if(r>0)
       {
         ndbout << "Receieved event" << endl;
@@ -651,7 +650,8 @@ int runTestMgmApiReadErrorRestart(NDBT_Context* ctx, NDBT_Step* step)
   int filter[] = { 15, NDB_MGM_EVENT_CATEGORY_BACKUP,
                    0};
 
-  NdbLogEventHandle le_handle= ndb_mgm_create_logevent_handle(h, filter);
+  const ndb_mgm::logevent_handle_ptr le_handle(
+      ndb_mgm_create_logevent_handle(h, filter));
 
   if(ndb_mgm_check_connection(h) < 0)
   {
@@ -702,7 +702,7 @@ int runTestMgmApiReadErrorRestart(NDBT_Context* ctx, NDBT_Step* step)
     // Restart mgmd
     if(i == 10)
     {
-      ndb_mgm_cluster_state *state = ndb_mgm_get_status(h);
+      const ndb_mgm::cluster_state_ptr state(ndb_mgm_get_status(h));
       if(state == NULL)
       {
         ndbout_c("Could not get status");
@@ -729,7 +729,7 @@ int runTestMgmApiReadErrorRestart(NDBT_Context* ctx, NDBT_Step* step)
       }
     }
 
-    int r= ndb_logevent_get_next2(le_handle, &le, 2500);
+    const int r= ndb_logevent_get_next2(le_handle.get(), &le, 2500);
 
     if(r > 0)
     {
@@ -737,17 +737,19 @@ int runTestMgmApiReadErrorRestart(NDBT_Context* ctx, NDBT_Step* step)
     }
     else if(r < 0)
     {
-      ndbout << "Error received: " << ndb_logevent_get_latest_error_msg(le_handle) << endl << endl;
+      ndbout << "Error received: "
+             << ndb_logevent_get_latest_error_msg(le_handle.get()) << endl
+             << endl;
 
-      if(ndb_logevent_get_latest_error(le_handle) == NDB_LEH_READ_ERROR && i >= 10)
+      if (ndb_logevent_get_latest_error(le_handle.get()) ==
+              NDB_LEH_READ_ERROR &&
+          i >= 10)
       {
         ndb_mgm_disconnect(h);
         ndb_mgm_destroy_handle(&h);
 
         return NDBT_OK;
-      }
-      else
-      {
+      } else {
         ndbout << "FAILED: Unexpected error received" << endl;
         return NDBT_FAILED;
       }
@@ -783,8 +785,7 @@ int runSetConfig(NDBT_Context* ctx, NDBT_Step* step)
   for (int l= 0; l < loops; l++){
     g_info << l << ": ";
 
-    struct ndb_mgm_configuration* conf=
-      ndb_mgm_get_configuration(mgmd.handle(), 0);
+    const ndb_mgm::config_ptr conf(ndb_mgm_get_configuration(mgmd.handle(), 0));
     if (!conf)
     {
       g_err << "ndb_mgm_get_configuration failed, error: "
@@ -792,9 +793,7 @@ int runSetConfig(NDBT_Context* ctx, NDBT_Step* step)
       return NDBT_FAILED;
     }
 
-    int r= ndb_mgm_set_configuration(mgmd.handle(), conf);
-    free(conf);
-
+    const int r= ndb_mgm_set_configuration(mgmd.handle(), conf.get());
     if (r != 0)
     {
       g_err << "ndb_mgm_set_configuration failed, error: " << endl
@@ -828,11 +827,9 @@ int runGetConfig(NDBT_Context* ctx, NDBT_Step* step)
   int loops= ctx->getNumLoops();
   for (int l= 0; l < loops; l++){
     g_info << l << ": ";
-    struct ndb_mgm_configuration* conf=
-      ndb_mgm_get_configuration(mgmd.handle(), 0);
+    const ndb_mgm::config_ptr conf(ndb_mgm_get_configuration(mgmd.handle(), 0));
     if (!conf)
       return NDBT_FAILED;
-    free(conf);
   }
   return NDBT_OK;
 }
@@ -886,8 +883,8 @@ get_nodeid_of_type(NdbMgmd& mgmd, ndb_mgm_node_type type, int *nodeId)
 static bool
 get_config_from_illegal_node(NdbMgmd& mgmd, int nodeId)
 {
-  struct ndb_mgm_configuration* conf=
-      ndb_mgm_get_configuration_from_node(mgmd.handle(), nodeId);
+  const ndb_mgm::config_ptr conf(
+      ndb_mgm_get_configuration_from_node(mgmd.handle(), nodeId));
 
   // Get conf from an illegal node should fail.
   if (ndb_mgm_get_latest_error(mgmd.handle()) != NDB_MGM_GET_CONFIG_FAILED)
@@ -906,7 +903,6 @@ get_config_from_illegal_node(NdbMgmd& mgmd, int nodeId)
           << nodeId << ", error: "
           << ndb_mgm_get_latest_error(mgmd.handle()) << " "
           << ndb_mgm_get_latest_error_msg(mgmd.handle()) << endl;
-    free(conf);
     return false;
   }
   return true;
@@ -983,8 +979,8 @@ int runGetConfigFromNode(NDBT_Context* ctx, NDBT_Step* step)
     int nodeId = 0;
     if (get_nodeid_of_type(mgmd,  NDB_MGM_NODE_TYPE_NDB, &nodeId))
     {
-      struct ndb_mgm_configuration* conf =
-        ndb_mgm_get_configuration_from_node(mgmd.handle(), nodeId);
+      ndb_mgm::config_ptr conf(
+          ndb_mgm_get_configuration_from_node(mgmd.handle(), nodeId));
       if (!conf)
       {
         g_err << "ndb_mgm_get_configuration_from_node "
@@ -993,7 +989,6 @@ int runGetConfigFromNode(NDBT_Context* ctx, NDBT_Step* step)
               << ndb_mgm_get_latest_error_msg(mgmd.handle()) << endl;
         return NDBT_FAILED;
       }
-      free(conf);
     }
     else
     {
@@ -3674,7 +3669,7 @@ int runTestNdbApiConfig(NDBT_Context* ctx, NDBT_Step* step)
     if (!mgmd.get_config(conf))
       return NDBT_FAILED;
 
-    ConfigValues::Iterator iter(conf.m_configValues->m_config);
+    ConfigValues::Iterator iter(conf.m_configuration->m_config_values);
     for (Uint32 nodeid = 1; nodeid < MAX_NODES; nodeid ++)
     {
       Uint32 type;
@@ -3963,6 +3958,9 @@ int main(int argc, const char** argv){
   NDBT_TESTSUITE_INSTANCE(testMgm);
   testMgm.setCreateTable(false);
   testMgm.setRunAllTables(true);
+  // Disable ensuring index stat tables since use of NdbApi is turned off for
+  // this test
+  testMgm.setEnsureIndexStatTables(false);
   return testMgm.execute(argc, argv);
 }
 

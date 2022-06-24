@@ -1,5 +1,5 @@
-/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
-   Copyright (c) 2018, Percona and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2021, Oracle and/or its affiliates.
+   Copyright (c) 2018, Percona and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -433,7 +433,7 @@ err:
   close_cached_file(&sort_param->tempfile_for_exceptions);
 
 ok:
-  free_root(&sort_param->wordroot, MYF(0));
+  sort_param->wordroot.Clear();
   /*
     Detach from the share if the writer is involved. Avoid others to
     be blocked. This includes a flush of the write buffer. This will
@@ -721,7 +721,7 @@ static int merge_many_buff(MI_SORT_PARAM *info, uint keys, uchar **sort_keys,
 cleanup:
   close_cached_file(to_file); /* This holds old result */
   if (to_file == t_file) {
-    DBUG_ASSERT(t_file2.type == WRITE_CACHE);
+    assert(t_file2.type == WRITE_CACHE);
     *t_file = t_file2; /* Copy result file */
     t_file->current_pos = &t_file->write_pos;
     t_file->current_end = &t_file->write_end;
@@ -803,7 +803,7 @@ static int write_merge_key_varlen(MI_SORT_PARAM *info, IO_CACHE *to_file,
   return (0);
 }
 
-static int write_merge_key(MI_SORT_PARAM *info MY_ATTRIBUTE((unused)),
+static int write_merge_key(MI_SORT_PARAM *info [[maybe_unused]],
                            IO_CACHE *to_file, uchar *key, uint sort_length,
                            uint count) {
   return my_b_write(to_file, key, (size_t)sort_length * count);
@@ -829,7 +829,7 @@ static int merge_buffers(MI_SORT_PARAM *info, uint keys, IO_CACHE *from_file,
 
   count = error = 0;
   maxcount = keys / ((uint)(Tb - Fb) + 1);
-  DBUG_ASSERT(maxcount > 0);
+  assert(maxcount > 0);
   if (to_file) to_start_filepos = my_b_tell(to_file);
   strpos = (uchar *)sort_keys;
   sort_length = info->key_length;

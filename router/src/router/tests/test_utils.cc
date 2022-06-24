@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2015, 2020, Oracle and/or its affiliates. All rights reserved.
+  Copyright (c) 2015, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -42,59 +42,16 @@
 #include "mysql/harness/string_utils.h"
 #include "mysqlrouter/utils.h"
 
-const std::string kIPv6AddrRange = "fd84:8829:117d:63d5";
-
 using mysql_harness::split_string;
 using mysqlrouter::get_tcp_port;
 using mysqlrouter::hexdump;
-using mysqlrouter::split_addr_port;
 using std::string;
 using ::testing::ContainerEq;
 using ::testing::Pair;
 
-class SplitAddrPortTest : public ::testing::Test {
- protected:
-  virtual void SetUp() {}
-};
-
-TEST_F(SplitAddrPortTest, SplitAddrPort) {
-  std::string addr6 = kIPv6AddrRange + ":0001:0002:0003:0004";
-
-  EXPECT_THAT(split_addr_port(addr6),
-              ::testing::Pair(addr6, static_cast<uint16_t>(0)));
-  EXPECT_THAT(split_addr_port("[" + addr6 + "]"),
-              ::testing::Pair(addr6, static_cast<uint16_t>(0)));
-  EXPECT_THAT(split_addr_port("[" + addr6 + "]:3306"),
-              ::testing::Pair(addr6, static_cast<uint16_t>(3306)));
-
-  EXPECT_THAT(split_addr_port("192.168.14.77"),
-              ::testing::Pair("192.168.14.77", static_cast<uint16_t>(0)));
-  EXPECT_THAT(split_addr_port("192.168.14.77:3306"),
-              ::testing::Pair("192.168.14.77", static_cast<uint16_t>(3306)));
-
-  EXPECT_THAT(split_addr_port("mysql.example.com"),
-              ::testing::Pair("mysql.example.com", static_cast<uint16_t>(0)));
-  EXPECT_THAT(
-      split_addr_port("mysql.example.com:3306"),
-      ::testing::Pair("mysql.example.com", static_cast<uint16_t>(3306)));
-}
-
-TEST_F(SplitAddrPortTest, SplitAddrPortFail) {
-  std::string addr6 = kIPv6AddrRange + ":0001:0002:0003:0004";
-  ASSERT_THROW(split_addr_port("[" + addr6), std::runtime_error);
-  ASSERT_THROW(split_addr_port(addr6 + "]"), std::runtime_error);
-  ASSERT_THROW(split_addr_port(kIPv6AddrRange + ":xyz00:0002:0003:0004"),
-               std::runtime_error);
-
-  // Invalid TCP port
-  ASSERT_THROW(split_addr_port("192.168.14.77:999999"), std::runtime_error);
-  ASSERT_THROW(split_addr_port("192.168.14.77:66000"), std::runtime_error);
-  ASSERT_THROW(split_addr_port("[" + addr6 + "]:999999"), std::runtime_error);
-}
-
 class GetTCPPortTest : public ::testing::Test {
  protected:
-  virtual void SetUp() {}
+  void SetUp() override {}
 };
 
 TEST_F(GetTCPPortTest, GetTCPPort) {
@@ -152,7 +109,7 @@ TEST_F(HexDumpTest, MultiLine) {
 
 class UtilsTests : public ::testing::Test {
  protected:
-  virtual void SetUp() {}
+  void SetUp() override {}
 };
 
 static bool files_equal(const std::string &f1, const std::string &f2) {
@@ -302,6 +259,22 @@ TEST_F(UtilsTests, uint_conversion) {
   // extra + sign
   EXPECT_EQ(12u, strtoui_checked("+12", 66));
   EXPECT_EQ(0u, strtoui_checked("+0", 66));
+}
+
+TEST_F(UtilsTests, uint64_conversion) {
+  using mysqlrouter::strtoull_checked;
+  const uint64_t kDefault{66};
+
+  EXPECT_EQ(kDefault, strtoull_checked(nullptr, kDefault));
+  EXPECT_EQ(kDefault, strtoull_checked(0, kDefault));
+  EXPECT_EQ(kDefault, strtoull_checked("18446744073709551617", kDefault));
+
+  EXPECT_EQ(static_cast<uint64_t>(0), strtoull_checked("0", kDefault));
+  EXPECT_EQ(static_cast<uint64_t>(4294967298),
+            strtoull_checked("4294967298", kDefault));
+  EXPECT_EQ(static_cast<uint64_t>(0x7fffffffffffffff),
+            strtoull_checked("9223372036854775807", kDefault));
+  EXPECT_EQ(static_cast<uint64_t>(66), strtoull_checked("66", kDefault));
 }
 
 int main(int argc, char **argv) {

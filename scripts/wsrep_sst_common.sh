@@ -23,10 +23,10 @@ WSREP_SST_OPT_BINLOG=""
 WSREP_SST_OPT_CONF_SUFFIX=""
 WSREP_SST_OPT_DATA=""
 WSREP_SST_OPT_BASEDIR=""
-WSREP_SST_OPT_PLUGINDIR=""
 WSREP_SST_OPT_USER=""
 WSREP_SST_OPT_PSWD=""
 WSREP_SST_OPT_VERSION=""
+WSREP_SST_OPT_DEBUG=""
 
 WSREP_LOG_DEBUG=""
 
@@ -97,10 +97,6 @@ case "$1" in
         # Ignore (read value from stdin)
         shift
         ;;
-    '--plugindir')
-        readonly WSREP_SST_OPT_PLUGINDIR="$2"
-        shift
-        ;;
     '--port')
         readonly WSREP_SST_OPT_PORT="$2"
         shift
@@ -127,6 +123,10 @@ case "$1" in
         ;;
     '--binlog')
         WSREP_SST_OPT_BINLOG="$2"
+        shift
+        ;;
+    '--debug')
+        WSREP_SST_OPT_DEBUG="$2"
         shift
         ;;
     *) # must be command
@@ -183,7 +183,7 @@ parse_cnf()
 #
 # Converts an input string into a boolean "on", "off"
 # Converts:
-#   "on", "true", "1" -> "on" (case insensitive)
+#   "on", "true", positive number -> "on" (case insensitive)
 #   "off", "false", "0" -> "off" (case insensitive)
 # All other values : -> default_value
 #
@@ -194,7 +194,7 @@ normalize_boolean()
     local input_value=$1
     local default_value=$2
 
-    [[ "$input_value" == "1" ]]                 && echo "on"    && return 0
+    [[ "$input_value" =~ ^[1-9][0-9]*$ ]]       && echo "on"    && return 0
     [[ "$input_value" =~ ^[Oo][Nn]$ ]]          && echo "on"    && return 0
     [[ "$input_value" =~ ^[Tt][Rr][Uu][Ee]$ ]]  && echo "on"    && return 0
     [[ "$input_value" == "0" ]]                 && echo "off"   && return 0
@@ -530,7 +530,6 @@ EOF
 #   WSREP_SST_OPT_CONF
 #   WSREP_SST_OPT_CONF_SUFFIX
 #   WSREP_SST_OPT_BASEDIR
-#   WSREP_SST_OPT_PLUGINDIR
 #   MYSQL_UPGRADE_TMPDIR    (This path will be deleted on exit)
 #
 # Arguments
@@ -800,10 +799,6 @@ function run_post_processing_steps()
         mysqld_cmdline+=" --basedir=${WSREP_SST_OPT_BASEDIR}"
     fi
 
-    if [[ -n $WSREP_SST_OPT_PLUGINDIR ]]; then
-        mysqld_cmdline+=" --plugin-dir=${WSREP_SST_OPT_PLUGINDIR}"
-    fi
-
     # Generate a new random password to be used by the JOINER
     local sst_user="mysql.pxc.sst.user"
     local sst_password="aA!9$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)"
@@ -993,3 +988,39 @@ function cat_file_to_stderr()
     cat $file_path >&2
     echo "EOF:" >&2
 }
+
+
+# Returns the absolute path from a path to a file (with a filename)
+#   If a relative path is given as an argument, the absolute path
+#   is generated from the current path.
+#
+# Globals:
+#   None
+#
+# Parameters:
+#   Argument 1: path to a file
+#
+# Returns 0 if successful (path exists) and the absolute path is output.
+# Returns non-zero otherwise
+#
+function get_absolute_path()
+{
+    local path="$1"
+    local abs_path retvalue
+    local filename
+
+    filename=$(basename "${path}")
+    abs_path=$(cd "$(dirname "${path}")" && pwd)
+    retvalue=$?
+    [[ $retvalue -ne 0 ]] && return $retvalue
+
+    printf "%s/%s" "${abs_path}" "${filename}"
+    return 0
+}
+
+# timeout for donor to connect to joiner (seconds)
+readonly WSREP_SST_DONOR_TIMEOUT=$(parse_cnf sst donor-timeout 10)
+# For backward compatiblitiy: joiner timeout waiting for donor connection
+readonly WSREP_SST_JOINER_TIMEOUT=$(parse_cnf sst joiner-timeout $(parse_cnf sst sst-initial-timeout 100) )
+# if the SST process stuck for this amount of time (no data transfered), it will be interrupted
+readonly WSREP_SST_IDLE_TIMEOUT=$(parse_cnf sst sst-idle-timeout 120)

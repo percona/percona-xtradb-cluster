@@ -5,13 +5,13 @@
 
 --source include/galera_cluster.inc
 
---let $wsrep_slave_threads_orig = `SELECT @@wsrep_slave_threads`
+--let $wsrep_applier_threads_orig = `SELECT @@wsrep_applier_threads`
 
 CREATE TABLE t1 (id INT) ENGINE=InnoDB;
 CREATE TABLE t2 (id INT) ENGINE=InnoDB;
 
 --connection node_2
-SET GLOBAL wsrep_slave_threads = 2;
+SET GLOBAL wsrep_applier_threads = 2;
 LOCK TABLE t1 WRITE;
 
 --connection node_1
@@ -49,7 +49,7 @@ SET SESSION wsrep_sync_wait = 15;
 SELECT COUNT(*) = 6 FROM t1;
 SELECT COUNT(*) = 6 FROM t2;
 
---eval SET GLOBAL wsrep_slave_threads = $wsrep_slave_threads_orig;
+--eval SET GLOBAL wsrep_applier_threads = $wsrep_applier_threads_orig;
 
 DROP TABLE t1;
 DROP TABLE t2;

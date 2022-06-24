@@ -1,0 +1,12 @@
+#node_1
+CREATE TABLE test_table (f1 INTEGER PRIMARY KEY AUTO_INCREMENT, f2 CHAR(255)) ENGINE=InnoDB;
+#node_2
+SET @@GLOBAL.debug = "+d,pause_commit_after_update_single_table";
+UPDATE test_table SET f2 = 'y' WHERE f1 = 1 OR f1 = 2;;
+#node_2a
+SET DEBUG_SYNC = "now WAIT_FOR update_commit_waiting";
+SET @@GLOBAL.debug = "-d,pause_commit_after_update_single_table";
+#node_1
+INSERT INTO test_table VALUES (1,'y'),(2,'x');
+SET DEBUG_SYNC = "RESET";
+DROP table test_table;

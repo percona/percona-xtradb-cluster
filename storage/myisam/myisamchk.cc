@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -226,7 +226,7 @@ static struct my_option my_long_options[] = {
     {"correct-checksum", OPT_CORRECT_CHECKSUM,
      "Correct checksum information for table.", nullptr, nullptr, nullptr,
      GET_NO_ARG, NO_ARG, 0, 0, 0, nullptr, 0, nullptr},
-#ifdef DBUG_OFF
+#ifdef NDEBUG
     {"debug", '#', "This is a non-debug version. Catch this and exit.", 0, 0, 0,
      GET_DISABLED, OPT_ARG, 0, 0, 0, 0, 0, 0},
 #else
@@ -405,7 +405,7 @@ static void usage(void) {
       "errors");
   printf("Usage: %s [OPTIONS] tables[.MYI]\n", my_progname_short);
   printf("\nGlobal options:\n");
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   printf(
       "\
   -#, --debug=...     Output debug log. Often this is 'd:t:o,filename'.\n");
@@ -525,7 +525,7 @@ TYPELIB myisam_stats_method_typelib = {
 /* Read options */
 
 static bool get_one_option(int optid,
-                           const struct my_option *opt MY_ATTRIBUTE((unused)),
+                           const struct my_option *opt [[maybe_unused]],
                            char *argument) {
   switch (optid) {
     case 'a':
@@ -1093,14 +1093,14 @@ static int myisamchk(MI_CHECK *param, char *filename) {
         if (param->testflag & (T_EXTEND | T_MEDIUM))
           (void)init_key_cache(dflt_key_cache, opt_key_cache_block_size,
                                (size_t)param->use_buffers, 0, 0);
-        MY_ATTRIBUTE((unused))
+        [[maybe_unused]]
         int init_res =
             init_io_cache(&param->read_cache, datafile,
                           (uint)param->read_buffer_length, READ_CACHE,
                           (param->start_check_pos ? param->start_check_pos
                                                   : share->pack.header_length),
                           true, MYF(MY_WME));
-        DBUG_ASSERT(init_res == 0);
+        assert(init_res == 0);
         if ((info->s->options &
              (HA_OPTION_PACK_RECORD | HA_OPTION_COMPRESS_RECORD)) ||
             (param->testflag & (T_EXTEND | T_MEDIUM)))
@@ -1630,15 +1630,15 @@ err:
 
 static int not_killed = 0;
 
-volatile int *killed_ptr(MI_CHECK *param MY_ATTRIBUTE((unused))) {
+volatile int *killed_ptr(MI_CHECK *param [[maybe_unused]]) {
   return &not_killed; /* always NULL */
 }
 
 /* print warnings and errors */
 /* VARARGS */
 
-void mi_check_print_info(MI_CHECK *param MY_ATTRIBUTE((unused)),
-                         const char *fmt, ...) {
+void mi_check_print_info(MI_CHECK *param [[maybe_unused]], const char *fmt,
+                         ...) {
   va_list args;
 
   va_start(args, fmt);

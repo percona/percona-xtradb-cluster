@@ -45,7 +45,7 @@ char *strndup(const char *from, size_t length)
 }
 #endif
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 static char pam_debug = 0;
 #define PAM_DEBUG(X)   do { if (pam_debug) { fprintf X; } } while(0)
 #else
@@ -213,7 +213,7 @@ static MYSQL_SYSVAR_BOOL(use_cleartext_plugin, use_cleartext_plugin,
        "supports simple PAM policies that don't require anything besides "
        "a password", NULL, NULL, 0);
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 static MYSQL_SYSVAR_BOOL(debug, pam_debug, PLUGIN_VAR_OPCMDARG,
        "Log all PAM activity", NULL, NULL, 0);
 #endif
@@ -221,7 +221,7 @@ static MYSQL_SYSVAR_BOOL(debug, pam_debug, PLUGIN_VAR_OPCMDARG,
 
 static struct st_mysql_sys_var* vars[] = {
   MYSQL_SYSVAR(use_cleartext_plugin),
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   MYSQL_SYSVAR(debug),
 #endif
   NULL

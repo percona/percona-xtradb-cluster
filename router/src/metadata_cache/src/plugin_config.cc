@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
+  Copyright (c) 2016, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -84,7 +84,16 @@ std::string MetadataCachePluginConfig::get_cluster_type_specific_id() const {
   return "";
 }
 
-unsigned MetadataCachePluginConfig::get_view_id() const {
+std::string MetadataCachePluginConfig::get_clusterset_id() const {
+  if (metadata_cache_dynamic_state) {
+    metadata_cache_dynamic_state->load();
+    return metadata_cache_dynamic_state->get_clusterset_id();
+  }
+
+  return "";
+}
+
+uint64_t MetadataCachePluginConfig::get_view_id() const {
   if (metadata_cache_dynamic_state) {
     metadata_cache_dynamic_state->load();
     return metadata_cache_dynamic_state->get_view_id();

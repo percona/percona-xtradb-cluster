@@ -5,7 +5,6 @@ wsrep_sst_method=xtrabackup-v2
 wsrep_debug=1
 
 [xtrabackup]
-backup-locks
 close-files
 # compact
 # compression requires qpress from the Percona repositories

@@ -1,7 +1,7 @@
 #ifndef MY_AES_INCLUDED
 #define MY_AES_INCLUDED
 
-/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2021, Oracle and/or its affiliates.
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License, version 2.0,
@@ -117,7 +117,7 @@ int my_aes_decrypt(const unsigned char *source, uint32 source_length,
   @return               size of buffer required to store encrypted data
 */
 
-int my_aes_get_size(uint32 source_length, enum my_aes_opmode opmode);
+longlong my_aes_get_size(uint32 source_length, enum my_aes_opmode opmode);
 
 /**
   Return true if the AES cipher and block mode requires an IV.

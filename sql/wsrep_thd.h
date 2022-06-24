@@ -28,11 +28,11 @@
 #include "mysql/psi/psi_thread.h"
 
 #ifdef HAVE_PSI_THREAD_INTERFACE
-#define wsrep_pfs_register_thread(key)                                  \
-  do {                                                                  \
-    struct PSI_thread *psi = PSI_THREAD_CALL(new_thread)(key, NULL, 0); \
-    PSI_THREAD_CALL(set_thread_os_id)(psi);                             \
-    PSI_THREAD_CALL(set_thread)(psi);                                   \
+#define wsrep_pfs_register_thread(key)                                     \
+  do {                                                                     \
+    struct PSI_thread *psi = PSI_THREAD_CALL(new_thread)(key, 0, NULL, 0); \
+    PSI_THREAD_CALL(set_thread_os_id)(psi);                                \
+    PSI_THREAD_CALL(set_thread)(psi);                                      \
   } while (0)
 
 /* This macro delist the current thread from performance schema */
@@ -106,7 +106,7 @@ class Wsrep_thd_queue {
     mysql_cond_destroy(&COND_wsrep_thd_queue);
   }
   bool push_back(THD *thd) {
-    DBUG_ASSERT(thd);
+    assert(thd);
     wsp::auto_lock lock(&LOCK_wsrep_thd_queue);
     std::deque<THD *>::iterator it = queue.begin();
     while (it != queue.end()) {
@@ -246,7 +246,7 @@ void wsrep_reset_threadvars(THD *);
  */
 
 static inline void wsrep_override_error(THD *thd, uint error) {
-  DBUG_ASSERT(error != ER_ERROR_DURING_COMMIT);
+  assert(error != ER_ERROR_DURING_COMMIT);
   Diagnostics_area *da = thd->get_stmt_da();
   if (da->is_ok() || da->is_eof() || !da->is_set() ||
       (da->is_error() && da->mysql_errno() != error &&
@@ -275,7 +275,7 @@ static inline void wsrep_override_error(THD *thd, uint error,
 
 static inline void wsrep_override_error(THD *thd, wsrep::client_error ce,
                                         enum wsrep::provider::status status) {
-  DBUG_ASSERT(ce != wsrep::e_success);
+  assert(ce != wsrep::e_success);
   switch (ce) {
     case wsrep::e_error_during_commit:
       wsrep_override_error(thd, ER_ERROR_DURING_COMMIT, status);

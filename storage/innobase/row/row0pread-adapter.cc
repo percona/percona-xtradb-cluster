@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2018, 2020, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2018, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -44,7 +44,7 @@ Parallel_reader_adapter::Parallel_reader_adapter(size_t max_threads,
 dberr_t Parallel_reader_adapter::add_scan(trx_t *trx,
                                           const Parallel_reader::Config &config,
                                           Parallel_reader::F &&f) {
-  return (m_parallel_reader.add_scan(trx, config, std::move(f)));
+  return m_parallel_reader.add_scan(trx, config, std::move(f));
 }
 
 Parallel_reader_adapter::Thread_ctx::Thread_ctx() {
@@ -77,12 +77,20 @@ void Parallel_reader_adapter::set(row_prebuilt_t *prebuilt) {
 
   m_parallel_reader.set_start_callback(
       [=](Parallel_reader::Thread_ctx *reader_thread_ctx) {
-        return init(reader_thread_ctx);
+        if (reader_thread_ctx->get_state() == Parallel_reader::State::THREAD) {
+          return init(reader_thread_ctx, prebuilt);
+        } else {
+          return DB_SUCCESS;
+        }
       });
 
   m_parallel_reader.set_finish_callback(
       [=](Parallel_reader::Thread_ctx *reader_thread_ctx) {
-        return end(reader_thread_ctx);
+        if (reader_thread_ctx->get_state() == Parallel_reader::State::THREAD) {
+          return end(reader_thread_ctx);
+        } else {
+          return DB_SUCCESS;
+        }
       });
 
   ut_a(m_prebuilt == nullptr);
@@ -96,12 +104,15 @@ dberr_t Parallel_reader_adapter::run(void **thread_ctxs, Init_fn init_fn,
   m_load_fn = load_fn;
   m_thread_ctxs = thread_ctxs;
 
-  return m_parallel_reader.run();
+  m_parallel_reader.set_n_threads(m_parallel_reader.max_threads());
+
+  return m_parallel_reader.run(m_parallel_reader.max_threads());
 }
 
 dberr_t Parallel_reader_adapter::init(
-    Parallel_reader::Thread_ctx *reader_thread_ctx) {
-  auto thread_ctx = UT_NEW(Thread_ctx(), mem_key_archive);
+    Parallel_reader::Thread_ctx *reader_thread_ctx, row_prebuilt_t *prebuilt) {
+  auto thread_ctx =
+      ut::new_withkey<Thread_ctx>(ut::make_psi_memory_key(mem_key_archive));
 
   if (thread_ctx == nullptr) {
     return DB_OUT_OF_MEMORY;
@@ -119,7 +130,9 @@ dberr_t Parallel_reader_adapter::init(
   To solve the blob heap issue in prebuilt we request parallel reader thread to
   use blob heap per thread and we pass this blob heap to the InnoDB to MySQL
   row format conversion function. */
-  reader_thread_ctx->create_blob_heap();
+  if (prebuilt->templ_contains_blob) {
+    reader_thread_ctx->create_blob_heap();
+  }
 
   auto ret = m_init_fn(m_thread_ctxs[reader_thread_ctx->m_thread_id],
                        static_cast<ulong>(m_mysql_row.m_offsets.size()),
@@ -159,6 +172,7 @@ dberr_t Parallel_reader_adapter::process_rows(
     const Parallel_reader::Ctx *reader_ctx) {
   auto reader_thread_ctx = reader_ctx->thread_ctx();
   auto ctx = reader_thread_ctx->get_callback_ctx<Thread_ctx>();
+  auto blob_heap = reader_thread_ctx->m_blob_heap;
 
   ut_a(ctx->m_n_read >= ctx->m_n_sent);
   ut_a(ctx->m_n_read - ctx->m_n_sent <= m_batch_size);
@@ -170,14 +184,15 @@ dberr_t Parallel_reader_adapter::process_rows(
 
     /* Start of a new range, send what we have buffered. */
     if ((reader_ctx->m_start && n_pending > 0) || is_buffer_full(ctx)) {
-      auto part_id = reader_ctx->m_start
-                         ? reader_thread_ctx->m_prev_partition_id
-                         : reader_ctx->partition_id();
-
-      err = send_batch(reader_thread_ctx, part_id, n_pending);
+      err = send_batch(reader_thread_ctx, ctx->m_partition_id, n_pending);
 
       if (err != DB_SUCCESS) {
         return (err);
+      }
+
+      /* Empty the heap for the next batch */
+      if (blob_heap != nullptr) {
+        mem_heap_empty(blob_heap);
       }
     }
   }
@@ -198,8 +213,16 @@ dberr_t Parallel_reader_adapter::process_rows(
   if (row_sel_store_mysql_rec(buffer_loc, m_prebuilt, reader_ctx->m_rec,
                               nullptr, true, reader_ctx->index(),
                               reader_ctx->index(), offsets, false, nullptr,
-                              reader_thread_ctx->m_blob_heap)) {
-    ++ctx->m_n_read;
+                              blob_heap)) {
+    /* If there is any pending records, then we should not overwrite the
+    partition ID with a different one. */
+    if (pending(ctx) && ctx->m_partition_id != reader_ctx->partition_id()) {
+      ut_ad(false);
+      err = DB_ERROR;
+    } else {
+      ++ctx->m_n_read;
+      ctx->m_partition_id = reader_ctx->partition_id();
+    }
 
     if (m_parallel_reader.is_error_set()) {
       /* Simply skip sending the records to RAPID in case of an error in the
@@ -234,15 +257,15 @@ dberr_t Parallel_reader_adapter::end(
     Send them now. */
     size_t n_pending = pending(thread_ctx);
 
-    err = (n_pending != 0)
-              ? send_batch(reader_thread_ctx,
-                           reader_thread_ctx->m_prev_partition_id, n_pending)
-              : DB_SUCCESS;
+    if (n_pending != 0) {
+      err =
+          send_batch(reader_thread_ctx, thread_ctx->m_partition_id, n_pending);
+    }
   }
 
   m_end_fn(m_thread_ctxs[thread_id]);
 
-  UT_DELETE(thread_ctx);
+  ut::delete_(thread_ctx);
   reader_thread_ctx->set_callback_ctx<Thread_ctx>(nullptr);
 
   return (err);

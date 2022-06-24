@@ -1,3 +1,7 @@
+SET @old_log_output = @@global.log_output;
+SET GLOBAL log_output="FILE";
+SET @old_log_output = @@global.log_output;
+SET GLOBAL log_output="FILE";
 call mtr.add_suppression("Although a path was specified for the.*");
 call mtr.add_suppression("Although a path was specified for the.*");
 TRUNCATE TABLE mysql.general_log;
@@ -8,13 +12,13 @@ CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 INSERT INTO t1 VALUES (1);
 SELECT COUNT(*) > 0 FROM mysql.general_log;
 COUNT(*) > 0
-1
+0
 SELECT 1 = 1 FROM t1;
 1 = 1
 1
 SELECT COUNT(*) = 1 FROM mysql.slow_log WHERE sql_text = 'SELECT 1 = 1 FROM t1';
 COUNT(*) = 1
-1
+0
 SELECT COUNT(*) = 0 FROM mysql.general_log WHERE argument = 'CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB';
 COUNT(*) = 0
 1
@@ -23,5 +27,11 @@ SELECT 2 = 2 FROM t1;
 1
 SELECT COUNT(*) = 1 FROM mysql.slow_log WHERE sql_text = 'SELECT 2 = 2 FROM t1';
 COUNT(*) = 1
-1
+0
+SET GLOBAL log_output = @old_log_output;
+TRUNCATE TABLE mysql.general_log;
+TRUNCATE TABLE mysql.slow_log;
+SET GLOBAL log_output = @old_log_output;
+TRUNCATE TABLE mysql.general_log;
+TRUNCATE TABLE mysql.slow_log;
 DROP TABLE t1;

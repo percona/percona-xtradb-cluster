@@ -1,4 +1,4 @@
-/* Copyright (c) 2008, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2008, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -27,6 +27,7 @@
 #include <stddef.h> /* size_t */
 #endif
 
+#include <mysql/components/services/bits/psi_bits.h>
 #include <mysql/components/services/my_io_bits.h>     /* sockaddr_storage */
 #include <mysql/components/services/my_thread_bits.h> /* my_thread_handle */
 
@@ -46,6 +47,15 @@
   Using a zero key always disable the instrumentation.
 */
 typedef unsigned int PSI_thread_key;
+
+/**
+  Instrumented thread sequence number.
+  This sequence number is used in conjunction
+  with @ref PSI_thread_info_v5::m_os_name "foo",
+  to print names like "foo-NN" in ps/top/debuggers ...
+  @see my_thread_self_setname().
+*/
+typedef unsigned int PSI_thread_seqnum;
 
 #ifdef __cplusplus
 class THD;
@@ -88,6 +98,7 @@ struct PSI_thread_info_v1 {
     The flags of the thread to register.
     @sa PSI_FLAG_SINGLETON
     @sa PSI_FLAG_USER
+    @sa PSI_FLAG_THREAD_SYSTEM
   */
   unsigned int m_flags;
   /** Volatility index. */
@@ -98,6 +109,91 @@ struct PSI_thread_info_v1 {
 typedef struct PSI_thread_info_v1 PSI_thread_info_v1;
 
 /**
+  Thread instrument information.
+  @since PSI_THREAD_VERSION_5
+  This structure is used to register an instrumented thread.
+*/
+struct PSI_thread_info_v5 {
+  /**
+    Pointer to the key assigned to the registered thread.
+  */
+  PSI_thread_key *m_key;
+  /**
+    The name of the thread instrument to register.
+  */
+  const char *m_name;
+
+  /**
+    The thread name to advertise to the operating system.
+
+    The performance schema thread instrumentation
+    exports instrumented names to the operating system,
+    so they can be visible in:
+    - the output of ps
+    - the output of top
+    - a debugger
+    etc.
+
+    This feature is optional, and improves
+    observability for platforms that support
+    a flavor of pthread_setname_np().
+    On other platforms, there are no effects.
+
+    Performance schema thread names can be instrumented
+    in different ways.
+
+    First, the thread can be unique (@c PSI_FLAG_SINGLETON).
+    In this case, the @c m_os_name attribute is printed as is.
+
+    Second, for threads that exist in multiple instances
+    (flag @c PSI_FLAG_SINGLETON not set),
+    the caller code should pass a sequence number when creating
+    a thread instance with @c new_thread_v5_t or @c spawn_thread_v5_t.
+
+    This sequence number is concatenated (with a dash) to
+    the @c m_os_name so that a thread name "foo" with a sequence
+    of "12" is displayed as "foo-12".
+    When the actual value of the sequence number has a special meaning
+    to the instrumented code (for example, a worker number is also
+    exposed in different places), this is the preferred instrumentation.
+
+    Third, for threads that exist in multiple instances,
+    but do not rely on a specific numbering, setting the flag
+    @c PSI_FLAG_AUTO_SEQNUM causes the performance schema to number
+    threads automatically, so the calling code does not have to do it.
+
+    Fourth and last, for threads that exist in multiple instances,
+    and are executed so often that the total number of threads
+    grows to a very large number (for example, user sessions),
+    numbering threads is not practical because of size limitations,
+    and would introduce just noise in the ps output.
+
+    For this case, the flag @c PSI_FLAG_NO_SEQNUM can be used
+    to avoid numbering.
+
+    @sa my_thread_self_setname().
+    @sa new_thread_v5_t
+    @sa spawn_thread_v5_t
+
+  */
+  const char *m_os_name;
+  /**
+    The flags of the thread to register.
+    @sa PSI_FLAG_SINGLETON
+    @sa PSI_FLAG_USER
+    @sa PSI_FLAG_THREAD_SYSTEM
+    @sa PSI_FLAG_AUTO_SEQNUM
+    @sa PSI_FLAG_NO_SEQNUM
+  */
+  unsigned int m_flags;
+  /** Volatility index. */
+  int m_volatility;
+  /** Documentation. */
+  const char *m_documentation;
+};
+typedef struct PSI_thread_info_v5 PSI_thread_info_v5;
+
+/**
   Thread registration API.
   @param category a category name (typically a plugin name)
   @param info an array of thread info to register
@@ -105,6 +201,16 @@ typedef struct PSI_thread_info_v1 PSI_thread_info_v1;
 */
 typedef void (*register_thread_v1_t)(const char *category,
                                      struct PSI_thread_info_v1 *info,
+                                     int count);
+
+/**
+  Thread registration API.
+  @param category a category name (typically a plugin name)
+  @param info an array of thread info to register
+  @param count the size of the info array
+*/
+typedef void (*register_thread_v5_t)(const char *category,
+                                     struct PSI_thread_info_v5 *info,
                                      int count);
 
 /**
@@ -120,6 +226,11 @@ typedef int (*spawn_thread_v1_t)(PSI_thread_key key, my_thread_handle *thread,
                                  const my_thread_attr_t *attr,
                                  void *(*start_routine)(void *), void *arg);
 
+typedef int (*spawn_thread_v5_t)(PSI_thread_key key, PSI_thread_seqnum seqnum,
+                                 my_thread_handle *thread,
+                                 const my_thread_attr_t *attr,
+                                 void *(*start_routine)(void *), void *arg);
+
 /**
   Create instrumentation for a thread.
   @param key the registered key
@@ -128,6 +239,11 @@ typedef int (*spawn_thread_v1_t)(PSI_thread_key key, my_thread_handle *thread,
   @return an instrumented thread
 */
 typedef struct PSI_thread *(*new_thread_v1_t)(PSI_thread_key key,
+                                              const void *identity,
+                                              unsigned long long thread_id);
+
+typedef struct PSI_thread *(*new_thread_v5_t)(PSI_thread_key key,
+                                              PSI_thread_seqnum seqnum,
                                               const void *identity,
                                               unsigned long long thread_id);
 
@@ -220,10 +336,29 @@ typedef void (*set_thread_command_v1_t)(int command);
 typedef void (*set_connection_type_v1_t)(opaque_vio_type conn_type);
 
 /**
-  Assign a start time to the instrumented thread.
+  Assign a start time in seconds to the instrumented thread.
   @param start_time the thread start time
 */
 typedef void (*set_thread_start_time_v1_t)(time_t start_time);
+
+/**
+  Assign a start time in micro seconds to the instrumented thread.
+  @param start_time_usec the thread start time in micro seconds
+*/
+typedef void (*set_thread_start_time_usec_v4_t)(
+    unsigned long long start_time_usec);
+
+/**
+  Assign a sent rows count to the instrumented thread.
+  @param rows_sent the thread sent rows count
+*/
+typedef void (*set_thread_rows_sent_v4_t)(unsigned long long rows_sent);
+
+/**
+  Assign an examined rows count to the instrumented thread.
+  @param rows_examined the thread examined rows count
+*/
+typedef void (*set_thread_rows_examined_v4_t)(unsigned long long rows_examined);
 
 /**
   Assign a state to the instrumented thread.
@@ -275,6 +410,15 @@ typedef int (*set_thread_resource_group_by_id_v1_t)(
   @param thread the thread instrumentation
 */
 typedef void (*set_thread_v1_t)(struct PSI_thread *thread);
+
+/**
+  Assign the remote (peer) port to the instrumented thread.
+
+  @param thread    pointer to the thread instrumentation
+  @param port      the remote port
+*/
+typedef void (*set_thread_peer_port_v4_t)(PSI_thread *thread,
+                                          unsigned int port);
 
 /** Aggregate the thread status variables. */
 typedef void (*aggregate_thread_status_v2_t)(struct PSI_thread *thread);
@@ -461,7 +605,7 @@ typedef void (*notify_session_disconnect_v1_t)(PSI_thread *thread);
 */
 typedef void (*notify_session_change_user_v1_t)(PSI_thread *thread);
 
-typedef struct PSI_thread_info_v1 PSI_thread_info;
+typedef struct PSI_thread_info_v5 PSI_thread_info;
 
 /** @} (end of group psi_abi_thread) */
 

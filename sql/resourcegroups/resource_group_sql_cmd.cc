@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2017, 2021, Oracle and/or its affiliates.
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
    as published by the Free Software Foundation.
@@ -160,13 +160,10 @@ class Move_thread_to_default_group {
       if (!pfs_thread_attr.m_system_thread) {
         Find_thd_with_id find_thd_with_id(pfs_thread_attr.m_processlist_id,
                                           false);
-        THD *thd =
+        THD_ptr thd_ptr =
             Global_THD_manager::get_instance()->find_thd(&find_thd_with_id);
-        if (thd != nullptr) {
-          thd->resource_group_ctx()->m_cur_resource_group = nullptr;
-          mysql_mutex_assert_owner(&thd->LOCK_thd_data);
-          mysql_mutex_unlock(&thd->LOCK_thd_data);
-        }
+        if (thd_ptr)
+          thd_ptr->resource_group_ctx()->m_cur_resource_group = nullptr;
       }
     }
   }
@@ -180,8 +177,12 @@ class Move_thread_to_default_group {
 */
 
 inline bool is_default_resource_group(const char *res_grp_name) {
-  return my_strcasecmp(system_charset_info, "USR_default", res_grp_name) == 0 ||
-         my_strcasecmp(system_charset_info, "SYS_default", res_grp_name) == 0;
+  return my_strcasecmp(system_charset_info,
+                       resourcegroups::USR_DEFAULT_RESOURCE_GROUP_NAME,
+                       res_grp_name) == 0 ||
+         my_strcasecmp(system_charset_info,
+                       resourcegroups::SYS_DEFAULT_RESOURCE_GROUP_NAME,
+                       res_grp_name) == 0;
 }
 
 }  // Anonymous namespace
@@ -582,12 +583,10 @@ static inline bool check_and_apply_resource_grp(
   // Set resource group context for non-system threads.
   if (!pfs_thread_attr.m_system_thread) {
     Find_thd_with_id find_thd_with_id(pfs_thread_attr.m_processlist_id, false);
-    THD *cur_thd =
+    THD_ptr cur_thd_ptr =
         Global_THD_manager::get_instance()->find_thd(&find_thd_with_id);
-    if (cur_thd != nullptr) {
-      cur_thd->resource_group_ctx()->m_cur_resource_group = resource_group;
-      mysql_mutex_unlock(&cur_thd->LOCK_thd_data);
-    }
+    if (cur_thd_ptr)
+      cur_thd_ptr->resource_group_ctx()->m_cur_resource_group = resource_group;
   }
 
   if (prev_cur_res_grp != nullptr)

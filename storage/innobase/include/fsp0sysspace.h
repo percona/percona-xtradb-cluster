@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2013, 2018, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2013, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -65,7 +65,7 @@ class SysTablespace : public Tablespace {
     /* No op */
   }
 
-  ~SysTablespace() { shutdown(); }
+  ~SysTablespace() override { shutdown(); }
 
   /** Set tablespace full status
   @param[in]	is_full		true if full */
@@ -86,16 +86,14 @@ class SysTablespace : public Tablespace {
   bool get_sanity_check_status() { return (m_sanity_checks_done); }
 
   /** Parse the input params and populate member variables.
-  @param	filepath_spec	path to data files
-  @param	supports_raw	true if it supports raw devices
+  @param[in]	filepath_spec	path to data files
+  @param[in]	supports_raw	true if the tablespace supports raw devices
   @return true on success parse */
   bool parse_params(const char *filepath_spec, bool supports_raw);
 
   /** Check the data file specification.
-  @param[in]	create_new_db		true if a new database
-  is to be created
-  @param[in]	min_expected_size	expected tablespace
-  size in bytes
+  @param[in]  create_new_db     True if a new database is to be created
+  @param[in]  min_expected_size Minimum expected tablespace size in bytes
   @return DB_SUCCESS if all OK else error code */
   dberr_t check_file_spec(bool create_new_db, ulint min_expected_size);
 
@@ -151,9 +149,9 @@ class SysTablespace : public Tablespace {
   @param[out] sum_new_sizes	sum of sizes of the new files added
   @param[out] flush_lsn		FIL_PAGE_FILE_FLUSH_LSN of first file
   @return DB_SUCCESS or error code */
-  dberr_t open_or_create(bool is_temp, bool create_new_db,
-                         page_no_t *sum_new_sizes, lsn_t *flush_lsn)
-      MY_ATTRIBUTE((warn_unused_result));
+  [[nodiscard]] dberr_t open_or_create(bool is_temp, bool create_new_db,
+                                       page_no_t *sum_new_sizes,
+                                       lsn_t *flush_lsn);
 
   Keyring_encryption_info keyring_encryption_info;
 

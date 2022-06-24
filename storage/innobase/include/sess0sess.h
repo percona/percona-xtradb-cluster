@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2013, 2019, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2013, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -64,7 +64,7 @@ class dict_intrinsic_table_t {
 /** InnoDB private data that is cached in THD */
 typedef std::map<
     std::string, dict_intrinsic_table_t *, std::less<std::string>,
-    ut_allocator<std::pair<const std::string, dict_intrinsic_table_t *>>>
+    ut::allocator<std::pair<const std::string, dict_intrinsic_table_t *>>>
     table_cache_t;
 
 class innodb_session_t {

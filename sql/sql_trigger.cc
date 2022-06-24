@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2004, 2020, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2004, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -57,6 +57,7 @@
 #include "sql/sql_backup_lock.h"  // acquire_shared_backup_lock
 #include "sql/sql_base.h"         // find_temporary_table()
 #include "sql/sql_class.h"
+#include "sql/sql_db.h"  // check_schema_readonly
 #include "sql/sql_error.h"
 #include "sql/sql_handler.h"  // mysql_ha_rm_tables()
 #include "sql/sql_lex.h"
@@ -139,7 +140,7 @@ bool get_table_for_trigger(THD *thd, const LEX_CSTRING &db_name,
 
   if (*table == nullptr) return true;
 
-  (*table)->select_lex = lex->current_select();
+  (*table)->query_block = lex->current_query_block();
   (*table)->cacheable_table = true;
 
   return false;
@@ -187,9 +188,9 @@ bool acquire_exclusive_mdl_for_trigger(THD *thd, const char *db,
 bool acquire_mdl_for_trigger(THD *thd, const char *db, const char *trg_name,
                              enum_mdl_type trigger_name_mdl_type) {
   DBUG_TRACE;
-  DBUG_ASSERT(trg_name != nullptr);
-  DBUG_ASSERT(trigger_name_mdl_type == MDL_EXCLUSIVE ||
-              trigger_name_mdl_type == MDL_SHARED_HIGH_PRIO);
+  assert(trg_name != nullptr);
+  assert(trigger_name_mdl_type == MDL_EXCLUSIVE ||
+         trigger_name_mdl_type == MDL_SHARED_HIGH_PRIO);
 
   MDL_key mdl_key;
   dd::Trigger::create_mdl_key(dd::String_type(db), dd::String_type(trg_name),
@@ -249,7 +250,7 @@ bool Sql_cmd_ddl_trigger_common::check_trg_priv_on_subj_table(
 TABLE *Sql_cmd_ddl_trigger_common::open_and_lock_subj_table(
     THD *thd, TABLE_LIST *tables, MDL_ticket **mdl_ticket) const {
   /* We should have only one table in table list. */
-  DBUG_ASSERT(tables->next_global == nullptr);
+  assert(tables->next_global == nullptr);
 
   /* We also don't allow creation of triggers on views. */
   tables->required_type = dd::enum_table_type::BASE_TABLE;
@@ -521,6 +522,8 @@ bool Sql_cmd_drop_trigger::execute(THD *thd) {
 
   if (schema_mdl_locker.ensure_locked(thd->lex->spname->m_db.str)) return true;
 
+  if (check_schema_readonly(thd, thd->lex->spname->m_db.str)) return true;
+
   if (acquire_exclusive_mdl_for_trigger(thd, thd->lex->spname->m_db.str,
                                         thd->lex->spname->m_name.str))
     return true;
@@ -536,7 +539,7 @@ bool Sql_cmd_drop_trigger::execute(THD *thd) {
     return true;
 
   if (tables == nullptr) {
-    DBUG_ASSERT(thd->lex->drop_if_exists == true);
+    assert(thd->lex->drop_if_exists == true);
     /*
       Since the trigger does not exist, there is no associated table,
       and therefore :
@@ -588,7 +591,7 @@ bool Sql_cmd_drop_trigger::execute(THD *thd) {
     restore_original_mdl_state(thd, mdl_ticket);
     return true;
   }
-  DBUG_ASSERT(dd_table != nullptr);
+  assert(dd_table != nullptr);
 
   const dd::Trigger *dd_trig_obj =
       dd_table->get_trigger(thd->lex->spname->m_name.str);

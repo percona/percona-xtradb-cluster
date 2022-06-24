@@ -12,4 +12,3 @@
 .. |rpm.e.nodeps| replace:: ``rpm -e --nodeps``
 .. |rpm.e| replace:: ``rpm -e``
 .. |mysql-upgrade| replace:: :program:`mysql_upgrade`
-.. |proxysql-admin| replace:: :program:`proxysql-admin`

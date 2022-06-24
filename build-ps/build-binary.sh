@@ -100,6 +100,7 @@ do
         shift
         CMAKE_BUILD_TYPE='Debug'
         BUILD_COMMENT="debug."
+        TARBALL_SUFFIX="-debug"
         DEBUG_EXTRA="-DDEBUG_EXTNAME=ON"
         SCONS_ARGS+=' debug=0'
         ;;
@@ -212,7 +213,7 @@ echo "Using $TARGETDIR as target/output directory"
 # source directory hold target directory as immediately child.
 # as in cd source-dir/target-dir should be true
 SOURCEDIR="$(cd $(dirname "$0"); cd ..; pwd)"
-test -e "$SOURCEDIR/VERSION" || exit 2
+test -e "$SOURCEDIR/MYSQL_VERSION" || exit 2
 echo "Using $SOURCEDIR as source directory"
 
 #
@@ -246,7 +247,7 @@ fi
 # (Galera: This is standalone so nothing to consider from here)
 # Extract the version from of each component.
 
-source "$SOURCEDIR/VERSION"
+source "$SOURCEDIR/MYSQL_VERSION"
 MYSQL_VERSION="$MYSQL_VERSION_MAJOR.$MYSQL_VERSION_MINOR.$MYSQL_VERSION_PATCH"
 PERCONA_SERVER_EXTENSION="$(echo $MYSQL_VERSION_EXTRA | sed 's/^-//')"
 PS_VERSION="$MYSQL_VERSION-$PERCONA_SERVER_EXTENSION"
@@ -256,13 +257,21 @@ PS_VERSION="$MYSQL_VERSION-$PERCONA_SERVER_EXTENSION"
 WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION wsrep-lib/wsrep-API/v26/wsrep_api.h | cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION'  "cmake/wsrep-lib.cmake" | cut -d '"' -f2)"
 
 if [[ $COPYGALERA -eq 0 ]];then
-    GALERA_REVISION="$(cd "$SOURCEDIR/percona-xtradb-cluster-galera"; test -r GALERA-REVISION && cat GALERA-REVISION)"
+	if [[ -n "$(which git)" ]] && [[ -f "$SOURCEDIR/percona-xtradb-cluster-galera/.git" ]]; then
+		pushd $SOURCEDIR/percona-xtradb-cluster-galera
+		GALERA_REVISION=$(git rev-parse --short HEAD)
+		popd
+	else
+		# When in troubles while getting Galera commit hash, fall back to well known
+		# and distinguishable value.
+		GALERA_REVISION="0000000"
+	fi
 fi
 TOKUDB_BACKUP_VERSION="${MYSQL_VERSION}${MYSQL_VERSION_EXTRA}"
 
 RELEASE_TAG=''
 PRODUCT_NAME="Percona-XtraDB-Cluster_$MYSQL_VERSION$MYSQL_VERSION_EXTRA"
-PRODUCT_FULL_NAME="${PRODUCT_NAME}.${TAG}_${BUILD_COMMENT}$(uname -s)${DIST_NAME:-}.$MACHINE_SPECS${GLIBC_VER:-}"
+PRODUCT_FULL_NAME="${PRODUCT_NAME}.${TAG}_$(uname -s)${DIST_NAME:-}.$MACHINE_SPECS${GLIBC_VER:-}${TARBALL_SUFFIX:-}"
 
 #
 # This corresponds to GIT revision when the build/package is created.
@@ -416,6 +425,7 @@ fi
             -DWITH_RE2=bundled \
             -DWITH_LIBEVENT=bundled \
             -DWITH_EDITLINE=bundled \
+            -DWITH_ZLIB=bundled \
             -DWITH_ZSTD=bundled \
             -DWITH_NUMA=ON \
             -DWITH_LDAP=system \
@@ -453,6 +463,7 @@ fi
             -DWITH_RE2=bundled \
             -DWITH_EDITLINE=bundled \
             -DWITH_LIBEVENT=bundled \
+            -DWITH_ZLIB=bundled \
             -DWITH_ZSTD=bundled \
             -DWITH_NUMA=ON \
             -DWITH_LDAP=system \
@@ -668,7 +679,7 @@ fi
         set_runpath bin/pxc_extra/pxb-8.0/lib/plugin '$ORIGIN/../../../../../lib/private/'
         set_runpath lib/plugin '$ORIGIN/../private/'
         set_runpath lib/private '$ORIGIN'
-        # LIBS MYSQLROUTER
+        #  LIBS MYSQLROUTER
         unset override && export override=true && set_runpath lib/mysqlrouter/plugin '$ORIGIN/:$ORIGIN/../private/:$ORIGIN/../../private/'
         unset override && export override=true && set_runpath lib/mysqlrouter/private '$ORIGIN/:$ORIGIN/../plugin/:$ORIGIN/../../private/'
         #  BINS MYSQLROUTER
@@ -676,6 +687,8 @@ fi
         unset override && export override=true && set_runpath bin/mysqlrouter_plugin_info '$ORIGIN/../lib/mysqlrouter/private/:$ORIGIN/../lib/mysqlrouter/plugin/:$ORIGIN/../lib/private/'
         unset override && export override=true && set_runpath bin/mysqlrouter '$ORIGIN/../lib/mysqlrouter/private/:$ORIGIN/../lib/mysqlrouter/plugin/:$ORIGIN/../lib/private/'
         unset override && export override=true && set_runpath bin/mysqlrouter_keyring '$ORIGIN/../lib/mysqlrouter/private/:$ORIGIN/../lib/mysqlrouter/plugin/:$ORIGIN/../lib/private/'
+        #  BINS XTRABACKUP
+        unset override && export override=true && set_runpath bin/pxc_extra/pxb-8.0/bin/xtrabackup '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'
 
         # Replace libs
         for DIR in ${DIRLIST}; do
@@ -696,11 +709,13 @@ fi
     link
 
     # MIN TARBALL
-    cd "$TARGETDIR/usr/local/minimal/$PRODUCT_FULL_NAME-minimal"
-    rm -rf mysql-test 2> /dev/null
-    rm -rf percona-xtradb-cluster-tests 2> /dev/null
-    find . -type f -exec file '{}' \; | grep ': ELF ' | cut -d':' -f1 | xargs strip --strip-unneeded
-    link
+    if [[ $CMAKE_BUILD_TYPE != "Debug" ]]; then
+        cd "$TARGETDIR/usr/local/minimal/$PRODUCT_FULL_NAME-minimal"
+        rm -rf mysql-test 2> /dev/null
+        rm -rf percona-xtradb-cluster-tests 2> /dev/null
+        find . -type f -exec file '{}' \; | grep ': ELF ' | cut -d':' -f1 | xargs strip --strip-unneeded
+        link
+    fi
 )
 
 # Package the archive
@@ -710,10 +725,12 @@ fi
     find $PRODUCT_FULL -type f -name 'COPYING.AGPLv3' -delete
     $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME.tar.gz" $PRODUCT_FULL_NAME
 
-    cd "$TARGETDIR/usr/local/minimal/"
-    # PS-4854 Percona Server for MySQL tarball without AGPLv3 dependency/license
-    find $PRODUCT_FULL -type f -name 'COPYING.AGPLv3' -delete
-    $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME-minimal.tar.gz" $PRODUCT_FULL_NAME-minimal
+    if [[ $CMAKE_BUILD_TYPE != "Debug" ]]; then
+        cd "$TARGETDIR/usr/local/minimal/"
+        # PS-4854 Percona Server for MySQL tarball without AGPLv3 dependency/license
+        find $PRODUCT_FULL -type f -name 'COPYING.AGPLv3' -delete
+        $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME-minimal.tar.gz" $PRODUCT_FULL_NAME-minimal
+    fi
 ) || exit 1
 
 if [[ $KEEP_BUILD -eq 0 ]]

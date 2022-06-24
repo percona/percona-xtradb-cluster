@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2016, 2020, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2016, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -193,11 +193,11 @@ static struct my_option ibd2sdi_options[] = {
      GET_NO_ARG, NO_ARG, 0, 0, 0, nullptr, 0, nullptr},
     {"version", 'v', "Display version information and exit.", nullptr, nullptr,
      nullptr, GET_NO_ARG, NO_ARG, 0, 0, 0, nullptr, 0, nullptr},
-#ifndef DBUG_OFF
+#ifndef NDEBUG
     {"debug", '#', "Output debug log. See " REFMAN "dbug-package.html",
      &opts.dbug_setting, &opts.dbug_setting, nullptr, GET_STR, OPT_ARG, 0, 0, 0,
      nullptr, 0, nullptr},
-#endif /* !DBUG_OFF */
+#endif /* !NDEBUG */
     {"dump-file", 'd',
      "Dump the tablespace SDI into the file passed by user."
      " Without the filename, it will default to stdout",
@@ -230,6 +230,11 @@ static struct my_option ibd2sdi_options[] = {
 
     {nullptr, 0, nullptr, nullptr, nullptr, nullptr, GET_NO_ARG, NO_ARG, 0, 0,
      0, nullptr, 0, nullptr}};
+
+/** A dummy implementation.  Actual implementation available in fil0fil.cc */
+std::ostream &Fil_page_header::print(std::ostream &out) const noexcept {
+  return out;
+}
 
 /** Report a failed assertion.
 @param[in]	expr	the failed assertion if not NULL
@@ -292,11 +297,11 @@ static FILE *create_tmp_file(char *temp_file_buf, const char *dir,
 
 /** Print the ibd2sdi tool usage. */
 static void usage() {
-#ifdef DBUG_OFF
+#ifdef NDEBUG
   print_version();
 #else
   print_version_debug();
-#endif /* DBUG_OFF */
+#endif /* NDEBUG */
   puts(ORACLE_WELCOME_COPYRIGHT_NOTICE("2015"));
   printf(
       "Usage: %s [-v] [-c <strict-check>] [-d <dump file name>] [-n]"
@@ -308,20 +313,21 @@ static void usage() {
 }
 
 /** Parse the options passed to tool. */
-extern "C" bool ibd2sdi_get_one_option(
-    int optid, const struct my_option *opt MY_ATTRIBUTE((unused)),
-    char *argument MY_ATTRIBUTE((unused))) {
+extern "C" bool ibd2sdi_get_one_option(int optid,
+                                       const struct my_option *opt
+                                       [[maybe_unused]],
+                                       char *argument [[maybe_unused]]) {
   switch (optid) {
-#ifndef DBUG_OFF
+#ifndef NDEBUG
     case '#':
       opts.dbug_setting =
           argument ? argument
                    : IF_WIN("d:O,ibd2sdi.trace", "d:o,/tmp/ibd2sdi.trace");
       DBUG_PUSH(opts.dbug_setting);
       break;
-#endif /* !DBUG_OFF */
+#endif /* !NDEBUG */
     case 'v':
-#ifdef DBUG_OFF
+#ifdef NDEBUG
       print_version();
 #else
       print_version_debug();
@@ -385,7 +391,7 @@ static bool get_options(int *argc, char ***argv) {
 /** Error logging classes. */
 namespace ib {
 
-logger::~logger() {}
+logger::~logger() = default;
 
 info::~info() {
   std::cerr << "[INFO] ibd2sdi: " << m_oss.str() << "." << std::endl;
@@ -404,10 +410,10 @@ fatal::~fatal() {
   ut_error;
 }
 
-/* TODO: Improve Object creation & destruction on DBUG_OFF */
+/* TODO: Improve Object creation & destruction on NDEBUG */
 class dbug : public logger {
  public:
-  ~dbug() { DBUG_PRINT("ibd2sdi", ("%s", m_oss.str().c_str())); }
+  ~dbug() override { DBUG_PRINT("ibd2sdi", ("%s", m_oss.str().c_str())); }
 };
 }  // namespace ib
 
@@ -509,14 +515,7 @@ class ib_tablespace {
 
   /** Copy Constructor.
   @param[in]	copy	another object of ib_tablespace */
-  ib_tablespace(const ib_tablespace &copy)
-      : m_space_id(copy.m_space_id),
-        m_page_size(copy.m_page_size),
-        m_file_vec(copy.m_file_vec),
-        m_page_num_recs(copy.m_page_num_recs),
-        m_max_recs_per_page(copy.m_max_recs_per_page),
-        m_sdi_root(copy.m_sdi_root),
-        m_tot_pages(copy.m_tot_pages) {}
+  ib_tablespace(const ib_tablespace &copy) = default;
 
   /** Add Datafile to vector of datafiles. Also
   resize of vector of pages.
@@ -720,8 +719,7 @@ static size_t fetch_page(ib_tablespace *ts, page_no_t page_num,
   }
 
   if (page_size.is_compressed() && fil_page_get_type(buf) == FIL_PAGE_SDI) {
-    byte *uncomp_buf =
-        static_cast<byte *>(ut_malloc_nokey(2 * page_size.logical()));
+    byte *uncomp_buf = static_cast<byte *>(ut::malloc(2 * page_size.logical()));
 
     byte *uncomp_page =
         static_cast<byte *>(ut_align(uncomp_buf, page_size.logical()));
@@ -755,7 +753,7 @@ static size_t fetch_page(ib_tablespace *ts, page_no_t page_num,
       memcpy(buf, uncomp_page, page_size.logical());
     }
 
-    ut_free(uncomp_buf);
+    ut::free(uncomp_buf);
   }
 
   return n_bytes;
@@ -1631,8 +1629,6 @@ uint64_t ibd2sdi::copy_compressed_blob(ib_tablespace *ts,
   DBUG_TRACE;
 
   byte page_buf[UNIV_PAGE_SIZE_MAX];
-  uint64_t calc_length = 0;
-  uint64_t part_len;
   page_no_t page_num = first_blob_page_num;
   z_stream d_stream;
   int err;
@@ -1669,16 +1665,12 @@ uint64_t ibd2sdi::copy_compressed_blob(ib_tablespace *ts,
       break;
     }
 
-    part_len =
-        mach_read_from_4(page_buf + FIL_PAGE_DATA + lob::LOB_HDR_PART_LEN);
-
     page_no_t next_page_num = mach_read_from_4(page_buf + FIL_PAGE_NEXT);
     space_id_t space_id =
         mach_read_from_4(page_buf + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
 
     d_stream.next_in = page_buf + FIL_PAGE_DATA;
     d_stream.avail_in = static_cast<uInt>(page_size.physical() - FIL_PAGE_DATA);
-    calc_length += part_len;
     err = inflate(&d_stream, Z_NO_FLUSH);
     switch (err) {
       case Z_OK:
@@ -1690,7 +1682,7 @@ uint64_t ibd2sdi::copy_compressed_blob(ib_tablespace *ts,
         if (next_page_num == FIL_NULL) {
           goto func_exit;
         }
-      /* fall through */
+        [[fallthrough]];
       default:
       inflate_error : {
         page_id_t page_id(space_id, page_num);

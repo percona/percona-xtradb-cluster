@@ -1,5 +1,5 @@
-# Copyright (c) 2006, 2020, Oracle and/or its affiliates. All rights reserved.
-# 
+# Copyright (c) 2006, 2021, Oracle and/or its affiliates.
+#
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
 # as published by the Free Software Foundation.
@@ -139,7 +139,9 @@ SET(CLIENT_API_FUNCTIONS
   mysql_thread_safe
   mysql_use_result
   mysql_warning_count
-
+  mysql_real_connect_dns_srv
+  mysql_bind_param
+  mysql_plugin_get_option
   CACHE INTERNAL "Functions exported by client API"
 )
 
@@ -177,18 +179,20 @@ SET(CLIENT_API_NONBLOCKING_FUNCTIONS
 SET(CLIENT_SOURCES
   libmysql.cc
   errmsg.cc
+  dns_srv.cc
   ../sql-common/client.cc
   ../sql-common/client_plugin.cc
   ../sql-common/client_authentication.cc
   ../sql-common/compression.cc
   ../sql-common/get_password.cc
   ../sql-common/net_serv.cc
+  ../sql-common/bind_params.cc
   ../sql/auth/password.cc
   ../sql/auth/sha2_password_common.cc
 )
 
 IF (WIN32 AND OPENSSL_APPLINK_C)
-  ADD_COMPILE_DEFINITIONS(
+  MY_ADD_COMPILE_DEFINITIONS(
     ../sql-common/client_authentication.cc
     COMPILE_DEFINITIONS HAVE_OPENSSL_APPLINK_C
   )
@@ -232,8 +236,33 @@ ENDIF()
 
 LIST(APPEND LIBS_TO_LINK ${SSL_LIBRARIES})
 
+UNSET(HAVE_WIN32_DNS_SRV)
+UNSET(HAVE_UNIX_DNS_SRV)
+SET(HAVE_DNS_SRV 0)
+IF(WIN32)
+  LIST(APPEND LIBS_TO_LINK dnsapi)
+  SET(HAVE_WIN32_DNS_SRV 1 PARENT_SCOPE)
+  SET(HAVE_DNS_SRV 1)
+  MESSAGE(STATUS "Found Win32 DNS SRV APIs")
+ELSEIF(FREEBSD)
+  SET(HAVE_DNS_SRV 1)
+  SET(HAVE_UNIX_DNS_SRV 1 PARENT_SCOPE)
+  MESSAGE(STATUS "BSD built in DNS SRV APIs")
+ELSE()
+  FIND_LIBRARY(RESOLV_LIBRARY NAMES resolv)
+  IF (RESOLV_LIBRARY)
+    LIST(APPEND LIBS_TO_LINK ${RESOLV_LIBRARY})
+    SET(HAVE_UNIX_DNS_SRV 1 PARENT_SCOPE)
+    SET(HAVE_DNS_SRV 1)
+    MESSAGE(STATUS "Found Unix DNS SRV APIs")
+  ENDIF()
+ENDIF()
+
+IF(HAVE_DNS_SRV EQUAL 0)
+  MESSAGE(FATAL_ERROR "Can't find neither Win32 nor Unix DNS SRV APIs")
+ENDIF()
 #
-# On Windows platform client library includes the client-side 
+# On Windows platform client library includes the client-side
 # Windows Native Authentication plugin.
 #
 IF(WIN32)
@@ -242,12 +271,23 @@ IF(WIN32)
   LIST(APPEND LIBS_TO_MERGE auth_win_client)
 ENDIF()
 
-# LDAP authentication SASL client plugin
+# LDAP authentication SASL client plug-in
 ADD_SUBDIRECTORY(authentication_ldap)
 
+# FIDO authentication client plugin
+ADD_SUBDIRECTORY(authentication_fido)
+
+# authentication kerberos client plug-in
+ADD_SUBDIRECTORY(authentication_kerberos)
+
+# authentication IAM client plug-in
+ADD_SUBDIRECTORY(authentication_oci_client)
+
 # Merge several convenience libraries into one big perconaserverclient
-MERGE_CONVENIENCE_LIBRARIES(perconaserverclient ${LIBS_TO_MERGE} COMPONENT Development)
-TARGET_LINK_LIBRARIES(perconaserverclient PRIVATE ${LIBS_TO_LINK})
+MERGE_CONVENIENCE_LIBRARIES(perconaserverclient ${LIBS_TO_MERGE}
+  COMPONENT Development
+  LINK_LIBRARIES ${LIBS_TO_LINK}
+  )
 
 # Visual Studio users need debug  static library for debug projects
 IF(MSVC)
@@ -269,15 +309,27 @@ ENDIF()
 IF(UNIX)
   MACRO(GET_VERSIONED_LIBNAME LIBNAME EXTENSION VERSION OUTNAME)
     SET(DOT_VERSION ".${VERSION}")
-    IF(DOT_VERSION STREQUAL ".") 
+    IF(DOT_VERSION STREQUAL ".")
       SET(DOT_VERSION "")
     ENDIF()
     IF(APPLE)
       SET(${OUTNAME} ${LIBNAME}${DOT_VERSION}${EXTENSION})
     ELSE()
       SET(${OUTNAME} ${LIBNAME}${EXTENSION}${DOT_VERSION})
-    ENDIF() 
+    ENDIF()
   ENDMACRO()
+ENDIF()
+
+IF(UNIX)
+  SET(OS_SHARED_LIB_VERSION "${SHARED_LIB_MAJOR_VERSION}")
+  IF(NOT FREEBSD AND NOT APPLE)
+    STRING_APPEND(OS_SHARED_LIB_VERSION
+      ".${SHARED_LIB_MINOR_VERSION}.${SHARED_LIB_PATCH_VERSION}")
+  ENDIF()
+  # Name of shared library is libperconaserverclient on Unix
+  SET(UNIX_OUTPUT_NAME OUTPUT_NAME perconaserverclient)
+  SET(UNIX_VERSION     VERSION     "${OS_SHARED_LIB_VERSION}")
+  SET(UNIX_SOVERSION   SOVERSION   "${SHARED_LIB_MAJOR_VERSION}")
 ENDIF()
 
 # Merge several convenience libraries into one big perconaserverclient
@@ -287,60 +339,38 @@ MERGE_LIBRARIES_SHARED(libmysql ${LIBS_TO_MERGE}
   ${CLIENT_API_FUNCTIONS}
   ${CLIENT_API_FUNCTIONS_UNDOCUMENTED}
   ${CLIENT_API_NONBLOCKING_FUNCTIONS}
-  COMPONENT SharedLibraries)
-TARGET_LINK_LIBRARIES(libmysql PRIVATE ${LIBS_TO_LINK})
+  COMPONENT SharedLibraries
+  LINK_LIBRARIES ${LIBS_TO_LINK}
+  ${UNIX_OUTPUT_NAME}
+  ${UNIX_SOVERSION}
+  ${UNIX_VERSION}
+  )
+
+# Downgrade warning for strncat in my_crypt_genhash.
+IF((WITH_LTO OR CMAKE_COMPILER_FLAG_WITH_LTO) AND MY_COMPILER_IS_GNU)
+  MY_TARGET_LINK_OPTIONS(libmysql "-Wno-error=stringop-truncation")
+ENDIF()
 
 IF(LINUX_STANDALONE AND KERBEROS_CUSTOM_LIBRARY)
   ADD_DEPENDENCIES(libmysql ${kerberos_target})
-  ADD_DEPENDENCIES(mysqlclient ${kerberos_target})
-ENDIF()
-
-IF(WIN32)
-  # So that libmysql_api_test below can find the .dll
-  ADD_CUSTOM_COMMAND(TARGET libmysql POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "${CMAKE_BINARY_DIR}/library_output_directory/${CMAKE_CFG_INTDIR}/libmysql.dll"
-    "${CMAKE_BINARY_DIR}/runtime_output_directory/${CMAKE_CFG_INTDIR}/libmysql.dll"
-    )
+  ADD_DEPENDENCIES(perconaserverclient ${kerberos_target})
 ENDIF()
 
 IF(UNIX)
-  # libtool compatability
-  IF(FREEBSD OR APPLE)
-    SET(OS_SHARED_LIB_VERSION "${SHARED_LIB_MAJOR_VERSION}")
-  ELSE()
-    SET(OS_SHARED_LIB_VERSION
-      "${SHARED_LIB_MAJOR_VERSION}.${SHARED_LIB_MINOR_VERSION}.${SHARED_LIB_PATCH_VERSION}")
-  ENDIF()
-  # Name of shared library is perconaserverclient on Unix
-  SET_TARGET_PROPERTIES(libmysql PROPERTIES 
-    OUTPUT_NAME perconaserverclient 
-    VERSION "${OS_SHARED_LIB_VERSION}" 
-    SOVERSION "${SHARED_LIB_MAJOR_VERSION}")
-  CONFIGURE_FILE(libmysql.ver.in ${CMAKE_CURRENT_BINARY_DIR}/libmysql.ver)
-
-  IF(APPLE)
-    SET_TARGET_PROPERTIES(libmysql PROPERTIES
-      MACOSX_RPATH ON 
-      )
+  IF(LINK_FLAG_Z_DEFS)
+    MY_TARGET_LINK_OPTIONS(libmysql "LINKER:${LINK_FLAG_Z_DEFS}")
   ENDIF()
 
-  ADD_INSTALL_RPATH_FOR_OPENSSL(libmysql)
+  IF(LINUX)
+    CONFIGURE_FILE(libmysql.ver.in ${CMAKE_CURRENT_BINARY_DIR}/libmysql.ver)
+    MY_TARGET_LINK_OPTIONS(libmysql
+      "LINKER:--version-script=${CMAKE_CURRENT_BINARY_DIR}/libmysql.ver")
+  ENDIF()
 
-  GET_TARGET_PROPERTY(libmysql_link_flags libmysql LINK_FLAGS)
-  IF(LINK_FLAG_NO_UNDEFINED)
-    STRING_APPEND(libmysql_link_flags
-      " ${LINK_FLAG_NO_UNDEFINED}")
-    STRING_APPEND(libmysql_link_flags
-      " -Wl,--version-script=${CMAKE_CURRENT_BINARY_DIR}/libmysql.ver")
-    SET_TARGET_PROPERTIES(libmysql
-      PROPERTIES LINK_FLAGS "${libmysql_link_flags}")
-  ENDIF() 
   # clean direct output needs to be set several targets have the same name
   #(perconaserverclient in this case)
   SET_TARGET_PROPERTIES(perconaserverclient PROPERTIES CLEAN_DIRECT_OUTPUT 1)
   SET_TARGET_PROPERTIES(libmysql PROPERTIES CLEAN_DIRECT_OUTPUT 1)
-
 ENDIF()
 
 #

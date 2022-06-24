@@ -34,6 +34,7 @@ call mtr.add_suppression("Ignoring error 'Unknown table 'test.t1'' on query");
 call mtr.add_suppression("Query apply failed");
 call mtr.add_suppression("Inconsistency detected");
 drop table t1;
+SET GLOBAL wsrep_provider_options = 'pc.ignore_sb=true';
 Killing server ...
 Starting mysqld
 # restart

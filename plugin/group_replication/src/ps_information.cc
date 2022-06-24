@@ -1,4 +1,4 @@
-/* Copyright (c) 2015, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2015, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -22,6 +22,7 @@
 
 #include <string>
 
+#include "mutex_lock.h"
 #include "plugin/group_replication/include/member_info.h"
 #include "plugin/group_replication/include/plugin.h"
 #include "plugin/group_replication/include/ps_information.h"
@@ -31,7 +32,7 @@ using std::string;
 bool get_group_members_info(
     uint index, const GROUP_REPLICATION_GROUP_MEMBERS_CALLBACKS &callbacks,
     Group_member_info_manager_interface *group_member_manager,
-    char *channel_name) {
+    Gcs_operations *gcs_module, char *channel_name) {
   if (channel_name != nullptr) {
     callbacks.set_channel_name(callbacks.context, *channel_name,
                                strlen(channel_name));
@@ -113,6 +114,24 @@ bool get_group_members_info(
   callbacks.set_member_version(callbacks.context, *member_version.c_str(),
                                member_version.length());
 
+  enum_transport_protocol incoming_connection_protocol_value = INVALID_PROTOCOL;
+  if (gcs_module == nullptr || (local_member_info->get_recovery_status() ==
+                                Group_member_info::MEMBER_OFFLINE)) {
+    // use the value that is present in the variable
+    incoming_connection_protocol_value =
+        static_cast<enum_transport_protocol>(get_communication_stack_var());
+  } else {
+    incoming_connection_protocol_value =
+        gcs_module->get_current_incoming_connections_protocol();
+  }
+
+  const char *incoming_connection_protocol =
+      Communication_stack_to_string::to_string(
+          incoming_connection_protocol_value);
+  callbacks.set_member_incoming_communication_protocol(
+      callbacks.context, *incoming_connection_protocol,
+      strlen(incoming_connection_protocol));
+
   delete member_info;
 
   return false;
@@ -159,6 +178,13 @@ bool get_group_member_stats(
   std::string uuid(member_info->get_uuid());
   callbacks.set_member_id(callbacks.context, *uuid.c_str(), uuid.length());
 
+  if (nullptr == local_member_info ||
+      local_member_info->get_recovery_status() ==
+          Group_member_info::MEMBER_OFFLINE) {
+    delete member_info;
+    return false;
+  }
+
   // Retrieve view information
   Gcs_view *view = gcs_module->get_current_view();
   if (view != nullptr) {
@@ -173,9 +199,10 @@ bool get_group_member_stats(
     const char act[] =
         "now signal signal.reached_get_group_member_stats "
         "wait_for signal.resume_get_group_member_stats";
-    DBUG_ASSERT(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
+    assert(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
   });
   // Check if the group replication has started and a valid certifier exists
+  MUTEX_LOCK(lock, get_plugin_running_lock());
   Pipeline_member_stats *pipeline_stats = nullptr;
   if (!get_plugin_is_stopping() && applier_module != nullptr &&
       (pipeline_stats =

@@ -1,4 +1,4 @@
-# Copyright (c) 2015, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2015, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -27,10 +27,10 @@ ENDIF()
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/../include/mysqlrouter)
 
-SET(MY_AES_IMPL ${CMAKE_SOURCE_DIR}/mysys/my_aes_openssl.cc)
-
-
 SET(lib_source_files
+  auto_cleaner.cc
+  certificate_generator.cc
+  certificate_handler.cc
   config_files.cc
   config_generator.cc
   cluster_metadata.cc
@@ -41,10 +41,8 @@ SET(lib_source_files
   keyring_info.cc
   plugin_config.cc
   common/log_filter.cc
-  # common/my_aes.cc
   common/mysql_session.cc
   common/utils_sqlstring.cc
-  # ${MY_AES_IMPL}
   )
 IF(WIN32)
   LIST(APPEND lib_source_files
@@ -62,15 +60,20 @@ IF(WIN32)
     ../../harness/src/logging/eventlog_rc/MSG00001.bin)
 ENDIF()
 
-IF(NOT WIN32)
-  ADD_LIBRARY(router_lib SHARED ${lib_source_files} ${common_files})
-ELSE()
+IF(WIN32)
   # on Windows, we statically link the router lib to otherwise avoid
   # exporting a bunch of symbols
   ADD_LIBRARY(router_lib STATIC ${lib_source_files})
+ELSE()
+  ADD_LIBRARY(router_lib SHARED ${lib_source_files} ${common_files})
 ENDIF()
 TARGET_LINK_LIBRARIES(router_lib
-  ${CMAKE_DL_LIBS} harness-library perconaserverclient ${SSL_LIBRARIES}
+  ${CMAKE_DL_LIBS}
+  harness-library
+  harness_stdx
+  perconaserverclient
+  ${SSL_LIBRARIES}
+  io_component
   )
 TARGET_INCLUDE_DIRECTORIES(router_lib PUBLIC ../include)
 
@@ -79,20 +82,20 @@ SET_TARGET_PROPERTIES(router_lib PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/runtime_output_directory
 )
 
-IF(NOT WIN32)
+IF(WIN32)
   SET_TARGET_PROPERTIES(router_lib PROPERTIES
-    OUTPUT_NAME "mysqlrouter"
+    OUTPUT_NAME "mysqlrouter_lib"
     SOVERSION 1
   )
 ELSE()
   SET_TARGET_PROPERTIES(router_lib PROPERTIES
-    OUTPUT_NAME "mysqlrouter_lib"
+    OUTPUT_NAME "mysqlrouter"
     SOVERSION 1
   )
 ENDIF()
 
 ADD_INSTALL_RPATH_FOR_OPENSSL(router_lib)
-SET_PATH_TO_SSL(router_lib ${CMAKE_BINARY_DIR}/library_output_directory)
+SET_PATH_TO_CUSTOM_SSL_FOR_APPLE(router_lib)
 
 MYSQL_ADD_EXECUTABLE(mysqlrouter
   ${source_files}

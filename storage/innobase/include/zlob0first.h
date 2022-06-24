@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2016, 2019, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2016, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -156,9 +156,9 @@ struct z_first_page_t {
     return (m_block);
   }
 
-  /** Load the first page using given mini transaction. The first page must
+  /** Load the first page using given mini-transaction. The first page must
   already be x-latched by the m_mtr.
-  @param[in]	mtr   the mini transaction in which first page is to be loaded.
+  @param[in]	mtr   the mini-transaction in which first page is to be loaded.
   @return the buffer block of first page. */
   buf_block_t *load_x(mtr_t *mtr) const {
     ut_ad(mtr_memo_contains(m_mtr, m_block, MTR_MEMO_PAGE_X_FIX));
@@ -264,16 +264,23 @@ struct z_first_page_t {
     return (fil_addr_t(page_no, offset));
   }
 
-  /** All the index pages are singled linked with each other, and
+  /** All the index pages are singly linked with each other, and
   the first page contains the link to one index page.
   @param[in]  page_no  the page number of an index page. */
   void set_index_page_no(page_no_t page_no) {
-    ut_ad(m_mtr != nullptr);
-    mlog_write_ulint(frame() + OFFSET_INDEX_PAGE_NO, page_no, MLOG_4BYTES,
-                     m_mtr);
+    set_index_page_no(page_no, m_mtr);
   }
 
-  /** All the index pages are singled linked with each other, and
+  /** All the index pages are singly linked with each other, and
+  the first page contains the link to one index page.
+  @param[in]  page_no  the page number of an index page.
+  @param[in]  mtr      use this mini transaction context for redo logs. */
+  void set_index_page_no(page_no_t page_no, mtr_t *mtr) {
+    ut_ad(m_mtr != nullptr);
+    mlog_write_ulint(frame() + OFFSET_INDEX_PAGE_NO, page_no, MLOG_4BYTES, mtr);
+  }
+
+  /** All the index pages are singly linked with each other, and
   the first page contains the link to one index page. Get that index
   page number.
   @return the index page number. */
@@ -290,7 +297,7 @@ struct z_first_page_t {
   /** All the fragment pages are doubly linked with each other, and
   the first page contains the link to one fragment page in FIL_PAGE_PREV. Get
   that frag page number.
-  @param[in]   mtr   mini transaction to use for this read operation.
+  @param[in]   mtr   Mini-transaction to use for this read operation.
   @return the frag page number. */
   page_no_t get_frag_page_no(mtr_t *mtr) const {
     return (mtr_read_ulint(frame() + FIL_PAGE_PREV, MLOG_4BYTES, mtr));
@@ -303,30 +310,44 @@ struct z_first_page_t {
   bool verify_frag_page_no();
 #endif /* UNIV_DEBUG */
 
-  /** All the fragment pages are doubly linked with each other, and
-  the first page contains the link to one fragment page in FIL_PAGE_PREV.
-  @param[in]  mtr      mini transaction for this modification.
-  @param[in]  page_no  the page number of a fragment page. */
+  /** All the fragment pages (@see z_frag_page_t) are doubly linked with each
+  other, and the first page contains the link to one fragment page in
+  FIL_PAGE_PREV.
+  @param[in]  mtr      Mini-transaction for this modification.
+  @param[in]  page_no  The page number of a fragment page. */
   void set_frag_page_no(mtr_t *mtr, page_no_t page_no) {
     ut_ad(verify_frag_page_no());
     set_prev_page_no(page_no, mtr);
   }
 
-  /** All the fragment pages are doubly linked with each other, and
-  the first page contains the link to one fragment page in FIL_PAGE_PREV.
+  /** All the fragment pages (@see z_frag_page_t) are doubly linked with each
+  other, and the first page contains the link to one fragment page in
+  FIL_PAGE_PREV.
   @param[in]  page_no  the page number of a fragment page. */
   void set_frag_page_no(page_no_t page_no) {
     ut_ad(verify_frag_page_no());
     set_prev_page_no(page_no, m_mtr);
   }
 
-  /** All the frag node pages are singled linked with each other, and
-  the first page contains the link to one frag node page.
+  /** All the frag node pages (@see z_frag_node_page_t) are singly linked with
+  each other, and the first page contains the link to the last allocated frag
+  node page. The last allocated FIL_PAGE_TYPE_ZLOB_FRAG_ENTRY  page will be the
+  first in this list. This list is used to free these pages.
   @param[in]  page_no  the page number of an frag node page. */
   void set_frag_node_page_no(page_no_t page_no) {
-    ut_ad(m_mtr != nullptr);
+    set_frag_node_page_no(page_no, m_mtr);
+  }
+
+  /** All the frag node pages (@see z_frag_node_page_t) are singly linked with
+  each other, and the first page contains the link to the last allocated frag
+  node page. The last allocated FIL_PAGE_TYPE_ZLOB_FRAG_ENTRY  page will be the
+  first in this list. This list is used to free these pages.
+  @param[in]  page_no  the page number of an frag node page.
+  @param[in]  mtr      mini trx context to generate redo logs. */
+  void set_frag_node_page_no(page_no_t page_no, mtr_t *mtr) {
+    ut_ad(mtr != nullptr);
     mlog_write_ulint(frame() + OFFSET_FRAG_NODES_PAGE_NO, page_no, MLOG_4BYTES,
-                     m_mtr);
+                     mtr);
   }
 
   /** Free all the z_frag_page_t pages. All the z_frag_page_t pages are
@@ -359,7 +380,7 @@ struct z_first_page_t {
   @return the number of pages freed. */
   size_t free_all_data_pages();
 
-  /** All the frag node pages are singled linked with each other, and the
+  /** All the frag node pages are singly linked with each other, and the
   first page contains the link to one frag node page. Get that frag node
   page number.
   @return the index page number. */
@@ -537,7 +558,7 @@ struct z_first_page_t {
 
   /** Load the page, in x-latch mode, containing the given file address.
   @param[in]	addr	given file address
-  @param[in]	mtr     the mini transaction context to be used.
+  @param[in]	mtr     the mini-transaction context to be used.
   @return	the file list node pointer. */
   flst_node_t *addr2ptr_x(fil_addr_t &addr, mtr_t *mtr) const {
     space_id_t space = dict_index_get_space(m_index);
@@ -567,6 +588,10 @@ struct z_first_page_t {
   /** Free all the pages of the zlob.
   @return the total number of pages freed. */
   size_t destroy();
+
+  /** Free all the pages of the zlob except the first page.
+  @return the total number of pages freed. */
+  size_t make_empty();
 
 #ifdef UNIV_DEBUG
  private:
@@ -599,7 +624,7 @@ struct z_first_page_t {
 
   /** Restart the given mtr. The first page must already be x-latched by the
   m_mtr.
-  @param[in]   mtr   the mini transaction context which is to be restarted. */
+  @param[in]   mtr   the mini-transaction context which is to be restarted. */
   void restart_mtr(mtr_t *mtr) {
     ut_ad(mtr != m_mtr);
 

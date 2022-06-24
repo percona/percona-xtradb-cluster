@@ -4,7 +4,7 @@ CREATE TABLE t2 (f2 INT);
 CREATE TABLE t3 (f3 INT);
 PREPARE check_view_columns FROM
 'SELECT table_name, column_name, column_type FROM information_schema.columns
-   WHERE table_name= ?';
+   WHERE table_name= ? ORDER BY table_name, column_name';
 PREPARE check_view_status FROM
 'SELECT table_name, table_comment FROM information_schema.tables WHERE
    table_name= ?';
@@ -662,7 +662,7 @@ JOIN v1 AS tab1;
 SELECT table_name, view_definition FROM information_schema.views
 WHERE table_name='v2';
 TABLE_NAME	VIEW_DEFINITION
-v2	select `func`(`stmt`.`f1`) AS `func(f1)`,`tab1`.`f2` AS `f2` from (`test`.`t1` `stmt` join `test`.`v1` `tab1`)
+v2	select `func`(`stmt`.`f1`) AS `func(f1)`,`test`.`tab1`.`f2` AS `f2` from (`test`.`t1` `stmt` join `test`.`v1` `tab1`)
 # Flush cached TABLE objects.
 FLUSH TABLES;
 # View v1 is dependent on t2 and view v2 is dependent on v1. Altering
@@ -675,7 +675,7 @@ ALTER TABLE t2 MODIFY f2 LONGTEXT;
 SELECT table_name, view_definition FROM information_schema.views
 WHERE table_name='v2';
 TABLE_NAME	VIEW_DEFINITION
-v2	select `func`(`stmt`.`f1`) AS `func(f1)`,`tab1`.`f2` AS `f2` from (`test`.`t1` `stmt` join `test`.`v1` `tab1`)
+v2	select `func`(`stmt`.`f1`) AS `func(f1)`,`test`.`tab1`.`f2` AS `f2` from (`test`.`t1` `stmt` join `test`.`v1` `tab1`)
 DROP TABLE t1, t2;
 DROP VIEW v1, v2;
 DROP FUNCTION func;

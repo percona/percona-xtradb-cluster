@@ -4,6 +4,7 @@
 
 --source include/galera_cluster.inc
 --source include/have_debug_sync.inc
+--source include/count_sessions.inc
 
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) Engine=InnoDB;
 
@@ -33,6 +34,52 @@ SELECT COUNT(*) = 2 FROM t1;
 
 DROP TABLE t1;
 
+
+###
+### RSU BF-ing local transaction (5.7 behavior)
+###
+--connection node_1
+CREATE TABLE t1(id INT PRIMARY KEY AUTO_INCREMENT, k INT);
+INSERT INTO t1(k) VALUES (1),(2),(3),(101),(102),(103);
+BEGIN;
+UPDATE t1 SET k=k+1 WHERE id<100;
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1a
+SET wsrep_OSU_method = RSU;
+ALTER TABLE t1 ADD KEY(k);
+
+--connection node_1
+--error ER_LOCK_DEADLOCK
+COMMIT;
+
+DROP TABLE t1;
+
+
+###
+### RSU BF-ing local transaction within non-wsrep session (5.7 behavior)
+###
+--connection node_1
+CREATE TABLE t1(id INT PRIMARY KEY AUTO_INCREMENT, k INT);
+INSERT INTO t1(k) VALUES (1),(2),(3),(101),(102),(103);
+SET SESSION wsrep_on = OFF;
+BEGIN;
+UPDATE t1 SET k=k+1 WHERE id<100;
+
+--connection node_1a
+SET wsrep_OSU_method = RSU;
+ALTER TABLE t1 ADD KEY(k);
+
+--connection node_1
+--error ER_LOCK_DEADLOCK
+COMMIT;
+
+SET SESSION wsrep_on = ON;
+DROP TABLE t1;
+
+
+--disconnect node_1a
+--source include/wait_until_count_sessions.inc
 
 ###
 ### RSU with parallely active commit connection

@@ -1,4 +1,4 @@
-/* Copyright (c) 2004, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2004, 2021, Oracle and/or its affiliates.
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License, version 2.0,
@@ -1367,7 +1367,9 @@ static int TIME_to_datetime_str(const MYSQL_TIME &my_time, char *to) {
   Print a datetime value with an optional fractional part.
 
   @param       my_time The MYSQL_TIME value to print
-  @param [out] to      The string pointer to print at
+  @param [out] to      The string pointer to print at. This function is
+  guaranteed not to write more than MAX_DATE_STRING_REP_LENGTH characters.
+
   @param       dec     Precision, in the range 0..6
 
   @return The length of the result string.
@@ -2250,9 +2252,9 @@ bool valid_period(long long period) {
 
    @return month
  */
-ulong convert_period_to_month(ulong period) {
-  ulong a;
-  ulong b;
+uint64_t convert_period_to_month(uint64_t period) {
+  uint64_t a;
+  unsigned b;
   if (period == 0) return 0L;
   if ((a = period / 100) < YY_PART_YEAR)
     a += 2000;
@@ -2267,8 +2269,8 @@ ulong convert_period_to_month(ulong period) {
 
    @return period
  */
-ulong convert_month_to_period(ulong month) {
-  ulong year;
+uint64_t convert_month_to_period(uint64_t month) {
+  uint64_t year;
   if (month == 0L) return 0L;
   if ((year = month / 12) < 100) {
     year += (year < YY_PART_YEAR) ? 2000 : 1900;

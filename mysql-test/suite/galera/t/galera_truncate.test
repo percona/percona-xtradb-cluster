@@ -78,3 +78,28 @@ DROP TABLE t1;
 DROP TABLE t2;
 DROP TABLE t3;
 DROP TABLE t4;
+
+# Test the case when the table contains foreign keys.
+# In such a case, parent table keys are added to the writeset to track dependencies in a proper way.
+# PXC-3924 discovered a bug when TRUNCATE TABLE was not replicated in this case causing failure
+# because of duplicated keys detection.
+# Note that failure was not deterministic and depended on random values of LEX::no_write_to_binlog.
+# Easily reproducible on ASAN builds.
+--connection node_1
+SET FOREIGN_KEY_CHECKS=0;
+CREATE TABLE t1 (
+	id INT,
+	related_id INT,
+	PRIMARY KEY (id),
+	CONSTRAINT FOREIGN KEY (related_id) REFERENCES non_existing_table (id)
+);
+
+--connection node_2
+SET FOREIGN_KEY_CHECKS=0;
+INSERT INTO t1 (id, related_id) VALUES (1,1);
+
+--connection node_1
+TRUNCATE TABLE t1;
+INSERT INTO t1 (id, related_id) VALUES (1,1);
+
+DROP TABLE t1;

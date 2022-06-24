@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2012, 2019, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2012, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -23,12 +23,15 @@
 */
 
 #include <cstdint>
+#include <time.h>
+
 #include <NDBT.hpp>
 #include <NDBT_Test.hpp>
 #include <HugoOperations.hpp>
 #include <NdbRestarter.hpp>
 #include <mgmapi.h>
 #include <ndb_logevent.h>
+#include <NdbSleep.h>
 #include <NdbTick.h>
 #include <NDBT_Stats.hpp>
 #include <random.h>
@@ -191,7 +194,7 @@ runLongtrans(NDBT_Context* ctx, NDBT_Step* step)
         if (sleep410 > 0)
         {
           info("longtrans: sleep " << sleep410);
-          sleep(sleep410);
+          NdbSleep_SecSleep(sleep410);
         }
 
         CHK2(ops.execute_Rollback(pNdb) == 0, ops.getNdbError());
@@ -210,11 +213,11 @@ runLongtrans(NDBT_Context* ctx, NDBT_Step* step)
             info("longtrans: 410 cleared");
             break;
           }
-          sleep(1);
+          NdbSleep_SecSleep(1);
         }
         break;
       }
-      sleep(1);
+      NdbSleep_SecSleep(1);
     }
     CHK1(result == NDBT_OK);
 
@@ -346,7 +349,7 @@ runWrite410(NDBT_Context* ctx, NDBT_Step* step)
         info("write: longtrans rollback seen");
         break;
       }
-      sleep(1);
+      NdbSleep_SecSleep(1);
     }
 
     while (!ctx->isTestStopped())
@@ -715,6 +718,8 @@ get_redostatus(NdbMgmHandle h, LogInfo& li)
         CHK1(rs.log_part < 4);
         LogPart& lp = ln.m_logpart[rs.log_part];
 
+        info("RedoStatus from node " << ev.source_nodeid << " log part " << rs.log_part);
+
         CHK1(!lp.m_set);
         LogPos& head = lp.m_head;
         LogPos& tail = lp.m_tail;
@@ -781,7 +786,10 @@ get_redostatus(NdbMgmHandle h, LogInfo& li)
       CHK1(result == 0);
     }
     CHK1(result == 0);
-    CHK2(rescnt == maxcnt, "got events " << rescnt << " != " << maxcnt);
+    CHK2(rescnt == maxcnt, "got events (after " << Int64(time(0) - start)
+                                                << "s of "
+                                                << maxwait << "s) "
+                                                << rescnt << " != " << maxcnt);
     require(li.isset()); // already implied by counts
 
     for (int n = 0; n < li.m_nodes; n++)
@@ -987,7 +995,7 @@ runRestartOK(NDBT_Context* ctx, NDBT_Step* step)
     info("restart01: cluster up again");
 
     // let write run until redo wraps (no check yet)
-    sleep(300);
+    NdbSleep_SecSleep(300);
     loop++;
   }
 
@@ -1261,7 +1269,7 @@ runRestartFD(NDBT_Context* ctx, NDBT_Step* step)
     }
     CHK1(result == NDBT_OK);
 
-    sleep(1 + myRandom48(10));
+    NdbSleep_SecSleep(1 + myRandom48(10));
     loop++;
   }
 
@@ -1318,7 +1326,7 @@ resizeRedoLog(NDBT_Context* ctx, NDBT_Step* step)
     g_err << "Setting NoOfFragmentLogFiles = " << noOfLogFiles
           << " FragmentLogFileSize = " << logFileSize
           << " TimeBetweenLCP " << LCPinterval << endl;
-    ConfigValues::Iterator iter(conf.m_configValues->m_config);
+    ConfigValues::Iterator iter(conf.m_configuration->m_config_values);
     for (int nodeid = 1; nodeid < MAX_NODES; nodeid ++)
     {
       Uint32 oldValue;
@@ -1378,7 +1386,7 @@ resizeRedoLog(NDBT_Context* ctx, NDBT_Step* step)
     }
 
     g_err << "Restarting nodes to apply config change..." << endl;
-    sleep(3); //Give MGM server time to restart
+    NdbSleep_SecSleep(3); //Give MGM server time to restart
     if (restarter.restartAll(true))
     {
       g_err << "Failed to restart node." << endl;

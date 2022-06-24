@@ -1,4 +1,4 @@
-/* Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2016, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License, version 2.0,
@@ -40,8 +40,8 @@ struct mysql_rwlock_t;
 */
 rwlock_scoped_lock::rwlock_scoped_lock(mysql_rwlock_t *lock,
                                        bool lock_for_write,
-                                       const char *file MY_ATTRIBUTE((unused)),
-                                       int line MY_ATTRIBUTE((unused))) {
+                                       const char *file [[maybe_unused]],
+                                       int line [[maybe_unused]]) {
   if (lock_for_write) {
     if (!mysql_rwlock_wrlock_with_src(lock, file, line)) {
       m_lock = lock;

@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2003, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -1255,6 +1255,7 @@ void determineParams(Uint32 typeId,
     }
   }
   // Fall through - for Blob v2
+  [[fallthrough]];
   default:
     /* Default determined by meta-info */
     convSize = 1 << typeLog2Size;

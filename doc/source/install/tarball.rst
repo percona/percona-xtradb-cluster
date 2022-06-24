@@ -1,8 +1,8 @@
 .. _tarball:
 
-====================================
-Installing |PXC| from Binary Tarball
-====================================
+======================================================
+Installing Percona XtraDB Cluster from Binary Tarball
+======================================================
 
 Percona provides generic tarballs with all required files and binaries
 for manual installation.
@@ -43,7 +43,7 @@ For example, you can use ``curl`` as follows:
 
    $ curl -O https://www.percona.com/downloads/Percona-XtraDB-Cluster-80/Percona-XtraDB-Cluster/binary/tarball/TARBALL_NAME
 
-Be sure to check your system and make sure that the packages are installed that |pxc| |version| depends on.
+Be sure to check your system and make sure that the packages are installed that PXC |version| depends on.
 
 .. rubric:: For Debian or Ubuntu:
 

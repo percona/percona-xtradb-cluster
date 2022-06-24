@@ -8,34 +8,34 @@
 CREATE TABLE t1 (f1 INTEGER) Engine=InnoDB;
 
 --connection node_1
-SET GLOBAL wsrep_slave_threads = 10;
+SET GLOBAL wsrep_applier_threads = 10;
 
 # ensure that the threads have actually started running
 --let $wait_condition = SELECT COUNT(*) = 11 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
 --source include/wait_condition.inc
 
-SET GLOBAL wsrep_slave_threads = 1;
+SET GLOBAL wsrep_applier_threads = 1;
 
 --connection node_2
 INSERT INTO t1 VALUES (1);
 
 --connection node_1
 --sleep 0.5
-SET GLOBAL wsrep_slave_threads = 10;
+SET GLOBAL wsrep_applier_threads = 10;
 
 --let $wait_condition = SELECT COUNT(*) = 11 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
 --let $wait_condition_on_error_output = SELECT COUNT(*), 12 as EXPECTED_VALUE FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user'; show processlist
 --source include/wait_condition_with_debug.inc
 SELECT COUNT(*) = 11 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
 
-SET GLOBAL wsrep_slave_threads = 20;
+SET GLOBAL wsrep_applier_threads = 20;
 
 --let $wait_condition = SELECT COUNT(*) = 21 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
 --let $wait_condition_on_error_output = SELECT COUNT(*), 22 as EXPECTED_VALUE FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user'; show processlist
 --source include/wait_condition_with_debug.inc
 SELECT COUNT(*) = 21 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
 
-SET GLOBAL wsrep_slave_threads = 1;
+SET GLOBAL wsrep_applier_threads = 1;
 
 --connection node_2
 INSERT INTO t1 VALUES (1);
@@ -50,8 +50,8 @@ INSERT INTO t1 VALUES (9);
 
 
 --connection node_1
-SET GLOBAL wsrep_slave_threads = 10;
-SET GLOBAL wsrep_slave_threads = 0;
+SET GLOBAL wsrep_applier_threads = 10;
+SET GLOBAL wsrep_applier_threads = 0;
 
 --connection node_2
 INSERT INTO t1 VALUES (10);
@@ -72,5 +72,5 @@ INSERT INTO t1 VALUES (20);
 --source include/wait_condition_with_debug.inc
 SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
 
-SET GLOBAL wsrep_slave_threads = 1;
+SET GLOBAL wsrep_applier_threads = 1;
 DROP TABLE t1;

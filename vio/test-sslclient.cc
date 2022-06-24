@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -33,7 +33,7 @@
 
 const char *VER = "0.2";
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 const char *default_dbug_option = "d:t:O,-";
 #endif
 
@@ -42,7 +42,7 @@ void fatal_error(const char *r) {
   exit(0);
 }
 
-int main(int argc MY_ATTRIBUTE((unused)), char **argv) {
+int main(int argc [[maybe_unused]], char **argv) {
   char client_key[] = "../SSL/client-key.pem",
        client_cert[] = "../SSL/client-cert.pem";
   char ca_file[] = "../SSL/cacert.pem", *ca_path = 0, *cipher = 0;

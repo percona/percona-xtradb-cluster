@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -120,6 +120,9 @@ int Rpl_info_table::do_init_info(enum_find_method method, uint instance) {
   saved_mode = thd->variables.sql_mode;
   ulonglong saved_options = thd->variables.option_bits;
   thd->variables.option_bits &= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+  thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
 
   /*
     Opens and locks the rpl_info table before accessing it.
@@ -145,7 +148,7 @@ int Rpl_info_table::do_init_info(enum_find_method method, uint instance) {
       break;
 
     default:
-      DBUG_ASSERT(0);
+      assert(0);
       break;
   }
 
@@ -186,6 +189,9 @@ int Rpl_info_table::do_flush_info(const bool force) {
   saved_mode = thd->variables.sql_mode;
   ulonglong saved_options = thd->variables.option_bits;
   thd->variables.option_bits &= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+  thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
   thd->is_operating_substatement_implicitly = true;
 
   /*
@@ -249,12 +255,12 @@ int Rpl_info_table::do_flush_info(const bool force) {
   }
 
 end:
-  DBUG_EXECUTE_IF("mts_debug_concurrent_access", {
+  DBUG_EXECUTE_IF("mta_debug_concurrent_access", {
     while (thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER &&
-           mts_debug_concurrent_access < 2 && mts_debug_concurrent_access > 0) {
+           mta_debug_concurrent_access < 2 && mta_debug_concurrent_access > 0) {
       DBUG_PRINT("mts", ("Waiting while locks are acquired to show "
                          "concurrency in mts: %u %u\n",
-                         mts_debug_concurrent_access, thd->thread_id()));
+                         mta_debug_concurrent_access, thd->thread_id()));
       my_sleep(6000000);
     }
   };);
@@ -286,6 +292,9 @@ int Rpl_info_table::do_clean_info() {
   saved_mode = thd->variables.sql_mode;
   ulonglong saved_options = thd->variables.option_bits;
   thd->variables.option_bits &= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+  thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
 
   /*
     Opens and locks the rpl_info table before accessing it.
@@ -354,6 +363,9 @@ int Rpl_info_table::do_reset_info(uint nparam, const char *param_schema,
   saved_mode = thd->variables.sql_mode;
   ulonglong saved_options = thd->variables.option_bits;
   thd->variables.option_bits &= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+  thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
 
   /*
     Opens and locks the rpl_info table before accessing it.
@@ -375,7 +387,7 @@ int Rpl_info_table::do_reset_info(uint nparam, const char *param_schema,
       todo: for another table in future, consider to make use of the
       passed parameter to locate the lookup key.
     */
-    DBUG_ASSERT(strcmp(info->str_table.str, "slave_worker_info") == 0);
+    assert(strcmp(info->str_table.str, "slave_worker_info") == 0);
 
     if (info->verify_table_primary_key_fields(table)) {
       error = 1;
@@ -527,7 +539,7 @@ end:
 bool Rpl_info_table::do_count_info(uint nparam, const char *param_schema,
                                    const char *param_table,
                                    MY_BITMAP const *nullable_bitmap,
-                                   uint *counter) {
+                                   ulonglong *counter) {
   int error = 1;
   TABLE *table = nullptr;
   sql_mode_t saved_mode;
@@ -578,6 +590,54 @@ end:
   info->access->drop_thd(thd);
   delete info;
   return error;
+}
+
+std::pair<bool, bool> Rpl_info_table::table_in_use(
+    uint nparam, const char *param_schema, const char *param_table,
+    MY_BITMAP const *nullable_bitmap) {
+  bool error{false};
+  bool empty{false};
+
+  TABLE *table = nullptr;
+  Open_tables_backup backup;
+  Rpl_info_table *info = nullptr;
+
+  DBUG_TRACE;
+
+  if (!(info = new Rpl_info_table(nparam, param_schema, param_table, 0, nullptr,
+                                  nullable_bitmap)))
+    return std::make_pair(true, false);
+
+  THD *thd = info->access->create_thd();
+  sql_mode_t saved_mode = thd->variables.sql_mode;
+
+  /*
+    Opens and locks the rpl_info table before accessing it.
+  */
+  if (!info->access->open_table(thd, to_lex_cstring(info->str_schema),
+                                to_lex_cstring(info->str_table),
+                                info->get_number_info(), TL_READ, &table,
+                                &backup)) {
+    /*
+      Check if table is in use
+    */
+    std::tie(error, empty) = info->access->is_table_in_use(table);
+    if (error) {
+      LogErr(WARNING_LEVEL, ER_RPL_CANT_SCAN_INFO_TABLE, info->str_schema.str,
+             info->str_table.str);
+    }
+  }
+  /* else:
+    We cannot simply print out a warning message at this
+    point because this may represent a bootstrap.
+  */
+
+  // Unlocks and closes the rpl_info table.
+  error = info->access->close_table(thd, table, &backup, error) || error;
+  thd->variables.sql_mode = saved_mode;
+  info->access->drop_thd(thd);
+  delete info;
+  return std::make_pair(error != 0, empty);
 }
 
 void Rpl_info_table::do_end_info() {}
@@ -675,7 +735,7 @@ Rpl_info_handler::enum_field_get_status Rpl_info_table::do_get_info(
 
 Rpl_info_handler::enum_field_get_status Rpl_info_table::do_get_info(
     const int pos, uchar *value, const size_t size,
-    const uchar *default_value MY_ATTRIBUTE((unused))) {
+    const uchar *default_value [[maybe_unused]]) {
   if (bitmap_is_set(&field_values->is_null, pos)) {
     return Rpl_info_handler::enum_field_get_status::FIELD_VALUE_IS_NULL;
   } else {
@@ -740,7 +800,7 @@ Rpl_info_handler::enum_field_get_status Rpl_info_table::do_get_info(
 
 Rpl_info_handler::enum_field_get_status Rpl_info_table::do_get_info(
     const int pos, Server_ids *value,
-    const Server_ids *default_value MY_ATTRIBUTE((unused))) {
+    const Server_ids *default_value [[maybe_unused]]) {
   if (value->unpack_dynamic_ids(field_values->value[pos].c_ptr_safe()))
     return Rpl_info_handler::enum_field_get_status::FAILURE;
 
@@ -758,12 +818,14 @@ bool Rpl_info_table::do_update_is_transactional() {
   Open_tables_backup backup;
 
   DBUG_TRACE;
-  DBUG_EXECUTE_IF("simulate_update_is_transactional_error", { return true; });
 
   THD *thd = access->create_thd();
   saved_mode = thd->variables.sql_mode;
   ulonglong saved_options = thd->variables.option_bits;
   thd->variables.option_bits &= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+  thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
 
   /*
     Opens and locks the rpl_info table before accessing it.

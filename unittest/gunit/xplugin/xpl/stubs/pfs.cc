@@ -1,4 +1,4 @@
-/* Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2018, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -23,12 +23,14 @@
 #include "include/config.h"
 
 #include "include/pfs_cond_provider.h"
+#include "include/pfs_memory_provider.h"
 #include "include/pfs_mutex_provider.h"
 #include "include/pfs_rwlock_provider.h"
 #include "include/pfs_socket_provider.h"
 #include "include/pfs_thread_provider.h"
 #include "my_inttypes.h"
 #include "mysql/components/services/psi_cond_bits.h"
+#include "mysql/components/services/psi_memory_bits.h"
 #include "mysql/components/services/psi_mutex_bits.h"
 #include "mysql/components/services/psi_rwlock_bits.h"
 #include "mysql/components/services/psi_socket_bits.h"
@@ -51,6 +53,16 @@ PSI_cond_locker *pfs_start_cond_wait_v1(PSI_cond_locker_state *, PSI_cond *,
   return nullptr;
 }
 #endif  // HAVE_PSI_COND_INTERFACE
+
+#ifdef HAVE_PSI_MEMORY_INTERFACE
+void pfs_register_memory_vc(const char *, struct PSI_memory_info_v1 *, int) {}
+
+PSI_memory_key pfs_memory_alloc_vc(PSI_memory_key, size_t, PSI_thread **) {
+  return 0;
+}
+
+void pfs_memory_free_vc(PSI_memory_key, size_t, PSI_thread *) {}
+#endif /* HAVE_PSI_MEMORY_INTERFACE */
 
 #ifdef HAVE_PSI_MUTEX_INTERFACE
 void pfs_destroy_mutex_v1(PSI_mutex *) {}
@@ -107,14 +119,15 @@ PSI_socket_locker *pfs_start_socket_wait_v1(PSI_socket_locker_state_v1 *,
 
 #ifdef HAVE_PSI_THREAD_INTERFACE
 void pfs_delete_current_thread_vc() {}
-PSI_thread *pfs_new_thread_vc(PSI_thread_key, const void *, ulonglong) {
+PSI_thread *pfs_new_thread_vc(PSI_thread_key, PSI_thread_seqnum, const void *,
+                              ulonglong) {
   return nullptr;
 }
-void pfs_register_thread_vc(char const *, PSI_thread_info_v1 *, int) {}
+void pfs_register_thread_vc(char const *, PSI_thread_info *, int) {}
 void pfs_set_thread_account_vc(char const *, int, char const *, int) {}
 void pfs_set_thread_os_id_vc(PSI_thread *) {}
 void pfs_set_thread_vc(PSI_thread *) {}
-int pfs_spawn_thread_vc(PSI_thread_key, my_thread_handle *,
+int pfs_spawn_thread_vc(PSI_thread_key, PSI_thread_seqnum, my_thread_handle *,
                         const my_thread_attr_t *, void *(*)(void *), void *) {
   return 0;
 }

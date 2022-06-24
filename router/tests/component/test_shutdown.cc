@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
+  Copyright (c) 2018, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -34,8 +34,6 @@
 #include <gmock/gmock.h>
 
 #ifdef RAPIDJSON_NO_SIZETYPEDEFINE
-// if we build within the server, it will set RAPIDJSON_NO_SIZETYPEDEFINE
-// globally and require to include my_rapidjson_size_t.h
 #include "my_rapidjson_size_t.h"
 #endif
 #include <rapidjson/document.h>
@@ -45,7 +43,6 @@
 #include "mysqlrouter/rest_client.h"
 #include "rest_api_testutils.h"
 #include "router_component_test.h"
-#include "tcp_port_pool.h"
 
 using ::testing::Eq;
 using namespace std::chrono_literals;
@@ -72,7 +69,8 @@ class ShutdownTest : public RouterComponentTest {
         create_config_file(temp_test_dir, other_sections, &default_section);
 
     // launch the router
-    auto &router = ProcessManager::launch_router({"-c", conf_file});
+    auto &router = ProcessManager::launch_router(
+        {"-c", conf_file}, EXIT_SUCCESS, true, false, -1s);
 
     return router;
   }
@@ -145,7 +143,6 @@ class ShutdownTest : public RouterComponentTest {
     }
   }
 
-  TcpPortPool port_pool_;
   unsigned wait_for_cache_ready_timeout_ = 1000;
 };
 
@@ -213,11 +210,6 @@ TEST_F(ShutdownTest, flaky_connection_to_cluster) {
         launch_mysql_server_mock(json_primary_node, cluster_node_ports[i],
                                  EXIT_SUCCESS, false /*debug_mode*/, http_port);
     cluster_nodes.emplace_back(&node);
-
-    ASSERT_NO_FATAL_FAILURE(
-        check_port_ready(*cluster_nodes[i], cluster_node_ports[i]));
-
-    EXPECT_TRUE(MockServerRestClient(http_port).wait_for_rest_endpoint_ready());
     set_mock_metadata(http_port, "gr-id", cluster_node_ports);
   }
 

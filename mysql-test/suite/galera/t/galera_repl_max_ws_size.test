@@ -28,3 +28,223 @@ DROP TABLE t1;
 #CALL mtr.add_suppression("rbr write fail");
 CALL mtr.add_suppression("Transaction/Write-set size limit.*");
 CALL mtr.add_suppression("Failed to create write-set from binlog.*");
+
+
+# === Purpose ===
+#
+# Test that setting repl.max_ws_size provider option also updates server's
+# wsrep_max_ws_size and vice versa.
+#
+# === References ====
+#
+# PXC-3704: wsrep_max_ws_size not linked to repl.max_ws_size when defined in
+#           configuration file
+
+--connection node_2
+
+# Save the provider options before testing
+--let $wsrep_provider_options_orig = `SELECT @@wsrep_provider_options`
+
+# Check that the cluster started correctly.
+SET SESSION wsrep_sync_wait = 0;
+
+--let $members=2
+--source include/galera_wait_until_synced.inc
+--source include/wsrep_wait_membership.inc
+
+--echo
+--echo # Test-1: Verify that value of wsrep_max_ws_size picked from cnf file is
+--echo #         also updated in the provider on server startup.
+--echo #
+
+# Create a temporary cnf file for testing with wsrep_max_ws_size
+--let $CONFIG_FILE = $MYSQLTEST_VARDIR/tmp/galera_repl_max_ws_size.cnf
+--copy_file $MYSQLTEST_VARDIR/my.cnf $CONFIG_FILE
+--append_file $CONFIG_FILE
+[mysqld.2]
+wsrep-max-ws-size= 8192
+wsrep-debug=1
+EOF
+
+--echo # Shutdown node2
+--connection node_2
+--echo [connection node_2]
+--echo # Shutting down node2
+--source include/shutdown_mysqld.inc
+
+--echo # restarting node2
+--let $restart_parameters = "restart: --defaults-file=$CONFIG_FILE"
+--replace_result $CONFIG_FILE CONFIG_FILE
+--source include/start_mysqld.inc
+
+# Check that the cluster started correctly.
+SET SESSION wsrep_sync_wait = 0;
+--source include/wsrep_wait_membership.inc
+
+# Verify that the value mentioned in the cnf file has been updated in both
+# 'repl.max_ws_size' provider option and also server's 'wsrep_max_ws_size'
+# variable.
+
+# Check the value of server variable.
+SELECT @@wsrep_max_ws_size;
+
+# Check the value in provider.
+SELECT SUBSTRING_INDEX(SUBSTR(@@wsrep_provider_options, LOCATE('repl.max_ws_size =', @@wsrep_provider_options) + LENGTH('repl.max_ws_size = ')), '; ', 1) AS provider_value;
+
+# Assert that the value is 8192, which is picked from wsrep-max-ws-size from cnf file.
+--assert (`SELECT @@wsrep_max_ws_size = 8192`)
+
+# Assert that both wsrep_max_ws_size and repl.max_ws_size have same values.
+--let $server_max_ws_value = `SELECT @@wsrep_max_ws_size`
+--let $provide_max_ws_value = `SELECT SUBSTRING_INDEX(SUBSTR(@@wsrep_provider_options, LOCATE('repl.max_ws_size =', @@wsrep_provider_options) + LENGTH('repl.max_ws_size = ')), '; ', 1)`
+
+--let $assert_text = Both wsrep_max_ws_size and repl.max_ws_size have same values
+--let $assert_cond = [ SELECT $server_max_ws_value = $provide_max_ws_value ]
+--source include/assert.inc
+
+--echo
+--echo # Test-2: Verify that value of wsrep_max_ws_size set during runtime is
+--echo #         also updated in the provider immediately.
+--echo #
+
+# Set the wsrep_max_ws_size to a new value and test again.
+SET GLOBAL wsrep_max_ws_size = 40960;
+
+# Check the value of server variable.
+SELECT @@wsrep_max_ws_size;
+
+# Check the value in provider.
+SELECT SUBSTRING_INDEX(SUBSTR(@@wsrep_provider_options, LOCATE('repl.max_ws_size =', @@wsrep_provider_options) + LENGTH('repl.max_ws_size = ')), '; ', 1) AS provider_value;
+
+# Assert that the value is 40960.
+--assert (`SELECT @@wsrep_max_ws_size = 40960`)
+
+# Assert that both wsrep_max_ws_size and repl.max_ws_size have same values.
+--let $server_max_ws_value = `SELECT @@wsrep_max_ws_size`
+--let $provide_max_ws_value = `SELECT SUBSTRING_INDEX(SUBSTR(@@wsrep_provider_options, LOCATE('repl.max_ws_size =', @@wsrep_provider_options) + LENGTH('repl.max_ws_size = ')), '; ', 1)`
+
+--let $assert_text = Both wsrep_max_ws_size and repl.max_ws_size have same values
+--let $assert_cond = [ SELECT $server_max_ws_value = $provide_max_ws_value ]
+--source include/assert.inc
+
+--echo
+--echo # Test-3: Verify that value of repl.max_ws_size provider option set
+--echo #         during runtime is also updated in the server variable
+--echo #         immediately.
+--echo #
+
+# Set the repl.max_ws_size to a new value and test again.
+SET GLOBAL wsrep_provider_options = 'repl.max_ws_size = 204800';
+
+# Check the value of server variable.
+SELECT @@wsrep_max_ws_size;
+
+# Check the value in provider.
+SELECT SUBSTRING_INDEX(SUBSTR(@@wsrep_provider_options, LOCATE('repl.max_ws_size =', @@wsrep_provider_options) + LENGTH('repl.max_ws_size = ')), '; ', 1) AS provider_value;
+
+# Assert that the value is 204800.
+--assert (`SELECT @@wsrep_max_ws_size = 204800`)
+
+# Assert that both wsrep_max_ws_size and repl.max_ws_size have same values.
+--let $server_max_ws_value = `SELECT @@wsrep_max_ws_size`
+--let $provide_max_ws_value = `SELECT SUBSTRING_INDEX(SUBSTR(@@wsrep_provider_options, LOCATE('repl.max_ws_size =', @@wsrep_provider_options) + LENGTH('repl.max_ws_size = ')), '; ', 1)`
+
+--let $assert_text = Both wsrep_max_ws_size and repl.max_ws_size have same values
+--let $assert_cond = [ SELECT $server_max_ws_value = $provide_max_ws_value ]
+--source include/assert.inc
+
+--echo
+--echo # Test-4: Verify that value of repl.max_ws_size picked from command line is
+--echo #         also updated in the provider on server startup.
+--echo #
+
+--echo # Shutdown node2
+--connection node_2
+--echo [connection node_2]
+--echo # Shutting down node2
+--source include/shutdown_mysqld.inc
+
+--let $suppress_print_params=1
+--let $start_mysqld_params = --wsrep_provider_options=base_port=$NODE_GALERAPORT_2;repl.max_ws_size=102400;
+--source include/start_mysqld.inc
+--source include/wait_until_connected_again.inc
+--let $suppress_print_params=0
+
+# Check that the cluster started correctly.
+SET SESSION wsrep_sync_wait = 0;
+--source include/wsrep_wait_membership.inc
+
+# Check the value of server variable.
+SELECT @@wsrep_max_ws_size;
+
+# Check the value in provider.
+SELECT SUBSTRING_INDEX(SUBSTR(@@wsrep_provider_options, LOCATE('repl.max_ws_size =', @@wsrep_provider_options) + LENGTH('repl.max_ws_size = ')), '; ', 1) AS provider_value;
+
+# Assert that the value is 102400, which is picked from repl.max_ws_size from command line.
+--assert (`SELECT @@wsrep_max_ws_size = 102400`)
+
+# Assert that both wsrep_max_ws_size and repl.max_ws_size have same values.
+--let $server_max_ws_value = `SELECT @@wsrep_max_ws_size`
+--let $provide_max_ws_value = `SELECT SUBSTRING_INDEX(SUBSTR(@@wsrep_provider_options, LOCATE('repl.max_ws_size =', @@wsrep_provider_options) + LENGTH('repl.max_ws_size = ')), '; ', 1)`
+
+--let $assert_text = Both wsrep_max_ws_size and repl.max_ws_size have same values
+--let $assert_cond = [ SELECT $server_max_ws_value = $provide_max_ws_value ]
+--source include/assert.inc
+
+--echo
+--echo # Test-5: Verify that value of repl.max_ws_size is chosen when both
+--echo #         wsrep_max_ws_size and repl.max_ws_size is passed to the
+--echo #         server.
+--echo #
+
+# Create a temporary cnf file for testing with wsrep_max_ws_size=8192
+--remove_file $CONFIG_FILE
+--copy_file $MYSQLTEST_VARDIR/my.cnf $CONFIG_FILE
+--append_file $CONFIG_FILE
+[mysqld.2]
+wsrep-max-ws-size= 8192
+wsrep-debug=1
+EOF
+
+--echo # Shutdown node2
+--connection node_2
+--echo [connection node_2]
+--echo # Shutting down node2
+--source include/shutdown_mysqld.inc
+
+--echo # restarting node2 with repl.max_ws_size=204800
+--let $suppress_print_params=1
+--let $start_mysqld_params =  --defaults-file=$CONFIG_FILE --wsrep_provider_options=base_port=$NODE_GALERAPORT_2;repl.max_ws_size=204800;
+--source include/start_mysqld.inc
+--source include/wait_until_connected_again.inc
+--let $suppress_print_params=0
+
+# Check that the cluster started correctly.
+SET SESSION wsrep_sync_wait = 0;
+--let $members=2
+--source include/galera_wait_until_synced.inc
+--source include/wsrep_wait_membership.inc
+
+# Check the value of server variable.
+SELECT @@wsrep_max_ws_size;
+
+# Check the value in provider.
+SELECT SUBSTRING_INDEX(SUBSTR(@@wsrep_provider_options, LOCATE('repl.max_ws_size =', @@wsrep_provider_options) + LENGTH('repl.max_ws_size = ')), '; ', 1) AS provider_value;
+
+# Assert that the value is 204800, which is picked from repl.max_ws_size from command line and wsrep_max_ws_size is ignored.
+--assert (`SELECT @@wsrep_max_ws_size = 204800`)
+
+# Assert that both wsrep_max_ws_size and repl.max_ws_size have same values.
+--let $server_max_ws_value = `SELECT @@wsrep_max_ws_size`
+--let $provide_max_ws_value = `SELECT SUBSTRING_INDEX(SUBSTR(@@wsrep_provider_options, LOCATE('repl.max_ws_size =', @@wsrep_provider_options) + LENGTH('repl.max_ws_size = ')), '; ', 1)`
+
+--let $assert_text = Both wsrep_max_ws_size and repl.max_ws_size have same values
+--let $assert_cond = [ SELECT $server_max_ws_value = $provide_max_ws_value ]
+--source include/assert.inc
+
+
+--let $restart_parameters=
+--source include/restart_mysqld.inc
+
+# Cleanup
+--remove_file $CONFIG_FILE

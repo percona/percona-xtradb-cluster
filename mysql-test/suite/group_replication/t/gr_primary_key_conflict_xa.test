@@ -144,7 +144,7 @@ XA END 'trx2';
 --echo # group_replication_before_message_broadcast debug sync point.
 --let $rpl_connection_name= server1
 --source include/rpl_connection.inc
---let $wait_condition=SELECT COUNT(*)=1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE State = 'debug sync point: now'
+--let $wait_condition=SELECT COUNT(*)=0 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE State = 'debug sync'
 --source include/wait_condition.inc
 
 --echo
@@ -164,6 +164,7 @@ INSERT INTO t1 VALUES (3);
 --source include/rpl_connection.inc
 SET DEBUG_SYNC='now SIGNAL waiting';
 SET @@GLOBAL.DEBUG= @debug_save;
+SET DEBUG_SYNC='RESET';
 
 --echo
 --echo ########################################################################

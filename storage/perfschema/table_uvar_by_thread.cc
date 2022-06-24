@@ -1,4 +1,4 @@
-/* Copyright (c) 2013, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2013, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -27,7 +27,8 @@
 
 #include "storage/perfschema/table_uvar_by_thread.h"
 
-#include "my_dbug.h"
+#include <assert.h>
+
 #include "my_thread.h"
 #include "sql/item_func.h"
 #include "sql/mysqld_thd_manager.h"
@@ -46,7 +47,7 @@ class Find_thd_user_var : public Find_THD_Impl {
  public:
   Find_thd_user_var(THD *unsafe_thd) : m_unsafe_thd(unsafe_thd) {}
 
-  virtual bool operator()(THD *thd) {
+  bool operator()(THD *thd) override {
     if (thd != m_unsafe_thd) {
       return false;
     }
@@ -55,7 +56,6 @@ class Find_thd_user_var : public Find_THD_Impl {
       return false;
     }
 
-    mysql_mutex_lock(&thd->LOCK_thd_data);
     return true;
   }
 
@@ -99,7 +99,7 @@ void User_variables::materialize(PFS_thread *pfs, THD *thd) {
     /* Copy VARIABLE_NAME */
     const char *name = sql_uvar->entry_name.ptr();
     size_t name_length = sql_uvar->entry_name.length();
-    DBUG_ASSERT(name_length <= sizeof(pfs_uvar.m_name));
+    assert(name_length <= sizeof(pfs_uvar.m_name));
     pfs_uvar.m_name.make_row(name, name_length);
 
     /* Copy VARIABLE_VALUE */
@@ -232,9 +232,9 @@ int table_uvar_by_thread::rnd_pos(const void *pos) {
   return HA_ERR_RECORD_DELETED;
 }
 
-int table_uvar_by_thread::index_init(uint idx MY_ATTRIBUTE((unused)), bool) {
+int table_uvar_by_thread::index_init(uint idx [[maybe_unused]], bool) {
   PFS_index_uvar_by_thread *result = nullptr;
-  DBUG_ASSERT(idx == 0);
+  assert(idx == 0);
   result = PFS_NEW(PFS_index_uvar_by_thread);
   m_opened_index = result;
   m_index = result;
@@ -286,13 +286,12 @@ int table_uvar_by_thread::materialize(PFS_thread *thread) {
   }
 
   Find_thd_user_var finder(unsafe_thd);
-  THD *safe_thd = Global_THD_manager::get_instance()->find_thd(&finder);
-  if (safe_thd == nullptr) {
+  THD_ptr safe_thd = Global_THD_manager::get_instance()->find_thd(&finder);
+  if (!safe_thd) {
     return 1;
   }
 
-  m_THD_cache.materialize(thread, safe_thd);
-  mysql_mutex_unlock(&safe_thd->LOCK_thd_data);
+  m_THD_cache.materialize(thread, safe_thd.get());
   return 0;
 }
 
@@ -321,11 +320,11 @@ int table_uvar_by_thread::read_row_values(TABLE *table, unsigned char *buf,
   Field *f;
 
   /* Set the null bits */
-  DBUG_ASSERT(table->s->null_bytes == 1);
+  assert(table->s->null_bytes == 1);
   buf[0] = 0;
 
-  DBUG_ASSERT(m_row.m_variable_name != nullptr);
-  DBUG_ASSERT(m_row.m_variable_value != nullptr);
+  assert(m_row.m_variable_name != nullptr);
+  assert(m_row.m_variable_value != nullptr);
 
   for (; (f = *fields); fields++) {
     if (read_all || bitmap_is_set(table->read_set, f->field_index())) {
@@ -346,7 +345,7 @@ int table_uvar_by_thread::read_row_values(TABLE *table, unsigned char *buf,
           }
           break;
         default:
-          DBUG_ASSERT(false);
+          assert(false);
       }
     }
   }

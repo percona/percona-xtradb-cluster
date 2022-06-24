@@ -57,7 +57,7 @@
       /*!50003 SET COMPLETION_TYPE=@OLD_COMPLETION_TYPE*/;
       /*!50530 SET @@SESSION.PSEUDO_SLAVE_MODE=0*/;
 
-   This information can be used for checking the |MySQL| error log for the corresponding error message. ::
+   This information can be used for checking the MySQL error log for the corresponding error message. ::
 
      160805  9:33:37 8:52:21 [ERROR] Slave SQL: Error 'Unknown table 'test'' on query. Default database: 'test'. Query: 'drop table test', Error_code: 1051
      160805  9:33:37 8:52:21 [Warning] WSREP: RBR event 1 Query apply warning: 1, 3
@@ -71,7 +71,7 @@
 
   .. seealso::
 
-     |percona| Database Performance Blog: All You Need to Know About GCache (Galera-Cache)
+     Percona Database Performance Blog: All You Need to Know About GCache (Galera-Cache)
         https://www.percona.com/blog/2016/11/16/all-you-need-to-know-about-gcache-galera-cache/
 
 .. _galera.cache: galera_cache
@@ -81,7 +81,7 @@
    ring-buffer file that is preallocated on disk when the node is initialized.
    File size can be controlled with the variable :variable:`gcache.size`. If
    this value is bigger, more writesets are cached and chances are better that
-   the re-joining node will get |IST| instead of |SST|. Filename can be changed
+   the re-joining node will get IST instead of SST. Filename can be changed
    with the :variable:`gcache.name` variable.
 
 .. _galera-grastate-dat:

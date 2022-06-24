@@ -151,6 +151,8 @@ SST_INFO_FILE="sst_info"
 # Used to pass status of pipelined processes executed in background
 PIPESTATUS_FILE="pipestatus"
 
+JOINER_SST_DIR=""
+
 # Setting the path for ss and ip
 # ss: is utility to investigate socket, ip for network routes.
 export PATH="/usr/sbin:/sbin:$PATH"
@@ -268,6 +270,51 @@ interruptable_timeout() {
 
     piperesult=( $result "${piperesult[@]}" )
     echo ${piperesult[@]}
+}
+
+# Monitor progress of SST and kill the process if stalled.
+monitor_sst_progress() {
+  local tmpsstdir=$1
+  shift
+  local pid=$1
+  shift
+  local timeout=$1
+  shift
+  local current_timeout=0
+  local previous_size=0
+  local sleep=5
+  if [[ ${timeout} -eq 0 ]]; then
+    return;
+  fi
+
+  while true; do
+    kill -0 $pid 2> /dev/null
+    if [[ $? -ne 0 ]]; then
+      break;
+    fi
+    if [[ ! -d ${tmpsstdir} ]]; then
+      break;
+    fi
+
+    current_size=$(du -b -s ${tmpsstdir} | awk '{print $1}')
+    if [[ ${current_size} -eq  ${previous_size} ]]; then
+      current_timeout=$((current_timeout + 1))
+      sleep=1
+    else
+      # Reset timeout and set sleep back to 5 seconds.
+      current_timeout=0
+      sleep=5
+      previous_size=${current_size}
+    fi
+
+    if [[ ${current_timeout} -eq  ${timeout} ]]; then
+      wsrep_log_error "Killing SST ($pid) with SIGKILL after stalling for ${current_timeout} seconds"
+      pkill -SIGKILL -P ${pid} 2> /dev/null
+      break;
+    fi
+
+    sleep ${sleep};
+  done
 }
 
 #
@@ -470,6 +517,18 @@ get_transfer()
 
         donor_extra=""
         joiner_extra=""
+
+        local socat_donor_connect_timeout=
+        local socat_T=
+        if [[ ${WSREP_SST_DONOR_TIMEOUT} -ne 0 ]]; then
+            wsrep_log_debug "Using donor connect timeout ${WSREP_SST_DONOR_TIMEOUT} sec (for 1 retry)"
+            socat_donor_connect_timeout=",connect-timeout=${WSREP_SST_DONOR_TIMEOUT}"
+        fi
+        if [[ ${WSREP_SST_IDLE_TIMEOUT} -ne 0 ]]; then
+            wsrep_log_debug "Using donor idle timeout ${WSREP_SST_IDLE_TIMEOUT} sec"
+            socat_T=" -T ${WSREP_SST_IDLE_TIMEOUT}"
+        fi
+
         if [[ $encrypt -eq 4 ]]; then
             if ! socat -V | grep -q WITH_OPENSSL; then
                 wsrep_log_error "******************* FATAL ERROR ********************** "
@@ -490,6 +549,15 @@ get_transfer()
                 exit 2
             fi
 
+            # Convert the dhparams path into an absolute path
+            if [[ -n $ssl_dhparams ]]; then
+                pushd "$DATA" &>/dev/null
+                ssl_dhparams=$(get_absolute_path "$ssl_dhparams")
+                popd &>/dev/null
+
+                wsrep_log_debug "dhparams (absolute) : $ssl_dhparams"
+            fi
+
             # socat versions < 1.7.3 will have 512-bit dhparams (too small)
             #       so create 2048-bit dhparams and send that as a parameter
             # socat version >= 1.7.3, checks to see if the peername matches the hostname
@@ -505,6 +573,23 @@ get_transfer()
             if compare_versions "$SOCAT_VERSION" ">=" "1.7.3"; then
                 donor_extra=',commonname=""'
             fi
+            # disable SNI if socat supports it
+            if compare_versions "$SOCAT_VERSION" ">=" "1.7.4"; then
+                donor_extra+=',no-sni=1'
+            fi
+
+
+            # PXC-3508 : If 'ssl_dhparams' option has been set, then always add it
+            # to the socat command (both donor and joiner)
+            if [[ -n $ssl_dhparams ]]; then
+                if [[ ! $donor_extra =~ dhparam= ]]; then
+                    donor_extra+=",dhparam=$ssl_dhparams"
+                fi
+                if [[ ! $joiner_extra =~ dhparam= ]]; then
+                    joiner_extra+=",dhparam=$ssl_dhparams"
+                fi
+            fi
+
         fi
 
         # prepend a comma if it's not already there
@@ -513,6 +598,18 @@ get_transfer()
         fi
 
         if [[ $encrypt -eq 4 ]]; then
+            wsrep_log_debug "Using openssl based encryption with socat: with key, crt, and ca"
+
+            pushd "$DATA" &>/dev/null
+            ssl_ca=$(get_absolute_path "$ssl_ca")
+            ssl_cert=$(get_absolute_path "$ssl_cert")
+            ssl_key=$(get_absolute_path "$ssl_key")
+            popd &>/dev/null
+
+            wsrep_log_debug "ssl_ca (absolute) : $ssl_ca"
+            wsrep_log_debug "ssl_cert (absolute) : $ssl_cert"
+            wsrep_log_debug "ssl_key (absolute) : $ssl_key"
+
             verify_file_exists "$ssl_ca" "CA, certificate, and key files are required." \
                                          "Please check the 'ssl-ca' option.           "
             verify_file_exists "$ssl_cert" "CA, certificate, and key files are required." \
@@ -529,14 +626,20 @@ get_transfer()
                 tcmd="socat -u openssl-listen:${TSST_PORT},reuseaddr,cert=${ssl_cert},key=${ssl_key},cafile=${ssl_ca},verify=1${joiner_extra}${sockopt} stdio"
             else
                 wsrep_log_debug "Encrypting with SSL. CERT: $ssl_cert, KEY: $ssl_key, CA: $ssl_ca"
-                tcmd="socat -u stdio openssl-connect:${REMOTEIP}:${TSST_PORT},cert=${ssl_cert},key=${ssl_key},cafile=${ssl_ca},verify=1${donor_extra}${sockopt}"
+                tcmd="socat ${socat_T} -u stdio openssl-connect:${REMOTEIP}:${TSST_PORT},cert=${ssl_cert},key=${ssl_key},cafile=${ssl_ca},verify=1${donor_extra}${sockopt}${socat_donor_connect_timeout}"
             fi
 
         else
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
-                tcmd="socat -u TCP-LISTEN:${TSST_PORT},reuseaddr${sockopt} stdio"
+                # PXC-3767 - IPv6 support in PXC (wsrep_sst_xtrabackup-v2)
+                # socat require TCP6-LISTEN to work with ip version6 addresses
+                if [[ "$WSREP_SST_OPT_HOST" =~ .*:.* ]]; then
+                    tcmd="socat -u TCP6-LISTEN:${TSST_PORT},reuseaddr${sockopt} stdio"
+                else
+                    tcmd="socat -u TCP-LISTEN:${TSST_PORT},reuseaddr${sockopt} stdio"
+                fi
             else
-                tcmd="socat -u stdio TCP:${REMOTEIP}:${TSST_PORT}${sockopt}"
+                tcmd="socat ${socat_T} -u stdio TCP:${REMOTEIP}:${TSST_PORT}${sockopt}${socat_donor_connect_timeout}"
             fi
         fi
     fi
@@ -634,7 +737,7 @@ read_cnf()
     iopts=$(parse_cnf sst inno-backup-opts "")
     iapts=$(parse_cnf sst inno-apply-opts "")
     impts=$(parse_cnf sst inno-move-opts "")
-    stimeout=$(parse_cnf sst sst-initial-timeout 100)
+    stimeout=${WSREP_SST_JOINER_TIMEOUT}
     ssyslog=$(parse_cnf sst sst-syslog 0)
     ssystag=$(parse_cnf mysqld_safe syslog-tag "${SST_SYSLOG_TAG:-}")
     ssystag+="-"
@@ -830,6 +933,9 @@ cleanup_joiner()
     if [[ -n $progress && -p $progress ]]; then
         wsrep_log_debug "Cleaning up fifo file $progress"
         rm $progress
+    fi
+    if [[ -n "${JOINER_SST_DIR:-}" && -z "$WSREP_LOG_DEBUG" ]]; then
+      [[ -d "${JOINER_SST_DIR}" ]] && rm -rf "${JOINER_SST_DIR}" || true
     fi
     if [[ -n "${tmpdirbase}" ]]; then
         [[ -d "${tmpdirbase}" ]] && rm -rf "${tmpdirbase}" || true
@@ -1435,7 +1541,7 @@ function initialize_pxb_commands()
         exit 2
     fi
 
-    if ${pxb_bin_path} /tmp --help 2>/dev/null | grep -q -- '--version-check'; then
+    if ${pxb_bin_path} --help 2>/dev/null | grep -q -- '--version-check'; then
         disver="--no-version-check"
     fi
 
@@ -1479,7 +1585,7 @@ function initialize_pxb_commands()
             }
 
             # prepare doesn't look at my.cnf instead it has its own generated backup-my.cnf
-            INNOPREPARE="${pxb_bin_path} $disver $iapts --prepare --binlog-info=ON \
+            INNOPREPARE="${pxb_bin_path} $disver $iapts --prepare \
                 \$rebuildcmd \$keyringapplyopt \$encrypt_prepare_options \
                 --rollback-prepared-trx \
                 --xtrabackup-plugin-dir="$pxb_plugin_dir" \
@@ -1487,19 +1593,19 @@ function initialize_pxb_commands()
             INNOMOVE="${pxb_bin_path} --defaults-file=${WSREP_SST_OPT_CONF} \
                 --defaults-group=mysqld${WSREP_SST_OPT_CONF_SUFFIX} \
                 --datadir=\${TDATA} $disver $impts \
-                --move-back --binlog-info=ON --force-non-empty-directories \$encrypt_move_options \
+                --move-back --force-non-empty-directories \$encrypt_move_options \
                 --xtrabackup-plugin-dir="$pxb_plugin_dir" \
                 --target-dir=\${DATA} 2>&1 | logger -p daemon.err -t ${ssystag}innobackupex-move "
             INNOBACKUP="${pxb_bin_path} --defaults-file=${WSREP_SST_OPT_CONF} \
                 --defaults-group=mysqld${WSREP_SST_OPT_CONF_SUFFIX} $disver $iopts \
                 \$INNOEXTRA \$keyringbackupopt --lock-ddl --backup --galera-info \
-                --binlog-info=ON \$encrypt_backup_options --stream=\$sfmt \
+                \$encrypt_backup_options --stream=\$sfmt \
                 --xtrabackup-plugin-dir="$pxb_plugin_dir" \
                 --target-dir=\$itmpdir 2> >(logger -p daemon.err -t ${ssystag}innobackupex-backup)"
         fi
     else
         # prepare doesn't look at my.cnf instead it has its own generated backup-my.cnf
-        INNOPREPARE="${pxb_bin_path} $disver $iapts --prepare --binlog-info=ON \
+        INNOPREPARE="${pxb_bin_path} $disver $iapts --prepare \
             \$rebuildcmd \$keyringapplyopt \$encrypt_prepare_options \
             --rollback-prepared-trx \
             --xtrabackup-plugin-dir="$pxb_plugin_dir" \
@@ -1507,13 +1613,13 @@ function initialize_pxb_commands()
         INNOMOVE="${pxb_bin_path} --defaults-file=${WSREP_SST_OPT_CONF} \
             --defaults-group=mysqld${WSREP_SST_OPT_CONF_SUFFIX} \
             --datadir=\${TDATA} $disver $impts \
-            --move-back --binlog-info=ON --force-non-empty-directories \$encrypt_move_options \
+            --move-back --force-non-empty-directories \$encrypt_move_options \
             --xtrabackup-plugin-dir="$pxb_plugin_dir" \
             --target-dir=\${DATA} &>\${DATA}/innobackup.move.log"
         INNOBACKUP="${pxb_bin_path} --defaults-file=${WSREP_SST_OPT_CONF} \
             --defaults-group=mysqld${WSREP_SST_OPT_CONF_SUFFIX} $disver $iopts \
             \$INNOEXTRA \$keyringbackupopt --lock-ddl --backup --galera-info \
-            --binlog-info=ON \$encrypt_backup_options --stream=\$sfmt \
+            \$encrypt_backup_options --stream=\$sfmt \
             --xtrabackup-plugin-dir="$pxb_plugin_dir" \
             --target-dir=\$itmpdir 2>\${DATA}/innobackup.backup.log"
     fi
@@ -1554,7 +1660,7 @@ fi
 # 2.4.20  Transition-key fixes
 #
 
-XB_2x_REQUIRED_VERSION="2.4.20"
+XB_2x_REQUIRED_VERSION="2.4.24"
 
 if [[ ! -x $XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN ]]; then
     wsrep_log_error "******************* FATAL ERROR ********************** "
@@ -1580,7 +1686,7 @@ fi
 # 8.0.11  Transition-key fixes
 #
 
-XB_8x_REQUIRED_VERSION="8.0.13"
+XB_8x_REQUIRED_VERSION="8.0.27"
 
 if [[ ! -x $XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN ]]; then
     wsrep_log_error "******************* FATAL ERROR ********************** "
@@ -1843,7 +1949,14 @@ then
         fi
 
         set +e
-        timeit "${stagemsg}-SST" "$INNOBACKUP | $tcmd; RC=( "\${PIPESTATUS[@]}" )"
+        # With wsrep_sst_donor_skip we never send the backup
+        if [ "$WSREP_SST_OPT_DEBUG" = "wsrep_sst_donor_skip" ]
+        then
+          RC=0
+        else
+          timeit "${stagemsg}-SST" "$INNOBACKUP | $tcmd; RC=( "\${PIPESTATUS[@]}" )"
+        fi
+
         set -e
 
         if [ ${RC[0]} -ne 0 ]; then
@@ -2067,7 +2180,10 @@ then
                     fi
 
                     XB_DONOR_KEYRING_FILE_PATH="${KEYRING_FILE_DIR}/${XB_DONOR_KEYRING_FILE}"
-                    recv_data_from_donor_to_joiner "${KEYRING_FILE_DIR}" "${stagemsg}-keyring" 0 2
+                    recv_data_from_donor_to_joiner "${KEYRING_FILE_DIR}" "${stagemsg}-keyring" 0 2 &
+                    jpid=$!
+                    monitor_sst_progress "${KEYRING_FILE_DIR}" $jpid ${WSREP_SST_IDLE_TIMEOUT} &
+                    wait $jpid
                     keyringapplyopt=" --keyring-file-data=$XB_DONOR_KEYRING_FILE_PATH "
                     wsrep_log_info "donor keyring received at: '${XB_DONOR_KEYRING_FILE_PATH}'"
                 else
@@ -2129,6 +2245,12 @@ then
         # with ever increasing number of files and achieve nothing.
         find $ib_home_dir $ib_log_dir $ib_undo_dir $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>/dev/null \+
 
+        if [[ -r "$keyring_file_data" ]] || [[ -r "${keyring_file_data}.backup" ]];
+        then
+          wsrep_log_info "Cleaning the existing keyring file"
+          rm -f "$keyring_file_data" "${keyring_file_data}.backup"
+        fi
+
         # Clean the binlog dir (if it's explicitly specified)
         # By default it'll be in the datadir
         tempdir=$(parse_cnf mysqld log-bin "")
@@ -2148,6 +2270,7 @@ then
 
         XB_GTID_INFO_FILE_PATH="${DATA}/${XB_GTID_INFO_FILE}"
         wsrep_log_info "............Waiting for SST streaming to complete!"
+        monitor_sst_progress "${JOINER_SST_DIR}" $jpid ${WSREP_SST_IDLE_TIMEOUT} &
         wait $jpid
 
         get_proc
@@ -2230,8 +2353,12 @@ then
         if [ $? -ne 0 ];
         then
             wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "${XTRABACKUP_BIN} apply finished with errors." \
-                            "Check ${DATA}/innobackup.prepare.log"
+            wsrep_log_error "${XTRABACKUP_BIN} apply finished with errors."
+            if [[ -n "$WSREP_LOG_DEBUG" ]]; then
+              wsrep_log_error "Keeping ${DATA} for further diagnosis. " \
+                        "Check ${DATA}/XXX.log for details. " \
+                        "${DATA} may be removed if not needed for further diagnosis."
+            fi
             wsrep_log_error "Line $LINENO"
             cat_file_to_stderr "${DATA}/innobackup.prepare.log" "ERR" "innobackup.prepare.log"
             wsrep_log_error "****************************************************** "
@@ -2290,8 +2417,12 @@ then
 
         if [[ $errcode -ne 0 ]]; then
             wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "Move failed, keeping ${DATA} for further diagnosis" \
-                            "Check ${DATA}/innobackup.move.log for details"
+            wsrep_log_error "Move failed."
+            if [[ -n "$WSREP_LOG_DEBUG" ]]; then
+              wsrep_log_error "Keeping ${DATA} for further diagnosis" \
+                            "Check ${DATA}/innobackup.move.log for details" \
+                            "${DATA} may be removed if not needed for further diagnosis."
+            fi
             wsrep_log_error "Line $LINENO"
             cat_file_to_stderr "${DATA}/innobackup.move.log" "ERR" "innobackup.move.log"
             wsrep_log_error "****************************************************** "

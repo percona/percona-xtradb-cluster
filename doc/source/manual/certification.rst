@@ -4,7 +4,7 @@
 Certification in Percona XtraDB Cluster
 =======================================
 
-|PXC| replicates actions executed on one node
+Percona XtraDB Cluster replicates actions executed on one node
 to all other nodes in the cluster,
 and makes it fast enough to appear
 as if it is synchronous (*virtually synchronous*).
@@ -23,12 +23,12 @@ The following types of actions exist:
 
 DML (``INSERT``, ``UPDATE``, and ``DELETE``) operations
 effectively change the state of the database,
-and all such operations are recorded in |XtraDB|
+and all such operations are recorded in XtraDB
 by registering a unique object identifier (key)
 for each change (an update or a new addition).
 
 * A transaction can change an arbitrary number of different data objects.
-  Each such object change is recorded in |XtraDB|
+  Each such object change is recorded in XtraDB
   using an ``append_key`` operation.
   An ``append_key`` operation registers the key of the data object
   that has undergone change by the transaction.
@@ -59,13 +59,13 @@ for each change (an update or a new addition).
   In such cases, the transaction that arrived later fails to certify.
 
 Changes made to database objects are bin-logged.
-This is similar to how |MySQL| does it for replication
+This is similar to how MySQL does it for replication
 with its Source-Replica ecosystem,
 except that a packet of changes from a given transaction
 is created and named as a write-set.
 
 Once the client/user issues a ``COMMIT``,
-|PXC| will run a commit hook.
+Percona XtraDB Cluster will run a commit hook.
 Commit hooks ensure the following:
 
 * Flush the binary logs.

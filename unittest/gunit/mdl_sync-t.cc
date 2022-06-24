@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -46,9 +46,9 @@ using thread::Thread;
 
 class MDLSyncTest : public ::testing::Test {
  protected:
-  MDLSyncTest() {}
+  MDLSyncTest() = default;
 
-  void SetUp() {
+  void SetUp() override {
     /* Set debug sync timeout of 60 seconds. */
     opt_debug_sync_timeout = 60;
     debug_sync_init();
@@ -62,7 +62,7 @@ class MDLSyncTest : public ::testing::Test {
     table_def_init();
   }
 
-  void TearDown() {
+  void TearDown() override {
     m_initializer.TearDown();
     mdl_destroy();
     debug_sync_end();
@@ -187,8 +187,15 @@ class MDLSyncThread : public Thread {
   Checks that "fast path" lock acquisition correctly handles MDL_lock objects
   which already have been marked as destroyed but still present in MDL_map.
 */
-
+#ifdef WITH_WSREP
+/*
+  WSREP forces slow lock destroy path.
+  Check MDL_context::try_acquire_lock_impl()
+*/
+TEST_F(MDLSyncTest, DISABLED_IsDestroyedFastPath) {
+#else
 TEST_F(MDLSyncTest, IsDestroyedFastPath) {
+#endif
   MDLSyncThread thread1("table", MDL_SHARED,
                         "mdl_remove_random_unused_after_is_destroyed_set "
                         "SIGNAL marked WAIT_FOR resume_removal",

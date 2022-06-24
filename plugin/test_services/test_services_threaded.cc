@@ -1,4 +1,4 @@
-/* Copyright (c) 2015, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2015, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -90,7 +90,7 @@ static int test_log_plugin_error() {
 }
 
 /* This fucntion is needed to be called in a thread. */
-static void *test_services(void *p MY_ATTRIBUTE((unused))) {
+static void *test_services(void *p [[maybe_unused]]) {
   DBUG_TRACE;
 
   int ret = 0;

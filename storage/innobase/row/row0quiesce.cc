@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2012, 2020, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2012, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -47,12 +47,11 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 /** Write the meta data (index user fields) config file.
  @return DB_SUCCESS or error code. */
-static MY_ATTRIBUTE((warn_unused_result)) dberr_t
-    row_quiesce_write_index_fields(
-        const dict_index_t *index, /*!< in: write the meta data for
-                                   this index */
-        FILE *file,                /*!< in: file to write to */
-        THD *thd)                  /*!< in/out: session */
+[[nodiscard]] static dberr_t row_quiesce_write_index_fields(
+    const dict_index_t *index, /*!< in: write the meta data for
+                               this index */
+    FILE *file,                /*!< in: file to write to */
+    THD *thd)                  /*!< in/out: session */
 {
   /* This row will store prefix_len, fixed_len,
   and in IB_EXPORT_CFG_VERSION_V4, is_ascending */
@@ -108,9 +107,8 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
 @param[in,out]	file	file to write to
 @param[in,out]	thd	session
 @return DB_SUCCESS or error code. */
-static MY_ATTRIBUTE((warn_unused_result)) dberr_t
-    row_quiesce_write_one_index(const dict_index_t *index, FILE *file,
-                                THD *thd) {
+[[nodiscard]] static dberr_t row_quiesce_write_one_index(
+    const dict_index_t *index, FILE *file, THD *thd) {
   dberr_t err;
   byte *ptr;
   byte row[sizeof(space_index_t) + sizeof(uint32_t) * 8];
@@ -176,7 +174,7 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
 
 /** Write the meta data config file index information.
  @return DB_SUCCESS or error code. */
-static MY_ATTRIBUTE((nonnull, warn_unused_result)) dberr_t
+[[nodiscard]] static MY_ATTRIBUTE((nonnull)) dberr_t
     row_quiesce_write_indexes(const dict_table_t *table, /*!< in: write the meta
                                                          data for this table */
                               FILE *file, /*!< in: file to write to */
@@ -207,8 +205,6 @@ static MY_ATTRIBUTE((nonnull, warn_unused_result)) dberr_t
     return (DB_IO_ERROR);
   }
 
-  dberr_t err = DB_SUCCESS;
-
   /* Write SDI Index */
   if (has_sdi) {
     dict_mutex_enter_for_mysql();
@@ -218,21 +214,21 @@ static MY_ATTRIBUTE((nonnull, warn_unused_result)) dberr_t
     dict_mutex_exit_for_mysql();
 
     ut_ad(index != nullptr);
-    err = row_quiesce_write_one_index(index, file, thd);
+    const auto err = row_quiesce_write_one_index(index, file, thd);
+    if (err != DB_SUCCESS) {
+      return err;
+    }
   }
 
   /* Write the table indexes meta data. */
-  for (const dict_index_t *index = UT_LIST_GET_FIRST(table->indexes);
-       index != nullptr && err == DB_SUCCESS;
-       index = UT_LIST_GET_NEXT(indexes, index)) {
-    err = row_quiesce_write_one_index(index, file, thd);
+  for (const dict_index_t *index : table->indexes) {
+    const auto err = row_quiesce_write_one_index(index, file, thd);
+    if (err != DB_SUCCESS) {
+      return err;
+    }
   }
 
-  if (err != DB_SUCCESS) {
-    return (err);
-  }
-
-  return (err);
+  return DB_SUCCESS;
 }
 
 /** Write the metadata (table columns) config file. Serialise the contents
@@ -240,8 +236,8 @@ of dict_col_t default value part if exists.
 @param[in]	col	column to which the default value belongs
 @param[in]	file	file to write to
 @return DB_SUCCESS or DB_IO_ERROR. */
-static MY_ATTRIBUTE((warn_unused_result)) dberr_t
-    row_quiesce_write_default_value(const dict_col_t *col, FILE *file) {
+[[nodiscard]] static dberr_t row_quiesce_write_default_value(
+    const dict_col_t *col, FILE *file) {
   byte row[6];
 
   if (col->instant_default != nullptr) {
@@ -277,11 +273,11 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
  dict_col_t structure, along with the column name. All fields are serialized
  as ib_uint32_t.
  @return DB_SUCCESS or error code. */
-static MY_ATTRIBUTE((warn_unused_result)) dberr_t
-    row_quiesce_write_table(const dict_table_t *table, /*!< in: write the meta
-                                                       data for this table */
-                            FILE *file, /*!< in: file to write to */
-                            THD *thd)   /*!< in/out: session */
+[[nodiscard]] static dberr_t row_quiesce_write_table(
+    const dict_table_t *table, /*!< in: write the meta
+                               data for this table */
+    FILE *file,                /*!< in: file to write to */
+    THD *thd)                  /*!< in/out: session */
 {
   dict_col_t *col;
   byte row[sizeof(ib_uint32_t) * 7];
@@ -355,11 +351,11 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
 
 /** Write the meta data config file header.
  @return DB_SUCCESS or error code. */
-static MY_ATTRIBUTE((warn_unused_result)) dberr_t
-    row_quiesce_write_header(const dict_table_t *table, /*!< in: write the meta
-                                                        data for this table */
-                             FILE *file, /*!< in: file to write to */
-                             THD *thd)   /*!< in/out: session */
+[[nodiscard]] static dberr_t row_quiesce_write_header(
+    const dict_table_t *table, /*!< in: write the meta
+                               data for this table */
+    FILE *file,                /*!< in: file to write to */
+    THD *thd)                  /*!< in/out: session */
 {
   byte value[sizeof(ib_uint32_t)];
 
@@ -367,7 +363,7 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
   // The table is read locked so it will not be dropped
   ut_ad(space != NULL);
   /* Write the current meta-data version number. */
-  uint32_t cfg_version = IB_EXPORT_CFG_VERSION_V5;
+  uint32_t cfg_version = IB_EXPORT_CFG_VERSION_V6;
   DBUG_EXECUTE_IF("ib_export_use_cfg_version_3",
                   cfg_version = IB_EXPORT_CFG_VERSION_V3;);
   DBUG_EXECUTE_IF("ib_export_use_cfg_version_99",
@@ -491,15 +487,29 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
     return (DB_IO_ERROR);
   }
 
+  if (cfg_version >= IB_EXPORT_CFG_VERSION_V6) {
+    /* Write compression type info. */
+    uint8_t compression_type =
+        static_cast<uint8_t>(fil_get_compression(table->space));
+    mach_write_to_1(value, compression_type);
+
+    if (fwrite(&value, 1, sizeof(uint8_t), file) != sizeof(uint8_t)) {
+      ib_senderrf(thd, IB_LOG_LEVEL_WARN, ER_IO_WRITE_ERROR, errno,
+                  strerror(errno), "while writing compression type info.");
+
+      return DB_IO_ERROR;
+    }
+  }
+
   return (DB_SUCCESS);
 }
 
 /** Write the table meta data after quiesce.
  @return DB_SUCCESS or error code */
-static MY_ATTRIBUTE((warn_unused_result)) dberr_t
-    row_quiesce_write_cfg(dict_table_t *table, /*!< in: write the meta data for
-                                                       this table */
-                          THD *thd)            /*!< in/out: session */
+[[nodiscard]] static dberr_t row_quiesce_write_cfg(
+    dict_table_t *table, /*!< in: write the meta data for
+                                 this table */
+    THD *thd)            /*!< in/out: session */
 {
   dberr_t err;
   char name[OS_FILE_MAX_PATH];
@@ -553,7 +563,7 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
 @param[in]	file		file to write to
 @param[in]	thd		session
 @return DB_SUCCESS or error code. */
-static MY_ATTRIBUTE((nonnull, warn_unused_result)) dberr_t
+[[nodiscard]] static MY_ATTRIBUTE((nonnull)) dberr_t
     row_quiesce_write_transfer_key(const dict_table_t *table, FILE *file,
                                    THD *thd) {
   byte key_size[sizeof(ib_uint32_t)];
@@ -634,7 +644,7 @@ static MY_ATTRIBUTE((nonnull, warn_unused_result)) dberr_t
 @param[in]	table		write the data for this table
 @param[in]	thd		session
 @return DB_SUCCESS or error code */
-static MY_ATTRIBUTE((nonnull, warn_unused_result)) dberr_t
+[[nodiscard]] static MY_ATTRIBUTE((nonnull)) dberr_t
     row_quiesce_write_cfp(dict_table_t *table, THD *thd) {
   dberr_t err;
   char name[OS_FILE_MAX_PATH];
@@ -650,7 +660,7 @@ static MY_ATTRIBUTE((nonnull, warn_unused_result)) dberr_t
 
   /* Get the encryption key and iv from space */
   /* For encrypted table, before we discard the tablespace,
-  we need save the encryption information into table, otherwise,
+  we need to save the encryption information into table, otherwise,
   this information will be lost in fil_discard_tablespace along
   with fil_space_free(). */
   if (table->encryption_key == nullptr) {
@@ -724,8 +734,7 @@ static bool row_quiesce_table_has_fts_index(
 
   dict_mutex_enter_for_mysql();
 
-  for (const dict_index_t *index = UT_LIST_GET_FIRST(table->indexes);
-       index != nullptr; index = UT_LIST_GET_NEXT(indexes, index)) {
+  for (const dict_index_t *index : table->indexes) {
     if (index->type & DICT_FTS) {
       exists = true;
       break;
@@ -737,10 +746,10 @@ static bool row_quiesce_table_has_fts_index(
   return (exists);
 }
 
-/** Quiesce the tablespace that the table resides in. */
-void row_quiesce_table_start(dict_table_t *table, /*!< in: quiesce this table */
-                             trx_t *trx) /*!< in/out: transaction/session */
-{
+/** Quiesce the tablespace that the table resides in.
+@param[in] table Quiesce this table
+@param[in,out] trx Transaction/session */
+void row_quiesce_table_start(dict_table_t *table, trx_t *trx) {
   ut_a(trx->mysql_thd != nullptr);
   ut_a(srv_n_purge_threads > 0);
   ut_ad(!srv_read_only_mode);
@@ -804,11 +813,10 @@ void row_quiesce_table_start(dict_table_t *table, /*!< in: quiesce this table */
   ut_a(err == DB_SUCCESS);
 }
 
-/** Cleanup after table quiesce. */
-void row_quiesce_table_complete(
-    dict_table_t *table, /*!< in: quiesce this table */
-    trx_t *trx)          /*!< in/out: transaction/session */
-{
+/** Cleanup after table quiesce.
+@param[in] table Quiesce this table
+@param[in,out] trx Transaction/session */
+void row_quiesce_table_complete(dict_table_t *table, trx_t *trx) {
   ulint count = 0;
 
   ut_a(trx->mysql_thd != nullptr);
@@ -823,8 +831,7 @@ void row_quiesce_table_complete(
           << "Waiting for quiesce of " << table->name << " to complete";
     }
 
-    /* Sleep for a second. */
-    os_thread_sleep(1000000);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 
     ++count;
   }

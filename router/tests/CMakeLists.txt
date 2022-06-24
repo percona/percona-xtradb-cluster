@@ -1,4 +1,4 @@
-# Copyright (c) 2015, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2015, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -36,6 +36,7 @@ SET(helper_sources
   helpers/mysql_session_replayer.cc
   helpers/process_manager.cc
   helpers/process_wrapper.cc
+  helpers/router_component_clusterset.cc
   helpers/router_component_test.cc
   helpers/router_component_testutils.cc
   helpers/router_component_system_layout.cc
@@ -49,6 +50,9 @@ SET(helper_sources
 IF(MY_COMPILER_IS_CLANG)
   STRING_APPEND(CMAKE_CXX_FLAGS " -Wno-deprecated")
 ENDIF()
+
+# TODO(sgunders): Remove when all GMock tests use MOCK_METHOD().
+STRING(REPLACE "-Wsuggest-override" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
 ADD_LIBRARY(routertest_helpers STATIC ${helper_sources})
 

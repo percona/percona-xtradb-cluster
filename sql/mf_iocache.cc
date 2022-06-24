@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -59,7 +59,7 @@
 */
 
 int _my_b_net_read(IO_CACHE *info, uchar *Buffer,
-                   size_t Count MY_ATTRIBUTE((unused))) {
+                   size_t Count [[maybe_unused]]) {
   ulong read_length;
   NET *net = current_thd->get_protocol_classic()->get_net();
   DBUG_TRACE;

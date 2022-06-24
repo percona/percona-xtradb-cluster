@@ -168,6 +168,10 @@ ok 19 - check stderr
 1..19
 ok 1 - use My::Config;
 ok 2 - config is a My::Config
+[ENV]
+env_option1=value1
+env_option2=value2
+
 [mysqld]
 option1=values2
 option2=value4
@@ -183,35 +187,41 @@ basedir=thebasedir
 [client]
 socket=asocketpath
 
-ok 3 - group mysqld_2 exists
-ok 4 - group mysqld_1 exists
-ok 5 - group mysqld.9 exists
-ok 6 - group mysqld.9 has suffix .9
-ok 7 - group mysqld exists
-ok 8 - group client exists
-ok 9 - group mysqld_3 does not exist
-ok 10 - options in [mysqld] is 4
-ok 11 - group [nonexist] is not defined
-ok 12 - 5 groups
-ok 13 - checking groups 1
-ok 14 - checking groups 2
-ok 15 - checking groups 3
-ok 16 - checking groups 4
-ok 17 - checking groups 5
-ok 18 - 4 groups like mysqld
-ok 19 - checking like("mysqld") 1
-ok 20 - checking like("mysqld") 2
-ok 21 - checking like("mysqld") 3
-ok 22 - checking like("mysqld") 4
-ok 23 - checking like("not")
-ok 24 - first_like
-ok 25 - mysqld_option4 exists, does not have a value
-ok 26 - mysqld_option4 exists
-ok 27 - mysqld_option2 exists
-ok 28 - mysqld_option5 does not exists
-ok 29 - config2 is a My::Config
-ok 30 - test.cnf is equal to test2.cnf
-ok 31 - config3 is a My::Config
+ok 3 - group ENV exists
+ok 4 - group mysqld_2 exists
+ok 5 - group mysqld_1 exists
+ok 6 - group mysqld.9 exists
+ok 7 - group mysqld.9 has suffix .9
+ok 8 - group mysqld exists
+ok 9 - group client exists
+ok 10 - group mysqld_3 does not exist
+ok 11 - options in [mysqld] is 4
+ok 12 - group [nonexist] is not defined
+ok 13 - 6 groups
+ok 14 - checking groups 1
+ok 15 - checking groups 2
+ok 16 - checking groups 3
+ok 17 - checking groups 4
+ok 18 - checking groups 5
+ok 19 - checking groups 6
+ok 20 - 4 groups like mysqld
+ok 21 - checking like("mysqld") 1
+ok 22 - checking like("mysqld") 2
+ok 23 - checking like("mysqld") 3
+ok 24 - checking like("mysqld") 4
+ok 25 - checking like("not")
+ok 26 - first_like
+ok 27 - mysqld_option4 exists, does not have a value
+ok 28 - mysqld_option4 exists
+ok 29 - mysqld_option2 exists
+ok 30 - mysqld_option5 does not exists
+ok 31 - config2 is a My::Config
+ok 32 - test.cnf is equal to test2.cnf
+ok 33 - config3 is a My::Config
+[ENV]
+env_option1=value1
+env_option2=value2
+
 [mysqld]
 option1=values3
 option2=value4
@@ -221,11 +231,15 @@ basedir=anotherbasedir
 [client]
 socket=asocketpath
 
-ok 32 - mysqld_basedir has been overriden by value in test_include.cnf
-ok 33 - mysqld_option1 has been overriden by value in test_include.cnf
-ok 34 - mysqld_option2 is from included file
-ok 35 - client.socket is from included file
-ok 36 - mysqld_option4 exists, does not have a value
+ok 34 - mysqld_basedir has been overriden by value in test_include.cnf
+ok 35 - mysqld_option1 has been overriden by value in test_include.cnf
+ok 36 - mysqld_option2 is from included file
+ok 37 - client.socket is from included file
+ok 38 - mysqld_option4 exists, does not have a value
+[ENV]
+env_option1=value1
+env_option2=value2
+
 [mysqld]
 option1=values3
 option2=value4
@@ -236,7 +250,7 @@ basedir=anotherbasedir
 socket=asocketpath
 
 
-1..36
+1..38
 ok 1 - use My::ConfigFactory;
 ok 2 - group mysqld.master exists
 ok 3 - group mysqld.1 exists

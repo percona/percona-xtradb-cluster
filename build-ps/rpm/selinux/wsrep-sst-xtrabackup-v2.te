@@ -1,0 +1,28 @@
+module wsrep-sst-xtrabackup-v2 1.0;
+
+require {
+	type mysqld_t;
+	type mysqld_tmp_t;
+	type kerberos_port_t;
+	type sysctl_vm_t;
+
+	class tcp_socket name_bind;
+	class unix_dgram_socket sendto;
+	class unix_stream_socket connectto;
+	class file {open read};
+	class sock_file { create unlink write};
+}
+
+# port 4444
+allow mysqld_t kerberos_port_t:tcp_socket name_bind;
+allow mysqld_t self:unix_dgram_socket sendto;
+
+# connection to mysqld
+allow mysqld_t self:unix_stream_socket connectto;
+
+# access to /proc filesystem
+allow mysqld_t sysctl_vm_t:file {open read};
+
+# joiner - mysql update part
+allow mysqld_t mysqld_tmp_t:sock_file { create unlink write };
+

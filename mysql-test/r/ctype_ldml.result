@@ -478,7 +478,7 @@ Bug#46448 trailing spaces are not ignored when user collation maps space != 0x20
 set names latin1;
 show collation like 'latin1_test';
 Collation	Charset	Id	Default	Compiled	Sortlen	Pad_attribute
-latin1_test	latin1	99		Yes	1	PAD SPACE
+latin1_test	latin1	1025			0	PAD SPACE
 select "foo" = "foo " collate latin1_test;
 "foo" = "foo " collate latin1_test
 1
@@ -548,10 +548,11 @@ ucs2_vn_ci	ucs2	359
 ucs2_5624_1	ucs2	360
 utf8_5624_5	utf8	368
 utf32_test_ci	utf32	391
+latin1_test	latin1	1025
 utf8_maxuserid_ci	utf8	2047
 show collation like '%test%';
 Collation	Charset	Id	Default	Compiled	Sortlen	Pad_attribute
-latin1_test	latin1	99		Yes	1	PAD SPACE
+latin1_test	latin1	1025			0	PAD SPACE
 ucs2_test_ci	ucs2	358			8	PAD SPACE
 utf16_test_ci	utf16	327			8	PAD SPACE
 utf32_test_ci	utf32	391			8	PAD SPACE
@@ -579,6 +580,8 @@ SELECT * FROM t1 WHERE s1='a' ORDER BY BINARY s1;
 s1
 a
 b
+Warnings:
+Warning	1287	'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
 DROP TABLE t1;
 SET NAMES utf8 COLLATE utf8_phone_ci;
 Warnings:
@@ -779,6 +782,8 @@ lp-lni	233E
 飵	753D
 糳	753E
 咗	753F
+Warnings:
+Warning	1287	'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
 #
 # WL#5624, the same test with UCS2
 #
@@ -907,6 +912,8 @@ lp-lni	233E
 飵	753D
 糳	753E
 咗	753F
+Warnings:
+Warning	1287	'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
 DROP TABLE t1;
 #
 # WL#5624, unsupported features
@@ -943,6 +950,8 @@ a	HEX(WEIGHT_STRING(a))
 x	02CE101F
 u	101F
 X	105A
+Warnings:
+Warning	1287	'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
 DROP TABLE t1;
 #
 # WL#5624, testing Bengali collations
@@ -969,6 +978,8 @@ HEX(WEIGHT_STRING(a))	HEX(CONVERT(a USING ucs2))	HEX(a)
 0376	09A209BC	E0A6A2E0A6BC
 0376	09DD	E0A79D
 0377	09A3	E0A6A3
+Warnings:
+Warning	1287	'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
 DROP TABLE t1;
 SET NAMES utf8, collation_connection=utf8_bengali_traditional_ci;
 Warnings:
@@ -1091,6 +1102,8 @@ HEX(WEIGHT_STRING(a))	HEX(CONVERT(a USING ucs2))	HEX(a)
 15D2	09B709CD	E0A6B7E0A78D
 15D3	09B809CD	E0A6B8E0A78D
 15D4	09B909CD	E0A6B9E0A78D
+Warnings:
+Warning	1287	'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
 SELECT HEX(WEIGHT_STRING(a)) as wa,
 GROUP_CONCAT(HEX(CONVERT(a USING ucs2)) ORDER BY LENGTH(a), BINARY a)
 FROM t1 GROUP BY a ORDER BY a;
@@ -1160,6 +1173,8 @@ wa	GROUP_CONCAT(HEX(CONVERT(a USING ucs2)) ORDER BY LENGTH(a), BINARY a)
 15D2	09B709CD
 15D3	09B809CD
 15D4	09B909CD
+Warnings:
+Warning	1287	'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
 DROP TABLE t1;
 #
 # WL#5624, shift after, using expansion
@@ -1240,6 +1255,8 @@ Z	0E293357
 AA	0E293358
 AAA	0E293359
 1	0E2A
+Warnings:
+Warning	1287	'BINARY expr' is deprecated and will be removed in a future release. Please use CAST instead
 DROP TABLE t1;
 #
 # End of WL#5624

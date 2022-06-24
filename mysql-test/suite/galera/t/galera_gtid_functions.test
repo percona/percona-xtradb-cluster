@@ -1,0 +1,149 @@
+#
+# Test the WSREP GTID-related functions
+#  WSREP_LAST_SEEN_GTID()
+#  WSREP_LAST_WRITTEN_GTID()
+#  WSREP_SYNC_WAIT_UPTO_GTID()
+#
+
+--source include/have_debug.inc
+--source suite/galera/include/galera_have_debug_sync.inc
+--source include/have_log_bin.inc
+--source include/have_util_sed.inc
+--source include/galera_cluster.inc
+
+--connection node_1
+--echo [connection node_1]
+
+--let $outfile = $MYSQLTEST_VARDIR/tmp/galera_gtid_functions.out
+
+CREATE TABLE t1 (id INT PRIMARY KEY);
+INSERT INTO t1 VALUES (1);
+
+#
+# Test 1 : WSREP_LAST_SEEN_GTID
+#
+
+# Retrieve the last seen gtid
+--let $last_seen_gtid=`SELECT WSREP_LAST_SEEN_GTID()`
+
+# Verify that we get the same result using the MySQL client
+--exec $MYSQL --socket=$NODE_MYSOCK_1 --user=root -e "SELECT WSREP_LAST_SEEN_GTID()" --binary-as-hex > $outfile
+--exec $SED -i "s/$last_seen_gtid/WSREP_GTID_FOUND/" $outfile
+
+# Check the output for a match
+--let $assert_text = check the output for the last seen GTID
+--let $assert_file = $outfile
+--let $assert_select = WSREP_GTID_FOUND
+--let $assert_count = 1
+--source include/assert_grep.inc
+--remove_file $outfile
+
+
+#
+# Test 2 : WSREP_LAST_WRITTEN_GTID
+#
+# This returns the last GTID written by the client session.
+# So at the beginning, it will have the default GTID (all zeros + -1 seqno)
+#
+
+# Retrieve the last written gtid
+# This value is per-session, so the guid should be all zeros at the start
+--let $last_written_gtid = 00000000-0000-0000-0000-000000000000:-1
+
+# Verify the result coming from the MySQL client
+--exec $MYSQL --socket=$NODE_MYSOCK_1 --user=root -e 'SELECT WSREP_LAST_WRITTEN_GTID()' --binary-as-hex > $outfile
+--exec $SED -i "s/$last_written_gtid/WSREP_GTID_FOUND/" $outfile
+
+# Check the output for a match
+--let $assert_text = check the output for the last written GTID
+--let $assert_file = $outfile
+--let $assert_select = WSREP_GTID_FOUND
+--let $assert_count = 1
+--source include/assert_grep.inc
+--remove_file $outfile
+
+
+# Verify the result coming from the MySQL client
+# Do a write in the same session, which will update the last written GTID
+--let $last_written_gtid = `SELECT WSREP_LAST_WRITTEN_GTID()`
+--let $cluster_uuid=`SELECT cluster_uuid FROM mysql.wsrep_cluster`
+--let $cluster_seqno=`SELECT SUBSTRING('$last_written_gtid', INSTR('$last_written_gtid', ':')+1)`
+
+--exec $MYSQL --socket=$NODE_MYSOCK_1 --user=root -e 'INSERT INTO test.t1 VALUES(10); SELECT WSREP_LAST_WRITTEN_GTID()' --binary-as-hex > $outfile
+--exec $SED -i "s/$cluster_uuid/WSREP_UUID_FOUND/" $outfile
+
+# The write should have incremented the seqno
+--inc $cluster_seqno
+
+# Check the output for a match
+--let $assert_text = check the output for the last written GTID
+--let $assert_file = $outfile
+--let $assert_select = WSREP_UUID_FOUND:$cluster_seqno
+--let $assert_count = 1
+--source include/assert_grep.inc
+--remove_file $outfile
+
+
+#
+# Test 3 : WSREP_SYNC_WAIT_UPTO_GTID
+#
+
+# Block the applier on node #2
+--connection node_2
+--echo [connection node_2]
+--let $wsrep_sync_wait_original=`SELECT @@SESSION.wsrep_sync_wait`
+--let $galera_sync_point = apply_monitor_slave_enter_sync
+--source include/galera_set_sync_point.inc
+
+# Initiate the operation on node1
+--connection node_1
+--echo [connection node_1]
+INSERT INTO t1 VALUES (20);
+--let $last_written_gtid=`SELECT WSREP_LAST_WRITTEN_GTID()`
+
+# Wait until applier has blocked
+--connection node_2
+--echo [connection node_2]
+SET SESSION wsrep_sync_wait = 0;
+--source include/galera_wait_sync_point.inc
+
+# WSREP_SYNC_WAIT_UPTO_GTID() should fail (because of bad arguments)
+--disable_query_log
+--echo # Call to WSREP_SYNC_WAIT_UPTO_GTID() which should fail (with bad arguments)
+--error ER_WRONG_ARGUMENTS
+--eval SELECT WSREP_SYNC_WAIT_UPTO_GTID('00000000:-1', 1) AS WSREP_SYNC_WAIT_UPTO_GTID_EXPECTED;
+--enable_query_log
+
+# WSREP_SYNC_WAIT_UPTO_GTID() should fail (because the applier is blocked)
+--disable_query_log
+--echo # Call to WSREP_SYNC_WAIT_UPTO_GTID() which should fail (timeout due to blocked applier)
+--error ER_LOCK_WAIT_TIMEOUT
+--eval SELECT WSREP_SYNC_WAIT_UPTO_GTID('$last_written_gtid', 1) AS WSREP_SYNC_WAIT_UPTO_GTID_EXPECTED;
+--enable_query_log
+
+# Unblock applier
+--source include/galera_clear_sync_point.inc
+--source include/galera_signal_sync_point.inc
+
+# WSREP_SYNC_WAIT_UPTO_GTID() should now succeed
+--disable_query_log
+--eval SELECT WSREP_SYNC_WAIT_UPTO_GTID('$last_written_gtid', 100) AS WSREP_SYNC_WAIT_UPTO_GTID_EXPECTED;
+--enable_query_log
+
+# Check that the tables are the same on both nodes
+--connection node_1
+--echo [connection node_1]
+SELECT * FROM test.t1;
+
+--connection node_2
+--echo [connection node_2]
+SELECT * FROM test.t1;
+
+# cleanup
+--connection node_1
+--echo [connection node_1]
+DROP TABLE t1;
+
+--connection node_2
+--echo [connection node_2]
+--eval SET SESSION wsrep_sync_wait = $wsrep_sync_wait_original

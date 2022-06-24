@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -257,7 +257,7 @@ void ft_parse_init(TREE *wtree, const CHARSET_INFO *cs) {
 
 static int ft_add_word(MYSQL_FTPARSER_PARAM *param, char *word, int word_len,
                        MYSQL_FTPARSER_BOOLEAN_INFO *boolean_info
-                           MY_ATTRIBUTE((unused))) {
+                       [[maybe_unused]]) {
   TREE *wtree;
   FT_WORD w;
   MY_FT_PARSER_PARAM *ft_param = (MY_FT_PARSER_PARAM *)param->mysql_ftparam;
@@ -265,7 +265,7 @@ static int ft_add_word(MYSQL_FTPARSER_PARAM *param, char *word, int word_len,
   wtree = ft_param->wtree;
   if (param->flags & MYSQL_FTFLAGS_NEED_COPY) {
     uchar *ptr;
-    DBUG_ASSERT(wtree->with_delete == 0);
+    assert(wtree->with_delete == 0);
     ptr = (uchar *)ft_param->mem_root->Alloc(word_len);
     memcpy(ptr, word, word_len);
     w.pos = ptr;
@@ -300,7 +300,7 @@ int ft_parse(TREE *wtree, uchar *doc, int doclen,
              MEM_ROOT *mem_root) {
   MY_FT_PARSER_PARAM my_param;
   DBUG_TRACE;
-  DBUG_ASSERT(parser);
+  assert(parser);
 
   my_param.wtree = wtree;
   my_param.mem_root = mem_root;
@@ -333,8 +333,8 @@ MYSQL_FTPARSER_PARAM *ftparser_alloc_param(MI_INFO *info) {
         mi_key_memory_FTPARSER_PARAM,
         MAX_PARAM_NR * sizeof(MYSQL_FTPARSER_PARAM) * info->s->ftkeys,
         MYF(MY_WME | MY_ZEROFILL));
-    init_alloc_root(mi_key_memory_ft_memroot, &info->ft_memroot,
-                    FTPARSER_MEMROOT_ALLOC_SIZE, 0);
+    ::new ((void *)&info->ft_memroot)
+        MEM_ROOT(mi_key_memory_ft_memroot, FTPARSER_MEMROOT_ALLOC_SIZE);
   }
   return info->ftparser_param;
 }
@@ -353,7 +353,7 @@ MYSQL_FTPARSER_PARAM *ftparser_call_initializer(MI_INFO *info, uint keynr,
     ftparser_nr = info->s->keyinfo[keynr].ftkey_nr;
     parser = info->s->keyinfo[keynr].parser;
   }
-  DBUG_ASSERT(paramnr < MAX_PARAM_NR);
+  assert(paramnr < MAX_PARAM_NR);
   ftparser_nr = ftparser_nr * MAX_PARAM_NR + paramnr;
   if (!info->ftparser_param[ftparser_nr].mysql_add_word) {
     /* Note, that mysql_add_word is used here as a flag:
@@ -370,7 +370,7 @@ MYSQL_FTPARSER_PARAM *ftparser_call_initializer(MI_INFO *info, uint keynr,
 
 void ftparser_call_deinitializer(MI_INFO *info) {
   uint i, j, keys = info->s->state.header.keys;
-  free_root(&info->ft_memroot, MYF(0));
+  info->ft_memroot.Clear();
   if (!info->ftparser_param) return;
   for (i = 0; i < keys; i++) {
     MI_KEYDEF *keyinfo = &info->s->keyinfo[i];

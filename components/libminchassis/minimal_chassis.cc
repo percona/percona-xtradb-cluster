@@ -1,4 +1,4 @@
-/* Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2020, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License, version 2.0,
@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 #include <mysql/components/services/mysql_psi_system_service.h>
 #include <mysql/components/services/mysql_runtime_error.h>
 #include <mysql/components/services/mysql_rwlock_service.h>
+#include <mysql/components/services/psi_memory_service.h>
 
 #include <mysql/components/minimal_chassis.h>
 #include <mysql/components/services/dynamic_loader.h>
@@ -44,6 +45,10 @@ REQUIRES_SERVICE_PLACEHOLDER(mysql_rwlock_v1);
 extern SERVICE_TYPE(mysql_psi_system_v1)
     SERVICE_IMPLEMENTATION(mysql_minimal_chassis, mysql_psi_system_v1);
 REQUIRES_SERVICE_PLACEHOLDER(mysql_psi_system_v1);
+
+extern SERVICE_TYPE(psi_memory_v2)
+    SERVICE_IMPLEMENTATION(mysql_minimal_chassis, psi_memory_v2);
+REQUIRES_SERVICE_PLACEHOLDER(psi_memory_v2);
 
 REQUIRES_SERVICE_PLACEHOLDER(mysql_runtime_error);
 my_h_service h_err_service;
@@ -116,6 +121,7 @@ PROVIDES_SERVICE(mysql_minimal_chassis, registry),
     PROVIDES_SERVICE(mysql_minimal_chassis, mysql_runtime_error),
     PROVIDES_SERVICE(mysql_minimal_chassis, mysql_rwlock_v1),
     PROVIDES_SERVICE(mysql_minimal_chassis, mysql_psi_system_v1),
+    PROVIDES_SERVICE(mysql_minimal_chassis, psi_memory_v2),
     END_COMPONENT_PROVIDES();
 
 BEGIN_COMPONENT_REQUIRES_WITHOUT_REGISTRY(mysql_minimal_chassis)
@@ -259,7 +265,7 @@ bool minimal_chassis_deinit(SERVICE_TYPE_NO_CONST(registry) * registry,
   flag.
   The global services are mysql_runtime_error, mysql_psi_system_v1 and
   mysql_rwlock_v1.
-  If the use_related is ON then the globals are leaded with minimal chassis
+  If the use_related is ON then the globals are loaded with minimal chassis
   service implementations else they are loaded with the default service
   implementations
 

@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
+  Copyright (c) 2016, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -26,6 +26,8 @@
 #define MYSQL_HARNESS_COMMON_INCLUDED
 
 #include <cstdlib>
+#include <functional>
+#include <map>
 #include <sstream>
 #include <string>
 #include "harness_export.h"
@@ -206,6 +208,40 @@ template <class Collection>
 std::string list_elements(Collection collection,
                           const std::string &delim = ",") {
   return list_elements(collection.begin(), collection.end(), delim);
+}
+
+/**
+ * dismissable scope guard.
+ *
+ * used with RAII to call cleanup function if not dismissed
+ *
+ * allows to release resources in case exceptions are thrown
+ */
+class ScopeGuard {
+ public:
+  template <class Callable>
+  ScopeGuard(Callable &&undo_func)
+      : undo_func_{std::forward<Callable>(undo_func)} {}
+
+  void dismiss() { undo_func_ = nullptr; }
+  ~ScopeGuard() {
+    if (undo_func_) undo_func_();
+  }
+
+ private:
+  std::function<void()> undo_func_;
+};
+
+/**
+ * Gets a Value from std::map for given Key. Returns provided default if the Key
+ * is not in the map.
+ */
+template <class Key, class Value>
+Value get_from_map(const std::map<Key, Value> &map, const Key &key,
+                   const Value &default_value) {
+  auto iter = map.find(key);
+  if (iter == map.end()) return default_value;
+  return iter->second;
 }
 
 }  // namespace mysql_harness

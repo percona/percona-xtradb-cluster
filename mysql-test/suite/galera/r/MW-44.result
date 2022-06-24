@@ -1,5 +1,10 @@
+SET @old_log_output = @@global.log_output;
+SET GLOBAL log_output="TABLE";
+SET @old_log_output = @@global.log_output;
+SET GLOBAL log_output="TABLE";
 call mtr.add_suppression("Although a path was specified for the.*");
 call mtr.add_suppression("Although a path was specified for the.*");
+TRUNCATE TABLE mysql.general_log;
 TRUNCATE TABLE mysql.general_log;
 SET SESSION wsrep_osu_method=TOI;
 CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
@@ -9,3 +14,7 @@ SET SESSION wsrep_osu_method=TOI;
 include/assert.inc [General log should have 2 queries for ALTER and CREATE]
 include/assert.inc [General log should have no queries which don't have SELECT]
 DROP TABLE t1;
+SET GLOBAL log_output = @old_log_output;
+TRUNCATE TABLE mysql.general_log;
+SET GLOBAL log_output = @old_log_output;
+TRUNCATE TABLE mysql.general_log;

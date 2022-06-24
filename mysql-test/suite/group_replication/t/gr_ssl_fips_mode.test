@@ -14,6 +14,7 @@
 ################################################################################
 
 --source include/big_test.inc
+--source include/have_group_replication_xcom_communication_stack.inc
 --source include/have_fips.inc
 --source include/have_group_replication_plugin.inc
 --let $rpl_skip_group_replication_start= 1
@@ -68,7 +69,7 @@ SET @group_replication_recovery_ssl_cipher_save= @@GLOBAL.group_replication_reco
 SET @group_replication_recovery_retry_count_save= @@GLOBAL.group_replication_recovery_retry_count;
 
 --disable_warnings
-CHANGE MASTER TO MASTER_USER="rec_ssl_user" FOR CHANNEL "group_replication_recovery";
+CHANGE REPLICATION SOURCE TO SOURCE_USER="rec_ssl_user" FOR CHANNEL "group_replication_recovery";
 --enable_warnings
 
 SET GLOBAL group_replication_recovery_use_ssl= 1;

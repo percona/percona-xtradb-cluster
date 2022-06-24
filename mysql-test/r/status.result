@@ -149,7 +149,7 @@ id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered
 2	UNION	t1	NULL	ALL	NULL	NULL	NULL	NULL	2	100.00	NULL
 NULL	UNION RESULT	<union1,2>	NULL	ALL	NULL	NULL	NULL	NULL	NULL	NULL	Using temporary; Using filesort
 Warnings:
-Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a` from `test`.`t1` union /* select#2 */ select `test`.`t1`.`a` AS `a` from `test`.`t1` order by `<union temporary>`.`a`
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a` from `test`.`t1` union /* select#2 */ select `test`.`t1`.`a` AS `a` from `test`.`t1` order by `a`
 SHOW SESSION STATUS LIKE 'Last_query_cost';
 Variable_name	Value
 Last_query_cost	0.898000
@@ -354,7 +354,7 @@ FLUSH STATUS;
 TIMESTAMPDIFF(SECOND,'DTVALUE','DTVALUE') <> 0
 1
 set @@global.concurrent_insert= @old_concurrent_insert;
-SET GLOBAL log_output = @old_log_output;
+SET GLOBAL log_output = 'FILE,TABLE';
 #
 # Bug#28786951 SET LAST_QUERY_COST FOR QUERIES WITH SUBQUERIES AND UNIONS
 #
@@ -511,3 +511,6 @@ SHOW STATUS LIKE 'Last_query_cost';
 Variable_name	Value
 Last_query_cost	9.664743
 DROP TABLE t1, t2;
+SET @@global.log_output = @old_log_output;
+SET @@global.general_log = @old_general_log;
+TRUNCATE TABLE mysql.general_log;

@@ -1,4 +1,4 @@
-/* Copyright (c) 2015, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2015, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -134,11 +134,11 @@
 #include "sql/mysqld_thd_manager.h"
 
 #define PFS_VAR
+#include <assert.h>
 #include <stddef.h>
 #include <sys/types.h>
 #include <string>
 
-#include "my_dbug.h"
 #include "sql/set_var.h"
 #include "storage/perfschema/pfs_account.h"
 #include "storage/perfschema/pfs_host.h"
@@ -248,7 +248,7 @@ class Find_THD_variable : public Find_THD_Impl {
   Find_THD_variable() : m_unsafe_thd(nullptr) {}
   Find_THD_variable(THD *unsafe_thd) : m_unsafe_thd(unsafe_thd) {}
 
-  virtual bool operator()(THD *thd);
+  bool operator()(THD *thd) override;
   void set_unsafe_thd(THD *unsafe_thd) { m_unsafe_thd = unsafe_thd; }
 
  private:
@@ -375,8 +375,8 @@ class PFS_variable_cache {
     Get a validated THD from the thread manager. Execute callback function while
     inside of the thread manager locks.
   */
-  THD *get_THD(THD *thd);
-  THD *get_THD(PFS_thread *pfs_thread);
+  THD_ptr get_THD(THD *thd);
+  THD_ptr get_THD(PFS_thread *pfs_thread);
 
   /**
     Get a single variable from the cache.
@@ -459,31 +459,30 @@ class PFS_variable_cache {
   Destructor.
 */
 template <class Var_type>
-PFS_variable_cache<Var_type>::~PFS_variable_cache() {}
+PFS_variable_cache<Var_type>::~PFS_variable_cache() = default;
 
 /**
   Get a validated THD from the thread manager. Execute callback function while
   while inside the thread manager lock.
 */
 template <class Var_type>
-THD *PFS_variable_cache<Var_type>::get_THD(THD *unsafe_thd) {
+THD_ptr PFS_variable_cache<Var_type>::get_THD(THD *unsafe_thd) {
   if (unsafe_thd == nullptr) {
     /*
       May happen, precisely because the pointer is unsafe
       (THD just disconnected for example).
       No need to walk Global_THD_manager for that.
     */
-    return nullptr;
+    return THD_ptr{nullptr};
   }
 
   m_thd_finder.set_unsafe_thd(unsafe_thd);
-  THD *safe_thd = Global_THD_manager::get_instance()->find_thd(&m_thd_finder);
-  return safe_thd;
+  return Global_THD_manager::get_instance()->find_thd(&m_thd_finder);
 }
 
 template <class Var_type>
-THD *PFS_variable_cache<Var_type>::get_THD(PFS_thread *pfs_thread) {
-  DBUG_ASSERT(pfs_thread != nullptr);
+THD_ptr PFS_variable_cache<Var_type>::get_THD(PFS_thread *pfs_thread) {
+  assert(pfs_thread != nullptr);
   return get_THD(pfs_thread->m_thd);
 }
 
@@ -610,19 +609,19 @@ class PFS_system_variable_cache : public PFS_variable_cache<System_variable> {
   PFS_system_variable_cache(bool external_init);
   bool match_scope(int scope);
   ulonglong get_sysvar_hash_version(void) { return m_version; }
-  ~PFS_system_variable_cache() { free_mem_root(); }
+  ~PFS_system_variable_cache() override { free_mem_root(); }
 
  private:
-  bool do_initialize_session(void);
+  bool do_initialize_session(void) override;
 
   /* Global */
-  int do_materialize_global(void);
+  int do_materialize_global(void) override;
   /* Session - THD */
-  int do_materialize_session(THD *thd);
+  int do_materialize_session(THD *thd) override;
   /* Session -  PFS_thread */
-  int do_materialize_session(PFS_thread *thread);
+  int do_materialize_session(PFS_thread *thread) override;
   /* Single variable -  PFS_thread */
-  int do_materialize_session(PFS_thread *pfs_thread, uint index);
+  int do_materialize_session(PFS_thread *pfs_thread, uint index) override;
 
   /* Temporary mem_root to use for materialization. */
   MEM_ROOT m_mem_sysvar;
@@ -643,7 +642,7 @@ class PFS_system_variable_cache : public PFS_variable_cache<System_variable> {
   /* Build SHOW_var array. */
   bool init_show_var_array(enum_var_type scope, bool strict);
   /* Global and Session - THD */
-  int do_materialize_all(THD *thd);
+  int do_materialize_all(THD *thd) override;
 };
 
 /**
@@ -653,11 +652,11 @@ class PFS_system_variable_info_cache : public PFS_system_variable_cache {
  public:
   PFS_system_variable_info_cache(bool external_init)
       : PFS_system_variable_cache(external_init) {}
-  ~PFS_system_variable_info_cache() {}
+  ~PFS_system_variable_info_cache() override = default;
 
  private:
   /* Global and Session - THD */
-  int do_materialize_all(THD *thd);
+  int do_materialize_all(THD *thd) override;
 };
 
 /**
@@ -667,11 +666,11 @@ class PFS_system_persisted_variables_cache : public PFS_system_variable_cache {
  public:
   PFS_system_persisted_variables_cache(bool external_init)
       : PFS_system_variable_cache(external_init) {}
-  ~PFS_system_persisted_variables_cache() {}
+  ~PFS_system_persisted_variables_cache() override = default;
 
  private:
   /* Global and Session - THD */
-  int do_materialize_all(THD *thd);
+  int do_materialize_all(THD *thd) override;
 };
 
 /**
@@ -696,14 +695,14 @@ class PFS_status_variable_cache : public PFS_variable_cache<Status_variable> {
   bool m_show_command;
 
  private:
-  bool do_initialize_session(void);
+  bool do_initialize_session(void) override;
 
-  int do_materialize_global(void);
+  int do_materialize_global(void) override;
   /* Global and Session - THD */
-  int do_materialize_all(THD *thd);
-  int do_materialize_session(THD *thd);
-  int do_materialize_session(PFS_thread *thread);
-  int do_materialize_session(PFS_thread *, uint) { return 0; }
+  int do_materialize_all(THD *thd) override;
+  int do_materialize_session(THD *thd) override;
+  int do_materialize_session(PFS_thread *thread) override;
+  int do_materialize_session(PFS_thread *, uint) override { return 0; }
   int do_materialize_client(PFS_client *pfs_client);
 
   /* Callback to sum user, host or account status variables. */
@@ -757,5 +756,4 @@ void sum_account_status(PFS_client *pfs_account,
 void system_variable_warning(void);
 void status_variable_warning(void);
 
-/** @} */
 #endif

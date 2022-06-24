@@ -103,6 +103,7 @@ enum enum_wsrep_reject_types {
 enum enum_wsrep_OSU_method {
   WSREP_OSU_TOI,
   WSREP_OSU_RSU,
+  WSREP_OSU_NBO,
   WSREP_OSU_NONE,
 };
 
@@ -236,6 +237,11 @@ extern enum wsrep::provider::status wsrep_sync_wait_upto_gtid(
 extern void wsrep_last_committed_id(wsrep_gtid_t *gtid);
 extern int wsrep_check_opts(int argc, char *const *argv);
 extern void wsrep_prepend_PATH(const char *path);
+bool wsrep_append_fk_parent_table(THD *thd, TABLE_LIST *table,
+                                  wsrep::key_array *keys);
+bool wsrep_append_child_tables(THD *thd, TABLE_LIST *tables,
+                               wsrep::key_array *keys);
+
 /* some inline functions are defined in wsrep_mysqld_inl.h */
 
 /* Provide a wrapper of the WSREP_ON macro for plugins to use */
@@ -247,9 +253,9 @@ extern String wsrep_thd_rewritten_query(THD *thd);
 /* Other global variables */
 extern wsrep_seqno_t wsrep_locked_seqno;
 
-#define WSREP_ON                                           \
-  ((global_system_variables.wsrep_on) && wsrep_provider && \
-   strcmp(wsrep_provider, WSREP_NONE))
+extern bool wsrep_provider_set;
+
+#define WSREP_ON ((global_system_variables.wsrep_on) && wsrep_provider_set)
 
 /* use xxxxxx_NNULL macros when thd pointer is guaranteed to be non-null to
  * avoid compiler warnings (GCC 6 and later) */
@@ -286,7 +292,8 @@ extern wsrep_seqno_t wsrep_locked_seqno;
 
 #define WSREP_ERROR(fmt, ...)                                         \
   do {                                                                \
-    if (!Wsrep_server_state::instance().is_initialized_unprotected()) \
+    if (Wsrep_server_state::has_instance() &&                         \
+        !Wsrep_server_state::instance().is_initialized_unprotected()) \
       pxc_force_flush_error_message = true;                           \
     WSREP_LOG(ERROR_LEVEL, fmt, ##__VA_ARGS__)                        \
   } while (0);
@@ -426,9 +433,12 @@ class Alter_info;
 int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
                              const TABLE_LIST *table_list,
                              dd::Tablespace_table_ref_vec *trefs = NULL,
-                             Alter_info *alter_info = NULL);
-
+                             Alter_info *alter_info = NULL,
+                             wsrep::key_array *fk_tables = NULL);
+bool wsrep_thd_is_in_to_isolation(THD *thd, bool flock);
 void wsrep_to_isolation_end(THD *thd);
+void wsrep_NBO_end_phase_one(THD *thd);
+int wsrep_NBO_begin_phase_two(THD *thd);
 
 bool wsrep_append_SR_keys(THD *thd);
 int wsrep_to_buf_helper(THD *thd, const char *query, uint query_len,

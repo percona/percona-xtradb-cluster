@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2013, 2020, Oracle and/or its affiliates. All rights reserved.
+  Copyright (c) 2013, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -36,8 +36,8 @@
 #include "sql/rpl_info.h"
 #include "sql/rpl_mi.h"
 #include "sql/rpl_msr.h" /* Multisource replciation */
+#include "sql/rpl_replica.h"
 #include "sql/rpl_rli.h"
-#include "sql/rpl_slave.h"
 #include "sql/sql_parse.h"
 #include "sql/table.h"
 #include "storage/perfschema/pfs_instr.h"
@@ -68,7 +68,7 @@ Plugin_table table_replication_connection_configuration::m_table_def(
     "  SSL_CRL_PATH VARCHAR(255) not null,\n"
     "  CONNECTION_RETRY_INTERVAL INTEGER not null,\n"
     "  CONNECTION_RETRY_COUNT BIGINT unsigned not null,\n"
-    "  HEARTBEAT_INTERVAL DOUBLE(10,3) unsigned not null\n"
+    "  HEARTBEAT_INTERVAL DOUBLE(10,3) not null\n"
     "  COMMENT 'Number of seconds after which a heartbeat will be sent .',\n"
     "  TLS_VERSION VARCHAR(255) not null,\n"
     "  PUBLIC_KEY_PATH VARCHAR(512) not null,\n"
@@ -81,6 +81,10 @@ Plugin_table table_replication_connection_configuration::m_table_def(
     "  COMMENT 'Compression level associated with zstd compression "
     "algorithm.',\n"
     "  TLS_CIPHERSUITES TEXT CHARACTER SET utf8 COLLATE utf8_bin NULL,\n"
+    "  SOURCE_CONNECTION_AUTO_FAILOVER ENUM('1','0') not null,\n"
+    "  GTID_ONLY ENUM('1','0') not null\n"
+    "  COMMENT 'Indicates if this channel only uses GTIDs and does not persist "
+    "positions.',\n"
     "  PRIMARY KEY (channel_name) USING HASH\n",
     /* Options */
     " ENGINE=PERFORMANCE_SCHEMA",
@@ -129,7 +133,7 @@ table_replication_connection_configuration::
     : PFS_engine_table(&m_share, &m_pos), m_pos(0), m_next_pos(0) {}
 
 table_replication_connection_configuration::
-    ~table_replication_connection_configuration() {}
+    ~table_replication_connection_configuration() = default;
 
 void table_replication_connection_configuration::reset_position(void) {
   m_pos.m_index = 0;
@@ -181,10 +185,11 @@ int table_replication_connection_configuration::rnd_pos(const void *pos) {
   return res;
 }
 
-int table_replication_connection_configuration::index_init(
-    uint idx MY_ATTRIBUTE((unused)), bool) {
+int table_replication_connection_configuration::index_init(uint idx
+                                                           [[maybe_unused]],
+                                                           bool) {
   PFS_index_rpl_connection_config *result = nullptr;
-  DBUG_ASSERT(idx == 0);
+  assert(idx == 0);
   result = PFS_NEW(PFS_index_rpl_connection_config);
   m_opened_index = result;
   m_index = result;
@@ -219,7 +224,7 @@ int table_replication_connection_configuration::index_next(void) {
 int table_replication_connection_configuration::make_row(Master_info *mi) {
   const char *temp_store;
 
-  DBUG_ASSERT(mi != nullptr);
+  assert(mi != nullptr);
 
   mysql_mutex_lock(&mi->data_lock);
   mysql_mutex_lock(&mi->rli->data_lock);
@@ -313,6 +318,14 @@ int table_replication_connection_configuration::make_row(Master_info *mi) {
 
   m_row.tls_ciphersuites = mi->tls_ciphersuites;
 
+  if (mi->is_source_connection_auto_failover()) {
+    m_row.source_connection_auto_failover = PS_RPL_YES;
+  } else {
+    m_row.source_connection_auto_failover = PS_RPL_NO;
+  }
+
+  m_row.gtid_only = mi->is_gtid_only_mode() ? PS_RPL_YES : PS_RPL_NO;
+
   mysql_mutex_unlock(&mi->rli->data_lock);
   mysql_mutex_unlock(&mi->data_lock);
 
@@ -323,7 +336,7 @@ int table_replication_connection_configuration::read_row_values(
     TABLE *table, unsigned char *buf, Field **fields, bool read_all) {
   DBUG_TRACE;
   /* Set the null bits */
-  DBUG_ASSERT(table->s->null_bytes == 1);
+  assert(table->s->null_bytes == 1);
   buf[0] = 0;
 
   for (Field *f = nullptr; (f = *fields); fields++) {
@@ -419,8 +432,14 @@ int table_replication_connection_configuration::read_row_values(
                            m_row.tls_ciphersuites.second.length(),
                            &my_charset_utf8mb4_bin);
           break;
+        case 25: /** source_connection_auto_failover */
+          set_field_enum(f, m_row.source_connection_auto_failover);
+          break;
+        case 26: /** gtid_only */
+          set_field_enum(f, m_row.gtid_only);
+          break;
         default:
-          DBUG_ASSERT(false);
+          assert(false);
       }
     }
   }

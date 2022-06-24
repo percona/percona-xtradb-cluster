@@ -23,6 +23,7 @@ if (!$command)
 
 --source include/read_file_to_var.inc
 
+--remove_file $read_from_file
 --let $read_from_file=
 
 --let $include_filename= get_command_output.inc

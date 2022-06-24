@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2013, 2020, Oracle and/or its affiliates. All rights reserved.
+  Copyright (c) 2013, 2021, Oracle and/or its affiliates. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -119,6 +119,17 @@ static void set_member_role(void *const context, const char &value,
   memcpy(row->member_role, &value, length);
 }
 
+static void set_member_communication_stack(void *const context,
+                                           const char &value, size_t length) {
+  struct st_row_group_members *row =
+      static_cast<struct st_row_group_members *>(context);
+  const size_t max = NAME_LEN;
+  length = std::min(length, max);
+
+  row->member_communication_stack_length = length;
+  memcpy(row->member_communication_stack, &value, length);
+}
+
 THR_LOCK table_replication_group_members::m_table_lock;
 
 Plugin_table table_replication_group_members::m_table_def(
@@ -133,7 +144,9 @@ Plugin_table table_replication_group_members::m_table_def(
     "  MEMBER_PORT INTEGER,\n"
     "  MEMBER_STATE CHAR(64) collate utf8mb4_bin not null,\n"
     "  MEMBER_ROLE CHAR(64) collate utf8mb4_bin not null,\n"
-    "  MEMBER_VERSION CHAR(64) collate utf8mb4_bin not null\n",
+    "  MEMBER_VERSION CHAR(64) collate utf8mb4_bin not null,\n"
+    "  MEMBER_COMMUNICATION_STACK CHAR(64) collate utf8mb4_bin not "
+    "null\n",
     /* Options */
     " ENGINE=PERFORMANCE_SCHEMA",
     /* Tablespace */
@@ -162,7 +175,7 @@ PFS_engine_table *table_replication_group_members::create(
 table_replication_group_members::table_replication_group_members()
     : PFS_engine_table(&m_share, &m_pos), m_pos(0), m_next_pos(0) {}
 
-table_replication_group_members::~table_replication_group_members() {}
+table_replication_group_members::~table_replication_group_members() = default;
 
 void table_replication_group_members::reset_position(void) {
   m_pos.m_index = 0;
@@ -193,7 +206,7 @@ int table_replication_group_members::rnd_pos(const void *pos) {
   }
 
   set_position(pos);
-  DBUG_ASSERT(m_pos.m_index < get_row_count());
+  assert(m_pos.m_index < get_row_count());
   return make_row(m_pos.m_index);
 }
 
@@ -207,12 +220,13 @@ int table_replication_group_members::make_row(uint index) {
   m_row.member_state_length = 0;
   m_row.member_version_length = 0;
   m_row.member_role_length = 0;
+  m_row.member_communication_stack_length = 0;
 
   // Set callbacks on GROUP_REPLICATION_GROUP_MEMBERS_CALLBACKS.
   const GROUP_REPLICATION_GROUP_MEMBERS_CALLBACKS callbacks = {
       &m_row,           &set_channel_name,   &set_member_id,
       &set_member_host, &set_member_port,    &set_member_state,
-      &set_member_role, &set_member_version,
+      &set_member_role, &set_member_version, &set_member_communication_stack,
   };
 
   // Query plugin and let callbacks do their job.
@@ -230,7 +244,7 @@ int table_replication_group_members::read_row_values(TABLE *table,
                                                      bool read_all) {
   Field *f;
 
-  DBUG_ASSERT(table->s->null_bytes == 1);
+  assert(table->s->null_bytes == 1);
   buf[0] = 0;
 
   for (; (f = *fields); fields++) {
@@ -262,8 +276,12 @@ int table_replication_group_members::read_row_values(TABLE *table,
           set_field_char_utf8(f, m_row.member_version,
                               m_row.member_version_length);
           break;
+        case 7: /** member_incoming_protocol */
+          set_field_char_utf8(f, m_row.member_communication_stack,
+                              m_row.member_communication_stack_length);
+          break;
         default:
-          DBUG_ASSERT(false);
+          assert(false);
       }
     }
   }

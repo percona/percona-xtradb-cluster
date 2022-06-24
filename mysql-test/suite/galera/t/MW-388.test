@@ -31,7 +31,7 @@ DELIMITER ;|
 # that of the INSERT. Because there is only one slave thread,
 # commit cut is not processed and therefore does not advance
 # local monitor, and our INSERT remains stuck there.
-SET GLOBAL wsrep_slave_threads = 2;
+SET GLOBAL wsrep_applier_threads = 2;
 SET GLOBAL DEBUG = "d,sync.wsrep_apply_cb";
 
 --connection node_2
@@ -111,7 +111,7 @@ DELIMITER ;|
 # that of the INSERT. Because there is only one slave thread,
 # commit cut is not processed and therefore does not advance
 # local monitor, and our INSERT remains stuck there.
-SET GLOBAL wsrep_slave_threads = 2;
+SET GLOBAL wsrep_applier_threads = 2;
 SET GLOBAL DEBUG = "d,sync.wsrep_apply_cb";
 
 --connection node_2
@@ -152,6 +152,6 @@ SELECT * FROM t1;
 
 --connection node_1
 SET DEBUG_SYNC = "reset";
-SET GLOBAL wsrep_slave_threads = DEFAULT;
+SET GLOBAL wsrep_applier_threads = DEFAULT;
 DROP TABLE t1;
 DROP PROCEDURE insert_proc;

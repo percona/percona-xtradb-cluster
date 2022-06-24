@@ -1,0 +1,35 @@
+--source include/galera_cluster.inc
+
+--connection node_1
+
+create table t1 (id int primary key, text varchar(255)); 
+create table t2 (id int primary key, text varchar(255));
+insert into t1 values (1, 'test1'); 
+insert into t1 values (2, 'test2'); 
+insert into t2 values (1, 'test1'); 
+insert into t2 values (2, 'test2');
+
+delimiter III;
+CREATE PROCEDURE `test_deadlock`(IN text varchar(255))
+BEGIN
+CREATE TABLE t1_insp (id int primary key) AS (SELECT id FROM t1 WHERE t1.text = 'test1');
+SELECT * FROM not_existent;
+END;
+III
+delimiter ;III
+
+--error ER_NO_SUCH_TABLE
+CALL test_deadlock('test1'); 
+
+SELECT * FROM t1_insp;
+
+--connection node_2
+
+
+SELECT * FROM t1_insp;
+
+--connection node_1
+DROP TABLE t1;
+DROP TABLE t2;
+DROP TABLE t1_insp;
+DROP PROCEDURE test_deadlock;

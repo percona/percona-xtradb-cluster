@@ -1,4 +1,4 @@
-SET GLOBAL wsrep_slave_threads=5;
+SET GLOBAL wsrep_applier_threads=5;
 SET SESSION wsrep_sync_wait = 0;
 CREATE TABLE t1 (f1 INT PRIMARY KEY) ENGINE=InnoDB;
 SET GLOBAL DEBUG = "d,wsrep_applier_sleep_15";

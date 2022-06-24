@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2005, 2020, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2005, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -40,7 +40,6 @@
 
 #define JAM_FILE_ID 287
 
-extern EventLogger * g_eventLogger;
 
 #define TOUCH_PARALLELISM 8
 #define MIN_START_THREAD_SIZE (128 * 1024 * 1024)
@@ -68,7 +67,7 @@ touch_mem(void* arg)
 {
   struct AllocTouchMem* touch_mem_ptr = (struct AllocTouchMem*)arg;
 
-#if defined(VM_TRACE_MEM) || defined(VM_TRACE) || defined(ERROR_INSERT)
+#if defined(VM_TRACE_MEM)
   g_eventLogger->info("Touching memory: %zu bytes at %p, thread index %u, "
                       "watch dog %p",
                       touch_mem_ptr->sz,
@@ -174,7 +173,12 @@ ndbd_alloc_touch_mem(void *p, size_t sz, volatile Uint32 * watchCounter)
     {
       g_eventLogger->warning("Touching much memory, %zu bytes, without watchdog.", sz);
 #if defined(VM_TRACE_MEM)
-      assert(!ndbd_malloc_need_watchdog(sz));
+      /*
+       * Assert to find big allocations not using watchdog.
+       * These typically comes from allocating static arrays for some resources
+       * for some configurations.
+       */
+      // assert(!ndbd_malloc_need_watchdog(sz));
 #endif
     }
     watchCounter = &dummy_watch_counter;
@@ -236,9 +240,11 @@ void *ndbd_malloc_watched(size_t size, volatile Uint32* watch_dog)
     {
       size_t s_m, s_k, s_b;
       xxx(size, &s_m, &s_k, &s_b);
-      fprintf(stderr, "%p malloc(%um %uk %ub)", p, s_m, s_k, s_b);
-      xxx(g_allocated_memory, &s_m, &s_k, &s_b);
-      fprintf(stderr, "\t\ttotal(%um %uk %ub)\n", s_m, s_k, s_b);
+
+      size_t s_m2, s_k2, s_b2;
+      xxx(g_allocated_memory, &s_m2, &s_k2, &s_b2);
+      g_eventLogger->info("%p malloc (%zum %zuk %zub) total (%zum %zuk %zub)",
+                          p, s_m, s_k, s_b, s_m2, s_k2, s_b2);
     }
 #endif
   }
@@ -265,7 +271,7 @@ void ndbd_free(void *p, size_t size)
   {
     g_allocated_memory -= size;
 #ifdef TRACE_MALLOC
-    fprintf(stderr, "%p free(%d)\n", p, size);
+    g_eventLogger->info("%p free(%zu)", p, size);
 #endif
   }
 }

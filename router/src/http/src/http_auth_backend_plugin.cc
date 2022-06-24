@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2018, 2020, Oracle and/or its affiliates. All rights reserved.
+  Copyright (c) 2018, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -53,6 +53,7 @@
 IMPORT_LOG_FUNCTIONS()
 
 static constexpr const char kSectionName[]{"http_auth_backend"};
+static std::vector<std::string> registered_backends;
 
 namespace {
 class HtpasswdPluginConfig : public mysqlrouter::BasePluginConfig {
@@ -129,7 +130,8 @@ static void init(mysql_harness::PluginFuncEnv *env) {
   }
 
   try {
-    auth_backends = std::make_shared<HttpAuthBackendComponent::value_type>();
+    auto &auth_backend_component = HttpAuthBackendComponent::get_instance();
+
     for (const mysql_harness::ConfigSection *section :
          info->config->sections()) {
       if (section->name != kSectionName) {
@@ -144,11 +146,13 @@ static void init(mysql_harness::PluginFuncEnv *env) {
       }
 
       PluginConfig config(section);
+      const std::string backend_name = section->key;
+      auth_backend_component.add_backend(
+          backend_name,
+          HttpAuthBackendFactory::create(config.backend, section));
 
-      auth_backends->insert({section->key, HttpAuthBackendFactory::create(
-                                               config.backend, section)});
+      registered_backends.push_back(backend_name);
     }
-    HttpAuthBackendComponent::get_instance().init(auth_backends);
   } catch (const std::invalid_argument &exc) {
     set_error(env, mysql_harness::kConfigInvalidArgument, "%s", exc.what());
   } catch (const std::exception &exc) {
@@ -189,8 +193,19 @@ static void start(mysql_harness::PluginFuncEnv *env) {
   }
 }
 
-static const std::array<const char *, 1> required = {{
+static void deinit(mysql_harness::PluginFuncEnv *) {
+  auto &auth_backend_component = HttpAuthBackendComponent::get_instance();
+
+  for (const auto &backend : registered_backends) {
+    auth_backend_component.remove_backend(backend);
+  }
+
+  registered_backends.clear();
+}
+
+static const std::array<const char *, 2> required = {{
     "logger",
+    "router_protobuf",
 }};
 
 extern "C" {
@@ -205,8 +220,9 @@ mysql_harness::Plugin HTTP_AUTH_BACKEND_EXPORT
         // conflicts
         0, nullptr,
         init,     // init
-        nullptr,  // deinit
+        deinit,   // deinit
         start,    // start
         nullptr,  // stop
+        false,    // declares_readiness
 };
 }

@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2017, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -172,7 +172,7 @@ Generate_scramble::Generate_scramble(
       break;
     }
     default:
-      DBUG_ASSERT(false);
+      assert(false);
   };
 }
 
@@ -224,7 +224,7 @@ bool Generate_scramble::scramble(unsigned char *scramble,
       break;
     }
     default: {
-      DBUG_ASSERT(false);
+      assert(false);
       return true;
     }
   }
@@ -287,7 +287,7 @@ Validate_scramble::Validate_scramble(
       break;
     }
     default:
-      DBUG_ASSERT(false);
+      assert(false);
       break;
   };
 }
@@ -327,7 +327,7 @@ bool Validate_scramble::validate() {
       break;
     }
     default: {
-      DBUG_ASSERT(false);
+      assert(false);
       return true;
     }
   }
@@ -433,9 +433,9 @@ bool generate_sha256_scramble(unsigned char *scramble, size_t scramble_size,
 */
 
 bool validate_sha256_scramble(const unsigned char *scramble,
-                              size_t scramble_size MY_ATTRIBUTE((unused)),
+                              size_t scramble_size [[maybe_unused]],
                               const unsigned char *known,
-                              size_t known_size MY_ATTRIBUTE((unused)),
+                              size_t known_size [[maybe_unused]],
                               const unsigned char *rnd, size_t rnd_size) {
   DBUG_TRACE;
 

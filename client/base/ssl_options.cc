@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2014, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -71,8 +71,8 @@ void Mysql_connection_options::Ssl_options::create_options() {
           this, _1)));
 }
 
-void Mysql_connection_options::Ssl_options::ca_option_callback(
-    char *argument MY_ATTRIBUTE((unused))) {
+void Mysql_connection_options::Ssl_options::ca_option_callback(char *argument [
+    [maybe_unused]]) {
   if (!ssl_mode_set_explicitly) ::opt_ssl_mode = SSL_MODE_VERIFY_CA;
 }
 

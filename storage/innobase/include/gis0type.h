@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2014, 2018, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2014, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -71,14 +71,14 @@ typedef struct node_visit {
                       enlarged for insertion */
 } node_visit_t;
 
-typedef std::vector<node_visit_t, ut_allocator<node_visit_t>> rtr_node_path_t;
+typedef std::vector<node_visit_t, ut::allocator<node_visit_t>> rtr_node_path_t;
 
 typedef struct rtr_rec {
   rec_t *r_rec; /*!< matched record */
   bool locked;  /*!< whether the record locked */
 } rtr_rec_t;
 
-typedef std::vector<rtr_rec_t, ut_allocator<rtr_rec_t>> rtr_rec_vector;
+typedef std::vector<rtr_rec_t, ut::allocator<rtr_rec_t>> rtr_rec_vector;
 
 /* Structure for matched records on the leaf page */
 typedef struct matched_rec {
@@ -145,7 +145,7 @@ typedef struct rtr_info {
   /*!< whether the current rec is a duplicate record. */
 } rtr_info_t;
 
-typedef std::list<rtr_info_t *, ut_allocator<rtr_info_t *>> rtr_info_active;
+typedef std::list<rtr_info_t *, ut::allocator<rtr_info_t *>> rtr_info_active;
 
 /* Tracking structure for all onoging search for an index */
 typedef struct rtr_info_track {

@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, 2020, Oracle and/or its affiliates.
+/* Copyright (c) 2014, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -19,9 +19,6 @@
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
-
-// First include (the generated) my_config.h, to get correct platform defines.
-#include "my_config.h"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -45,8 +42,8 @@ namespace json_path_unittest {
 
 class JsonPathTest : public ::testing::Test {
  protected:
-  virtual void SetUp() { initializer.SetUp(); }
-  virtual void TearDown() { initializer.TearDown(); }
+  void SetUp() override { initializer.SetUp(); }
+  void TearDown() override { initializer.TearDown(); }
   THD *thd() const { return initializer.thd(); }
   my_testing::Server_initializer initializer;
   void vet_wrapper_seek(Json_wrapper *wrapper, const Json_path &path,
@@ -121,8 +118,8 @@ class JsonGoodLocationTestP : public ::testing::TestWithParam<Location_tuple> {
   arg of Json_wrapper.seek().
 */
 class JsonGoodOnoTestP : public ::testing::TestWithParam<Ono_tuple> {
-  virtual void SetUp() { initializer.SetUp(); }
-  virtual void TearDown() { initializer.TearDown(); }
+  void SetUp() override { initializer.SetUp(); }
+  void TearDown() override { initializer.TearDown(); }
   my_testing::Server_initializer initializer;
 
  protected:
@@ -133,8 +130,8 @@ class JsonGoodOnoTestP : public ::testing::TestWithParam<Ono_tuple> {
   Class that contains parameterized test cases for cloning tests.
 */
 class JsonGoodCloneTestP : public ::testing::TestWithParam<Clone_tuple> {
-  virtual void SetUp() { initializer.SetUp(); }
-  virtual void TearDown() { initializer.TearDown(); }
+  void SetUp() override { initializer.SetUp(); }
+  void TearDown() override { initializer.TearDown(); }
   my_testing::Server_initializer initializer;
 };
 

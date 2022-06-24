@@ -1,7 +1,7 @@
 # ==== Purpose ====
 #
 # This test verifies that deadlock errors arising due to lock conflicts are
-# handled properly when --slave-preserve-commit-order is enabled on the replica
+# handled properly when --replica-preserve-commit-order is enabled on the replica
 # server.
 #
 # ==== Implementation ====
@@ -42,7 +42,7 @@
 #         thread (DELETE) is waiting for its turn to commit and is handled
 #         properly.
 #    3.2. Wait till server to handle the deadlock and till the co-ordinator
-#         thread to error out with ER_MTS_INCONSISTENT_DATA.
+#         thread to error out with ER_LOCK_DEADLOCK.
 #    3.3. Restart the replication threads, sync the replica and verify that
 #         table data is consistent.
 #
@@ -59,7 +59,10 @@
 #
 # ==== References ====
 #
-# PS-7232 Multithreaded Slave hangs when slave_transaction_retries=0
+# Bug #87796 Commit_order_manager can't terminate MTS worker properly when deadlock happens
+# Bug #89247 Deadlock with MTS when replica_preserve_commit_order = ON.
+# Bug #95249 stop slave permanently blocked
+# Bug #99440 Threads of MTS Slave randomly stuck
 
 # The test needs debug binaries
 
@@ -79,16 +82,16 @@ INSERT INTO t1 VALUES(1, NULL),(2, 2), (3, NULL), (4, 4), (5, NULL), (6, 6);
 
 --source include/sync_slave_sql_with_master.inc
 --source include/stop_slave_sql.inc
-SET @saved_slave_parallel_type = @@GLOBAL.slave_parallel_type;
-SET @saved_slave_parallel_workers = @@GLOBAL.slave_parallel_workers;
-SET @saved_slave_preserve_commit_order = @@GLOBAL.slave_preserve_commit_order;
+SET @saved_replica_parallel_type = @@GLOBAL.replica_parallel_type;
+SET @saved_replica_parallel_workers = @@GLOBAL.replica_parallel_workers;
+SET @saved_replica_preserve_commit_order = @@GLOBAL.replica_preserve_commit_order;
 SET @saved_innodb_lock_wait_timeout = @@GLOBAL.innodb_lock_wait_timeout;
-SET @saved_slave_transaction_retries = @@GLOBAL.slave_transaction_retries;
+SET @saved_replica_transaction_retries = @@GLOBAL.replica_transaction_retries;
 
-SET GLOBAL slave_transaction_retries = 0;
-SET GLOBAL slave_parallel_type = "LOGICAL_CLOCK";
-SET GLOBAL slave_parallel_workers = 8;
-SET GLOBAL slave_preserve_commit_order = ON;
+SET GLOBAL replica_transaction_retries = 0;
+SET GLOBAL replica_parallel_type = "LOGICAL_CLOCK";
+SET GLOBAL replica_parallel_workers = 8;
+SET GLOBAL replica_preserve_commit_order = ON;
 # Set it to a long time to guarantee it doesn't report timeout error.
 SET GLOBAL innodb_lock_wait_timeout = 1000;
 
@@ -115,7 +118,7 @@ INSERT INTO t1 VALUES(22, 22);   # Transaction 4
 INSERT INTO t1 VALUES(23, 23);   # Transaction 5
 --source include/remove_debug_point.inc
 
-# Start a local transaction on replica to block the INSERT statement coming
+# Start a local Transaction 6 on replica to block the INSERT statement coming
 # through the replication channel. This blocks the worker thread executing
 # "INSERT INTO t1 VALUES(11, NULL)"
 --source include/rpl_connection_slave.inc
@@ -138,15 +141,18 @@ ROLLBACK;
 # have set it to 0 throughout the test, the w2 shall not retry the transaction
 # and would call report_rollback.
 #
-# Without the fix for PS-7232, calling report_rollback() would make the w2 to
-# return without removing its entry from the SPCO queue thus resulting in other
-# worker threads to wait forever on the signal. Meanwhile if co-ordinator was
-# asked to go down by any of the previous workers, this would make co-ordinator
-# thread to wait for the workers to finish thus leading to server hang.
+# Without the fix, calling report_rollback() would make the w2 to return
+# without removing its entry from the SPCO queue thus resulting in other worker
+# threads to wait forever on the signal. Meanwhile if co-ordinator was asked to
+# go down by any of the previous workers, this would make co-ordinator thread
+# to wait for the workers to finish thus leading to server hang.
+
+--echo # Add error supressions.
+CALL mtr.add_suppression("Worker .* failed executing transaction.*");
 
 --echo #
---echo # 3.2. Wait till the co-ordinator thread to error out with ER_MTS_INCONSISTENT_DATA.
---let $slave_sql_errno = convert_error(ER_MTS_INCONSISTENT_DATA)
+--echo # 3.2. Wait till the co-ordinator thread to error out with ER_LOCK_DEADLOCK.
+--let $slave_sql_errno = convert_error(ER_LOCK_DEADLOCK)
 --source include/wait_for_slave_sql_error.inc
 
 --echo #
@@ -253,10 +259,10 @@ DROP TABLE t1;
 CALL mtr.add_suppression("The slave coordinator and worker threads are stopped, possibly leaving data in inconsistent state.");
 
 --source include/stop_slave.inc
-SET GLOBAL slave_transaction_retries = @saved_slave_transaction_retries;
-SET GLOBAL slave_parallel_type = @saved_slave_parallel_type;
-SET GLOBAL slave_parallel_workers = @saved_slave_parallel_workers;
-SET GLOBAL slave_preserve_commit_order = @saved_slave_preserve_commit_order;
+SET GLOBAL replica_transaction_retries = @saved_replica_transaction_retries;
+SET GLOBAL replica_parallel_type = @saved_replica_parallel_type;
+SET GLOBAL replica_parallel_workers = @saved_replica_parallel_workers;
+SET GLOBAL replica_preserve_commit_order = @saved_replica_preserve_commit_order;
 SET GLOBAL innodb_lock_wait_timeout = @saved_innodb_lock_wait_timeout;
 
 --let $rpl_only_running_threads = 1

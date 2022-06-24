@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+  Copyright (c) 2020, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -199,7 +199,10 @@ bool Ndb_dd_sync::remove_deleted_tables() const {
       continue;
     }
 
-    // Fetch list of tables in NDB
+    // Fetch list of tables in NDB. The util tables are skipped since the
+    // ndb_schema, ndb_schema_result, and ndb_sql_metadata tables are handled
+    // separately during binlog setup. The index stat tables are not installed
+    // in the DD.
     std::unordered_set<std::string> tables_in_NDB;
     if (!ndb_get_table_names_in_schema(m_thd_ndb->ndb->getDictionary(),
                                        schema_name, &tables_in_NDB)) {
@@ -328,7 +331,7 @@ bool Ndb_dd_sync::synchronize_logfile_group(
   if (existing == nullptr) {
     ndb_log_error("Logfile group '%s' does not exist in DD",
                   logfile_group_name);
-    DBUG_ASSERT(false);
+    assert(false);
     return false;
   }
 
@@ -340,7 +343,7 @@ bool Ndb_dd_sync::synchronize_logfile_group(
         "Could not extract id and version from the definition "
         "of logfile group '%s'",
         logfile_group_name);
-    DBUG_ASSERT(false);
+    assert(false);
     return false;
   }
 
@@ -525,7 +528,7 @@ bool Ndb_dd_sync::synchronize_tablespace(
 
   if (existing == nullptr) {
     ndb_log_error("Tablespace '%s' does not exist in DD", tablespace_name);
-    DBUG_ASSERT(false);
+    assert(false);
     return false;
   }
 
@@ -537,7 +540,7 @@ bool Ndb_dd_sync::synchronize_tablespace(
         "Could not extract id and version from the definition "
         "of tablespace '%s'",
         tablespace_name);
-    DBUG_ASSERT(false);
+    assert(false);
     return false;
   }
 
@@ -644,7 +647,7 @@ bool Ndb_dd_sync::synchronize_tablespaces() const {
 const NdbError *Ndb_dd_sync::fetch_database_ddls(
     NdbTransaction *ndb_transaction, const NdbDictionary::Table *ndb_schema_tab,
     std::vector<Ndb_schema_tuple> *database_ddls) {
-  DBUG_ASSERT(ndb_transaction != nullptr);
+  assert(ndb_transaction != nullptr);
   DBUG_TRACE;
 
   // Create scan operation and define the read
@@ -793,7 +796,7 @@ bool Ndb_dd_sync::synchronize_databases() const {
     unsigned int ddl_counter, ddl_node_id;
     std::tie(db_name, query, schema_ddl_type, ddl_counter, ddl_node_id) =
         ddl_tuple;
-    DBUG_ASSERT(ddl_counter != 0 && ddl_node_id != 0);
+    assert(ddl_counter != 0 && ddl_node_id != 0);
     ndb_log_verbose(5,
                     "ndb_schema query : '%s', db : '%s', "
                     "counter : %u, node_id : %u",
@@ -955,7 +958,7 @@ bool Ndb_dd_sync::synchronize_databases() const {
         }
       } break;
       default:
-        DBUG_ASSERT(!"Unknown database DDL type");
+        assert(!"Unknown database DDL type");
     }
   }
 
@@ -979,19 +982,6 @@ bool Ndb_dd_sync::synchronize_databases() const {
 bool Ndb_dd_sync::migrate_table_with_old_extra_metadata(
     const char *schema_name, const char *table_name, void *unpacked_data,
     Uint32 unpacked_len, bool force_overwrite) const {
-#ifndef BUG27543602
-  // Temporary workaround for Bug 27543602
-  if (strcmp("mysql", schema_name) == 0 &&
-      (strcmp("ndb_index_stat_head", table_name) == 0 ||
-       strcmp("ndb_index_stat_sample", table_name) == 0)) {
-    ndb_log_info(
-        "Skipped installation of the ndb_index_stat table '%s.%s'. "
-        "The table can still be accessed using NDB tools",
-        schema_name, table_name);
-    return true;
-  }
-#endif
-
   ndb_log_info(
       "Table '%s.%s' has obsolete extra metadata. "
       "The table is installed into the data dictionary "
@@ -1180,15 +1170,13 @@ bool Ndb_dd_sync::install_table(const char *schema_name, const char *table_name,
 
 bool Ndb_dd_sync::synchronize_table(const char *schema_name,
                                     const char *table_name) const {
-  Ndb *ndb = m_thd_ndb->ndb;
-
   ndb_log_verbose(1, "Synchronizing table '%s.%s'", schema_name, table_name);
 
-  Ndb_table_guard ndbtab_g(ndb, schema_name, table_name);
+  Ndb_table_guard ndbtab_g(m_thd_ndb->ndb, schema_name, table_name);
   const NdbDictionary::Table *ndbtab = ndbtab_g.get_table();
   if (!ndbtab) {
     // Failed to open the table from NDB
-    log_NDB_error(ndb->getDictionary()->getNdbError());
+    log_NDB_error(ndbtab_g.getNdbError());
     ndb_log_error("Failed to setup table '%s.%s'", schema_name, table_name);
 
     // Failed, table was listed but could not be opened, retry
@@ -1268,7 +1256,7 @@ bool Ndb_dd_sync::synchronize_table(const char *schema_name,
         "Failed to extract id and version from table definition "
         "for table '%s.%s'",
         schema_name, table_name);
-    DBUG_ASSERT(false);
+    assert(false);
     return false;
   }
 
@@ -1295,8 +1283,8 @@ bool Ndb_dd_sync::synchronize_table(const char *schema_name,
     return false;
   }
 
-  if (ndbcluster_binlog_setup_table(m_thd, ndb, schema_name, table_name,
-                                    table_def) != 0) {
+  if (ndbcluster_binlog_setup_table(m_thd, m_thd_ndb->ndb, schema_name,
+                                    table_name, table_def) != 0) {
     ndb_log_error("Failed to setup binlog for table '%s.%s'", schema_name,
                   table_name);
     return false;
@@ -1316,9 +1304,26 @@ bool Ndb_dd_sync::synchronize_schema(const char *schema_name) const {
     return false;
   }
 
-  // Fetch list of NDB tables in NDB
   std::unordered_set<std::string> ndb_tables_in_NDB;
   NdbDictionary::Dictionary *dict = m_thd_ndb->ndb->getDictionary();
+  /*
+    Fetch list of tables in NDB. The util tables are skipped since the
+    ndb_schema, ndb_schema_result, and ndb_sql_metadata tables are handled
+    separately during binlog setup. The index stat tables are not installed in
+    the DD. This is due to an issue after an initial system restart. The binlog
+    thread of the first MySQL Server connecting to the Cluster post an initial
+    restart pokes the index stat thread to create the index stat tables in NDB.
+    This happens only after the synchronization phase during binlog setup which
+    means that the tables aren't synced to the DD of the first MySQL Server
+    connecting to the Cluster. If there are multiple MySQL Servers connecting to
+    the Cluster, there's a race condition where the index stat tables could be
+    synchronized during subsequent MySQL Server connections depending on when
+    the index stat thread creates them in NDB. If the creation occurs in the
+    middle of the sync during binlog setup of a Server, it opens the door to
+    errors in the sync. The contents of these tables are incomprehensible
+    without some kind of parsing and are thus not exposed to the MySQL Server.
+    They remain visible and accessible via the ndb_select_all tool.
+  */
   if (!ndb_get_table_names_in_schema(dict, schema_name, &ndb_tables_in_NDB)) {
     log_NDB_error(dict->getNdbError());
     ndb_log_error("Failed to get list of NDB tables in schema '%s' from NDB",

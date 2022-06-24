@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2020, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2021, Oracle and/or its affiliates.
 Copyright (c) 2012, Facebook Inc.
 
 This program is free software; you can redistribute it and/or modify it under
@@ -31,6 +31,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
  Created 1/8/1996 Heikki Tuuri
  ***********************************************************************/
 
+#include <atomic>
 #ifndef UNIV_HOTBACKUP
 #include <mysql_com.h>
 
@@ -55,7 +56,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 /** An interger randomly initialized at startup used to make a temporary
 table name as unuique as possible. */
-static ib_uint32_t dict_temp_file_num;
+static std::atomic<ib_uint32_t> dict_temp_file_num;
 
 /** Display an identifier.
 @param[in,out]	s	output stream
@@ -135,14 +136,14 @@ dict_v_col_t *dict_mem_table_add_v_col(dict_table_t *table, mem_heap_t *heap,
   v_col->num_base = num_base;
 
   /* Initialize the index list for virtual columns */
-  v_col->v_indexes = UT_NEW_NOKEY(dict_v_idx_list());
+  v_col->v_indexes = ut::new_withkey<dict_v_idx_list>(UT_NEW_THIS_FILE_PSI_KEY);
 
   v_col->m_col.is_visible = is_visible;
   return (v_col);
 }
 
 /** Adds a stored column definition to a table.
-@param[in]	table		table
+@param[in,out]	table		table
 @param[in]	num_base	number of base columns. */
 void dict_mem_table_add_s_col(dict_table_t *table, ulint num_base) {
   ulint i = table->n_def - 1;
@@ -152,7 +153,7 @@ void dict_mem_table_add_s_col(dict_table_t *table, ulint num_base) {
   ut_ad(col != nullptr);
 
   if (table->s_cols == nullptr) {
-    table->s_cols = UT_NEW_NOKEY(dict_s_col_list());
+    table->s_cols = ut::new_withkey<dict_s_col_list>(UT_NEW_THIS_FILE_PSI_KEY);
   }
 
   s_col.m_col = col;
@@ -306,14 +307,15 @@ static void dict_mem_table_col_rename_low(
   }
 }
 
-/** Renames a column of a table in the data dictionary cache. */
-void dict_mem_table_col_rename(dict_table_t *table, /*!< in/out: table */
-                               ulint nth_col,       /*!< in: column index */
-                               const char *from,    /*!< in: old column name */
-                               const char *to,      /*!< in: new column name */
-                               bool is_virtual)
-/*!< in: if this is a virtual column */
-{
+/** Renames a column of a table in the data dictionary cache.
+@param[in,out] table Table
+@param[in] nth_col Column index
+@param[in] from Old column name
+@param[in] to New column name
+@param[in] is_virtual If this is a virtual column */
+void dict_mem_table_col_rename(dict_table_t *table, ulint nth_col,
+                               const char *from, const char *to,
+                               bool is_virtual) {
   const char *s = is_virtual ? table->v_col_names : table->col_names;
 
   ut_ad((!is_virtual && nth_col < table->n_def) ||
@@ -421,7 +423,7 @@ static void dict_mem_fill_vcol_has_index(const dict_index_t *index,
 
       if (v_idx.index == index) {
         if (*v_cols == nullptr) {
-          *v_cols = UT_NEW_NOKEY(dict_vcol_set());
+          *v_cols = ut::new_withkey<dict_vcol_set>(UT_NEW_THIS_FILE_PSI_KEY);
         }
 
         (*v_cols)->insert(v_col);
@@ -477,7 +479,7 @@ static void dict_mem_fill_vcol_set_for_base_col(const char *col_name,
     for (ulint j = 0; j < v_col->num_base; j++) {
       if (strcmp(col_name, table->get_col_name(v_col->base_col[j]->ind)) == 0) {
         if (*v_cols == nullptr) {
-          *v_cols = UT_NEW_NOKEY(dict_vcol_set());
+          *v_cols = ut::new_withkey<dict_vcol_set>(UT_NEW_THIS_FILE_PSI_KEY);
         }
 
         (*v_cols)->insert(v_col);
@@ -535,7 +537,7 @@ void dict_mem_table_free_foreign_vcol_set(dict_table_t *table) {
     foreign = *it;
 
     if (foreign->v_cols != nullptr) {
-      UT_DELETE(foreign->v_cols);
+      ut::delete_(foreign->v_cols);
       foreign->v_cols = nullptr;
     }
   }
@@ -614,6 +616,34 @@ bool dict_index_t::is_usable(const trx_t *trx) const {
           trx->read_view->changes_visible(trx_id, table->name));
 }
 #endif /* !UNIV_HOTBACKUP */
+
+bool dict_index_t::is_tuple_instant_format(
+    const uint16_t n_fields_in_tuple) const {
+  ut_ad(n_fields_in_tuple <= n_fields);
+
+  if (!has_instant_cols()) {
+    return false;
+  }
+
+  /* For instant index, if the tuple comes from UPDATE, its fields could be less
+  than index definition */
+  if (n_fields_in_tuple < n_fields) {
+    /* If PK is not specified, DB_ROW_ID will be part of tuple */
+    uint16_t sys_fields_in_tuple = 0;
+    if (innobase_strcasecmp(name, innobase_index_reserve_name) == 0) {
+      sys_fields_in_tuple = table->get_n_sys_cols();
+    } else {
+      sys_fields_in_tuple = table->get_n_sys_cols() - 1;
+    }
+
+    uint16_t fields_in_tuple = n_fields_in_tuple - sys_fields_in_tuple;
+    if (fields_in_tuple == table->get_instant_cols()) {
+      return false;
+    }
+  }
+
+  return true;
+}
 
 /** Gets the column number the nth field in an index.
 @param[in] pos	position of the field
@@ -702,7 +732,7 @@ void dict_mem_index_free(dict_index_t *index) /*!< in: index */
 
     mutex_destroy(&index->rtr_ssn.mutex);
     mutex_destroy(&index->rtr_track->rtr_active_mutex);
-    UT_DELETE(index->rtr_track->rtr_active);
+    ut::delete_(index->rtr_track->rtr_active);
   }
   dict_index_remove_from_v_col_list(index);
 #endif /* !UNIV_HOTBACKUP */
@@ -734,14 +764,14 @@ char *dict_mem_create_temporary_tablename(mem_heap_t *heap, const char *dbtab,
   size_t dblen = dbend - dbtab + 1;
 
   /* Increment a randomly initialized  number for each temp file. */
-  os_atomic_increment_uint32(&dict_temp_file_num, 1);
+  auto file_num =
+      dict_temp_file_num.fetch_add(1, std::memory_order_relaxed) + 1;
 
   size = dblen + (sizeof(TEMP_FILE_PREFIX) + 3 + 20 + 1 + 10);
   name = static_cast<char *>(mem_heap_alloc(heap, size));
   memcpy(name, dbtab, dblen);
   snprintf(name + dblen, size - dblen,
-           TEMP_FILE_PREFIX_INNODB UINT64PF "-" UINT32PF, id,
-           dict_temp_file_num);
+           TEMP_FILE_PREFIX_INNODB UINT64PF "-" UINT32PF, id, file_num);
 
   return (name);
 }
@@ -752,11 +782,11 @@ void dict_mem_init(void) {
   ib_uint32_t now = static_cast<ib_uint32_t>(ut_time());
 
   const byte *buf = reinterpret_cast<const byte *>(&now);
+  auto file_num = ut_crc32(buf, sizeof(now));
+  dict_temp_file_num.store(file_num, std::memory_order_relaxed);
 
-  dict_temp_file_num = ut_crc32(buf, sizeof(now));
-
-  DBUG_PRINT("dict_mem_init", ("Starting Temporary file number is " UINT32PF,
-                               dict_temp_file_num));
+  DBUG_PRINT("dict_mem_init",
+             ("Starting Temporary file number is " UINT32PF, file_num));
 }
 
 /** Validate the search order in the foreign key set.

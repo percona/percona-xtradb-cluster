@@ -1,4 +1,4 @@
-# Copyright (c) 2015, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2015, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -27,23 +27,17 @@ SET(MYSQLX_PROJECT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 SET(MYSQLX_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 SET(MYSQLX_PLUGIN_NAME "mysqlx")
 
-# Protobuf 3 will generate #if PROTOBUF_INLINE_NOT_IN_HEADERS
-# which may fail with -Werror=undef
-ADD_DEFINITIONS(-DPROTOBUF_INLINE_NOT_IN_HEADERS=0)
 IF(WIN32)
   # Activate necessary dllexport/dllimport declarations.
   ADD_DEFINITIONS(-DPROTOBUF_USE_DLLS)
 ENDIF()
 
-# --yplg_out: protoc-gen-yplg: Plugin killed by signal 11.
-IF(SOLARIS_SPARC AND MY_COMPILER_IS_GNU AND
-    CMAKE_BUILD_TYPE_UPPER MATCHES "REL")
-  ADD_COMPILE_OPTIONS("-O0")
-ENDIF()
-
 ADD_DEFINITIONS(-DLOG_COMPONENT_TAG="mysqlx")
 
-INCLUDE(source_files.cmake)
+INCLUDE(src/source_files.cmake)
+FOREACH(FILE ${XPL_SRC})
+  LIST(APPEND XPLUGIN_SRC "src/${FILE}")
+ENDFOREACH()
 
 SET(XPLUGIN_LOG_PROTOBUF 1 CACHE STRING "Enable logging of protobuf messages")
 
@@ -85,25 +79,17 @@ INCLUDE_DIRECTORIES(
   ${MYSQLX_CLIENT_INCLUDE_DIR}
 )
 
-MY_INCLUDE_SYSTEM_DIRECTORIES(PROTOBUF)
 MY_INCLUDE_SYSTEM_DIRECTORIES(LIBEVENT)
 MY_INCLUDE_SYSTEM_DIRECTORIES(ICU)
 
-ADD_COMPILE_FLAGS(${xplugin_SRC}
+ADD_COMPILE_FLAGS(${XPLUGIN_SRC}
   COMPILE_FLAGS "${MYSQLX_PROTOCOL_FLAGS}"
 )
-
-# assertion failed in function assert_with_dumps() @ ssa.c:621 when using -xO3
-IF(MY_COMPILER_IS_SUNPRO)
-  ADD_COMPILE_FLAGS(${MYSQLX_PROJECT_DIR}/ngs/src/client.cc
-    COMPILE_FLAGS "-xO2"
-  )
-ENDIF()
 
 # MYSQL_ADD_PLUGIN may have disabled the plugin.
 IF(WITH_MYSQLX)
   MYSQL_ADD_PLUGIN(${MYSQLX_PLUGIN_NAME}
-    ${xplugin_SRC}
+    ${XPLUGIN_SRC}
     DEFAULT
     DEPENDENCIES xprotocol_tags
     LINK_LIBRARIES
@@ -136,10 +122,3 @@ IF(WIN32)
   ADD_DEFINITIONS(-DU_STATIC_IMPLEMENTATION)
 ENDIF()
 
-IF(WITH_MYSQLX)
-  MYSQL_ADD_COMPONENT("${MYSQLX_PLUGIN_NAME}_global_reset"
-    ${xplugin_global_reset_SRC}
-    MODULE_ONLY
-    TEST_ONLY
-    )
-ENDIF()

@@ -1,4 +1,6 @@
 var/run
 etc/mysql/conf.d
+etc/apparmor.d
+etc/apparmor.d/local
 var/lib/mysql-files
 

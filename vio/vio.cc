@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -87,16 +87,16 @@ void internal_vio_delete(Vio *vio);
   @retval 1       The requested I/O event has occurred.
 */
 
-static int no_io_wait(Vio *vio MY_ATTRIBUTE((unused)),
-                      enum enum_vio_io_event event MY_ATTRIBUTE((unused)),
-                      int timeout MY_ATTRIBUTE((unused))) {
+static int no_io_wait(Vio *vio [[maybe_unused]],
+                      enum enum_vio_io_event event [[maybe_unused]],
+                      int timeout [[maybe_unused]]) {
   return 1;
 }
 
 #endif
 
 extern "C" {
-static bool has_no_data(Vio *vio MY_ATTRIBUTE((unused))) { return false; }
+static bool has_no_data(Vio *vio [[maybe_unused]]) { return false; }
 }  // extern "C"
 
 Vio::Vio(uint flags) {
@@ -320,8 +320,8 @@ static bool vio_init(Vio *vio, enum enum_vio_type type, my_socket sd,
   DBUG_EXECUTE_IF("vio_init_returns_error", { return true; });
 
 #ifdef HAVE_KQUEUE
-  DBUG_ASSERT(type == VIO_TYPE_TCPIP || type == VIO_TYPE_SOCKET ||
-              type == VIO_TYPE_SSL);
+  assert(type == VIO_TYPE_TCPIP || type == VIO_TYPE_SOCKET ||
+         type == VIO_TYPE_SSL);
   vio->kq_fd = kqueue();
   if (vio->kq_fd == -1) {
     DBUG_PRINT("vio_init", ("kqueue failed with errno: %d", errno));
@@ -359,13 +359,13 @@ static bool vio_init(Vio *vio, enum enum_vio_type type, my_socket sd,
 */
 
 bool vio_reset(Vio *vio, enum enum_vio_type type, my_socket sd,
-               void *ssl MY_ATTRIBUTE((unused)), uint flags) {
+               void *ssl [[maybe_unused]], uint flags) {
   int ret = false;
   Vio new_vio(flags);
   DBUG_TRACE;
 
   /* The only supported rebind is from a socket-based transport type. */
-  DBUG_ASSERT(vio->type == VIO_TYPE_TCPIP || vio->type == VIO_TYPE_SOCKET);
+  assert(vio->type == VIO_TYPE_TCPIP || vio->type == VIO_TYPE_SOCKET);
 
   if (vio_init(&new_vio, type, sd, flags)) return true;
 

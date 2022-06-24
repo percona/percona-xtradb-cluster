@@ -30,29 +30,30 @@ class Wsrep_high_priority_service : public wsrep::high_priority_service,
                                     public wsrep::high_priority_context {
  public:
   Wsrep_high_priority_service(THD *);
-  ~Wsrep_high_priority_service();
-  int start_transaction(const wsrep::ws_handle &, const wsrep::ws_meta &);
-  const wsrep::transaction &transaction() const;
-  int adopt_transaction(const wsrep::transaction &);
-  int apply_write_set(const wsrep::ws_meta &, const wsrep::const_buffer &,
-                      wsrep::mutable_buffer &) = 0;
+  ~Wsrep_high_priority_service() override;
+  int start_transaction(const wsrep::ws_handle &, const wsrep::ws_meta &) override;
+  const wsrep::transaction &transaction() const override;
+  int adopt_transaction(const wsrep::transaction &) override;
   int append_fragment_and_commit(const wsrep::ws_handle &,
                                  const wsrep::ws_meta &,
-                                 const wsrep::const_buffer &);
-  int remove_fragments(const wsrep::ws_meta &);
-  int commit(const wsrep::ws_handle &, const wsrep::ws_meta &);
-  int rollback(const wsrep::ws_handle &, const wsrep::ws_meta &);
+                                 const wsrep::const_buffer& data,
+                                 const wsrep::xid& xid) override;
+  int remove_fragments(const wsrep::ws_meta &) override;
+  int commit(const wsrep::ws_handle &, const wsrep::ws_meta &) override;
+  int rollback(const wsrep::ws_handle &, const wsrep::ws_meta &) override;
   int apply_toi(const wsrep::ws_meta &, const wsrep::const_buffer &,
-                wsrep::mutable_buffer &);
-  void store_globals();
-  void reset_globals();
-  void switch_execution_context(wsrep::high_priority_service &);
+                wsrep::mutable_buffer &) override;
+  void store_globals() override;
+  void reset_globals() override;
+  void switch_execution_context(wsrep::high_priority_service &) override;
   int log_dummy_write_set(const wsrep::ws_handle &, const wsrep::ws_meta &,
-                          wsrep::mutable_buffer &);
-  void adopt_apply_error(wsrep::mutable_buffer &);
+                          wsrep::mutable_buffer &) override;
+  void adopt_apply_error(wsrep::mutable_buffer &) override;
 
   virtual bool check_exit_status() const = 0;
-  void debug_crash(const char *);
+  void debug_crash(const char *) override;
+
+  int next_fragment(const wsrep::ws_meta&) override;
 
  protected:
   friend Wsrep_server_service;
@@ -76,28 +77,36 @@ class Wsrep_high_priority_service : public wsrep::high_priority_service,
 class Wsrep_applier_service : public Wsrep_high_priority_service {
  public:
   Wsrep_applier_service(THD *);
-  ~Wsrep_applier_service();
+  ~Wsrep_applier_service() override;
   int apply_write_set(const wsrep::ws_meta &, const wsrep::const_buffer &,
-                      wsrep::mutable_buffer &);
-  void after_apply();
-  bool is_replaying() const { return false; }
-  bool check_exit_status() const;
+                      wsrep::mutable_buffer &) override;
+  int apply_nbo_begin(const wsrep::ws_meta&, const wsrep::const_buffer& data,
+                      wsrep::mutable_buffer& err) override;
+  void after_apply() override;
+  bool is_replaying() const  override{ return false; }
+  bool check_exit_status() const override;
 };
 
 class Wsrep_replayer_service : public Wsrep_high_priority_service {
  public:
   Wsrep_replayer_service(THD *replayer_thd, THD *orig_thd);
-  ~Wsrep_replayer_service();
+  ~Wsrep_replayer_service() override;
   int apply_write_set(const wsrep::ws_meta &, const wsrep::const_buffer &,
-                      wsrep::mutable_buffer &);
-  void after_apply() {}
-  bool is_replaying() const { return true; }
+                      wsrep::mutable_buffer &) override;
+  int apply_nbo_begin(const wsrep::ws_meta&, const wsrep::const_buffer&,
+                      wsrep::mutable_buffer&) override
+  {
+    assert(0); /* DDL should never cause replaying */
+    return 0;
+  }
+  void after_apply() override {}
+  bool is_replaying() const override { return true; }
   void replay_status(enum wsrep::provider::status status) {
     m_replay_status = status;
   }
   enum wsrep::provider::status replay_status() const { return m_replay_status; }
   /* Replayer should never be forced to exit */
-  bool check_exit_status() const { return false; }
+  bool check_exit_status() const override { return false; }
 
  private:
   THD *m_orig_thd;

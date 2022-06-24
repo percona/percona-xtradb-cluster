@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -56,8 +56,6 @@ Applier_module::Applier_module()
       applier_aborted(false),
       applier_error(0),
       suspended(false),
-      waiting_for_applier_suspension(false),
-      shared_stop_write_lock(nullptr),
       incoming(nullptr),
       pipeline(nullptr),
       stop_wait_timeout(LONG_TIMEOUT),
@@ -93,8 +91,7 @@ Applier_module::~Applier_module() {
 int Applier_module::setup_applier_module(Handler_pipeline_type pipeline_type,
                                          bool reset_logs, ulong stop_timeout,
                                          rpl_sidno group_sidno,
-                                         ulonglong gtid_assignment_block_size,
-                                         Shared_writelock *shared_stop_lock) {
+                                         ulonglong gtid_assignment_block_size) {
   DBUG_TRACE;
 
   int error = 0;
@@ -113,8 +110,6 @@ int Applier_module::setup_applier_module(Handler_pipeline_type pipeline_type,
   reset_applier_logs = reset_logs;
   group_replication_sidno = group_sidno;
   this->gtid_assignment_block_size = gtid_assignment_block_size;
-
-  shared_stop_write_lock = shared_stop_lock;
 
   return error;
 }
@@ -201,6 +196,15 @@ void Applier_module::set_applier_thread_context() {
     in the process list.
   */
   thd->system_thread = SYSTEM_THREAD_SLAVE_IO;
+
+#ifdef HAVE_PSI_THREAD_INTERFACE
+  {
+    // Attach thread instrumentation
+    struct PSI_thread *psi = PSI_THREAD_CALL(get_thread)();
+    thd->set_psi(psi);
+  }
+#endif /* HAVE_PSI_THREAD_INTERFACE */
+
   // Make the thread have a better description on process list
   thd->set_query(STRING_WITH_LEN("Group replication applier module"));
   thd->set_query_for_display(
@@ -213,7 +217,7 @@ void Applier_module::set_applier_thread_context() {
 
   DBUG_EXECUTE_IF("group_replication_applier_thread_init_wait", {
     const char act[] = "now wait_for signal.gr_applier_init_signal";
-    DBUG_ASSERT(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
+    assert(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
   });
 
   applier_thd = thd;
@@ -307,11 +311,13 @@ int Applier_module::apply_view_change_packet(
                         "prepared transactions",
                         view_change_packet->view_id.c_str()));
     transaction_consistency_manager->schedule_view_change_event(pevent);
-    return error;
+    pevent->set_delayed_view_change_waiting_for_consistent_transactions();
   }
 
   error = inject_event_into_pipeline(pevent, cont);
-  if (!cont->is_transaction_discarded()) delete pevent;
+  if (!cont->is_transaction_discarded() &&
+      !pevent->is_delayed_view_change_waiting_for_consistent_transactions())
+    delete pevent;
 
   return error;
 }
@@ -325,7 +331,7 @@ int Applier_module::apply_data_packet(Data_packet *data_packet,
 
   DBUG_EXECUTE_IF("group_replication_before_apply_data_packet", {
     const char act[] = "now wait_for continue_apply";
-    DBUG_ASSERT(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
+    assert(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
   });
 
   while ((payload != payload_end) && !error) {
@@ -369,7 +375,7 @@ int Applier_module::apply_single_primary_action_packet(
       certifier->disable_conflict_detection();
       break;
     default:
-      DBUG_ASSERT(0); /* purecov: inspected */
+      assert(0); /* purecov: inspected */
   }
 
   return error;
@@ -452,6 +458,19 @@ int Applier_module::applier_thread_handle() {
   applier_error += pipeline->handle_action(thd_conf_action);
   delete thd_conf_action;
 
+  // Update thread instrumentation
+#ifdef HAVE_PSI_THREAD_INTERFACE
+  {
+    struct PSI_thread *psi = applier_thd->get_psi();
+    PSI_THREAD_CALL(set_thread_id)(psi, applier_thd->thread_id());
+    PSI_THREAD_CALL(set_thread_THD)(psi, applier_thd);
+    PSI_THREAD_CALL(set_thread_command)(applier_thd->get_command());
+    // Restore Info field
+    PSI_THREAD_CALL(set_thread_info)
+    (STRING_WITH_LEN("Group replication applier module"));
+  }
+#endif
+
   // applier main loop
   while (!applier_error && !packet_application_error && !loop_termination) {
     if (is_applier_thread_aborted()) break;
@@ -494,13 +513,31 @@ int Applier_module::applier_thread_handle() {
         packet_application_error = apply_leaving_members_action_packet(
             static_cast<Leaving_members_action_packet *>(packet));
         this->incoming->pop();
+        /**
+         @ref group_replication_wait_for_current_events_execution_fail
+         Member leave has been received. Primary change has started in
+         separate thread. Primary change will go to error and try to suspend
+         the applier by adding suspension packet. But we want to kill the
+         applier via shutdown before suspension packet is processed. So block
+         here till SHUTDOWN forwards the KILL signal.
+
+         @note If we do not block here, even if KILL is forwarded suspension
+         packet is processed and kill is seen post processing of suspend
+         packet, hence the DEBUG here
+        */
+        DBUG_EXECUTE_IF(
+            "group_replication_wait_for_current_events_execution_fail", {
+              while (!is_applier_thread_aborted()) my_sleep(1 * 1000 * 1000);
+            };);
+
         break;
       default:
-        DBUG_ASSERT(0); /* purecov: inspected */
+        assert(0); /* purecov: inspected */
     }
 
     delete packet;
   }
+
   if (packet_application_error) applier_error = packet_application_error;
   delete fde_evt;
   delete cont;
@@ -513,7 +550,9 @@ end:
       ->unregister_channel_observer(applier_channel_observer);
 
   // only try to leave if the applier managed to start
-  if (applier_error && applier_thd_state.is_running()) {
+  // or if the applier_thd was killed by the DBA.
+  if ((applier_error && applier_thd_state.is_running()) ||
+      applier_thd->killed) {
     const char *exit_state_action_abort_log_message =
         "Fatal error during execution on the Applier module of Group "
         "Replication.";
@@ -544,7 +583,7 @@ end:
 
   DBUG_EXECUTE_IF("applier_thd_timeout", {
     const char act[] = "now wait_for signal.applier_continue";
-    DBUG_ASSERT(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
+    assert(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
   });
 
   stage_handler.end_stage();
@@ -568,12 +607,22 @@ end:
     local_applier_error = applier_error;
 
   applier_killed_status = false;
+
+  // Detach thread instrumentation
+#ifdef HAVE_PSI_THREAD_INTERFACE
+  PSI_THREAD_CALL(set_thread_THD)(applier_thd->get_psi(), nullptr);
+#endif
+
   delete applier_thd;
+  applier_thd = nullptr;
+  my_thread_end();
   applier_thd_state.set_terminated();
   mysql_cond_broadcast(&run_cond);
+  mysql_mutex_lock(&suspend_lock);
+  mysql_cond_broadcast(&suspension_waiting_condition);
+  mysql_mutex_unlock(&suspend_lock);
   mysql_mutex_unlock(&run_lock);
 
-  my_thread_end();
   applier_thread_is_exiting = true;
   my_thread_exit(nullptr);
 
@@ -671,7 +720,7 @@ int Applier_module::terminate_applier_thread() {
     */
     struct timespec abstime;
     set_timespec(&abstime, (stop_wait_timeout == 1 ? 1 : 2));
-#ifndef DBUG_OFF
+#ifndef NDEBUG
     int error =
 #endif
         mysql_cond_timedwait(&run_cond, &run_lock, &abstime);
@@ -685,10 +734,10 @@ int Applier_module::terminate_applier_thread() {
       mysql_mutex_unlock(&run_lock);
       return 1;
     }
-    DBUG_ASSERT(error == ETIMEDOUT || error == 0);
+    assert(error == ETIMEDOUT || error == 0);
   }
 
-  DBUG_ASSERT(!applier_thd_state.is_running());
+  assert(!applier_thd_state.is_running());
 
 delete_pipeline:
 
@@ -750,13 +799,14 @@ int Applier_module::wait_for_applier_complete_suspension(
       we_are_waiting = true;
       wait();
   */
-  while (!suspended && !(*abort_flag) && !applier_aborted && !applier_error) {
+  while (!suspended && !(*abort_flag) && !is_applier_thread_aborted() &&
+         !applier_error) {
     mysql_cond_wait(&suspension_waiting_condition, &suspend_lock);
   }
 
   mysql_mutex_unlock(&suspend_lock);
 
-  if (applier_aborted || applier_error)
+  if (is_applier_thread_aborted() || applier_error)
     return APPLIER_THREAD_ABORTED; /* purecov: inspected */
 
   /**
@@ -919,7 +969,7 @@ int Applier_module::intersect_group_executed_sets(
     }
   }
 
-#if !defined(DBUG_OFF)
+#if !defined(NDEBUG)
   char *executed_set_string;
   output_set->to_string(&executed_set_string);
   DBUG_PRINT("info", ("View change GTID information: output_set: %s",

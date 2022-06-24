@@ -1,4 +1,4 @@
-/* Copyright (c) 2001, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2001, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -96,8 +96,8 @@ static const char *heap_start;
 extern char *__bss_start;
 #endif /* __linux */
 
-static inline bool ptr_sane(const char *p MY_ATTRIBUTE((unused)),
-                            const char *heap_end MY_ATTRIBUTE((unused))) {
+static inline bool ptr_sane(const char *p [[maybe_unused]],
+                            const char *heap_end [[maybe_unused]]) {
 #ifdef __linux__
   return p && p >= heap_start && p <= heap_end;
 #else
@@ -233,21 +233,7 @@ static bool my_demangle_symbol(char *line) {
     }
   }
   if (demangled) my_safe_printf_stderr("%s %s %s\n", line, demangled, end + 1);
-#elif defined(__SUNPRO_CC)  // Solaris has different formatting .....
-  char *begin = strchr(line, '\'');
-  char *end = begin ? strchr(begin, '+') : NULL;
-  if (begin && end) {
-    *begin++ = *end++ = '\0';
-    int status = 0;
-    demangled = my_demangle(begin, &status);
-    if (!demangled || status) {
-      demangled = NULL;
-      begin[-1] = ' ';
-      end[-1] = '+';
-    }
-  }
-  if (demangled) my_safe_printf_stderr("%s %s+%s\n", line, demangled, end);
-#else                       // !__APPLE__ and !__SUNPRO_CC
+#else  // !__APPLE__
   char *begin = strchr(line, '(');
   char *end = begin ? strchr(begin, '+') : nullptr;
 
@@ -451,13 +437,13 @@ static void get_symbol_path(char *path, size_t size) {
   HANDLE hSnap;
   char *envvar;
   char *p;
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   static char pdb_debug_dir[MAX_PATH + 7];
 #endif
 
   path[0] = '\0';
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   /*
     Add "debug" subdirectory of the application directory, sometimes PDB will
     placed here by installation.

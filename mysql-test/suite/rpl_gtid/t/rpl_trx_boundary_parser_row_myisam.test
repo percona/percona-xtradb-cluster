@@ -26,6 +26,7 @@
 
 --let $rpl_gtid_utils= 1
 --source include/have_binlog_format_row.inc
+--source include/not_rpl_gtid_only.inc
 --source include/master-slave.inc
 
 --echo # Using MyISAM storage engine
@@ -34,7 +35,7 @@
 
 #
 # As we are going to use GTID related checks for the IO thread after
-# a CHANGE MASTER, we will first reset both slave and master to avoid
+# a CHANGE REPLICATION SOURCE, we will first reset both slave and master to avoid
 # problems with the gtid related mtr includes.
 #
 --source include/rpl_connection_slave.inc
@@ -49,7 +50,7 @@ RESET MASTER;
 #
 --source include/rpl_connection_slave.inc
 --source include/stop_slave.inc
-CHANGE MASTER TO MASTER_AUTO_POSITION= 0;
+CHANGE REPLICATION SOURCE TO SOURCE_AUTO_POSITION= 0;
 --source include/start_slave.inc
 
 --echo # Using MyISAM storage engine without auto positioning
@@ -61,7 +62,7 @@ CHANGE MASTER TO MASTER_AUTO_POSITION= 0;
 #
 --source include/rpl_connection_slave.inc
 --source include/stop_slave.inc
-CHANGE MASTER TO MASTER_AUTO_POSITION= 1;
+CHANGE REPLICATION SOURCE TO SOURCE_AUTO_POSITION= 1;
 --source include/start_slave.inc
 
 --source include/rpl_end.inc

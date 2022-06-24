@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2008, 2020, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 2008, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -49,7 +49,7 @@ typedef unsigned long uint32;
 #error Neither int or long is of 4 bytes width
 #endif
 
-#if defined(WITH_INNODB_MEMCACHED) && !defined(DBUG_OFF)
+#if defined(WITH_INNODB_MEMCACHED) && !defined(NDEBUG)
 #define UNIV_MEMCACHED_SDI
 #endif
 
@@ -60,12 +60,6 @@ typedef uint32 space_id_t;
 
 typedef struct ib_sdi_key ib_sdi_key_t;
 typedef struct ib_sdi_vector ib_sdi_vector_t;
-
-#if defined(__GNUC__)
-#define UNIV_NO_IGNORE MY_ATTRIBUTE((warn_unused_result))
-#else
-#define UNIV_NO_IGNORE
-#endif /* __GNUC__ */
 
 /* See comment about ib_bool_t as to why the two macros are unsigned long. */
 /** The boolean value of "true" used internally within InnoDB */
@@ -849,13 +843,13 @@ ib_err_t ib_sdi_create(space_id_t tablespace_id);
 /** Drop SDI Index from tablespace. This should be used only when SDI
 is corrupted.
 @param[in]	tablespace_id	InnoDB tablespace id
-@return DB_SUCCESS if dropping of SDI indexes  is successful, else error */
+@return DB_SUCCESS if dropping of SDI indexes is successful, else error */
 ib_err_t ib_sdi_drop(space_id_t tablespace_id);
 
-/** Flush SDI in a tablespace. The pages of a SDI copy modified by the
+/** Flush SDI in a tablespace. The pages of a SDI Index modified by the
 transaction will be flushed to disk.
 @param[in]	space_id	tablespace id
-@return DB_SUCCESS always*/
+@return DB_SUCCESS always */
 ib_err_t ib_sdi_flush(space_id_t space_id);
 
 #ifdef UNIV_MEMCACHED_SDI
@@ -906,7 +900,7 @@ ib_err_t ib_memc_sdi_get_keys(ib_crsr_t crsr, const char *key, void *sdi,
 
 /** Check the table whether it contains virtual columns.
 @param[in]	crsr	InnoDB Cursor
-@return true if table contains virtual column else false. */
+@return true if the table contains virtual column else failure. */
 ib_bool_t ib_is_virtual_table(ib_crsr_t crsr);
 
 #ifdef UNIV_MEMCACHED_SDI

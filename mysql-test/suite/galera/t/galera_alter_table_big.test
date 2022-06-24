@@ -633,6 +633,10 @@ drop table t1;
 # Bug#27507: Wrong DATETIME value was allowed by ALTER TABLE in the
 #            NO_ZERO_DATE mode.
 #
+--disable_query_log
+set wsrep_replicate_myisam=on;
+--enable_query_log
+
 set sql_mode= default;
 create table t1(f1 int) engine=myisam;
 alter table t1 add column f2 datetime not null, add column f21 date not null;
@@ -648,6 +652,10 @@ alter table t1 add column f4 datetime not null default '2002-02-02',
   add column f41 date not null default '2002-02-02';
 select * from t1;
 drop table t1;
+
+--disable_query_log
+set wsrep_replicate_myisam=off;
+--enable_query_log
 
 #
 # Some additional tests for new, faster alter table.  Note that most of the
@@ -1510,15 +1518,11 @@ CREATE TABLE db (dummy int) ENGINE=memory;
 --error ER_UNSUPPORTED_ENGINE
 CREATE TABLE user (dummy int) ENGINE=memory;
 --error ER_UNSUPPORTED_ENGINE
-CREATE TABLE func (dummy int) ENGINE=csv;
---error ER_UNSUPPORTED_ENGINE
 CREATE TABLE servers (dummy int) ENGINE=merge;
 --error ER_UNSUPPORTED_ENGINE
 CREATE TABLE procs_priv (dummy int) ENGINE=memory;
 --error ER_UNSUPPORTED_ENGINE
 CREATE TABLE tables_priv (dummy int) ENGINE=heap;
---error ER_UNSUPPORTED_ENGINE
-CREATE TABLE columns_priv (dummy int) ENGINE=csv;
 --error ER_UNSUPPORTED_ENGINE
 CREATE TABLE time_zone (dummy int) ENGINE=merge;
 --error ER_UNSUPPORTED_ENGINE

@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2011, 2019, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2011, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -33,6 +33,7 @@ struct NDB_SHARE;
 class Ndb_cluster_connection;
 struct SHOW_VAR;
 struct SYS_VAR;
+struct Ndb_index_stat_proc;
 
 class Ndb_index_stat_thread : public Ndb_component {
   // Someone is waiting for stats
@@ -42,7 +43,7 @@ class Ndb_index_stat_thread : public Ndb_component {
 
  public:
   Ndb_index_stat_thread();
-  virtual ~Ndb_index_stat_thread();
+  ~Ndb_index_stat_thread() override;
 
   /*
     protect stats entry lists where needed
@@ -55,26 +56,26 @@ class Ndb_index_stat_thread : public Ndb_component {
   void wakeup();
 
   /* are we setup */
-  bool is_setup_complete();
+  static bool is_setup_complete();
 
  private:
-  virtual int do_init();
-  virtual void do_run();
-  virtual int do_deinit();
+  int do_init() override;
+  void do_run() override;
+  int do_deinit() override;
   // Wakeup for stop
-  virtual void do_wakeup();
+  void do_wakeup() override;
 
-  int check_or_create_systables(struct Ndb_index_stat_proc &pr);
-  int check_or_create_sysevents(struct Ndb_index_stat_proc &pr);
-  void drop_ndb(struct Ndb_index_stat_proc &pr);
-  int start_listener(struct Ndb_index_stat_proc &pr);
-  int create_ndb(struct Ndb_index_stat_proc &pr,
-                 Ndb_cluster_connection *connection);
-  void stop_listener(struct Ndb_index_stat_proc &pr);
+  int check_or_create_systables(const Ndb_index_stat_proc &pr) const;
+  int check_or_create_sysevents(const Ndb_index_stat_proc &pr) const;
+  void drop_ndb(Ndb_index_stat_proc *const pr) const;
+  int start_listener(const Ndb_index_stat_proc &pr) const;
+  int create_ndb(Ndb_index_stat_proc *const pr,
+                 Ndb_cluster_connection *const connection) const;
+  void stop_listener(const Ndb_index_stat_proc &pr) const;
 };
 
 /* free entries from share or at end */
-void ndb_index_stat_free(NDB_SHARE *, int iudex_id, int index_version);
+void ndb_index_stat_free(NDB_SHARE *, int index_id, int index_version);
 void ndb_index_stat_free(NDB_SHARE *);
 void ndb_index_stat_end();
 

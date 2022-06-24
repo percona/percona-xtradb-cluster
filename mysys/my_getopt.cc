@@ -1,4 +1,4 @@
-/* Copyright (c) 2002, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2002, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -251,8 +251,8 @@ int my_handle_options(int *argc, char ***argv, const struct my_option *longopts,
   int opt_found;
 
   /* handle_options() assumes arg0 (program name) always exists */
-  DBUG_ASSERT(argc && *argc >= 1);
-  DBUG_ASSERT(argv && *argv);
+  assert(argc && *argc >= 1);
+  assert(argv && *argv);
   (*argc)--; /* Skip the program name */
   (*argv)++; /*      --- || ----      */
   init_variables(longopts, init_one_value);
@@ -395,7 +395,7 @@ int my_handle_options(int *argc, char ***argv, const struct my_option *longopts,
                 if ((opt_found = findopt(opt_str, length, &optp))) {
                   switch (i) {
                     case OPT_SKIP:
-                    case OPT_DISABLE: /* fall through */
+                    case OPT_DISABLE:
                       /*
                         double negation is actually enable again,
                         for example: --skip-option=0 -> option = true
@@ -597,10 +597,10 @@ int my_handle_options(int *argc, char ***argv, const struct my_option *longopts,
                 Hack the string "-XYZ" to make a "-YZ" substring in it,
                 and push that to the output as an unrecognized parameter.
               */
-              DBUG_ASSERT(optend > *pos);
-              DBUG_ASSERT(optend >= cur_arg);
-              DBUG_ASSERT(optend <= *pos + strlen(*pos));
-              DBUG_ASSERT(*optend);
+              assert(optend > *pos);
+              assert(optend >= cur_arg);
+              assert(optend <= *pos + strlen(*pos));
+              assert(*optend);
               optend--;
               optend[0] = '-'; /* replace 'X' or '-' by '-' */
               (*argv)[argvpos++] = optend;
@@ -1095,7 +1095,7 @@ ulonglong max_of_int_range(int var_type) {
     case GET_ULL:
       return ULLONG_MAX;
     default:
-      DBUG_ASSERT(0);
+      assert(0);
       return 0;
   }
 }
@@ -1353,7 +1353,7 @@ static void init_one_value(const struct my_option *option, void *variable,
 */
 
 static void fini_one_value(const struct my_option *option, void *variable,
-                           longlong value MY_ATTRIBUTE((unused))) {
+                           longlong value [[maybe_unused]]) {
   DBUG_TRACE;
   switch ((option->var_type & GET_TYPE_MASK)) {
     case GET_STR_ALLOC:
@@ -1554,7 +1554,7 @@ void my_print_variables_ex(const struct my_option *options, FILE *file) {
           break;
         case GET_STR:
         case GET_PASSWORD:
-        case GET_STR_ALLOC: /* fall through */
+        case GET_STR_ALLOC:
           fprintf(file, "%s\n",
                   *((char **)value) ? *((char **)value) : "(No default value)");
           break;

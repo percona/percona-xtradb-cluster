@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -54,7 +54,7 @@ struct Vio;
 
 /* Simple vio interface in C;  The functions are implemented in violite.c */
 
-#if !defined(_WIN32) && !defined(HAVE_KQUEUE) && !defined(__SUNPRO_CC)
+#if !defined(_WIN32) && !defined(HAVE_KQUEUE)
 #define USE_PPOLL_IN_VIO
 #endif
 
@@ -200,11 +200,11 @@ int vio_keepalive(MYSQL_VIO vio, bool onoff);
 bool vio_should_retry(MYSQL_VIO vio);
 /* Check that operation was timed out */
 bool vio_was_timeout(MYSQL_VIO vio);
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 /* Short text description of the socket for those, who are curious.. */
 #define VIO_DESCRIPTION_SIZE 30 /* size of description */
 void vio_description(MYSQL_VIO vio, char *buf);
-#endif  // DBUG_OFF
+#endif  // NDEBUG
 /* Return the type of the connection */
 enum enum_vio_type vio_type(const MYSQL_VIO vio);
 /* Return last error number */
@@ -216,7 +216,7 @@ bool vio_peer_addr(MYSQL_VIO vio, char *buf, uint16 *port, size_t buflen);
 /* Wait for an I/O event notification. */
 int vio_io_wait(MYSQL_VIO vio, enum enum_vio_io_event event, int timeout);
 bool vio_is_connected(MYSQL_VIO vio);
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 ssize_t vio_pending(MYSQL_VIO vio);
 #endif
 /* Set timeout for a network operation. */
@@ -298,6 +298,8 @@ long process_tls_version(const char *tls_version);
 int set_fips_mode(const uint fips_mode, char *err_string);
 
 uint get_fips_mode();
+
+int test_ssl_fips_mode(char *err_string);
 
 struct st_VioSSLFd *new_VioSSLAcceptorFd(
     const char *key_file, const char *cert_file, const char *ca_file,

@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2019, 2020, Oracle and/or its affiliates.
+  Copyright (c) 2019, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -25,8 +25,6 @@
 #include <thread>
 
 #ifdef RAPIDJSON_NO_SIZETYPEDEFINE
-// if we build within the server, it will set RAPIDJSON_NO_SIZETYPEDEFINE
-// globally and require to include my_rapidjson_size_t.h
 #include "my_rapidjson_size_t.h"
 #endif
 
@@ -66,8 +64,8 @@ TEST_P(RestOpenApiTest, ensure_openapi) {
   const std::string http_uri = GetParam().uri + GetParam().api_path;
 
   const std::string userfile = create_password_file();
-  const auto config_sections = get_restapi_config(
-      "rest_api", userfile, GetParam().request_authentication);
+  auto config_sections = get_restapi_config("rest_api", userfile,
+                                            GetParam().request_authentication);
 
   const std::string conf_file{create_config_file(
       conf_dir_.name(), mysql_harness::join(config_sections, "\n"))};
@@ -77,15 +75,15 @@ TEST_P(RestOpenApiTest, ensure_openapi) {
   RestClient rest_client(io_ctx, http_hostname, http_port_,
                          GetParam().user_name, GetParam().user_password);
 
-  std::string wait_for_uri =
-      (GetParam().status_code == HttpStatusCode::NotFound)
-          ? std::string(rest_api_basepath) + "/swagger.json"
-          : http_uri;
+  //  std::string wait_for_uri =
+  //      (GetParam().status_code == HttpStatusCode::NotFound)
+  //          ? std::string(rest_api_basepath) + "/swagger.json"
+  //          : http_uri;
 
-  SCOPED_TRACE("// wait for REST endpoint: " + http_uri);
-  ASSERT_TRUE(wait_for_rest_endpoint_ready(
-      wait_for_uri, http_port_, GetParam().user_name, GetParam().user_password,
-      http_hostname));
+  //  SCOPED_TRACE("// wait for REST endpoint: " + http_uri);
+  //  ASSERT_TRUE(wait_for_rest_endpoint_ready(
+  //      wait_for_uri, http_port_, GetParam().user_name,
+  //      GetParam().user_password, http_hostname));
 
   // walk all the bits
   for (HttpMethod::pos_type ndx = 0; ndx < HttpMethod::Pos::_LAST; ++ndx) {
@@ -101,7 +99,7 @@ TEST_P(RestOpenApiTest, ensure_openapi) {
                                            GetParam().expected_content_type));
 
       for (const auto &kv : GetParam().value_checks) {
-        validate_value(json_doc, kv.first, kv.second);
+        ASSERT_NO_FATAL_FAILURE(validate_value(json_doc, kv.first, kv.second));
       }
     }
   }
@@ -293,7 +291,7 @@ static const RestApiTestParams rest_api_invalid_methods_params[]{
      kRestApiUsername,
      kRestApiPassword,
      /*request_authentication =*/true,
-     RestApiComponentTest::kProblemJsonMethodNotAllowed,
+     RestApiComponentTest::get_json_method_not_allowed_verifiers(),
      {}},
 };
 
@@ -320,7 +318,7 @@ static const RestApiTestParams rest_api_invalid_methods_no_auth_params[]{
      /*username =*/"",
      /*password =*/"",
      /*request_authentication =*/false,
-     RestApiComponentTest::kProblemJsonMethodNotAllowed,
+     RestApiComponentTest::get_json_method_not_allowed_verifiers(),
      {}},
 };
 
@@ -346,11 +344,10 @@ TEST_F(RestOpenApiTest, invalid_realm) {
 
   const std::string conf_file{create_config_file(
       conf_dir_.name(), mysql_harness::join(config_sections, "\n"))};
-  auto &router = launch_router({"-c", conf_file}, EXIT_FAILURE);
+  auto &router =
+      launch_router({"-c", conf_file}, EXIT_FAILURE, true, false, -1s);
 
-  const auto wait_for_process_exit_timeout{10000ms};
-
-  check_exit_code(router, EXIT_FAILURE, wait_for_process_exit_timeout);
+  check_exit_code(router, EXIT_FAILURE, 10000ms);
 
   const std::string router_output = router.get_full_logfile();
   EXPECT_THAT(router_output, ::testing::HasSubstr(
@@ -369,14 +366,15 @@ TEST_F(RestOpenApiTest, duplicated_rest_api_section) {
       get_restapi_config("rest_api", userfile, /*request_authentication=*/true);
 
   // force [rest_api] twice in the config
-  config_sections.push_back(ConfigBuilder::build_section("rest_api", {}));
+  config_sections.push_back(
+      mysql_harness::ConfigBuilder::build_section("rest_api", {}));
 
   const std::string conf_file{create_config_file(
       conf_dir_.name(), mysql_harness::join(config_sections, "\n"))};
-  auto &router = launch_router({"-c", conf_file}, EXIT_FAILURE);
+  auto &router =
+      launch_router({"-c", conf_file}, EXIT_FAILURE, true, false, -1s);
 
-  const auto wait_for_process_exit_timeout{10000ms};
-  check_exit_code(router, EXIT_FAILURE, wait_for_process_exit_timeout);
+  check_exit_code(router, EXIT_FAILURE, 10000ms);
 
   const std::string router_output = router.get_full_output();
   EXPECT_THAT(
@@ -397,10 +395,10 @@ TEST_F(RestOpenApiTest, rest_api_section_key) {
 
   const std::string conf_file{create_config_file(
       conf_dir_.name(), mysql_harness::join(config_sections, "\n"))};
-  auto &router = launch_router({"-c", conf_file}, EXIT_FAILURE);
+  auto &router =
+      launch_router({"-c", conf_file}, EXIT_FAILURE, true, false, -1s);
 
-  const auto wait_for_process_exit_timeout{10000ms};
-  check_exit_code(router, EXIT_FAILURE, wait_for_process_exit_timeout);
+  check_exit_code(router, EXIT_FAILURE, 10000ms);
 
   const std::string router_output = router.get_full_logfile();
   EXPECT_THAT(

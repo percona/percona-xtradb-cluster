@@ -344,9 +344,11 @@ EXPLAIN SELECT j, COUNT(*) FROM t GROUP BY j WITH ROLLUP;
 # either '9223372036854775807.000' or '9223372036854775807' could be the name of the group
 # These issues are resolved by removing trailing zeros from decimals and replacing -0 with 0.
 # This also replaces .000010 with 010 and .000001 with 001 [because \s is not supported].
+--skip_if_hypergraph  # Different warnings.
 --replace_regex /1\.0e\-1/0.1/ /1\.0e\-2/0.01/ /0\.010/0.01/ /\.000// /\.0// /0\.100/0.1/ /\-0/0/ /3\.130/3.13/ /3\.140/3.14/ /3\.150/3.15/ /9\.223372036854776e18/9223372036854776000/
 SELECT j, COUNT(*) FROM t GROUP BY j ORDER BY j;
 
+--skip_if_hypergraph  # Different warnings.
 --replace_regex /1\.0e\-1/0.1/ /1\.0e\-2/0.01/ /0\.010/0.01/ /\.000// /\.0// /0\.100/0.1/ /\-0/0/ /3\.130/3.13/ /3\.140/3.14/ /3\.150/3.15/ /9\.223372036854776e18/9223372036854776000/
 SELECT JSON_EXTRACT(j, '$') AS je, COUNT(*) FROM t GROUP BY je ORDER BY je;
 
@@ -3048,7 +3050,6 @@ DROP TABLE t;
 --echo # JSON should work with INSERT .. ON DUPLICATE KEY UPDATE
 --echo #
 CREATE TABLE t(id INT PRIMARY KEY, j JSON);
---disable_ps_protocol # Different number of warnings until WL#6570.
 INSERT INTO t VALUES (1, '[1]')
 ON DUPLICATE KEY UPDATE j = JSON_OBJECT("a", VALUES(j));
 SELECT * FROM t;
@@ -3057,7 +3058,6 @@ ON DUPLICATE KEY UPDATE j = JSON_OBJECT("ab", VALUES(j));
 SELECT * FROM t;
 INSERT INTO t VALUES (1, '[1,2,3]')
 ON DUPLICATE KEY UPDATE j = JSON_OBJECT("abc", VALUES(j));
---enable_ps_protocol
 SELECT * FROM t;
 DROP TABLE t;
 
@@ -3477,6 +3477,8 @@ DROP TABLE t;
 --echo # Bug#22816576: ASSERTION FAILED: !THD->IS_ERROR() IN OPTIMIZE_COND()
 --echo #
 CREATE TABLE t(a DATE);
+INSERT INTO t VALUES ('1970-01-01');
+
 --error ER_INVALID_JSON_PATH
 SELECT 1 FROM t WHERE 1 <>
 (
@@ -3667,7 +3669,11 @@ let $query= UPDATE t SET j1 = JSON_SET(j1, '\$.a', 'x'),
 SET optimizer_trace="enabled=on";
 --eval $query
 SET optimizer_trace="enabled=off";
-SELECT trace FROM INFORMATION_SCHEMA.OPTIMIZER_TRACE;
+# View trace, but eliminating update_preparation block which is
+# not produced in -ps mode.
+let $show_trace=
+SELECT REGEXP_SUBSTR(TRACE, '"table".*', 1, 1, 'n') FROM INFORMATION_SCHEMA.OPTIMIZER_TRACE;
+eval $show_trace;
 --eval $dump_table
 let $query= UPDATE t SET j1 = JSON_SET(j1, '\$.a', 's'),
                          j2 = JSON_SET(j2, '\$.a', 'abcdefghi'),
@@ -3676,28 +3682,28 @@ let $query= UPDATE t SET j1 = JSON_SET(j1, '\$.a', 's'),
 SET optimizer_trace="enabled=on";
 --eval $query
 SET optimizer_trace="enabled=off";
-SELECT trace FROM INFORMATION_SCHEMA.OPTIMIZER_TRACE;
+eval $show_trace;
 --eval $dump_table
 --let $query= UPDATE t SET j1 = JSON_SET(j1, '\$.x.y.z', 'abc', '\$.b', 'X')
 --eval EXPLAIN FORMAT=JSON $query
 SET optimizer_trace="enabled=on";
 --eval $query
 SET optimizer_trace="enabled=off";
-SELECT trace FROM INFORMATION_SCHEMA.OPTIMIZER_TRACE;
+eval $show_trace;
 --eval $dump_table
 --let $query= UPDATE t SET j1 = JSON_REPLACE(j1, '\$.x', 'abc', '\$.b', 'Y')
 --eval EXPLAIN FORMAT=JSON $query
 SET optimizer_trace="enabled=on";
 --eval $query
 SET optimizer_trace="enabled=off";
-SELECT trace FROM INFORMATION_SCHEMA.OPTIMIZER_TRACE;
+eval $show_trace;
 --eval $dump_table
 --let $query= UPDATE t SET j1 = JSON_SET(j1, '\$.x', 'abc', '\$.b', 'Z')
 --eval EXPLAIN FORMAT=JSON $query
 SET optimizer_trace="enabled=on";
 --eval $query
 SET optimizer_trace="enabled=off";
-SELECT trace FROM INFORMATION_SCHEMA.OPTIMIZER_TRACE;
+eval $show_trace;
 --eval $dump_table
 # No partial update here since input column is different from target column.
 --let $query= UPDATE t SET j1 = JSON_SET(j2, '\$.a', 'ABC')
@@ -3705,7 +3711,7 @@ SELECT trace FROM INFORMATION_SCHEMA.OPTIMIZER_TRACE;
 SET optimizer_trace="enabled=on";
 --eval $query
 SET optimizer_trace="enabled=off";
-SELECT trace FROM INFORMATION_SCHEMA.OPTIMIZER_TRACE;
+eval $show_trace;
 --eval $dump_table
 # No partial update here since JSON_ARRAY doesn't support partial update.
 --let $query= UPDATE t SET j1 = JSON_ARRAY(j1, j1)
@@ -3713,7 +3719,7 @@ SELECT trace FROM INFORMATION_SCHEMA.OPTIMIZER_TRACE;
 SET optimizer_trace="enabled=on";
 --eval $query
 SET optimizer_trace="enabled=off";
-SELECT trace FROM INFORMATION_SCHEMA.OPTIMIZER_TRACE;
+eval $show_trace;
 --eval $dump_table
 # No partial update of j1, but j2 should be partially updated.
 let $query= UPDATE t SET j1 = JSON_SET(j2, '\$.a', 1),
@@ -3722,7 +3728,7 @@ let $query= UPDATE t SET j1 = JSON_SET(j2, '\$.a', 1),
 SET optimizer_trace="enabled=on";
 --eval $query
 SET optimizer_trace="enabled=off";
-SELECT trace FROM INFORMATION_SCHEMA.OPTIMIZER_TRACE;
+eval $show_trace;
 --eval $dump_table
 DROP TABLE t;
 
@@ -4140,6 +4146,43 @@ CREATE TABLE t(a DATETIME);
 INSERT INTO t VALUES ('2019-01-13 00:00:00');
 SELECT 1 IN (SELECT 1 FROM t WHERE JSON_OBJECT('a', 'b') = a);
 DROP TABLE t;
+
+--echo #
+--echo # Bug#25840784: PARTIAL UPDATE ON VIEWS DOES NOT WORK AS EXPECTED ON BASE TABLES
+--echo #
+CREATE TABLE t1(id INT PRIMARY KEY, j JSON);
+CREATE VIEW v1 AS SELECT id, j, JSON_REMOVE(j, '$.b') jj FROM t1;
+INSERT INTO t1 VALUES
+(1, '{"a": "abcdefghijklmnopqrstuvwxyz", "b":"abcdef"}'),
+(2, '{"a": "abcdefghijklmnopqrstuvwxyz"}'),
+(3, '{"b":"abcdef"}');
+UPDATE v1 SET j = JSON_SET(j, '$.a', 'abcdefghijklm');
+SELECT j, JSON_STORAGE_SIZE(j), JSON_STORAGE_FREE(j) FROM v1 ORDER BY id;
+UPDATE v1 SET j = JSON_SET(jj, '$.a', 'abcdefg');
+SELECT j, JSON_STORAGE_SIZE(j), JSON_STORAGE_FREE(j) FROM v1 ORDER BY id;
+UPDATE v1 SET j = JSON_REMOVE(j, '$.a');
+SELECT j, JSON_STORAGE_SIZE(j), JSON_STORAGE_FREE(j) FROM v1 ORDER BY id;
+DROP TABLE t1;
+DROP VIEW v1;
+
+--echo #
+--echo # Bug#32248705: PUTTING A MISSING ROW INTO JSON_OBJECT CAUSES
+--echo #               JSON_EXTRACT TO FAIL
+--echo #
+
+CREATE TABLE t1(x VARCHAR(1));
+CREATE TABLE t2(y VARCHAR(1));
+INSERT INTO t1 VALUES ('a');
+# These statements used to return zero rows because the left joins were
+# incorrectly transformed to inner joins. Expect one row.
+SELECT * FROM t1 LEFT JOIN t2 ON x=y WHERE JSON_ARRAY(y) <> 3;
+SELECT * FROM t1 LEFT JOIN t2 ON x=y WHERE JSON_OBJECT('y', y) <> 3;
+SELECT * FROM t1 LEFT JOIN t2 ON x=y WHERE JSON_ARRAY_APPEND('[]', '$', y) <> 3;
+SELECT * FROM t1 LEFT JOIN t2 ON x=y WHERE JSON_INSERT('{}', '$.a', y) <> 3;
+SELECT * FROM t1 LEFT JOIN t2 ON x=y WHERE JSON_ARRAY_INSERT('[]', '$[0]', y) <> 3;
+SELECT * FROM t1 LEFT JOIN t2 ON x=y WHERE JSON_SET('{}', '$.a', y) <> 3;
+SELECT * FROM t1 LEFT JOIN t2 ON x=y WHERE JSON_REPLACE('{}', '$.a', y) <> 3;
+DROP TABLE t1, t2;
 
 # Local Variables:
 # mode: sql

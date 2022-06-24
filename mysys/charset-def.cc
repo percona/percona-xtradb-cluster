@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -253,7 +253,7 @@ extern CHARSET_INFO my_charset_utf8mb4_0900_bin;
 
 extern CHARSET_INFO my_charset_gb18030_unicode_520_ci;
 
-bool init_compiled_charsets(myf flags MY_ATTRIBUTE((unused))) {
+bool init_compiled_charsets(myf flags [[maybe_unused]]) {
   CHARSET_INFO *cs;
 
   add_compiled_collation(&my_charset_bin);

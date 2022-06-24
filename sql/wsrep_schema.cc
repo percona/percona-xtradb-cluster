@@ -17,6 +17,7 @@
 #include "key.h"
 #include "my_sys.h"
 #include "mysql/components/services/log_builtins.h"
+#include "sql/raii/sentry.h"  // raii::Sentry
 #include "sql/sql_lex.h"
 #include "sql_base.h"
 #include "sql_parse.h"
@@ -29,7 +30,6 @@
 #include "wsrep_binlog.h"
 #include "wsrep_high_priority_service.h"
 #include "wsrep_schema.h"
-#include "wsrep_storage_service.h"
 #include "wsrep_thd.h"
 #include "wsrep_xid.h"
 
@@ -109,6 +109,7 @@ class binlog_off {
         m_option_bits(thd->variables.option_bits),
         m_sql_log_bin(thd->variables.sql_log_bin) {
     thd->variables.option_bits &= ~OPTION_BIN_LOG;
+    thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
     thd->variables.sql_log_bin = 0;
   }
   ~binlog_off() {
@@ -169,7 +170,7 @@ static int execute_SQL(THD *thd, const char *sql, uint length) {
     thd->set_query(sql, length);
     thd->set_query_id(next_query_id());
 
-    mysql_parse(thd, &parser_state, false);
+    dispatch_sql_command(thd, &parser_state, false);
 
     if (thd->is_error()) {
       WSREP_WARN("Wsrep_schema::execute_sql() failed, %d %s\nSQL: %s",
@@ -848,7 +849,7 @@ int Wsrep_schema::update_fragment_meta(THD *thd,
   WSREP_DEBUG("update_frag_seqno(%u) %s, %llu, seqno %lld", thd->thread_id(),
               os.str().c_str(), ws_meta.transaction_id().get(),
               ws_meta.seqno().get());
-  DBUG_ASSERT(ws_meta.seqno().is_undefined() == false);
+  assert(ws_meta.seqno().is_undefined() == false);
 
   Wsrep_schema_impl::binlog_off binlog_off(thd);
   int error;
@@ -908,9 +909,9 @@ static int remove_fragment(THD *thd, TABLE *frag_table,
   uchar key[MAX_KEY_LENGTH];
   key_part_map key_map = 0;
 
-  DBUG_ASSERT(server_id.is_undefined() == false);
-  DBUG_ASSERT(transaction_id.is_undefined() == false);
-  DBUG_ASSERT(seqno.is_undefined() == false);
+  assert(server_id.is_undefined() == false);
+  assert(transaction_id.is_undefined() == false);
+  assert(seqno.is_undefined() == false);
 
   /*
     Remove record with the given uuid, trx id, and seqno.
@@ -1005,7 +1006,7 @@ int Wsrep_schema::replay_transaction(
     THD *orig_thd, Relay_log_info *rli, const wsrep::ws_meta &ws_meta,
     const std::vector<wsrep::seqno> &fragments) {
   DBUG_ENTER("Wsrep_schema::replay_transaction");
-  DBUG_ASSERT(!fragments.empty());
+  assert(!fragments.empty());
 
   THD thd;
   thd.set_new_thread_id();
@@ -1015,6 +1016,20 @@ int Wsrep_schema::replay_transaction(
   Wsrep_schema_impl::wsrep_off wsrep_off(&thd);
   Wsrep_schema_impl::binlog_off binlog_off(&thd);
   Wsrep_schema_impl::thd_context_switch thd_context_switch(orig_thd, &thd);
+
+  /*
+    It is expected that both creation and destruction of trx object in InnoDB
+    should be done by the same thread except for the case of BF abort by a HP
+    trx (See call to TrxInInnoDB::enter() from innobase_close_connection()).
+    So, any trx object opened by the THD object must be destroyed before the
+    current_thd is updated.
+
+    As current_thd is updated in the destructor of
+    `Wsrep_schema_impl::thd_context_switch`, we delegate this cleanup task to a
+    Sentry object.
+  */
+  raii::Sentry<> thd_release_resources_guard{
+      [&thd]() { thd.release_resources(); }};
 
   int ret = 1;
   int error;
@@ -1112,12 +1127,25 @@ int Wsrep_schema::recover_sr_transactions(THD *orig_thd) {
 
   TABLE *frag_table = 0;
   TABLE *cluster_table = 0;
-  Wsrep_storage_service storage_service(&storage_thd);
   Wsrep_schema_impl::binlog_off binlog_off(&storage_thd);
   Wsrep_schema_impl::wsrep_off wsrep_off(&storage_thd);
   Wsrep_schema_impl::thd_context_switch thd_context_switch(orig_thd,
                                                            &storage_thd);
   Wsrep_server_state &server_state(Wsrep_server_state::instance());
+
+  /*
+    It is expected that both creation and destruction of trx object in InnoDB
+    should be done by the same thread except for the case of BF abort by a HP
+    trx (See call to TrxInInnoDB::enter() from innobase_close_connection()).
+    So, any trx object opened by the THD object must be destroyed before the
+    current_thd is updated.
+
+    As current_thd is updated in the destructor of
+    `Wsrep_schema_impl::thd_context_switch`, we delegate this cleanup task to a
+    Sentry object.
+  */
+  raii::Sentry<> thd_release_resources_guard{
+      [&storage_thd]() { storage_thd.release_resources(); }};
 
   int ret = 1;
   int error;
@@ -1201,7 +1229,7 @@ int Wsrep_schema::recover_sr_transactions(THD *orig_thd) {
       wsrep::high_priority_service *applier;
       if (!(applier = server_state.find_streaming_applier(server_id,
                                                           transaction_id))) {
-        DBUG_ASSERT(wsrep::starts_transaction(flags));
+        assert(wsrep::starts_transaction(flags));
         applier = wsrep_create_streaming_applier(&storage_thd, "recovery");
         server_state.start_streaming_applier(server_id, transaction_id,
                                              applier);
@@ -1210,12 +1238,13 @@ int Wsrep_schema::recover_sr_transactions(THD *orig_thd) {
       }
       applier->store_globals();
       wsrep::mutable_buffer unused;
-      if((ret= applier->apply_write_set(ws_meta, data, unused)) != 0) {
+      if ((ret = applier->apply_write_set(ws_meta, data, unused)) != 0) {
         WSREP_ERROR("SR trx recovery applying returned %d", ret);
       } else {
         applier->after_apply();
       }
-      storage_service.store_globals();
+      applier->reset_globals();
+      wsrep_store_threadvars(&storage_thd);
     } else if (error == HA_ERR_END_OF_FILE) {
       ret = 0;
     } else {

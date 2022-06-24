@@ -1,5 +1,5 @@
 #!/bin/sh
-config=/etc/default/garbd
+config=/etc/default/garb
 if [ -x "/etc/init.d/garbd" ]; then
   if grep -q -E '^# REMOVE' $config; then
     echo  "Garbd config $config is not configured yet"

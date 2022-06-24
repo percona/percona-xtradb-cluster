@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1994, 2019, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1994, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -231,7 +231,7 @@ char *ut_format_name(const char *name, char *formatted, ulint formatted_size) {
   switch (formatted_size) {
     case 1:
       formatted[0] = '\0';
-      /* FALL-THROUGH */
+      [[fallthrough]];
     case 0:
       return (formatted);
   }
@@ -254,10 +254,10 @@ char *ut_format_name(const char *name, char *formatted, ulint formatted_size) {
   return (formatted);
 }
 
-/** Catenate files. */
-void ut_copy_file(FILE *dest, /*!< in: output file */
-                  FILE *src)  /*!< in: input file to be appended to output */
-{
+/** Catenate files.
+@param[in] dest Output file
+@param[in] src Input file to be appended to output */
+void ut_copy_file(FILE *dest, FILE *src) {
   long len = ftell(src);
   char buf[4096];
 
@@ -330,8 +330,6 @@ The returned string is static and should not be freed or modified.
 @return string, describing the error */
 const char *ut_strerr(dberr_t num) {
   switch (num) {
-    case DB_CACHE_RECORDS:
-      return ("Request caller to copy tuple");
     case DB_SUCCESS:
       return ("Success");
     case DB_SUCCESS_LOCKED_REC:
@@ -519,7 +517,14 @@ const char *ut_strerr(dberr_t num) {
       return ("Sample reader has been requested to stop sampling");
     case DB_OUT_OF_RESOURCES:
       return ("System has run out of resources");
-
+    case DB_FTS_TOO_MANY_NESTED_EXP:
+      return ("Too many nested sub-expressions in a full-text search");
+    case DB_PAGE_IS_STALE:
+      return "Page was discarded, was not written to storage.";
+    case DB_AUTOINC_READ_ERROR:
+      return "Auto-increment read failed";
+    case DB_FILE_READ_BEYOND_SIZE:
+      return "File read failure because of the read being beyond file size.";
     case DB_ERROR_UNSET:;
       /* Fall through. */
 
@@ -547,15 +552,30 @@ void logger::log_event(std::string msg) {
 }
 logger::~logger() { log_event(m_oss.str()); }
 
+/*
+MSVS complains: Warning C4722: destructor never returns, potential memory leak.
+But, the whole point of using ib::fatal temporary object is to cause an abort.
+*/
+#ifdef _WIN32
+#pragma warning(push)
+#pragma warning(disable : 4722)
+#endif /* _WIN32 */
+
 fatal::~fatal() {
   log_event("[FATAL] " + m_oss.str());
-  ut_error;
+  ut_dbg_assertion_failed("ib::fatal triggered", m_location.filename,
+                          m_location.line);
 }
+// Restore the MSVS checks for Warning C4722, silenced for ib::fatal::~fatal().
+#ifdef _WIN32
+#pragma warning(pop)
+#endif /* _WIN32 */
 
 fatal_or_error::~fatal_or_error() {
   if (m_fatal) {
     log_event("[FATAL] " + m_oss.str());
-    ut_error;
+    ut_dbg_assertion_failed("ib::fatal_or_error triggered", m_location.filename,
+                            m_location.line);
   }
 }
 

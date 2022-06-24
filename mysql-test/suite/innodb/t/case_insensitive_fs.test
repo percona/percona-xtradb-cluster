@@ -8,6 +8,7 @@
 --disable_query_log
 LET $MYSQLD_DATADIR=`select @@datadir`;
 LET $MYSQLD_DATADIR_UC=../DATA;
+LET $MYSQL_TMP_DIR=`SELECT REGEXP_REPLACE('$MYSQLD_DATADIR', '/data/', '')`;
 LET $KNOWN_DIR_LC=$MYSQL_TMP_DIR/known_dir;
 LET $KNOWN_DIR_UC=$MYSQL_TMP_DIR/KNOWN_DIR;
 LET $KNOWN_DIR_MC=$MYSQL_TMP_DIR/Known_Dir;
@@ -84,4 +85,9 @@ DROP TABLE t3;
 DROP TABLESPACE ts1;
 DROP TABLESPACE ts2;
 DROP TABLESPACE ts3;
+
+let $restart_parameters = restart:;
+--source include/restart_mysqld_no_echo.inc
+--rmdir $KNOWN_DIR_LC/test
+--rmdir $KNOWN_DIR_LC
 

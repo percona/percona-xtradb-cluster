@@ -52,7 +52,7 @@ int wsrep_is_wsrep_xid(const void *xid_ptr) {
 }
 
 const unsigned char *wsrep_xid_uuid(const xid_t *xid) {
-  DBUG_ASSERT(xid);
+  assert(xid);
   static wsrep::id const undefined;
   if (wsrep_is_wsrep_xid(xid))
     return reinterpret_cast<const unsigned char *>(xid->get_data() +
@@ -62,7 +62,7 @@ const unsigned char *wsrep_xid_uuid(const xid_t *xid) {
 }
 
 const wsrep::id &wsrep_xid_uuid(const XID &xid) {
-  DBUG_ASSERT(sizeof(wsrep::id) == sizeof(wsrep_uuid_t));
+  assert(sizeof(wsrep::id) == sizeof(wsrep_uuid_t));
   return *reinterpret_cast<const wsrep::id *>(wsrep_xid_uuid(&xid));
 }
 
@@ -138,7 +138,7 @@ static bool get_SE_checkpoint(THD *, plugin_ref plugin, void *arg) {
                 (long long)wsrep_xid_seqno(xid));
     DBUG_EXECUTE_IF("stop_after_reading_xid", {
       const char action[] = "now SIGNAL read_xid WAIT_FOR go_ahead";
-      DBUG_ASSERT(!debug_sync_set_action(current_thd, STRING_WITH_LEN(action)));
+      assert(!debug_sync_set_action(current_thd, STRING_WITH_LEN(action)));
     };);
   }
 

@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, 2020, Oracle and/or its affiliates.
+/* Copyright (c) 2017, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -33,7 +33,7 @@
 #include "my_dbug.h"
 #include "my_inttypes.h"
 #include "sql/query_options.h"
-#include "sql/rpl_slave_commit_order_manager.h"  // has_commit_order_manager
+#include "sql/rpl_replica_commit_order_manager.h"  // has_commit_order_manager
 #include "sql/sql_alter.h"
 #include "sql/sql_class.h"
 #include "sql/sql_lex.h"  // thd->lex
@@ -60,8 +60,8 @@ class Disable_autocommit_guard {
         We can't disable auto-commit if there is ongoing transaction as this
         might easily break statement/session transaction invariants.
       */
-      DBUG_ASSERT(m_thd->get_transaction()->is_empty(Transaction_ctx::STMT) &&
-                  m_thd->get_transaction()->is_empty(Transaction_ctx::SESSION));
+      assert(m_thd->get_transaction()->is_empty(Transaction_ctx::STMT) &&
+             m_thd->get_transaction()->is_empty(Transaction_ctx::SESSION));
 
       m_thd->variables.option_bits &= ~OPTION_AUTOCOMMIT;
       m_thd->variables.option_bits |= OPTION_NOT_AUTOCOMMIT;
@@ -75,11 +75,10 @@ class Disable_autocommit_guard {
         time when we enable auto-commit mode back OR there must be a
         transactional DDL being executed.
       */
-      DBUG_ASSERT(
-          ((m_thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
-            m_thd->lex->create_info->m_transactional_ddl) ||
-           (m_thd->get_transaction()->is_empty(Transaction_ctx::STMT) &&
-            m_thd->get_transaction()->is_empty(Transaction_ctx::SESSION))));
+      assert(((m_thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
+               m_thd->lex->create_info->m_transactional_ddl) ||
+              (m_thd->get_transaction()->is_empty(Transaction_ctx::STMT) &&
+               m_thd->get_transaction()->is_empty(Transaction_ctx::SESSION))));
       m_thd->variables.option_bits = m_save_option_bits;
     }
   }
@@ -177,8 +176,11 @@ class Disable_binlog_guard {
   explicit Disable_binlog_guard(THD *thd, bool turn_off_wsrep = false)
       : m_thd(thd),
         m_wsrep_on(thd->variables.wsrep_on),
+        m_binlog_internal_off_at_entry(thd->variables.option_bits &
+                                       OPTION_BIN_LOG_INTERNAL_OFF),
         m_binlog_disabled(thd->variables.option_bits & OPTION_BIN_LOG) {
     thd->variables.option_bits &= ~OPTION_BIN_LOG;
+    thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
     if (turn_off_wsrep) {
       thd->variables.wsrep_on = false;
     }
@@ -194,6 +196,9 @@ class Disable_binlog_guard {
   ~Disable_binlog_guard() {
     if (m_binlog_disabled) m_thd->variables.option_bits |= OPTION_BIN_LOG;
 #ifdef WITH_WSREP
+    if (!m_binlog_internal_off_at_entry) {
+      m_thd->variables.option_bits &= ~OPTION_BIN_LOG_INTERNAL_OFF;
+    }
     m_thd->variables.wsrep_on = m_wsrep_on;
 #endif /* WITH_WSREP */
   }
@@ -202,6 +207,7 @@ class Disable_binlog_guard {
   THD *const m_thd;
 #ifdef WITH_WSREP
   const bool m_wsrep_on;
+  const bool m_binlog_internal_off_at_entry;
 #endif /* WITH_WSREP */
   const bool m_binlog_disabled;
 };
@@ -245,7 +251,7 @@ class Save_and_Restore_binlog_format_state {
   }
 
   ~Save_and_Restore_binlog_format_state() {
-    DBUG_ASSERT(!m_thd->is_current_stmt_binlog_format_row());
+    assert(!m_thd->is_current_stmt_binlog_format_row());
     m_thd->variables.binlog_format = m_global_binlog_format;
     if (m_current_stmt_binlog_format == BINLOG_FORMAT_ROW)
       m_thd->set_current_stmt_binlog_format_row();
@@ -394,6 +400,28 @@ class Prepared_stmt_arena_holder {
 };
 
 /**
+  RAII class for pushed LEX object.
+*/
+class Pushed_lex_guard {
+ public:
+  Pushed_lex_guard(THD *thd, LEX *new_lex) : m_thd(thd), m_old_lex(thd->lex) {
+    thd->lex = new_lex;
+    lex_start(thd);
+  }
+  ~Pushed_lex_guard() {
+    // Clean up this statement context and restore the old one:
+    m_thd->lex->cleanup(m_thd, true);
+    lex_end(m_thd->lex);
+
+    m_thd->lex = m_old_lex;
+  }
+
+ private:
+  THD *const m_thd;
+  LEX *m_old_lex;
+};
+
+/**
   RAII class for column privilege checking
 */
 class Column_privilege_tracker {
@@ -431,6 +459,26 @@ class Enable_derived_merge_guard {
  private:
   THD *const m_thd{nullptr};
   bool m_derived_merge{false};
+  ulonglong m_save_optimizer_switch{0};
+};
+
+/**
+  RAII class to temporarily disable OPTIMIZER_SWITCH_USE_INDEX_EXTENSIONS
+  optimizer_switch for replication applier threads.
+*/
+class Disable_index_extensions_switch_guard {
+ public:
+  explicit Disable_index_extensions_switch_guard(THD *thd) : m_thd(thd) {
+    m_save_optimizer_switch = m_thd->variables.optimizer_switch;
+    m_thd->variables.optimizer_switch &= ~OPTIMIZER_SWITCH_USE_INDEX_EXTENSIONS;
+  }
+
+  ~Disable_index_extensions_switch_guard() {
+    m_thd->variables.optimizer_switch = m_save_optimizer_switch;
+  }
+
+ private:
+  THD *const m_thd{nullptr};
   ulonglong m_save_optimizer_switch{0};
 };
 

@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2015, 2020, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2015, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -40,7 +40,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 namespace lob {
 
 /** A BLOB field reference has all the bits set to zero, except the "being
- * modified" bit. */
+modified" bit. */
 const byte field_ref_almost_zero[FIELD_REF_SIZE] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x20, 0, 0, 0, 0, 0, 0, 0,
 };
@@ -92,7 +92,7 @@ log file. */
 void BtrContext::check_redolog_bulk() {
   ut_ad(is_bulk());
 
-  FlushObserver *observer = m_mtr->get_flush_observer();
+  Flush_observer *observer = m_mtr->get_flush_observer();
 
   rec_block_fix();
 
@@ -110,11 +110,11 @@ void BtrContext::check_redolog_bulk() {
 }
 
 /** Check if there is enough space in log file. Commit and re-start the
-mini transaction. */
+mini-transaction. */
 void BtrContext::check_redolog_normal() {
   ut_ad(!is_bulk());
 
-  FlushObserver *observer = m_mtr->get_flush_observer();
+  Flush_observer *observer = m_mtr->get_flush_observer();
   store_position();
 
   commit_btr_mtr();
@@ -131,36 +131,6 @@ void BtrContext::check_redolog_normal() {
 
   restore_position();
 
-  ut_ad(validate());
-}
-
-void BtrContext::restart_mtr_normal() {
-  ut_ad(!is_bulk());
-  FlushObserver *observer = m_mtr->get_flush_observer();
-
-  if (m_pcur != nullptr) {
-    store_position();
-  }
-
-  commit_btr_mtr();
-  start_btr_mtr();
-  m_mtr->set_flush_observer(observer);
-
-  if (m_pcur != nullptr) {
-    restore_position();
-  }
-
-  ut_ad(m_pcur == nullptr || validate());
-}
-
-void BtrContext::restart_mtr_bulk() {
-  ut_ad(is_bulk());
-  FlushObserver *observer = m_mtr->get_flush_observer();
-  rec_block_fix();
-  commit_btr_mtr();
-  start_btr_mtr();
-  m_mtr->set_flush_observer(observer);
-  rec_block_unfix();
   ut_ad(validate());
 }
 
@@ -244,15 +214,15 @@ dberr_t zReader::fetch() {
         if (m_rctx.m_page_no == FIL_NULL) {
           goto end_of_blob;
         }
-      /* fall through */
+        [[fallthrough]];
       default:
         err = DB_FAIL;
         ib::error(ER_IB_MSG_630)
             << "inflate() of compressed BLOB page "
             << page_id_t(m_rctx.m_space_id, curr_page_no) << " returned "
             << zlib_err << " (" << m_stream.msg << ")";
-        /* fall through */
         ut_error;
+        [[fallthrough]];
       case Z_BUF_ERROR:
         goto end_of_blob;
     }
@@ -455,7 +425,7 @@ dberr_t btr_store_big_rec_extern_fields(trx_t *trx, btr_pcur_t *pcur,
   ut_ad(btr_mtr);
   ut_ad(mtr_memo_contains_flagged(btr_mtr, dict_index_get_lock(index),
                                   MTR_MEMO_X_LOCK | MTR_MEMO_SX_LOCK) ||
-        index->table->is_intrinsic());
+        index->table->is_intrinsic() || !index->is_committed());
   ut_ad(
       mtr_is_block_fix(btr_mtr, rec_block, MTR_MEMO_PAGE_X_FIX, index->table));
   ut_ad(buf_block_get_frame(rec_block) == page_align(rec));
@@ -664,12 +634,15 @@ dberr_t btr_store_big_rec_extern_fields(trx_t *trx, btr_pcur_t *pcur,
 }
 
 /** Copies an externally stored field of a record to mem heap.
+@param[in]	trx		the current transaction.
+@param[in]	index		the clustered index
 @param[in]	rec		record in a clustered index; must be
                                 protected by a lock or a page latch
 @param[in]	offsets		array returned by rec_get_offsets()
 @param[in]	page_size	BLOB page size
 @param[in]	no		field number
-@param[out]	len		length of the field */
+@param[out]	len		length of the field
+@param[out]	lob_version	version of lob that has been copied */
 #ifdef UNIV_DEBUG
 /**
 @param[in]	is_sdi		true for SDI Indexes */
@@ -707,11 +680,9 @@ byte *btr_rec_copy_externally_stored_field_func(
 
   ut_a(local_len >= BTR_EXTERN_FIELD_REF_SIZE);
 
-#ifdef UNIV_DEBUG
   /* Verify if the LOB reference is sane. */
-  space_id_t space_id = ref.space_id();
+  ut_d(space_id_t space_id = ref.space_id());
   ut_ad(space_id == 0 || space_id == index->space);
-#endif /* UNIV_DEBUG */
 
   if (ref.is_null()) {
     /* The externally stored field was not written yet.
@@ -763,7 +734,7 @@ static void btr_check_blob_fil_page_type(space_id_t space_id, page_no_t page_no,
       }
 #endif /* !UNIV_DEBUG */
 
-      ib::fatal(ER_IB_MSG_631)
+      ib::fatal(UT_LOCATION_HERE, ER_IB_MSG_631)
           << "FIL_PAGE_TYPE=" << type << " on BLOB "
           << (read ? "read" : "purge") << " space " << space_id << " page "
           << page_no << " flags " << flags;
@@ -837,6 +808,8 @@ ulint Reader::fetch() {
 
 /** Copies the prefix of an externally stored field of a record.
 The clustered index record must be protected by a lock or a page latch.
+@param[in]	trx		the current transaction object if available
+or nullptr.
 @param[in]	index		the clust index in which lob is read.
 @param[out]	buf		the field, or a prefix of it
 @param[in]	len		length of buf, in bytes
@@ -932,32 +905,10 @@ ulint btr_copy_externally_stored_field_prefix_func(trx_t *trx,
   return (local_len + fetch_len);
 }
 
-/** Copies an externally stored field of a record to mem heap.
-The clustered index record must be protected by a lock or a page latch.
-@param[in]	trx		the current trx object or nullptr
-@param[in]	index		the clust index in which lob is read.
-@param[out]	len		length of the whole field
-@param[out]	lob_version	LOB version number.
-@param[in]	data		'internally' stored part of the field
-                                containing also the reference to the external
-                                part; must be protected by a lock or a page
-                                latch.
-@param[in]	page_size	BLOB page size
-@param[in]	local_len	length of data */
-#ifdef UNIV_DEBUG
-/**
-@param[in]	is_sdi		true for SDI Indexes */
-#endif /* UNIV_DEBUG */
-/**
-@param[in,out]	heap		mem heap
-@return the whole field copied to heap */
 byte *btr_copy_externally_stored_field_func(
     trx_t *trx, const dict_index_t *index, ulint *len, size_t *lob_version,
     const byte *data, const page_size_t &page_size, ulint local_len,
-#ifdef UNIV_DEBUG
-    bool is_sdi,
-#endif /* UNIV_DEBUG */
-    mem_heap_t *heap) {
+    IF_DEBUG(bool is_sdi, ) mem_heap_t *heap) {
   uint32_t extern_len;
   byte *buf;
 
@@ -977,12 +928,7 @@ byte *btr_copy_externally_stored_field_func(
   buf = (byte *)mem_heap_alloc(heap, local_len + extern_len);
 
   ReadContext rctx(page_size, data, local_len + BTR_EXTERN_FIELD_REF_SIZE,
-                   buf + local_len, extern_len
-#ifdef UNIV_DEBUG
-                   ,
-                   is_sdi
-#endif /* UNIV_DEBUG */
-  );
+                   buf + local_len, extern_len IF_DEBUG(, is_sdi));
 
   rctx.m_index = (dict_index_t *)index;
 
@@ -1066,7 +1012,10 @@ void BtrContext::free_updated_extern_fields(trx_id_t trx_id, undo_no_t undo_no,
   for (i = 0; i < n_fields; i++) {
     const upd_field_t *ufield = upd_get_nth_field(update, i);
 
-    if (rec_offs_nth_extern(m_offsets, ufield->field_no)) {
+    /* No need to free the column if it is a virtual column as it does not
+    consume any storage. */
+    if (!ufield->is_virtual() &&
+        rec_offs_nth_extern(m_offsets, ufield->field_no)) {
       ulint len;
       byte *data = rec_get_nth_field(m_rec, m_offsets, ufield->field_no, &len);
       ut_a(len >= BTR_EXTERN_FIELD_REF_SIZE);
@@ -1074,7 +1023,9 @@ void BtrContext::free_updated_extern_fields(trx_id_t trx_id, undo_no_t undo_no,
       byte *field_ref = data + len - BTR_EXTERN_FIELD_REF_SIZE;
 
       DeleteContext ctx(*this, field_ref, ufield->field_no, rollback);
-      lob::purge(&ctx, m_index, trx_id, undo_no, 0, ufield);
+
+      /* Last argument is nullptr because this is rollback. */
+      lob::purge(&ctx, m_index, trx_id, undo_no, 0, ufield, nullptr);
       if (need_recalc()) {
         recalc();
       }
@@ -1083,11 +1034,11 @@ void BtrContext::free_updated_extern_fields(trx_id_t trx_id, undo_no_t undo_no,
 }
 
 /** Deallocate a buffer block that was reserved for a BLOB part.
-@param[in]	index	index
-@param[in]	block	buffer block
-@param[in]	all	flag whether remove the compressed page
+@param[in]	index	Index
+@param[in]	block	Buffer block
+@param[in]	all	TRUE=remove also the compressed page
                         if there is one
-@param[in]	mtr	mini-transaction to commit */
+@param[in]	mtr	Mini-transaction to commit */
 void blob_free(dict_index_t *index, buf_block_t *block, bool all, mtr_t *mtr) {
   buf_pool_t *buf_pool = buf_pool_from_block(block);
   page_id_t page_id(block->page.id.space(), block->page.id.page_no());
@@ -1159,10 +1110,12 @@ ulint btr_rec_get_externally_stored_len(const rec_t *rec,
 @param[in]	undo_no		undo number within a transaction whose
                                 LOB is being freed.
 @param[in]	rollback	performing rollback?
-@param[in]	rec_type	undo record type.*/
+@param[in]	rec_type	undo record type.
+@param[in]	node        purge node or nullptr */
 void BtrContext::free_externally_stored_fields(trx_id_t trx_id,
                                                undo_no_t undo_no, bool rollback,
-                                               ulint rec_type) {
+                                               ulint rec_type,
+                                               purge_node_t *node) {
   ut_ad(rec_offs_validate());
   ut_ad(mtr_is_page_fix(m_mtr, m_rec, MTR_MEMO_PAGE_X_FIX, m_index->table));
   /* Assert that the cursor position and the record are matching. */
@@ -1179,7 +1132,7 @@ void BtrContext::free_externally_stored_fields(trx_id_t trx_id,
       DeleteContext ctx(*this, field_ref, i, rollback);
 
       upd_field_t *uf = nullptr;
-      lob::purge(&ctx, m_index, trx_id, undo_no, rec_type, uf);
+      lob::purge(&ctx, m_index, trx_id, undo_no, rec_type, uf, node);
       if (need_recalc()) {
         recalc();
       }
@@ -1230,10 +1183,10 @@ ulint ref_t::get_lob_page_info(const dict_index_t *index,
 
 /** Load the first page of the LOB and mark it as not partially
 updatable anymore.
-@param[in]	trx		the current transaction
-@param[in]	mtr		the mini transaction context.
-@param[in]	index		the index dictionary object.
-@param[in]	page_size	the page size information. */
+@param[in]  trx       Current transaction
+@param[in]  mtr       Mini-transaction context.
+@param[in]  index     Index dictionary object.
+@param[in]  page_size Page size information. */
 void ref_t::mark_not_partially_updatable(trx_t *trx, mtr_t *mtr,
                                          dict_index_t *index,
                                          const page_size_t &page_size) {
@@ -1312,8 +1265,8 @@ bool ref_t::check_space_id(dict_index_t *index) const {
 #endif /* UNIV_DEBUG */
 
 /** Acquire an x-latch on the index page containing the clustered
-index record, in the given mini transaction context.
-@param[in]	mtr	the mini-transaction context. */
+index record, in the given mini-transaction context.
+@param[in]  mtr  Mini-transaction context. */
 void DeleteContext::x_latch_rec_page(mtr_t *mtr) {
   bool found;
   page_t *rec_page = m_blobref.page_align();
@@ -1375,7 +1328,8 @@ bool rec_check_lobref_space_id(dict_index_t *index, const rec_t *rec,
 #endif /* UNIV_DEBUG */
 
 dberr_t mark_not_partially_updatable(trx_t *trx, dict_index_t *index,
-                                     const upd_t *update, mtr_t *mtr) {
+                                     const upd_t *update,
+                                     const mtr_t *btr_mtr) {
   if (!index->is_clustered()) {
     /* Only clustered index can have LOBs. */
     return (DB_SUCCESS);
@@ -1402,9 +1356,14 @@ dberr_t mark_not_partially_updatable(trx_t *trx, dict_index_t *index,
       ref_t ref(field_ref);
 
       if (!ref.is_null_relaxed()) {
+        mtr_t local_mtr;
         ut_ad(ref.space_id() == index->space_id());
-        ref.mark_not_partially_updatable(trx, mtr, index,
+
+        mtr_start(&local_mtr);
+        local_mtr.set_log_mode(btr_mtr->get_log_mode());
+        ref.mark_not_partially_updatable(trx, &local_mtr, index,
                                          index->get_page_size());
+        mtr_commit(&local_mtr);
       }
     }
   }

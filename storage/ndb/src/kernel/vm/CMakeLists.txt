@@ -1,4 +1,4 @@
-# Copyright (c) 2008, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2008, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -52,6 +52,12 @@ ADD_LIBRARY(ndbkernel STATIC
 #    WOPool.cpp
 #    RWPool.cpp
 
+# 'sbrk' is deprecated [-Wdeprecated-declarations]
+IF(APPLE)
+  ADD_COMPILE_FLAGS(ndbd_malloc_impl.cpp COMPILE_FLAGS
+    " -Wno-error=deprecated-declarations")
+ENDIF()
+
 ADD_LIBRARY(ndbsched STATIC
   FastScheduler.cpp
   LongSignal_nonmt.cpp
@@ -79,7 +85,8 @@ ADD_LIBRARY(ndbtest STATIC
   ../blocks/dbtup/tuppage.cpp
 )
 
-NDB_ADD_TEST(mt_thr_config-t mt_thr_config.cpp LIBS ndbgeneral)
+NDB_ADD_TEST(mt_thr_config-t mt_thr_config.cpp LIBS ndbgeneral ndbportlib)
+NDB_ADD_TEST(RefConvert-t RefConvert.cpp LIBS ndbgeneral ndbportlib)
 
 # ${ALL_UNIT_TEST_LIBS} may be listed twice in the linker command due
 # to inter-library dependencies

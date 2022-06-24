@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2013, 2019, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2013, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -45,7 +45,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 Currently this can be the system tablespace or a temporary table tablespace */
 class Tablespace {
  public:
-  typedef std::vector<Datafile, ut_allocator<Datafile>> files_t;
+  typedef std::vector<Datafile, ut::allocator<Datafile>> files_t;
 
   /** Data file information - each Datafile can be accessed globally */
   files_t m_files;
@@ -56,6 +56,7 @@ class Tablespace {
         m_space_id(SPACE_UNKNOWN),
         m_path(),
         m_flags(),
+        m_autoextend_size(),
         m_ignore_read_only(false) {
     /* No op */
   }
@@ -65,11 +66,11 @@ class Tablespace {
     ut_ad(m_files.empty());
     ut_ad(m_space_id == SPACE_UNKNOWN);
     if (m_name != nullptr) {
-      ut_free(m_name);
+      ut::free(m_name);
       m_name = nullptr;
     }
     if (m_path != nullptr) {
-      ut_free(m_path);
+      ut::free(m_path);
       m_path = nullptr;
     }
   }
@@ -155,7 +156,7 @@ class Tablespace {
   /** Open or Create the data files if they do not exist.
   @param[in]	is_temp	whether this is a temporary tablespace
   @return DB_SUCCESS or error code */
-  dberr_t open_or_create(bool is_temp) MY_ATTRIBUTE((warn_unused_result));
+  [[nodiscard]] dberr_t open_or_create(bool is_temp);
 
   /** Delete all the data files. */
   void delete_files();
@@ -182,6 +183,12 @@ class Tablespace {
     return (&m_files.front());
   }
 
+  /* Set the autoextend size for the tablespace */
+  void set_autoextend_size(uint64_t size) { m_autoextend_size = size; }
+
+  /* Get the autoextend size for the tablespace */
+  uint64_t get_autoextend_size() const { return m_autoextend_size; }
+
   /** @return true if tablespace is encrypted */
   bool is_encrypted() const noexcept {
     return (FSP_FLAGS_GET_ENCRYPTION(m_flags));
@@ -194,7 +201,7 @@ class Tablespace {
   bool find(const char *filename);
 
   /** Note that the data file was found.
-  @param[in]	file	data file object */
+  @param[in,out] file	Data file object to set */
   void file_found(Datafile &file);
 
   /* DATA MEMBERS */
@@ -210,6 +217,9 @@ class Tablespace {
 
   /** Tablespace flags */
   uint32_t m_flags;
+
+  /** Autoextend size */
+  uint64_t m_autoextend_size;
 
  protected:
   /** Ignore server read only configuration for this tablespace. */

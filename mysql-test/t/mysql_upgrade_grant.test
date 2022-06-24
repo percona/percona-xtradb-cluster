@@ -363,6 +363,8 @@ GRANT SUPER ON *.* TO u1;
 --echo # mysql server without support for XA_RECOVER_ADMIN.
 REVOKE XA_RECOVER_ADMIN ON *.* FROM root@localhost;
 REVOKE XA_RECOVER_ADMIN ON *.* FROM `mysql.session`@localhost;
+REVOKE XA_RECOVER_ADMIN ON *.* FROM `mysql.pxc.internal.session`@localhost;
+REVOKE XA_RECOVER_ADMIN ON *.* FROM `mysql.pxc.sst.role`@localhost;
 
 --echo # We show here that the users root@localhost and u1 have the privilege
 --echo # SUPER and don't have the privilege XA_RECOVER_ADMIN
@@ -394,6 +396,8 @@ SHOW GRANTS FOR u1;
 --echo # mysql.session@localhost
 REVOKE XA_RECOVER_ADMIN ON *.* FROM u1;
 REVOKE XA_RECOVER_ADMIN ON *.* FROM `mysql.session`@localhost;
+REVOKE XA_RECOVER_ADMIN ON *.* FROM `mysql.pxc.internal.session`@localhost;
+REVOKE XA_RECOVER_ADMIN ON *.* FROM `mysql.pxc.sst.role`@localhost;
 
 --echo # Start upgrade
 
@@ -425,6 +429,10 @@ REVOKE BACKUP_ADMIN ON *.* FROM root@localhost;
 REVOKE XA_RECOVER_ADMIN ON *.* FROM root@localhost;
 REVOKE BACKUP_ADMIN ON *.* FROM `mysql.session`@localhost;
 REVOKE XA_RECOVER_ADMIN ON *.* FROM `mysql.session`@localhost;
+REVOKE BACKUP_ADMIN ON *.* FROM `mysql.pxc.internal.session`@localhost;
+REVOKE XA_RECOVER_ADMIN ON *.* FROM `mysql.pxc.internal.session`@localhost;
+REVOKE BACKUP_ADMIN ON *.* FROM `mysql.pxc.sst.role`@localhost;
+REVOKE XA_RECOVER_ADMIN ON *.* FROM `mysql.pxc.sst.role`@localhost;
 CREATE USER u1;
 CREATE USER u2;
 
@@ -455,6 +463,7 @@ DROP USER u2;
 # Revoke privilege XA_RECOVER_ADMIN from the user mysql.session@localhost in order to
 # match contol checksum for mysql.global_grants
 REVOKE XA_RECOVER_ADMIN ON *.* FROM `mysql.session`@localhost;
+REVOKE XA_RECOVER_ADMIN ON *.* FROM `mysql.pxc.internal.session`@localhost;
 
 --echo #
 --echo # Bug#26948662 - REMOVE SUPER_ACL CHECK IN RESOURCE GROUPS.
@@ -462,6 +471,7 @@ REVOKE XA_RECOVER_ADMIN ON *.* FROM `mysql.session`@localhost;
 
 REVOKE RESOURCE_GROUP_ADMIN ON *.* FROM root@localhost;
 REVOKE RESOURCE_GROUP_ADMIN ON *.* FROM `mysql.session`@localhost;
+REVOKE RESOURCE_GROUP_ADMIN ON *.* FROM `mysql.pxc.internal.session`@localhost;
 
 
 # Create a new user user1 and grant super privilege to user1.
@@ -486,6 +496,7 @@ DROP USER user1;
 # Revoke privilege RESOURCE_GROUP_ADMIN from the user mysql.session@localhost in order to
 # match contol checksum for mysql.global_grants
 REVOKE RESOURCE_GROUP_ADMIN ON *.* FROM `mysql.session`@localhost;
+REVOKE RESOURCE_GROUP_ADMIN ON *.* FROM `mysql.pxc.internal.session`@localhost;
 
 --echo #
 --echo # Tests for WL#12138
@@ -505,6 +516,7 @@ GRANT SUPER ON *.* TO u1;
 --echo # mysql server without support for SERVICE_CONNECTION_ADMIN.
 REVOKE SERVICE_CONNECTION_ADMIN ON *.* FROM root@localhost;
 REVOKE SERVICE_CONNECTION_ADMIN ON *.* FROM `mysql.session`@localhost;
+REVOKE SERVICE_CONNECTION_ADMIN ON *.* FROM `mysql.pxc.internal.session`@localhost;
 
 --echo # We show here that the users root@localhost and u1 have the privilege
 --echo # SUPER and don't have the privilege SERVICE_CONNECTION_ADMIN
@@ -534,6 +546,7 @@ SHOW GRANTS FOR u1;
 --echo # mysql.session@localhost
 REVOKE SERVICE_CONNECTION_ADMIN ON *.* FROM u1;
 REVOKE SERVICE_CONNECTION_ADMIN ON *.* FROM `mysql.session`@localhost;
+REVOKE SERVICE_CONNECTION_ADMIN ON *.* FROM `mysql.pxc.internal.session`@localhost;
 
 --echo # Start upgrade
 
@@ -574,6 +587,8 @@ GRANT SUPER ON *.* TO u1;
 --echo # mysql server without support for them.
 --eval REVOKE $privileges ON *.* FROM root@localhost;
 --eval REVOKE $privileges ON *.* FROM `mysql.session`@localhost;
+--eval REVOKE $privileges ON *.* FROM `mysql.pxc.internal.session`@localhost
+--eval REVOKE $privileges ON *.* FROM `mysql.pxc.sst.role`@localhost
 
 --echo # Show here that the users root@localhost and u1 have the privilege
 --echo # SUPER and don't have the @privileges
@@ -598,6 +613,8 @@ SHOW GRANTS FOR u1;
 --echo # Revoke the @privileges from the user u1 and mysql.session@localhost
 --eval REVOKE $privileges ON *.* FROM u1;
 --eval REVOKE $privileges ON *.* FROM `mysql.session`@localhost;
+--eval REVOKE $privileges ON *.* FROM `mysql.pxc.internal.session`@localhost
+--eval REVOKE $privileges ON *.* FROM `mysql.pxc.sst.role`@localhost
 
 --echo # Start upgrade
 
@@ -626,6 +643,7 @@ DROP USER u1;
 
 --echo # Revoke SHOW_ROUTINE from root user (since the upgrade scenario takes place only if no user had this privilege before)
 REVOKE SHOW_ROUTINE ON *.* FROM root@localhost;
+REVOKE SHOW_ROUTINE ON *.* FROM `mysql.pxc.internal.session`@localhost;
 
 --echo # Create new user
 CREATE USER sheldon;

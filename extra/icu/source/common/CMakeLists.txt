@@ -203,6 +203,15 @@ SET(ICU_COMMON_SOURCES
   wintz.cpp
 )
 
+IF(APPLE)
+  LIST(REMOVE_ITEM ICU_COMMON_SOURCES
+    cwchar.cpp
+    icuplug.cpp
+    restrace.cpp
+    wintz.cpp
+    )
+ENDIF()
+
 ADD_LIBRARY(icuuc STATIC ${ICU_COMMON_SOURCES})
 
 # uidna_toASCII_59 is marked as deprecated
@@ -210,6 +219,6 @@ IF(MY_COMPILER_IS_GNU_OR_CLANG)
   ADD_COMPILE_FLAGS(uidna.cpp COMPILE_FLAGS "-Wno-deprecated-declarations")
 ENDIF()
 
-IF(LINUX)
+IF(LINUX OR (SOLARIS AND MY_COMPILER_IS_GNU_OR_CLANG))
   TARGET_COMPILE_OPTIONS(icuuc PRIVATE ${ICU_LINUX_COMPILE_OPTIONS})
 ENDIF()

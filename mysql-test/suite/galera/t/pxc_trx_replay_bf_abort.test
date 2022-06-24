@@ -1,0 +1,148 @@
+--echo #
+--echo # PXC-3584 : Assertion failure: lock0lock.cc:6588:!(&trx->mutex)->is_owned()
+--echo #
+
+--echo # When does replaying of trx happen?
+--echo # 1. Two transactions that are not conflicting at certification level but
+--echo #    are conflicting at trx commit can lead to situation where one trx
+--echo #    can be replayed. (See below for example)
+--echo # 2. Trx is replayed only if Victim will have higher seqno than the trx
+--echo #    that initiated the abort
+--echo # 3. During the replay, before replay is initiated, if a new trx holds
+--echo #    locks that will be required by replayed trx, replayed trx will try
+--echo #    to BF Abort the new trx that is open and uncommitted
+
+--source suite/galera/include/galera_have_debug_sync.inc
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+--let $wsrep_local_replays_old = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 CHAR(1));
+INSERT INTO t1 VALUES (1, 'a');
+INSERT INTO t1 VALUES (2, 'a');
+
+--echo # This trx is used to acquire conflicting locks just before
+--echo # replaying of trx is started.
+--echo # Connection node_1b
+--connect node_1b, 127.0.0.1, root, , test, $NODE_MYPORT_1
+START TRANSACTION;
+
+--echo # Connection node_1
+--connection node_1
+START TRANSACTION;
+
+UPDATE t1 SET f2 = 'b' WHERE f1 = 1;
+SELECT * FROM t1 WHERE f1 = 2 FOR UPDATE;
+
+--echo # Block the applier on node1 and issue a conflicting update on node #2
+--echo # Trx from node2 is replicated and certified first. Will have lower global sequence
+--echo # number
+--echo # Connection node_1a
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+SET SESSION wsrep_sync_wait=0;
+--let $galera_sync_point = apply_monitor_slave_enter_sync
+--source include/galera_set_sync_point.inc
+
+--echo # Connection node_2
+--connection node_2
+UPDATE t1 SET f2 = 'c' WHERE f1 = 2;
+
+--echo # Connection node_1a
+--connection node_1a
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+--echo # Block the commit, send the COMMIT and wait until it gets blocked
+
+--let $galera_sync_point = commit_monitor_master_enter_sync
+--source include/galera_set_sync_point.inc
+
+--echo # Trx from Node 1 Will have higher sequence number and will be a victim because the trx
+--echo # from Node 2 is allowed to proceed first and it will try to BF-Abort
+--echo # the higher global seqno trx from node1 (certified but not committed yet)
+--echo # Connection node_1
+--connection node_1
+--send COMMIT
+
+--echo # Connection node_1a
+--connection node_1a
+
+--let $galera_sync_point = apply_monitor_slave_enter_sync commit_monitor_master_enter_sync
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+--echo # Let the conflicting UPDATE (from node 2) proceed and wait until it hits abort_trx_end.
+--echo # The victim transaction(node 1) still sits in commit_monitor_master_sync_point.
+
+--let $galera_sync_point = abort_trx_end
+--source include/galera_set_sync_point.inc
+--let $galera_sync_point = apply_monitor_slave_enter_sync
+--source include/galera_signal_sync_point.inc
+--let $galera_sync_point = abort_trx_end commit_monitor_master_enter_sync
+--source include/galera_wait_sync_point.inc
+
+--echo # Let the transactions proceed
+--source include/galera_clear_sync_point.inc
+
+--echo # Node 1 trx will be scheduled for replay and wait just before replaying of trx
+--let $galera_sync_point = start_of_replay_trx
+--source include/galera_set_sync_point.inc
+
+--let $galera_sync_point = abort_trx_end
+--source include/galera_signal_sync_point.inc
+--let $galera_sync_point = commit_monitor_master_enter_sync
+--source include/galera_signal_sync_point.inc
+
+--let $galera_sync_point = start_of_replay_trx
+--source include/galera_wait_sync_point.inc
+
+--echo # Now replaying of trx is paused, at this time, we initiate a trx that acquires
+--echo # conflicting locks required by replay trx
+--echo # Connection node_1b
+--connection node_1b
+UPDATE t1 SET f2 = 'd' WHERE f1 = 1;
+UPDATE t1 SET f2 = 'e' WHERE f1 = 2;
+
+--echo # Let the replay of trx to proceed. This will BF-Abort the new conflicting and
+--echo # not yet committed trx.
+--echo # Connection node_1a
+--connection node_1a
+--let $galera_sync_point = start_of_replay_trx
+--source include/galera_signal_sync_point.inc
+
+--echo # Commit succeeds
+--echo # Connection node_1
+--connection node_1
+--reap
+
+--echo # The new conflicting trx started just before the replay of node1 trx has been
+--echo # BF-Aborted, so we get ER_LOCK_DEADLOCK
+--echo # Connection node_1b
+--connection node_1b
+--error ER_LOCK_DEADLOCK
+COMMIT;
+
+SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'b';
+SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'c';
+
+--echo # wsrep_local_replays has increased by 1
+--let $wsrep_local_replays_new = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--disable_query_log
+--eval SELECT $wsrep_local_replays_new - $wsrep_local_replays_old = 1 AS wsrep_local_replays;
+--enable_query_log
+
+--echo # Connection node_2
+--connection node_2
+SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'b';
+SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'c';
+
+--let $diff_servers = 1 2
+--source include/diff_servers.inc
+
+DROP TABLE t1;
+
+--connection default
+--disconnect node_1a
+--disconnect node_1b
+--source include/wait_until_count_sessions.inc

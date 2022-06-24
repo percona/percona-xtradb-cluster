@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -31,15 +31,22 @@ SET(TESTS
   group_replication_compatibility_module
   group_replication_member_version
   group_replication_mysql_version_gcs_protocol_map
+  group_replication_gcs_mysql_network_provider
   )
 
 FOREACH(test ${TESTS})
-  MYSQL_ADD_EXECUTABLE(${test}-t ${test}-t.cc
+  SET(SRC_FILES ${test}-t.cc)
+  IF(WIN32)
+    LIST(APPEND SRC_FILES ../../../sql/nt_servc.cc)
+  ENDIF()
+
+  MYSQL_ADD_EXECUTABLE(${test}-t ${SRC_FILES}
     ADD_TEST ${test}
     ENABLE_EXPORTS
     LINK_LIBRARIES
     gr_unit_test_resource
-    gunit_small
+    gunit_large
+    server_unittest_library
     perconaserverclient
     mysqlgcs
     )

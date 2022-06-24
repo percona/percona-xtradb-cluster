@@ -1,6 +1,6 @@
 #
-# Test SET SESSION sql_log_bin = 0 . We expect that unlogged updates will not be replicated
-# to the slave and that there will be no assertions in the process.
+# Test SET SESSION sql_log_bin = 0 . We expect that even with this settings
+# replication across PXC nodes will take place.
 #
 
 --source include/galera_cluster.inc
@@ -27,22 +27,17 @@ INSERT INTO t1 VALUES (2);
 SELECT @@global.gtid_executed;
 
 --connection node_2
-CALL mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t2'' on query");
-call mtr.add_suppression("Ignoring error 'Unknown table 'test.t2'' on query");
-CALL mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t3'' on query");
-call mtr.add_suppression("Ignoring error 'Unknown table 'test.t3'' on query");
-CALL mtr.add_suppression("Slave SQL: Error 'Compression dictionary 'numbers' does not exist'");
-call mtr.add_suppression("Ignoring error 'Compression dictionary 'numbers' does not exist'");
-call mtr.add_suppression("Query apply failed.*");
-
-SELECT COUNT(*) = 1 FROM t1;
-SELECT COUNT(*) = 0 FROM t1 WHERE f1 = 1;
+SELECT COUNT(*) = 2 FROM t1;
+SELECT COUNT(*) = 1 FROM t1 WHERE f1 = 1;
 SHOW TABLES;
 
---error ER_CANNOT_USER
-SHOW CREATE USER 'demo'@'localhost';
+# avoid SHOW CREATE USER as it will show hashed password with will do mess with
+# results file
+--let $assert_text = demo@localhost user should be replicated to node_2
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE User="demo" AND host="localhost"
+--source include/assert.inc
 
---connection node_1
+--connection node_2
 DROP TABLE t1;
 SET SESSION sql_log_bin = 0;
 DROP TABLE t2;
@@ -53,27 +48,25 @@ SET SESSION sql_log_bin = 1;
 
 #-------------------------------------------------------------------------------
 #
-# Setting sql_log_bin = 0 use to block DML replication but allow DDL replication
-# After fixing PXC#841 we ensure that sql_log_bin also blocks DDL replication
-# PXC#915 is regression caused during implementation of PXC#841.
+# Setting sql_log_bin = 0 should not block DDL/MDL across PXC cluser (PXC-3464)
 #
 
 --connection node_1
-use test;
-create table t (i int, primary key pk(i)) engine=innodb;
-insert into t values (1);
-set sql_log_bin=0;
-alter table t add column j int;
-optimize table t;
-analyze table t;
-repair table t;
-set sql_log_bin=1;
-set sql_log_bin=0;
-insert into t values (2, 2);
-set sql_log_bin=1;
-select * from t;
+USE test;
+CREATE TABLE t (i INT, PRIMARY KEY pk(i)) ENGINE=InnoDB;
+INSERT INTO t VALUES (1);
+SET sql_log_bin=0;
+ALTER TABLE t ADD COLUMN j int;
+OPTIMIZE TABLE t;
+ANALYZE TABLE t;
+REPAIR TABLE t;
+SET sql_log_bin=1;
+SET sql_log_bin=0;
+INSERT INTO t VALUES (2, 2);
+SET sql_log_bin=1;
+SELECT * FROM t;
 
 --connection node_2
-use test;
-select * from t;
-drop table t;
+USE test;
+SELECT * FROM t;
+DROP TABLE t;

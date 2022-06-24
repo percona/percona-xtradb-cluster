@@ -1,4 +1,4 @@
-/* Copyright (c) 2006, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2006, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -422,7 +422,7 @@ class Master_info : public Rpl_info {
     if (need_lock) mysql_mutex_unlock(&data_lock);
   }
 
-  virtual ~Master_info();
+  ~Master_info() override;
 
   /**
     Sets the flag that indicates that a relay log rotation has been requested.
@@ -448,12 +448,21 @@ class Master_info : public Rpl_info {
   my_off_t master_log_pos;
 
  public:
-  inline const char *get_master_log_name() { return master_log_name; }
-  inline ulonglong get_master_log_pos() { return master_log_pos; }
+  inline const char *get_master_log_name() const { return master_log_name; }
+  inline const char *get_master_log_name_info() const {
+    if (m_is_receiver_position_info_invalid) return "INVALID";
+    return get_master_log_name();
+  }
+  inline ulonglong get_master_log_pos() const { return master_log_pos; }
+  inline ulonglong get_master_log_pos_info() const {
+    if (m_is_receiver_position_info_invalid) return 0;
+    return get_master_log_pos();
+  }
   inline void set_master_log_name(const char *log_file_name) {
     strmake(master_log_name, log_file_name, sizeof(master_log_name) - 1);
   }
   inline void set_master_log_pos(ulonglong log_pos) {
+    m_is_receiver_position_info_invalid = false;
     master_log_pos = log_pos;
   }
   inline const char *get_io_rpl_log_name() {
@@ -492,6 +501,71 @@ class Master_info : public Rpl_info {
   void set_auto_position(bool auto_position_param) {
     auto_position = auto_position_param;
   }
+
+  /**
+    Checks if Asynchronous Replication Connection Failover feature is enabled.
+
+    @returns true   if Asynchronous Replication Connection Failover feature is
+                    enabled.
+             false  otherwise.
+  */
+  bool is_source_connection_auto_failover() {
+    return m_source_connection_auto_failover;
+  }
+
+  /**
+    Enable Asynchronous Replication Connection Failover feature.
+  */
+  void set_source_connection_auto_failover() {
+    m_source_connection_auto_failover = true;
+  }
+
+  /**
+    Disable Asynchronous Replication Connection Failover feature.
+  */
+  void unset_source_connection_auto_failover() {
+    m_source_connection_auto_failover = false;
+  }
+
+  /**
+    Return current position in the Failover source list for the
+    Asynchronous Replication Connection Failover feature.
+    Based on this position next failover source is selected.
+
+    @returns current position in the Failover source list.
+  */
+  uint get_failover_list_position() { return m_failover_list_position; }
+
+  /**
+    Reset current position to 0, when new failover source list is fetched.
+  */
+  void reset_failover_list_position() { m_failover_list_position = 0; }
+
+  /**
+    Increment current position, so next failover source can be selected on
+    failure.
+  */
+  void increment_failover_list_position() { m_failover_list_position++; }
+
+  /**
+    Checks if network error has occurred.
+
+    @returns true   if slave IO thread failure was due to network error,
+             false  otherwise.
+  */
+  bool is_network_error() { return m_network_error; }
+
+  /**
+    Sets m_network_error to true. Its used by async replication connection
+    failover in case of slave IO thread failure to check if it was due to
+    network failure.
+  */
+  void set_network_error() { m_network_error = true; }
+
+  /**
+    Resets m_network_error to false.
+  */
+  void reset_network_error() { m_network_error = false; }
 
   /**
     This member function shall return true if there are server
@@ -534,9 +608,9 @@ class Master_info : public Rpl_info {
     mi_description_event = fdle;
   }
 
-  bool set_info_search_keys(Rpl_info_handler *to);
+  bool set_info_search_keys(Rpl_info_handler *to) override;
 
-  virtual const char *get_for_channel_str(bool upper_case = false) const {
+  const char *get_for_channel_str(bool upper_case = false) const override {
     return reinterpret_cast<const char *>(upper_case ? for_channel_uppercase_str
                                                      : for_channel_str);
   }
@@ -544,10 +618,13 @@ class Master_info : public Rpl_info {
   void init_master_log_pos();
 
  private:
-  bool read_info(Rpl_info_handler *from);
-  bool write_info(Rpl_info_handler *to);
+  bool read_info(Rpl_info_handler *from) override;
+  bool write_info(Rpl_info_handler *to) override;
 
-  bool auto_position;
+  bool auto_position{false};
+  bool m_source_connection_auto_failover{false};
+  uint m_failover_list_position{0};
+  bool m_network_error{false};
 
   Master_info(
 #ifdef HAVE_PSI_INTERFACE
@@ -606,6 +683,12 @@ class Master_info : public Rpl_info {
     Acquire the channel write lock.
   */
   void channel_wrlock();
+
+  /**
+    Try to acquire the write lock, and fail if it cannot be
+    immediately granted.
+  */
+  int channel_trywrlock();
 
   /**
     Release the channel lock (whether it is a write or read lock).
@@ -676,12 +759,55 @@ class Master_info : public Rpl_info {
 
   void get_flushed_relay_log_info(LOG_INFO *linfo);
 
+  /**
+    Marks the receiver position information (master_log_name, master_log_pos)
+    as being invalid or not.
+
+    @param invalid The value to set the status to invalid or valid
+  */
+  void set_receiver_position_info_invalid(bool invalid);
+
+  /**
+    Returns if receiver position information is valid or invalid
+
+    @return true if receiver position information is not reliable,
+            false otherwise.
+  */
+  bool is_receiver_position_info_invalid() const;
+
+  /**
+    Enable or disable the gtid_only mode
+
+    @param gtid_only_mode value to set gtid_only (enable/disable it)
+  */
+  void set_gtid_only_mode(bool gtid_only_mode);
+
+  /**
+    Returns if gtid_only is enabled or not
+
+    @return true if gtid_only mode is active for a channel,
+            false otherwise.
+  */
+  bool is_gtid_only_mode() const;
+
  private:
   /*
     Holds the relay log coordinates (file name and position) of the last master
     coordinates flushed into Master_info repository.
   */
   LOG_INFO flushed_relay_log_info;
+
+  /**
+    Is the replica working in GTID only mode, meaning it does not
+    persist position related information when executing or queing transactions.
+  */
+  bool m_gtid_only_mode;
+
+  /**
+    Are positions invalid. When true this means the values for
+    receiver position related information might be outdated.
+  */
+  bool m_is_receiver_position_info_invalid;
 };
 
 #endif /* RPL_MI_H */

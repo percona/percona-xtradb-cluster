@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+  Copyright (c) 2019, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -30,11 +30,9 @@
 #include <ostream>
 #include <type_traits>
 
-#include "mysql/harness/stdx/type_traits.h"
-
 // operator<< for std::expected
 //
-// the functions are kept in a seperate header as it
+// the functions are kept in a separate header as it
 //
 // - isn't part of the std-proposal
 // - includes <ostream> which isn't need for stdx::expected<> itself
@@ -46,7 +44,7 @@ struct is_to_stream_writable : std::false_type {};
 
 template <typename S, typename T>
 struct is_to_stream_writable<
-    S, T, stdx::void_t<decltype(std::declval<S &>() << std::declval<T>())>>
+    S, T, std::void_t<decltype(std::declval<S &>() << std::declval<T>())>>
     : std::true_type {};
 
 }  // namespace impl

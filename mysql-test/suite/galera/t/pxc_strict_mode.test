@@ -69,6 +69,7 @@ call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of INSERT");
 
 
 call mtr.add_suppression("WSREP doesn't support XA transaction");
+call mtr.add_suppression("Event 1 Query apply failed");
 
 set global pxc_strict_mode='ENFORCING';
 

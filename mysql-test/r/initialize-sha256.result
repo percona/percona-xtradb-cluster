@@ -20,6 +20,8 @@ SELECT user, host, plugin, LENGTH(authentication_string) > 0
 FROM mysql.user ORDER BY user;
 user	host	plugin	LENGTH(authentication_string) > 0
 mysql.infoschema	localhost	caching_sha2_password	1
+mysql.pxc.internal.session	localhost	caching_sha2_password	1
+mysql.pxc.sst.role	localhost	sha256_password	0
 mysql.session	localhost	caching_sha2_password	1
 mysql.sys	localhost	caching_sha2_password	1
 root	localhost	sha256_password	0

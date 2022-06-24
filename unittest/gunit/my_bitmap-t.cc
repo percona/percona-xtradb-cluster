@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2006, 2020, Oracle and/or its affiliates.
+   Copyright (c) 2006, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -439,7 +439,7 @@ error:
 
 class BitMapTest : public ::testing::TestWithParam<uint> {
  protected:
-  virtual void SetUp() {
+  void SetUp() override {
     bitsize = GetParam();
     ASSERT_FALSE(bitmap_init(&map, buf, bitsize));
     bitmap_clear_all(&map);

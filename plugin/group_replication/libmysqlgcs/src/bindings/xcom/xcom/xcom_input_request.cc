@@ -1,4 +1,4 @@
-/* Copyright (c) 2018, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2018, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -20,8 +20,11 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 
-#include "xcom/xcom_input_request.h"
+#ifdef _MSC_VER
+#include <stdint.h>
+#endif
 #include <stdlib.h>
+#include "xcom/xcom_input_request.h"
 #include "xcom/xcom_memory.h"
 
 typedef struct xcom_input_request {
@@ -34,8 +37,8 @@ typedef struct xcom_input_request {
 xcom_input_request_ptr xcom_input_request_new(
     app_data_ptr a, xcom_input_reply_function_ptr reply_function,
     void *reply_arg) {
-  xcom_input_request_ptr request =
-      (xcom_input_request_ptr)calloc((size_t)1, sizeof(xcom_input_request));
+  xcom_input_request_ptr request = (xcom_input_request_ptr)xcom_calloc(
+      (size_t)1, sizeof(xcom_input_request));
   if (request != NULL) {
     request->a = a;
     request->reply_function = reply_function;

@@ -1,13 +1,13 @@
 High Availability
 =================
 
-In a basic setup with 3 nodes, |PXC| will continue to function
+In a basic setup with 3 nodes, Percona XtraDB Cluster will continue to function
 if you take any of the nodes down.
 At any point in time, you can shut down any node to perform maintenance
 or make configuration changes.
 Even in unplanned situations
 (like a node crashing or if it becomes unavailable over the network),
-the |PXC| will continue to work
+the Percona XtraDB Cluster will continue to work
 and you'll be able to run queries on working nodes.
 
 If there were changes to data while a node was down,
@@ -18,7 +18,7 @@ there are two options that the node may use when it joins the cluster again:
 
   SST is usually used when a new node joins the cluster
   and receives all data from an existing node.
-  |PXC| uses :program:`xtrabackup` for SST.
+  Percona XtraDB Cluster uses :program:`xtrabackup` for SST.
 
   SST using ``xtrabackup`` does not require the :command:`READ LOCK` command
   for the entire syncing process, only for syncing |.FRM| files

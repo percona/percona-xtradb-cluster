@@ -1,0 +1,7 @@
+!include ../galera_2nodes.cnf
+
+[mysqld.1]
+skip-log-bin
+
+[mysqld.2]
+skip-log-bin

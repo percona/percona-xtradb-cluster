@@ -1,4 +1,4 @@
-/* Copyright (c) 2011, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2011, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -31,6 +31,7 @@
 #include "storage/perfschema/pfs_stat.h"
 #include "storage/perfschema/pfs_user.h"
 #include "storage/perfschema/unittest/stub_pfs_global.h"
+#include "storage/perfschema/unittest/stub_pfs_defaults.h"
 #include "storage/perfschema/unittest/stub_pfs_plugin_table.h"
 #include "unittest/mytap/tap.h"
 
@@ -114,10 +115,11 @@ static void test_oom() {
       PSI_CURRENT_THREAD_VERSION);
 
   PSI_thread_key thread_key_1;
-  PSI_thread_info all_thread[] = {{&thread_key_1, "T-1", 0, 0, ""}};
+  PSI_thread_info all_thread[] = {{&thread_key_1, "T-1", "T-1", 0, 0, ""}};
   thread_service->register_thread("test", all_thread, 1);
 
-  PSI_thread *thread_1 = thread_service->new_thread(thread_key_1, nullptr, 0);
+  PSI_thread *thread_1 =
+      thread_service->new_thread(thread_key_1, 0, nullptr, 0);
   thread_service->set_thread(thread_1);
 
   /* Tests */

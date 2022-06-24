@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2013, 2020, Oracle and/or its affiliates. All rights reserved.
+  Copyright (c) 2013, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -29,18 +29,19 @@
 
 #include "storage/perfschema/table_replication_applier_status_by_worker.h"
 
+#include <assert.h>
 #include <stddef.h>
 
 #include "my_compiler.h"
-#include "my_dbug.h"
+
 #include "sql/field.h"
 #include "sql/plugin_table.h"
 #include "sql/rpl_info.h"
 #include "sql/rpl_mi.h"
 #include "sql/rpl_msr.h" /*Multi source replication */
+#include "sql/rpl_replica.h"
 #include "sql/rpl_rli.h"
 #include "sql/rpl_rli_pdb.h"
-#include "sql/rpl_slave.h"
 #include "sql/sql_parse.h"
 #include "sql/table.h"
 #include "storage/perfschema/pfs_instr.h"
@@ -167,7 +168,7 @@ bool PFS_index_rpl_applier_status_by_worker_by_thread::match(Master_info *mi) {
     if (mi->rli->slave_running) {
       /* STS will use SQL thread as workers on this table */
       if (mi->rli->get_worker_count() == 0) {
-        PSI_thread *psi MY_ATTRIBUTE((unused)) = thd_get_psi(mi->rli->info_thd);
+        PSI_thread *psi [[maybe_unused]] = thd_get_psi(mi->rli->info_thd);
 #ifdef HAVE_PSI_THREAD_INTERFACE
         if (psi != nullptr) {
           row.thread_id = PSI_THREAD_CALL(get_thread_internal_id)(psi);
@@ -197,7 +198,7 @@ bool PFS_index_rpl_applier_status_by_worker_by_thread::match(
 
     if (mi->rli->slave_running) {
       if (worker) {
-        PSI_thread *psi MY_ATTRIBUTE((unused)) = thd_get_psi(worker->info_thd);
+        PSI_thread *psi [[maybe_unused]] = thd_get_psi(worker->info_thd);
 #ifdef HAVE_PSI_THREAD_INTERFACE
         if (psi != nullptr) {
           row.thread_id = PSI_THREAD_CALL(get_thread_internal_id)(psi);
@@ -226,7 +227,7 @@ table_replication_applier_status_by_worker::
     : PFS_engine_table(&m_share, &m_pos), m_pos(), m_next_pos() {}
 
 table_replication_applier_status_by_worker::
-    ~table_replication_applier_status_by_worker() {}
+    ~table_replication_applier_status_by_worker() = default;
 
 void table_replication_applier_status_by_worker::reset_position(void) {
   m_pos.reset();
@@ -340,7 +341,7 @@ int table_replication_applier_status_by_worker::index_init(uint idx, bool) {
       result = PFS_NEW(PFS_index_rpl_applier_status_by_worker_by_thread);
       break;
     default:
-      DBUG_ASSERT(false);
+      assert(false);
       break;
   }
   m_opened_index = result;
@@ -424,8 +425,8 @@ int table_replication_applier_status_by_worker::make_row(Master_info *mi) {
   m_row.thread_id = 0;
   m_row.thread_id_is_null = true;
 
-  DBUG_ASSERT(mi != nullptr);
-  DBUG_ASSERT(mi->rli != nullptr);
+  assert(mi != nullptr);
+  assert(mi->rli != nullptr);
 
   mysql_mutex_lock(&mi->rli->data_lock);
 
@@ -434,7 +435,7 @@ int table_replication_applier_status_by_worker::make_row(Master_info *mi) {
          m_row.channel_name_length);
 
   if (mi->rli->slave_running) {
-    PSI_thread *psi MY_ATTRIBUTE((unused)) = thd_get_psi(mi->rli->info_thd);
+    PSI_thread *psi [[maybe_unused]] = thd_get_psi(mi->rli->info_thd);
 #ifdef HAVE_PSI_THREAD_INTERFACE
     if (psi != nullptr) {
       m_row.thread_id = PSI_THREAD_CALL(get_thread_internal_id)(psi);
@@ -485,7 +486,7 @@ int table_replication_applier_status_by_worker::make_row(Slave_worker *w) {
 
   mysql_mutex_lock(&w->jobs_lock);
   if (w->running_status == Slave_worker::RUNNING) {
-    PSI_thread *psi MY_ATTRIBUTE((unused)) = thd_get_psi(w->info_thd);
+    PSI_thread *psi [[maybe_unused]] = thd_get_psi(w->info_thd);
 #ifdef HAVE_PSI_THREAD_INTERFACE
     if (psi != nullptr) {
       m_row.thread_id = PSI_THREAD_CALL(get_thread_internal_id)(psi);
@@ -565,7 +566,7 @@ int table_replication_applier_status_by_worker::read_row_values(
     TABLE *table, unsigned char *buf, Field **fields, bool read_all) {
   Field *f;
 
-  DBUG_ASSERT(table->s->null_bytes == 1);
+  assert(table->s->null_bytes == 1);
   buf[0] = 0;
 
   for (; (f = *fields); fields++) {
@@ -655,7 +656,7 @@ int table_replication_applier_status_by_worker::read_row_values(
           set_field_timestamp(f, m_row.applying_trx_last_retry_timestamp);
           break;
         default:
-          DBUG_ASSERT(false);
+          assert(false);
       }
     }
   }

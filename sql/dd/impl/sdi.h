@@ -1,4 +1,4 @@
-/* Copyright (c) 2015, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2015, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -230,8 +230,7 @@ namespace sdi {
  */
 
 template <class DDT>
-inline bool store(THD *thd MY_ATTRIBUTE((unused)),
-                  const DDT *ddo MY_ATTRIBUTE((unused))) {
+inline bool store(THD *thd [[maybe_unused]], const DDT *ddo [[maybe_unused]]) {
   return false;
 }
 
@@ -281,7 +280,7 @@ bool store(THD *thd, const Tablespace *ts);
  */
 
 template <class DDT>
-inline bool drop(THD *thd MY_ATTRIBUTE((unused)), const DDT *) {
+inline bool drop(THD *thd [[maybe_unused]], const DDT *) {
   return false;
 }
 
@@ -317,9 +316,9 @@ bool drop(THD *thd, const Table *t);
  */
 
 template <class DDT>
-inline bool drop_after_update(THD *thd MY_ATTRIBUTE((unused)),
-                              const DDT *old_ddo MY_ATTRIBUTE((unused)),
-                              const DDT *new_ddo MY_ATTRIBUTE((unused))) {
+inline bool drop_after_update(THD *thd [[maybe_unused]],
+                              const DDT *old_ddo [[maybe_unused]],
+                              const DDT *new_ddo [[maybe_unused]]) {
   return false;
 }
 

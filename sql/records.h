@@ -1,6 +1,6 @@
 #ifndef SQL_RECORDS_H
 #define SQL_RECORDS_H
-/* Copyright (c) 2008, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2008, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -36,21 +36,35 @@
 
 class QEP_TAB;
 class THD;
+struct AccessPath;
 struct TABLE;
+struct POSITION;
 
-unique_ptr_destroy_only<RowIterator> create_table_iterator(
-    THD *thd, TABLE *table, QEP_TAB *qep_tab, bool disable_rr_cache,
-    bool ignore_not_found_rows, ha_rows *examined_rows, bool *using_table_scan);
+AccessPath *create_table_access_path(THD *thd, TABLE *table,
+                                     QUICK_SELECT_I *quick,
+                                     TABLE_LIST *table_ref, POSITION *position,
+                                     bool count_examined_rows);
 
 /**
-  Calls create_table_iterator(), then calls Init() on the resulting iterator.
+  Creates an iterator for the given table, then calls Init() on the resulting
+  iterator. Unlike create_table_iterator(), this can create iterators for sort
+  buffer results (which are set in the TABLE object during query execution).
   Returns nullptr on failure.
  */
 unique_ptr_destroy_only<RowIterator> init_table_iterator(
-    THD *thd, TABLE *table, QEP_TAB *qep_tab, bool disable_rr_cache,
-    bool ignore_not_found_rows);
+    THD *thd, TABLE *table, QUICK_SELECT_I *quick, TABLE_LIST *table_ref,
+    POSITION *position, bool ignore_not_found_rows, bool count_examined_rows);
 
-unique_ptr_destroy_only<RowIterator> create_table_iterator_idx(
-    THD *thd, TABLE *table, uint idx, bool reverse, QEP_TAB *qep_tab);
+/**
+  A short form for when there's no range scan, recursive CTEs or cost
+  information; just a unique_result or a simple table scan. Normally, you should
+  prefer just instantiating an iterator yourself -- this is for legacy use only.
+ */
+inline unique_ptr_destroy_only<RowIterator> init_table_iterator(
+    THD *thd, TABLE *table, bool ignore_not_found_rows,
+    bool count_examined_rows) {
+  return init_table_iterator(thd, table, nullptr, nullptr, nullptr,
+                             ignore_not_found_rows, count_examined_rows);
+}
 
 #endif /* SQL_RECORDS_H */

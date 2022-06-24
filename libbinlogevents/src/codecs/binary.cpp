@@ -1,4 +1,4 @@
-/* Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2019, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -143,7 +143,7 @@ end:
  */
 std::pair<std::size_t, bool> Transaction_payload::encode(
     const Binary_log_event &from, unsigned char *to,
-    size_t size MY_ATTRIBUTE((unused))) const {
+    size_t size [[maybe_unused]]) const {
   bool result =
       from.header()->type_code != binary_log::TRANSACTION_PAYLOAD_EVENT;
   uchar *ptr = to;

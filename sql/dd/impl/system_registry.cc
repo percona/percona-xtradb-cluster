@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -52,6 +52,7 @@
 #include "sql/dd/impl/system_views/role_table_grants.h"    // Role_table_grants
 #include "sql/dd/impl/system_views/routines.h"             // Routines
 #include "sql/dd/impl/system_views/schemata.h"             // Schemata
+#include "sql/dd/impl/system_views/schemata_extensions.h"  //Schemata_extensions
 #include "sql/dd/impl/system_views/st_geometry_columns.h"  // st_geometry_columns
 #include "sql/dd/impl/system_views/st_spatial_reference_systems.h"  // St_spatial...
 #include "sql/dd/impl/system_views/st_units_of_measure.h"  // St_units_of_measure
@@ -227,6 +228,11 @@ void System_tables::add_remaining_dd_tables() {
   register_table("password_history", system);
   register_table("procs_priv", system);
   register_table("proxies_priv", system);
+  register_table("replication_asynchronous_connection_failover", system);
+  register_table("replication_asynchronous_connection_failover_managed",
+                 system);
+  register_table("replication_group_member_actions", system);
+  register_table("replication_group_configuration_version", system);
   register_table("role_edges", system);
   register_table("servers", system);
   register_table("server_cost", system);
@@ -241,6 +247,12 @@ void System_tables::add_remaining_dd_tables() {
   register_table("time_zone_transition", system);
   register_table("time_zone_transition_type", system);
   register_table("user", system);
+
+#ifdef WITH_WSREP
+  register_table("wsrep_cluster", system);
+  register_table("wsrep_cluster_members", system);
+  register_table("wsrep_streaming_log", system);
+#endif /* WITH_WSREP */
 
   /*
     MTR tests expects following tables to be created in the 'mysql' tablespace.
@@ -291,6 +303,7 @@ void System_views::init() {
   register_view<dd::system_views::Role_table_grants>(non_dd_based_is);
   register_view<dd::system_views::Routines>(is);
   register_view<dd::system_views::Schemata>(is);
+  register_view<dd::system_views::Schemata_extensions>(is);
   register_view<dd::system_views::Show_statistics>(is);
   register_view<dd::system_views::St_spatial_reference_systems>(is);
   register_view<dd::system_views::St_units_of_measure>(is);

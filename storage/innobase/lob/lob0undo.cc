@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2017, 2019, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2017, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License, version 2.0,
@@ -73,7 +73,8 @@ std::ostream &undo_data_t::print(std::ostream &out) const {
 @return pointer past the old data. */
 const byte *undo_data_t::copy_old_data(const byte *undo_ptr, ulint len) {
   m_length = len;
-  m_old_data = UT_NEW_ARRAY_NOKEY(byte, m_length);
+  m_old_data =
+      ut::new_arr_withkey<byte>(UT_NEW_THIS_FILE_PSI_KEY, ut::Count{m_length});
   if (m_old_data == nullptr) {
     return (nullptr);
   }
@@ -84,7 +85,7 @@ const byte *undo_data_t::copy_old_data(const byte *undo_ptr, ulint len) {
 /** Free allocated memory for old data. */
 void undo_data_t::destroy() {
   if (m_old_data != nullptr) {
-    UT_DELETE_ARRAY(m_old_data);
+    ut::delete_arr(m_old_data);
     m_old_data = nullptr;
   }
 }

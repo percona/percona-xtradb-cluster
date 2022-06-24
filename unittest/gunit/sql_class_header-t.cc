@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2017, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -41,7 +41,21 @@
 #endif
 
 #ifdef HANDLER_INCLUDED
+#ifdef WITH_WSREP
+/*
+ * PS includes handler.h in mysqld.h. This is because definition of TABLE_STATS
+ * struct is needed for
+ * using table_stats_t = collation_unordered_map<std::string, TABLE_STATS>;
+ *
+ * PXC wsrep_mysqld.h includes mysqld.h and sql_class.h includes wsrep_mysqld.h
+ * It is possible to decouple headers, but it needs changes in PS, which is
+ * not needed there, so just to avoid these changes turn it into message now.
+ */
+#pragma message( \
+    "sql_class.h includes handler.h directly or indirectly; it should not.")
+#else
 #error "sql_class.h includes handler.h directly or indirectly; it should not."
+#endif
 #endif
 
 #ifdef _SQL_PROFILE_H

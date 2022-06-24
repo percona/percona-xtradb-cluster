@@ -22,18 +22,11 @@ perl;
   @skipvars=qw/basedir open-files-limit general-log-file plugin-dir
                pid-file slow-query-log-file
                language lc-messages-dir
-               datadir slave-load-tmpdir tmpdir socket table-definition-cache table-open-cache
-<<<<<<< HEAD
-               tls-version secure-file-priv wsrep-node-name/;
-||||||| 5b5a5d2584a
-               tls-version secure-file-priv/;
-=======
-               tls-version admin-tls-version secure-file-priv/;
->>>>>>> Percona-Server-8.0.21-12
-
+               datadir replica-load-tmpdir slave-load-tmpdir tmpdir socket table-definition-cache table-open-cache
+               tls-version admin-tls-version secure-file-priv wsrep-node-name wsrep-data-home-dir/;
   # Variables which we don't want to display in result file since
   # they depend on type of build
-  @build_specific=qw/auto-generate-certs lock-order/;
+  @build_specific=qw/auto-generate-certs lock-order version-suffix/;
 
   # Plugins which may or may not be there:
   @plugins=qw/innodb ngram mecab ndb ndbinfo archive blackhole federated partition ndbcluster debug ssl des-key-file
@@ -67,6 +60,7 @@ perl;
     # s/\b196608\b/262144/;
     # s/\b524288\b/262144/;
     # s/\b393216\b/262144/;
+    s/\b1146880\b/262144/;
     s/\b860160\b/262144/;
     s/\b573440\b/262144/;
     s/\b286720\b/262144/;

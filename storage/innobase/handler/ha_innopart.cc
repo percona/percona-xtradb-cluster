@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 2014, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -54,6 +54,7 @@ Created Nov 22, 2013 Mattias Jonsson */
 
 /* Include necessary InnoDB headers */
 #include "btr0sea.h"
+#include "ddl0ddl.h"
 #include "dict0dd.h"
 #include "dict0dict.h"
 #include "dict0priv.h"
@@ -73,7 +74,6 @@ Created Nov 22, 2013 Mattias Jonsson */
 #include "partition_info.h"
 #include "row0import.h"
 #include "row0ins.h"
-#include "row0merge.h"
 #include "row0mysql.h"
 #include "row0quiesce.h"
 #include "row0sel.h"
@@ -95,11 +95,11 @@ Ha_innopart_share::Ha_innopart_share(TABLE_SHARE *table_share)
 Ha_innopart_share::~Ha_innopart_share() {
   ut_ad(m_ref_count == 0);
   if (m_table_parts != nullptr) {
-    ut_free(m_table_parts);
+    ut::free(m_table_parts);
     m_table_parts = nullptr;
   }
   if (m_index_mapping != nullptr) {
-    ut_free(m_index_mapping);
+    ut::free(m_index_mapping);
     m_index_mapping = nullptr;
   }
 }
@@ -123,8 +123,8 @@ inline void ha_innopart::copy_cached_row(uchar *buf, const uchar *cached_row) {
 @param[in]	dd_part		dd::Partition
 @param[in]	part_name	Table name of this partition
 @param[out]	part_dict_table	InnoDB table for partition
-@retval	false on success
-@retval	true on failure */
+@retval	false	On success
+@retval	true	On failure */
 bool Ha_innopart_share::open_one_table_part(
     dd::cache::Dictionary_client *client, THD *thd, const TABLE *table,
     const dd::Partition *dd_part, const char *part_name,
@@ -132,7 +132,7 @@ bool Ha_innopart_share::open_one_table_part(
   dict_table_t *part_table = nullptr;
   bool cached = false;
 
-  mutex_enter(&dict_sys->mutex);
+  dict_sys_mutex_enter();
   part_table = dict_table_check_if_in_cache_low(part_name);
   if (part_table != nullptr) {
     cached = true;
@@ -159,7 +159,7 @@ bool Ha_innopart_share::open_one_table_part(
       dict_table_ddl_release(part_table);
     }
   }
-  mutex_exit(&dict_sys->mutex);
+  dict_sys_mutex_exit();
 
   if (!cached) {
     part_table = dd_open_table(client, table, part_name, dd_part, thd);
@@ -167,7 +167,8 @@ bool Ha_innopart_share::open_one_table_part(
 
   if (part_table != nullptr) {
     /* Set compression type like ha_innobase::open() does */
-    dberr_t err = fil_set_compression(part_table, table->s->compress.str);
+    dberr_t err =
+        dict_set_compression(part_table, table->s->compress.str, false);
     switch (err) {
       case DB_NOT_FOUND:
       case DB_UNSUPPORTED:
@@ -202,12 +203,13 @@ all m_table_parts[]->vc_templ to it.
 @param[in]	name		Table name (db/table_name) */
 void Ha_innopart_share::set_v_templ(TABLE *table, dict_table_t *ib_table,
                                     const char *name) {
-  ut_ad(mutex_own(&dict_sys->mutex));
+  ut_ad(dict_sys_mutex_own());
 
   if (ib_table->n_v_cols > 0) {
     for (ulint i = 0; i < m_tot_parts; i++) {
       if (m_table_parts[i]->vc_templ == nullptr) {
-        m_table_parts[i]->vc_templ = UT_NEW_NOKEY(dict_vcol_templ_t());
+        m_table_parts[i]->vc_templ =
+            ut::new_withkey<dict_vcol_templ_t>(UT_NEW_THIS_FILE_PSI_KEY);
         m_table_parts[i]->vc_templ->vtempl = nullptr;
       } else if (m_table_parts[i]->get_ref_count() == 1) {
         /* Clean and refresh the template */
@@ -238,13 +240,13 @@ void Ha_innopart_share::increment_ref_counts() {
   m_ref_count++;
 
   /* Increment dict_table_t reference count for all partitions */
-  mutex_enter(&dict_sys->mutex);
+  dict_sys_mutex_enter();
   for (uint i = 0; i < m_tot_parts; i++) {
     dict_table_t *table = m_table_parts[i];
     table->acquire();
     ut_ad(table->get_ref_count() >= m_ref_count);
   }
-  mutex_exit(&dict_sys->mutex);
+  dict_sys_mutex_exit();
 }
 
 /** Open InnoDB tables for partitions and return them as array.
@@ -273,8 +275,8 @@ dict_table_t **Ha_innopart_share::open_table_parts(THD *thd, const TABLE *table,
 
   uint tot_parts = part_info->get_tot_partitions();
   size_t table_parts_size = sizeof(dict_table_t *) * tot_parts;
-  dict_table_t **table_parts = static_cast<dict_table_t **>(
-      ut_zalloc(table_parts_size, mem_key_partitioning));
+  dict_table_t **table_parts = static_cast<dict_table_t **>(ut::zalloc_withkey(
+      ut::make_psi_memory_key(mem_key_partitioning), table_parts_size));
   if (table_parts == nullptr) {
     return (nullptr);
   }
@@ -297,7 +299,7 @@ dict_table_t **Ha_innopart_share::open_table_parts(THD *thd, const TABLE *table,
                             &table_parts[i])) {
       ut_ad(table_parts[i] == nullptr);
       close_table_parts(table_parts, i);
-      ut_free(table_parts);
+      ut::free(table_parts);
       return (nullptr);
     }
     i++;
@@ -340,7 +342,7 @@ bool Ha_innopart_share::set_table_parts_and_indexes(
       ut_ad(m_table_parts[i] == table_parts[i]);
     }
 #endif /* UNIV_DEBUG */
-    ut_free(table_parts);
+    ut::free(table_parts);
     return (false);
   }
 
@@ -367,8 +369,8 @@ bool Ha_innopart_share::set_table_parts_and_indexes(
   if (mysql_num_index != 0) {
     size_t alloc_size =
         mysql_num_index * m_tot_parts * sizeof(*m_index_mapping);
-    m_index_mapping = static_cast<dict_index_t **>(
-        ut_zalloc(alloc_size, mem_key_partitioning));
+    m_index_mapping = static_cast<dict_index_t **>(ut::zalloc_withkey(
+        ut::make_psi_memory_key(mem_key_partitioning), alloc_size));
     if (m_index_mapping == nullptr) {
       /* Report an error if index_mapping continues to be
       NULL and mysql_num_index is a non-zero value. */
@@ -420,7 +422,7 @@ bool Ha_innopart_share::set_table_parts_and_indexes(
     }
   }
   if (!index_loaded && m_index_mapping != nullptr) {
-    ut_free(m_index_mapping);
+    ut::free(m_index_mapping);
     m_index_mapping = nullptr;
   }
 
@@ -473,12 +475,12 @@ void Ha_innopart_share::close_table_parts(void) {
 
   if (m_table_parts != nullptr) {
     close_table_parts(m_table_parts, m_tot_parts);
-    ut_free(m_table_parts);
+    ut::free(m_table_parts);
     m_table_parts = nullptr;
   }
 
   if (m_index_mapping != nullptr) {
-    ut_free(m_index_mapping);
+    ut::free(m_index_mapping);
     m_index_mapping = nullptr;
   }
 
@@ -490,11 +492,10 @@ void Ha_innopart_share::close_table_parts(void) {
   auto_inc_initialized = false;
 }
 
-/** Get index.
-Find the index of the specified partition and key number.
+/** Return innodb index for given partition and key number.
 @param[in]	part_id	Partition number.
 @param[in]	keynr	Key number.
-@return	Index pointer or NULL. */
+@return	InnoDB index. */
 inline dict_index_t *Ha_innopart_share::get_index(uint part_id, uint keynr) {
   if (part_id >= m_tot_parts) {
     /* purecov: begin inspected */
@@ -618,9 +619,6 @@ ha_innopart::ha_innopart(handlerton *hton, TABLE_SHARE *table_arg)
   m_share = nullptr;
 }
 
-/** Destruct ha_innopart handler. */
-ha_innopart::~ha_innopart() {}
-
 /** Returned supported alter table flags.
 @param[in]	flags	Flags to support.
 @return	Supported flags. */
@@ -642,8 +640,8 @@ This should only be called once from ha_innobase::open().
 Therefore there's no need for a covering lock.
 @param[in]	no_lock	If locking should be skipped. Not used!
 @return	0 for success or error code. */
-inline int ha_innopart::initialize_auto_increment(
-    bool no_lock MY_ATTRIBUTE((unused))) {
+inline int ha_innopart::initialize_auto_increment(bool no_lock
+                                                  [[maybe_unused]]) {
   int error = 0;
   ulonglong auto_inc = 0;
   const Field *field = table->found_next_number_field;
@@ -793,8 +791,10 @@ done:
   return (error);
 }
 
-/** Open a partitioned InnoDB table.
-@param[in]	name	table name
+/** Open an InnoDB table.
+@param[in]	name		table name
+@param[in]	mode		access mode
+@param[in]	test_if_locked	test if the file to be opened is locked
 @param[in]	table_def	dd::Table describing table to be opened
 @retval 1 if error
 @retval 0 if success */
@@ -804,7 +804,7 @@ int ha_innopart::open(const char *name, int, uint, const dd::Table *table_def) {
   THD *thd;
 
   DBUG_TRACE;
-  DBUG_ASSERT(table_share == table->s);
+  assert(table_share == table->s);
 
   if (m_part_info == nullptr) {
     /* Must be during ::clone()! */
@@ -856,7 +856,7 @@ int ha_innopart::open(const char *name, int, uint, const dd::Table *table_def) {
         if (thd->dd_client()->acquire(table_share->db.str,
                                       table_share->table_name.str, &table_def))
           return HA_ERR_INTERNAL_ERROR;
-        DBUG_ASSERT(table_def);
+        assert(table_def);
       }
 
       table_parts = Ha_innopart_share::open_table_parts(thd, table, table_def,
@@ -923,14 +923,16 @@ int ha_innopart::open(const char *name, int, uint, const dd::Table *table_def) {
   /* TODO: Should we do this check for every partition during ::open()? */
   /* TODO: refactor this in ha_innobase so it can increase code reuse. */
   if (dict_table_is_discarded(ib_table)) {
-    ib_senderrf(thd, IB_LOG_LEVEL_WARN, ER_TABLESPACE_DISCARDED,
-                table->s->table_name.str);
+    /* If the op is an IMPORT, open the space without this warning. */
+    if (thd_tablespace_op(thd) != Alter_info::ALTER_IMPORT_TABLESPACE) {
+      ib_senderrf(thd, IB_LOG_LEVEL_WARN, ER_TABLESPACE_DISCARDED,
+                  table->s->table_name.str);
+    }
 
     /* Allow an open because a proper DISCARD should have set
     all the flags and index root page numbers to FIL_NULL that
     should prevent any DML from running but it should allow DDL
     operations. */
-
     no_tablespace = false;
 
   } else if (ib_table->ibd_file_missing) {
@@ -955,14 +957,14 @@ int ha_innopart::open(const char *name, int, uint, const dd::Table *table_def) {
   m_prebuilt->default_rec = table->s->default_values;
   ut_ad(m_prebuilt->default_rec);
 
-  DBUG_ASSERT(table != nullptr);
+  assert(table != nullptr);
   m_prebuilt->m_mysql_table = table;
   m_prebuilt->m_mysql_handler = this;
 
   if (ib_table->n_v_cols > 0) {
-    mutex_enter(&dict_sys->mutex);
+    dict_sys_mutex_enter();
     m_part_share->set_v_templ(table, ib_table, name);
-    mutex_exit(&dict_sys->mutex);
+    dict_sys_mutex_exit();
   }
 
   key_used_on_scan = table_share->primary_key;
@@ -1136,25 +1138,26 @@ int ha_innopart::open(const char *name, int, uint, const dd::Table *table_def) {
 #endif /* HA_INNOPART_SUPPORTS_FULLTEXT */
 
   size_t alloc_size = sizeof(*m_ins_node_parts) * m_tot_parts;
-  m_ins_node_parts =
-      static_cast<ins_node_t **>(ut_zalloc(alloc_size, mem_key_partitioning));
+  m_ins_node_parts = static_cast<ins_node_t **>(ut::zalloc_withkey(
+      ut::make_psi_memory_key(mem_key_partitioning), alloc_size));
 
   alloc_size = sizeof(*m_upd_node_parts) * m_tot_parts;
-  m_upd_node_parts =
-      static_cast<upd_node_t **>(ut_zalloc(alloc_size, mem_key_partitioning));
+  m_upd_node_parts = static_cast<upd_node_t **>(ut::zalloc_withkey(
+      ut::make_psi_memory_key(mem_key_partitioning), alloc_size));
 
   alloc_blob_heap_array();
 
   alloc_size = sizeof(*m_trx_id_parts) * m_tot_parts;
-  m_trx_id_parts =
-      static_cast<trx_id_t *>(ut_zalloc(alloc_size, mem_key_partitioning));
+  m_trx_id_parts = static_cast<trx_id_t *>(ut::zalloc_withkey(
+      ut::make_psi_memory_key(mem_key_partitioning), alloc_size));
 
   alloc_size = sizeof(*m_row_read_type_parts) * m_tot_parts;
-  m_row_read_type_parts =
-      static_cast<ulint *>(ut_zalloc(alloc_size, mem_key_partitioning));
+  m_row_read_type_parts = static_cast<ulint *>(ut::zalloc_withkey(
+      ut::make_psi_memory_key(mem_key_partitioning), alloc_size));
 
   alloc_size = sizeof(*m_bitset) * UT_BITS_IN_BYTES(m_tot_parts);
-  m_bitset = static_cast<byte *>(ut_zalloc(alloc_size, mem_key_partitioning));
+  m_bitset = static_cast<byte *>(ut::zalloc_withkey(
+      ut::make_psi_memory_key(mem_key_partitioning), alloc_size));
 
   if (m_ins_node_parts == nullptr || m_upd_node_parts == nullptr ||
       m_blob_heap_parts == nullptr || m_trx_id_parts == nullptr ||
@@ -1170,10 +1173,11 @@ int ha_innopart::open(const char *name, int, uint, const dd::Table *table_def) {
   return 0;
 }
 
-/** Get a cloned ha_innopart handler.
+/** Clone this handler, used when needing more than one cursor
+to the same table.
 @param[in]	name		Table name.
-@param[in]	mem_root	MySQL mem_root to use.
-@return	new ha_innopart handler. */
+@param[in]	mem_root	mem_root to allocate from.
+@retval	Pointer to clone or NULL if error. */
 handler *ha_innopart::clone(const char *name, MEM_ROOT *mem_root) {
   ha_innopart *new_handler;
 
@@ -1274,23 +1278,23 @@ int ha_innopart::close() {
   }
 
   if (m_ins_node_parts != nullptr) {
-    ut_free(m_ins_node_parts);
+    ut::free(m_ins_node_parts);
     m_ins_node_parts = nullptr;
   }
   if (m_upd_node_parts != nullptr) {
-    ut_free(m_upd_node_parts);
+    ut::free(m_upd_node_parts);
     m_upd_node_parts = nullptr;
   }
   if (m_trx_id_parts != nullptr) {
-    ut_free(m_trx_id_parts);
+    ut::free(m_trx_id_parts);
     m_trx_id_parts = nullptr;
   }
   if (m_row_read_type_parts != nullptr) {
-    ut_free(m_row_read_type_parts);
+    ut::free(m_row_read_type_parts);
     m_row_read_type_parts = nullptr;
   }
 
-  ut_free(m_bitset);
+  ut::free(m_bitset);
   m_bitset = nullptr;
 
   MONITOR_INC(MONITOR_TABLE_CLOSE);
@@ -1432,12 +1436,12 @@ void ha_innopart::unlock_row() {
   update_partition(m_last_part);
 }
 
-/** Write a row in partition.
+/** Write a row in specific partition.
 Stores a row in an InnoDB database, to the table specified in this
 handle.
 @param[in]	part_id	Partition to write to.
 @param[in]	record	A row in MySQL format.
-@return	0 or error code. */
+@return error code. */
 int ha_innopart::write_row_in_part(uint part_id, uchar *record) {
   int error;
   Field *saved_next_number_field = table->next_number_field;
@@ -1566,7 +1570,7 @@ int ha_innopart::index_end() {
 
 /** Setup the ordered record buffer and the priority queue.
 @param[in]	used_parts	Number of used partitions in query.
-@return	false for success else true. */
+@return false for success, else true. */
 int ha_innopart::init_record_priority_queue_for_parts(uint used_parts) {
   size_t alloc_size;
   void *buf;
@@ -1597,7 +1601,8 @@ int ha_innopart::init_record_priority_queue_for_parts(uint used_parts) {
   if (need_clust_index) {
     alloc_size *= 2;
   }
-  buf = ut_zalloc(alloc_size, mem_key_partitioning);
+  buf = ut::zalloc_withkey(ut::make_psi_memory_key(mem_key_partitioning),
+                           alloc_size);
   if (buf == nullptr) {
     return true;
   }
@@ -1607,7 +1612,8 @@ int ha_innopart::init_record_priority_queue_for_parts(uint used_parts) {
   }
   /* mapping from part_id to pcur. */
   alloc_size = m_tot_parts * sizeof(*m_pcur_map);
-  buf = ut_zalloc(alloc_size, mem_key_partitioning);
+  buf = ut::zalloc_withkey(ut::make_psi_memory_key(mem_key_partitioning),
+                           alloc_size);
   if (buf == nullptr) {
     return true;
   }
@@ -1635,7 +1641,7 @@ inline void ha_innopart::destroy_record_priority_queue_for_parts() {
         btr_pcur_free(&m_clust_pcur_parts[i]);
       }
     }
-    ut_free(m_pcur_parts);
+    ut::free(m_pcur_parts);
     m_clust_pcur_parts = nullptr;
     m_pcur_parts = nullptr;
     /* Reset the original m_prebuilt->pcur. */
@@ -1643,7 +1649,7 @@ inline void ha_innopart::destroy_record_priority_queue_for_parts() {
     m_prebuilt->clust_pcur = m_clust_pcur;
   }
   if (m_pcur_map != nullptr) {
-    ut_free(m_pcur_map);
+    ut::free(m_pcur_map);
     m_pcur_map = nullptr;
   }
 }
@@ -2032,9 +2038,10 @@ int ha_innopart::read_range_next_in_part(uint part, uchar *record) {
 
 int ha_innopart::sample_init(void *&scan_ctx, double sampling_percentage,
                              int sampling_seed,
-                             enum_sampling_method sampling_method) {
-  DBUG_ASSERT(table_share->is_missing_primary_key() ==
-              m_prebuilt->clust_index_was_generated);
+                             enum_sampling_method sampling_method,
+                             const bool tablesample) {
+  assert(table_share->is_missing_primary_key() ==
+         m_prebuilt->clust_index_was_generated);
 
   ut_ad(sampling_percentage >= 0.0);
   ut_ad(sampling_percentage <= 100.0);
@@ -2042,32 +2049,35 @@ int ha_innopart::sample_init(void *&scan_ctx, double sampling_percentage,
 
   if (sampling_percentage <= 0.0 || sampling_percentage > 100.0 ||
       sampling_method != enum_sampling_method::SYSTEM) {
-    return (0);
+    return 0;
   }
 
-  auto trx = m_prebuilt->trx;
+  trx_t *trx{nullptr};
 
-  /* Since histogram sampling does not have any correlation to transactions
-  we're setting the isolation level to read uncommitted to avoid unnecessarily
-  looking up old versions of a record as the version list can be very long. */
-  trx->isolation_level = TRX_ISO_READ_UNCOMMITTED;
+  if (tablesample) {
+    update_thd(ha_thd());
 
-  innobase_register_trx(ht, ha_thd(), trx);
-  trx_start_if_not_started_xa(trx, false);
-  trx_assign_read_view(trx);
+    trx = m_prebuilt->trx;
+    trx_start_if_not_started_xa(trx, false);
+
+    if (trx->isolation_level > TRX_ISO_READ_UNCOMMITTED) {
+      trx_assign_read_view(trx);
+    }
+  }
 
   /* Parallel read is not currently supported for sampling. */
-  size_t n_threads = Parallel_reader::available_threads(1);
+  size_t max_threads = Parallel_reader::available_threads(1, false);
 
-  if (n_threads == 0) {
+  if (max_threads == 0) {
     return HA_ERR_SAMPLING_INIT_FAILED;
   }
 
-  Histogram_sampler *sampler = UT_NEW_NOKEY(Histogram_sampler(
-      n_threads, sampling_seed, sampling_percentage, sampling_method));
+  Histogram_sampler *sampler = ut::new_withkey<Histogram_sampler>(
+      UT_NEW_THIS_FILE_PSI_KEY, max_threads, sampling_seed, sampling_percentage,
+      sampling_method);
 
   if (sampler == nullptr) {
-    Parallel_reader::release_threads(n_threads);
+    Parallel_reader::release_threads(max_threads);
     return HA_ERR_OUT_OF_MEM;
   }
 
@@ -2125,19 +2135,19 @@ int ha_innopart::sample_next(void *scan_ctx, uchar *buf) {
 
 int ha_innopart::sample_end(void *scan_ctx) {
   auto sampler = static_cast<Histogram_sampler *>(scan_ctx);
-  UT_DELETE(sampler);
+  ut::delete_(sampler);
 
-  return (0);
+  return 0;
 }
 
-/** Initialize a table scan in a specific partition.
-@param[in]	part_id	Partition to initialize.
-@param[in]	scan	True if table/index scan false otherwise (for rnd_pos)
-@return	0 or error number. */
+/** Initialize random read/scan of a specific partition.
+@param[in]	part_id		Partition to initialize.
+@param[in]	scan		True for scan else random access.
+@return error number or 0. */
 int ha_innopart::rnd_init_in_part(uint part_id, bool scan) {
   DBUG_TRACE;
-  DBUG_ASSERT(table_share->is_missing_primary_key() ==
-              m_prebuilt->clust_index_was_generated);
+  assert(table_share->is_missing_primary_key() ==
+         m_prebuilt->clust_index_was_generated);
 
   int err = change_active_index(part_id, table_share->primary_key);
 
@@ -2152,20 +2162,19 @@ int ha_innopart::rnd_init_in_part(uint part_id, bool scan) {
   return err;
 }
 
-/** Ends a table scan.
-@param[in]	part_id	Partition to end table scan in.
-@param[in]	scan	True for scan else random access.
-@return	0 or error number. */
+/** End random read/scan of a specific partition.
+@param[in]	part_id		Partition to end random read/scan.
+@param[in]	scan		True for scan else random access.
+@return error number or 0. */
 int ha_innopart::rnd_end_in_part(uint part_id, bool scan) {
   return (index_end());
 }
 
-/** Read next row in partition.
-Reads the next row in a table scan (also used to read the FIRST row
-in a table scan).
-@param[in]	part_id	Partition to end table scan in.
-@param[out]	buf	Returns the row in this buffer, in MySQL format.
-@return	0, HA_ERR_END_OF_FILE or error number. */
+/** Get next row during scan of a specific partition.
+Also used to read the FIRST row in a table scan.
+@param[in]	part_id	Partition to read from.
+@param[out]	buf	Next row.
+@return error number or 0. */
 int ha_innopart::rnd_next_in_part(uint part_id, uchar *buf) {
   int error;
 
@@ -2237,8 +2246,8 @@ was positioned the last time.
 @param[in]	record	Record to position for. */
 void ha_innopart::position_in_last_part(uchar *ref_arg, const uchar *record) {
   DBUG_TRACE;
-  DBUG_ASSERT(table_share->is_missing_primary_key() ==
-              m_prebuilt->clust_index_was_generated);
+  assert(table_share->is_missing_primary_key() ==
+         m_prebuilt->clust_index_was_generated);
 
   if (m_prebuilt->clust_index_was_generated) {
     /* No primary key was defined for the table and we
@@ -2651,6 +2660,7 @@ int ha_innopart::create(const char *name, TABLE *form,
 int ha_innopart::delete_table(const char *name, const dd::Table *dd_table) {
   THD *thd = ha_thd();
   trx_t *trx = check_trx_exists(thd);
+  char norm_name[FN_REFLEN];
   int error = 0;
 
   DBUG_TRACE;
@@ -2663,7 +2673,22 @@ int ha_innopart::delete_table(const char *name, const dd::Table *dd_table) {
     return HA_ERR_TABLE_READONLY;
   }
 
+  if (!normalize_table_name(norm_name, name)) {
+    return (HA_ERR_TOO_LONG_PATH);
+  }
+
   innobase_register_trx(ht, thd, trx);
+  TrxInInnoDB trx_in_innodb(trx);
+
+  dd::cache::Dictionary_client *client = dd::get_dd_client(thd);
+  dd::cache::Dictionary_client::Auto_releaser releaser(client);
+
+  TABLE_SHARE ts;
+  TABLE td;
+  error = acquire_uncached_table(thd, client, dd_table, norm_name, &ts, &td);
+  if (error != 0) {
+    return (error);
+  }
 
   for (const dd::Partition *dd_part : dd_table->leaf_partitions()) {
     std::string partition;
@@ -2676,19 +2701,19 @@ int ha_innopart::delete_table(const char *name, const dd::Table *dd_table) {
 
     if (part_table.length() >= FN_REFLEN) {
       ut_ad(false);
+      release_uncached_table(&ts, &td);
       return HA_ERR_INTERNAL_ERROR;
     }
 
     const char *partition_name = part_table.c_str();
 
-    error = innobase_basic_ddl::delete_impl<dd::Partition>(thd, partition_name,
-                                                           dd_part);
+    error = innobase_basic_ddl::delete_impl(thd, partition_name, dd_part, &td);
 
     if (error != 0) {
       break;
     }
   }
-
+  release_uncached_table(&ts, &td);
   return error;
 }
 
@@ -2703,6 +2728,8 @@ int ha_innopart::rename_table(const char *from, const char *to,
                               const dd::Table *from_table,
                               dd::Table *to_table) {
   THD *thd = ha_thd();
+  char norm_from[FN_REFLEN];
+  char norm_to[FN_REFLEN];
   int error = 0;
 
   DBUG_TRACE;
@@ -2719,6 +2746,11 @@ int ha_innopart::rename_table(const char *from, const char *to,
     return HA_ERR_TABLE_READONLY;
   }
 
+  if (!normalize_table_name(norm_from, from) ||
+      !normalize_table_name(norm_to, to)) {
+    return (HA_ERR_TOO_LONG_PATH);
+  }
+
   /* Get the transaction associated with the current thd, or create one
   if not yet created */
   trx_t *trx = check_trx_exists(thd);
@@ -2727,6 +2759,15 @@ int ha_innopart::rename_table(const char *from, const char *to,
   innobase_register_trx(ht, thd, trx);
 
   TrxInInnoDB trx_in_innodb(trx);
+  dd::cache::Dictionary_client *client = dd::get_dd_client(thd);
+  dd::cache::Dictionary_client::Auto_releaser releaser(client);
+
+  TABLE_SHARE ts;
+  TABLE td;
+  error = acquire_uncached_table(thd, client, from_table, norm_from, &ts, &td);
+  if (error != 0) {
+    return (error);
+  }
 
   auto to_part = to_table->leaf_partitions()->begin();
 
@@ -2752,17 +2793,15 @@ int ha_innopart::rename_table(const char *from, const char *to,
       ut_ad(false);
       return HA_ERR_INTERNAL_ERROR;
     }
-
-    error = innobase_basic_ddl::rename_impl<dd::Partition>(
-        thd, from_name.c_str(), to_name.c_str(), from_part, *to_part);
-
+    error = innobase_basic_ddl::rename_impl(
+        thd, from_name.c_str(), to_name.c_str(), from_part, *to_part, &td);
     if (error != 0) {
       break;
     }
 
     ++to_part;
   }
-
+  release_uncached_table(&ts, &td);
   return error;
 }
 
@@ -2786,44 +2825,17 @@ int ha_innopart::set_dd_discard_attribute(dd::Table *table_def, bool discard) {
 
     dd_part->set_se_private_id(table->id);
 
-    /* Set discard flag. */
+    /* Set the discard flag in the partition. */
     dd_set_discarded(*dd_part, discard);
 
-    /* Get Tablespace object */
-    dd::Tablespace *dd_space = nullptr;
+    /* Set the discarded state in the dd::Tablespace */
     THD *thd = ha_thd();
-    dd::cache::Dictionary_client *client = dd::get_dd_client(thd);
-    dd::cache::Dictionary_client::Auto_releaser releaser(client);
-
     dd::Object_id dd_space_id = (*dd_part->indexes()->begin())->tablespace_id();
-
     std::string space_name(table->name.m_name);
     dict_name::convert_to_space(space_name);
-
-    if (dd_tablespace_get_mdl(space_name.c_str())) {
-      /* purecov: begin inspected */
-      ut_ad(false);
-      return (HA_ERR_INTERNAL_ERROR);
-      /* purecov: end */
-    }
-
-    if (client->acquire_for_modification(dd_space_id, &dd_space) ||
-        dd_space == nullptr) {
-      /* purecov: begin inspected */
-      ut_ad(false);
-      return (HA_ERR_INTERNAL_ERROR);
-      /* purecov: end */
-    }
-
-    dd_tablespace_set_state(
-        dd_space, (discard ? DD_SPACE_STATE_DISCARDED : DD_SPACE_STATE_NORMAL));
-
-    if (client->update(dd_space)) {
-      /* purecov: begin inspected */
-      ut_ad(false);
-      return (HA_ERR_INTERNAL_ERROR);
-      /* purecov: end */
-    }
+    dd_space_states dd_state =
+        (discard ? DD_SPACE_STATE_DISCARDED : DD_SPACE_STATE_NORMAL);
+    dd_tablespace_set_state(thd, dd_space_id, space_name, dd_state);
 
     for (auto dd_index : *dd_part->indexes()) {
       const dict_index_t *index = dd_find_index(table, dd_index);
@@ -3219,7 +3231,7 @@ int ha_innopart::records(ha_rows *num_rows) {
   auto trx = thd_to_trx(ha_thd());
   size_t n_threads = thd_parallel_read_threads(m_prebuilt->trx->mysql_thd);
 
-  n_threads = Parallel_reader::available_threads(n_threads);
+  n_threads = Parallel_reader::available_threads(n_threads, false);
 
   if (n_threads > 0 && trx->isolation_level > TRX_ISO_READ_UNCOMMITTED &&
       m_prebuilt->select_lock_type == LOCK_NONE &&
@@ -3501,7 +3513,7 @@ static int update_table_stats(dict_table_t *table, bool is_analyze) {
     opt = DICT_STATS_RECALC_TRANSIENT;
   }
 
-  ut_ad(!mutex_own(&dict_sys->mutex));
+  ut_ad(!dict_sys_mutex_own());
   ret = dict_stats_update(table, opt);
 
   if (ret != DB_SUCCESS) {
@@ -3730,8 +3742,7 @@ int ha_innopart::info_low(uint flag, bool is_analyze) {
       created, because MySQL will only consider
       the fully built indexes here. */
 
-      for (const dict_index_t *index = UT_LIST_GET_FIRST(ib_table->indexes);
-           index != nullptr; index = UT_LIST_GET_NEXT(indexes, index)) {
+      for (const dict_index_t *index : ib_table->indexes) {
         /* First, online index creation is
         completed inside InnoDB, and then
         MySQL attempts to upgrade the
@@ -4186,8 +4197,8 @@ mem_heap_t **ha_innopart::alloc_blob_heap_array() {
   DBUG_TRACE;
 
   const ulint len = sizeof(mem_heap_t *) * m_tot_parts;
-  m_blob_heap_parts =
-      static_cast<mem_heap_t **>(ut_zalloc(len, mem_key_partitioning));
+  m_blob_heap_parts = static_cast<mem_heap_t **>(
+      ut::zalloc_withkey(ut::make_psi_memory_key(mem_key_partitioning), len));
   if (m_blob_heap_parts == nullptr) {
     return nullptr;
   }
@@ -4201,7 +4212,7 @@ void ha_innopart::free_blob_heap_array() {
 
   if (m_blob_heap_parts != nullptr) {
     clear_blob_heaps();
-    ut_free(m_blob_heap_parts);
+    ut::free(m_blob_heap_parts);
     m_blob_heap_parts = nullptr;
   }
 }
@@ -4237,20 +4248,18 @@ int ha_innopart::reset() {
   return ha_innobase::reset();
 }
 
-/**
- Read row using position using given record to find.
-
+/** Read row using position using given record to find.
 This works as position()+rnd_pos() functions, but does some
 extra work,calculating m_last_part - the partition to where
-the 'record' should go.	Only useful when position is based
-on primary key (HA_PRIMARY_KEY_REQUIRED_FOR_POSITION).
-
+the 'record' should go.
+Only useful when position is based on primary key
+(HA_PRIMARY_KEY_REQUIRED_FOR_POSITION).
 @param[in]	record	Current record in MySQL Row Format.
 @return	0 for success else error code. */
 int ha_innopart::rnd_pos_by_record(uchar *record) {
   int error;
   DBUG_TRACE;
-  DBUG_ASSERT(ha_table_flags() & HA_PRIMARY_KEY_REQUIRED_FOR_POSITION);
+  assert(ha_table_flags() & HA_PRIMARY_KEY_REQUIRED_FOR_POSITION);
   /* TODO: Support HA_READ_BEFORE_WRITE_REMOVAL */
   /* Set m_last_part correctly. */
   if (unlikely(get_part_for_delete(record, m_table->record[0], m_part_info,

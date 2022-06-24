@@ -1,4 +1,4 @@
-/* Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2016, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -2613,8 +2613,7 @@ TEST_F(HistogramsTest, HistogramOOM) {
   values.add_values(3, 10);
   values.add_values(4, 10);
 
-  MEM_ROOT oom_mem_root;
-  init_alloc_root(PSI_NOT_INSTRUMENTED, &oom_mem_root, 32, 0);
+  MEM_ROOT oom_mem_root(PSI_NOT_INSTRUMENTED, 32);
 
   /*
     Restrict the maximum capacity of the MEM_ROOT so it cannot grow anymore. But
@@ -2645,8 +2644,7 @@ TEST_F(HistogramsTest, EquiHeightOOM) {
   values.add_values(3, 10);
   values.add_values(4, 10);
 
-  MEM_ROOT oom_mem_root;
-  init_alloc_root(PSI_NOT_INSTRUMENTED, &oom_mem_root, 128, 0);
+  MEM_ROOT oom_mem_root(PSI_NOT_INSTRUMENTED, 128);
 
   {
     /*
@@ -2673,8 +2671,7 @@ TEST_F(HistogramsTest, SingletonOOM) {
   values.add_values(3, 10);
   values.add_values(4, 10);
 
-  MEM_ROOT oom_mem_root;
-  init_alloc_root(PSI_NOT_INSTRUMENTED, &oom_mem_root, 128, 0);
+  MEM_ROOT oom_mem_root(PSI_NOT_INSTRUMENTED, 128);
 
   {
     /*

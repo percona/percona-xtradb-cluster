@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2017, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -35,8 +35,8 @@
 #include "my_sys.h"
 #include "my_time.h"
 #include "my_user.h"  // parse_user
+#include "mysql/components/services/bits/psi_bits.h"
 #include "mysql/components/services/log_builtins.h"
-#include "mysql/psi/psi_base.h"
 #include "mysql/udf_registration_types.h"
 #include "mysql_com.h"
 #include "mysqld_error.h"
@@ -507,7 +507,6 @@ static bool migrate_event_to_dd(THD *thd, TABLE *event_table) {
   // Holders for user name and host name used in parse user.
   char definer_user_name_holder[USERNAME_LENGTH + 1];
   char definer_host_name_holder[HOSTNAME_LENGTH + 1];
-  memset(&user_info, 0, sizeof(LEX_USER));
   user_info.user = {definer_user_name_holder, USERNAME_LENGTH};
   user_info.host = {definer_host_name_holder, HOSTNAME_LENGTH};
 
@@ -534,7 +533,14 @@ static bool migrate_event_to_dd(THD *thd, TABLE *event_table) {
   dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
   const dd::Schema *schema = nullptr;
   if (thd->dd_client()->acquire(et_parse_data.dbname.str, &schema)) return true;
-  DBUG_ASSERT(schema != nullptr);
+
+  if (schema == nullptr) {
+    // Schema does not exist. Fail with an error indicating the presence of an
+    // orphan event.
+    LogErr(ERROR_LEVEL, ER_UPGRADE_NONEXISTENT_SCHEMA, et_parse_data.dbname.str,
+           "event", et_parse_data.name.str, "events");
+    return true;
+  }
 
   if (dd::create_event(thd, *schema, et_parse_data.name.str, event_body.str,
                        event_body_utf8.str, &user_info, &et_parse_data)) {

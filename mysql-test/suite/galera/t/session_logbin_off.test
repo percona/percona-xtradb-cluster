@@ -1,0 +1,72 @@
+--source include/galera_cluster.inc
+
+--connection node_1
+--let $assert_text = node_1 binlog should be enabled
+--let $sql_log_bin = query_get_value(SHOW VARIABLES LIKE 'sql_log_bin', Value, 1)
+--let $assert_cond = "$sql_log_bin" = "ON"
+--source include/assert.inc
+
+SHOW VARIABLES LIKE 'sql_log_bin';
+SHOW VARIABLES LIKE 'log_bin';
+
+CREATE TABLE t1 (a INT PRIMARY KEY);
+INSERT INTO t1 VALUES (0);
+
+SET SESSION sql_log_bin = OFF;
+
+INSERT INTO t1 VALUES (1);
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 2 FROM t1
+--source include/wait_condition.inc
+
+--connection node_1
+DELETE FROM t1;
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 0 FROM t1
+--source include/wait_condition.inc
+
+#
+# Now the same, but with --skip-log-bin. Let's use node_2 for this
+#
+--connection node_2
+--let $restart_parameters = "restart:--skip-log-bin"
+--source include/restart_mysqld.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+--let $assert_text = node_2 log_bin should be OFF
+--let $log_bin = query_get_value(SHOW VARIABLES LIKE 'log_bin', Value, 1)
+--let $assert_cond = "$log_bin" = "OFF"
+--source include/assert.inc
+
+--let $assert_text = node_2 sql_log_bin should be ON
+--let $sql_log_bin = query_get_value(SHOW VARIABLES LIKE 'sql_log_bin', Value, 1)
+--let $assert_cond = "$sql_log_bin" = "ON"
+--source include/assert.inc
+
+SHOW VARIABLES LIKE 'sql_log_bin';
+SHOW VARIABLES LIKE 'log_bin';
+
+INSERT INTO t1 VALUES (0);
+
+SET SESSION sql_log_bin = OFF;
+
+INSERT INTO t1 VALUES (1);
+
+--connection node_1
+--let $wait_condition = SELECT COUNT(*) = 2 FROM t1
+--source include/wait_condition.inc
+
+--connection node_2
+DELETE FROM t1;
+
+--connection node_1
+--let $wait_condition = SELECT COUNT(*) = 0 FROM t1
+--source include/wait_condition.inc
+
+
+# cleanup
+DROP TABLE t1;

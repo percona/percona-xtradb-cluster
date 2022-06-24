@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -48,7 +48,7 @@ class Rpl_info_table : public Rpl_info_handler {
   friend class Rpl_info_factory;
 
  public:
-  virtual ~Rpl_info_table();
+  ~Rpl_info_table() override;
 
  private:
   /**
@@ -93,12 +93,12 @@ class Rpl_info_table : public Rpl_info_handler {
   */
   bool is_transactional;
 
-  int do_init_info();
-  int do_init_info(uint instance);
+  int do_init_info() override;
+  int do_init_info(uint instance) override;
   int do_init_info(enum_find_method method, uint instance);
-  enum_return_check do_check_info();
-  enum_return_check do_check_info(uint instance);
-  void do_end_info();
+  enum_return_check do_check_info() override;
+  enum_return_check do_check_info(uint instance) override;
+  void do_end_info() override;
 
   /**
     Flushes and syncs in-memory information into a stable storage.
@@ -108,13 +108,13 @@ class Rpl_info_table : public Rpl_info_handler {
 
     @retval 0         Success
     @retval nonzero   Failure  This can happen if there is an error writing the
-                               table, or if slave_preserve_commit_order is
+                               table, or if replica_preserve_commit_order is
                                enabled and a previous transaction has failed. In
                                both cases, the error has been reported already.
   */
-  int do_flush_info(const bool force);
-  int do_remove_info();
-  int do_clean_info();
+  int do_flush_info(const bool force) override;
+  int do_remove_info() override;
+  int do_clean_info() override;
   /**
     Returns the number of entries in the table identified by:
     param_schema.param_table.
@@ -131,19 +131,44 @@ class Rpl_info_table : public Rpl_info_handler {
   */
   static bool do_count_info(uint nparam, const char *param_schema,
                             const char *param_table,
-                            MY_BITMAP const *nullable_bitmap, uint *counter);
+                            MY_BITMAP const *nullable_bitmap,
+                            ulonglong *counter);
+  /**
+    Returns if the table is being used, meaning it contains at least a
+    line or some concurrency related error was returned when looking at
+    the table identified by: param_schema.param_table
+
+    @param[in]  nparam           Number of fields in the table.
+    @param[in]  param_schema     Table's schema.
+    @param[in]  param_table      Table's name.
+    @param[in]  nullable_bitmap  bitmap that holds the fields that are
+                                 allowed to be `NULL`-
+    @param[out] counter          Number of entries found.
+
+    @retval a pair of booleans
+            First element is true if an error occurred, false otherwise.
+            Second element is true if the table is not empty or an access error
+            occurred meaning someone else is accessing it. False if the table
+            is empty.
+  */
+  static std::pair<bool, bool> table_in_use(uint nparam,
+                                            const char *param_schema,
+                                            const char *param_table,
+                                            MY_BITMAP const *nullable_bitmap);
+
   static int do_reset_info(uint nparam, const char *param_schema,
                            const char *param_table, const char *channel_name,
                            MY_BITMAP const *nullable_bitmap);
-  int do_prepare_info_for_read();
-  int do_prepare_info_for_write();
+  int do_prepare_info_for_read() override;
+  int do_prepare_info_for_write() override;
 
-  bool do_set_info(const int pos, const char *value);
-  bool do_set_info(const int pos, const uchar *value, const size_t size);
-  bool do_set_info(const int pos, const int value);
-  bool do_set_info(const int pos, const ulong value);
-  bool do_set_info(const int pos, const float value);
-  bool do_set_info(const int pos, const Server_ids *value);
+  bool do_set_info(const int pos, const char *value) override;
+  bool do_set_info(const int pos, const uchar *value,
+                   const size_t size) override;
+  bool do_set_info(const int pos, const int value) override;
+  bool do_set_info(const int pos, const ulong value) override;
+  bool do_set_info(const int pos, const float value) override;
+  bool do_set_info(const int pos, const Server_ids *value) override;
   /**
     Setter needed to set nullable fields to `NULL`.
 
@@ -152,7 +177,7 @@ class Rpl_info_table : public Rpl_info_handler {
 
     @return true if there was an error and false otherwise.
    */
-  bool do_set_info(const int pos, const std::nullptr_t value);
+  bool do_set_info(const int pos, const std::nullptr_t value) override;
   /**
     Setter needed to set nullable fields to `NULL`.
 
@@ -163,25 +188,27 @@ class Rpl_info_table : public Rpl_info_handler {
     @return true if there was an error and false otherwise.
    */
   bool do_set_info(const int pos, const std::nullptr_t value,
-                   const size_t size);
+                   const size_t size) override;
   Rpl_info_handler::enum_field_get_status do_get_info(
-      const int pos, char *value, const size_t size, const char *default_value);
+      const int pos, char *value, const size_t size,
+      const char *default_value) override;
   Rpl_info_handler::enum_field_get_status do_get_info(
       const int pos, uchar *value, const size_t size,
-      const uchar *default_value);
-  Rpl_info_handler::enum_field_get_status do_get_info(const int pos, int *value,
-                                                      const int default_value);
+      const uchar *default_value) override;
   Rpl_info_handler::enum_field_get_status do_get_info(
-      const int pos, ulong *value, const ulong default_value);
+      const int pos, int *value, const int default_value) override;
   Rpl_info_handler::enum_field_get_status do_get_info(
-      const int pos, float *value, const float default_value);
+      const int pos, ulong *value, const ulong default_value) override;
   Rpl_info_handler::enum_field_get_status do_get_info(
-      const int pos, Server_ids *value, const Server_ids *default_value);
-  char *do_get_description_info();
+      const int pos, float *value, const float default_value) override;
+  Rpl_info_handler::enum_field_get_status do_get_info(
+      const int pos, Server_ids *value,
+      const Server_ids *default_value) override;
+  char *do_get_description_info() override;
 
-  bool do_is_transactional();
-  bool do_update_is_transactional();
-  uint do_get_rpl_info_type();
+  bool do_is_transactional() override;
+  bool do_update_is_transactional() override;
+  uint do_get_rpl_info_type() override;
 
   /**
     Verify if the table primary key fields are at the expected (column)

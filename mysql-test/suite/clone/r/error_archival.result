@@ -1,3 +1,4 @@
+set sort_buffer_size=1048576;
 call mtr.add_suppression("\\[Warning\\] .*MY-\\d+.* Log writer is waiting for redo-archiver to catch up .*");
 call mtr.add_suppression("\\[ERROR\\] .*MY-\\d+.* Log writer waited too long for redo-archiver to advance .*");
 INSTALL PLUGIN clone SONAME 'CLONE_PLUGIN';
@@ -26,10 +27,12 @@ END IF;
 CASE p_dml_type
 WHEN 0 THEN
 SET @clol3_text = CONCAT('Clone Test Row - ', v_key);
-INSERT INTO t1 VALUES(v_key, v_key * 10,
+INSERT INTO t1 (col1, col2, col3, col4) VALUES (
+v_key, v_key * 10,
 @clol3_text, REPEAT('Large Column Data ', 2048))
 ON DUPLICATE KEY UPDATE col2 = col2 + 1;
-INSERT INTO t2 VALUES(v_key, v_key * 10,
+INSERT INTO t2 (col1, col2, col3, col4) VALUES (
+v_key, v_key * 10,
 @clol3_text, REPEAT('Large Column Data ', 2048))
 ON DUPLICATE KEY UPDATE col2 = col2 + 1;
 WHEN 1 THEN
@@ -55,6 +58,7 @@ START TRANSACTION;
 END IF;
 END IF;
 END WHILE;
+COMMIT;
 END|
 call execute_dml(0, 0, 100, 100, 10, 0);
 SHOW CREATE TABLE t1;
@@ -334,3 +338,4 @@ DROP TABLE t2;
 DROP PROCEDURE execute_dml;
 UNINSTALL PLUGIN clone;
 SET DEBUG_SYNC = 'RESET';
+set sort_buffer_size=DEFAULT;

@@ -1,24 +1,41 @@
 .. _3nodec2:
 
-====================================================
-How to set up a three-node cluster in EC2 enviroment
-====================================================
+=====================================================
+How to set up a three-node cluster in EC2 environment
+=====================================================
 
-This manual assumes you are running *m1.xlarge* instances
+This manual assumes you are running three EC2 instances
 with Red Hat Enterprise Linux 7 64-bit.
 
 * ``node1``: ``10.93.46.58``
 * ``node2``: ``10.93.46.59``
 * ``node3``: ``10.93.46.60``
 
-To set up |PXC|:
+.. rubric:: Recommendations on launching EC2 instances
 
-1. Remove |PXC| and |PS| packages for older versions:
+1. Select `instance types <https://aws.amazon.com/ec2/instance-types/>`_ that support Enhanced Networking functionality. Good network performance critical for synchronous replication used in Percona XtraDB Cluster.
+#. When adding instance storage volumes, choose the ones with good I/O performance:
 
-   - |PXC| 5.6, 5.7
-   - |PS| 5.6, 5.7
+   * instances with NVMe are preferred
+   * GP2 SSD are preferred to GP3 SSD volume types due to I/O latency
+   * over sized GP2 SSD are preferred to IO1 volume types due to cost
+     
+#. Attach Elastic network interfaces with static IPs or assign Elastic IP addresses to your instances. Thereby IP addresses are preserved on instances in case of reboot or restart. This is required as each Percona XtraDB Cluster member includes the ``wsrep_cluster_address`` option in its configuration which points to other cluster members.
+#. Launch instances in different availability zones to avoid cluster downtime in case one of the zones experiences power loss or network connectivity issues.
+   
+.. seealso::
 
-#. Install |PXC| as described in :ref:`yum`.
+   Amazon EC2 Documentation:
+       https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EC2_GetStarted.html
+
+To set up Percona XtraDB Cluster:
+
+1. Remove Percona XtraDB Cluster and Percona Server for MySQL packages for older versions:
+
+   - Percona XtraDB Cluster 5.6, 5.7
+   - Percona Server for MySQL 5.6, 5.7
+
+#. Install Percona XtraDB Cluster as described in :ref:`yum`.
 
 #. Create data directories:
 
@@ -54,7 +71,6 @@ To set up |PXC|:
     wsrep_provider=/usr/lib64/libgalera_smm.so
     wsrep_cluster_address=gcomm://10.93.46.58,10.93.46.59,10.93.46.60
 
-    wsrep_slave_threads=2
     wsrep_cluster_name=trimethylxanthine
     wsrep_sst_method=xtrabackup-v2
     wsrep_node_name=node1
@@ -67,7 +83,7 @@ To set up |PXC|:
 
     wsrep_node_name=node3
 
-#. Start and bootstrap |PXC| on the first node:
+#. Start and bootstrap Percona XtraDB Cluster on the first node:
 
    .. code-block:: bash
 

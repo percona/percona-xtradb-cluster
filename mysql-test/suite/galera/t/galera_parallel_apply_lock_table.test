@@ -12,10 +12,10 @@ CREATE TABLE t2 (id INT PRIMARY KEY) ENGINE=InnoDB;
 
 --connection node_2
 
---let $wsrep_slave_threads_orig = `SELECT @@wsrep_slave_threads`
+--let $wsrep_applier_threads_orig = `SELECT @@wsrep_applier_threads`
 --let $wsrep_sync_wait_orig = `SELECT @@wsrep_sync_wait`
 
-SET GLOBAL wsrep_slave_threads = 2;
+SET GLOBAL wsrep_applier_threads = 2;
 LOCK TABLE t1 READ;
 
 --connection node_1
@@ -49,6 +49,6 @@ SELECT COUNT(*) = 1 FROM t2;
 --let $wait_condition = SELECT COUNT(*) = 2  FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'wsrep: committed write set%';
 --source include/wait_condition.inc
 
---eval SET GLOBAL wsrep_slave_threads = $wsrep_slave_threads_orig;
+--eval SET GLOBAL wsrep_applier_threads = $wsrep_applier_threads_orig;
 DROP TABLE t1;
 DROP TABLE t2;

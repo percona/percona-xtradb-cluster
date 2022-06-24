@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -59,7 +59,7 @@ SET(GCS_XCOM_TESTS
   xcom/gcs_xcom_notification
   xcom/gcs_xcom_utils
   xcom/gcs_msg_stages
-  xcom/gcs_whitelist
+  xcom/gcs_allowlist
   xcom/gcs_xcom_group_management
   xcom/gcs_xcom_state_exchange
   xcom/gcs_packet
@@ -79,7 +79,17 @@ SET(GCS_XCOM_TESTS
   xcom/gcs_message_stage_fragmentation
   xcom/gcs_xcom_site_def
   xcom/gcs_xcom_expels_in_progress
-  )
+  xcom/gcs_xcom_network_provider
+  xcom/gcs_xcom_network_provider_manager
+  xcom/gcs_xcom_xcom_single_writer
+)
+
+# When binding using IPv6 the way XCom does (dual stack IPv4/IPv6), it
+# does not detect that a port is busy when binding and overruns the
+# previous port. As such, this test cannot run on Solaris
+IF(SOLARIS)
+  LIST(REMOVE_ITEM GCS_XCOM_TESTS xcom/gcs_xcom_network_provider)
+ENDIF()
 
 ###
 ### Configure the tests and add target
@@ -93,6 +103,12 @@ FOREACH(tpath ${GCS_INTERFACE_TESTS} ${GCS_XCOM_TESTS})
     LINK_LIBRARIES gunit_small mysqlgcs ${LZ4_LIBRARY}
     )
   SET(GCS_UNIT_TESTS "${GCS_UNIT_TESTS}" "${test}-t")
+  IF(WIN32)
+    # Suppress linker warnings arising from linking to mysqlgcs and mysys
+    # LNK4217: symbol 'symbol' defined in 'f1.obj' is imported by 'f2.obj'...
+    # LNK4286: symbol 'symbol' defined in 'f1.obj' is imported by 'f2.obj'
+    MY_TARGET_LINK_OPTIONS(${test}-t "/ignore:4217 /ignore:4286")
+  ENDIF()
 ENDFOREACH()
 
 IF(MY_COMPILER_IS_CLANG)

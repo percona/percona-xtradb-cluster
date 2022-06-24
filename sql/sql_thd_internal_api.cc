@@ -1,4 +1,4 @@
-/* Copyright (c) 2015, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2015, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -64,8 +64,61 @@
 struct mysql_cond_t;
 struct mysql_mutex_t;
 
-void thd_init(THD *thd, char *stack_start, bool bound MY_ATTRIBUTE((unused)),
-              PSI_thread_key psi_key MY_ATTRIBUTE((unused))) {
+#ifdef WITH_WSREP
+THD *create_internal_thd(bool allow_mdl_conflict) {
+#else
+THD *create_internal_thd() {
+#endif /* WITH_WSREP */
+  /* For internal threads, use enabled_plugins = false. */
+  THD *thd = new THD(false);
+  thd->system_thread = SYSTEM_THREAD_BACKGROUND;
+#ifdef WITH_WSREP
+  thd->wsrep_allow_mdl_conflict = allow_mdl_conflict;
+#endif /* WITH_WSREP */
+  // Skip grants and set the system_user flag in THD.
+  thd->security_context()->skip_grants();
+  thd->thread_stack = reinterpret_cast<char *>(&thd);
+  thd->store_globals();
+
+#ifdef HAVE_PSI_THREAD_INTERFACE
+  PSI_thread *psi;
+  psi = PSI_THREAD_CALL(get_thread)();
+  if (psi != nullptr) {
+    /*
+      Associate this THD to the background thread instrumentation,
+      so that system variables and status variables
+      are visible for the background thread.
+    */
+    PSI_THREAD_CALL(set_thread_THD)(psi, thd);
+    thd->set_psi(psi);
+  }
+#endif /* HAVE_PSI_THREAD_INTERFACE */
+
+  return thd;
+}
+
+void destroy_internal_thd(THD *thd) {
+  assert(thd->system_thread == SYSTEM_THREAD_BACKGROUND);
+
+#ifdef HAVE_PSI_THREAD_INTERFACE
+  PSI_thread *psi;
+  psi = PSI_THREAD_CALL(get_thread)();
+  if (psi != nullptr) {
+    /*
+      Dissociate this THD from the background thread instrumentation.
+    */
+    PSI_THREAD_CALL(set_thread_THD)(psi, nullptr);
+    thd->set_psi(nullptr);
+  }
+#endif /* HAVE_PSI_THREAD_INTERFACE */
+
+  thd->release_resources();
+  delete thd;
+}
+
+void thd_init(THD *thd, char *stack_start, bool bound [[maybe_unused]],
+              PSI_thread_key psi_key [[maybe_unused]],
+              unsigned int psi_seqnum [[maybe_unused]]) {
   DBUG_TRACE;
   // TODO: Purge threads currently terminate too late for them to be added.
   // Note that P_S interprets all threads with thread_id != 0 as
@@ -78,7 +131,7 @@ void thd_init(THD *thd, char *stack_start, bool bound MY_ATTRIBUTE((unused)),
   }
 #ifdef HAVE_PSI_THREAD_INTERFACE
   PSI_thread *psi;
-  psi = PSI_THREAD_CALL(new_thread)(psi_key, thd, thd->thread_id());
+  psi = PSI_THREAD_CALL(new_thread)(psi_key, psi_seqnum, thd, thd->thread_id());
   if (bound) {
     PSI_THREAD_CALL(set_thread_os_id)(psi);
   }
@@ -98,14 +151,15 @@ void thd_init(THD *thd, char *stack_start, bool bound MY_ATTRIBUTE((unused)),
 }
 
 THD *create_thd(bool enable_plugins, bool background_thread, bool bound,
-                PSI_thread_key psi_key) {
+                PSI_thread_key psi_key, unsigned int psi_seqnum) {
   THD *thd = new THD(enable_plugins);
   if (background_thread) {
     thd->system_thread = SYSTEM_THREAD_BACKGROUND;
     // Skip grants and set the system_user flag in THD.
     thd->security_context()->skip_grants();
   }
-  (void)thd_init(thd, reinterpret_cast<char *>(&thd), bound, psi_key);
+  (void)thd_init(thd, reinterpret_cast<char *>(&thd), bound, psi_key,
+                 psi_seqnum);
   return thd;
 }
 
@@ -195,7 +249,7 @@ enum_tx_isolation thd_get_trx_isolation(const THD *thd) {
 const CHARSET_INFO *thd_charset(THD *thd) { return (thd->charset()); }
 
 LEX_CSTRING thd_query_unsafe(THD *thd) {
-  DBUG_ASSERT(current_thd == thd);
+  assert(current_thd == thd);
   return thd->query();
 }
 
@@ -218,9 +272,8 @@ int thd_non_transactional_update(const THD *thd) {
 
 int thd_binlog_format(const THD *thd) {
 #ifdef WITH_WSREP
-  if ((WSREP(thd) && wsrep_emulate_bin_log) ||
-      ((mysql_bin_log.is_open()) &&
-       (thd->variables.option_bits & OPTION_BIN_LOG)))
+  if (((WSREP(thd) && wsrep_emulate_bin_log) || mysql_bin_log.is_open()) &&
+      !(thd->variables.option_bits & OPTION_BIN_LOG_INTERNAL_OFF))
     return (int)thd->variables.binlog_format;
 #else
   if (mysql_bin_log.is_open() && (thd->variables.option_bits & OPTION_BIN_LOG))
@@ -275,8 +328,8 @@ bool is_mysql_datadir_path(const char *path) {
 }
 
 int mysql_tmpfile_path(const char *path, const char *prefix) {
-  DBUG_ASSERT(path != nullptr);
-  DBUG_ASSERT((strlen(path) + strlen(prefix)) <= FN_REFLEN);
+  assert(path != nullptr);
+  assert((strlen(path) + strlen(prefix)) <= FN_REFLEN);
 
   char filename[FN_REFLEN];
   int mode = O_CREAT | O_EXCL | O_RDWR;
@@ -289,13 +342,13 @@ int mysql_tmpfile_path(const char *path, const char *prefix) {
 }
 
 bool thd_is_bootstrap_thread(THD *thd) {
-  DBUG_ASSERT(thd);
+  assert(thd);
   return (thd->is_bootstrap_system_thread() &&
           !thd->is_init_file_system_thread());
 }
 
 bool thd_is_dd_update_stmt(const THD *thd) {
-  DBUG_ASSERT(thd != nullptr);
+  assert(thd != nullptr);
 
   /*
     OPTION_DD_UPDATE_CONTEXT flag is set when thread switches context to
@@ -319,7 +372,7 @@ NULL.
 @param[out] stats a pointer to fragmentation statistics to fill */
 void thd_get_fragmentation_stats(const THD *thd,
                                  fragmentation_stats_t *stats) noexcept {
-  DBUG_ASSERT(stats != nullptr);
+  assert(stats != nullptr);
   if (likely(thd != nullptr)) {
     stats->scan_pages_contiguous =
         thd->status_var.fragmentation_stats.scan_pages_contiguous;

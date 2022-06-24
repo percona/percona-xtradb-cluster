@@ -1,4 +1,4 @@
-/* Copyright (c) 2008, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2008, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -119,14 +119,14 @@ void my_timer_init(MY_TIMER_INFO *mti);
 #define MY_TIMER_ROUTINE_TIMES 17
 /* #define MY_TIMER_ROUTINE_FTIME                   18  - No longer used */
 #define MY_TIMER_ROUTINE_ASM_PPC64 19
-#define MY_TIMER_ROUTINE_ASM_SUNPRO_SPARC64 20
-#define MY_TIMER_ROUTINE_ASM_SUNPRO_SPARC32 21
-#define MY_TIMER_ROUTINE_ASM_SUNPRO_I386 22
+/* #define MY_TIMER_ROUTINE_ASM_SUNPRO_SPARC64      20  - No longer used */
+/* #define MY_TIMER_ROUTINE_ASM_SUNPRO_SPARC32      21  - No longer used */
+/* #define MY_TIMER_ROUTINE_ASM_SUNPRO_I386         22  - No longer used */
 #define MY_TIMER_ROUTINE_ASM_GCC_SPARC64 23
-#define MY_TIMER_ROUTINE_ASM_GCC_SPARC32 24
+/* #define MY_TIMER_ROUTINE_ASM_GCC_SPARC32         24  - No longer used */
 #define MY_TIMER_ROUTINE_MACH_ABSOLUTE_TIME 25
 #define MY_TIMER_ROUTINE_GETSYSTEMTIMEASFILETIME 26
-#define MY_TIMER_ROUTINE_ASM_SUNPRO_X86_64 27
+/* #define MY_TIMER_ROUTINE_ASM_SUNPRO_X86_64       27  - No longer used */
 #define MY_TIMER_ROUTINE_ASM_AARCH64 28
 
 #endif

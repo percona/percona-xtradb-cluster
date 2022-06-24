@@ -1,4 +1,4 @@
-# Copyright (c) 2010, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2010, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -34,14 +34,13 @@ ADD_SUBDIRECTORY(jtie)
 ADD_SUBDIRECTORY(test)
 
 IF(HAVE_JDK)
-
-  INCLUDE_DIRECTORIES(${JNI_INCLUDE_DIRS})
-
-  INCLUDE_DIRECTORIES(utils
-                      jtie)
-
-  ADD_LIBRARY(ndbjtie STATIC ndbjtie_lib.cpp)
-
+  ADD_CONVENIENCE_LIBRARY(ndbjtie
+    ndbjtie_lib.cpp
+    INCLUDE_DIRECTORIES
+    ${JNI_INCLUDE_DIRS}
+    jtie
+    utils
+    )
 ENDIF(HAVE_JDK)
 
 # the NdbJTie Java API

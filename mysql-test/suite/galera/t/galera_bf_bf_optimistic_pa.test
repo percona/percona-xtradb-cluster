@@ -1,0 +1,115 @@
+#
+# Test that ALTER TABLE on parent table is properly ordered with simultaneous
+# transactions that perform DML on child table.
+#
+# node_2's UPDATE should be ordered after ALTER TABLE, as from point of view of
+# node_2 it is executed after ALTER TABLE
+# node_1's UPDATE should fail certification as its certification keys conflict
+# with ALTER TABLE certification keys.
+#
+# Without the fix, it triggers BF-BF conflict between TOI and wsrep applier.
+#
+
+--source include/have_debug_sync.inc
+--source suite/galera/include/galera_have_debug_sync.inc
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+--connect node_1_toi, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1_toi
+SET SESSION wsrep_sync_wait = 0;
+
+CREATE TABLE p1 (pk INTEGER PRIMARY KEY, f2 INTEGER);
+INSERT INTO p1 VALUES (1,1);
+
+CREATE TABLE c1 (pk INTEGER PRIMARY KEY, f2 CHAR(30), fk INTEGER, FOREIGN KEY (fk) REFERENCES p1(pk));
+INSERT INTO c1 VALUES (1, 'INITIAL VALUE', 1);
+INSERT INTO c1 VALUES (2, 'INITIAL VALUE', 1);
+
+--let $galera_sync_point = apply_monitor_master_enter_sync
+--source include/galera_set_sync_point.inc
+
+--send ALTER TABLE p1 ADD f1 INT
+
+--connection node_1
+SET SESSION wsrep_sync_wait=0;
+--let $galera_sync_point = apply_monitor_master_enter_sync
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+######################################################################
+
+--connection node_1
+START TRANSACTION;
+
+UPDATE c1 SET f2 = 'changed from node 1' WHERE pk = 1;
+SELECT * FROM c1 WHERE pk = 2 FOR UPDATE;
+
+# Block the applier on node #1 and issue a conflicting update on node #2
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+SET SESSION wsrep_sync_wait = 0;
+--let $galera_sync_point = apply_monitor_slave_enter_sync
+--source include/galera_set_sync_point.inc
+
+--connection node_2
+UPDATE c1 SET f2 = 'changed from node 2' WHERE pk = 2;
+
+--connection node_1a
+# Block the commit, send the COMMIT and wait until it gets blocked
+
+--let $galera_sync_point = commit_monitor_master_enter_sync
+--source include/galera_set_sync_point.inc
+
+--connection node_1
+--send COMMIT
+
+--connection node_1a
+--let $galera_sync_point = apply_monitor_master_enter_sync apply_monitor_slave_enter_sync commit_monitor_master_enter_sync
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+# Let the conflicting UPDATE proceed and wait until it hits abort_trx_end.
+# The victim transaction still sits in commit_monitor_master_sync_point.
+
+--let $galera_sync_point = apply_monitor_slave_enter_sync
+--source include/galera_signal_sync_point.inc
+--let $galera_sync_point = apply_monitor_master_enter_sync commit_monitor_master_enter_sync
+--source include/galera_wait_sync_point.inc
+
+# Let the transactions proceed
+--source include/galera_clear_sync_point.inc
+--let $galera_sync_point = commit_monitor_master_enter_sync
+--source include/galera_signal_sync_point.inc
+
+--let $galera_sync_point = apply_monitor_master_enter_sync
+--source include/galera_signal_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+--connection node_1
+--error ER_LOCK_DEADLOCK
+--reap
+
+--connection node_1_toi
+--reap
+# wait for replication thd to do its job
+--let $assert_text = node_2 changes should be replicated
+--let $assert_cond = [SELECT COUNT(*) FROM c1 WHERE pk = 2 AND f2 = "changed from node 2"] = 1
+--source include/assert.inc
+
+--echo node_1:
+SELECT * FROM c1;
+SELECT * FROM p1;
+SHOW CREATE TABLE p1;
+
+--connection node_2
+--echo node_2:
+SELECT * FROM c1;
+SELECT * FROM p1;
+SHOW CREATE TABLE p1;
+
+DROP TABLE c1;
+DROP TABLE p1;
+
+--disconnect node_1_toi
+--disconnect node_1a
+--source include/wait_until_count_sessions.inc

@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+  Copyright (c) 2019, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -25,28 +25,10 @@
 #ifndef MYSQL_PROTOCOL_AUTHENTICATION_INCLUDED
 #define MYSQL_PROTOCOL_AUTHENTICATION_INCLUDED
 
+#include <string_view>
 #include <vector>
 
 #include "mysql/harness/stdx/expected.h"
-#include "mysql/harness/stdx/string_view.h"
-
-#ifdef _WIN32
-// workaround LNK2005 in std::vector<uint8_t> when linking against
-// mysql_protocol.lib
-//
-//     mysql_protocol.lib(mysql_protocol.dll) : error LNK2005:
-//       "public: __cdecl std::vector<unsigned char,class
-//       std::allocator<unsigned char> >::~vector<unsigned char,class
-//       std::allocator<unsigned char> >(void)"
-//       (??1?$vector@EV?$allocator@E@std@@@std@@QEAA@XZ) already defined in
-//       authentication.obj
-//
-// to be removed if mysql_protocol/base_packet.h doesn't inherit from
-// std::vector<uint8_t> anymore.
-//
-// only happens with MSVC
-#include "mysqlrouter/mysql_protocol.h"
-#endif
 
 class MySQLNativePassword {
  public:
@@ -54,7 +36,7 @@ class MySQLNativePassword {
 
   // client-side scrambling of the password
   static stdx::expected<std::vector<uint8_t>, void> scramble(
-      stdx::string_view nonce, stdx::string_view password);
+      std::string_view nonce, std::string_view password);
 };
 
 class CachingSha2Password {
@@ -63,7 +45,7 @@ class CachingSha2Password {
 
   // client-side scrambling of the password
   static stdx::expected<std::vector<uint8_t>, void> scramble(
-      stdx::string_view nonce, stdx::string_view password);
+      std::string_view nonce, std::string_view password);
 };
 
 class ClearTextPassword {
@@ -72,7 +54,7 @@ class ClearTextPassword {
 
   // client-side scrambling of the password
   static stdx::expected<std::vector<uint8_t>, void> scramble(
-      stdx::string_view nonce, stdx::string_view password);
+      std::string_view nonce, std::string_view password);
 };
 
 #endif
