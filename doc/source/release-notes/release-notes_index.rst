@@ -1,5 +1,5 @@
 ============================================
- |Percona XtraDB Cluster| 5.7 Release notes
+ *Percona XtraDB Cluster* 5.7 Release notes
 ============================================
 
 .. toctree::

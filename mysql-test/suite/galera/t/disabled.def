@@ -16,7 +16,6 @@ galera_as_slave_replication_bundle : GCF-912 0000-00-00 CODERSHIP feature no lon
 galera_kill_nochanges : mysql-wsrep#24 0000-00-00 CODERSHIP Galera server does not restart properly if killed
 galera_as_slave_preordered : Intermittent failure (duplicate entry) observed in mtr.
 galera_toi_ddl_online : fails randomly with "deadlock error" as sequence of action is causing an issue.
-galera_garbd : Failing to find the garbd binary after new minimal image change.
 galera_create_table_like : Resource leak with CTAS statement (PXC#2232)
 pxc_encrypt_rest_blog : Currently PXC doesn't support binlog encryption
 pxc_encrypt_rest_gt_vault : Vault server availability is unreliable

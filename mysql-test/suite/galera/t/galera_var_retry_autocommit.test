@@ -3,6 +3,7 @@
 # proceeds very slowly due to extra SLEEP() in a trigger
 #
 
+--source include/no_ps_protocol.inc
 --source include/galera_cluster.inc
 
 --connection node_1

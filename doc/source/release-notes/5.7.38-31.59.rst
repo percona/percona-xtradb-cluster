@@ -20,3 +20,4 @@ Bugs Fixed
 * :jirabug:`PXC-3961`: Reduced the strictness of checks which had marked `GNo=0` invalid. In Percona XtraDB Cluster, writesets are replicated to other nodes with `GNo=0`. The generation of seqno or GTID occurs later in the pre-commit phase. A recent version had increased the strictness of these checks which caused the GTID event from 5.6 to be considered invalid.
 
 .. include:: ../_res/5.7-useful-links.txt
+
