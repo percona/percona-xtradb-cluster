@@ -6289,6 +6289,7 @@ restart:
   if (is_dml_stmt                                    &&
       thd->variables.wsrep_replicate_myisam          &&
       db_type == DB_TYPE_MYISAM                      &&
+      thd->get_command()!= COM_STMT_PREPARE          &&
       thd->wsrep_exec_mode == LOCAL_STATE)
   {
     WSREP_TO_ISOLATION_BEGIN(NULL, NULL, (*start));

@@ -7,6 +7,12 @@
 # gets the deadlock error
 #
 
+if (`SELECT $PS_PROTOCOL = 1`)
+{
+  --skip See codership/mysql-wsrep-bugs#1130
+  # Remove this once the bug is fixed
+}
+
 --source include/galera_cluster.inc
 --source suite/galera/t/MW-328-header.inc
 

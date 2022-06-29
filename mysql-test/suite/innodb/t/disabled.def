@@ -18,3 +18,4 @@ innodb_file_limit_check : BUG#89208 2018-05-31 VasilDimov https://bugs.mysql.com
 mysqldump_max_recordsize : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
 xa_prepare_lock_release : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
 # Codership disabled tests end here
+innodb.undo_encrypt_basic : Bug#nnnnnnnn 2021-11-22 Disable unstable test

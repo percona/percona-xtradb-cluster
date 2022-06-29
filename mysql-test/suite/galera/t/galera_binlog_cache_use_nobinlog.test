@@ -1,0 +1,40 @@
+# === Purpose ===
+#
+# This test verifies that binlog cache related status variables are not updated
+# when binlog is turned off.
+#
+# === References ===
+#
+# PXC-3609: Binlog_cache_disk_use not zero
+#
+--source include/have_wsrep_provider.inc
+CREATE TABLE `t1` (
+  `i` int NOT NULL AUTO_INCREMENT,
+  `s` TEXT DEFAULT NULL,
+  PRIMARY KEY (`i`)
+) ENGINE=InnoDB;
+
+# The below INSERT shall generate writeset that exceeds the default
+# binlog_cache_size (32k) resulting in writing to temp file duing the
+# transaction and results in incrementing the counter of
+# `Binlog_cache_disk_use` status var when binary log is enabled.
+INSERT INTO `t1` (s) VALUES (REPEAT('a',40000));
+INSERT INTO `t1` (s) VALUES (REPEAT('b',40000));
+
+
+--let $binlog_cache_use=`SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'Binlog_cache_use';`
+--let $binlog_cache_disk_use=`SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'Binlog_cache_disk_use';`
+
+# Assert that Binlog_cache_use is 0
+--let $assert_text = Binlog_cache_use should be 0
+--let $assert_cond = $binlog_cache_use = 0
+--source include/assert.inc
+
+# Assert that Binlog_cache_disk_use is 0
+--let $assert_text = Binlog_cache_disk_use should be 0
+--let $assert_cond = $binlog_cache_disk_use = 0
+--source include/assert.inc
+
+SHOW GLOBAL STATUS LIKE '%binlog%cache%';
+
+DROP TABLE t1;

@@ -1,0 +1,10 @@
+Release Highlights
+=================================================
+
+The following lists a number of the notable updates and fixes for MySQL 5.7.37, provided by Oracle, and included in Percona Server for MySQL:
+
+* The performance on debug builds has been improved by optimizing the `buf_validate()` function in the *InnoDB* sources.
+* Fix for when a query using an index that differs from the primary key of the partitioned table results in excessive CPU load.
+* Enabling ``PAD_CHAR_TO_FULL_LENGTH`` SQL mode on a replica server added trailing spaces to a replication channel's name in the replication metadata repository tables. Attempts to identify the channel using the padded name caused errors. The SQL mode is disabled when reading from those tables.
+
+Find the complete list of bug fixes and changes in `MySQL 5.7.37 Release Notes <https://dev.mysql.com/doc/relnotes/mysql/5.7/en/news-5-7-37.html>`__.

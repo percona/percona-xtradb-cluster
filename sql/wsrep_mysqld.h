@@ -158,7 +158,8 @@ extern ulong       pxc_maint_transition_period;
 extern my_bool     pxc_encrypt_cluster_traffic;
 
 enum enum_wsrep_mode {
-    WSREP_MODE_IGNORE_NATIVE_REPLICATION_FILTER_RULES = 0
+    WSREP_MODE_IGNORE_NATIVE_REPLICATION_FILTER_RULES = 0,
+    WSREP_MODE_IGNORE_CASCADING_FK_DELETE_MISSING_ROW_ERROR = 1,
 };
 
 // MySQL status variables
@@ -249,8 +250,10 @@ extern void wsrep_kill_mysql(THD *thd);
 /* new defines */
 extern void wsrep_stop_replication(THD *thd, bool is_server_shutdown);
 extern bool wsrep_start_replication();
+extern bool wsrep_is_show_query(enum enum_sql_command command);
 extern bool wsrep_must_sync_wait (THD* thd, uint mask = WSREP_SYNC_WAIT_BEFORE_READ);
 extern bool wsrep_sync_wait (THD* thd, uint mask = WSREP_SYNC_WAIT_BEFORE_READ);
+extern bool wsrep_sync_wait(THD* thd, enum enum_sql_command command);
 extern bool wsrep_check_mode(uint mask);
 extern int  wsrep_check_opts (int argc, char* const* argv);
 extern void wsrep_prepend_PATH (const char* path);
