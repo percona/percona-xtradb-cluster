@@ -1,0 +1,9 @@
+Release Highlights
+=================================================
+
+Improvements and bug fixes for MySQL 5.7.38, provided by Oracle, and included in Percona Server for MySQL are the following:
+
+* In certain scenarios, a MySQL server connection could fail if the `.ibd` file for the partition was missing.
+* A statement was not written to the slow query log if the statement contained errors and could not be parsed.
+
+Find the complete list of bug fixes and changes in `MySQL 5.7.38 Release Notes <https://dev.mysql.com/doc/relnotes/mysql/5.7/en/news-5-7-38.html>`__.
