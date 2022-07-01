@@ -16,7 +16,8 @@ function handle_sigint() {
   fi
 }
 
-trap 'handle_sigint' 2
+trap 'handle_sigint' SIGINT
+trap 'handle_sigint' SIGTERM
 
 echo 1
 
