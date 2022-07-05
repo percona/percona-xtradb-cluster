@@ -6864,6 +6864,24 @@ static int init_server_components() {
 #endif /* WITH_WSREP */
 
 #ifdef WITH_WSREP /* WSREP BEFORE SE */
+  /* We need to load keyring before Galera, as we need to access
+     the Master Key during GCache recovery */
+  /*Load early plugins */
+  if (plugin_register_early_plugins(&remaining_argc, remaining_argv,
+                                    (is_help_or_validate_option())
+                                        ? PLUGIN_INIT_SKIP_INITIALIZATION
+                                        : 0)) {
+    LogErr(ERROR_LEVEL, ER_CANT_INITIALIZE_EARLY_PLUGINS);
+    unireg_abort(1);
+  }
+
+  /* Load builtin daemon keyring proxy plugin */
+  if (plugin_register_keyring(&remaining_argc, remaining_argv)) {
+    if (!opt_validate_config)
+      LogErr(ERROR_LEVEL, ER_CANT_INITIALIZE_BUILTIN_PLUGINS);
+    unireg_abort(1);
+  }
+
   /*
     Wsrep initialization must happen at this point, because:
     - opt_bin_logname must be known when starting replication
@@ -6894,26 +6912,6 @@ static int init_server_components() {
         unireg_abort(MYSQLD_ABORT_EXIT);
       }
     }
-#if 0
-      ssl_artifacts_status auto_detection_status = auto_detect_ssl();
-      if (auto_detection_status == SSL_ARTIFACTS_AUTO_DETECTED)
-        sql_print_information(
-            "Found %s, %s and %s in data directory. "
-            "Trying to enable SSL support using them.",
-            DEFAULT_SSL_CA_CERT, DEFAULT_SSL_SERVER_CERT,
-            DEFAULT_SSL_SERVER_KEY);
-
-      /* Generate certs automatically only when bootstrapping
-      to avoid cases where starting up creates incompatible certs */
-      if (wsrep_new_cluster) {
-        if (do_auto_cert_generation(auto_detection_status) == false)
-          unireg_abort(MYSQLD_ABORT_EXIT);
-      } else {
-        WSREP_INFO(
-            "Skipping automatic SSL certificate generation"
-            " (enabled only in bootstrap mode)");
-      }
-#endif /* 0 */
 
     /* Disable wsrep functionality with bootstrap */
     if (opt_initialize) {
@@ -7178,6 +7176,7 @@ static int init_server_components() {
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
 
+#ifndef WITH_WSREP
   /*Load early plugins */
   if (plugin_register_early_plugins(&remaining_argc, remaining_argv,
                                     (is_help_or_validate_option())
@@ -7186,7 +7185,7 @@ static int init_server_components() {
     LogErr(ERROR_LEVEL, ER_CANT_INITIALIZE_EARLY_PLUGINS);
     unireg_abort(1);
   }
-
+#endif
   /* Load builtin plugins, initialize MyISAM, CSV and InnoDB */
   if (plugin_register_builtin_and_init_core_se(&remaining_argc,
                                                remaining_argv)) {

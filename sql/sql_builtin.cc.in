@@ -44,8 +44,12 @@ struct st_mysql_plugin *mysql_optional_plugins[]=
 struct st_mysql_plugin *mysql_mandatory_plugins[]=
 {
 #ifdef WITH_WSREP
-  builtin_binlog_plugin, builtin_mysql_password_plugin, builtin_caching_sha2_password_plugin, builtin_daemon_keyring_proxy_plugin, builtin_wsrep_plugin, @mysql_mandatory_plugins@ 0
+  builtin_binlog_plugin, builtin_mysql_password_plugin, builtin_caching_sha2_password_plugin, builtin_wsrep_plugin, @mysql_mandatory_plugins@ 0
 #else
   builtin_binlog_plugin, builtin_mysql_password_plugin, builtin_caching_sha2_password_plugin, builtin_daemon_keyring_proxy_plugin, @mysql_mandatory_plugins@ 0
 #endif /* WITH_WSREP */
 };
+
+#ifdef WITH_WSREP
+struct st_mysql_plugin *mysql_mandatory_keyring_plugin[]={builtin_daemon_keyring_proxy_plugin, 0};
+#endif

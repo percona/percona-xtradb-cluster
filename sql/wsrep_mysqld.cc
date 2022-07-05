@@ -66,6 +66,10 @@
 
 #include "debug_sync.h"
 
+#include "wsrep_master_key_manager.h"
+static bool wsrep_init_master_key();
+static void wsrep_deinit_master_key();
+
 /* wsrep-lib */
 Wsrep_server_state *Wsrep_server_state::m_instance;
 
@@ -161,6 +165,7 @@ static char provider_vendor[256] = {
 
 /* Set to true on successful connect and false on disconnect. */
 bool wsrep_connected = false;
+bool forceKeysFetch = false;
 
 // wsrep status variable - start
 bool wsrep_ready = false;  // node can accept queries
@@ -1078,6 +1083,16 @@ int wsrep_init() {
       wsrep_init_provider_status_variables();
     }
     return err;
+  } else {
+    /* There is provider. Initialize master key manager.
+       Even if there is no kering plugin loaded, it will initialize,
+       but will be useless. In such a case if Galera GCache encryption
+       is enabled, it will fail on master key fetch/generate. */
+    if (wsrep_init_master_key()) {
+      WSREP_ERROR(
+          "wsrep::init() master key initialization failed, must shutdown");
+      return 1;
+    }
   }
 
   global_system_variables.wsrep_on = 1;
@@ -1211,6 +1226,13 @@ void wsrep_init_startup(bool sst_first) {
     // initialization and we cannot recover anyway.
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
+
+  // This is definitely a hack, but we need to force keyring cache to repopulate
+  // after SST, because SST might have add some keys.
+  // forceKeysFetch is a weak symbol, so if keyring plugin provides its own
+  // instance, we are good, if not... GCache necryption won't work.
+  // If not this way, we need to change keyring plugin interface.
+  forceKeysFetch = true;
 }
 
 void wsrep_deinit() {
@@ -1226,6 +1248,7 @@ void wsrep_deinit() {
     wsrep_provider_capabilities = NULL;
     free(p);
   }
+  wsrep_deinit_master_key();
 }
 
 void wsrep_recover() {
@@ -3093,3 +3116,29 @@ bool wsrep_consistency_check(THD *thd) {
  This is to avoid interference of PXC specific part with generic server part.
  */
 String wsrep_thd_rewritten_query(THD *thd) { return thd->rewritten_query(); }
+
+static std::shared_ptr<MasterKeyManager> masterKeyManager;
+static bool wsrep_init_master_key() {
+  masterKeyManager = std::make_shared<MasterKeyManager>(
+      [](const std::string &msg) { WSREP_ERROR("%s", msg.c_str()); });
+  return masterKeyManager->Init();
+}
+
+static void wsrep_deinit_master_key() {
+  masterKeyManager->DeInit();
+  masterKeyManager.reset();
+}
+
+std::string wsrep_get_master_key(const std::string &keyId) {
+  std::string mk = masterKeyManager->GetKey(keyId);
+  return mk;
+}
+
+bool wsrep_new_master_key(const std::string &keyId) {
+  return masterKeyManager->GenerateKey(keyId);
+}
+
+bool wsrep_rotate_master_key() {
+  wsrep::provider &provider = Wsrep_server_state::instance().provider();
+  return (wsrep::provider::status::success != provider.rotate_gcache_key());
+}

@@ -119,6 +119,16 @@ class Rotate_redo_system_key final : public Alter_instance {
   Rotate_percona_system_key rotate_percona_system_key;
 };
 
+#ifdef WITH_WSREP
+class Rotate_gcache_master_key final : public Rotate_innodb_key {
+ public:
+  explicit Rotate_gcache_master_key(THD *thd) : Rotate_innodb_key(thd) {}
+
+  bool execute() override;
+  ~Rotate_gcache_master_key() override {}
+};
+#endif /* WITH_WSREP */
+
 /** Alter Innodb redo log properties. */
 class Innodb_redo_log : public Alter_instance {
  public:

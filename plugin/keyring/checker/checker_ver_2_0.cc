@@ -27,6 +27,10 @@
 #include "my_compiler.h"
 #include "plugin/keyring/digest.h"
 
+#ifdef WITH_WSREP
+extern bool forceKeysFetch;
+#endif
+
 namespace keyring {
 
 bool CheckerVer_2_0::is_file_size_correct(size_t file_size) {
@@ -53,8 +57,14 @@ bool CheckerVer_2_0::is_dgst_correct(File file, Digest *digest) {
     return false;
   dgst_read_from_file.is_empty = false;
 
+#ifdef WITH_WSREP
+  if (forceKeysFetch ||
+      strncmp(dummy_digest, reinterpret_cast<const char *>(digest->value),
+              SHA256_DIGEST_LENGTH) == 0) {
+#else
   if (strncmp(dummy_digest, reinterpret_cast<const char *>(digest->value),
               SHA256_DIGEST_LENGTH) == 0) {
+#endif
     *digest = dgst_read_from_file;
     return true;
   }
