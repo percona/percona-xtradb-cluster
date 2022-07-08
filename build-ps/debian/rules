@@ -96,6 +96,7 @@ ifeq ($(SKIP_DEBUG_BINARY),)
                 -DWITH_ZLIB=bundled \
                 -DWITH_EDITLINE=bundled \
                 -DWITH_LIBEVENT=bundled \
+                -DWITH_FIDO=bundled \
                 -DWITH_NUMA=ON \
 		-DWITH_EXTRA_CHARSETS=all ..
 endif
@@ -145,6 +146,7 @@ endif
                 -DWITH_ZLIB=bundled \
                 -DWITH_EDITLINE=bundled \
                 -DWITH_LIBEVENT=bundled \
+                -DWITH_FIDO=bundled \
                 -DWITH_NUMA=ON \
 		-DWITH_EXTRA_CHARSETS=all ..
 
