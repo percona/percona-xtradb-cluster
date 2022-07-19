@@ -213,28 +213,35 @@ For example: ::
 .. option:: compressor
 
     :Default: not set (disabled)
-    :Example: compressor='gzip'
+    :Example: compressor='zstd -TO -2'
 
 .. option:: decompressor
 
     :Default: not set (disabled)
-    :Example: decompressor='gzip -dc'
+    :Example: decompressor='zstd -TO -dc'
 
-Two previous options enable stream-based compression/decompression.
-When these options are set, compression/decompression is performed on stream,
-in contrast to performing decompression after streaming to disk,
-involving additional I/O.
-This saves a lot of I/O (up to twice less I/O on joiner node).
+Stream-based compression and decompression are performed on the stream, in contrast to performing decompression after streaming to disk, which involves additional I/O. The savings are considerable, up to half the I/O on the JOINER node.
 
 You can use any compression utility which works on stream:
-``gzip``, ``pigz`` (which is recommended because it is multi-threaded), etc.
-Compressor has to be set on donor node and decompressor on joiner node
-(although you can set them vice-versa for configuration homogeneity,
-it won't affect that particular SST).
-To use XtraBackup based compression as before,
-set ``compress`` under ``[xtrabackup]``.
-Having both enabled won't cause any failure
-(although you will be wasting CPU cycles).
+``gzip``, ``pigz``, ``zstd``, and others. The ``pigz`` or ``zstd`` options are multi-threaded. At a minimum, the compressor must be set on the DONOR and the decompressor on JOINER.
+
+You must install the related binaries, otherwise SST aborts.
+
+compressor='pigz'
+decompressor='pigz -dc'
+
+compressor='gzip'
+decompressor='gzip -dc'
+
+To revert to the XtraBackup-based compression, 
+set ``compress`` under ``[xtrabackup]``. You can define both the compressor and the decompressor, although you will be wasting CPU cycles.
+
+.. code-block:: text
+
+   [xtrabackup]
+   compress
+
+   -- compact has led to some crashes
 
 .. option:: inno-backup-opts
 
