@@ -73,6 +73,7 @@ one host:
       -e CLUSTER_NAME=pxc-cluster1 \
       --name=pxc-node1 \
       --net=pxc-network \
+      -v ~/pxc-docker-test/cert:/cert \
       -v ~/pxc-docker-test/config:/etc/percona-xtradb-cluster.conf.d \
       percona/percona-xtradb-cluster:8.0
 
