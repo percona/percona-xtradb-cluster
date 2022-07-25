@@ -27,7 +27,7 @@ if ($sst_allowed_methods != '')
 --echo Starting garbd with --sst $sst_request_method:$sst_request_data
 
 --error 0, 1
---exec `dirname $WSREP_PROVIDER`/../bin/garbd --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'base_port=$NODE_GALERAPORT_2' --sst "$sst_request_method:$sst_request_data"
+--exec $GALERA_GARBD --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'base_port=$NODE_GALERAPORT_2' --sst "$sst_request_method:$sst_request_data"
 
 --let SEARCH_FILE = $error_log
 

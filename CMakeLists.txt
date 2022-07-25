@@ -2697,3 +2697,5 @@ IF(HAVE_WITH_NDBCLUSTER)
   SET(WITH_NDBCLUSTER ${WITH_NDB} CACHE BOOL
     "Deprecated legacy option for MySQL Cluster")
 ENDIF()
+
+ADD_SUBDIRECTORY(percona-xtradb-cluster-galera)

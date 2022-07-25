@@ -4193,6 +4193,7 @@ sub check_wsrep_support() {
       my $file_wsrep_provider=
         mtr_file_exists("/usr/lib/galera/libgalera_smm.so",
                         "/usr/lib64/galera/libgalera_smm.so",
+                        "$dirname/percona-xtradb-cluster-galera/libgalera_smm.so",
                         "$dirname/lib/libgalera_smm.so");
 
       if ($file_wsrep_provider ne "") {
@@ -4202,6 +4203,23 @@ sub check_wsrep_support() {
       } else {
         mtr_verbose("Could not find wsrep provider library, setting it to 'none'");
         $ENV{'WSREP_PROVIDER'}= "none";
+      }
+    }
+    if (not defined $ENV{'GALERA_GARBD'}) {
+      my $dirname = dirname(abs_path($0));
+      $dirname = "$dirname/..";
+      if (defined $ENV{MTR_BINDIR}) {
+        $dirname = "$ENV{'MTR_BINDIR'}",
+      }
+      my $file_garbd=
+        mtr_file_exists("$dirname/percona-xtradb-cluster-galera/bin/garbd",
+                        "$dirname/bin/garbd");
+      if ($file_garbd ne "") {
+        mtr_verbose("garbd binary found : $file_garbd");
+        $ENV{'GALERA_GARBD'}= $file_garbd;
+      } else {
+        mtr_verbose("Could not find garbd binary, setting it to 'none'");
+        $ENV{'GALERA_GARBD'}= "none";
       }
     }
   }
