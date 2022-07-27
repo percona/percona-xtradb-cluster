@@ -3408,15 +3408,8 @@ MgmtSrvr::dumpState(int nodeId, const char* args)
   int b  = 0;
   std::memset(buf, 0, BufSz);
   for (size_t i = 0; i <= strlen(args); i++){
-    if (b == NDB_ARRAY_SIZE(buf))
-    {
-      return -1;
-    }
-    if (numArgs == NDB_ARRAY_SIZE(args_array))
-    {
-      return -1;
-    }
     if (args[i] == ' ' || args[i] == 0){
+      assert(b < BufSz);
       assert(buf[b] == 0);
       args_array[numArgs] = atoi(buf);
       numArgs++;
@@ -5126,6 +5119,7 @@ MgmtSrvr::change_config(Config& new_config, BaseString& msg)
   }
   SimpleSignal ssig;
   UtilBuffer buf;
+  UtilBuffer *buf_ptr = &buf;
   new_config.pack(buf, v2);
   ssig.ptr[0].p = (Uint32*)buf.get_data();
   ssig.ptr[0].sz = (buf.length() + 3) / 4;
@@ -5177,7 +5171,8 @@ MgmtSrvr::change_config(Config& new_config, BaseString& msg)
             /**
              * Free old buffer and create a new one.
              */
-            buf.assign(nullptr, 0);
+            delete buf_ptr;
+            buf_ptr = new (buf_ptr) UtilBuffer;
             require(new_config.pack(buf, v2_new));
             v2 = v2_new;
           }

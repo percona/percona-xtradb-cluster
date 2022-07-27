@@ -296,12 +296,11 @@ enum_gcs_error Gcs_xcom_control::do_join(bool retry) {
     retry_join_count--;
     if (retry && m_join_attempts != 0 && ret == GCS_NOK &&
         retry_join_count >= 1) {
-      MYSQL_GCS_LOG_INFO("Sleeping for "
-                         << m_join_sleep_time
-                         << " seconds before retrying to join the group. There "
-                            "are "
-                         << retry_join_count
-                         << " more attempt(s) before giving up.");
+      MYSQL_GCS_LOG_DEBUG(
+          "Sleeping for %u seconds before retrying to join the group. There "
+          "are "
+          " %u more attempt(s) before giving up.",
+          m_join_sleep_time, retry_join_count);
       My_xp_util::sleep_seconds(m_join_sleep_time);
     } else {
       break;
@@ -405,14 +404,13 @@ enum_gcs_error Gcs_xcom_control::retry_do_join() {
   if (!could_connect_to_local_xcom) {
     MYSQL_GCS_LOG_ERROR("Error testing to the local group communication"
                         << " engine instance.")
+    MYSQL_GCS_LOG_DEBUG(
+        "Error testing the connection to the local group communication engine "
+        "instance.")
     goto err;
   }
 
   if (m_boot) {
-    MYSQL_GCS_LOG_INFO(
-        "Booting a group: "
-        << m_local_node_info->get_member_uuid().actual_value.c_str() << ":"
-        << local_port)
     MYSQL_GCS_LOG_TRACE(
         "::join():: I am the boot node. %d - %s. Calling xcom_client_boot.",
         local_port, m_local_node_info->get_member_uuid().actual_value.c_str())
@@ -465,8 +463,8 @@ enum_gcs_error Gcs_xcom_control::retry_do_join() {
   }
 
   m_xcom_running = true;
-  MYSQL_GCS_LOG_INFO(
-      "The member has joined the group. Local port: " << local_port);
+  MYSQL_GCS_LOG_DEBUG("The member has joined the group. Local port: %d",
+                      local_port);
 
   m_suspicions_manager->set_groupid_hash(m_gid_hash);
   m_suspicions_manager->set_my_info(m_local_node_info);
@@ -532,11 +530,6 @@ bool Gcs_xcom_control::try_send_add_node_request_to_seeds(
     std::tie(connected, con) = connect_to_peer(peer, my_addresses);
 
     if (connected) {
-      MYSQL_GCS_LOG_INFO("Sucessfully connected to peer "
-                         << peer.get_member_ip().c_str() << ":"
-                         << peer.get_member_port()
-                         << ". Sending a request to be added to the group");
-
       MYSQL_GCS_LOG_TRACE(
           "::join():: Calling xcom_client_add_node %d_%s connected to "
           "%s:%d "
@@ -591,9 +584,8 @@ std::pair<bool, connection_descriptor *> Gcs_xcom_control::connect_to_peer(
   con = m_xcom_proxy->xcom_client_open_connection(addr, port);
   if (con->fd == -1) {
     // Could not connect to the peer.
-    MYSQL_GCS_LOG_ERROR("Error on opening a connection to peer node "
-                        << addr << ":" << port
-                        << " when joining a group. My local port is: "
+    MYSQL_GCS_LOG_ERROR("Error on opening a connection to "
+                        << addr << ":" << port << " on local port: "
                         << m_local_node_address->get_member_port() << ".");
     goto end;
   }
@@ -2120,7 +2112,7 @@ void Gcs_suspicions_manager::run_process_suspicions(bool lock) {
   }
 
   // List of nodes to remove
-  Gcs_xcom_nodes nodes_to_remove, nodes_to_remember_expel;
+  Gcs_xcom_nodes nodes_to_remove;
 
   bool force_remove = false;
 
@@ -2160,9 +2152,6 @@ void Gcs_suspicions_manager::run_process_suspicions(bool lock) {
       }
 
       nodes_to_remove.add_node(*susp_it);
-      if ((*susp_it).is_member()) {
-        nodes_to_remember_expel.add_node(*susp_it);
-      }
       m_suspicions.remove_node(*susp_it);
       /* purecov: end */
     } else {
@@ -2196,9 +2185,9 @@ void Gcs_suspicions_manager::run_process_suspicions(bool lock) {
           "process_suspicions: Expelling suspects that timed out!");
       bool const removed =
           m_proxy->xcom_remove_nodes(nodes_to_remove, m_gid_hash);
-      if (removed && !nodes_to_remember_expel.empty()) {
+      if (removed) {
         m_expels_in_progress.remember_expels_issued(m_config_id,
-                                                    nodes_to_remember_expel);
+                                                    nodes_to_remove);
       }
     } else if (force_remove) {
       assert(!m_is_killer_node);

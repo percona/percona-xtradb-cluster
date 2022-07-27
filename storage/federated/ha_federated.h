@@ -277,5 +277,4 @@ class ha_federated : public handler {
   int connection_autocommit(bool state);
   int execute_simple_query(const char *query, int len);
   int reset(void) override;
-  int rnd_pos_by_record(uchar *record) override;
 };

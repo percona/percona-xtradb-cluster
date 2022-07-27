@@ -40,13 +40,12 @@
 #include "mock_server_testutils.h"
 #include "mysql/harness/logging/registry.h"
 #include "mysql/harness/utility/string.h"  // ::join
-#include "mysqlrouter/mysql_session.h"
+#include "mysql_session.h"
 #include "mysqlrouter/rest_client.h"
 #include "rest_api_testutils.h"
 #include "router_component_test.h"
 #include "tcp_port_pool.h"
-#include "test/helpers.h"
-#include "test/temp_directory.h"
+#include "temp_dir.h"
 
 using namespace std::string_literals;
 
@@ -170,7 +169,7 @@ TEST_P(RestRoutingApiTest, ensure_openapi) {
   init_keyring(default_section, conf_dir_.name());
 
   const std::string conf_file{create_config_file(
-      conf_dir_.name(), mysql_harness::join(config_sections, ""),
+      conf_dir_.name(), mysql_harness::join(config_sections, "\n"),
       &default_section, "mysqlrouter.conf", "connect_timeout=1")};
 
   SCOPED_TRACE("// starting router");
@@ -1162,7 +1161,7 @@ TEST_P(RestRoutingApiTestCluster, ensure_openapi_cluster) {
   init_keyring(default_section, conf_dir_.name());
 
   const std::string conf_file{create_config_file(
-      conf_dir_.name(), mysql_harness::join(config_sections, ""),
+      conf_dir_.name(), mysql_harness::join(config_sections, "\n"),
       &default_section)};
 
   ProcessWrapper &http_server =

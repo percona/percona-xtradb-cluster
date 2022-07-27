@@ -31,8 +31,6 @@
 #
 ###############################################################
 
---source include/have_ipv6.inc
-
 if (!$localhost_address)
 {
   --die "Missing argument $localhost_address"

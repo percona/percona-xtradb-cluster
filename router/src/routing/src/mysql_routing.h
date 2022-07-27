@@ -72,6 +72,7 @@
 #include "mysqlrouter/uri.h"
 #include "plugin_config.h"
 #include "protocol/base_protocol.h"
+#include "router_config.h"
 #include "socket_container.h"
 #include "ssl_mode.h"
 #include "tcp_address.h"
@@ -79,6 +80,9 @@
 namespace mysql_harness {
 class PluginFuncEnv;
 }
+
+using mysqlrouter::URI;
+using std::string;
 
 struct Nothing {};
 
@@ -141,9 +145,9 @@ class MySQLRouting : public MySQLRoutingBase {
       net::io_context &io_ctx, routing::RoutingStrategy routing_strategy,
       uint16_t port, const Protocol::Type protocol,
       const routing::AccessMode access_mode = routing::AccessMode::kUndefined,
-      const std::string &bind_address = {"0.0.0.0"},
+      const string &bind_address = string{"0.0.0.0"},
       const mysql_harness::Path &named_socket = mysql_harness::Path(),
-      const std::string &route_name = {},
+      const string &route_name = string{},
       int max_connections = routing::kDefaultMaxConnections,
       std::chrono::milliseconds destination_connect_timeout =
           routing::kDefaultDestinationConnectionTimeout,

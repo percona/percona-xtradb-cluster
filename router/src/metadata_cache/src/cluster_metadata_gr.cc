@@ -32,12 +32,12 @@
 #include "mysql/harness/logging/logging.h"
 #include "mysqlrouter/mysql_session.h"
 #include "mysqlrouter/uri.h"
-#include "mysqlrouter/utils.h"  // strtoui_checked
 
 using mysql_harness::EventStateTracker;
 using mysql_harness::logging::LogLevel;
 using mysqlrouter::ClusterType;
 using mysqlrouter::MySQLSession;
+using mysqlrouter::strtoi_checked;
 using mysqlrouter::strtoui_checked;
 using mysqlrouter::strtoull_checked;
 IMPORT_LOG_FUNCTIONS()
@@ -229,16 +229,6 @@ class GRClusterSetMetadataBackend : public GRMetadataBackendV2 {
   metadata_cache::metadata_servers_list_t
   update_clusterset_topology_from_metadata_server(
       mysqlrouter::MySQLSession &session, const std::string &clusterset_id);
-
-  /** @brief Finds the writable node within the currently known ClusterSet
-   * topology.
-   *
-   * @return address of the current primary node if found
-   * @return metadata_cache::metadata_errc::no_rw_node_found if did not find any
-   * primary
-   */
-  stdx::expected<metadata_cache::metadata_server_t, std::error_code>
-  find_rw_server() const;
 
   struct ClusterSetTopology {
     // we at least once successfully read the metadata from one of the metadata
@@ -1069,18 +1059,16 @@ static std::string get_router_option_str(const std::string &options,
     return default_value;
   }
 
-  const auto it =
-      json_doc.FindMember(rapidjson::Value{name.data(), name.size()});
-  if (it == json_doc.MemberEnd()) {
+  if (!json_doc.HasMember(name.c_str())) {
     return default_value;
   }
 
-  if (!it->value.IsString()) {
+  if (!json_doc[name.c_str()].IsString()) {
     out_error = "options." + name + " not a string";
     return default_value;
   }
 
-  return it->value.GetString();
+  return json_doc[name.c_str()].GetString();
 }
 
 static bool update_router_options_from_metadata(
@@ -1329,62 +1317,6 @@ GRClusterSetMetadataBackend::update_clusterset_topology_from_metadata_server(
   return result;
 }
 
-static void log_target_cluster_warnings(
-    const mysqlrouter::TargetCluster &target_cluster) {
-  const bool is_invalidated = target_cluster.is_invalidated();
-  const bool state_changed = EventStateTracker::instance().state_changed(
-      is_invalidated, EventStateTracker::EventId::TargetClusterInvalidated);
-
-  if (is_invalidated) {
-    const auto log_level =
-        state_changed ? LogLevel::kWarning : LogLevel::kDebug;
-
-    const auto policy = target_cluster.invalidated_cluster_routing_policy();
-
-    if (policy ==
-        mysqlrouter::TargetCluster::InvalidatedClusterRoutingPolicy::DropAll) {
-      log_custom(
-          log_level,
-          "Target cluster '%s' invalidated in the metadata - blocking all "
-          "connections",
-          target_cluster.c_str());
-    } else {
-      // mysqlrouter::TargetCluster::InvalidatedClusterRoutingPolicy::AcceptRO
-      log_custom(log_level,
-                 "Target cluster %s invalidated in the metadata - accepting "
-                 "only RO connections",
-                 target_cluster.c_str());
-    }
-  }
-}
-
-stdx::expected<metadata_cache::metadata_server_t, std::error_code>
-GRClusterSetMetadataBackend::find_rw_server() const {
-  for (const auto &cluster : clusterset_topology_.clusters) {
-    if (!cluster.second.is_primary) continue;
-
-    const auto cluster_uuid = cluster.first;
-    metadata_cache::ManagedCluster primary_cluster;
-    for (const auto &node : cluster.second.nodes) {
-      primary_cluster.members.emplace_back(node);
-    }
-
-    log_debug("Updating the status of cluster '%s' to find the writable node",
-              cluster_uuid.c_str());
-
-    // we need to connect to the Primary Cluster and query its GR status to
-    // figure out the current Primary node
-    metadata_->update_cluster_status(
-        {mysqlrouter::TargetCluster::TargetType::ByUUID, cluster_uuid},
-        primary_cluster);
-
-    return metadata_->find_rw_server(primary_cluster.members);
-  }
-
-  return stdx::make_unexpected(
-      make_error_code(metadata_cache::metadata_errc::no_rw_node_needed));
-}
-
 stdx::expected<metadata_cache::ClusterTopology, std::error_code>
 GRClusterSetMetadataBackend::fetch_cluster_topology(
     MySQLSession::Transaction &transaction,
@@ -1478,58 +1410,93 @@ GRClusterSetMetadataBackend::fetch_cluster_topology(
     }
   }
 
-  log_target_cluster_warnings(target_cluster);
+  // if our target cluster is invalidated in the metadata our behavior is
+  // determined by the policy we read from the metadata
+  if (target_cluster.is_invalidated()) {
+    const auto policy = target_cluster.invalidated_cluster_routing_policy();
 
-  // update the clusterset topology
-  result.metadata_servers =
-      update_clusterset_topology_from_metadata_server(*connection, cs_id);
-
-  // query for the nodes of our target_cluster
-  if (target_cluster.is_usable()) {
-    result.cluster_data.members =
-        fetch_target_cluster_instances_from_metadata_server(*connection,
-                                                            target_cluster_id);
-    result.cluster_data.view_id = view_id;
-    result.cluster_data.single_primary_mode = true;
+    if (policy ==
+        mysqlrouter::TargetCluster::InvalidatedClusterRoutingPolicy::DropAll) {
+      log_warning(
+          "Target cluster '%s' invalidated in the metadata - blocking all "
+          "connections",
+          target_cluster.c_str());
+      return stdx::make_unexpected(make_error_code(
+          metadata_cache::metadata_errc::cluster_marked_as_invalid));
+    } else {
+      // mysqlrouter::TargetCluster::InvalidatedClusterRoutingPolicy::AcceptRO
+      log_warning(
+          "Target cluster %s invalidated in the metadata - accepting "
+          "only RO connections",
+          target_cluster.c_str());
+      // fall down
+    }
   }
 
-  // we are done with querying metadata, this transaction commit has to be done
-  // unconditionally, regardless of the target cluster usability
+  // query for the nodes of our target_cluster
+  result.cluster_data.members =
+      fetch_target_cluster_instances_from_metadata_server(*connection,
+                                                          target_cluster_id);
+  // update the metadata servers list
+  result.metadata_servers =
+      update_clusterset_topology_from_metadata_server(*connection, cs_id);
+  result.cluster_data.view_id = view_id;
+  result.cluster_data.single_primary_mode = true;
+
+  // we are done with querying metadata
   transaction.commit();
 
-  if (target_cluster.is_usable()) {
-    // connect to the cluster and query for the list and status of its
-    // members. (more precisely: search and connect to a
-    // member which is part of quorum to retrieve this data)
-    metadata_->update_cluster_status(
-        target_cluster,
-        result.cluster_data);  // throws metadata_cache::metadata_error
+  // now connect to the cluster and query for the list and status of its
+  // members. (more precisely: search and connect to a
+  // member which is part of quorum to retrieve this data)
+  metadata_->update_cluster_status(
+      target_cluster,
+      result.cluster_data);  // throws metadata_cache::metadata_error
 
-    // change the mode of RW node(s) reported by the GR to RO if the
-    // Cluster is Replica or if our target cluster is invalidated
-    if (!target_cluster.is_primary() || target_cluster.is_invalidated()) {
-      for (auto &member : result.cluster_data.members) {
-        if (member.mode == metadata_cache::ServerMode::ReadWrite) {
-          member.mode = metadata_cache::ServerMode::ReadOnly;
-        }
+  // here we change the mode of RW node(s) reported by the GR to RO if the
+  // Cluster is Replica or if our target cluster is invalidated
+  if (!target_cluster.is_primary() || target_cluster.is_invalidated()) {
+    for (auto &member : result.cluster_data.members) {
+      if (member.mode == metadata_cache::ServerMode::ReadWrite) {
+        member.mode = metadata_cache::ServerMode::ReadOnly;
       }
     }
   }
 
   if (needs_writable_node) {
     if (target_cluster.is_primary()) {
-      // if our target cluster is PRIMARY we grab the writable node; we already
-      // know which one is it as we just checked it
+      // if our target cluster is PRIMARY we grab the writable node as with
+      // regular standalone Cluster
       result.cluster_data.writable_server =
           metadata_->find_rw_server(result.cluster_data.members);
     } else {
-      result.cluster_data.writable_server = find_rw_server();
-    }
+      // if our target cluster is NOT a PRIMARY we need to connect to the
+      // Primary Cluster and query its GR status to figure out the current
+      // Primary node
+      for (const auto &cluster : clusterset_topology_.clusters) {
+        if (cluster.second.is_primary) {
+          const auto cluster_uuid = cluster.first;
+          metadata_cache::ManagedCluster primary_cluster;
+          for (const auto &node : cluster.second.nodes) {
+            primary_cluster.members.push_back(
+                metadata_cache::ManagedInstance{node});
+          }
 
-    log_debug("Writable server is: %s",
-              result.cluster_data.writable_server
-                  ? result.cluster_data.writable_server.value().str().c_str()
-                  : "(not found)");
+          log_debug(
+              "Updating the status of cluster '%s' to find the writable node",
+              cluster_uuid.c_str());
+
+          metadata_->update_cluster_status(
+              {mysqlrouter::TargetCluster::TargetType::ByUUID, cluster_uuid},
+              primary_cluster);
+
+          result.cluster_data.writable_server =
+              metadata_->find_rw_server(primary_cluster.members);
+
+          break;
+        }
+      }
+    }
   } else {
     result.cluster_data.writable_server = stdx::make_unexpected(
         make_error_code(metadata_cache::metadata_errc::no_rw_node_needed));

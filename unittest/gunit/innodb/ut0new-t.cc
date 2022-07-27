@@ -24,11 +24,10 @@
 
 #include <gtest/gtest.h>
 #include <stddef.h>
-#include <memory>
 #include <stdexcept>
 #include <vector>
 
-#include "my_config.h"
+#include "storage/innobase/include/detail/ut0new.h"
 #include "storage/innobase/include/univ.i"
 #include "storage/innobase/include/ut0new.h"
 
@@ -36,32 +35,10 @@ namespace innodb_ut0new_unittest {
 
 static auto pfs_key = 12345;
 
-inline bool ptr_is_suitably_aligned(void *ptr) {
-#if (defined(LINUX_RHEL6) || (defined(LINUX_RHEL7))) && (SIZEOF_VOIDP == 4)
-  // This is a "workaround" for 32-bit OL6/7 platform which do not respect
-  // the alignment requirements. TL;DR 32-bit OL6/7/8 have a violation so that
-  // the pointer returned by malloc is not suitably aligned
-  // (ptr % alignof(max_align_t) is _not_ 0). This was found out through the
-  // suite of ut0new* unit-tests and since then these unit-tests are failing
-  // on those platforms.
-  //
-  // For more details see
-  // https://mybug.mysql.oraclecorp.com/orabugs/bug.php?id=33137030.
-  //
-  // As it stands, issue is identified and confirmed but OL6 and OL7 platforms
-  // will not receive a backport of a fix that has been deployed to OL8. By
-  // returning true, we allow the unit-tests to continue running in faith that
-  // nothing will become broken.
-  return true;
-#else
-  return reinterpret_cast<std::uintptr_t>(ptr) % alignof(max_align_t) == 0;
-#endif
-}
-
 /* test edge cases */
 TEST(ut0new, edgecases) {
 #ifdef UNIV_PFS_MEMORY
-  auto ptr = ut::new_arr<byte>(ut::Count{0});
+  auto ptr = ut::new_arr_withkey<byte>(UT_NEW_THIS_FILE_PSI_KEY, ut::Count{0});
   EXPECT_NE(nullptr, ptr);
   ut::delete_arr((byte *)ptr);
 #endif /* UNIV_PFS_MEMORY */
@@ -166,7 +143,8 @@ TYPED_TEST_P(ut0new_malloc_free_fundamental_types, fundamental_types) {
   type *ptr = with_pfs ? static_cast<type *>(ut::malloc_withkey(
                              ut::make_psi_memory_key(pfs_key), sizeof(type)))
                        : static_cast<type *>(ut::malloc(sizeof(type)));
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr));
+  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignof(max_align_t) ==
+              0);
   ut::free(ptr);
 }
 REGISTER_TYPED_TEST_SUITE_P(ut0new_malloc_free_fundamental_types,
@@ -185,7 +163,8 @@ TYPED_TEST_P(ut0new_malloc_free_pod_types, pod_types) {
   type *ptr = with_pfs ? static_cast<type *>(ut::malloc_withkey(
                              ut::make_psi_memory_key(pfs_key), sizeof(type)))
                        : static_cast<type *>(ut::malloc(sizeof(type)));
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr));
+  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignof(max_align_t) ==
+              0);
   ut::free(ptr);
 }
 REGISTER_TYPED_TEST_SUITE_P(ut0new_malloc_free_pod_types, pod_types);
@@ -202,7 +181,8 @@ TYPED_TEST_P(ut0new_malloc_free_non_pod_types, non_pod_types) {
   type *ptr = with_pfs ? static_cast<type *>(ut::malloc_withkey(
                              ut::make_psi_memory_key(pfs_key), sizeof(type)))
                        : static_cast<type *>(ut::malloc(sizeof(type)));
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr));
+  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignof(max_align_t) ==
+              0);
   ut::free(ptr);
 }
 REGISTER_TYPED_TEST_SUITE_P(ut0new_malloc_free_non_pod_types, non_pod_types);
@@ -219,7 +199,8 @@ TYPED_TEST_P(ut0new_zalloc_free_fundamental_types, fundamental_types) {
   type *ptr = with_pfs ? static_cast<type *>(ut::zalloc_withkey(
                              ut::make_psi_memory_key(pfs_key), sizeof(type)))
                        : static_cast<type *>(ut::zalloc(sizeof(type)));
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr));
+  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignof(max_align_t) ==
+              0);
   EXPECT_EQ(*ptr, 0);
   ut::free(ptr);
 }
@@ -242,7 +223,8 @@ TYPED_TEST_P(ut0new_realloc_fundamental_types, fundamental_types) {
                  ? static_cast<T *>(ut::realloc_withkey(
                        ut::make_psi_memory_key(pfs_key), nullptr, sizeof(T)))
                  : static_cast<T *>(ut::realloc(nullptr, sizeof(T)));
-    EXPECT_TRUE(ptr_is_suitably_aligned(p));
+    EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(p) % alignof(max_align_t) ==
+                0);
     ut::free(p);
   }
 
@@ -252,7 +234,8 @@ TYPED_TEST_P(ut0new_realloc_fundamental_types, fundamental_types) {
                  ? static_cast<T *>(ut::realloc_withkey(
                        ut::make_psi_memory_key(pfs_key), nullptr, sizeof(T)))
                  : static_cast<T *>(ut::realloc(nullptr, sizeof(T)));
-    EXPECT_TRUE(ptr_is_suitably_aligned(p));
+    EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(p) % alignof(max_align_t) ==
+                0);
     ut::realloc(p, 0);
   }
 
@@ -262,7 +245,8 @@ TYPED_TEST_P(ut0new_realloc_fundamental_types, fundamental_types) {
     auto p = with_pfs ? static_cast<T *>(ut::malloc_withkey(
                             ut::make_psi_memory_key(pfs_key), sizeof(T)))
                       : static_cast<T *>(ut::malloc(sizeof(T)));
-    EXPECT_TRUE(ptr_is_suitably_aligned(p));
+    EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(p) % alignof(max_align_t) ==
+                0);
 
     // Let's write something into the memory so we can afterwards check if
     // ut::realloc_* is handling the copying/moving the element(s) properly
@@ -272,7 +256,8 @@ TYPED_TEST_P(ut0new_realloc_fundamental_types, fundamental_types) {
     p = with_pfs ? static_cast<T *>(ut::realloc_withkey(
                        ut::make_psi_memory_key(pfs_key), p, 10 * sizeof(T)))
                  : static_cast<T *>(ut::realloc(p, 10 * sizeof(T)));
-    EXPECT_TRUE(ptr_is_suitably_aligned(p));
+    EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(p) % alignof(max_align_t) ==
+                0);
 
     // Make sure that the contents of memory are untouched after reallocation
     EXPECT_EQ(p[0], 0xA);
@@ -284,7 +269,8 @@ TYPED_TEST_P(ut0new_realloc_fundamental_types, fundamental_types) {
     p = with_pfs ? static_cast<T *>(ut::realloc_withkey(
                        ut::make_psi_memory_key(pfs_key), p, 100 * sizeof(T)))
                  : static_cast<T *>(ut::realloc(p, 100 * sizeof(T)));
-    EXPECT_TRUE(ptr_is_suitably_aligned(p));
+    EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(p) % alignof(max_align_t) ==
+                0);
 
     // Make sure that the contents of memory are untouched after reallocation
     EXPECT_EQ(p[0], 0xA);
@@ -297,7 +283,8 @@ TYPED_TEST_P(ut0new_realloc_fundamental_types, fundamental_types) {
     p = with_pfs ? static_cast<T *>(ut::realloc_withkey(
                        ut::make_psi_memory_key(pfs_key), p, 1000 * sizeof(T)))
                  : static_cast<T *>(ut::realloc(p, 1000 * sizeof(T)));
-    EXPECT_TRUE(ptr_is_suitably_aligned(p));
+    EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(p) % alignof(max_align_t) ==
+                0);
 
     // Make sure that the contents of memory are untouched after reallocation
     EXPECT_EQ(p[0], 0xA);
@@ -313,7 +300,8 @@ TYPED_TEST_P(ut0new_realloc_fundamental_types, fundamental_types) {
     auto p = with_pfs ? static_cast<T *>(ut::malloc_withkey(
                             ut::make_psi_memory_key(pfs_key), 10 * sizeof(T)))
                       : static_cast<T *>(ut::malloc(10 * sizeof(T)));
-    EXPECT_TRUE(ptr_is_suitably_aligned(p));
+    EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(p) % alignof(max_align_t) ==
+                0);
 
     // Write some stuff to the memory
     for (size_t i = 0; i < 10; i++) p[i] = 0xA;
@@ -322,7 +310,8 @@ TYPED_TEST_P(ut0new_realloc_fundamental_types, fundamental_types) {
     p = with_pfs ? static_cast<T *>(ut::realloc_withkey(
                        ut::make_psi_memory_key(pfs_key), p, 5 * sizeof(T)))
                  : static_cast<T *>(ut::realloc(p, 5 * sizeof(T)));
-    EXPECT_TRUE(ptr_is_suitably_aligned(p));
+    EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(p) % alignof(max_align_t) ==
+                0);
 
     // Make sure that the respective contents of memory (only half of the
     // elements) are untouched after reallocation
@@ -347,7 +336,8 @@ TYPED_TEST_P(ut0new_new_delete_fundamental_types, fundamental_types) {
   type *ptr = with_pfs
                   ? ut::new_withkey<type>(ut::make_psi_memory_key(pfs_key), 1)
                   : ut::new_<type>(1);
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr));
+  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignof(max_align_t) ==
+              0);
   EXPECT_EQ(*ptr, 1);
   ut::delete_(ptr);
 }
@@ -367,7 +357,8 @@ TYPED_TEST_P(ut0new_new_delete_pod_types, pod_types) {
   type *ptr =
       with_pfs ? ut::new_withkey<type>(ut::make_psi_memory_key(pfs_key), 2, 5)
                : ut::new_<type>(2, 5);
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr));
+  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignof(max_align_t) ==
+              0);
   EXPECT_EQ(ptr->x, 2);
   EXPECT_EQ(ptr->y, 5);
   ut::delete_(ptr);
@@ -385,7 +376,8 @@ TYPED_TEST_P(ut0new_new_delete_non_pod_types, non_pod_types) {
   type *ptr = with_pfs ? ut::new_withkey<type>(ut::make_psi_memory_key(pfs_key),
                                                2, 5, std::string("non-pod"))
                        : ut::new_<type>(2, 5, std::string("non-pod"));
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr));
+  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignof(max_align_t) ==
+              0);
   EXPECT_EQ(ptr->x, 2);
   EXPECT_EQ(ptr->y, 5);
   EXPECT_EQ(ptr->sum->result, 7);
@@ -419,7 +411,8 @@ TYPED_TEST_P(ut0new_new_delete_fundamental_types_arr, fundamental_types) {
                 std::forward_as_tuple((type)6), std::forward_as_tuple((type)7),
                 std::forward_as_tuple((type)8), std::forward_as_tuple((type)9));
 
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr));
+  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignof(max_align_t) ==
+              0);
 
   for (size_t elem = 0; elem < 10; elem++) {
     EXPECT_EQ(ptr[elem], elem);
@@ -449,7 +442,8 @@ TYPED_TEST_P(ut0new_new_delete_pod_types_arr, pod_types) {
                 std::forward_as_tuple(4, 5), std::forward_as_tuple(6, 7),
                 std::forward_as_tuple(8, 9));
 
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr));
+  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignof(max_align_t) ==
+              0);
 
   for (size_t elem = 0; elem < 5; elem++) {
     EXPECT_EQ(ptr[elem].x, 2 * elem);
@@ -482,7 +476,8 @@ TYPED_TEST_P(ut0new_new_delete_non_pod_types_arr, non_pod_types) {
                              std::forward_as_tuple(7, 8, std::string("d")),
                              std::forward_as_tuple(9, 10, std::string("e")));
 
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr));
+  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignof(max_align_t) ==
+              0);
 
   EXPECT_EQ(ptr[0].x, 1);
   EXPECT_EQ(ptr[0].y, 2);
@@ -532,7 +527,8 @@ TYPED_TEST_P(ut0new_new_delete_default_constructible_fundamental_types_arr,
                                               ut::Count{n_elements})
                   : ut::new_arr<type>(ut::Count{n_elements});
 
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr));
+  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignof(max_align_t) ==
+              0);
 
   for (size_t elem = 0; elem < n_elements; elem++) {
     EXPECT_EQ(ptr[elem], type{});
@@ -560,7 +556,8 @@ TYPED_TEST_P(ut0new_new_delete_default_constructible_pod_types_arr, pod_types) {
                                               ut::Count{n_elements})
                   : ut::new_arr<type>(ut::Count{n_elements});
 
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr));
+  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignof(max_align_t) ==
+              0);
 
   for (size_t elem = 0; elem < n_elements; elem++) {
     EXPECT_EQ(ptr[elem].x, 0);
@@ -590,7 +587,8 @@ TYPED_TEST_P(ut0new_new_delete_default_constructible_non_pod_types_arr,
                                               ut::Count{n_elements})
                   : ut::new_arr<type>(ut::Count{n_elements});
 
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr));
+  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignof(max_align_t) ==
+              0);
 
   for (size_t elem = 0; elem < n_elements; elem++) {
     EXPECT_EQ(ptr[elem].x, 0);
@@ -923,7 +921,8 @@ TYPED_TEST_P(ut0new_page_malloc_free_fundamental_types, fundamental_types) {
   type *ptr = with_pfs ? static_cast<type *>(ut::malloc_page_withkey(
                              ut::make_psi_memory_key(pfs_key), sizeof(type)))
                        : static_cast<type *>(ut::malloc_page(sizeof(type)));
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr));
+  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignof(max_align_t) ==
+              0);
   EXPECT_GE(ut::page_allocation_size(ptr), sizeof(type));
   ut::free_page(ptr);
 }
@@ -943,7 +942,8 @@ TYPED_TEST_P(ut0new_page_malloc_free_pod_types, pod_types) {
   type *ptr = with_pfs ? static_cast<type *>(ut::malloc_page_withkey(
                              ut::make_psi_memory_key(pfs_key), sizeof(type)))
                        : static_cast<type *>(ut::malloc_page(sizeof(type)));
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr));
+  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignof(max_align_t) ==
+              0);
   EXPECT_GE(ut::page_allocation_size(ptr), sizeof(type));
   ut::free_page(ptr);
 }
@@ -961,7 +961,8 @@ TYPED_TEST_P(ut0new_page_malloc_free_non_pod_types, non_pod_types) {
   type *ptr = with_pfs ? static_cast<type *>(ut::malloc_page_withkey(
                              ut::make_psi_memory_key(pfs_key), sizeof(type)))
                        : static_cast<type *>(ut::malloc_page(sizeof(type)));
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr));
+  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignof(max_align_t) ==
+              0);
   EXPECT_GE(ut::page_allocation_size(ptr), sizeof(type));
   // Referencing non-pod type members through returned pointer is UB.
   // Solely releasing it is ok.
@@ -1003,14 +1004,9 @@ TYPED_TEST_P(ut0new_large_malloc_free_fundamental_types, fundamental_types) {
                         ut::make_psi_memory_key(pfs_key), sizeof(type)))
                   : static_cast<type *>(ut::malloc_large_page(sizeof(type)));
   SKIP_TEST_IF_HUGE_PAGE_SUPPORT_IS_NOT_AVAILABLE(ptr)
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr));
+  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignof(max_align_t) ==
+              0);
   EXPECT_GE(ut::large_page_allocation_size(ptr), sizeof(type));
-  EXPECT_GT(ut::large_page_low_level_info(ptr).allocation_size,
-            ut::large_page_allocation_size(ptr));
-  EXPECT_EQ(reinterpret_cast<std::uintptr_t>(
-                ut::large_page_low_level_info(ptr).base_ptr) %
-                CPU_PAGE_SIZE,
-            0);
   ut::free_large_page(ptr);
 }
 REGISTER_TYPED_TEST_SUITE_P(ut0new_large_malloc_free_fundamental_types,
@@ -1031,14 +1027,9 @@ TYPED_TEST_P(ut0new_large_malloc_free_pod_types, pod_types) {
                         ut::make_psi_memory_key(pfs_key), sizeof(type)))
                   : static_cast<type *>(ut::malloc_large_page(sizeof(type)));
   SKIP_TEST_IF_HUGE_PAGE_SUPPORT_IS_NOT_AVAILABLE(ptr)
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr));
+  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignof(max_align_t) ==
+              0);
   EXPECT_GE(ut::large_page_allocation_size(ptr), sizeof(type));
-  EXPECT_GT(ut::large_page_low_level_info(ptr).allocation_size,
-            ut::large_page_allocation_size(ptr));
-  EXPECT_EQ(reinterpret_cast<std::uintptr_t>(
-                ut::large_page_low_level_info(ptr).base_ptr) %
-                CPU_PAGE_SIZE,
-            0);
   ut::free_large_page(ptr);
 }
 REGISTER_TYPED_TEST_SUITE_P(ut0new_large_malloc_free_pod_types, pod_types);
@@ -1057,14 +1048,9 @@ TYPED_TEST_P(ut0new_large_malloc_free_non_pod_types, non_pod_types) {
                         ut::make_psi_memory_key(pfs_key), sizeof(type)))
                   : static_cast<type *>(ut::malloc_large_page(sizeof(type)));
   SKIP_TEST_IF_HUGE_PAGE_SUPPORT_IS_NOT_AVAILABLE(ptr)
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr));
+  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignof(max_align_t) ==
+              0);
   EXPECT_GE(ut::large_page_allocation_size(ptr), sizeof(type));
-  EXPECT_GT(ut::large_page_low_level_info(ptr).allocation_size,
-            ut::large_page_allocation_size(ptr));
-  EXPECT_EQ(reinterpret_cast<std::uintptr_t>(
-                ut::large_page_low_level_info(ptr).base_ptr) %
-                CPU_PAGE_SIZE,
-            0);
   // Referencing non-pod type members through returned pointer is UB.
   // Solely releasing it is ok.
   //
@@ -1100,16 +1086,6 @@ TYPED_TEST_P(ut0new_large_malloc_free_fallback_fundamental_types,
     EXPECT_GE(
         ut::large_page_allocation_size(ret, ut::fallback_to_normal_page_t{}),
         sizeof(type));
-    EXPECT_GT(
-        ut::large_page_low_level_info(ret, ut::fallback_to_normal_page_t{})
-            .allocation_size,
-        ut::large_page_allocation_size(ret, ut::fallback_to_normal_page_t{}));
-    EXPECT_EQ(
-        reinterpret_cast<std::uintptr_t>(
-            ut::large_page_low_level_info(ret, ut::fallback_to_normal_page_t{})
-                .base_ptr) %
-            CPU_PAGE_SIZE,
-        0);
     ut::free_large_page(ret, ut::fallback_to_normal_page_t{});
   }
 }
@@ -1137,16 +1113,6 @@ TYPED_TEST_P(ut0new_large_malloc_free_fallback_pod_types, pod_types) {
     EXPECT_GE(
         ut::large_page_allocation_size(ret, ut::fallback_to_normal_page_t{}),
         sizeof(type));
-    EXPECT_GT(
-        ut::large_page_low_level_info(ret, ut::fallback_to_normal_page_t{})
-            .allocation_size,
-        ut::large_page_allocation_size(ret, ut::fallback_to_normal_page_t{}));
-    EXPECT_EQ(
-        reinterpret_cast<std::uintptr_t>(
-            ut::large_page_low_level_info(ret, ut::fallback_to_normal_page_t{})
-                .base_ptr) %
-            CPU_PAGE_SIZE,
-        0);
     ut::free_large_page(ret, ut::fallback_to_normal_page_t{});
   }
 }
@@ -1175,16 +1141,6 @@ TYPED_TEST_P(ut0new_large_malloc_free_fallback_non_pod_types, non_pod_types) {
     EXPECT_GE(
         ut::large_page_allocation_size(ret, ut::fallback_to_normal_page_t{}),
         sizeof(type));
-    EXPECT_GT(
-        ut::large_page_low_level_info(ret, ut::fallback_to_normal_page_t{})
-            .allocation_size,
-        ut::large_page_allocation_size(ret, ut::fallback_to_normal_page_t{}));
-    EXPECT_EQ(
-        reinterpret_cast<std::uintptr_t>(
-            ut::large_page_low_level_info(ret, ut::fallback_to_normal_page_t{})
-                .base_ptr) %
-            CPU_PAGE_SIZE,
-        0);
     // Referencing non-pod type members through returned pointer is UB.
     // Solely releasing it is ok.
     //
@@ -1354,29 +1310,11 @@ TYPED_TEST_P(aligned_new_delete_fundamental_types_arr, fundamental_types) {
   constexpr size_t n_elements = 10;
   for (auto alignment = 2 * alignof(std::max_align_t);
        alignment < 1024 * 1024 + 1; alignment *= 2) {
-    type *ptr = with_pfs ? ut::aligned_new_arr_withkey<type>(
-                               ut::make_psi_memory_key(pfs_key), alignment,
-                               std::forward_as_tuple((type)0),
-                               std::forward_as_tuple((type)1),
-                               std::forward_as_tuple((type)2),
-                               std::forward_as_tuple((type)3),
-                               std::forward_as_tuple((type)4),
-                               std::forward_as_tuple((type)5),
-                               std::forward_as_tuple((type)6),
-                               std::forward_as_tuple((type)7),
-                               std::forward_as_tuple((type)8),
-                               std::forward_as_tuple((type)9))
-                         : ut::aligned_new_arr<type>(
-                               alignment, std::forward_as_tuple((type)0),
-                               std::forward_as_tuple((type)1),
-                               std::forward_as_tuple((type)2),
-                               std::forward_as_tuple((type)3),
-                               std::forward_as_tuple((type)4),
-                               std::forward_as_tuple((type)5),
-                               std::forward_as_tuple((type)6),
-                               std::forward_as_tuple((type)7),
-                               std::forward_as_tuple((type)8),
-                               std::forward_as_tuple((type)9));
+    type *ptr = with_pfs ? ut::aligned_new_arr_withkey<type, n_elements>(
+                               ut::make_psi_memory_key(pfs_key), alignment, 0,
+                               1, 2, 3, 4, 5, 6, 7, 8, 9)
+                         : ut::aligned_new_arr<type, n_elements>(
+                               alignment, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
     EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignment == 0);
 
     for (size_t elem = 0; elem < n_elements; elem++) {
@@ -1400,17 +1338,11 @@ TYPED_TEST_P(aligned_new_delete_pod_types_arr, pod_types) {
   constexpr size_t n_elements = 5;
   for (auto alignment = 2 * alignof(std::max_align_t);
        alignment < 1024 * 1024 + 1; alignment *= 2) {
-    type *ptr =
-        with_pfs
-            ? ut::aligned_new_arr_withkey<type>(
-                  ut::make_psi_memory_key(pfs_key), alignment,
-                  std::forward_as_tuple(0, 1), std::forward_as_tuple(2, 3),
-                  std::forward_as_tuple(4, 5), std::forward_as_tuple(6, 7),
-                  std::forward_as_tuple(8, 9))
-            : ut::aligned_new_arr<type>(
-                  alignment, std::forward_as_tuple(0, 1),
-                  std::forward_as_tuple(2, 3), std::forward_as_tuple(4, 5),
-                  std::forward_as_tuple(6, 7), std::forward_as_tuple(8, 9));
+    type *ptr = with_pfs ? ut::aligned_new_arr_withkey<type, n_elements>(
+                               ut::make_psi_memory_key(pfs_key), alignment, 0,
+                               1, 2, 3, 4, 5, 6, 7, 8, 9)
+                         : ut::aligned_new_arr<type, n_elements>(
+                               alignment, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
 
     EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignment == 0);
 
@@ -1432,22 +1364,18 @@ TYPED_TEST_SUITE_P(aligned_new_delete_non_pod_types_arr);
 TYPED_TEST_P(aligned_new_delete_non_pod_types_arr, non_pod_types) {
   using type = typename TypeParam::type;
   auto with_pfs = TypeParam::with_pfs;
+  constexpr size_t n_elements = 5;
   for (auto alignment = 2 * alignof(std::max_align_t);
        alignment < 1024 * 1024 + 1; alignment *= 2) {
-    type *ptr =
-        with_pfs ? ut::aligned_new_arr_withkey<type>(
-                       ut::make_psi_memory_key(pfs_key), alignment,
-                       std::forward_as_tuple(1, 2, std::string("a")),
-                       std::forward_as_tuple(3, 4, std::string("b")),
-                       std::forward_as_tuple(5, 6, std::string("c")),
-                       std::forward_as_tuple(7, 8, std::string("d")),
-                       std::forward_as_tuple(9, 10, std::string("e")))
-                 : ut::aligned_new_arr<type>(
-                       alignment, std::forward_as_tuple(1, 2, std::string("a")),
-                       std::forward_as_tuple(3, 4, std::string("b")),
-                       std::forward_as_tuple(5, 6, std::string("c")),
-                       std::forward_as_tuple(7, 8, std::string("d")),
-                       std::forward_as_tuple(9, 10, std::string("e")));
+    type *ptr = with_pfs ? ut::aligned_new_arr_withkey<type, n_elements>(
+                               ut::make_psi_memory_key(pfs_key), alignment, 1,
+                               2, std::string("a"), 3, 4, std::string("b"), 5,
+                               6, std::string("c"), 7, 8, std::string("d"), 9,
+                               10, std::string("e"))
+                         : ut::aligned_new_arr<type, n_elements>(
+                               alignment, 1, 2, std::string("a"), 3, 4,
+                               std::string("b"), 5, 6, std::string("c"), 7, 8,
+                               std::string("d"), 9, 10, std::string("e"));
 
     EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignment == 0);
 
@@ -1500,9 +1428,8 @@ TYPED_TEST_P(aligned_new_delete_default_constructible_fundamental_types_arr,
        alignment < 1024 * 1024 + 1; alignment *= 2) {
     type *ptr =
         with_pfs ? ut::aligned_new_arr_withkey<type>(
-                       ut::make_psi_memory_key(pfs_key), alignment,
-                       ut::Count{n_elements})
-                 : ut::aligned_new_arr<type>(alignment, ut::Count{n_elements});
+                       ut::make_psi_memory_key(pfs_key), alignment, n_elements)
+                 : ut::aligned_new_arr<type>(alignment, n_elements);
 
     EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignment == 0);
 
@@ -1533,9 +1460,8 @@ TYPED_TEST_P(aligned_new_delete_default_constructible_pod_types_arr,
        alignment < 1024 * 1024 + 1; alignment *= 2) {
     type *ptr =
         with_pfs ? ut::aligned_new_arr_withkey<type>(
-                       ut::make_psi_memory_key(pfs_key), alignment,
-                       ut::Count{n_elements})
-                 : ut::aligned_new_arr<type>(alignment, ut::Count{n_elements});
+                       ut::make_psi_memory_key(pfs_key), alignment, n_elements)
+                 : ut::aligned_new_arr<type>(alignment, n_elements);
 
     EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignment == 0);
 
@@ -1567,9 +1493,8 @@ TYPED_TEST_P(aligned_new_delete_default_constructible_non_pod_types_arr,
        alignment < 1024 * 1024 + 1; alignment *= 2) {
     type *ptr =
         with_pfs ? ut::aligned_new_arr_withkey<type>(
-                       ut::make_psi_memory_key(pfs_key), alignment,
-                       ut::Count{n_elements})
-                 : ut::aligned_new_arr<type>(alignment, ut::Count{n_elements});
+                       ut::make_psi_memory_key(pfs_key), alignment, n_elements)
+                 : ut::aligned_new_arr<type>(alignment, n_elements);
 
     EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignment == 0);
 
@@ -1600,6 +1525,7 @@ TEST(aligned_new_delete, unique_ptr_demo) {
 }
 
 TEST(aligned_new_delete_arr, unique_ptr_demo) {
+  constexpr auto n_elements = 5;
   constexpr auto alignment = 4 * 1024;
   struct Aligned_int_arr_deleter {
     void operator()(int *p) {
@@ -1608,10 +1534,7 @@ TEST(aligned_new_delete_arr, unique_ptr_demo) {
     }
   };
   std::unique_ptr<int, Aligned_int_arr_deleter> ptr(
-      ut::aligned_new_arr<int>(
-          alignment, std::forward_as_tuple(1), std::forward_as_tuple(2),
-          std::forward_as_tuple(3), std::forward_as_tuple(4),
-          std::forward_as_tuple(5)),
+      ut::aligned_new_arr<int, n_elements>(alignment, 1, 2, 3, 4, 5),
       Aligned_int_arr_deleter{});
 }
 
@@ -1620,7 +1543,7 @@ TEST(aligned_new_delete_arr, distance_between_elements_in_arr) {
   constexpr size_t n_elements = 5;
   for (auto alignment = 2 * alignof(std::max_align_t);
        alignment < 1024 * 1024 + 1; alignment *= 2) {
-    type *ptr = ut::aligned_new_arr<type>(alignment, ut::Count{n_elements});
+    type *ptr = ut::aligned_new_arr<type>(alignment, n_elements);
 
     EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignment == 0);
 
@@ -1632,154 +1555,6 @@ TEST(aligned_new_delete_arr, distance_between_elements_in_arr) {
     }
     ut::aligned_delete_arr(ptr);
   }
-}
-
-TEST(
-    ut0new_aligned_new_delete_arr,
-    destructors_of_successfully_instantiated_trivially_constructible_elements_are_invoked_when_one_of_the_element_constructors_throws) {
-  static int n_constructors = 0;
-  static int n_destructors = 0;
-
-  struct Type_that_may_throw {
-    Type_that_may_throw() {
-      n_constructors++;
-      if (n_constructors % 4 == 0) {
-        throw std::runtime_error("cannot construct");
-      }
-    }
-    ~Type_that_may_throw() { ++n_destructors; }
-  };
-
-  bool exception_thrown_and_caught = false;
-  try {
-    auto ptr = ut::aligned_new_arr_withkey<Type_that_may_throw>(
-        ut::make_psi_memory_key(pfs_key), 2 * alignof(std::max_align_t),
-        ut::Count(7));
-    ASSERT_FALSE(ptr);
-  } catch (std::runtime_error &) {
-    exception_thrown_and_caught = true;
-  }
-  EXPECT_TRUE(exception_thrown_and_caught);
-  EXPECT_EQ(n_constructors, 4);
-  EXPECT_EQ(n_destructors, 3);
-}
-
-TEST(
-    ut0new_aligned_new_delete_arr,
-    destructors_of_successfully_instantiated_non_trivially_constructible_elements_are_invoked_when_one_of_the_element_constructors_throws) {
-  static int n_constructors = 0;
-  static int n_destructors = 0;
-
-  struct Type_that_may_throw {
-    Type_that_may_throw(int x, int y) : _x(x), _y(y) {
-      n_constructors++;
-      if (n_constructors % 4 == 0) {
-        throw std::runtime_error("cannot construct");
-      }
-    }
-    ~Type_that_may_throw() { ++n_destructors; }
-    int _x, _y;
-  };
-
-  bool exception_thrown_and_caught = false;
-  try {
-    auto ptr = ut::aligned_new_arr_withkey<Type_that_may_throw>(
-        ut::make_psi_memory_key(pfs_key), 2 * alignof(std::max_align_t),
-        std::forward_as_tuple(0, 1), std::forward_as_tuple(2, 3),
-        std::forward_as_tuple(4, 5), std::forward_as_tuple(6, 7),
-        std::forward_as_tuple(8, 9));
-    ASSERT_FALSE(ptr);
-  } catch (std::runtime_error &) {
-    exception_thrown_and_caught = true;
-  }
-  EXPECT_TRUE(exception_thrown_and_caught);
-  EXPECT_EQ(n_constructors, 4);
-  EXPECT_EQ(n_destructors, 3);
-}
-
-TEST(
-    ut0new_aligned_new_delete_arr,
-    no_destructors_are_invoked_when_first_trivially_constructible_element_constructor_throws) {
-  static int n_constructors = 0;
-  static int n_destructors = 0;
-
-  struct Type_that_always_throws {
-    Type_that_always_throws() {
-      n_constructors++;
-      throw std::runtime_error("cannot construct");
-    }
-    ~Type_that_always_throws() { ++n_destructors; }
-  };
-
-  bool exception_thrown_and_caught = false;
-  try {
-    auto ptr = ut::aligned_new_arr_withkey<Type_that_always_throws>(
-        ut::make_psi_memory_key(pfs_key), 2 * alignof(std::max_align_t),
-        ut::Count(7));
-    ASSERT_FALSE(ptr);
-  } catch (std::runtime_error &) {
-    exception_thrown_and_caught = true;
-  }
-  EXPECT_TRUE(exception_thrown_and_caught);
-  EXPECT_EQ(n_constructors, 1);
-  EXPECT_EQ(n_destructors, 0);
-}
-
-TEST(
-    ut0new_aligned_new_delete_arr,
-    no_destructors_are_invoked_when_first_non_trivially_constructible_element_constructor_throws) {
-  static int n_constructors = 0;
-  static int n_destructors = 0;
-
-  struct Type_that_always_throws {
-    Type_that_always_throws(int x, int y) : _x(x), _y(y) {
-      n_constructors++;
-      throw std::runtime_error("cannot construct");
-    }
-    ~Type_that_always_throws() { ++n_destructors; }
-    int _x, _y;
-  };
-
-  bool exception_thrown_and_caught = false;
-  try {
-    auto ptr = ut::aligned_new_arr_withkey<Type_that_always_throws>(
-        ut::make_psi_memory_key(pfs_key), 2 * alignof(std::max_align_t),
-        std::forward_as_tuple(0, 1), std::forward_as_tuple(2, 3),
-        std::forward_as_tuple(4, 5), std::forward_as_tuple(6, 7),
-        std::forward_as_tuple(8, 9));
-    ASSERT_FALSE(ptr);
-  } catch (std::runtime_error &) {
-    exception_thrown_and_caught = true;
-  }
-  EXPECT_TRUE(exception_thrown_and_caught);
-  EXPECT_EQ(n_constructors, 1);
-  EXPECT_EQ(n_destructors, 0);
-}
-
-TEST(ut0new_aligned_new_delete,
-     no_destructor_is_invoked_when_no_object_is_successfully_constructed) {
-  static int n_constructors = 0;
-  static int n_destructors = 0;
-
-  struct Type_that_always_throws {
-    Type_that_always_throws() {
-      n_constructors++;
-      throw std::runtime_error("cannot construct");
-    }
-    ~Type_that_always_throws() { ++n_destructors; }
-  };
-
-  bool exception_thrown_and_caught = false;
-  try {
-    auto ptr = ut::aligned_new_withkey<Type_that_always_throws>(
-        ut::make_psi_memory_key(pfs_key), 2 * alignof(std::max_align_t));
-    ASSERT_FALSE(ptr);
-  } catch (std::runtime_error &) {
-    exception_thrown_and_caught = true;
-  }
-  EXPECT_TRUE(exception_thrown_and_caught);
-  EXPECT_EQ(n_constructors, 1);
-  EXPECT_EQ(n_destructors, 0);
 }
 
 TEST(aligned_pointer, access_data_through_implicit_conversion_operator) {
@@ -1798,7 +1573,7 @@ TEST(aligned_array_pointer, access_data_through_subscript_operator) {
   constexpr auto n_elements = 5;
   constexpr auto alignment = 4 * 1024;
   ut::aligned_array_pointer<Default_constructible_pod, alignment> ptr;
-  ptr.alloc(ut::Count{n_elements});
+  ptr.alloc(n_elements);
 
   EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(&ptr[0]) % alignment == 0);
   for (size_t elem = 0; elem < n_elements; elem++) {
@@ -1810,13 +1585,12 @@ TEST(aligned_array_pointer, access_data_through_subscript_operator) {
 }
 
 TEST(aligned_array_pointer, initialize_an_array_of_non_pod_types) {
+  constexpr auto n_elements = 5;
   constexpr auto alignment = 4 * 1024;
   ut::aligned_array_pointer<Non_pod_type, alignment> ptr;
-  ptr.alloc(std::forward_as_tuple(1, 2, std::string("a")),
-            std::forward_as_tuple(3, 4, std::string("b")),
-            std::forward_as_tuple(5, 6, std::string("c")),
-            std::forward_as_tuple(7, 8, std::string("d")),
-            std::forward_as_tuple(9, 10, std::string("e")));
+  ptr.alloc<n_elements>(1, 2, std::string("a"), 3, 4, std::string("b"), 5, 6,
+                        std::string("c"), 7, 8, std::string("d"), 9, 10,
+                        std::string("e"));
 
   EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(&ptr[0]) % alignment == 0);
 
@@ -1847,7 +1621,7 @@ TEST(aligned_array_pointer, distance_between_elements_in_arr) {
   constexpr auto n_elements = 5;
   constexpr auto alignment = 4 * 1024;
   ut::aligned_array_pointer<Default_constructible_pod, alignment> ptr;
-  ptr.alloc(ut::Count{n_elements});
+  ptr.alloc(n_elements);
 
   EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(&ptr[0]) % alignment == 0);
 
@@ -1886,7 +1660,8 @@ TYPED_TEST_P(ut0new_allocator_fundamental_types, fundamental_types) {
 
   auto ptr = a.allocate(n_elements);
 
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr));
+  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignof(max_align_t) ==
+              0);
 
   ptr[0] = std::numeric_limits<T>::max();
   EXPECT_EQ(ptr[0], std::numeric_limits<T>::max());
@@ -1914,7 +1689,8 @@ TYPED_TEST_P(ut0new_allocator_pod_types, pod_types) {
 
   auto ptr = a.allocate(n_elements);
 
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr));
+  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignof(max_align_t) ==
+              0);
 
   a.deallocate(ptr);
 }
@@ -1934,7 +1710,8 @@ TYPED_TEST_P(ut0new_allocator_non_pod_types, non_pod_types) {
   ut::allocator<T, allocator_variant> a(pfs_key);
   auto ptr = a.allocate(n_elements);
 
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr));
+  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr) % alignof(max_align_t) ==
+              0);
 
   a.deallocate(ptr);
 }
@@ -1958,7 +1735,8 @@ TYPED_TEST_P(ut0new_allocator_std_vector_with_fundamental_types,
   vec.push_back(std::numeric_limits<T>::max());
   vec.push_back(std::numeric_limits<T>::min());
 
-  EXPECT_TRUE(ptr_is_suitably_aligned(&vec[0]));
+  EXPECT_TRUE(
+      reinterpret_cast<std::uintptr_t>(&vec[0]) % alignof(max_align_t) == 0);
 
   EXPECT_EQ(vec[0], std::numeric_limits<T>::max());
   EXPECT_EQ(vec[1], std::numeric_limits<T>::min());
@@ -1988,7 +1766,8 @@ TYPED_TEST_P(ut0new_allocator_std_vector_with_pod_types,
   vec.push_back({max, min});
   vec.push_back({max, max});
 
-  EXPECT_TRUE(ptr_is_suitably_aligned(&vec[0]));
+  EXPECT_TRUE(
+      reinterpret_cast<std::uintptr_t>(&vec[0]) % alignof(max_align_t) == 0);
 
   EXPECT_EQ(vec[0].x, min);
   EXPECT_EQ(vec[0].y, min);
@@ -2022,7 +1801,8 @@ TYPED_TEST_P(ut0new_allocator_std_vector_with_non_pod_types,
   vec.push_back({7, 8, std::string("d")});
   vec.push_back({9, 10, std::string("e")});
 
-  EXPECT_TRUE(ptr_is_suitably_aligned(&vec[0]));
+  EXPECT_TRUE(
+      reinterpret_cast<std::uintptr_t>(&vec[0]) % alignof(max_align_t) == 0);
 
   EXPECT_EQ(vec[0].x, 1);
   EXPECT_EQ(vec[0].y, 2);
@@ -2067,7 +1847,8 @@ TYPED_TEST_P(ut0new_allocator_std_vector_with_default_constructible_pod_types,
   vec.push_back({});
   vec.push_back({});
 
-  EXPECT_TRUE(ptr_is_suitably_aligned(&vec[0]));
+  EXPECT_TRUE(
+      reinterpret_cast<std::uintptr_t>(&vec[0]) % alignof(max_align_t) == 0);
 
   EXPECT_EQ(vec[0].x, 0);
   EXPECT_EQ(vec[0].y, 1);
@@ -2105,7 +1886,8 @@ TYPED_TEST_P(
   vec.push_back({});
   vec.push_back({});
 
-  EXPECT_TRUE(ptr_is_suitably_aligned(&vec[0]));
+  EXPECT_TRUE(
+      reinterpret_cast<std::uintptr_t>(&vec[0]) % alignof(max_align_t) == 0);
 
   EXPECT_EQ(vec[0].x, 0);
   EXPECT_EQ(vec[0].y, 1);
@@ -2153,732 +1935,5 @@ TEST(ut0new_allocator, throws_bad_array_new_length_when_max_size_is_exceeded) {
   EXPECT_TRUE(threw);
   EXPECT_FALSE(ptr);
 }
-
-// make_unique - fundamental types
-template <typename T>
-class ut0new_make_unique_ptr_fundamental_types : public ::testing::Test {};
-TYPED_TEST_SUITE_P(ut0new_make_unique_ptr_fundamental_types);
-TYPED_TEST_P(ut0new_make_unique_ptr_fundamental_types, fundamental_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-  auto ptr = with_pfs
-                 ? ut::make_unique<type>(ut::make_psi_memory_key(pfs_key), 1)
-                 : ut::make_unique<type>(1);
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr.get()));
-  EXPECT_EQ(*ptr, 1);
-}
-REGISTER_TYPED_TEST_SUITE_P(ut0new_make_unique_ptr_fundamental_types,
-                            fundamental_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(My, ut0new_make_unique_ptr_fundamental_types,
-                               all_fundamental_types);
-
-// make_unique - pod types
-template <typename T>
-class ut0new_make_unique_ptr_pod_types : public ::testing::Test {};
-TYPED_TEST_SUITE_P(ut0new_make_unique_ptr_pod_types);
-TYPED_TEST_P(ut0new_make_unique_ptr_pod_types, pod_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-
-  auto ptr = with_pfs
-                 ? ut::make_unique<type>(ut::make_psi_memory_key(pfs_key), 2, 5)
-                 : ut::make_unique<type>(2, 5);
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr.get()));
-  EXPECT_EQ(ptr->x, 2);
-  EXPECT_EQ(ptr->y, 5);
-}
-REGISTER_TYPED_TEST_SUITE_P(ut0new_make_unique_ptr_pod_types, pod_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(My, ut0new_make_unique_ptr_pod_types,
-                               all_pod_types);
-
-// make_unique - default constructible pod types
-template <typename T>
-class ut0new_make_unique_ptr_default_constructible_pod_types
-    : public ::testing::Test {};
-TYPED_TEST_SUITE_P(ut0new_make_unique_ptr_default_constructible_pod_types);
-TYPED_TEST_P(ut0new_make_unique_ptr_default_constructible_pod_types,
-             default_constructible_pod_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-
-  auto ptr = with_pfs ? ut::make_unique<type>(ut::make_psi_memory_key(pfs_key))
-                      : ut::make_unique<type>();
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr.get()));
-  EXPECT_EQ(ptr->x, 0);
-  EXPECT_EQ(ptr->y, 1);
-}
-REGISTER_TYPED_TEST_SUITE_P(
-    ut0new_make_unique_ptr_default_constructible_pod_types,
-    default_constructible_pod_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(
-    My, ut0new_make_unique_ptr_default_constructible_pod_types,
-    all_default_constructible_pod_types);
-
-// make_unique - non-pod types
-template <typename T>
-class ut0new_make_unique_ptr_non_pod_types : public ::testing::Test {};
-TYPED_TEST_SUITE_P(ut0new_make_unique_ptr_non_pod_types);
-TYPED_TEST_P(ut0new_make_unique_ptr_non_pod_types, non_pod_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-  auto ptr = with_pfs ? ut::make_unique<type>(ut::make_psi_memory_key(pfs_key),
-                                              2, 5, std::string("non-pod"))
-                      : ut::make_unique<type>(2, 5, std::string("non-pod"));
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr.get()));
-  EXPECT_EQ(ptr->x, 2);
-  EXPECT_EQ(ptr->y, 5);
-  EXPECT_EQ(ptr->sum->result, 7);
-  EXPECT_EQ(ptr->s, std::string("non-pod"));
-}
-REGISTER_TYPED_TEST_SUITE_P(ut0new_make_unique_ptr_non_pod_types,
-                            non_pod_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(My, ut0new_make_unique_ptr_non_pod_types,
-                               all_non_pod_types);
-
-// make_unique - default constructible non-pod types
-template <typename T>
-class ut0new_make_unique_ptr_default_constructible_non_pod_types
-    : public ::testing::Test {};
-TYPED_TEST_SUITE_P(ut0new_make_unique_ptr_default_constructible_non_pod_types);
-TYPED_TEST_P(ut0new_make_unique_ptr_default_constructible_non_pod_types,
-             default_constructible_non_pod_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-  auto ptr = with_pfs ? ut::make_unique<type>(ut::make_psi_memory_key(pfs_key))
-                      : ut::make_unique<type>();
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr.get()));
-  EXPECT_EQ(ptr->x, 0);
-  EXPECT_EQ(ptr->y, 1);
-  EXPECT_EQ(ptr->s, std::string("non-pod-string"));
-}
-REGISTER_TYPED_TEST_SUITE_P(
-    ut0new_make_unique_ptr_default_constructible_non_pod_types,
-    default_constructible_non_pod_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(
-    My, ut0new_make_unique_ptr_default_constructible_non_pod_types,
-    all_default_constructible_non_pod_types);
-
-// make_unique - array specialization for fundamental types
-template <typename T>
-class ut0new_make_unique_ptr_fundamental_types_arr : public ::testing::Test {};
-TYPED_TEST_SUITE_P(ut0new_make_unique_ptr_fundamental_types_arr);
-TYPED_TEST_P(ut0new_make_unique_ptr_fundamental_types_arr, fundamental_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-  auto ptr = with_pfs
-                 ? ut::make_unique<type[]>(ut::make_psi_memory_key(pfs_key), 3)
-                 : ut::make_unique<type[]>(3);
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr.get()));
-  EXPECT_EQ(ptr[0], type{});
-  EXPECT_EQ(ptr[1], type{});
-  EXPECT_EQ(ptr[2], type{});
-}
-REGISTER_TYPED_TEST_SUITE_P(ut0new_make_unique_ptr_fundamental_types_arr,
-                            fundamental_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(My, ut0new_make_unique_ptr_fundamental_types_arr,
-                               all_fundamental_types);
-
-// make_unique - array specialization for default_constructible POD types
-template <typename T>
-class ut0new_make_unique_ptr_default_constructible_pod_types_arr
-    : public ::testing::Test {};
-TYPED_TEST_SUITE_P(ut0new_make_unique_ptr_default_constructible_pod_types_arr);
-TYPED_TEST_P(ut0new_make_unique_ptr_default_constructible_pod_types_arr,
-             default_constructible_pod_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-
-  auto ptr = with_pfs
-                 ? ut::make_unique<type[]>(ut::make_psi_memory_key(pfs_key), 3)
-                 : ut::make_unique<type[]>(3);
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr.get()));
-  EXPECT_EQ(ptr[0].x, 0);
-  EXPECT_EQ(ptr[0].y, 1);
-  EXPECT_EQ(ptr[1].x, 0);
-  EXPECT_EQ(ptr[1].y, 1);
-  EXPECT_EQ(ptr[2].x, 0);
-  EXPECT_EQ(ptr[2].y, 1);
-}
-REGISTER_TYPED_TEST_SUITE_P(
-    ut0new_make_unique_ptr_default_constructible_pod_types_arr,
-    default_constructible_pod_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(
-    My, ut0new_make_unique_ptr_default_constructible_pod_types_arr,
-    all_default_constructible_pod_types);
-
-// make_unique_aligned - fundamental types
-template <typename T>
-class ut0new_make_unique_aligned_fundamental_types : public ::testing::Test {};
-TYPED_TEST_SUITE_P(ut0new_make_unique_aligned_fundamental_types);
-TYPED_TEST_P(ut0new_make_unique_aligned_fundamental_types, fundamental_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-  auto alignment = 4 * alignof(std::max_align_t);
-  auto ptr = with_pfs ? ut::make_unique_aligned<type>(
-                            ut::make_psi_memory_key(pfs_key), alignment, 1)
-                      : ut::make_unique_aligned<type>(alignment, 1);
-  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr.get()) % alignment == 0);
-  EXPECT_EQ(*ptr, 1);
-}
-REGISTER_TYPED_TEST_SUITE_P(ut0new_make_unique_aligned_fundamental_types,
-                            fundamental_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(My, ut0new_make_unique_aligned_fundamental_types,
-                               all_fundamental_types);
-
-// make_unique_aligned - pod types
-template <typename T>
-class ut0new_make_unique_aligned_pod_types : public ::testing::Test {};
-TYPED_TEST_SUITE_P(ut0new_make_unique_aligned_pod_types);
-TYPED_TEST_P(ut0new_make_unique_aligned_pod_types, pod_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-  auto alignment = 4 * alignof(std::max_align_t);
-  auto ptr = with_pfs ? ut::make_unique_aligned<type>(
-                            ut::make_psi_memory_key(pfs_key), alignment, 2, 5)
-                      : ut::make_unique_aligned<type>(alignment, 2, 5);
-  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr.get()) % alignment == 0);
-  EXPECT_EQ(ptr->x, 2);
-  EXPECT_EQ(ptr->y, 5);
-}
-REGISTER_TYPED_TEST_SUITE_P(ut0new_make_unique_aligned_pod_types, pod_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(My, ut0new_make_unique_aligned_pod_types,
-                               all_pod_types);
-
-// make_unique_aligned - default constructible pod types
-template <typename T>
-class ut0new_make_unique_aligned_default_constructible_pod_types
-    : public ::testing::Test {};
-TYPED_TEST_SUITE_P(ut0new_make_unique_aligned_default_constructible_pod_types);
-TYPED_TEST_P(ut0new_make_unique_aligned_default_constructible_pod_types,
-             default_constructible_pod_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-  auto alignment = 4 * alignof(std::max_align_t);
-  auto ptr = with_pfs ? ut::make_unique_aligned<type>(
-                            ut::make_psi_memory_key(pfs_key), alignment)
-                      : ut::make_unique_aligned<type>(alignment);
-  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr.get()) % alignment == 0);
-  EXPECT_EQ(ptr->x, 0);
-  EXPECT_EQ(ptr->y, 1);
-}
-REGISTER_TYPED_TEST_SUITE_P(
-    ut0new_make_unique_aligned_default_constructible_pod_types,
-    default_constructible_pod_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(
-    My, ut0new_make_unique_aligned_default_constructible_pod_types,
-    all_default_constructible_pod_types);
-
-// make_unique_aligned - non-pod types
-template <typename T>
-class ut0new_make_unique_aligned_non_pod_types : public ::testing::Test {};
-TYPED_TEST_SUITE_P(ut0new_make_unique_aligned_non_pod_types);
-TYPED_TEST_P(ut0new_make_unique_aligned_non_pod_types, non_pod_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-  auto alignment = 4 * alignof(std::max_align_t);
-  auto ptr = with_pfs ? ut::make_unique_aligned<type>(
-                            ut::make_psi_memory_key(pfs_key), alignment, 2, 5,
-                            std::string("non-pod"))
-                      : ut::make_unique_aligned<type>(alignment, 2, 5,
-                                                      std::string("non-pod"));
-  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr.get()) % alignment == 0);
-  EXPECT_EQ(ptr->x, 2);
-  EXPECT_EQ(ptr->y, 5);
-  EXPECT_EQ(ptr->sum->result, 7);
-  EXPECT_EQ(ptr->s, std::string("non-pod"));
-}
-REGISTER_TYPED_TEST_SUITE_P(ut0new_make_unique_aligned_non_pod_types,
-                            non_pod_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(My, ut0new_make_unique_aligned_non_pod_types,
-                               all_non_pod_types);
-
-// make_unique_aligned - default constructible non-pod types
-template <typename T>
-class ut0new_make_unique_aligned_default_constructible_non_pod_types
-    : public ::testing::Test {};
-TYPED_TEST_SUITE_P(
-    ut0new_make_unique_aligned_default_constructible_non_pod_types);
-TYPED_TEST_P(ut0new_make_unique_aligned_default_constructible_non_pod_types,
-             default_constructible_non_pod_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-  auto alignment = 4 * alignof(std::max_align_t);
-  auto ptr = with_pfs ? ut::make_unique_aligned<type>(
-                            ut::make_psi_memory_key(pfs_key), alignment)
-                      : ut::make_unique_aligned<type>(alignment);
-  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr.get()) % alignment == 0);
-  EXPECT_EQ(ptr->x, 0);
-  EXPECT_EQ(ptr->y, 1);
-  EXPECT_EQ(ptr->s, std::string("non-pod-string"));
-}
-REGISTER_TYPED_TEST_SUITE_P(
-    ut0new_make_unique_aligned_default_constructible_non_pod_types,
-    default_constructible_non_pod_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(
-    My, ut0new_make_unique_aligned_default_constructible_non_pod_types,
-    all_default_constructible_non_pod_types);
-
-// make_unique_aligned - array specialization for fundamental types
-template <typename T>
-class ut0new_make_unique_aligned_fundamental_types_arr
-    : public ::testing::Test {};
-TYPED_TEST_SUITE_P(ut0new_make_unique_aligned_fundamental_types_arr);
-TYPED_TEST_P(ut0new_make_unique_aligned_fundamental_types_arr,
-             fundamental_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-  auto alignment = 4 * alignof(std::max_align_t);
-  auto ptr = with_pfs ? ut::make_unique_aligned<type[]>(
-                            ut::make_psi_memory_key(pfs_key), alignment, 3)
-                      : ut::make_unique_aligned<type[]>(alignment, 3);
-  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr.get()) % alignment == 0);
-  EXPECT_EQ(ptr[0], type{});
-  EXPECT_EQ(ptr[1], type{});
-  EXPECT_EQ(ptr[2], type{});
-}
-REGISTER_TYPED_TEST_SUITE_P(ut0new_make_unique_aligned_fundamental_types_arr,
-                            fundamental_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(My,
-                               ut0new_make_unique_aligned_fundamental_types_arr,
-                               all_fundamental_types);
-
-// make_unique_aligned - array specialization for default_constructible POD
-// types
-template <typename T>
-class ut0new_make_unique_aligned_default_constructible_pod_types_arr
-    : public ::testing::Test {};
-TYPED_TEST_SUITE_P(
-    ut0new_make_unique_aligned_default_constructible_pod_types_arr);
-TYPED_TEST_P(ut0new_make_unique_aligned_default_constructible_pod_types_arr,
-             default_constructible_pod_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-  auto alignment = 4 * alignof(std::max_align_t);
-  auto ptr = with_pfs ? ut::make_unique_aligned<type[]>(
-                            ut::make_psi_memory_key(pfs_key), alignment, 3)
-                      : ut::make_unique_aligned<type[]>(alignment, 3);
-  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr.get()) % alignment == 0);
-  EXPECT_EQ(ptr[0].x, 0);
-  EXPECT_EQ(ptr[0].y, 1);
-  EXPECT_EQ(ptr[1].x, 0);
-  EXPECT_EQ(ptr[1].y, 1);
-  EXPECT_EQ(ptr[2].x, 0);
-  EXPECT_EQ(ptr[2].y, 1);
-}
-REGISTER_TYPED_TEST_SUITE_P(
-    ut0new_make_unique_aligned_default_constructible_pod_types_arr,
-    default_constructible_pod_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(
-    My, ut0new_make_unique_aligned_default_constructible_pod_types_arr,
-    all_default_constructible_pod_types);
-
-// make_shared - fundamental types
-template <typename T>
-class ut0new_make_shared_ptr_fundamental_types : public ::testing::Test {};
-TYPED_TEST_SUITE_P(ut0new_make_shared_ptr_fundamental_types);
-TYPED_TEST_P(ut0new_make_shared_ptr_fundamental_types, fundamental_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-  auto ptr = with_pfs
-                 ? ut::make_shared<type>(ut::make_psi_memory_key(pfs_key), 1)
-                 : ut::make_shared<type>(1);
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr.get()));
-  EXPECT_EQ(*ptr, 1);
-}
-REGISTER_TYPED_TEST_SUITE_P(ut0new_make_shared_ptr_fundamental_types,
-                            fundamental_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(My, ut0new_make_shared_ptr_fundamental_types,
-                               all_fundamental_types);
-
-// make_shared - pod types
-template <typename T>
-class ut0new_make_shared_ptr_pod_types : public ::testing::Test {};
-TYPED_TEST_SUITE_P(ut0new_make_shared_ptr_pod_types);
-TYPED_TEST_P(ut0new_make_shared_ptr_pod_types, pod_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-
-  auto ptr = with_pfs
-                 ? ut::make_shared<type>(ut::make_psi_memory_key(pfs_key), 2, 5)
-                 : ut::make_shared<type>(2, 5);
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr.get()));
-  EXPECT_EQ(ptr->x, 2);
-  EXPECT_EQ(ptr->y, 5);
-}
-REGISTER_TYPED_TEST_SUITE_P(ut0new_make_shared_ptr_pod_types, pod_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(My, ut0new_make_shared_ptr_pod_types,
-                               all_pod_types);
-
-// make_shared - default constructible pod types
-template <typename T>
-class ut0new_make_shared_ptr_default_constructible_pod_types
-    : public ::testing::Test {};
-TYPED_TEST_SUITE_P(ut0new_make_shared_ptr_default_constructible_pod_types);
-TYPED_TEST_P(ut0new_make_shared_ptr_default_constructible_pod_types,
-             default_constructible_pod_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-
-  auto ptr = with_pfs ? ut::make_shared<type>(ut::make_psi_memory_key(pfs_key))
-                      : ut::make_shared<type>();
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr.get()));
-  EXPECT_EQ(ptr->x, 0);
-  EXPECT_EQ(ptr->y, 1);
-}
-REGISTER_TYPED_TEST_SUITE_P(
-    ut0new_make_shared_ptr_default_constructible_pod_types,
-    default_constructible_pod_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(
-    My, ut0new_make_shared_ptr_default_constructible_pod_types,
-    all_default_constructible_pod_types);
-
-// make_shared - non-pod types
-template <typename T>
-class ut0new_make_shared_ptr_non_pod_types : public ::testing::Test {};
-TYPED_TEST_SUITE_P(ut0new_make_shared_ptr_non_pod_types);
-TYPED_TEST_P(ut0new_make_shared_ptr_non_pod_types, non_pod_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-  auto ptr = with_pfs ? ut::make_shared<type>(ut::make_psi_memory_key(pfs_key),
-                                              2, 5, std::string("non-pod"))
-                      : ut::make_shared<type>(2, 5, std::string("non-pod"));
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr.get()));
-  EXPECT_EQ(ptr->x, 2);
-  EXPECT_EQ(ptr->y, 5);
-  EXPECT_EQ(ptr->sum->result, 7);
-  EXPECT_EQ(ptr->s, std::string("non-pod"));
-}
-REGISTER_TYPED_TEST_SUITE_P(ut0new_make_shared_ptr_non_pod_types,
-                            non_pod_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(My, ut0new_make_shared_ptr_non_pod_types,
-                               all_non_pod_types);
-
-// make_shared - default constructible non-pod types
-template <typename T>
-class ut0new_make_shared_ptr_default_constructible_non_pod_types
-    : public ::testing::Test {};
-TYPED_TEST_SUITE_P(ut0new_make_shared_ptr_default_constructible_non_pod_types);
-TYPED_TEST_P(ut0new_make_shared_ptr_default_constructible_non_pod_types,
-             default_constructible_non_pod_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-
-  auto ptr = with_pfs ? ut::make_shared<type>(ut::make_psi_memory_key(pfs_key))
-                      : ut::make_shared<type>();
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr.get()));
-  EXPECT_EQ(ptr->x, 0);
-  EXPECT_EQ(ptr->y, 1);
-  EXPECT_EQ(ptr->s, std::string("non-pod-string"));
-}
-REGISTER_TYPED_TEST_SUITE_P(
-    ut0new_make_shared_ptr_default_constructible_non_pod_types,
-    default_constructible_non_pod_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(
-    My, ut0new_make_shared_ptr_default_constructible_non_pod_types,
-    all_default_constructible_non_pod_types);
-
-// TODO macOS build of clang on PB2 currently exhibits a bug in which
-// std::shared_ptr with array types is not usable.
-//
-// For example,
-//   std::shared_ptr<int[]> ptr(new int[3]);
-//   ptr[0]; ptr[1]; ptr[2];
-//
-// will give the following error:
-//   type 'std::__1::shared_ptr<int []>' does not provide a subscript operator
-//
-// This can be worked around by reinterpreting it as pointer to int:
-//   ((int*)ptr.get())[0];
-//   ((int*)ptr.get())[1];
-//   ((int*)ptr.get())[2];
-//
-// But this leads to another issue:
-//   no matching constructor for initialization of 'std::shared_ptr<int[]>'
-//
-// Interestingly enough, issue is _not_ reproducible on Linux build of clang
-// (Fedora) which implied that there's something wrong with the Apple deployment
-// of clang. And indeed, issue is reproducible only if code is compiled with
-// libc++, an alternative (and default to Apple) implementation of C++ standard
-// library. clang on Linux OTOH is using libstdc++ by default and libstdc++ does
-// not suffer from this problem. So this is a bug in libc++ implementation.
-//
-// For now I am disabling std::shared_ptr-with-arrays subset of unit-tests from
-// running on PB2 macOS jobs so that the build is not broken and so that the
-// other unit-tests keep running. If and when this becomes a real issue (when
-// somebody actually tries to use this approach in production code), a
-// workaround will be needed to be found. It looks like
-//   std::shared_ptr<std::array<int, 3>> p(new std::array<int, 3>{});
-// will do or FWIW ut::make_shared version of it.
-#if !defined(__APPLE__)
-// make_shared - array specialization for fundamental types
-template <typename T>
-class ut0new_make_shared_ptr_fundamental_types_arr : public ::testing::Test {};
-TYPED_TEST_SUITE_P(ut0new_make_shared_ptr_fundamental_types_arr);
-TYPED_TEST_P(ut0new_make_shared_ptr_fundamental_types_arr, fundamental_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-  auto ptr = with_pfs
-                 ? ut::make_shared<type[]>(ut::make_psi_memory_key(pfs_key), 3)
-                 : ut::make_shared<type[]>(3);
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr.get()));
-  EXPECT_EQ(ptr[0], type{});
-  EXPECT_EQ(ptr[1], type{});
-  EXPECT_EQ(ptr[2], type{});
-}
-REGISTER_TYPED_TEST_SUITE_P(ut0new_make_shared_ptr_fundamental_types_arr,
-                            fundamental_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(My, ut0new_make_shared_ptr_fundamental_types_arr,
-                               all_fundamental_types);
-
-// make_shared - bounded array specialization for fundamental types
-template <typename T>
-class ut0new_make_shared_ptr_fundamental_types_bounded_arr
-    : public ::testing::Test {};
-TYPED_TEST_SUITE_P(ut0new_make_shared_ptr_fundamental_types_bounded_arr);
-TYPED_TEST_P(ut0new_make_shared_ptr_fundamental_types_bounded_arr,
-             fundamental_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-  auto ptr = with_pfs
-                 ? ut::make_shared<type[3]>(ut::make_psi_memory_key(pfs_key))
-                 : ut::make_shared<type[3]>();
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr.get()));
-  EXPECT_EQ(ptr[0], type{});
-  EXPECT_EQ(ptr[1], type{});
-  EXPECT_EQ(ptr[2], type{});
-}
-REGISTER_TYPED_TEST_SUITE_P(
-    ut0new_make_shared_ptr_fundamental_types_bounded_arr, fundamental_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(
-    My, ut0new_make_shared_ptr_fundamental_types_bounded_arr,
-    all_fundamental_types);
-
-// make_shared - array specialization for default_constructible POD types
-template <typename T>
-class ut0new_make_shared_ptr_default_constructible_pod_types_arr
-    : public ::testing::Test {};
-TYPED_TEST_SUITE_P(ut0new_make_shared_ptr_default_constructible_pod_types_arr);
-TYPED_TEST_P(ut0new_make_shared_ptr_default_constructible_pod_types_arr,
-             default_constructible_pod_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-  auto ptr = with_pfs
-                 ? ut::make_shared<type[]>(ut::make_psi_memory_key(pfs_key), 3)
-                 : ut::make_shared<type[]>(3);
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr.get()));
-  EXPECT_EQ(ptr[0].x, 0);
-  EXPECT_EQ(ptr[0].y, 1);
-  EXPECT_EQ(ptr[1].x, 0);
-  EXPECT_EQ(ptr[1].y, 1);
-  EXPECT_EQ(ptr[2].x, 0);
-  EXPECT_EQ(ptr[2].y, 1);
-}
-REGISTER_TYPED_TEST_SUITE_P(
-    ut0new_make_shared_ptr_default_constructible_pod_types_arr,
-    default_constructible_pod_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(
-    My, ut0new_make_shared_ptr_default_constructible_pod_types_arr,
-    all_default_constructible_pod_types);
-
-// make_shared - bounded array specialization for default_constructible POD
-// types
-template <typename T>
-class ut0new_make_shared_ptr_default_constructible_pod_types_bounded_arr
-    : public ::testing::Test {};
-TYPED_TEST_SUITE_P(
-    ut0new_make_shared_ptr_default_constructible_pod_types_bounded_arr);
-TYPED_TEST_P(ut0new_make_shared_ptr_default_constructible_pod_types_bounded_arr,
-             default_constructible_pod_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-  auto ptr = with_pfs
-                 ? ut::make_shared<type[3]>(ut::make_psi_memory_key(pfs_key))
-                 : ut::make_shared<type[3]>();
-  EXPECT_TRUE(ptr_is_suitably_aligned(ptr.get()));
-  EXPECT_EQ(ptr[0].x, 0);
-  EXPECT_EQ(ptr[0].y, 1);
-  EXPECT_EQ(ptr[1].x, 0);
-  EXPECT_EQ(ptr[1].y, 1);
-  EXPECT_EQ(ptr[2].x, 0);
-  EXPECT_EQ(ptr[2].y, 1);
-}
-REGISTER_TYPED_TEST_SUITE_P(
-    ut0new_make_shared_ptr_default_constructible_pod_types_bounded_arr,
-    default_constructible_pod_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(
-    My, ut0new_make_shared_ptr_default_constructible_pod_types_bounded_arr,
-    all_default_constructible_pod_types);
-#endif
-
-// make_shared_aligned - fundamental types
-template <typename T>
-class ut0new_make_shared_aligned_fundamental_types : public ::testing::Test {};
-TYPED_TEST_SUITE_P(ut0new_make_shared_aligned_fundamental_types);
-TYPED_TEST_P(ut0new_make_shared_aligned_fundamental_types, fundamental_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-  auto alignment = 4 * alignof(std::max_align_t);
-  auto ptr = with_pfs ? ut::make_shared_aligned<type>(
-                            ut::make_psi_memory_key(pfs_key), alignment, 1)
-                      : ut::make_shared_aligned<type>(alignment, 1);
-  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr.get()) % alignment == 0);
-  EXPECT_EQ(*ptr, 1);
-}
-REGISTER_TYPED_TEST_SUITE_P(ut0new_make_shared_aligned_fundamental_types,
-                            fundamental_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(My, ut0new_make_shared_aligned_fundamental_types,
-                               all_fundamental_types);
-
-// make_shared_aligned - pod types
-template <typename T>
-class ut0new_make_shared_aligned_pod_types : public ::testing::Test {};
-TYPED_TEST_SUITE_P(ut0new_make_shared_aligned_pod_types);
-TYPED_TEST_P(ut0new_make_shared_aligned_pod_types, pod_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-  auto alignment = 4 * alignof(std::max_align_t);
-  auto ptr = with_pfs ? ut::make_shared_aligned<type>(
-                            ut::make_psi_memory_key(pfs_key), alignment, 2, 5)
-                      : ut::make_shared_aligned<type>(alignment, 2, 5);
-  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr.get()) % alignment == 0);
-  EXPECT_EQ(ptr->x, 2);
-  EXPECT_EQ(ptr->y, 5);
-}
-REGISTER_TYPED_TEST_SUITE_P(ut0new_make_shared_aligned_pod_types, pod_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(My, ut0new_make_shared_aligned_pod_types,
-                               all_pod_types);
-
-// make_shared_aligned - default constructible pod types
-template <typename T>
-class ut0new_make_shared_aligned_default_constructible_pod_types
-    : public ::testing::Test {};
-TYPED_TEST_SUITE_P(ut0new_make_shared_aligned_default_constructible_pod_types);
-TYPED_TEST_P(ut0new_make_shared_aligned_default_constructible_pod_types,
-             default_constructible_pod_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-  auto alignment = 4 * alignof(std::max_align_t);
-  auto ptr = with_pfs ? ut::make_shared_aligned<type>(
-                            ut::make_psi_memory_key(pfs_key), alignment)
-                      : ut::make_shared_aligned<type>(alignment);
-  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr.get()) % alignment == 0);
-  EXPECT_EQ(ptr->x, 0);
-  EXPECT_EQ(ptr->y, 1);
-}
-REGISTER_TYPED_TEST_SUITE_P(
-    ut0new_make_shared_aligned_default_constructible_pod_types,
-    default_constructible_pod_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(
-    My, ut0new_make_shared_aligned_default_constructible_pod_types,
-    all_default_constructible_pod_types);
-
-// make_shared_aligned - non-pod types
-template <typename T>
-class ut0new_make_shared_aligned_non_pod_types : public ::testing::Test {};
-TYPED_TEST_SUITE_P(ut0new_make_shared_aligned_non_pod_types);
-TYPED_TEST_P(ut0new_make_shared_aligned_non_pod_types, non_pod_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-  auto alignment = 4 * alignof(std::max_align_t);
-  auto ptr = with_pfs ? ut::make_shared_aligned<type>(
-                            ut::make_psi_memory_key(pfs_key), alignment, 2, 5,
-                            std::string("non-pod"))
-                      : ut::make_shared_aligned<type>(alignment, 2, 5,
-                                                      std::string("non-pod"));
-  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr.get()) % alignment == 0);
-  EXPECT_EQ(ptr->x, 2);
-  EXPECT_EQ(ptr->y, 5);
-  EXPECT_EQ(ptr->sum->result, 7);
-  EXPECT_EQ(ptr->s, std::string("non-pod"));
-}
-REGISTER_TYPED_TEST_SUITE_P(ut0new_make_shared_aligned_non_pod_types,
-                            non_pod_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(My, ut0new_make_shared_aligned_non_pod_types,
-                               all_non_pod_types);
-
-// make_shared_aligned - default constructible non-pod types
-template <typename T>
-class ut0new_make_shared_aligned_default_constructible_non_pod_types
-    : public ::testing::Test {};
-TYPED_TEST_SUITE_P(
-    ut0new_make_shared_aligned_default_constructible_non_pod_types);
-TYPED_TEST_P(ut0new_make_shared_aligned_default_constructible_non_pod_types,
-             default_constructible_non_pod_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-  auto alignment = 4 * alignof(std::max_align_t);
-  auto ptr = with_pfs ? ut::make_shared_aligned<type>(
-                            ut::make_psi_memory_key(pfs_key), alignment)
-                      : ut::make_shared_aligned<type>(alignment);
-  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr.get()) % alignment == 0);
-  EXPECT_EQ(ptr->x, 0);
-  EXPECT_EQ(ptr->y, 1);
-  EXPECT_EQ(ptr->s, std::string("non-pod-string"));
-}
-REGISTER_TYPED_TEST_SUITE_P(
-    ut0new_make_shared_aligned_default_constructible_non_pod_types,
-    default_constructible_non_pod_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(
-    My, ut0new_make_shared_aligned_default_constructible_non_pod_types,
-    all_default_constructible_non_pod_types);
-
-// TODO macOS build of clang on PB2 currently exhibits a bug in which
-// std::shared_ptr with array types is not usable. Please see above for more in
-// depth explanation.
-#if !defined(__APPLE__)
-// make_shared_aligned - array specialization for fundamental types
-template <typename T>
-class ut0new_make_shared_aligned_fundamental_types_arr
-    : public ::testing::Test {};
-TYPED_TEST_SUITE_P(ut0new_make_shared_aligned_fundamental_types_arr);
-TYPED_TEST_P(ut0new_make_shared_aligned_fundamental_types_arr,
-             fundamental_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-  auto alignment = 4 * alignof(std::max_align_t);
-  auto ptr = with_pfs ? ut::make_shared_aligned<type[]>(
-                            ut::make_psi_memory_key(pfs_key), alignment, 3)
-                      : ut::make_shared_aligned<type[]>(alignment, 3);
-  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr.get()) % alignment == 0);
-  EXPECT_EQ(ptr[0], type{});
-  EXPECT_EQ(ptr[1], type{});
-  EXPECT_EQ(ptr[2], type{});
-}
-REGISTER_TYPED_TEST_SUITE_P(ut0new_make_shared_aligned_fundamental_types_arr,
-                            fundamental_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(My,
-                               ut0new_make_shared_aligned_fundamental_types_arr,
-                               all_fundamental_types);
-
-// make_shared_aligned - array specialization for default_constructible POD
-// types
-template <typename T>
-class ut0new_make_shared_aligned_default_constructible_pod_types_arr
-    : public ::testing::Test {};
-TYPED_TEST_SUITE_P(
-    ut0new_make_shared_aligned_default_constructible_pod_types_arr);
-TYPED_TEST_P(ut0new_make_shared_aligned_default_constructible_pod_types_arr,
-             default_constructible_pod_types) {
-  using type = typename TypeParam::type;
-  auto with_pfs = TypeParam::with_pfs;
-  auto alignment = 4 * alignof(std::max_align_t);
-  auto ptr = with_pfs ? ut::make_shared_aligned<type[]>(
-                            ut::make_psi_memory_key(pfs_key), alignment, 3)
-                      : ut::make_shared_aligned<type[]>(alignment, 3);
-  EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(ptr.get()) % alignment == 0);
-  EXPECT_EQ(ptr[0].x, 0);
-  EXPECT_EQ(ptr[0].y, 1);
-  EXPECT_EQ(ptr[1].x, 0);
-  EXPECT_EQ(ptr[1].y, 1);
-  EXPECT_EQ(ptr[2].x, 0);
-  EXPECT_EQ(ptr[2].y, 1);
-}
-REGISTER_TYPED_TEST_SUITE_P(
-    ut0new_make_shared_aligned_default_constructible_pod_types_arr,
-    default_constructible_pod_types);
-INSTANTIATE_TYPED_TEST_SUITE_P(
-    My, ut0new_make_shared_aligned_default_constructible_pod_types_arr,
-    all_default_constructible_pod_types);
-#endif
 
 }  // namespace innodb_ut0new_unittest

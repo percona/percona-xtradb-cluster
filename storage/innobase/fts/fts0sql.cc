@@ -248,11 +248,12 @@ que_t *fts_parse_sql(
 dberr_t fts_eval_sql(trx_t *trx,   /*!< in: transaction */
                      que_t *graph) /*!< in: Query graph to evaluate */
 {
+  que_thr_t *thr;
+
   graph->trx = trx;
   graph->fork_type = QUE_FORK_MYSQL_INTERFACE;
 
-  auto thr = que_fork_start_command(graph);
-  ut_a(thr);
+  ut_a(thr = que_fork_start_command(graph));
 
   que_run_threads(thr);
 

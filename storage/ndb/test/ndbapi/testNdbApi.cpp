@@ -2089,7 +2089,7 @@ int runTestExecuteAsynch(NDBT_Context* ctx, NDBT_Step* step){
 
   NdbScanOperation* pOp = pCon->getNdbScanOperation(pTab->getName());
   if (pOp == NULL){
-    NDB_ERR(pCon->getNdbError());
+    NDB_ERR(pOp->getNdbError());
     pNdb->closeTransaction(pCon);
     delete pNdb;
     return NDBT_FAILED;
@@ -3614,7 +3614,7 @@ runBug51775(NDBT_Context* ctx, NDBT_Step* step)
     NdbOperation * pOp = pTrans1->getNdbOperation(ctx->getTab()->getName());
     if (pOp == NULL)
     {
-      NDB_ERR(pTrans1->getNdbError());
+      NDB_ERR(pOp->getNdbError());
       return NDBT_FAILED;
     }
 
@@ -3632,7 +3632,7 @@ runBug51775(NDBT_Context* ctx, NDBT_Step* step)
     NdbOperation * pOp = pTrans2->getNdbOperation(ctx->getTab()->getName());
     if (pOp == NULL)
     {
-      NDB_ERR(pTrans2->getNdbError());
+      NDB_ERR(pOp->getNdbError());
       return NDBT_FAILED;
     }
 

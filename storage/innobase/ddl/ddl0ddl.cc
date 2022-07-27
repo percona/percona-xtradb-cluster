@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2005, 2021, Oracle and/or its affiliates.
+Copyright (c) 2005, 2021, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -153,7 +153,7 @@ dberr_t pwrite(os_fd_t fd, void *ptr, size_t len, os_offset_t offset,
   return err;
 }
 
-Unique_os_file_descriptor file_create_low(const char *path) noexcept {
+os_fd_t file_create_low(const char *path) noexcept {
   if (path == nullptr) {
     path = innobase_mysql_tmpdir();
   }
@@ -187,25 +187,42 @@ Unique_os_file_descriptor file_create_low(const char *path) noexcept {
 
   if (fd < 0) {
     ib::error(ER_IB_MSG_967) << "Cannot create temporary merge file";
-    return Unique_os_file_descriptor{};
+    return OS_FD_CLOSED;
   }
 
-  return Unique_os_file_descriptor{fd};
+  return fd;
 }
 
-bool file_create(ddl::file_t *file, const char *path) noexcept {
+os_fd_t file_create(ddl::file_t *file, const char *path) noexcept {
   file->m_size = 0;
   file->m_n_recs = 0;
-  file->m_file = ddl::file_create_low(path);
+  file->m_fd = ddl::file_create_low(path);
 
-  if (file->m_file.is_open()) {
-    if (srv_disable_sort_file_cache) {
-      os_file_set_nocache(file->m_file.get(), "ddl0ddl.cc", "sort");
-    }
-    return true;
+  if (file->m_fd >= 0 && srv_disable_sort_file_cache) {
+    os_file_set_nocache(file->m_fd, "ddl0ddl.cc", "sort");
   }
 
-  return false;
+  return file->m_fd;
+}
+
+void file_destroy_low(os_fd_t fd) noexcept {
+#ifdef UNIV_PFS_IO
+  struct PSI_file_locker *locker = nullptr;
+  PSI_file_locker_state state;
+  locker = PSI_FILE_CALL(get_thread_file_descriptor_locker)(&state, fd,
+                                                            PSI_FILE_CLOSE);
+  if (locker != nullptr) {
+    PSI_FILE_CALL(start_file_wait)(locker, 0, __FILE__, __LINE__);
+  }
+#endif /* UNIV_PFS_IO */
+  if (fd != OS_FD_CLOSED) {
+    close(fd);
+  }
+#ifdef UNIV_PFS_IO
+  if (locker != nullptr) {
+    PSI_FILE_CALL(end_file_wait)(locker, 0);
+  }
+#endif /* UNIV_PFS_IO */
 }
 
 dict_index_t *create_index(trx_t *trx, dict_table_t *table,

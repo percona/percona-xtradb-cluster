@@ -213,12 +213,7 @@ bool fido_make_cred::make_challenge_response(
   pos += rp_id_len;
   assert(len == (size_t)(pos - str));
 
-  uint64 needed = base64_needed_encoded_length((uint64)len);
-  unsigned char *tmp_value = new unsigned char[needed];
-  base64_encode(str, len, reinterpret_cast<char *>(tmp_value));
-  /* Ensure caller will release this memory. */
-  challenge_response = tmp_value;
-
+  base64_encode(str, len, reinterpret_cast<char *>(challenge_response));
   delete[] str;
   return false;
 }
@@ -336,6 +331,6 @@ bool fido_registration::make_credentials(const char *challenge) {
   Helper method to get challenge response
 */
 bool fido_registration::make_challenge_response(
-    unsigned char *&challenge_response) {
+    unsigned char *challenge_response) {
   return m_fido_make_cred.make_challenge_response(challenge_response);
 }

@@ -81,7 +81,6 @@
 #include "my_io.h"
 #include "my_macros.h"
 #include "my_thread.h"
-#include "mysql/psi/mysql_memory.h"
 #include "mysql/psi/mysql_thread.h"
 #include "pfs_error_provider.h"
 /* Make sure exported prototypes match the implementation. */
@@ -3092,21 +3091,6 @@ void pfs_set_thread_THD_vc(PSI_thread *thread, THD *thd) {
     return;
   }
   pfs->m_thd = thd;
-  pfs->m_cnt_thd = thd;
-}
-
-/**
-  Implementation of the thread instrumentation interface.
-  @sa PSI_v2::set_mem_cnt_THD.
-*/
-void pfs_set_mem_cnt_THD_vc(THD *thd, THD **backup_thd) {
-  PFS_thread *pfs = my_thread_get_THR_PFS();
-  if (unlikely(pfs == nullptr)) {
-    *backup_thd = nullptr;
-    return;
-  }
-  *backup_thd = pfs->m_cnt_thd;
-  pfs->m_cnt_thd = thd;
 }
 
 /**
@@ -6002,10 +5986,6 @@ PSI_statement_locker *pfs_get_thread_statement_locker_v2(
 
     if (klass->m_timed) {
       flags |= STATE_FLAG_TIMED;
-
-      if (flag_events_statements_cpu) {
-        flags |= STATE_FLAG_CPU;
-      }
     }
 
     if (flag_events_statements_current) {
@@ -6056,7 +6036,6 @@ PSI_statement_locker *pfs_get_thread_statement_locker_v2(
       pfs->m_sort_scan = 0;
       pfs->m_no_index_used = 0;
       pfs->m_no_good_index_used = 0;
-      pfs->m_cpu_time = 0;
       pfs->m_digest_storage.reset();
 
       /* New stages will have this statement as parent */
@@ -6152,7 +6131,6 @@ PSI_statement_locker *pfs_get_thread_statement_locker_v2(
   state->m_sort_scan = 0;
   state->m_no_index_used = 0;
   state->m_no_good_index_used = 0;
-  state->m_cpu_time_start = 0;
 
   state->m_digest = nullptr;
   state->m_cs_number = static_cast<const CHARSET_INFO *>(charset)->number;
@@ -6224,16 +6202,10 @@ void pfs_start_statement_v2(PSI_statement_locker *locker, const char *db,
 
   uint flags = state->m_flags;
   ulonglong timer_start = 0;
-  ulonglong cpu_time_start = 0;
 
   if (flags & STATE_FLAG_TIMED) {
     timer_start = get_statement_timer();
     state->m_timer_start = timer_start;
-  }
-
-  if (flags & STATE_FLAG_CPU) {
-    cpu_time_start = get_thread_cpu_timer();
-    state->m_cpu_time_start = cpu_time_start;
   }
 
   static_assert(PSI_SCHEMA_NAME_LEN == NAME_LEN, "");
@@ -6445,16 +6417,9 @@ void pfs_end_statement_v2(PSI_statement_locker *locker, void *stmt_da) {
       reinterpret_cast<PFS_statement_class *>(state->m_class);
   assert(klass != nullptr);
 
-  ulonglong cpu_time_end;
   ulonglong timer_end = 0;
-  ulonglong cpu_time = 0;
   ulonglong wait_time = 0;
   uint flags = state->m_flags;
-
-  if (flags & STATE_FLAG_CPU) {
-    cpu_time_end = get_thread_cpu_timer();
-    cpu_time = cpu_time_end - state->m_cpu_time_start;
-  }
 
   if (flags & STATE_FLAG_TIMED) {
     timer_end = get_statement_timer();
@@ -6525,7 +6490,6 @@ void pfs_end_statement_v2(PSI_statement_locker *locker, void *stmt_da) {
       }
 
       pfs->m_timer_end = timer_end;
-      pfs->m_cpu_time = cpu_time;
       pfs->m_end_event_id = thread->m_event_id;
 
       pfs_program = reinterpret_cast<PFS_program *>(state->m_parent_sp_share);
@@ -6570,7 +6534,6 @@ void pfs_end_statement_v2(PSI_statement_locker *locker, void *stmt_da) {
   if (flags & STATE_FLAG_TIMED) {
     /* Aggregate to EVENTS_STATEMENTS_SUMMARY_..._BY_EVENT_NAME (timed) */
     stat->aggregate_value(wait_time);
-    stat->m_cpu_time += cpu_time;
   } else {
     /* Aggregate to EVENTS_STATEMENTS_SUMMARY_..._BY_EVENT_NAME (counted) */
     stat->aggregate_counted();
@@ -6598,7 +6561,6 @@ void pfs_end_statement_v2(PSI_statement_locker *locker, void *stmt_da) {
 
     if (flags & STATE_FLAG_TIMED) {
       digest_stat->m_stat.aggregate_value(wait_time);
-      digest_stat->m_stat.m_cpu_time += cpu_time;
 
       /* Update the digest sample if it's a new maximum. */
       if (wait_time > digest_stat->get_sample_timer_wait()) {
@@ -6689,7 +6651,6 @@ void pfs_end_statement_v2(PSI_statement_locker *locker, void *stmt_da) {
     if (sub_stmt_stat != nullptr) {
       if (flags & STATE_FLAG_TIMED) {
         sub_stmt_stat->aggregate_value(wait_time);
-        sub_stmt_stat->m_cpu_time += cpu_time;
       } else {
         sub_stmt_stat->aggregate_counted();
       }
@@ -6732,7 +6693,6 @@ void pfs_end_statement_v2(PSI_statement_locker *locker, void *stmt_da) {
       if (prepared_stmt_stat != nullptr) {
         if (flags & STATE_FLAG_TIMED) {
           prepared_stmt_stat->aggregate_value(wait_time);
-          prepared_stmt_stat->m_cpu_time += cpu_time;
         } else {
           prepared_stmt_stat->aggregate_counted();
         }
@@ -7644,7 +7604,6 @@ void pfs_register_memory_vc(const char *category, PSI_memory_info_v1 *info,
 
 PSI_memory_key pfs_memory_alloc_vc(PSI_memory_key key, size_t size,
                                    PSI_thread **owner) {
-  PSI_memory_key result_key = key;
   PFS_thread **owner_thread = reinterpret_cast<PFS_thread **>(owner);
   assert(owner_thread != nullptr);
 
@@ -7677,14 +7636,6 @@ PSI_memory_key pfs_memory_alloc_vc(PSI_memory_key key, size_t size,
       return PSI_NOT_INSTRUMENTED;
     }
 
-    if (klass->has_memory_cnt()) {
-#ifndef NDEBUG
-      pfs_thread->current_key_name = klass->m_name.str();
-#endif
-      if (pfs_thread->m_cnt_thd != nullptr && pfs_thread->mem_cnt_alloc(size))
-        result_key |= PSI_MEM_CNT_BIT;
-    }
-
     PFS_memory_safe_stat *event_name_array;
     PFS_memory_safe_stat *stat;
     PFS_memory_stat_alloc_delta delta_buffer;
@@ -7713,7 +7664,7 @@ PSI_memory_key pfs_memory_alloc_vc(PSI_memory_key key, size_t size,
     *owner_thread = nullptr;
   }
 
-  return result_key;
+  return key;
 }
 
 PSI_memory_key pfs_memory_realloc_vc(PSI_memory_key key, size_t old_size,
@@ -7721,7 +7672,7 @@ PSI_memory_key pfs_memory_realloc_vc(PSI_memory_key key, size_t old_size,
   PFS_thread **owner_thread_hdl = reinterpret_cast<PFS_thread **>(owner);
   assert(owner != nullptr);
 
-  PFS_memory_class *klass = find_memory_class(PSI_REAL_MEM_KEY(key));
+  PFS_memory_class *klass = find_memory_class(key);
   if (klass == nullptr) {
     *owner_thread_hdl = nullptr;
     return PSI_NOT_INSTRUMENTED;
@@ -7798,7 +7749,7 @@ PSI_memory_key pfs_memory_claim_vc(PSI_memory_key key, size_t size,
   PFS_thread **owner_thread = reinterpret_cast<PFS_thread **>(owner);
   assert(owner_thread != nullptr);
 
-  PFS_memory_class *klass = find_memory_class(PSI_REAL_MEM_KEY(key));
+  PFS_memory_class *klass = find_memory_class(key);
   if (klass == nullptr) {
     *owner_thread = nullptr;
     return PSI_NOT_INSTRUMENTED;
@@ -7911,8 +7862,7 @@ PSI_memory_key pfs_memory_claim_vc(PSI_memory_key key, size_t size,
 
 void pfs_memory_free_vc(PSI_memory_key key, size_t size,
                         PSI_thread *owner [[maybe_unused]]) {
-  PFS_memory_class *klass = find_memory_class(PSI_REAL_MEM_KEY(key));
-
+  PFS_memory_class *klass = find_memory_class(key);
   if (klass == nullptr) {
     return;
   }
@@ -7932,11 +7882,6 @@ void pfs_memory_free_vc(PSI_memory_key key, size_t size,
     PFS_thread *pfs_thread = my_thread_get_THR_PFS();
     PFS_thread *owner_thread = reinterpret_cast<PFS_thread *>(owner);
     if (likely(pfs_thread != nullptr)) {
-      if (pfs_thread->m_cnt_thd != nullptr && (key & PSI_MEM_CNT_BIT)) {
-        assert(klass->has_memory_cnt());
-        pfs_thread->mem_cnt_free(size);
-      }
-
       if (pfs_thread == owner_thread) {
         /*
           Do not check pfs_thread->m_enabled.
@@ -8409,8 +8354,7 @@ PSI_thread_service_v5 pfs_thread_service_v5 = {
     pfs_unregister_notification_vc,
     pfs_notify_session_connect_vc,
     pfs_notify_session_disconnect_vc,
-    pfs_notify_session_change_user_vc,
-    pfs_set_mem_cnt_THD_vc};
+    pfs_notify_session_change_user_vc};
 
 SERVICE_TYPE(psi_thread_v5)
 SERVICE_IMPLEMENTATION(performance_schema, psi_thread_v5) = {

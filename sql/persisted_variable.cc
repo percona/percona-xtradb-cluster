@@ -163,17 +163,16 @@ Persisted_variables_cache *Persisted_variables_cache::m_instance = nullptr;
 
 st_persist_var::st_persist_var() {
   if (current_thd) {
-    my_timeval tv =
-        current_thd->query_start_timeval_trunc(DATETIME_MAX_DECIMALS);
-    timestamp = tv.m_tv_sec * 1000000ULL + tv.m_tv_usec;
+    timeval tv = current_thd->query_start_timeval_trunc(DATETIME_MAX_DECIMALS);
+    timestamp = tv.tv_sec * 1000000ULL + tv.tv_usec;
   } else
     timestamp = my_micro_time();
   is_null = false;
 }
 
 st_persist_var::st_persist_var(THD *thd) {
-  my_timeval tv = thd->query_start_timeval_trunc(DATETIME_MAX_DECIMALS);
-  timestamp = tv.m_tv_sec * 1000000ULL + tv.m_tv_usec;
+  timeval tv = thd->query_start_timeval_trunc(DATETIME_MAX_DECIMALS);
+  timestamp = tv.tv_sec * 1000000ULL + tv.tv_usec;
   user = thd->security_context()->user().str;
   host = thd->security_context()->host().str;
   is_null = false;
@@ -684,6 +683,7 @@ bool Persisted_variables_cache::load_persist_file() {
 bool Persisted_variables_cache::set_persist_options(bool plugin_options,
                                                     bool lock_vars) {
   THD *thd;
+  LEX lex_tmp, *sav_lex = nullptr;
   List<set_var_base> tmp_var_list;
   std::unordered_set<st_persist_var, st_persist_var_hash> *persist_variables =
       nullptr;
@@ -708,6 +708,9 @@ bool Persisted_variables_cache::set_persist_options(bool plugin_options,
   */
   if (current_thd) {
     thd = current_thd;
+    sav_lex = thd->lex;
+    thd->lex = &lex_tmp;
+    lex_start(thd);
   } else {
     if (!(thd = new THD)) {
       LogErr(ERROR_LEVEL, ER_FAILED_TO_SET_PERSISTED_OPTIONS);
@@ -825,11 +828,8 @@ bool Persisted_variables_cache::set_persist_options(bool plugin_options,
 
       var = new (thd->mem_root) set_var(OPT_GLOBAL, sysvar, base_name, res);
       tmp_var_list.push_back(var);
-      LEX *saved_lex = thd->lex, lex_tmp;
-      thd->lex = &lex_tmp;
-      lex_start(thd);
+
       if (sql_set_variables(thd, &tmp_var_list, false)) {
-        thd->lex = saved_lex;
         /*
          If there is a connection and an error occurred during install
          plugin then report error at sql layer, else log the error in
@@ -852,7 +852,6 @@ bool Persisted_variables_cache::set_persist_options(bool plugin_options,
         goto err;
       }
       tmp_var_list.clear();
-      thd->lex = saved_lex;
     }
     /*
       Once persisted variables are SET in the server,
@@ -909,6 +908,8 @@ err:
     thd->release_resources();
     ctx.reset(nullptr);
     delete thd;
+  } else {
+    thd->lex = sav_lex;
   }
   if (lock_vars) mysql_rwlock_unlock(&LOCK_system_variables_hash);
   unlock();

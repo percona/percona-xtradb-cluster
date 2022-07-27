@@ -75,7 +75,7 @@ Prefix: %{_sysconfdir}
 
 #Placeholder should be replaced on preparation stage
 %if %{undefined galera_version}
- %define galera_version 4.11
+ %define galera_version 4.10
 %endif
 
 %if %{undefined galera_revision}
@@ -588,12 +588,6 @@ Obsoletes:      mysql-router-devel percona-mysql-router-devel
 This package contains the development header files and libraries
 necessary to develop Percona MySQL Router applications.
 
-%package   -n   percona-xtradb-cluster-icu-data-files
-Summary:        MySQL packaging of ICU data files
-
-%description -n percona-xtradb-cluster-icu-data-files
-This package contains ICU data files needer by MySQL regular expressions.
-
 
 ##############################################################################
 %prep
@@ -654,7 +648,7 @@ mkdir pxc_extra
 pushd pxc_extra
 mkdir pxb-2.4
 pushd pxb-2.4
-yumdownloader percona-xtrabackup-24-2.4.26
+yumdownloader percona-xtrabackup-24-2.4.24
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib* ./
@@ -668,7 +662,7 @@ popd
 
 mkdir pxb-8.0
 pushd pxb-8.0
-yumdownloader percona-xtrabackup-80-8.0.28
+yumdownloader percona-xtrabackup-80-8.0.27
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib64 ./
@@ -729,7 +723,6 @@ mkdir debug
            -DWITH_PAM=1 \
            -DWITH_INNODB_MEMCACHED=1 \
            -DWITH_ZSTD=bundled \
-           -DWITH_FIDO=bundled \
            -DWITH_UNIT_TESTS=0 \
            -DWITH_SCALABILITY_METRICS=ON \
            -DMYSQL_SERVER_SUFFIX=".%{rel}" \
@@ -770,7 +763,6 @@ mkdir release
            -DWITH_PAM=1 \
            -DWITH_INNODB_MEMCACHED=1 \
            -DWITH_ZSTD=bundled \
-           -DWITH_FIDO=bundled \
            -DWITH_UNIT_TESTS=0 \
            -DWITH_SCALABILITY_METRICS=ON \
            %{?mecab_option} \
@@ -1530,8 +1522,6 @@ fi
 %dir %{_libdir}/mysql/private
 %attr(755, root, root) %{_libdir}/mysql/private/libprotobuf-lite.so.*
 %attr(755, root, root) %{_libdir}/mysql/private/libprotobuf.so.*
-%attr(755, root, root) %{_libdir}/mysql/private/libfido2.so.*
-
 %if 0%{?systemd} == 0
 %attr(755, root, root) %{_sbindir}/rcmysql
 %endif
@@ -1786,14 +1776,6 @@ fi
 %{_libdir}/mysqlrouter/*.so*
 %dir %attr(755, mysqlrouter, mysqlrouter) /var/log/mysqlrouter
 %dir %attr(755, mysqlrouter, mysqlrouter) /var/run/mysqlrouter
-
-
-%files -n percona-xtradb-cluster-icu-data-files
-%defattr(-, root, root, -)
-%doc %{?license_files_server}
-%dir %attr(755, root, root) %{_libdir}/mysql/private/icudt69l
-%{_libdir}/mysql/private/icudt69l/unames.icu
-%{_libdir}/mysql/private/icudt69l/brkitr
 
 
 ##############################################################################

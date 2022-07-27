@@ -29,7 +29,6 @@
 #include <mutex>  // std::adopt_lock_t
 
 #include "libbinlogevents/include/compression/base.h"
-#include "libbinlogevents/include/gtids/global.h"
 #include "libbinlogevents/include/uuid.h"
 #include "map_helpers.h"
 #include "my_dbug.h"
@@ -97,9 +96,8 @@ class THD;
 
 /// Type of SIDNO (source ID number, first component of GTID)
 typedef int rpl_sidno;
-/// GNO, the second (numeric) component of a GTID, is an alias of
-/// binary_log::gtids::gno_t
-using rpl_gno = binary_log::gtids::gno_t;
+/// Type of GNO, the second (numeric) component of GTID
+typedef std::int64_t rpl_gno;
 typedef int64 rpl_binlog_pos;
 
 /**
@@ -328,7 +326,7 @@ class Checkable_rwlock {
   /// Destroy this Checkable_lock.
   ~Checkable_rwlock() { mysql_rwlock_destroy(&m_rwlock); }
 
-  enum enum_lock_type { NO_LOCK, READ_LOCK, WRITE_LOCK, TRY_READ_LOCK };
+  enum enum_lock_type { NO_LOCK, READ_LOCK, WRITE_LOCK };
 
   /**
     RAII class to acquire a lock for the duration of a block.
@@ -351,9 +349,6 @@ class Checkable_rwlock {
         case WRITE_LOCK:
           wrlock();
           break;
-        case TRY_READ_LOCK:
-          tryrdlock();
-          break;
         case NO_LOCK:
           break;
       }
@@ -373,7 +368,6 @@ class Checkable_rwlock {
         case WRITE_LOCK:
           lock.assert_some_wrlock();
           break;
-        case TRY_READ_LOCK:
         case NO_LOCK:
           break;
       }
@@ -414,18 +408,6 @@ class Checkable_rwlock {
       assert(m_lock_type == NO_LOCK);
       int ret = m_lock.trywrlock();
       if (ret == 0) m_lock_type = WRITE_LOCK;
-      return ret;
-    }
-
-    /**
-      Try to acquire a read lock, and fail if it cannot be
-      immediately granted.
-    */
-    int tryrdlock() {
-      DBUG_TRACE;
-      assert(m_lock_type == NO_LOCK);
-      int ret = m_lock.tryrdlock();
-      if (ret == 0) m_lock_type = READ_LOCK;
       return ret;
     }
 
@@ -1214,7 +1196,7 @@ struct Trx_monitoring_info {
   void copy_to_ps_table(Sid_map *sid_map, char *gtid_arg, uint *gtid_length_arg,
                         ulonglong *original_commit_ts_arg,
                         ulonglong *immediate_commit_ts_arg,
-                        ulonglong *start_time_arg) const;
+                        ulonglong *start_time_arg);
 
   /**
     Copies this transaction monitoring information to the output parameters
@@ -1234,8 +1216,7 @@ struct Trx_monitoring_info {
   void copy_to_ps_table(Sid_map *sid_map, char *gtid_arg, uint *gtid_length_arg,
                         ulonglong *original_commit_ts_arg,
                         ulonglong *immediate_commit_ts_arg,
-                        ulonglong *start_time_arg,
-                        ulonglong *end_time_arg) const;
+                        ulonglong *start_time_arg, ulonglong *end_time_arg);
 
   /**
     Copies this transaction monitoring information to the output parameters
@@ -1264,7 +1245,7 @@ struct Trx_monitoring_info {
       ulonglong *original_commit_ts_arg, ulonglong *immediate_commit_ts_arg,
       ulonglong *start_time_arg, uint *last_transient_errno_arg,
       char *last_transient_errmsg_arg, uint *last_transient_errmsg_length_arg,
-      ulonglong *last_transient_timestamp_arg, ulong *retries_count_arg) const;
+      ulonglong *last_transient_timestamp_arg, ulong *retries_count_arg);
 
   /**
     Copies this transaction monitoring information to the output parameters
@@ -1300,7 +1281,7 @@ struct Trx_monitoring_info {
                         char *last_transient_errmsg_arg,
                         uint *last_transient_errmsg_length_arg,
                         ulonglong *last_transient_timestamp_arg,
-                        ulong *retries_count_arg) const;
+                        ulong *retries_count_arg);
 };
 
 /**
@@ -3099,15 +3080,12 @@ class Gtid_state {
     @param sidno Sidno to wait for.
     @param[in] abstime The absolute point in time when the wait times
     out and stops, or NULL to wait indefinitely.
-    @param[in] update_thd_status when true updates the stage info with
-    the new wait condition, when false keeps the current stage info.
 
     @retval false Success.
     @retval true Failure: either timeout or thread was killed.  If
     thread was killed, the error has been generated.
   */
-  bool wait_for_sidno(THD *thd, rpl_sidno sidno, struct timespec *abstime,
-                      bool update_thd_status = true);
+  bool wait_for_sidno(THD *thd, rpl_sidno sidno, struct timespec *abstime);
   /**
     This is only a shorthand for wait_for_sidno, which contains
     additional debug printouts and assertions for the case when the
@@ -3122,15 +3100,12 @@ class Gtid_state {
     @param gtid_set Gtid_set to wait for.
     @param[in] timeout The maximum number of milliseconds that the
     function should wait, or 0 to wait indefinitely.
-    @param[in] update_thd_status when true updates the stage info with
-    the new wait condition, when false keeps the current stage info.
 
     @retval false Success.
     @retval true Failure: either timeout or thread was killed.  If
     thread was killed, the error has been generated.
    */
-  bool wait_for_gtid_set(THD *thd, Gtid_set *gtid_set, double timeout,
-                         bool update_thd_status = true);
+  bool wait_for_gtid_set(THD *thd, Gtid_set *gtid_set, double timeout);
 #endif  // ifdef MYSQL_SERVER
   /**
     Locks one mutex for each SIDNO where the given Gtid_set has at

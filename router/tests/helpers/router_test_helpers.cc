@@ -30,14 +30,12 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <iterator>
 #include <regex>
 #include <stdexcept>
 #include <string>
-#include <system_error>
 #include <thread>
 #include <vector>
 
@@ -56,13 +54,10 @@
 #include "my_inttypes.h"  // ssize_t
 #include "mysql/harness/filesystem.h"
 #include "mysql/harness/net_ts.h"
-#include "mysql/harness/net_ts/impl/socket_error.h"
 #include "mysql/harness/net_ts/io_context.h"
-#include "mysql/harness/net_ts/socket.h"
-#include "mysql/harness/stdx/filesystem.h"
 #include "mysqlrouter/mysql_session.h"
 #include "mysqlrouter/utils.h"
-#include "test/temp_directory.h"
+#include "temp_dir.h"
 
 using mysql_harness::Path;
 using namespace std::chrono_literals;
@@ -88,7 +83,7 @@ Path get_cmake_source_dir() {
 
   if (env_value == nullptr) {
     // try a few places
-    result = Path(stdx::filesystem::current_path().native()).join("..");
+    result = Path(get_cwd()).join("..");
     result = Path(result).real_path();
   } else {
     result = Path(env_value).real_path();
@@ -118,6 +113,98 @@ Path get_envvar_path(const std::string &envvar, Path alternative = Path()) {
   }
   return result;
 }
+
+const std::string get_cwd() {
+  char buffer[FILENAME_MAX];
+  if (!getcwd(buffer, FILENAME_MAX)) {
+    throw std::runtime_error("getcwd failed: " + std::string(strerror(errno)));
+  }
+  return std::string(buffer);
+}
+
+const std::string change_cwd(std::string &dir) {
+  auto cwd = get_cwd();
+#ifndef _WIN32
+  if (chdir(dir.c_str()) == -1) {
+#else
+  if (!SetCurrentDirectory(dir.c_str())) {
+#endif
+    throw std::runtime_error("chdir failed: " + mysqlrouter::get_last_error());
+  }
+  return cwd;
+}
+
+size_t read_bytes_with_timeout(int sockfd, void *buffer, size_t n_bytes,
+                               uint64_t timeout_in_ms) {
+  // returns epoch time (aka unix time, etc), expressed in milliseconds
+  auto get_epoch_in_ms = []() -> uint64_t {
+    using namespace std::chrono;
+    time_point<system_clock> now = system_clock::now();
+    return static_cast<uint64_t>(
+        duration_cast<milliseconds>(now.time_since_epoch()).count());
+  };
+
+  // calculate deadline time
+  uint64_t now_in_ms = get_epoch_in_ms();
+  uint64_t deadline_epoch_in_ms = now_in_ms + timeout_in_ms;
+
+  // read until 1 of 3 things happen: enough bytes were read, we time out or
+  // read() fails
+  size_t bytes_read = 0;
+  while (true) {
+#ifndef _WIN32
+    ssize_t res = read(sockfd, static_cast<char *>(buffer) + bytes_read,
+                       n_bytes - bytes_read);
+#else
+    WSASetLastError(0);
+    ssize_t res = recv(sockfd, static_cast<char *>(buffer) + bytes_read,
+                       n_bytes - bytes_read, 0);
+#endif
+
+    if (res == 0) {  // reached EOF?
+      return bytes_read;
+    }
+
+    if (get_epoch_in_ms() > deadline_epoch_in_ms) {
+      throw std::runtime_error("read() timed out");
+    }
+
+    if (res == -1) {
+#ifndef _WIN32
+      if (errno != EAGAIN) {
+        throw std::runtime_error(std::string("read() failed: ") +
+                                 strerror(errno));
+      }
+#else
+      int err_code = WSAGetLastError();
+      if (err_code != 0) {
+        throw std::runtime_error("recv() failed with error: " +
+                                 get_last_error(err_code));
+      }
+
+#endif
+    } else {
+      bytes_read += static_cast<size_t>(res);
+      if (bytes_read >= n_bytes) {
+        assert(bytes_read == n_bytes);
+        return bytes_read;
+      }
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+}
+
+#ifdef _WIN32
+std::string get_last_error(int err_code) {
+  char message[512];
+  FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS |
+                    FORMAT_MESSAGE_ALLOCATE_BUFFER,
+                nullptr, err_code, LANG_NEUTRAL, message, sizeof(message),
+                nullptr);
+  return std::string(message);
+}
+#endif
 
 void init_windows_sockets() {
 #ifdef _WIN32
@@ -187,8 +274,8 @@ bool wait_for_port_ready(uint16_t port, std::chrono::milliseconds timeout,
     auto sock_id =
         socket(ainfo->ai_family, ainfo->ai_socktype, ainfo->ai_protocol);
     if (sock_id < 0) {
-      throw std::system_error(net::impl::socket::last_error_code(),
-                              "wait_for_port_ready(): socket() failed");
+      throw std::runtime_error("wait_for_port_ready(): socket() failed: " +
+                               std::to_string(mysqlrouter::get_socket_errno()));
     }
     std::shared_ptr<void> exit_close_socket(
         nullptr, [&](void *) { close_socket(sock_id); });
@@ -205,11 +292,13 @@ bool wait_for_port_ready(uint16_t port, std::chrono::milliseconds timeout,
       // if the address is not available, it is a client side problem.
 #ifdef _WIN32
       if (WSAGetLastError() == WSAEADDRNOTAVAIL) {
-        throw std::system_error(net::impl::socket::last_error_code());
+        throw std::system_error(mysqlrouter::get_socket_errno(),
+                                std::system_category());
       }
 #else
       if (errno == EADDRNOTAVAIL) {
-        throw std::system_error(net::impl::socket::last_error_code());
+        throw std::system_error(mysqlrouter::get_socket_errno(),
+                                std::generic_category());
       }
 #endif
       const auto step = std::min(timeout, step_ms);
@@ -248,14 +337,14 @@ inline bool is_port_available_fallback(const uint16_t port) {
 
 bool is_port_available(const uint16_t port) {
 #if defined(__linux__)
-  const std::string netstat_cmd{"netstat -tnl"};
+  const std::string &netstat_cmd{"netstat -tnl"};
 #elif defined(_WIN32)
-  const std::string netstat_cmd{"netstat -p tcp -n -a"};
+  const std::string &netstat_cmd{"netstat -p tcp -n -a | findstr LISTEN"};
 #elif defined(__sun)
-  const std::string netstat_cmd{"netstat -na -P tcp"};
+  const std::string &netstat_cmd{"netstat -na -P tcp | grep LISTEN"};
 #else
   // BSD and MacOS
-  const std::string netstat_cmd{"netstat -p tcp -an"};
+  const std::string &netstat_cmd{"netstat -p tcp -an | grep LISTEN"};
 #endif
 
   TempDirectory temp_dir;
@@ -290,8 +379,8 @@ bool is_port_available(const uint16_t port) {
     //  SunOS
     //  *.XYZ                 *.*              0      0  256000      0 LISTEN
     //  127.0.0.1.XYZ         *.*              0      0  256000      0 LISTEN
-    if (pattern_found(line, "[\\*,0,127]\\..*[.:]" + std::to_string(port) +
-                                "[^\\d].*LISTEN")) {
+    if (pattern_found(
+            line, "[\\*,0,127]\\..*[.:]" + std::to_string(port) + "[^\\d]?")) {
       return false;
     }
   }
@@ -555,7 +644,7 @@ get_log_timestamp(const std::string &log_file, const std::string &log_regex,
     return stdx::make_unexpected();
   }
 
-  // extract the timestamp prefix and convert to the duration
+  // extract the timestamp prefix and conver to the duration
   std::string timestamp_str =
       log_line_str.substr(0, strlen("2020-06-09 03:53:26.027"));
   std::tm tm{};

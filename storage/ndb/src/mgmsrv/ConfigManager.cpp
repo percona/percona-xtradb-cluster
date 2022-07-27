@@ -218,9 +218,6 @@ find_own_nodeid(Config* conf)
 {
   NodeId found_nodeid= 0;
   ConfigIter iter(conf, CFG_SECTION_NODE);
-  int unmatched_host_count = 0;
-  std::string unmatched_hostname;
-  const char *separator = "";
   for (iter.first(); iter.valid(); iter.next())
   {
     Uint32 type;
@@ -244,28 +241,15 @@ find_own_nodeid(Config* conf)
       // This node is setup to run on this host
       if (found_nodeid == 0)
         found_nodeid = nodeid;
-      else {
-        g_eventLogger->error(
-            "More than one hostname matches a local interface, including node "
-            "ids %d and %d.",
-            found_nodeid, nodeid);
-        return 0;
+      else
+      {
+        return 0; // More than one host on this node
       }
-    } else {
-      unmatched_host_count++;
-      // Append the hostname to the list of unmatched host
-      unmatched_hostname += separator + std::string(hostname);
-      separator = ",";
     }
-  }
-  if (found_nodeid == 0 && unmatched_host_count > 0) {
-    g_eventLogger->error(
-        "At least one hostname in the configuration does not match a local "
-        "interface. Failed to bind on %s",
-        unmatched_hostname.c_str());
   }
   return found_nodeid;
 }
+
 
 NodeId
 ConfigManager::find_nodeid_from_config(void)
@@ -329,11 +313,6 @@ ConfigManager::init_nodeid(void)
                          nodeid);
     m_node_id = nodeid;
     DBUG_RETURN(true);
-  }
-
-  if (m_config_retriever.hasError())
-  {
-    g_eventLogger->error("%s", m_config_retriever.getErrorString());
   }
 
   // We _could_ try connecting to other running mgmd(s)
@@ -2223,31 +2202,14 @@ ConfigManager::fetch_config(void)
                         "using '%s'...",
                         m_config_retriever.get_connectstring(buf, sizeof(buf)));
 
-    if (!m_config_retriever.is_connected())
-    {
-      int ret = m_config_retriever.do_connect(30 /* retry */,
-        1 /* delay */,
-        0 /* verbose */);
-      if (ret == 0)
-      {
-        //connection success
-        g_eventLogger->info("Connected to '%s:%d'...",
-          m_config_retriever.get_mgmd_host(),
-          m_config_retriever.get_mgmd_port());
-        break;
-      }
-      else if (ret == -2)
-      {
-        //premanent error, return without re-try
-        g_eventLogger->error("%s", m_config_retriever.getErrorString());
-        DBUG_RETURN(NULL);
-      }
-    }
-    else
+    if (m_config_retriever.is_connected() ||
+        m_config_retriever.do_connect(30 /* retry */,
+                                      1 /* delay */,
+                                      0 /* verbose */) == 0)
     {
       g_eventLogger->info("Connected to '%s:%d'...",
-        m_config_retriever.get_mgmd_host(),
-        m_config_retriever.get_mgmd_port());
+                          m_config_retriever.get_mgmd_host(),
+                          m_config_retriever.get_mgmd_port());
       break;
     }
   }

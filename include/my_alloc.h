@@ -80,7 +80,6 @@ struct MEM_ROOT {
  private:
   struct Block {
     Block *prev{nullptr}; /** Previous block; used for freeing. */
-    char *end{nullptr};   /** One byte past the end; used for Contains(). */
   };
 
  public:
@@ -344,22 +343,6 @@ struct MEM_ROOT {
     m_current_free_start += length;
   }
 
-  /**
-   * Returns whether this MEM_ROOT contains the given pointer,
-   * ie., whether it was given back from Alloc(n) (given n >= 1)
-   * at some point. This means it will be legally accessible until
-   * the next Clear() or ClearForReuse() call.
-   */
-  bool Contains(void *ptr) const {
-    for (Block *block = m_current_block; block != nullptr;
-         block = block->prev) {
-      if (ptr >= block && ptr < block->end) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   /// @}
 
  private:
@@ -375,7 +358,8 @@ struct MEM_ROOT {
     than wanted_length, but if it cannot allocate at least minimum_length,
     will return nullptr.
   */
-  Block *AllocBlock(size_t wanted_length, size_t minimum_length);
+  std::pair<Block *, size_t> AllocBlock(size_t wanted_length,
+                                        size_t minimum_length);
 
   /** Allocate memory that doesn't fit into the current free block. */
   void *AllocSlow(size_t length);

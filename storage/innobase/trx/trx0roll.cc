@@ -506,6 +506,7 @@ dberr_t trx_rollback_to_savepoint_for_mysql(
   }
 
   ut_error;
+  return (DB_CORRUPTION);
 }
 
 /** Creates a named savepoint. If the transaction is not yet started, starts it.
@@ -726,6 +727,7 @@ static ibool trx_rollback_or_clean_resurrected(
   }
 
   ut_error;
+  return (FALSE);
 }
 
 /** Rollback or clean up any incomplete transactions which were

@@ -194,8 +194,7 @@ class table_replication_applier_status_by_worker : public PFS_engine_table {
     information in STS mode
   */
   int make_row(Master_info *);
-  void populate_trx_info(Trx_monitoring_info const &applying_trx,
-                         Trx_monitoring_info const &last_applied_trx);
+  void populate_trx_info(Gtid_monitoring_info *, mysql_mutex_t *);
 
   /** Table share lock. */
   static THR_LOCK m_table_lock;

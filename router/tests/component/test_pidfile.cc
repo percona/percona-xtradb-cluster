@@ -22,19 +22,15 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#include <chrono>
-#include <cstdlib>  // setenv
-#include <fstream>
-#include <memory>  // unique_ptr
-#include <string>
-#include <thread>
-
-#include <gmock/gmock.h>
-
-#include "mysql/harness/filesystem.h"
-#include "process_wrapper.h"
+#include "gmock/gmock.h"
 #include "router_component_test.h"
+
+#include "mysqlrouter/utils.h"
+#include "process_wrapper.h"
 #include "tcp_port_pool.h"
+
+#include <chrono>
+#include <thread>
 
 using namespace std::chrono_literals;
 
@@ -484,16 +480,16 @@ INSTANTIATE_TEST_SUITE_P(
         // readonly dir : TS_FR11_01 (M)
         PidFileOptionErrorParams(
             mysql_harness::Path(FOO).join(READONLY_FOLDER).c_str(),
-            "^Error: Failed writing PID to .*/foo/readonly':.*"),
+            "^Error: Failed writing PID to .*/foo/readonly:.*"),
         // readonly file : TS_FR11_02 (M)
         PidFileOptionErrorParams(
             mysql_harness::Path(FOO).join(READONLY_FILE).c_str(),
-            "^Error: Failed writing PID to .*/foo/readonly.pid':.*"),
+            "^Error: Failed writing PID to .*/foo/readonly.pid:.*"),
         // nonexisting dir : TS_FR11_03 (M)
         PidFileOptionErrorParams(
             mysql_harness::Path(FOO).join(NONEXISTING).join(PIDFILE).c_str(),
             "^Error: Failed writing PID to "
-            ".*/foo/nonexisting/mysqlrouter.pid':.*")));
+            ".*/foo/nonexisting/mysqlrouter.pid:.*")));
 
 /**
  * @test

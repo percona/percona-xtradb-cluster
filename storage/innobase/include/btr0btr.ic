@@ -265,7 +265,7 @@ static inline void btr_leaf_page_release(
       mode = MTR_MEMO_BUF_FIX;
       break;
     default:
-      ut_error;
+      ut_a(0);
   }
 
   mtr->memo_release(block, mode);

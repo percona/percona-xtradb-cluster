@@ -33,9 +33,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #ifndef sync0policy_h
 #define sync0policy_h
 
-#include <string>
-#include <thread>
-
+#include "os0thread.h"
 #include "srv0mon.h"
 #include "sync0types.h"
 #include "univ.i"
@@ -324,7 +322,7 @@ struct GenericPolicy
   latch_id_t m_id;
 };
 
-/** Track aggregate metrics policy, used by the page mutex. There are just
+/** Track agregate metrics policy, used by the page mutex. There are just
 too many of them to count individually. */
 template <typename Mutex>
 class AggregateMutexStatsPolicy

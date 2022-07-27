@@ -433,13 +433,11 @@ const char *get_variable_value(sys_var *system_var, char *val_buf,
 
          (tocs->mbminlen * (len)) / fromcs->mbmaxlen
    */
-
-  if (*val_length < result_length + 1) {  // "+1" is for terminating '\0'
-    *val_length = result_length + 1;
-    return nullptr;
-  }
-
+  const bool is_user_buffer_too_small = *val_length < result_length;
   *val_length = result_length;
+
+  if (is_user_buffer_too_small) return nullptr;
+
   memcpy(val_buf, result.get(), result_length);
   val_buf[result_length] = '\0';
 

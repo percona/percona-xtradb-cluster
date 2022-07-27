@@ -43,8 +43,7 @@
 #include "my_dbug.h"
 #include "my_inttypes.h"
 #include "my_macros.h"
-#include "myisampack.h"  // mi_int8store
-#include "mysql.h"       // IS_NUM
+#include "mysql.h"  // IS_NUM
 #include "mysql_time.h"
 #include "sql/aggregate_check.h"  // Distinct_check
 #include "sql/auth/auth_acls.h"
@@ -1201,7 +1200,7 @@ bool Item::eq(const Item *item, bool) const {
 Item *Item::safe_charset_converter(THD *thd, const CHARSET_INFO *tocs) {
   Item_func_conv_charset *conv =
       new Item_func_conv_charset(thd, this, tocs, true);
-  return conv && conv->m_safe ? conv : nullptr;
+  return conv && conv->safe ? conv : nullptr;
 }
 
 /**
@@ -1552,7 +1551,7 @@ bool Item::get_time_from_non_temporal(MYSQL_TIME *ltime) {
    if invalid DATETIME value, or a valid DATETIME value but which is out of
    the supported Unix timestamp range, sets 'tm' to 0.
 */
-bool Item::get_timeval(my_timeval *tm, int *warnings) {
+bool Item::get_timeval(struct timeval *tm, int *warnings) {
   MYSQL_TIME ltime;
   if (get_date(&ltime, TIME_FUZZY_DATE)) {
     if (null_value) return true; /* Value is NULL */
@@ -1562,7 +1561,7 @@ bool Item::get_timeval(my_timeval *tm, int *warnings) {
     goto zero;  /* Value is out of the supported range */
   return false; /* Value is a good Unix timestamp */
 zero:
-  tm->m_tv_sec = tm->m_tv_usec = 0;
+  tm->tv_sec = tm->tv_usec = 0;
   return false;
 }
 
@@ -1763,19 +1762,11 @@ bool Item_splocal::val_json(Json_wrapper *result) {
   return ret;
 }
 
-void Item_splocal::print(const THD *, String *str,
-                         enum_query_type query_type) const {
-  // With QT_DERIVED_TABLE_ORIG_FIELD_NAMES, print the SP variable name.
-  // Without QT_DERIVED_TABLE_ORIG_FIELD_NAMES, print the SP variable
-  // name, followed by '@' and the variable index.
-  // The first is used when cloning this item during condition pushdown
-  // to derived tables.
+void Item_splocal::print(const THD *, String *str, enum_query_type) const {
   str->reserve(m_name.length() + 8);
   str->append(m_name);
-  if (!(query_type & QT_DERIVED_TABLE_ORIG_FIELD_NAMES)) {
-    str->append('@');
-    qs_append(m_var_idx, str);
-  }
+  str->append('@');
+  qs_append(m_var_idx, str);
 }
 
 bool Item_splocal::set_value(THD *thd, sp_rcontext *ctx, Item **it) {
@@ -2987,9 +2978,9 @@ bool Item_field::get_time(MYSQL_TIME *ltime) {
   return false;
 }
 
-bool Item_field::get_timeval(my_timeval *tm, int *warnings) {
+bool Item_field::get_timeval(struct timeval *tm, int *warnings) {
   if ((null_value = field->is_null())) return true;
-  if (field->get_timestamp(tm, warnings)) tm->m_tv_sec = tm->m_tv_usec = 0;
+  if (field->get_timestamp(tm, warnings)) tm->tv_sec = tm->tv_usec = 0;
   return false;
 }
 
@@ -3517,8 +3508,22 @@ Item *Item_null::safe_charset_converter(THD *, const CHARSET_INFO *tocs) {
 
 /*********************** Item_param related ******************************/
 
+/**
+  Default function of Item_param::set_param_func, so in case
+  of malformed packet the server won't SIGSEGV.
+*/
+
+static void default_set_param_func(Item_param *param,
+                                   uchar **pos [[maybe_unused]],
+                                   ulong len [[maybe_unused]]) {
+  param->set_param_state(Item_param::NO_VALUE);
+}
+
 Item_param::Item_param(const POS &pos, MEM_ROOT *root, uint pos_in_query_arg)
-    : super(pos), pos_in_query(pos_in_query_arg), m_clones(root) {
+    : super(pos),
+      pos_in_query(pos_in_query_arg),
+      set_param_func(default_set_param_func),
+      m_clones(root) {
   item_name.set("?");
   // Initial type is "invalid type", type will be assigned from context
   set_nullable(true);  // All parameters are nullable
@@ -3561,47 +3566,43 @@ bool Item_param::itemize(Parse_context *pc, Item **res) {
 }
 
 bool Item_param::fix_fields(THD *, Item **) {
-  assert(!fixed);
-  if (param_state() == NO_VALUE) {
-    // Parameter has no value, set data type from context
-    assert(data_type() == MYSQL_TYPE_INVALID);
-    fixed = true;
-    return false;
-  }
-  if (param_state() == NULL_VALUE) {
-    // Parameter data type may be ignored, keep existing type
-    fixed = true;
-    return false;
-  }
-  // Assign data type from actual data value, when given
-  switch (data_type_actual()) {
-    case MYSQL_TYPE_LONGLONG:
+  // Assign data type from actual data value, if given
+  switch (param_state()) {
+    case NO_VALUE:
+      // Parameter has no value, set data type from context
+      assert(data_type() == MYSQL_TYPE_INVALID);
+      break;
+    case NULL_VALUE:
+      // Parameter data type may be ignored, keep existing type
+      break;
+    case INT_VALUE:
       set_data_type_longlong();
       unsigned_flag = is_unsigned_actual();
       break;
-    case MYSQL_TYPE_NEWDECIMAL:
+    case DECIMAL_VALUE:
       set_data_type_decimal(DECIMAL_MAX_PRECISION, DECIMAL_MAX_SCALE);
       break;
-    case MYSQL_TYPE_DOUBLE:
+    case REAL_VALUE:
       set_data_type_double();
       break;
-    case MYSQL_TYPE_VARCHAR:
+    case STRING_VALUE:
       // Set data type string with maximum possible size
       // @todo WL#6570 - what about blob values???
-      set_data_type_string(65535U / m_collation_actual->mbmaxlen,
-                           m_collation_actual);
+      set_data_type_string(65535U / m_collation_stored->mbmaxlen,
+                           m_collation_stored);
       break;
-    case MYSQL_TYPE_DATE:
-      set_data_type_date();
+    case TIME_VALUE:
+      if (data_type_actual() == MYSQL_TYPE_DATE)
+        set_data_type_date();
+      else if (data_type_actual() == MYSQL_TYPE_TIME)
+        set_data_type_time(6);
+      else if (data_type_actual() == MYSQL_TYPE_DATETIME ||
+               data_type_actual() == MYSQL_TYPE_TIMESTAMP)
+        set_data_type_datetime(6);
       break;
-    case MYSQL_TYPE_TIME:
-      set_data_type_time(DATETIME_MAX_DECIMALS);
+    case LONG_DATA_VALUE:
+      set_data_type_blob(2147483647U);
       break;
-    case MYSQL_TYPE_DATETIME:
-      set_data_type_datetime(DATETIME_MAX_DECIMALS);
-      break;
-    default:
-      assert(false);
   }
   // Do not set result type until having a valid type type (i.e. keep original)
   if (data_type() != MYSQL_TYPE_INVALID)
@@ -3696,12 +3697,12 @@ void Item_param::sync_clones() {
     c->unsigned_flag = unsigned_flag;
     c->m_param_state = m_param_state;
     c->m_result_type = m_result_type;
+    c->set_param_func = set_param_func;
     c->value = value;
-    c->m_data_type_source = m_data_type_source;
     c->m_data_type_actual = m_data_type_actual;
     c->m_unsigned_actual = m_unsigned_actual;
-    c->m_collation_source = m_collation_source;
     c->m_collation_actual = m_collation_actual;
+    c->m_collation_stored = m_collation_stored;
     // Class-type members:
     c->decimal_value = decimal_value;
     /*
@@ -3719,30 +3720,24 @@ void Item_param::set_null() {
 
   null_value = true;
 
-  m_data_type_actual = MYSQL_TYPE_NULL;
   m_param_state = NULL_VALUE;
 }
 
 void Item_param::set_int(longlong i) {
   DBUG_TRACE;
   value.integer = i;
-  m_data_type_actual = MYSQL_TYPE_LONGLONG;
-  m_unsigned_actual = false;
   m_param_state = INT_VALUE;
 }
 
 void Item_param::set_int(ulonglong i) {
   DBUG_TRACE;
   value.integer = i;
-  m_data_type_actual = MYSQL_TYPE_LONGLONG;
-  m_unsigned_actual = true;
   m_param_state = INT_VALUE;
 }
 
 void Item_param::set_double(double d) {
   DBUG_TRACE;
   value.real = d;
-  m_data_type_actual = MYSQL_TYPE_DOUBLE;
   m_param_state = REAL_VALUE;
 }
 
@@ -3763,13 +3758,11 @@ void Item_param::set_decimal(const char *str, ulong length) {
 
   const char *end = str + length;
   str2my_decimal(E_DEC_FATAL_ERROR, str, &decimal_value, &end);
-  m_data_type_actual = MYSQL_TYPE_NEWDECIMAL;
   m_param_state = DECIMAL_VALUE;
 }
 
 void Item_param::set_decimal(const my_decimal *dv) {
   m_param_state = DECIMAL_VALUE;
-  m_data_type_actual = MYSQL_TYPE_NEWDECIMAL;
 
   my_decimal2decimal(dv, &decimal_value);
 }
@@ -3808,12 +3801,6 @@ void Item_param::set_time(MYSQL_TIME *tm, enum_mysql_timestamp_type time_type) {
                                        time_type, NullS);
     set_zero_time(&value.time, MYSQL_TIMESTAMP_ERROR);
   }
-  if (time_type == MYSQL_TIMESTAMP_DATE)
-    m_data_type_actual = MYSQL_TYPE_DATE;
-  else if (time_type == MYSQL_TIMESTAMP_TIME)
-    m_data_type_actual = MYSQL_TYPE_TIME;
-  else
-    m_data_type_actual = MYSQL_TYPE_DATETIME;
 
   m_param_state = TIME_VALUE;
 }
@@ -3828,21 +3815,6 @@ bool Item_param::set_str(const char *str, size_t length) {
   if (str_value.copy(str, length, &my_charset_bin, &my_charset_bin,
                      &dummy_errors))
     return true;
-  m_data_type_actual = MYSQL_TYPE_VARCHAR;
-  /*
-    Generally, the character set of the string stored in the parameter object
-    is the resolved character set of the parameter, except:
-    - when the resolved character set is a binary string, ensure the string
-      is in the connection character set.
-    - when the source string is a binary string, keep it as-is and perform
-      no conversion.
-  */
-  set_collation_actual(collation_source() == &my_charset_bin
-                           ? &my_charset_bin
-                           : collation.collation != &my_charset_bin
-                                 ? collation.collation
-                                 : current_thd->variables.collation_connection);
-
   m_param_state = STRING_VALUE;
   return false;
 }
@@ -3869,11 +3841,6 @@ bool Item_param::set_longdata(const char *str, ulong length) {
   }
 
   if (str_value.append(str, length, &my_charset_bin)) return true;
-
-  /*
-    Currently, both source type and actual type is MYSQL_TYPE_INVALID.
-    They will be set to proper values by Prepared_statement::insert_params().
-  */
   m_param_state = LONG_DATA_VALUE;
 
   return false;
@@ -3922,12 +3889,15 @@ bool Item_param::set_from_user_var(THD *, const user_var_entry *entry) {
         }
         break;
       case STRING_RESULT:
+        /*
+          Exact value of max_length is not known unless data is converted to
+          charset of connection, so we have to set it later.
+        */
         if (set_str(entry->ptr(), entry->length())) return true;
         break;
       case DECIMAL_RESULT: {
         const my_decimal *ent_value = (const my_decimal *)entry->ptr();
         my_decimal2decimal(ent_value, &decimal_value);
-        m_data_type_actual = MYSQL_TYPE_NEWDECIMAL;
         m_param_state = DECIMAL_VALUE;
         break;
       }
@@ -3935,9 +3905,9 @@ bool Item_param::set_from_user_var(THD *, const user_var_entry *entry) {
         assert(0);
         set_null();
     }
-  } else {
+  } else
     set_null();
-  }
+
   return false;
 }
 
@@ -3958,32 +3928,30 @@ void Item_param::reset() {
     str_value.length(0);
   str_value_ptr.length(0);
   m_param_state = NO_VALUE;
-  m_data_type_actual = MYSQL_TYPE_INVALID;
   null_value = false;
 }
 
 type_conversion_status Item_param::save_in_field_inner(Field *field,
                                                        bool no_conversions) {
-  if (param_state() == NULL_VALUE) {
-    return set_field_to_null_with_conversions(field, no_conversions);
-  }
   field->set_notnull();
 
-  switch (data_type_actual()) {
-    case MYSQL_TYPE_LONGLONG:
+  switch (m_param_state) {
+    case INT_VALUE:
       return field->store(value.integer, is_unsigned_actual());
-    case MYSQL_TYPE_DOUBLE:
+    case REAL_VALUE:
       return field->store(value.real);
-    case MYSQL_TYPE_NEWDECIMAL:
+    case DECIMAL_VALUE:
       return field->store_decimal(&decimal_value);
-    case MYSQL_TYPE_DATE:
-    case MYSQL_TYPE_TIME:
-    case MYSQL_TYPE_DATETIME:
+    case TIME_VALUE:
       field->store_time(&value.time);
       return TYPE_OK;
-    case MYSQL_TYPE_VARCHAR:
+    case STRING_VALUE:
+    case LONG_DATA_VALUE:
       return field->store(str_value.ptr(), str_value.length(),
                           str_value.charset());
+    case NULL_VALUE:
+      return set_field_to_null_with_conversions(field, no_conversions);
+    case NO_VALUE:
     default:
       assert(0);
   }
@@ -3991,74 +3959,79 @@ type_conversion_status Item_param::save_in_field_inner(Field *field,
 }
 
 bool Item_param::get_time(MYSQL_TIME *res) {
-  switch (data_type_actual()) {
-    case MYSQL_TYPE_TIME:
-    case MYSQL_TYPE_DATE:
-    case MYSQL_TYPE_DATETIME:
+  switch (m_param_state) {
+    case TIME_VALUE:
       *res = value.time;
       return false;
-    case MYSQL_TYPE_LONGLONG:
+    case INT_VALUE:
       return get_time_from_int(res);
-    case MYSQL_TYPE_DOUBLE:
+    case REAL_VALUE:
       return get_time_from_real(res);
-    case MYSQL_TYPE_NEWDECIMAL:
+    case DECIMAL_VALUE:
       return get_time_from_decimal(res);
     default:
-      return get_time_from_string(res);
+      /*
+        If parameter value isn't supplied assertion will fire in val_str()
+        which is called from Item::get_time_from_string().
+      */
+      return is_temporal() ? get_time_from_string(res)
+                           : get_time_from_non_temporal(res);
   }
 }
 
 bool Item_param::get_date(MYSQL_TIME *res, my_time_flags_t fuzzydate) {
-  switch (data_type_actual()) {
-    case MYSQL_TYPE_TIME:
-    case MYSQL_TYPE_DATE:
-    case MYSQL_TYPE_DATETIME:
+  switch (m_param_state) {
+      /*
+        A few special cases to avoid conversion to string then to date, when
+        this conversion is:
+        - a waste of time (TIME is easily converted to DATE)
+        - a problem (an INT like 9990101 can be cast/inserted into DATE, but
+        '9990101' cannot as it has a 3-digit year).
+      */
+    case TIME_VALUE:
       *res = value.time;
       return false;
-    case MYSQL_TYPE_LONGLONG:
+    case INT_VALUE:
       return get_date_from_int(res, fuzzydate);
-    case MYSQL_TYPE_DOUBLE:
+    case REAL_VALUE:
       return get_date_from_real(res, fuzzydate);
-    case MYSQL_TYPE_NEWDECIMAL:
+    case DECIMAL_VALUE:
       return get_date_from_decimal(res, fuzzydate);
     default:
-      return get_date_from_string(res, fuzzydate);
+      return is_temporal() ? get_date_from_string(res, fuzzydate)
+                           : get_date_from_non_temporal(res, fuzzydate);
   }
 }
 
 double Item_param::val_real() {
   assert(data_type() != MYSQL_TYPE_INVALID);
-  assert(param_state() != NO_VALUE);
-
-  if (param_state() == NULL_VALUE) {
-    return 0.0;
-  }
-  switch (data_type_actual()) {
-    case MYSQL_TYPE_DOUBLE:
+  switch (m_param_state) {
+    case REAL_VALUE:
       return value.real;
-    case MYSQL_TYPE_LONGLONG:
+    case INT_VALUE:
       if (is_unsigned_actual())
         return static_cast<double>(static_cast<ulonglong>(value.integer));
       else
         return static_cast<double>(value.integer);
-    case MYSQL_TYPE_NEWDECIMAL: {
+    case DECIMAL_VALUE: {
       double result;
       my_decimal2double(E_DEC_FATAL_ERROR, &decimal_value, &result);
       return result;
     }
-    case MYSQL_TYPE_VARCHAR: {
+    case STRING_VALUE:
+    case LONG_DATA_VALUE: {
       return double_from_string_with_check(
           str_value.charset(), str_value.ptr(),
           str_value.ptr() + str_value.length());
     }
-    case MYSQL_TYPE_DATE:
-    case MYSQL_TYPE_TIME:
-    case MYSQL_TYPE_DATETIME:
+    case TIME_VALUE:
       /*
         This works for example when user says SELECT ?+0.0 and supplies
         time value for the placeholder.
       */
       return TIME_to_double(value.time);
+    case NULL_VALUE:
+      return 0.0;
     default:
       assert(0);
   }
@@ -4067,32 +4040,28 @@ double Item_param::val_real() {
 
 longlong Item_param::val_int() {
   assert(data_type() != MYSQL_TYPE_INVALID);
-  assert(param_state() != NO_VALUE);
-
-  if (param_state() == NULL_VALUE) {
-    return 0;
-  }
-  switch (data_type_actual()) {
-    case MYSQL_TYPE_DOUBLE:
-      return static_cast<longlong>(rint(value.real));
-    case MYSQL_TYPE_LONGLONG:
+  switch (m_param_state) {
+    case REAL_VALUE:
+      return (longlong)rint(value.real);
+    case INT_VALUE:
       return value.integer;
-    case MYSQL_TYPE_NEWDECIMAL: {
+    case DECIMAL_VALUE: {
       longlong i;
       my_decimal2int(E_DEC_FATAL_ERROR, &decimal_value, unsigned_flag, &i);
       return i;
     }
-    case MYSQL_TYPE_VARCHAR: {
+    case STRING_VALUE:
+    case LONG_DATA_VALUE: {
       return longlong_from_string_with_check(
           str_value.charset(), str_value.ptr(),
           str_value.ptr() + str_value.length(), unsigned_flag);
     }
-    case MYSQL_TYPE_DATE:
-    case MYSQL_TYPE_TIME:
-    case MYSQL_TYPE_DATETIME:
+    case TIME_VALUE:
       return (longlong)propagate_datetime_overflow(current_thd, [&](int *w) {
         return TIME_to_ulonglong_round(value.time, w);
       });
+    case NULL_VALUE:
+      return 0;
     default:
       assert(0);
   }
@@ -4101,27 +4070,23 @@ longlong Item_param::val_int() {
 
 my_decimal *Item_param::val_decimal(my_decimal *dec) {
   assert(data_type() != MYSQL_TYPE_INVALID);
-  assert(param_state() != NO_VALUE);
-
-  if (param_state() == NULL_VALUE) {
-    return nullptr;
-  }
-  switch (data_type_actual()) {
-    case MYSQL_TYPE_NEWDECIMAL:
+  switch (m_param_state) {
+    case DECIMAL_VALUE:
       return &decimal_value;
-    case MYSQL_TYPE_DOUBLE:
+    case REAL_VALUE:
       double2my_decimal(E_DEC_FATAL_ERROR, value.real, dec);
       return dec;
-    case MYSQL_TYPE_LONGLONG:
+    case INT_VALUE:
       int2my_decimal(E_DEC_FATAL_ERROR, value.integer, is_unsigned_actual(),
                      dec);
       return dec;
-    case MYSQL_TYPE_VARCHAR:
+    case STRING_VALUE:
+    case LONG_DATA_VALUE:
       return val_decimal_from_string(dec);
-    case MYSQL_TYPE_DATE:
-    case MYSQL_TYPE_TIME:
-    case MYSQL_TYPE_DATETIME:
+    case TIME_VALUE:
       return date2my_decimal(&value.time, dec);
+    case NULL_VALUE:
+      return nullptr;
     default:
       assert(0);
   }
@@ -4130,33 +4095,29 @@ my_decimal *Item_param::val_decimal(my_decimal *dec) {
 
 String *Item_param::val_str(String *str) {
   assert(data_type() != MYSQL_TYPE_INVALID);
-  assert(param_state() != NO_VALUE);
-
-  if (param_state() == NULL_VALUE) {
-    return nullptr;
-  }
-  switch (data_type_actual()) {
-    case MYSQL_TYPE_VARCHAR:
+  switch (m_param_state) {
+    case STRING_VALUE:
+    case LONG_DATA_VALUE:
       return &str_value_ptr;
-    case MYSQL_TYPE_DOUBLE:
+    case REAL_VALUE:
       str->set_real(value.real, DECIMAL_NOT_SPECIFIED, &my_charset_bin);
       return str;
-    case MYSQL_TYPE_LONGLONG:
+    case INT_VALUE:
       str->set_int(value.integer, is_unsigned_actual(), &my_charset_bin);
       return str;
-    case MYSQL_TYPE_NEWDECIMAL:
+    case DECIMAL_VALUE:
       if (my_decimal2string(E_DEC_FATAL_ERROR, &decimal_value, str) <= 1)
         return str;
       return nullptr;
-    case MYSQL_TYPE_DATE:
-    case MYSQL_TYPE_TIME:
-    case MYSQL_TYPE_DATETIME: {
+    case TIME_VALUE: {
       if (str->reserve(MAX_DATE_STRING_REP_LENGTH)) break;
       str->length(my_TIME_to_str(value.time, str->ptr(),
                                  min(decimals, uint8{DATETIME_MAX_DECIMALS})));
       str->set_charset(&my_charset_bin);
       return str;
     }
+    case NULL_VALUE:
+      return nullptr;
     default:
       assert(0);
   }
@@ -4165,8 +4126,6 @@ String *Item_param::val_str(String *str) {
 
 bool Item_param::val_json(Json_wrapper *wr) {
   assert(fixed);
-  assert(data_type() != MYSQL_TYPE_INVALID);
-  assert(param_state() != NO_VALUE);
 
   String value;
   String tmp;
@@ -4175,10 +4134,9 @@ bool Item_param::val_json(Json_wrapper *wr) {
 }
 
 void Item_param::copy_param_actual_type(Item_param *from) {
-  set_data_type_source(from->data_type_source(), from->is_unsigned_actual());
-  set_data_type_actual(from->data_type_actual(), from->is_unsigned_actual());
-  m_collation_source = from->m_collation_source;
+  set_type_actual(from->data_type_actual(), from->is_unsigned_actual());
   m_collation_actual = from->m_collation_actual;
+  m_collation_stored = from->m_collation_stored;
   m_param_state = from->m_param_state;
   /*
     In a repreparation, steps are:
@@ -4273,290 +4231,41 @@ const String *Item_param::query_val_str(const THD *thd, String *str) const {
 }
 
 /**
-  Convert value according to the following rules:
-  - Convert string from client character set to the character set of
-    connection.
-  - Invalid character set conversions cause an error.
-  - If resolved type is a temporal value, attempt to interpret string
-    or numeric value as temporal value and set actual type accordingly.
-  - Invalid conversions to temporal values are currently ignored and
-    will cause neither errors nor warnings, and actual type is left
-    unchanged. It is expected that later processing will issue error
-    or warning as appropriate.
-
-  @returns false if success, true if error
+  Convert string from client character set to the character set of
+  connection.
 */
 
-bool Item_param::convert_value() {
-  switch (data_type_actual()) {
-    case MYSQL_TYPE_LONGLONG:
-      /*
-        If a temporal value is expected and the provided integer value can
-        be converted to one, change the actual value accordingly.
-      */
-      if (data_type() == MYSQL_TYPE_DATE ||
-          data_type() == MYSQL_TYPE_DATETIME) {
-        int status = 0;
-        MYSQL_TIME t;
-        if (number_to_datetime(value.integer, &t, TIME_FUZZY_DATE, &status) ==
-                -1LL ||
-            status != 0) {
-          break;
-        }
-        value.time = t;
-        if (value.time.time_type == MYSQL_TIMESTAMP_DATE) {
-          set_data_type_actual(MYSQL_TYPE_DATE);
-        } else if (value.time.time_type == MYSQL_TIMESTAMP_DATETIME) {
-          set_data_type_actual(MYSQL_TYPE_DATETIME);
-        } else if (value.time.time_type == MYSQL_TIMESTAMP_DATETIME_TZ) {
-          if (convert_time_zone_displacement(current_thd->time_zone(),
-                                             &value.time))
-            return true;
-          set_data_type_actual(MYSQL_TYPE_DATETIME);
-        } else {
-          // We only expect DATE and DATETIME values, not TIME.
-          assert(value.time.time_type == MYSQL_TIMESTAMP_DATE ||
-                 value.time.time_type == MYSQL_TIMESTAMP_DATETIME);
-        }
-        return false;
-      } else if (data_type() == MYSQL_TYPE_TIME) {
-        int status = 0;
-        MYSQL_TIME t;
-        if (number_to_time(value.integer, &t, &status) || status != 0) {
-          break;
-        }
-        value.time = t;
-        if (value.time.time_type == MYSQL_TIMESTAMP_TIME) {
-          set_data_type_actual(MYSQL_TYPE_TIME);
-        } else if (value.time.time_type == MYSQL_TIMESTAMP_DATETIME) {
-          set_data_type_actual(MYSQL_TYPE_DATETIME);
-        } else {
-          // We only expect TIME and DATETIME values, not DATE.
-          assert(value.time.time_type == MYSQL_TIMESTAMP_TIME ||
-                 value.time.time_type == MYSQL_TIMESTAMP_DATETIME);
-        }
-        return false;
+bool Item_param::convert_str_value() {
+  if (m_param_state != STRING_VALUE && m_param_state != LONG_DATA_VALUE)
+    return false;
+
+  if (is_string_type(data_type())) {
+    size_t dummy;
+    if (String::needs_conversion(0, m_collation_actual, m_collation_stored,
+                                 &dummy)) {
+      uint errors;
+      StringBuffer<STRING_BUFFER_USUAL_SIZE> convert_buffer;
+      if (convert_buffer.copy(str_value.ptr(), str_value.length(),
+                              m_collation_actual, m_collation_stored, &errors))
+        return true;
+      if (errors > 0) {
+        my_error(ER_IMPOSSIBLE_STRING_CONVERSION, MYF(0),
+                 m_collation_actual->name, m_collation_stored->name,
+                 "parameter");
+        return true;
       }
-      break;
+      if (str_value.copy(convert_buffer)) return true;
+    } else
+      str_value.set_charset(m_collation_stored);
+  } else
+    str_value.set_charset(m_collation_actual);
 
-    case MYSQL_TYPE_NEWDECIMAL:
-      /*
-        If a temporal value is expected and the provided decimal value can
-        be converted to one, change the actual value accordingly.
-      */
-      if (data_type() == MYSQL_TYPE_DATE ||
-          data_type() == MYSQL_TYPE_DATETIME) {
-        MYSQL_TIME t;
-        if (decimal_to_datetime(&decimal_value, &t, TIME_FUZZY_DATE)) {
-          break;
-        }
-        value.time = t;
-        if (value.time.time_type == MYSQL_TIMESTAMP_DATE) {
-          set_data_type_actual(MYSQL_TYPE_DATE);
-        } else if (value.time.time_type == MYSQL_TIMESTAMP_DATETIME) {
-          set_data_type_actual(MYSQL_TYPE_DATETIME);
-        } else if (value.time.time_type == MYSQL_TIMESTAMP_DATETIME_TZ) {
-          if (convert_time_zone_displacement(current_thd->time_zone(),
-                                             &value.time))
-            return true;
-          set_data_type_actual(MYSQL_TYPE_DATETIME);
-        } else {
-          // We only expect DATE and DATETIME values, not TIME.
-          assert(value.time.time_type == MYSQL_TIMESTAMP_DATE ||
-                 value.time.time_type == MYSQL_TIMESTAMP_DATETIME);
-        }
-        return false;
-      } else if (data_type() == MYSQL_TYPE_TIME) {
-        MYSQL_TIME t;
-        if (decimal_to_time(&decimal_value, &t)) {
-          break;
-        }
-        value.time = t;
-        if (value.time.time_type == MYSQL_TIMESTAMP_TIME) {
-          set_data_type_actual(MYSQL_TYPE_TIME);
-        } else if (value.time.time_type == MYSQL_TIMESTAMP_DATETIME) {
-          set_data_type_actual(MYSQL_TYPE_DATETIME);
-        } else {
-          // We only expect TIME and DATETIME values, not DATE.
-          assert(value.time.time_type == MYSQL_TIMESTAMP_TIME ||
-                 value.time.time_type == MYSQL_TIMESTAMP_DATETIME);
-        }
-        return false;
-      }
-      break;
+  /*
+    str_value_ptr is returned from val_str(). It must be not alloced
+    to prevent it's modification by val_str() invoker.
+  */
+  str_value_ptr.set(str_value.ptr(), str_value.length(), str_value.charset());
 
-    case MYSQL_TYPE_DOUBLE:
-      /*
-        If a temporal value is expected and the provided float value can
-        be converted to one, change the actual value accordingly.
-      */
-      if (data_type() == MYSQL_TYPE_DATE ||
-          data_type() == MYSQL_TYPE_DATETIME) {
-        MYSQL_TIME t;
-        if (double_to_datetime(value.real, &t, TIME_FUZZY_DATE)) {
-          break;
-        }
-        value.time = t;
-        if (value.time.time_type == MYSQL_TIMESTAMP_DATE) {
-          set_data_type_actual(MYSQL_TYPE_DATE);
-        } else if (value.time.time_type == MYSQL_TIMESTAMP_DATETIME) {
-          set_data_type_actual(MYSQL_TYPE_DATETIME);
-        } else if (value.time.time_type == MYSQL_TIMESTAMP_DATETIME_TZ) {
-          if (convert_time_zone_displacement(current_thd->time_zone(),
-                                             &value.time))
-            return true;
-          set_data_type_actual(MYSQL_TYPE_DATETIME);
-        } else {
-          // We only expect DATE and DATETIME values, not TIME.
-          assert(value.time.time_type == MYSQL_TIMESTAMP_DATE ||
-                 value.time.time_type == MYSQL_TIMESTAMP_DATETIME);
-        }
-        return false;
-      } else if (data_type() == MYSQL_TYPE_TIME) {
-        MYSQL_TIME t;
-        if (double_to_time(value.real, &t)) {
-          break;
-        }
-        value.time = t;
-        if (value.time.time_type == MYSQL_TIMESTAMP_TIME) {
-          set_data_type_actual(MYSQL_TYPE_TIME);
-        } else if (value.time.time_type == MYSQL_TIMESTAMP_DATETIME) {
-          set_data_type_actual(MYSQL_TYPE_DATETIME);
-        } else {
-          // We only expect TIME and DATETIME values, not DATE.
-          assert(value.time.time_type == MYSQL_TIMESTAMP_TIME ||
-                 value.time.time_type == MYSQL_TIMESTAMP_DATETIME);
-        }
-        return false;
-      }
-      break;
-
-    case MYSQL_TYPE_DATE:
-    case MYSQL_TYPE_TIME:
-    case MYSQL_TYPE_DATETIME:
-      break;
-
-    case MYSQL_TYPE_VARCHAR:
-      if (is_string_type(data_type())) {
-        size_t dummy;
-        if (String::needs_conversion(0, m_collation_source, m_collation_actual,
-                                     &dummy)) {
-          uint errors;
-          StringBuffer<STRING_BUFFER_USUAL_SIZE> convert_buffer;
-          if (convert_buffer.copy(str_value.ptr(), str_value.length(),
-                                  m_collation_source, m_collation_actual,
-                                  &errors))
-            return true;
-          if (errors > 0) {
-            my_error(ER_IMPOSSIBLE_STRING_CONVERSION, MYF(0),
-                     m_collation_source->name, m_collation_actual->name,
-                     "parameter");
-            return true;
-          }
-          if (str_value.copy(convert_buffer)) return true;
-        } else {
-          str_value.set_charset(m_collation_actual);
-        }
-      } else if (is_numeric_type(data_type())) {
-        const char *ptr = str_value.ptr();
-        size_t length = str_value.length();
-        const CHARSET_INFO *cs = m_collation_source;
-        int error;
-        const char *endptr;
-        bool check_integer = is_integer_type(data_type());
-        if (check_integer) {
-          // First, check if string is a signed or unsigned integer
-          endptr = ptr + length;
-          value.integer = (*(cs->cset->strtoll10))(cs, ptr, &endptr, &error);
-          if (length == static_cast<size_t>(endptr - ptr) ||
-              check_if_only_end_space(cs, endptr, ptr + length)) {
-            if (!unsigned_flag && error <= 0 && value.integer >= 0) {
-              set_data_type_actual(MYSQL_TYPE_LONGLONG, false);
-              return false;
-            } else if (unsigned_flag && error == 0) {
-              set_data_type_actual(MYSQL_TYPE_LONGLONG, true);
-              return false;
-            }
-          }
-        }
-        // Next, check if it is a decimal
-        if (check_integer || data_type() == MYSQL_TYPE_NEWDECIMAL) {
-          if (str2my_decimal(E_DEC_ERROR, ptr, length, cs, &decimal_value) ==
-              E_DEC_OK) {
-            set_data_type_actual(MYSQL_TYPE_NEWDECIMAL);
-            return false;
-          }
-        }
-        // Finally, check if it is a valid floating point value
-        value.real = my_strntod(cs, ptr, length, &endptr, &error);
-        if (error == 0 && (length == static_cast<size_t>(endptr - ptr) ||
-                           check_if_only_end_space(cs, endptr, ptr + length))) {
-          set_data_type_actual(MYSQL_TYPE_DOUBLE);
-          return false;
-        }
-      } else if (data_type() == MYSQL_TYPE_DATE ||
-                 data_type() == MYSQL_TYPE_DATETIME) {
-        str_value.set_charset(m_collation_source);
-        MYSQL_TIME_STATUS status;
-        if (str_to_datetime(&str_value, &value.time, TIME_FUZZY_DATE,
-                            &status) ||
-            status.warnings != 0) {
-          // Nothing
-        } else {
-          if (value.time.time_type == MYSQL_TIMESTAMP_DATE) {
-            set_data_type_actual(MYSQL_TYPE_DATE);
-          } else if (value.time.time_type == MYSQL_TIMESTAMP_DATETIME) {
-            set_data_type_actual(MYSQL_TYPE_DATETIME);
-          } else if (value.time.time_type == MYSQL_TIMESTAMP_DATETIME_TZ) {
-            if (convert_time_zone_displacement(current_thd->time_zone(),
-                                               &value.time))
-              return true;
-            set_data_type_actual(MYSQL_TYPE_DATETIME);
-          } else {
-            // We only expect DATE and DATETIME values, not TIME.
-            assert(value.time.time_type == MYSQL_TIMESTAMP_DATE ||
-                   value.time.time_type == MYSQL_TIMESTAMP_DATETIME ||
-                   value.time.time_type == MYSQL_TIMESTAMP_DATETIME_TZ);
-          }
-          return false;
-        }
-      } else if (data_type() == MYSQL_TYPE_TIME) {
-        str_value.set_charset(m_collation_source);
-        MYSQL_TIME_STATUS status;
-        if (str_to_time(&str_value, &value.time, 0, &status) ||
-            status.warnings != 0) {
-        } else {
-          if (value.time.time_type == MYSQL_TIMESTAMP_TIME) {
-            set_data_type_actual(MYSQL_TYPE_TIME);
-          } else if (value.time.time_type == MYSQL_TIMESTAMP_DATETIME) {
-            set_data_type_actual(MYSQL_TYPE_DATETIME);
-          } else if (value.time.time_type == MYSQL_TIMESTAMP_DATETIME_TZ) {
-            if (convert_time_zone_displacement(current_thd->time_zone(),
-                                               &value.time))
-              return true;
-            set_data_type_actual(MYSQL_TYPE_DATETIME);
-          } else {
-            // We only expect TIME and DATETIME values, not DATE.
-            assert(value.time.time_type == MYSQL_TIMESTAMP_TIME ||
-                   value.time.time_type == MYSQL_TIMESTAMP_DATETIME ||
-                   value.time.time_type == MYSQL_TIMESTAMP_DATETIME_TZ);
-          }
-          return false;
-        }
-      }
-      /*
-        str_value_ptr is returned from val_str(). It must be not alloced
-        to prevent it's modification by val_str() invoker.
-      */
-      str_value_ptr.set(str_value.ptr(), str_value.length(),
-                        str_value.charset());
-      break;
-
-    case MYSQL_TYPE_NULL:
-      break;
-    default:
-      assert(false);
-  }
   return false;
 }
 
@@ -4623,11 +4332,11 @@ void Item_param::print(const THD *thd, String *str,
 */
 
 void Item_param::set_param_type_and_swap_value(Item_param *src) {
-  m_data_type_source = src->m_data_type_source;
+  set_param_func = src->set_param_func;
   m_data_type_actual = src->m_data_type_actual;
   m_unsigned_actual = src->m_unsigned_actual;
-  m_collation_source = src->m_collation_source;
   m_collation_actual = src->m_collation_actual;
+  m_collation_stored = src->m_collation_stored;
 
   null_value = src->null_value;
   assert(m_param_state == src->m_param_state);
@@ -7926,20 +7635,17 @@ bool Item_ref::fix_fields(THD *thd, Item **reference) {
         }
 
         /*
-          Check table fields only if the subquery is used in a context that
-          is not the HAVING clause, or in case the HAVING clause can be
-          implemented as a WHERE clause (i.e. the query block is not grouped
-          - implicitly or explicitly - and DISTINCT filtering is not present).
+          Check table fields only if the subquery is used somewhere out of
+          HAVING or the outer SELECT does not use grouping (i.e. tables are
+          accessible).
           TODO:
-          Implement proper SQL resolving, by looking at fields from columns
-          only and reject fields in HAVING clause that are not functionally
-          dependent on grouping columns from this query block.
-          In order to preserve MySQL semantics, we may need to accept
-          fields from the SELECT fields, until this feature has been removed.
+          Here we could first find the field anyway, and then test this
+          condition, so that we can give a better error message -
+          ER_WRONG_FIELD_WITH_GROUP, instead of the less informative
+          ER_BAD_FIELD_ERROR which we produce now.
         */
-        if (place != CTX_HAVING ||
-            (!select->with_sum_func && select->group_list.elements == 0 &&
-             !select->is_distinct())) {
+        if ((place != CTX_HAVING ||
+             (!select->with_sum_func && select->group_list.elements == 0))) {
           /*
             In case of view, find_field_in_tables() write pointer to view
             field expression to 'reference', i.e. it substitute that
@@ -8692,9 +8398,6 @@ bool Item_default_value::fix_fields(THD *thd, Item **) {
   assert(field_name == nullptr);
   field_name = arg->item_name.ptr();
 
-  // Always allow a "read" from the default value.
-  field->table->mark_column_used(field, MARK_COLUMNS_READ);
-
   return false;
 }
 
@@ -8704,8 +8407,6 @@ void Item_default_value::bind_fields() {
   field->move_field_offset(
       (ptrdiff_t)(field->table->s->default_values - m_rowbuffer_saved));
   m_rowbuffer_saved = field->table->s->default_values;
-  // Always allow a "read" from the default value.
-  field->table->mark_column_used(field, MARK_COLUMNS_READ);
 }
 
 void Item_default_value::print(const THD *thd, String *str,
@@ -9305,12 +9006,6 @@ Item_cache *Item_cache::get_cache(const Item *item) {
 Item_cache *Item_cache::get_cache(const Item *item, const Item_result type) {
   switch (type) {
     case INT_RESULT:
-      /*
-        When it's an item of MYSQL_TYPE_BIT, we need to retain its result
-        as bit format instead of an integer.
-      */
-      if (item->data_type() == MYSQL_TYPE_BIT)
-        return new Item_cache_bit(item->data_type());
       return new Item_cache_int(item->data_type());
     case REAL_RESULT:
       return new Item_cache_real();
@@ -9425,22 +9120,6 @@ longlong Item_cache_int::val_int() {
   assert(fixed == 1);
   if (!has_value()) return 0;
   return value;
-}
-
-String *Item_cache_bit::val_str(String *str) {
-  assert(fixed);
-  if (!has_value()) return nullptr;
-
-  char buff[sizeof(longlong)];
-  mi_int8store(buff, value);
-  uint offset = sizeof(longlong) - string_length();
-
-  // for BIT(N), copy last N bits from buff
-  // (rounded up to an integral number of bytes)
-  str->length(0);
-  if (str->append(buff + offset, string_length())) return nullptr;
-
-  return str;
 }
 
 bool Item_cache_datetime::cache_value_int() {

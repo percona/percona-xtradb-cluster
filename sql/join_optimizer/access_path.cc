@@ -22,33 +22,21 @@
 
 #include "sql/join_optimizer/access_path.h"
 
+#include "sql/basic_row_iterators.h"
+#include "sql/bka_iterator.h"
+#include "sql/composite_iterators.h"
 #include "sql/filesort.h"
+#include "sql/hash_join_iterator.h"
 #include "sql/item_sum.h"
-#include "sql/iterators/basic_row_iterators.h"
-#include "sql/iterators/bka_iterator.h"
-#include "sql/iterators/composite_iterators.h"
-#include "sql/iterators/hash_join_iterator.h"
-#include "sql/iterators/ref_row_iterators.h"
-#include "sql/iterators/sorting_iterator.h"
-#include "sql/iterators/timing_iterator.h"
-#include "sql/iterators/window_iterators.h"
 #include "sql/join_optimizer/bit_utils.h"
-#include "sql/join_optimizer/cost_model.h"
-#include "sql/join_optimizer/estimate_selectivity.h"
 #include "sql/join_optimizer/relational_expression.h"
 #include "sql/join_optimizer/walk_access_paths.h"
-#include "sql/range_optimizer/geometry_index_range_scan.h"
-#include "sql/range_optimizer/group_index_skip_scan.h"
-#include "sql/range_optimizer/group_index_skip_scan_plan.h"
-#include "sql/range_optimizer/index_merge.h"
-#include "sql/range_optimizer/index_range_scan.h"
-#include "sql/range_optimizer/index_skip_scan.h"
-#include "sql/range_optimizer/index_skip_scan_plan.h"
-#include "sql/range_optimizer/range_optimizer.h"
-#include "sql/range_optimizer/reverse_index_range_scan.h"
-#include "sql/range_optimizer/rowid_ordered_retrieval.h"
+#include "sql/ref_row_iterators.h"
+#include "sql/sorting_iterator.h"
 #include "sql/sql_optimizer.h"
 #include "sql/table.h"
+#include "sql/timing_iterator.h"
+#include "sql/window_iterators.h"
 
 #include <vector>
 
@@ -78,18 +66,6 @@ AccessPath *NewSortAccessPath(THD *thd, AccessPath *child, Filesort *filesort,
     }
   }
 
-  return path;
-}
-
-AccessPath *NewDeleteRowsAccessPath(THD *thd, AccessPath *child,
-                                    table_map delete_tables,
-                                    table_map immediate_tables) {
-  assert(IsSubset(immediate_tables, delete_tables));
-  AccessPath *path = new (thd->mem_root) AccessPath;
-  path->type = AccessPath::DELETE_ROWS;
-  path->delete_rows().child = child;
-  path->delete_rows().tables_to_delete_from = delete_tables;
-  path->delete_rows().immediate_tables = immediate_tables;
   return path;
 }
 
@@ -180,6 +156,7 @@ bool ShouldEnableBatchMode(AccessPath *path) {
     case AccessPath::REF_OR_NULL:
     case AccessPath::PUSHED_JOIN_REF:
     case AccessPath::FULL_TEXT_SEARCH:
+    case AccessPath::INDEX_RANGE_SCAN:
     case AccessPath::DYNAMIC_INDEX_RANGE_SCAN:
       return true;
     case AccessPath::FILTER:
@@ -226,8 +203,7 @@ bool FinalizeMaterializedSubqueries(THD *thd, JOIN *join, AccessPath *path) {
 }
 
 unique_ptr_destroy_only<RowIterator> CreateIteratorFromAccessPath(
-    THD *thd, MEM_ROOT *mem_root, AccessPath *path, JOIN *join,
-    bool eligible_for_batch_mode) {
+    THD *thd, AccessPath *path, JOIN *join, bool eligible_for_batch_mode) {
   if (join != nullptr) {
     assert(!join->needs_finalize);
   }
@@ -246,19 +222,19 @@ unique_ptr_destroy_only<RowIterator> CreateIteratorFromAccessPath(
     case AccessPath::TABLE_SCAN: {
       const auto &param = path->table_scan();
       iterator = NewIterator<TableScanIterator>(
-          thd, mem_root, param.table, path->num_output_rows, examined_rows);
+          thd, param.table, path->num_output_rows, examined_rows);
       break;
     }
     case AccessPath::INDEX_SCAN: {
       const auto &param = path->index_scan();
       if (param.reverse) {
         iterator = NewIterator<IndexScanIterator<true>>(
-            thd, mem_root, param.table, param.idx, param.use_order,
-            path->num_output_rows, examined_rows);
+            thd, param.table, param.idx, param.use_order, path->num_output_rows,
+            examined_rows);
       } else {
         iterator = NewIterator<IndexScanIterator<false>>(
-            thd, mem_root, param.table, param.idx, param.use_order,
-            path->num_output_rows, examined_rows);
+            thd, param.table, param.idx, param.use_order, path->num_output_rows,
+            examined_rows);
       }
       break;
     }
@@ -266,55 +242,53 @@ unique_ptr_destroy_only<RowIterator> CreateIteratorFromAccessPath(
       const auto &param = path->ref();
       if (param.reverse) {
         iterator = NewIterator<RefIterator<true>>(
-            thd, mem_root, param.table, param.ref, param.use_order,
-            path->num_output_rows, examined_rows);
+            thd, param.table, param.ref, param.use_order, path->num_output_rows,
+            examined_rows);
       } else {
         iterator = NewIterator<RefIterator<false>>(
-            thd, mem_root, param.table, param.ref, param.use_order,
-            path->num_output_rows, examined_rows);
+            thd, param.table, param.ref, param.use_order, path->num_output_rows,
+            examined_rows);
       }
       break;
     }
     case AccessPath::REF_OR_NULL: {
       const auto &param = path->ref_or_null();
       iterator = NewIterator<RefOrNullIterator>(
-          thd, mem_root, param.table, param.ref, param.use_order,
-          path->num_output_rows, examined_rows);
+          thd, param.table, param.ref, param.use_order, path->num_output_rows,
+          examined_rows);
       break;
     }
     case AccessPath::EQ_REF: {
       const auto &param = path->eq_ref();
-      iterator =
-          NewIterator<EQRefIterator>(thd, mem_root, param.table, param.ref,
-                                     param.use_order, examined_rows);
+      iterator = NewIterator<EQRefIterator>(thd, param.table, param.ref,
+                                            param.use_order, examined_rows);
       break;
     }
     case AccessPath::PUSHED_JOIN_REF: {
       const auto &param = path->pushed_join_ref();
       iterator = NewIterator<PushedJoinRefIterator>(
-          thd, mem_root, param.table, param.ref, param.use_order,
-          param.is_unique, examined_rows);
+          thd, param.table, param.ref, param.use_order, param.is_unique,
+          examined_rows);
       break;
     }
     case AccessPath::FULL_TEXT_SEARCH: {
       const auto &param = path->full_text_search();
       iterator = NewIterator<FullTextSearchIterator>(
-          thd, mem_root, param.table, param.ref, param.ft_func, param.use_order,
+          thd, param.table, param.ref, param.ft_func, param.use_order,
           param.use_limit, examined_rows);
       break;
     }
     case AccessPath::CONST_TABLE: {
       const auto &param = path->const_table();
-      iterator = NewIterator<ConstIterator>(thd, mem_root, param.table,
-                                            param.ref, examined_rows);
+      iterator = NewIterator<ConstIterator>(thd, param.table, param.ref,
+                                            examined_rows);
       break;
     }
     case AccessPath::MRR: {
       const auto &param = path->mrr();
       const auto &bka_param = param.bka_path->bka_join();
       iterator = NewIterator<MultiRangeRowIterator>(
-          thd, mem_root, param.table, param.ref, param.mrr_flags,
-          bka_param.join_type,
+          thd, param.table, param.ref, param.mrr_flags, bka_param.join_type,
           GetUsedTables(bka_param.outer, /*include_pruned_tables=*/true),
           bka_param.store_rowids, bka_param.tables_to_get_rowid_for);
       break;
@@ -322,201 +296,94 @@ unique_ptr_destroy_only<RowIterator> CreateIteratorFromAccessPath(
     case AccessPath::FOLLOW_TAIL: {
       const auto &param = path->follow_tail();
       iterator = NewIterator<FollowTailIterator>(
-          thd, mem_root, param.table, path->num_output_rows, examined_rows);
+          thd, param.table, path->num_output_rows, examined_rows);
       break;
     }
     case AccessPath::INDEX_RANGE_SCAN: {
       const auto &param = path->index_range_scan();
-      TABLE *table = param.used_key_part[0].field->table;
-      if (param.geometry) {
-        iterator = NewIterator<GeometryIndexRangeScanIterator>(
-            thd, mem_root, table, examined_rows, path->num_output_rows,
-            param.index, param.need_rows_in_rowid_order, param.reuse_handler,
-            mem_root, param.mrr_flags, param.mrr_buf_size,
-            Bounds_checked_array{param.ranges, param.num_ranges});
-      } else if (param.reverse) {
-        iterator = NewIterator<ReverseIndexRangeScanIterator>(
-            thd, mem_root, table, examined_rows, path->num_output_rows,
-            param.index, mem_root, param.mrr_flags,
-            Bounds_checked_array{param.ranges, param.num_ranges},
-            param.using_extended_key_parts);
-      } else {
-        iterator = NewIterator<IndexRangeScanIterator>(
-            thd, mem_root, table, examined_rows, path->num_output_rows,
-            param.index, param.need_rows_in_rowid_order, param.reuse_handler,
-            mem_root, param.mrr_flags, param.mrr_buf_size,
-            Bounds_checked_array{param.ranges, param.num_ranges});
-      }
-      break;
-    }
-    case AccessPath::INDEX_MERGE: {
-      const auto &param = path->index_merge();
-      unique_ptr_destroy_only<RowIterator> pk_quick_select;
-      Mem_root_array<unique_ptr_destroy_only<RowIterator>> children(mem_root);
-      children.reserve(param.children->size());
-      for (AccessPath *range_scan : *param.children) {
-        unique_ptr_destroy_only<RowIterator> child_iterator =
-            CreateIteratorFromAccessPath(thd, range_scan, join,
-                                         /*eligible_for_batch_mode=*/false);
-        if (param.table->file->primary_key_is_clustered() &&
-            range_scan->index_range_scan().index ==
-                param.table->s->primary_key) {
-          assert(pk_quick_select == nullptr);
-          pk_quick_select = std::move(child_iterator);
-        } else {
-          children.push_back(std::move(child_iterator));
-        }
-      }
-
-      iterator = NewIterator<IndexMergeIterator>(
-          thd, mem_root, mem_root, param.table, std::move(pk_quick_select),
-          std::move(children));
-      break;
-    }
-    case AccessPath::ROWID_INTERSECTION: {
-      const auto &param = path->rowid_intersection();
-      Mem_root_array<unique_ptr_destroy_only<RowIterator>> children(mem_root);
-      children.reserve(param.children->size());
-      for (AccessPath *range_scan : *param.children) {
-        children.push_back(
-            CreateIteratorFromAccessPath(thd, range_scan, join,
-                                         /*eligible_for_batch_mode=*/false));
-      }
-
-      unique_ptr_destroy_only<RowIterator> cpk_child;
-      if (param.cpk_child != nullptr) {
-        cpk_child = CreateIteratorFromAccessPath(
-            thd, param.cpk_child, join, /*eligible_for_batch_mode=*/false);
-      }
-      iterator = NewIterator<RowIDIntersectionIterator>(
-          thd, mem_root, mem_root, param.table, param.retrieve_full_rows,
-          param.need_rows_in_rowid_order, std::move(children),
-          std::move(cpk_child));
-      break;
-    }
-    case AccessPath::ROWID_UNION: {
-      const auto &param = path->rowid_union();
-      Mem_root_array<unique_ptr_destroy_only<RowIterator>> children(mem_root);
-      children.reserve(param.children->size());
-      for (AccessPath *range_scan : *param.children) {
-        children.push_back(
-            CreateIteratorFromAccessPath(thd, range_scan, join,
-                                         /*eligible_for_batch_mode=*/false));
-      }
-
-      iterator = NewIterator<RowIDUnionIterator>(
-          thd, mem_root, mem_root, param.table, std::move(children));
-      break;
-    }
-    case AccessPath::INDEX_SKIP_SCAN: {
-      const IndexSkipScanParameters *param = path->index_skip_scan().param;
-      iterator = NewIterator<IndexSkipScanIterator>(
-          thd, mem_root, path->index_skip_scan().table, param->index_info,
-          path->index_skip_scan().index, param->eq_prefix_len,
-          param->eq_prefix_key_parts, param->eq_prefixes,
-          path->index_skip_scan().num_used_key_parts, mem_root,
-          param->has_aggregate_function, param->min_range_key,
-          param->max_range_key, param->min_search_key, param->max_search_key,
-          param->range_cond_flag, param->range_key_len);
-      break;
-    }
-    case AccessPath::GROUP_INDEX_SKIP_SCAN: {
-      const GroupIndexSkipScanParameters *param =
-          path->group_index_skip_scan().param;
-      iterator = NewIterator<GroupIndexSkipScanIterator>(
-          thd, mem_root, path->group_index_skip_scan().table,
-          &param->min_functions, &param->max_functions,
-          param->have_agg_distinct, param->min_max_arg_part,
-          param->group_prefix_len, param->group_key_parts,
-          param->real_key_parts, param->max_used_key_length, param->index_info,
-          path->group_index_skip_scan().index, param->key_infix_len, mem_root,
-          param->is_index_scan, &param->prefix_ranges, &param->key_infix_ranges,
-          &param->min_max_ranges);
+      iterator = NewIterator<IndexRangeScanIterator>(
+          thd, param.table, param.quick, path->num_output_rows, examined_rows);
       break;
     }
     case AccessPath::DYNAMIC_INDEX_RANGE_SCAN: {
       const auto &param = path->dynamic_index_range_scan();
       iterator = NewIterator<DynamicRangeIterator>(
-          thd, mem_root, param.table, param.qep_tab, examined_rows);
+          thd, param.table, param.qep_tab, examined_rows);
       break;
     }
     case AccessPath::TABLE_VALUE_CONSTRUCTOR: {
       assert(join != nullptr);
       Query_block *query_block = join->query_block;
       iterator = NewIterator<TableValueConstructorIterator>(
-          thd, mem_root, examined_rows, *query_block->row_value_list,
+          thd, examined_rows, *query_block->row_value_list,
           query_block->join->fields);
       break;
     }
     case AccessPath::FAKE_SINGLE_ROW:
-      iterator =
-          NewIterator<FakeSingleRowIterator>(thd, mem_root, examined_rows);
+      iterator = NewIterator<FakeSingleRowIterator>(thd, examined_rows);
       break;
     case AccessPath::ZERO_ROWS: {
       const auto &param = path->zero_rows();
       unique_ptr_destroy_only<RowIterator> child;
       if (param.child != nullptr) {
-        child = CreateIteratorFromAccessPath(thd, mem_root, param.child, join,
+        child = CreateIteratorFromAccessPath(thd, param.child, join,
                                              /*eligible_for_batch_mode=*/false);
         if (child == nullptr) {
           return nullptr;
         }
       }
-      iterator = NewIterator<ZeroRowsIterator>(thd, mem_root, move(child));
+      iterator = NewIterator<ZeroRowsIterator>(thd, move(child));
       break;
     }
     case AccessPath::ZERO_ROWS_AGGREGATED:
-      iterator = NewIterator<ZeroRowsAggregatedIterator>(thd, mem_root, join,
-                                                         examined_rows);
+      iterator =
+          NewIterator<ZeroRowsAggregatedIterator>(thd, join, examined_rows);
       break;
     case AccessPath::MATERIALIZED_TABLE_FUNCTION: {
       const auto &param = path->materialized_table_function();
       unique_ptr_destroy_only<RowIterator> table_iterator =
-          CreateIteratorFromAccessPath(thd, mem_root, param.table_path, join,
+          CreateIteratorFromAccessPath(thd, param.table_path, join,
                                        eligible_for_batch_mode);
       if (table_iterator == nullptr) {
         return nullptr;
       }
       iterator = NewIterator<MaterializedTableFunctionIterator>(
-          thd, mem_root, param.table_function, param.table,
-          move(table_iterator));
+          thd, param.table_function, param.table, move(table_iterator));
       break;
     }
     case AccessPath::UNQUALIFIED_COUNT:
-      iterator = NewIterator<UnqualifiedCountIterator>(thd, mem_root, join);
+      iterator = NewIterator<UnqualifiedCountIterator>(thd, join);
       break;
     case AccessPath::NESTED_LOOP_JOIN: {
       const auto &param = path->nested_loop_join();
       unique_ptr_destroy_only<RowIterator> outer = CreateIteratorFromAccessPath(
-          thd, mem_root, param.outer, join, /*eligible_for_batch_mode=*/false);
+          thd, param.outer, join, /*eligible_for_batch_mode=*/false);
       if (outer == nullptr) {
         return nullptr;
       }
       unique_ptr_destroy_only<RowIterator> inner = CreateIteratorFromAccessPath(
-          thd, mem_root, param.inner, join, eligible_for_batch_mode);
+          thd, param.inner, join, eligible_for_batch_mode);
       if (inner == nullptr) {
         return nullptr;
       }
-      iterator = NewIterator<NestedLoopIterator>(thd, mem_root, move(outer),
-                                                 move(inner), param.join_type,
-                                                 param.pfs_batch_mode);
+      iterator = NewIterator<NestedLoopIterator>(
+          thd, move(outer), move(inner), param.join_type, param.pfs_batch_mode);
       break;
     }
     case AccessPath::NESTED_LOOP_SEMIJOIN_WITH_DUPLICATE_REMOVAL: {
       const auto &param = path->nested_loop_semijoin_with_duplicate_removal();
       unique_ptr_destroy_only<RowIterator> outer = CreateIteratorFromAccessPath(
-          thd, mem_root, param.outer, join, /*eligible_for_batch_mode=*/false);
+          thd, param.outer, join, /*eligible_for_batch_mode=*/false);
       if (outer == nullptr) {
         return nullptr;
       }
       unique_ptr_destroy_only<RowIterator> inner = CreateIteratorFromAccessPath(
-          thd, mem_root, param.inner, join, eligible_for_batch_mode);
+          thd, param.inner, join, eligible_for_batch_mode);
       if (inner == nullptr) {
         return nullptr;
       }
       iterator = NewIterator<NestedLoopSemiJoinWithDuplicateRemovalIterator>(
-          thd, mem_root, move(outer), move(inner), param.table, param.key,
-          param.key_len);
+          thd, move(outer), move(inner), param.table, param.key, param.key_len);
       break;
     }
     case AccessPath::BKA_JOIN: {
@@ -526,19 +393,19 @@ unique_ptr_destroy_only<RowIterator> CreateIteratorFromAccessPath(
       mrr_path->mrr().bka_path = path;
 
       unique_ptr_destroy_only<RowIterator> outer = CreateIteratorFromAccessPath(
-          thd, mem_root, param.outer, join, /*eligible_for_batch_mode=*/false);
+          thd, param.outer, join, /*eligible_for_batch_mode=*/false);
       if (outer == nullptr) {
         return nullptr;
       }
       unique_ptr_destroy_only<RowIterator> inner = CreateIteratorFromAccessPath(
-          thd, mem_root, param.inner, join, /*eligible_for_batch_mode=*/false);
+          thd, param.inner, join, /*eligible_for_batch_mode=*/false);
       if (inner == nullptr) {
         return nullptr;
       }
       MultiRangeRowIterator *mrr_iterator = down_cast<MultiRangeRowIterator *>(
           mrr_path->iterator->real_iterator());
       iterator = NewIterator<BKAIterator>(
-          thd, mem_root, move(outer),
+          thd, move(outer),
           GetUsedTables(param.outer, /*include_pruned_tables=*/true),
           move(inner), thd->variables.join_buff_size, param.mrr_length_per_rec,
           param.rec_per_key, param.store_rowids, param.tables_to_get_rowid_for,
@@ -549,12 +416,12 @@ unique_ptr_destroy_only<RowIterator> CreateIteratorFromAccessPath(
       const auto &param = path->hash_join();
       const JoinPredicate *join_predicate = param.join_predicate;
       unique_ptr_destroy_only<RowIterator> outer = CreateIteratorFromAccessPath(
-          thd, mem_root, param.outer, join, eligible_for_batch_mode);
+          thd, param.outer, join, eligible_for_batch_mode);
       if (outer == nullptr) {
         return nullptr;
       }
       unique_ptr_destroy_only<RowIterator> inner = CreateIteratorFromAccessPath(
-          thd, mem_root, param.inner, join, /*eligible_for_batch_mode=*/true);
+          thd, param.inner, join, /*eligible_for_batch_mode=*/true);
       if (inner == nullptr) {
         return nullptr;
       }
@@ -608,7 +475,7 @@ unique_ptr_destroy_only<RowIterator> CreateIteratorFromAccessPath(
                                             : nullptr;
 
       iterator = NewIterator<HashJoinIterator>(
-          thd, mem_root, move(inner),
+          thd, move(inner),
           GetUsedTables(param.inner, /*include_pruned_tables=*/true),
           estimated_build_rows, move(outer),
           GetUsedTables(param.outer, /*include_pruned_tables=*/true),
@@ -622,18 +489,17 @@ unique_ptr_destroy_only<RowIterator> CreateIteratorFromAccessPath(
     case AccessPath::FILTER: {
       const auto &param = path->filter();
       unique_ptr_destroy_only<RowIterator> child = CreateIteratorFromAccessPath(
-          thd, mem_root, param.child, join, eligible_for_batch_mode);
+          thd, param.child, join, eligible_for_batch_mode);
       if (child == nullptr) {
         return nullptr;
       }
-      iterator = NewIterator<FilterIterator>(thd, mem_root, move(child),
-                                             param.condition);
+      iterator = NewIterator<FilterIterator>(thd, move(child), param.condition);
       break;
     }
     case AccessPath::SORT: {
       const auto &param = path->sort();
       unique_ptr_destroy_only<RowIterator> child = CreateIteratorFromAccessPath(
-          thd, mem_root, param.child, join, /*eligible_for_batch_mode=*/true);
+          thd, param.child, join, /*eligible_for_batch_mode=*/true);
       if (child == nullptr) {
         return nullptr;
       }
@@ -642,7 +508,7 @@ unique_ptr_destroy_only<RowIterator> CreateIteratorFromAccessPath(
                                       : lrint(param.child->num_output_rows);
       Filesort *filesort = param.filesort;
       iterator = NewIterator<SortingIterator>(
-          thd, mem_root, filesort, move(child), num_rows_estimate,
+          thd, filesort, move(child), num_rows_estimate,
           param.tables_to_get_rowid_for, examined_rows);
       if (filesort->m_remove_duplicates) {
         filesort->tables[0]->duplicate_removal_iterator =
@@ -656,14 +522,14 @@ unique_ptr_destroy_only<RowIterator> CreateIteratorFromAccessPath(
     case AccessPath::AGGREGATE: {
       const auto &param = path->aggregate();
       unique_ptr_destroy_only<RowIterator> child = CreateIteratorFromAccessPath(
-          thd, mem_root, param.child, join, eligible_for_batch_mode);
+          thd, param.child, join, eligible_for_batch_mode);
       if (child == nullptr) {
         return nullptr;
       }
       Prealloced_array<TABLE *, 4> tables =
           GetUsedTables(param.child, /*include_pruned_tables=*/true);
       iterator = NewIterator<AggregateIterator>(
-          thd, mem_root, move(child), join,
+          thd, move(child), join,
           TableCollection(tables, /*store_rowids=*/false,
                           /*tables_to_get_rowid_for=*/0),
           param.rollup);
@@ -672,26 +538,26 @@ unique_ptr_destroy_only<RowIterator> CreateIteratorFromAccessPath(
     case AccessPath::TEMPTABLE_AGGREGATE: {
       const auto &param = path->temptable_aggregate();
       unique_ptr_destroy_only<RowIterator> subquery_iterator =
-          CreateIteratorFromAccessPath(thd, mem_root, param.subquery_path, join,
+          CreateIteratorFromAccessPath(thd, param.subquery_path, join,
                                        /*eligible_for_batch_mode=*/true);
       if (subquery_iterator == nullptr) {
         return nullptr;
       }
       unique_ptr_destroy_only<RowIterator> table_iterator =
-          CreateIteratorFromAccessPath(thd, mem_root, param.table_path, join,
+          CreateIteratorFromAccessPath(thd, param.table_path, join,
                                        eligible_for_batch_mode);
       if (table_iterator == nullptr) {
         return nullptr;
       }
       iterator = NewIterator<TemptableAggregateIterator>(
-          thd, mem_root, move(subquery_iterator), param.temp_table_param,
-          param.table, move(table_iterator), join, param.ref_slice);
+          thd, move(subquery_iterator), param.temp_table_param, param.table,
+          move(table_iterator), join, param.ref_slice);
       break;
     }
     case AccessPath::LIMIT_OFFSET: {
       const auto &param = path->limit_offset();
       unique_ptr_destroy_only<RowIterator> child = CreateIteratorFromAccessPath(
-          thd, mem_root, param.child, join, eligible_for_batch_mode);
+          thd, param.child, join, eligible_for_batch_mode);
       if (child == nullptr) {
         return nullptr;
       }
@@ -702,19 +568,19 @@ unique_ptr_destroy_only<RowIterator> CreateIteratorFromAccessPath(
         send_records = &join->send_records;
       }
       iterator = NewIterator<LimitOffsetIterator>(
-          thd, mem_root, move(child), param.limit, param.offset,
-          param.count_all_rows, param.reject_multiple_rows, send_records);
+          thd, move(child), param.limit, param.offset, param.count_all_rows,
+          param.reject_multiple_rows, send_records);
       break;
     }
     case AccessPath::STREAM: {
       const auto &param = path->stream();
       unique_ptr_destroy_only<RowIterator> child = CreateIteratorFromAccessPath(
-          thd, mem_root, param.child, param.join, eligible_for_batch_mode);
+          thd, param.child, param.join, eligible_for_batch_mode);
       if (child == nullptr) {
         return nullptr;
       }
       iterator = NewIterator<StreamingIterator>(
-          thd, mem_root, move(child), param.temp_table_param, param.table,
+          thd, move(child), param.temp_table_param, param.table,
           param.provide_rowid, param.join, param.ref_slice);
       break;
     }
@@ -729,9 +595,8 @@ unique_ptr_destroy_only<RowIterator> CreateIteratorFromAccessPath(
              path->materialize().table_path->type == AccessPath::CONST_TABLE);
 
       unique_ptr_destroy_only<RowIterator> table_iterator =
-          CreateIteratorFromAccessPath(thd, mem_root,
-                                       path->materialize().table_path, join,
-                                       eligible_for_batch_mode);
+          CreateIteratorFromAccessPath(thd, path->materialize().table_path,
+                                       join, eligible_for_batch_mode);
       if (table_iterator == nullptr) {
         return nullptr;
       }
@@ -743,9 +608,9 @@ unique_ptr_destroy_only<RowIterator> CreateIteratorFromAccessPath(
         const MaterializePathParameters::QueryBlock &from =
             param->query_blocks[i];
         MaterializeIterator::QueryBlock &to = query_blocks[i];
-        to.subquery_iterator = CreateIteratorFromAccessPath(
-            thd, mem_root, from.subquery_path, from.join,
-            /*eligible_for_batch_mode=*/true);
+        to.subquery_iterator =
+            CreateIteratorFromAccessPath(thd, from.subquery_path, from.join,
+                                         /*eligible_for_batch_mode=*/true);
         if (to.subquery_iterator == nullptr) {
           return nullptr;
         }
@@ -775,10 +640,9 @@ unique_ptr_destroy_only<RowIterator> CreateIteratorFromAccessPath(
       }
       JOIN *subjoin = param->ref_slice == -1 ? nullptr : query_blocks[0].join;
       iterator = NewIterator<MaterializeIterator>(
-          thd, mem_root, std::move(query_blocks), param->table,
-          move(table_iterator), param->cte, param->unit, subjoin,
-          param->ref_slice, param->rematerialize, param->limit_rows,
-          param->reject_multiple_rows);
+          thd, std::move(query_blocks), param->table, move(table_iterator),
+          param->cte, param->unit, subjoin, param->ref_slice,
+          param->rematerialize, param->limit_rows, param->reject_multiple_rows);
 
       if (param->invalidators != nullptr) {
         MaterializeIterator *materialize =
@@ -798,14 +662,13 @@ unique_ptr_destroy_only<RowIterator> CreateIteratorFromAccessPath(
     case AccessPath::MATERIALIZE_INFORMATION_SCHEMA_TABLE: {
       const auto &param = path->materialize_information_schema_table();
       unique_ptr_destroy_only<RowIterator> table_iterator =
-          CreateIteratorFromAccessPath(thd, mem_root, param.table_path, join,
+          CreateIteratorFromAccessPath(thd, param.table_path, join,
                                        eligible_for_batch_mode);
       if (table_iterator == nullptr) {
         return nullptr;
       }
       iterator = NewIterator<MaterializeInformationSchemaTableIterator>(
-          thd, mem_root, move(table_iterator), param.table_list,
-          param.condition);
+          thd, move(table_iterator), param.table_list, param.condition);
       break;
     }
     case AccessPath::APPEND: {
@@ -813,106 +676,92 @@ unique_ptr_destroy_only<RowIterator> CreateIteratorFromAccessPath(
       vector<unique_ptr_destroy_only<RowIterator>> children;
       children.reserve(param.children->size());
       for (const AppendPathParameters &child : *param.children) {
-        children.push_back(
-            CreateIteratorFromAccessPath(thd, mem_root, child.path, child.join,
-                                         /*eligible_for_batch_mode=*/true));
+        children.push_back(CreateIteratorFromAccessPath(
+            thd, child.path, child.join, /*eligible_for_batch_mode=*/true));
         if (children.back() == nullptr) {
           return nullptr;
         }
       }
-      iterator = NewIterator<AppendIterator>(thd, mem_root, move(children));
+      iterator = NewIterator<AppendIterator>(thd, move(children));
       break;
     }
     case AccessPath::WINDOW: {
       const auto &param = path->window();
       unique_ptr_destroy_only<RowIterator> child = CreateIteratorFromAccessPath(
-          thd, mem_root, param.child, join, eligible_for_batch_mode);
+          thd, param.child, join, eligible_for_batch_mode);
       if (child == nullptr) {
         return nullptr;
       }
       if (param.needs_buffering) {
         iterator = NewIterator<BufferingWindowIterator>(
-            thd, mem_root, move(child), param.temp_table_param, join,
-            param.ref_slice);
+            thd, move(child), param.temp_table_param, join, param.ref_slice);
       } else {
-        iterator = NewIterator<WindowIterator>(thd, mem_root, move(child),
-                                               param.temp_table_param, join,
-                                               param.ref_slice);
+        iterator = NewIterator<WindowIterator>(
+            thd, move(child), param.temp_table_param, join, param.ref_slice);
       }
       break;
     }
     case AccessPath::WEEDOUT: {
       const auto &param = path->weedout();
       unique_ptr_destroy_only<RowIterator> child = CreateIteratorFromAccessPath(
-          thd, mem_root, param.child, join, eligible_for_batch_mode);
+          thd, param.child, join, eligible_for_batch_mode);
       if (child == nullptr) {
         return nullptr;
       }
-      iterator = NewIterator<WeedoutIterator>(thd, mem_root, move(child),
-                                              param.weedout_table,
-                                              param.tables_to_get_rowid_for);
+      iterator = NewIterator<WeedoutIterator>(
+          thd, move(child), param.weedout_table, param.tables_to_get_rowid_for);
       break;
     }
     case AccessPath::REMOVE_DUPLICATES: {
       const auto &param = path->remove_duplicates();
       unique_ptr_destroy_only<RowIterator> child = CreateIteratorFromAccessPath(
-          thd, mem_root, param.child, join, eligible_for_batch_mode);
+          thd, param.child, join, eligible_for_batch_mode);
       if (child == nullptr) {
         return nullptr;
       }
       iterator = NewIterator<RemoveDuplicatesIterator>(
-          thd, mem_root, move(child), join, param.group_items,
-          param.group_items_size);
+          thd, move(child), join, param.group_items, param.group_items_size);
       break;
     }
     case AccessPath::REMOVE_DUPLICATES_ON_INDEX: {
       const auto &param = path->remove_duplicates_on_index();
       unique_ptr_destroy_only<RowIterator> child = CreateIteratorFromAccessPath(
-          thd, mem_root, param.child, join, eligible_for_batch_mode);
+          thd, param.child, join, eligible_for_batch_mode);
       if (child == nullptr) {
         return nullptr;
       }
       iterator = NewIterator<RemoveDuplicatesOnIndexIterator>(
-          thd, mem_root, move(child), param.table, param.key,
-          param.loosescan_key_len);
+          thd, move(child), param.table, param.key, param.loosescan_key_len);
       break;
     }
     case AccessPath::ALTERNATIVE: {
       const auto &param = path->alternative();
       unique_ptr_destroy_only<RowIterator> child = CreateIteratorFromAccessPath(
-          thd, mem_root, param.child, join, eligible_for_batch_mode);
+          thd, param.child, join, eligible_for_batch_mode);
       if (child == nullptr) {
         return nullptr;
       }
       unique_ptr_destroy_only<RowIterator> table_scan_iterator =
-          CreateIteratorFromAccessPath(thd, mem_root, param.table_scan_path,
-                                       join, eligible_for_batch_mode);
+          CreateIteratorFromAccessPath(thd, param.table_scan_path, join,
+                                       eligible_for_batch_mode);
       if (table_scan_iterator == nullptr) {
         return nullptr;
       }
       iterator = NewIterator<AlternativeIterator>(
-          thd, mem_root, param.table_scan_path->table_scan().table, move(child),
+          thd, param.table_scan_path->table_scan().table, move(child),
           move(table_scan_iterator), param.used_ref);
       break;
     }
     case AccessPath::CACHE_INVALIDATOR: {
       const auto &param = path->cache_invalidator();
       unique_ptr_destroy_only<RowIterator> child = CreateIteratorFromAccessPath(
-          thd, mem_root, param.child, join, eligible_for_batch_mode);
+          thd, param.child, join, eligible_for_batch_mode);
       if (child == nullptr) {
         return nullptr;
       }
-      iterator = NewIterator<CacheInvalidatorIterator>(thd, mem_root,
-                                                       move(child), param.name);
+      iterator =
+          NewIterator<CacheInvalidatorIterator>(thd, move(child), param.name);
       break;
-    }
-    case AccessPath::DELETE_ROWS: {
-      // TODO(khatlen): There is no iterator type for DELETE_ROWS yet. The logic
-      // for deleting the rows lives in Query_result_delete, but much of it
-      // could just as well have been in a delete iterator. For now, just create
-      // the iterator for the child.
-      return CreateIteratorFromAccessPath(thd, path->delete_rows().child, join,
-                                          eligible_for_batch_mode);
     }
   }
 
@@ -993,7 +842,7 @@ void FindTablesToGetRowidFor(AccessPath *path) {
           ~handled_by_others;
       break;
     default:
-      my_abort();
+      abort();
   }
 }
 
@@ -1008,69 +857,9 @@ static Item *ConditionFromFilterPredicates(
   return CreateConjunction(&items);
 }
 
-void ExpandSingleFilterAccessPath(THD *thd, AccessPath *path, const JOIN *join,
+void ExpandSingleFilterAccessPath(THD *thd, AccessPath *path,
                                   const Mem_root_array<Predicate> &predicates,
                                   unsigned num_where_predicates) {
-  // Expand join filters for nested loop joins.
-  if (path->type == AccessPath::NESTED_LOOP_JOIN &&
-      !path->nested_loop_join().already_expanded_predicates &&
-      !(path->nested_loop_join().equijoin_predicates.empty() &&
-        path->nested_loop_join()
-            .join_predicate->expr->join_conditions.empty()) &&
-      path->nested_loop_join().inner->type != AccessPath::ZERO_ROWS) {
-    AccessPath *right_path = path->nested_loop_join().inner;
-    const RelationalExpression *expr =
-        path->nested_loop_join().join_predicate->expr;
-
-    // While we're collecting the join conditions, calculate cost and output
-    // rows (purely for display purposes). Note that this mirrors the
-    // calculation we are doing in CostingReceiver::ProposeNestedLoopJoin();
-    // we don't have space in the AccessPath to store it there.
-    double filter_cost = right_path->cost;
-    double filter_rows = right_path->num_output_rows;
-
-    List<Item> items;
-    for (size_t filter_idx :
-         BitsSetIn(path->nested_loop_join().equijoin_predicates)) {
-      Item *condition = expr->equijoin_conditions[filter_idx];
-      items.push_back(condition);
-      filter_cost +=
-          EstimateFilterCost(thd, filter_rows, condition, join->query_block)
-              .cost_if_not_materialized;
-      filter_rows *= EstimateSelectivity(thd, condition, /*trace=*/nullptr);
-    }
-    for (Item *condition : expr->join_conditions) {
-      items.push_back(condition);
-      filter_cost +=
-          EstimateFilterCost(thd, filter_rows, condition, join->query_block)
-              .cost_if_not_materialized;
-      filter_rows *= EstimateSelectivity(thd, condition, /*trace=*/nullptr);
-    }
-    assert(!items.is_empty());
-
-    AccessPath *filter_path = new (thd->mem_root) AccessPath;
-    filter_path->type = AccessPath::FILTER;
-    filter_path->filter().child = right_path;
-
-    // We don't bother trying to materialize subqueries in join conditions,
-    // since they should be very rare.
-    filter_path->filter().materialize_subqueries = false;
-
-    CopyBasicProperties(*right_path, filter_path);
-    filter_path->filter().condition = CreateConjunction(&items);
-    filter_path->cost = filter_cost;
-    filter_path->num_output_rows = filter_rows;
-
-    path->nested_loop_join().inner = filter_path;
-
-    // Since multiple root paths may have their filters expanded,
-    // and the same nested loop may be a subpath in several
-    // of them, we need to make sure we don't add the join predicates
-    // more than once, so mark them as done here.
-    path->nested_loop_join().already_expanded_predicates = true;
-  }
-
-  // Expand filters _after_ the access path (these are much more common).
   Item *condition = ConditionFromFilterPredicates(
       predicates, path->filter_predicates, num_where_predicates);
   if (condition == nullptr) {
@@ -1108,11 +897,11 @@ void ExpandSingleFilterAccessPath(THD *thd, AccessPath *path, const JOIN *join,
 void ExpandFilterAccessPaths(THD *thd, AccessPath *path_arg, const JOIN *join,
                              const Mem_root_array<Predicate> &predicates,
                              unsigned num_where_predicates) {
-  WalkAccessPaths(path_arg, join, WalkAccessPathPolicy::ENTIRE_QUERY_BLOCK,
-                  [thd, &predicates, num_where_predicates](
-                      AccessPath *path, const JOIN *sub_join) {
-                    ExpandSingleFilterAccessPath(
-                        thd, path, sub_join, predicates, num_where_predicates);
-                    return false;
-                  });
+  WalkAccessPaths(
+      path_arg, join, WalkAccessPathPolicy::ENTIRE_QUERY_BLOCK,
+      [thd, &predicates, num_where_predicates](AccessPath *path, const JOIN *) {
+        ExpandSingleFilterAccessPath(thd, path, predicates,
+                                     num_where_predicates);
+        return false;
+      });
 }

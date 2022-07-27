@@ -43,10 +43,8 @@ begin; insert into t3 values (1000, 1000), (2000, 2000); commit;
 select * from t3;
 #
 #
---let $binlog_file = mysqld-bin.000001
---let $binlog_start = 125
---let $keep_gtid_events = 1
---source include/show_binlog_events.inc
+--replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
 
 --connection node_2
 --echo #=============================================
@@ -54,10 +52,8 @@ select * from t3;
 --let $wait_condition = SELECT COUNT(*) = 5 FROM t3
 --source include/wait_condition.inc
 #
---let $binlog_file = mysqld-bin.000001
---let $binlog_start = 125
---let $keep_gtid_events = 1
---source include/show_binlog_events.inc
+--replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
 #
 drop table t3;
 

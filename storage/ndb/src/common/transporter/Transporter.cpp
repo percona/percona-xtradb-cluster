@@ -97,7 +97,7 @@ Transporter::Transporter(TransporterRegistry &t_reg,
 
   assert(rHostName);
   if (rHostName && strlen(rHostName) > 0){
-    snprintf(remoteHostName, sizeof(remoteHostName), "%s", rHostName);
+    strncpy(remoteHostName, rHostName, sizeof(remoteHostName));
   }
   else
   {
@@ -110,7 +110,7 @@ Transporter::Transporter(TransporterRegistry &t_reg,
     }
     remoteHostName[0]= 0;
   }
-  snprintf(localHostName, sizeof(localHostName), "%s", lHostName);
+  strncpy(localHostName, lHostName, sizeof(localHostName));
 
   DBUG_PRINT("info",("rId=%d lId=%d isServer=%d rHost=%s lHost=%s s_port=%d",
 		     remoteNodeId, localNodeId, isServer,

@@ -87,15 +87,6 @@ bool RouterComponentTest::wait_log_contains(const ProcessWrapper &router,
 std::string RouterComponentBootstrapTest::my_hostname;
 constexpr const char RouterComponentBootstrapTest::kRootPassword[];
 
-const RouterComponentBootstrapTest::OutputResponder
-    RouterComponentBootstrapTest::kBootstrapOutputResponder{
-        [](const std::string &line) -> std::string {
-          if (line == "Please enter MySQL password for root: ")
-            return kRootPassword + "\n"s;
-
-          return "";
-        }};
-
 /**
  * the tiny power function that does all the work.
  *
@@ -168,8 +159,11 @@ void RouterComponentBootstrapTest::bootstrap_failover(
   }
 
   // launch the router
-  auto &router =
-      launch_router_for_bootstrap(router_cmdline, expected_exitcode, true);
+  auto &router = launch_router_for_bootstrap(router_cmdline, expected_exitcode);
+
+  // type in the password
+  router.register_response("Please enter MySQL password for root: ",
+                           kRootPassword + "\n"s);
 
   ASSERT_NO_FATAL_FAILURE(
       check_exit_code(router, expected_exitcode, wait_for_exit_timeout));

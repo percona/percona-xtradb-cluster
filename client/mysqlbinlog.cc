@@ -757,7 +757,7 @@ static ulonglong start_position, stop_position;
 #define stop_position_mot ((my_off_t)stop_position)
 
 static char *start_datetime_str, *stop_datetime_str;
-static my_time_t start_datetime = 0, stop_datetime = MYTIME_MAX_VALUE;
+static my_time_t start_datetime = 0, stop_datetime = MY_TIME_T_MAX;
 static ulonglong rec_count = 0;
 static MYSQL *mysql = nullptr;
 static char *dirname_for_local_load = nullptr;
@@ -2170,7 +2170,7 @@ the mysql command line client.\n\n");
 static my_time_t convert_str_to_timestamp(const char *str) {
   MYSQL_TIME_STATUS status;
   MYSQL_TIME l_time;
-  my_time_t dummy_my_timezone;
+  long dummy_my_timezone;
   bool dummy_in_dst_time_gap;
   /* We require a total specification (date AND time) */
   if (str_to_datetime(str, strlen(str), &l_time, 0, &status) ||
@@ -3188,7 +3188,7 @@ static int args_post_process(void) {
     if (stop_position != (ulonglong)(~(my_off_t)0))
       warning("The --stop-position option is ignored in raw mode");
 
-    if (stop_datetime != MYTIME_MAX_VALUE)
+    if (stop_datetime != MY_TIME_T_MAX)
       warning("The --stop-datetime option is ignored in raw mode");
   } else if (output_file) {
     if (!(result_file =

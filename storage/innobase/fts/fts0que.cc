@@ -3659,7 +3659,7 @@ dberr_t fts_query(trx_t *trx, dict_index_t *index, uint flags,
   query_trx = trx_allocate_for_background();
   query_trx->op_info = "FTS query";
 
-  const auto start_time = std::chrono::steady_clock::now();
+  const auto start_time_ms = ut_time_monotonic_ms();
 
   query.trx = query_trx;
   query.index = index;
@@ -3824,10 +3824,7 @@ dberr_t fts_query(trx_t *trx, dict_index_t *index, uint flags,
   ut::free(lc_query_str);
 
   if (fts_enable_diag_print && (*result)) {
-    const auto diff_time =
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now() - start_time)
-            .count();
+    auto diff_time = ut_time_monotonic_ms() - start_time_ms;
 
     ib::info(ER_IB_MSG_516)
         << "FTS Search Processing time: " << diff_time / 1000

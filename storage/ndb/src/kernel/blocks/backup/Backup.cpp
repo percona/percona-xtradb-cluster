@@ -3401,10 +3401,8 @@ void Backup::execDBINFO_SCANREQ(Signal *signal)
     };
 
     const size_t num_config_params =
-      NDB_ARRAY_SIZE(pools[0].config_params);
-    const Uint32 numPools = NDB_ARRAY_SIZE(pools);
+      sizeof(pools[0].config_params) / sizeof(pools[0].config_params[0]);
     Uint32 pool = cursor->data[0];
-    ndbrequire(pool < numPools);
     BlockNumber bn = blockToMain(number());
     while(pools[pool].poolname)
     {
@@ -3651,7 +3649,6 @@ Backup::findTable(const BackupRecordPtr & ptr,
 		  TablePtr & tabPtr, Uint32 tableId)
 {
   Uint32 loopCount = 0;
-  ndbrequire(tableId < c_tableMapSize);
   tabPtr.i = c_tableMap[tableId];
   while (loopCount++ < MAX_TABLE_MAPS)
   {

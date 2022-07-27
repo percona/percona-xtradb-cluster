@@ -132,7 +132,6 @@ SET(TESTS
   m_string
   mdl
   mem_root_deque
-  mutex_lock
   my_alloc
   my_bitmap
   my_error
@@ -430,4 +429,3 @@ ADD_SUBDIRECTORY(binlogevents)
 ADD_SUBDIRECTORY(memory)
 ADD_SUBDIRECTORY(containers)
 ADD_SUBDIRECTORY(locks)
-ADD_SUBDIRECTORY(changestreams)

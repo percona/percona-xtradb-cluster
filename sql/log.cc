@@ -265,11 +265,11 @@ class Silence_log_table_errors : public Internal_error_handler {
   const char *message() const { return m_message; }
 };
 
-static void ull2timeval(ulonglong utime, my_timeval *tv) {
+static void ull2timeval(ulonglong utime, struct timeval *tv) {
   assert(tv != nullptr);
   assert(utime > 0); /* should hold true in this context */
-  tv->m_tv_sec = static_cast<int64_t>(utime / 1000000);
-  tv->m_tv_usec = utime % 1000000;
+  tv->tv_sec = static_cast<long>(utime / 1000000);
+  tv->tv_usec = utime % 1000000;
 }
 
 class File_query_log {
@@ -1017,7 +1017,7 @@ bool Log_to_csv_event_handler::log_general(
   bool need_close = false;
   bool need_rnd_end = false;
   uint field_index;
-  my_timeval tv;
+  struct timeval tv;
 
   /*
     CSV uses TIME_to_timestamp() internally if table needs to be repaired
@@ -1146,7 +1146,7 @@ bool Log_to_csv_event_handler::log_slow(
   bool need_close = false;
   bool need_rnd_end = false;
   const CHARSET_INFO *client_cs = thd->variables.character_set_client;
-  my_timeval tv;
+  struct timeval tv;
   const char *reason = "";
 
   DBUG_TRACE;
@@ -1446,12 +1446,9 @@ void Query_logger::cleanup() {
   file_log_handler = nullptr;
 }
 
-
-bool Query_logger::slow_log_write(THD *thd, const char *query,
-                                  size_t query_length,
-                                  struct System_status_var *query_start_status,
-                                  bool aggregate, ulonglong lock_usec,
-                                  ulonglong exec_usec) {
+bool Query_logger::slow_log_write(
+    THD *thd, const char *query, size_t query_length,
+    struct System_status_var *query_start_status) {
   assert(thd->enable_slow_log);
 
   if (!(*slow_log_handler_list)) return false;
@@ -1475,12 +1472,9 @@ bool Query_logger::slow_log_write(THD *thd, const char *query,
        user_host_buff);
   ulonglong current_utime = my_micro_time();
   ulonglong query_utime, lock_utime;
-  if (aggregate) {
-    query_utime = exec_usec;
-    lock_utime = lock_usec;
-  } else if (thd->start_utime) {
+  if (thd->start_utime) {
     query_utime = (current_utime - thd->start_utime);
-    lock_utime = thd->get_lock_usec();
+    lock_utime = (thd->utime_after_lock - thd->start_utime);
   } else {
     query_utime = 0;
     lock_utime = 0;
@@ -1762,12 +1756,12 @@ char *make_query_log_name(char *buff, enum_log_table_type log_type) {
    themselves.
 
    @param thd              thread handle
-   @param cur_utime        current relative time in microseconds
+   @param lex              current relative time in microseconds
 
-   @return                 time in microseconds
+   @return                 time in microseconds from utime_after_lock
 */
 
-static ulonglong get_query_exec_time(THD *thd) {
+static ulonglong get_query_exec_time(THD *thd, ulonglong cur_utime) {
   ulonglong res;
 
 #ifndef NDEBUG
@@ -1777,7 +1771,7 @@ static ulonglong get_query_exec_time(THD *thd) {
               : 0;
   else
 #endif
-    res = get_query_time(thd);
+    res = cur_utime - thd->utime_after_lock;
 
   if (res > thd->variables.long_query_time)
     thd->server_status |= SERVER_QUERY_WAS_SLOW;
@@ -1817,7 +1811,8 @@ bool log_slow_applicable(THD *thd, int sp_sql_command) {
   if (!thd->enable_slow_log || !opt_slow_log) return false;
 
   /* Collect query exec time as the first step. */
-  ulonglong query_exec_time = get_query_exec_time(thd);
+  ulonglong end_utime_of_query = thd->current_utime();
+  ulonglong query_exec_time = get_query_exec_time(thd, end_utime_of_query);
 
   /*
     Copy all needed global variables into a session one before doing all checks.
@@ -1918,10 +1913,10 @@ void log_slow_do(THD *thd, struct System_status_var *query_start_status) {
   if (thd->rewritten_query().length())
     query_logger.slow_log_write(thd, thd->rewritten_query().ptr(),
                                 thd->rewritten_query().length(),
-                                query_start_status, false, 0, 0);
+                                query_start_status);
   else
     query_logger.slow_log_write(thd, thd->query().str, thd->query().length,
-                                query_start_status, false, 0, 0);
+                                query_start_status);
 }
 
 /**
@@ -1955,7 +1950,9 @@ void Slow_log_throttle::new_window(ulonglong now) {
 }
 
 Slow_log_throttle::Slow_log_throttle(ulong *threshold, mysql_mutex_t *lock,
-                                     ulong window_usecs, log_summary_t logger,
+                                     ulong window_usecs,
+                                     bool (*logger)(THD *, const char *, size_t,
+                                                    struct System_status_var *),
                                      const char *msg)
     : Log_throttle(window_usecs, msg),
       total_exec_time(0),
@@ -1981,6 +1978,14 @@ ulong Log_throttle::prepare_summary(ulong rate) {
 void Slow_log_throttle::print_summary(THD *thd, ulong suppressed,
                                       ulonglong print_lock_time,
                                       ulonglong print_exec_time) {
+  /*
+    We synthesize these values so the totals in the log will be
+    correct (just in case somebody analyses them), even if the
+    start/stop times won't be (as they're an aggregate which will
+    usually mostly lie within [ window_end - window_size ; window_end ]
+  */
+  ulonglong save_start_utime = thd->start_utime;
+  ulonglong save_utime_after_lock = thd->utime_after_lock;
   Security_context *save_sctx = thd->security_context();
 
   char buf[128];
@@ -1988,14 +1993,17 @@ void Slow_log_throttle::print_summary(THD *thd, ulong suppressed,
   snprintf(buf, sizeof(buf), summary_template, suppressed);
 
   mysql_mutex_lock(&thd->LOCK_thd_data);
+  thd->start_utime = my_micro_time() - print_exec_time;
+  thd->utime_after_lock = thd->start_utime + print_lock_time;
   thd->set_security_context(&aggregate_sctx);
   mysql_mutex_unlock(&thd->LOCK_thd_data);
 
-  (*log_summary)(thd, buf, strlen(buf), nullptr, true, print_lock_time,
-                 print_exec_time);
+  (*log_summary)(thd, buf, strlen(buf), nullptr); /* purecov: inspected */
 
   mysql_mutex_lock(&thd->LOCK_thd_data);
   thd->set_security_context(save_sctx);
+  thd->start_utime = save_start_utime;
+  thd->utime_after_lock = save_utime_after_lock;
   mysql_mutex_unlock(&thd->LOCK_thd_data);
 }
 
@@ -2043,7 +2051,7 @@ bool Slow_log_throttle::log(THD *thd, bool eligible) {
         Add its execution time and lock time to totals for the current window.
       */
       total_exec_time += (end_utime_of_query - thd->start_utime);
-      total_lock_time += thd->get_lock_usec();
+      total_lock_time += (thd->utime_after_lock - thd->start_utime);
       suppress_current = true;
     }
 
@@ -2294,12 +2302,12 @@ bool Error_log_throttle::flush() {
 
 static bool slow_log_write(THD *thd, /* purecov: inspected */
                            const char *query, size_t query_length,
-                           struct System_status_var *query_start_status,
-                           bool aggregate, ulonglong time_usec,
-                           ulonglong lock_usec) {
-  return opt_slow_log && query_logger.slow_log_write(
-                             thd, query, query_length, query_start_status,
-                             aggregate, time_usec, lock_usec);
+                           struct System_status_var *query_start_status) {
+  return opt_slow_log &&                               /* purecov: inspected */
+         query_logger                                  /* purecov: inspected */
+             .slow_log_write(                          /* purecov: inspected */
+                             thd, query, query_length, /* purecov: inspected */
+                             query_start_status);      /* purecov: inspected */
 }
 
 Slow_log_throttle log_throttle_qni(&opt_log_throttle_queries_not_using_indexes,

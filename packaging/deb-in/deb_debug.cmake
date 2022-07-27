@@ -202,6 +202,7 @@ usr/lib/mysql/plugin/debug/keyring_hashicorp.so
 usr/lib/mysql/plugin/debug/openssl_udf.so
 usr/lib/mysql/plugin/debug/thread_pool.so
 usr/lib/mysql/plugin/debug/firewall.so
+usr/lib/mysql/plugin/debug/component_test_page_track_component.so
 usr/lib/mysql/plugin/debug/authentication_fido.so
 usr/lib/mysql/plugin/debug/component_keyring_encrypted_file.so
 ")
@@ -211,18 +212,13 @@ usr/lib/mysql/plugin/debug/component_keyring_encrypted_file.so
 usr/lib/mysql/plugin/debug/keyring_aws.so
 ")
   ENDIF()
-  SET (DEB_INSTALL_DEBUG_TEST_PLUGINS "${DEB_INSTALL_DEBUG_TEST_PLUGINS}
-usr/lib/mysql/plugin/debug/component_test_global_priv_registration.so
-usr/lib/mysql/plugin/debug/component_test_page_track_component.so
-")
-
 ENDIF()
 SET (DEB_CONTROL_DEBUG
 "
 Package: mysql-${DEB_PRODUCTNAME}-server-debug
 Architecture: any
 Section: debug
-Depends: \${misc:Depends}, mysql-${DEB_PRODUCTNAME}-server (= \${binary:Version})
+Depends: \${misc:Depends}
 Description: Debug binaries for MySQL Server
 
 Package: mysql-${DEB_PRODUCTNAME}-test-debug

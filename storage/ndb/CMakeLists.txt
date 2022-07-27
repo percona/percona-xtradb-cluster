@@ -161,7 +161,6 @@ INCLUDE_DIRECTORIES(
   ${CMAKE_CURRENT_BINARY_DIR}/include
 )
 
-SET(WITH_NDBAPI_EXAMPLES_DEFAULT OFF)
 OPTION(WITH_NDB_TEST
   "Include the NDB Cluster ndbapi test programs" OFF)
 IF(WITH_NDB_TEST)
@@ -172,14 +171,14 @@ ELSE()
     MESSAGE(STATUS "Building NDB test programs for improved gcov coverage")
     SET(WITH_NDB_TEST ON)
     MESSAGE(STATUS "Building NdbApi examples for improved gcov coverage")
-    SET(WITH_NDBAPI_EXAMPLES_DEFAULT ON)
+    SET(WITH_NDBAPI_EXAMPLES ON)
   ENDIF()
   # Turn on NDB tests automatically for valgrind builds
   IF(WITH_VALGRIND)
     MESSAGE(STATUS "Building NDB test programs for improved valgrind coverage")
     SET(WITH_NDB_TEST ON)
     MESSAGE(STATUS "Building NdbApi examples for improved valgrind coverage")
-    SET(WITH_NDBAPI_EXAMPLES_DEFAULT ON)
+    SET(WITH_NDBAPI_EXAMPLES ON)
   ENDIF()
   # Turn on NDB tests automatically for "-devbld" debug builds
   # to increase test coverage
@@ -188,14 +187,14 @@ ELSE()
     MESSAGE(STATUS "Building NDB test programs for \"-devbld\" debug build")
     SET(WITH_NDB_TEST ON)
     MESSAGE(STATUS "Building NdbApi examples for \"-devbld\" debug build")
-    SET(WITH_NDBAPI_EXAMPLES_DEFAULT ON)
+    SET(WITH_NDBAPI_EXAMPLES ON)
   ENDIF()
   # Turn on build of NDB tests automatically for "-werror" builds
   IF(PACKAGE_SUFFIX STREQUAL "-werror")
     MESSAGE(STATUS "Building NDB test programs for \"-werror\" build")
     SET(WITH_NDB_TEST ON)
     MESSAGE(STATUS "Building NdbApi examples for \"-werror\" build")
-    SET(WITH_NDBAPI_EXAMPLES_DEFAULT ON)
+    SET(WITH_NDBAPI_EXAMPLES ON)
   ENDIF()
 ENDIF()
 
@@ -417,8 +416,7 @@ IF(WITH_NDB_NODEJS)
   ADD_SUBDIRECTORY(nodejs)
 ENDIF(WITH_NDB_NODEJS)
 
-OPTION(WITH_NDBAPI_EXAMPLES
-  "Build the NdbApi example programs" ${WITH_NDBAPI_EXAMPLES_DEFAULT})
+OPTION(WITH_NDBAPI_EXAMPLES "Build the NdbApi example programs" OFF)
 IF(WITH_NDBAPI_EXAMPLES)
   MESSAGE(STATUS "Building the NdbApi example programs")
   ADD_SUBDIRECTORY(ndbapi-examples)

@@ -31,6 +31,8 @@
 #include <iterator>
 #include <ostream>
 
+using std::string;
+
 namespace mysql_harness {
 
 ////////////////////////////////////////////////////////////////
@@ -50,8 +52,8 @@ Path::Path(const std::string &path)
     p = path_.find('\\');
   }
 #endif
-  std::string::size_type pos = path_.find_last_not_of(directory_separator);
-  if (pos != std::string::npos)
+  string::size_type pos = path_.find_last_not_of(directory_separator);
+  if (pos != string::npos)
     path_.erase(pos + 1);
   else if (path_.size() > 0)
     path_.erase(1);
@@ -60,7 +62,7 @@ Path::Path(const std::string &path)
 }
 
 // throws std::invalid_argument
-Path::Path(const char *path) : Path(std::string(path)) {}
+Path::Path(const char *path) : Path(string(path)) {}
 
 // throws std::invalid_argument
 void Path::validate_non_empty_path() const {
@@ -77,22 +79,22 @@ bool Path::operator<(const Path &rhs) const { return path_ < rhs.path_; }
 
 Path Path::basename() const {
   validate_non_empty_path();  // throws std::invalid_argument
-  std::string::size_type pos = path_.find_last_of(directory_separator);
-  if (pos == std::string::npos)
+  string::size_type pos = path_.find_last_of(directory_separator);
+  if (pos == string::npos)
     return *this;
   else if (pos > 1)
-    return std::string(path_, pos + 1);
+    return string(path_, pos + 1);
   else
     return Path(root_directory);
 }
 
 Path Path::dirname() const {
   validate_non_empty_path();  // throws std::invalid_argument
-  std::string::size_type pos = path_.find_last_of(directory_separator);
-  if (pos == std::string::npos)
+  string::size_type pos = path_.find_last_of(directory_separator);
+  if (pos == string::npos)
     return Path(".");
   else if (pos > 0)
-    return std::string(path_, 0, pos);
+    return string(path_, 0, pos);
   else
     return Path(root_directory);
 }
@@ -176,7 +178,7 @@ Directory::DirectoryIterator Directory::begin() {
   return DirectoryIterator(*this);
 }
 
-Directory::DirectoryIterator Directory::glob(const std::string &pattern) {
+Directory::DirectoryIterator Directory::glob(const string &pattern) {
   return DirectoryIterator(*this, pattern);
 }
 
@@ -323,26 +325,6 @@ int mkdir(const std::string &dir, perm_mode mode, bool recursive) {
   }
 
   return mkdir_recursive(mysql_harness::Path(dir), mode);
-}
-
-void check_file_access_rights(const std::string &file_name) {
-  auto rights_res = access_rights_get(file_name);
-  if (!rights_res) {
-    auto ec = rights_res.error();
-
-    if (ec == std::errc::no_such_file_or_directory) return;
-
-    throw std::system_error(
-        ec, "getting access rights for '" + file_name + "' failed");
-  }
-
-  auto verify_res =
-      access_rights_verify(rights_res.value(), DenyOtherReadWritableVerifier());
-  if (!verify_res) {
-    const auto ec = verify_res.error();
-
-    throw std::system_error(ec, "'" + file_name + "' has insecure permissions");
-  }
 }
 
 }  // namespace mysql_harness

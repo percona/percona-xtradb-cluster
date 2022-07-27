@@ -371,15 +371,14 @@ normal client queries.
 @param[in]	n_io			number of IO ops done since buffer
                                         pool load has started */
 static inline void buf_load_throttle_if_needed(
-    std::chrono::steady_clock::time_point *last_check_time,
-    ulint *last_activity_count, ulint n_io) {
+    ib_time_monotonic_ms_t *last_check_time, ulint *last_activity_count,
+    ulint n_io) {
   if (n_io % srv_io_capacity < srv_io_capacity - 1) {
     return;
   }
 
-  if (*last_check_time == std::chrono::steady_clock::time_point{} ||
-      *last_activity_count == 0) {
-    *last_check_time = std::chrono::steady_clock::now();
+  if (*last_check_time == 0 || *last_activity_count == 0) {
+    *last_check_time = ut_time_monotonic_ms();
     *last_activity_count = srv_get_activity_count();
     return;
   }
@@ -394,7 +393,8 @@ static inline void buf_load_throttle_if_needed(
 
   /* There has been other activity, throttle. */
 
-  const auto elapsed_time = std::chrono::steady_clock::now() - *last_check_time;
+  const auto now = ut_time_monotonic_ms();
+  const auto elapsed_time = now - *last_check_time;
 
   /* Notice that elapsed_time is not the time for the last
   srv_io_capacity IO operations performed by BP load. It is the
@@ -415,11 +415,11 @@ static inline void buf_load_throttle_if_needed(
   "cur_activity_count == *last_activity_count" check and calling
   ut_time_monotonic_ms() that often may turn out to be too expensive. */
 
-  if (elapsed_time < std::chrono::seconds{1}) {
-    std::this_thread::sleep_for(std::chrono::seconds{1} - elapsed_time);
+  if (elapsed_time < 1000 /* 1 sec (1000 milli secs) */) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000 - elapsed_time));
   }
 
-  *last_check_time = std::chrono::steady_clock::now();
+  *last_check_time = ut_time_monotonic_ms();
   *last_activity_count = srv_get_activity_count();
 }
 
@@ -564,7 +564,7 @@ static void buf_load() {
     std::sort(dump, dump + dump_n);
   }
 
-  std::chrono::steady_clock::time_point last_check_time;
+  ib_time_monotonic_ms_t last_check_time = 0;
   ulint last_activity_cnt = 0;
 
   /* Avoid calling the expensive fil_space_acquire_silent() for each

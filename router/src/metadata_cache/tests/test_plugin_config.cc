@@ -24,14 +24,13 @@
 
 #include <typeinfo>
 
-#include <gmock/gmock.h>
-
 #include "../src/metadata_cache.h"
 #include "../src/plugin_config.h"
 
-#include "mysqlrouter/utils.h"  // ms_to_second_string
 #include "router_test_helpers.h"
 #include "test/helpers.h"
+
+#include "gmock/gmock.h"
 
 using ::testing::ContainerEq;
 using ::testing::Eq;
@@ -271,7 +270,7 @@ INSTANTIATE_TEST_SUITE_P(SomethingUseful, MetadataCachePluginConfigBadTest,
                               },
 
                               {
-                                  typeid(mysql_harness::option_not_present),
+                                  typeid(mysqlrouter::option_not_present),
                                   "option user in [metadata_cache] is required",
                               }},
                              // ttl is garbage
@@ -313,7 +312,7 @@ INSTANTIATE_TEST_SUITE_P(SomethingUseful, MetadataCachePluginConfigBadTest,
                               }},
                          })));
 
-using mysql_harness::BasePluginConfig;
+using mysqlrouter::BasePluginConfig;
 
 // Valid millisecond configuration values
 using GetOptionMillisecondsOkTestData =

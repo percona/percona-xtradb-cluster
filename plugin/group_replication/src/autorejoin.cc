@@ -28,9 +28,9 @@
 #include "plugin/group_replication/include/plugin_handlers/read_mode_handler.h"
 #include "plugin/group_replication/include/plugin_handlers/stage_monitor_handler.h"
 
-void *Autorejoin_thread::launch_thread(void *arg) {
+[[noreturn]] void *Autorejoin_thread::launch_thread(void *arg) {
   Autorejoin_thread *thd = static_cast<Autorejoin_thread *>(arg);
-  thd->autorejoin_thread_handle();  // Does not return.
+  thd->autorejoin_thread_handle();
 }
 
 Autorejoin_thread::Autorejoin_thread()

@@ -33,9 +33,8 @@
 #include "mysql/harness/arg_handler.h"
 #include "mysql/harness/filesystem.h"
 #include "mysql/harness/utility/string.h"
-#include "mysqlrouter/utils.h"         // prompt_password
+#include "mysqlrouter/utils.h"
 #include "print_version.h"             // build_version
-#include "router_config.h"             // MYSQL_ROUTER_NAME
 #include "welcome_copyright_notice.h"  // ORACLE_WELCOME_COPYRIGHT_NOTICE
 
 #include "http_auth_backend.h"

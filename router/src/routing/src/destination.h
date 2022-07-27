@@ -38,6 +38,7 @@
 #include "mysqlrouter/destination.h"
 #include "mysqlrouter/routing.h"
 #include "protocol/protocol.h"
+#include "router_config.h"
 #include "tcp_address.h"
 
 namespace mysql_harness {

@@ -22,10 +22,8 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mysqlrouter/utils_sqlstring.h"
-
-#include <cstring>
-#include <string>
+#include "utils_sqlstring.h"
+#include <string.h>
 
 #ifdef _WIN32
 #define strcasecmp _stricmp

@@ -26,11 +26,8 @@
  * Test the metadata cache implementation.
  */
 
-#include <chrono>
-#include <memory>
-#include <vector>
-
-#include <gmock/gmock.h>
+#include "gmock/gmock.h"
+#include "gtest/gtest_prod.h"  // must be the first header
 
 #include "cluster_metadata.h"
 #include "dim.h"

@@ -51,10 +51,8 @@
 #include "mysqlrouter/routing.h"
 #include "tcp_port_pool.h"
 #include "test/helpers.h"  // init_test_logger
-#include "test/temp_directory.h"
 
 using mysql_harness::TCPAddress;
-using mysqlrouter::URI;
 using routing::AccessMode;
 using namespace std::chrono_literals;
 
@@ -391,10 +389,10 @@ TEST_F(RoutingTests, bug_24841281) {
               ::testing::Truly([](const auto &v) { return bool(v); }))
       << server_endpoint;
 
-  TempDirectory tmp_dir;
+  TmpDir tmp_dir;  // create a tmp dir (it will be destroyed via RAII later)
   mysql_harness::Path sock_path
 #ifndef _WIN32
-      (tmp_dir.name() + "/sock")
+      (tmp_dir() + "/sock")
 #endif
           ;
 

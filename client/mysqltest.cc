@@ -1719,8 +1719,7 @@ void flush_ds_res() {
       cleanup_and_exit(1);
 
     if (!result_file_name) {
-      if (std::fwrite(ds_res.str, 1, ds_res.length, stdout) != ds_res.length)
-        cleanup_and_exit(1);
+      std::fwrite(ds_res.str, 1, ds_res.length, stdout);
       std::fflush(stdout);
     }
 

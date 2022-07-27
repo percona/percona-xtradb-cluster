@@ -324,7 +324,7 @@ class Clone_persist_gtid {
  private:
   /** Time threshold to trigger persisting GTID. Insert GTID once per 1k
   transactions or every 100 millisecond. */
-  static constexpr std::chrono::milliseconds s_time_threshold{100};
+  const static uint32_t s_time_threshold_ms = 100;
 
   /** Threshold for the count for compressing GTID. */
   const static uint32_t s_compression_threshold = 50;

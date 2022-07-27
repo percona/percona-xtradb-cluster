@@ -40,10 +40,7 @@ RESET MASTER;
 
 # Expect no recorded output
 
---let $binlog_file = mysqld-bin.000001
---let $binlog_start = 125
---let $keep_gtid_events = 1
---source include/show_binlog_events.inc
+SHOW BINLOG EVENTS FROM 125;
 
 #
 # One line loaded, so less than the wsrep-load-data-splitting value
@@ -94,16 +91,12 @@ SELECT COUNT(*) = 1 FROM t1;
 # Expect one binlog entry, identical on both nodes
 
 --connection node_1
---let $binlog_file = mysqld-bin.000001
---let $binlog_start = 125
---let $keep_gtid_events = 1
---source include/show_binlog_events.inc
+--replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
+SHOW BINLOG EVENTS FROM 125;
 
 --connection node_2
---let $binlog_file = mysqld-bin.000001
---let $binlog_start = 125
---let $keep_gtid_events = 1
---source include/show_binlog_events.inc
+--replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
+SHOW BINLOG EVENTS FROM 125;
 
 --connection node_1
 TRUNCATE TABLE t1;
@@ -140,10 +133,7 @@ RESET MASTER;
 
 SELECT COUNT(*) = 0 FROM t1;
 
---let $binlog_file = mysqld-bin.000001
---let $binlog_start = 125
---let $keep_gtid_events = 1
---source include/show_binlog_events.inc
+SHOW BINLOG EVENTS FROM 125;
 
 --connection node_1
 DROP TABLE t1;

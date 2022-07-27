@@ -632,8 +632,6 @@ void do_cache_maintenance() {
 int cache_manager_task(task_arg arg [[maybe_unused]]) {
   DECL_ENV
   int dummy;
-  ENV_INIT
-  END_ENV_INIT
   END_ENV;
 
   TASK_BEGIN

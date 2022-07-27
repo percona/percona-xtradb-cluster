@@ -2953,20 +2953,3 @@ g   codership/mysql-wsrep/issues#176
    fun:tls_get_addr_tail
    fun:__tls_get_addr
 }
-<<<<<<< HEAD
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-=======
-
-#  The ... is for malloc or realloc
-{
-   mysql_dynamic_loader_scheme_file_imp_load
-   Memcheck:Leak
-   match-leak-kinds: reachable
-   ...
-   fun:vasprintf
-   fun:asprintf
-   fun:dlerror
-   fun:_ZN36mysql_dynamic_loader_scheme_file_imp4loadEPKcPP17mysql_component_t
-}
->>>>>>> tag/Percona-Server-8.0.28-19

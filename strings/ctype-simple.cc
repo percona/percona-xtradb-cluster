@@ -47,15 +47,6 @@
 #include "stdarg.h"
 #include "template_utils.h"
 
-MY_COMPILER_DIAGNOSTIC_PUSH()
-// Suppress warning C4146 unary minus operator applied to unsigned type,
-// result still unsigned
-MY_COMPILER_MSVC_DIAGNOSTIC_IGNORE(4146)
-static inline longlong ulonglong_with_sign(bool negative, ulonglong ll) {
-  return negative ? -ll : ll;
-}
-MY_COMPILER_DIAGNOSTIC_POP()
-
 /*
   Returns the number of bytes required for strnxfrm().
 */
@@ -537,12 +528,12 @@ longlong my_strntoll_8bit(const CHARSET_INFO *cs, const char *nptr, size_t l,
     return negative ? LLONG_MIN : LLONG_MAX;
   }
 
-  return ulonglong_with_sign(negative, i);
+  return negative ? -i : i;
 
 noconv:
   err[0] = EDOM;
   if (endptr != nullptr) *endptr = nptr;
-  return 0LL;
+  return 0L;
 }
 
 ulonglong my_strntoull_8bit(const CHARSET_INFO *cs, const char *nptr, size_t l,
@@ -612,7 +603,7 @@ ulonglong my_strntoull_8bit(const CHARSET_INFO *cs, const char *nptr, size_t l,
     return (~(ulonglong)0);
   }
 
-  return ulonglong_with_sign(negative, i);
+  return negative ? -i : i;
 
 noconv:
   err[0] = EDOM;

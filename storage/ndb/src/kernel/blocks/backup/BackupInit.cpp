@@ -362,12 +362,11 @@ Backup::execREAD_CONFIG_REQ(Signal* signal)
   c_fragmentPool.setSize(noBackups * noFrags + 2);
   c_deleteLcpFilePool.setSize(noDeleteLcpFile);
 
-  c_tableMapSize = noBackups * noTables;
   c_tableMap = (Uint32*)allocRecord("c_tableMap",
                                     sizeof(Uint32),
-                                    c_tableMapSize);
+                                    noBackups * noTables);
 
-  for (Uint32 i = 0; i < c_tableMapSize; i++)
+  for (Uint32 i = 0; i < (noBackups * noTables); i++)
   {
     c_tableMap[i] = RNIL;
   }

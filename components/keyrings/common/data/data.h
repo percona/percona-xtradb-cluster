@@ -25,18 +25,19 @@
 
 #include <functional>
 #include <string>
-#include "pfs_string.h"
+#include "global_default_mr.h"
 
 namespace keyring_common {
 namespace data {
 
 /** Data types */
-using Type = pfs_string;
+using Type = pmr_string;
+// using Sensitive_data = pmr_string;
 
 struct Sensitive_data {
   Sensitive_data() {}
 
-  Sensitive_data(pfs_string const &str) : data(str) { encode(); }
+  Sensitive_data(pmr_string const &str) : data(str) { encode(); }
 
   Sensitive_data(const char *str) : data(str) { encode(); }
 
@@ -63,7 +64,7 @@ struct Sensitive_data {
   std::size_t size() const { return data.size(); }
   std::size_t length() const { return data.size(); }
 
-  pfs_string decode() const {
+  pmr_string decode() const {
     auto ret = data;
     const auto key =
         std::hash<std::uintptr_t>{}(reinterpret_cast<std::uintptr_t>(this));
@@ -86,7 +87,7 @@ struct Sensitive_data {
     }
   }
 
-  pfs_string data;
+  pmr_string data;
 };
 
 /**

@@ -175,8 +175,6 @@ int initialize_performance_schema(
         param->m_consumer_events_stages_history_enabled;
     flag_events_stages_history_long =
         param->m_consumer_events_stages_history_long_enabled;
-    flag_events_statements_cpu =
-        param->m_consumer_events_statements_cpu_enabled;
     flag_events_statements_current =
         param->m_consumer_events_statements_current_enabled;
     flag_events_statements_history =
@@ -202,7 +200,6 @@ int initialize_performance_schema(
     flag_events_stages_current = false;
     flag_events_stages_history = false;
     flag_events_stages_history_long = false;
-    flag_events_statements_cpu = false;
     flag_events_statements_current = false;
     flag_events_statements_history = false;
     flag_events_statements_history_long = false;
@@ -350,7 +347,6 @@ void shutdown_performance_schema(void) {
   flag_events_stages_current = false;
   flag_events_stages_history = false;
   flag_events_stages_history_long = false;
-  flag_events_statements_cpu = false;
   flag_events_statements_current = false;
   flag_events_statements_history = false;
   flag_events_statements_history_long = false;

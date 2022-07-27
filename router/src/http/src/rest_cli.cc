@@ -35,7 +35,6 @@
 #include "mysql/harness/tls_client_context.h"
 #include "mysqlrouter/http_request.h"
 #include "mysqlrouter/rest_client.h"
-#include "router_config.h"  // MYSQL_ROUTER_VERSION
 
 /**
  * exception thrown by the frontend.

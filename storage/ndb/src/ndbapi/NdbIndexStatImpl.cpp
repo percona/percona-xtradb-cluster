@@ -389,36 +389,27 @@ NdbIndexStatImpl::create_systables(Ndb* ndb)
   }
 
   if (get_systables(sys) == -1)
-  {
-    dic->endSchemaTrans(NdbDictionary::Dictionary::SchemaTransAbort);
     return -1;
-  }
 
   if (sys.m_obj_cnt == Sys::ObjCnt)
   {
     setError(HaveSysTables, __LINE__);
-    dic->endSchemaTrans(NdbDictionary::Dictionary::SchemaTransAbort);
     return -1;
   }
 
   if (sys.m_obj_cnt != 0)
   {
     setError(BadSysTables, __LINE__);
-    dic->endSchemaTrans(NdbDictionary::Dictionary::SchemaTransAbort);
     return -1;
   }
 
   {
     NdbDictionary::Table tab;
     if (make_headtable(tab) == -1)
-    {
-      dic->endSchemaTrans(NdbDictionary::Dictionary::SchemaTransAbort);
       return -1;
-    }
     if (dic->createTable(tab) == -1)
     {
       setError(dic->getNdbError().code, __LINE__);
-      dic->endSchemaTrans(NdbDictionary::Dictionary::SchemaTransAbort);
       return -1;
     }
 
@@ -426,7 +417,6 @@ NdbIndexStatImpl::create_systables(Ndb* ndb)
     if (sys.m_headtable == 0)
     {
       setError(dic->getNdbError().code, __LINE__);
-      dic->endSchemaTrans(NdbDictionary::Dictionary::SchemaTransAbort);
       return -1;
     }
   }
@@ -434,10 +424,7 @@ NdbIndexStatImpl::create_systables(Ndb* ndb)
   {
     NdbDictionary::Table tab;
     if (make_sampletable(tab) == -1)
-    {
-      dic->endSchemaTrans(NdbDictionary::Dictionary::SchemaTransAbort);
       return -1;
-    }
 
 #ifdef VM_TRACE
 #ifdef NDB_USE_GET_ENV
@@ -447,7 +434,6 @@ NdbIndexStatImpl::create_systables(Ndb* ndb)
       if (p != 0 && strchr("1Y", p[0]) != 0)
       {
         setError(9999, __LINE__);
-        dic->endSchemaTrans(NdbDictionary::Dictionary::SchemaTransAbort);
         return -1;
       }
     }
@@ -457,7 +443,6 @@ NdbIndexStatImpl::create_systables(Ndb* ndb)
     if (dic->createTable(tab) == -1)
     {
       setError(dic->getNdbError().code, __LINE__);
-      dic->endSchemaTrans(NdbDictionary::Dictionary::SchemaTransAbort);
       return -1;
     }
 
@@ -465,7 +450,6 @@ NdbIndexStatImpl::create_systables(Ndb* ndb)
     if (sys.m_sampletable == 0)
     {
       setError(dic->getNdbError().code, __LINE__);
-      dic->endSchemaTrans(NdbDictionary::Dictionary::SchemaTransAbort);
       return -1;
     }
   }
@@ -473,14 +457,10 @@ NdbIndexStatImpl::create_systables(Ndb* ndb)
   {
     NdbDictionary::Index ind;
     if (make_sampleindex1(ind) == -1)
-    {
-      dic->endSchemaTrans(NdbDictionary::Dictionary::SchemaTransAbort);
       return -1;
-    }
     if (dic->createIndex(ind, *sys.m_sampletable) == -1)
     {
       setError(dic->getNdbError().code, __LINE__);
-      dic->endSchemaTrans(NdbDictionary::Dictionary::SchemaTransAbort);
       return -1;
     }
 
@@ -488,7 +468,6 @@ NdbIndexStatImpl::create_systables(Ndb* ndb)
     if (sys.m_sampleindex1 == 0)
     {
       setError(dic->getNdbError().code, __LINE__);
-      dic->endSchemaTrans(NdbDictionary::Dictionary::SchemaTransAbort);
       return -1;
     }
   }
@@ -517,17 +496,13 @@ NdbIndexStatImpl::drop_systables(Ndb* ndb)
 
   if (get_systables(sys) == -1 &&
       m_error.code != BadSysTables)
-  {
-    dic->endSchemaTrans(NdbDictionary::Dictionary::SchemaTransAbort);
     return -1;
-  }
 
   if (sys.m_headtable != 0)
   {
     if (dic->dropTableGlobal(*sys.m_headtable) == -1)
     {
       setError(dic->getNdbError().code, __LINE__);
-      dic->endSchemaTrans(NdbDictionary::Dictionary::SchemaTransAbort);
       return -1;
     }
   }
@@ -543,7 +518,6 @@ NdbIndexStatImpl::drop_systables(Ndb* ndb)
       if (p != 0 && strchr("1Y", p[0]) != 0)
       {
         setError(9999, __LINE__);
-        dic->endSchemaTrans(NdbDictionary::Dictionary::SchemaTransAbort);
         return -1;
       }
     }
@@ -553,7 +527,6 @@ NdbIndexStatImpl::drop_systables(Ndb* ndb)
     if (dic->dropTableGlobal(*sys.m_sampletable) == -1)
     {
       setError(dic->getNdbError().code, __LINE__);
-      dic->endSchemaTrans(NdbDictionary::Dictionary::SchemaTransAbort);
       return -1;
     }
   }

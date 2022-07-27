@@ -45,8 +45,9 @@ INSERT INTO t3 VALUES (101, repeat('x1 ',5));
 SHOW VARIABLES LIKE 'innodb_rollback_segments';
 Variable_name	Value
 innodb_rollback_segments	1
-SHOW GLOBAL STATUS LIKE 'Innodb_undo%';
+SHOW GLOBAL STATUS LIKE '%undo%';
 Variable_name	Value
+Innodb_purge_undo_no	0
 Innodb_undo_tablespaces_total	2
 Innodb_undo_tablespaces_implicit	2
 Innodb_undo_tablespaces_explicit	0
@@ -71,8 +72,9 @@ CREATE UNDO TABLESPACE `undo_003` ADD DATAFILE 'undo_003.ibu';
 SHOW VARIABLES LIKE 'innodb_rollback_segments';
 Variable_name	Value
 innodb_rollback_segments	1
-SHOW GLOBAL STATUS LIKE 'Innodb_undo%';
+SHOW GLOBAL STATUS LIKE '%undo%';
 Variable_name	Value
+Innodb_purge_undo_no	0
 Innodb_undo_tablespaces_total	3
 Innodb_undo_tablespaces_implicit	2
 Innodb_undo_tablespaces_explicit	1
@@ -130,8 +132,9 @@ SHOW VARIABLES LIKE 'innodb_rollback_segments';
 Variable_name	Value
 innodb_rollback_segments	4
 CREATE UNDO TABLESPACE `undo_004` ADD DATAFILE 'undo_004.ibu';
-SHOW GLOBAL STATUS LIKE 'Innodb_undo%';
+SHOW GLOBAL STATUS LIKE '%undo%';
 Variable_name	Value
+Innodb_purge_undo_no	0
 Innodb_undo_tablespaces_total	4
 Innodb_undo_tablespaces_implicit	2
 Innodb_undo_tablespaces_explicit	2
@@ -246,8 +249,9 @@ Variable_name	Value
 innodb_rollback_segments	2
 ALTER UNDO TABLESPACE `undo_003` SET INACTIVE;
 ALTER UNDO TABLESPACE `undo_004` SET INACTIVE;
-SHOW GLOBAL STATUS LIKE 'Innodb_undo%';
+SHOW GLOBAL STATUS LIKE '%undo%';
 Variable_name	Value
+Innodb_purge_undo_no	0
 Innodb_undo_tablespaces_total	4
 Innodb_undo_tablespaces_implicit	2
 Innodb_undo_tablespaces_explicit	2
@@ -296,8 +300,9 @@ COUNT(*)
 SHOW VARIABLES LIKE 'innodb_rollback_segments';
 Variable_name	Value
 innodb_rollback_segments	2
-SHOW GLOBAL STATUS LIKE 'Innodb_undo%';
+SHOW GLOBAL STATUS LIKE '%undo%';
 Variable_name	Value
+Innodb_purge_undo_no	0
 Innodb_undo_tablespaces_total	4
 Innodb_undo_tablespaces_implicit	2
 Innodb_undo_tablespaces_explicit	2
@@ -309,8 +314,9 @@ CREATE UNDO TABLESPACE `undo_005` ADD DATAFILE 'undo_005.ibu';
 SHOW VARIABLES LIKE 'innodb_rollback_segments';
 Variable_name	Value
 innodb_rollback_segments	5
-SHOW GLOBAL STATUS LIKE 'Innodb_undo%';
+SHOW GLOBAL STATUS LIKE '%undo%';
 Variable_name	Value
+Innodb_purge_undo_no	0
 Innodb_undo_tablespaces_total	5
 Innodb_undo_tablespaces_implicit	2
 Innodb_undo_tablespaces_explicit	3
@@ -368,8 +374,9 @@ COUNT(*)
 SHOW VARIABLES LIKE 'innodb_rollback_segments';
 Variable_name	Value
 innodb_rollback_segments	6
-SHOW GLOBAL STATUS LIKE 'Innodb_undo%';
+SHOW GLOBAL STATUS LIKE '%undo%';
 Variable_name	Value
+Innodb_purge_undo_no	0
 Innodb_undo_tablespaces_total	5
 Innodb_undo_tablespaces_implicit	2
 Innodb_undo_tablespaces_explicit	3
@@ -406,8 +413,9 @@ ALTER UNDO TABLESPACE `undo_003` SET INACTIVE;
 SHOW VARIABLES LIKE 'innodb_rollback_segments';
 Variable_name	Value
 innodb_rollback_segments	4
-SHOW GLOBAL STATUS LIKE 'Innodb_undo%';
+SHOW GLOBAL STATUS LIKE '%undo%';
 Variable_name	Value
+Innodb_purge_undo_no	0
 Innodb_undo_tablespaces_total	5
 Innodb_undo_tablespaces_implicit	2
 Innodb_undo_tablespaces_explicit	3
@@ -465,8 +473,9 @@ INSERT INTO t3  VALUES (6, repeat('f',15));
 SHOW VARIABLES LIKE 'innodb_rollback_segments';
 Variable_name	Value
 innodb_rollback_segments	2
-SHOW GLOBAL STATUS LIKE 'Innodb_undo%';
+SHOW GLOBAL STATUS LIKE '%undo%';
 Variable_name	Value
+Innodb_purge_undo_no	0
 Innodb_undo_tablespaces_total	5
 Innodb_undo_tablespaces_implicit	2
 Innodb_undo_tablespaces_explicit	3
@@ -527,8 +536,9 @@ Level	Code	Message
 SHOW VARIABLES LIKE 'innodb_rollback_segments';
 Variable_name	Value
 innodb_rollback_segments	7
-SHOW GLOBAL STATUS LIKE 'Innodb_undo%';
+SHOW GLOBAL STATUS LIKE '%undo%';
 Variable_name	Value
+Innodb_purge_undo_no	0
 Innodb_undo_tablespaces_total	6
 Innodb_undo_tablespaces_implicit	2
 Innodb_undo_tablespaces_explicit	4
@@ -605,8 +615,9 @@ ERROR HY000: Running in read-only mode
 SHOW VARIABLES LIKE 'innodb_rollback_segments';
 Variable_name	Value
 innodb_rollback_segments	7
-SHOW GLOBAL STATUS LIKE 'Innodb_undo%';
+SHOW GLOBAL STATUS LIKE '%undo%';
 Variable_name	Value
+Innodb_purge_undo_no	0
 Innodb_undo_tablespaces_total	6
 Innodb_undo_tablespaces_implicit	2
 Innodb_undo_tablespaces_explicit	4
@@ -667,8 +678,9 @@ COUNT(*)
 # restart: --innodb_force_recovery=1 --innodb_rollback_segments=8
 CREATE UNDO TABLESPACE `undo_007` ADD DATAFILE 'undo_007.ibu';
 ERROR HY000: Changes to undo tablespaces are not allowed in force_recovery mode
-SHOW GLOBAL STATUS LIKE 'Innodb_undo%';
+SHOW GLOBAL STATUS LIKE '%undo%';
 Variable_name	Value
+Innodb_purge_undo_no	0
 Innodb_undo_tablespaces_total	6
 Innodb_undo_tablespaces_implicit	2
 Innodb_undo_tablespaces_explicit	4
@@ -750,8 +762,9 @@ INSERT INTO t3  VALUES (10, repeat('j',15));
 SHOW VARIABLES LIKE 'innodb_rollback_segments';
 Variable_name	Value
 innodb_rollback_segments	11
-SHOW GLOBAL STATUS LIKE 'Innodb_undo%';
+SHOW GLOBAL STATUS LIKE '%undo%';
 Variable_name	Value
+Innodb_purge_undo_no	0
 Innodb_undo_tablespaces_total	6
 Innodb_undo_tablespaces_implicit	2
 Innodb_undo_tablespaces_explicit	4

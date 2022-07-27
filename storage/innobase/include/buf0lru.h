@@ -195,10 +195,6 @@ void buf_LRU_adjust_hp(buf_pool_t *buf_pool, const buf_page_t *bpage);
  @return true */
 ibool buf_LRU_validate(void);
 
-/** Validates the LRU list for one buffer pool instance.
-@param[in]	buf_pool	buffer pool instance */
-void buf_LRU_validate_instance(buf_pool_t *buf_pool);
-
 using Space_References = std::map<struct fil_space_t *, size_t>;
 
 /** Counts number of pages that are still in the LRU  for each space instance
@@ -236,7 +232,7 @@ The minimum must exceed
 
 /** Move blocks to "new" LRU list only if the first access was at
 least this many milliseconds ago.  Not protected by any mutex or latch. */
-std::chrono::milliseconds get_buf_LRU_old_threshold();
+extern uint buf_LRU_old_threshold_ms;
 /** @} */
 
 /** @brief Statistics for selecting the LRU list for eviction.

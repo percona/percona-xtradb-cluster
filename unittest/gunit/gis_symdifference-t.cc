@@ -517,17 +517,10 @@ TYPED_TEST(SymDifferenceTest, LinestringGeometryCollection) {
   ls_result2.push_back(pt2);
   ls_result2.push_back(pt4);
 
-  // using clear() here create memory leaks
-  // e.g.
-  // result.clear();
-  // result.push_back(ls_result2);
-  // result.push_back(mpy);
-  // this->test_valid_input(ls2, gc, result);
-
-  typename TypeParam::Geometrycollection result2;
-  result2.push_back(ls_result2);
-  result2.push_back(mpy);
-  this->test_valid_input(ls2, gc, result2);
+  result.clear();
+  result.push_back(ls_result2);
+  result.push_back(mpy);
+  this->test_valid_input(ls2, gc, result);
 }
 
 // symdifference(... , polygon, *, ...)
@@ -904,12 +897,12 @@ TYPED_TEST(SymDifferenceTest, MultiLinestringGeometryCollection) {
   ls_result2.push_back(pt2);
   ls_result2.push_back(pt4);
 
-  typename TypeParam::Geometrycollection result2;
-  result2.push_back(ls_result2);
-  result2.push_back(mpy);
+  result.clear();
+  result.push_back(ls_result2);
+  result.push_back(mpy);
   mls.clear();
   mls.push_back(ls2);
-  this->test_valid_input(mls, gc, result2);
+  this->test_valid_input(mls, gc, result);
 }
 
 // symdifference(... , multipolygon, *, ...)

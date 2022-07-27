@@ -57,7 +57,7 @@ static ulint page_cur_short_succ = 0;
  being used are:
  X[n+1] = (a * X[n] + c) mod m
  where:
- X[0] = number based on std::chrono::steady_clock::now()
+ X[0] = ut_time_monotonic_us()
  a = 1103515245 (3^5 * 5 * 7 * 129749)
  c = 12345 (3 * 5 * 823)
  m = 18446744073709551616 (2^64)
@@ -70,10 +70,7 @@ static ib_uint64_t page_cur_lcg_prng(void) {
   static ibool initialized = FALSE;
 
   if (!initialized) {
-    lcg_current = std::chrono::duration_cast<std::chrono::microseconds>(
-                      std::chrono::steady_clock::now() -
-                      std::chrono::steady_clock::time_point{})
-                      .count();
+    lcg_current = (ib_uint64_t)ut_time_monotonic_us();
     initialized = TRUE;
   }
 

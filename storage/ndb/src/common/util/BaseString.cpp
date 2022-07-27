@@ -406,7 +406,6 @@ BaseString::lastIndexOf(char c) const
 bool
 BaseString::starts_with(const BaseString& str) const
 {
-  if (str.m_len > m_len) return false;
   return std::strncmp(m_chr, str.m_chr, str.m_len) == 0;
 }
 

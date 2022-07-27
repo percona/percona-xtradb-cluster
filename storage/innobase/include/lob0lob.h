@@ -83,8 +83,8 @@ namespace lob {
 const ulint MAX_SIZE = UINT32_MAX;
 
 /** The compressed LOB is stored as a collection of zlib streams.  The
-uncompressed LOB is divided into chunks of size Z_CHUNK_SIZE and each of
-these chunks are compressed individually and stored as compressed LOB.
+ * uncompressed LOB is divided into chunks of size Z_CHUNK_SIZE and each of
+ * these chunks are compressed individually and stored as compressed LOB.
 data. */
 #define KB128 (128 * 1024)
 #define Z_CHUNK_SIZE KB128
@@ -226,7 +226,10 @@ struct ref_t {
   @return true if LOB is big enough, false otherwise. */
   static bool is_big(const page_size_t &page_size, const ulint lob_length) {
     /* Disable a performance optimization */
-    return true;
+    return (true);
+
+    const ulint limit = page_size.physical() * LOB_BIG_THRESHOLD_SIZE;
+    return (lob_length >= limit);
   }
 
   /** Check if this LOB is big enough to do partial update.
@@ -234,7 +237,11 @@ struct ref_t {
   @return true if LOB is big enough, false otherwise. */
   bool is_big(const page_size_t &page_size) const {
     /* Disable a performance optimization */
-    return true;
+    return (true);
+
+    const ulint limit = page_size.physical() * LOB_BIG_THRESHOLD_SIZE;
+    const ulint lob_length = length();
+    return (lob_length >= limit);
   }
 
   /** Parse the LOB reference object and copy data into the given

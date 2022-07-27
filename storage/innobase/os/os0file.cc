@@ -311,7 +311,7 @@ struct Slot {
   bool is_reserved{false};
 
   /** time when reserved */
-  std::chrono::steady_clock::time_point reservation_time;
+  ib_time_monotonic_t reservation_time{0};
 
   /** buffer used in i/o */
   byte *buf{nullptr};
@@ -386,6 +386,9 @@ struct Slot {
   /** bytes written/read. */
   ulint n_bytes{0};
 #endif /* WIN_ASYNC_IO */
+
+  /** Length of the block before it was compressed */
+  uint32 original_len{0};
 
   /** Buffer block for compressed pages or encrypted pages */
   file::Block *buf_block{nullptr};
@@ -829,8 +832,8 @@ AIO *AIO::s_sync;
 /** timeout for each io_getevents() call = 500ms. */
 static constexpr uint64_t OS_AIO_REAP_TIMEOUT = 500000000UL;
 
-/** time to sleep if io_setup() returns EAGAIN. */
-static constexpr std::chrono::milliseconds OS_AIO_IO_SETUP_RETRY_SLEEP{500};
+/** time to sleep, in milliseconds if io_setup() returns EAGAIN. */
+static constexpr uint64_t OS_AIO_IO_SETUP_RETRY_SLEEP_MS = 500UL;
 
 /** number of attempts before giving up on io_setup(). */
 static const int OS_AIO_IO_SETUP_RETRY_ATTEMPTS = 5;
@@ -858,7 +861,7 @@ std::atomic<ulint> os_n_pending_writes{0};
 /** Number of pending read operations */
 std::atomic<ulint> os_n_pending_reads{0};
 
-static std::chrono::steady_clock::time_point os_last_printout;
+static ib_time_monotonic_t os_last_printout;
 bool os_has_said_disk_full = false;
 
 /** Default Zip compression level */
@@ -1077,14 +1080,14 @@ class AIOHandler {
     ut_a(slot->offset > 0);
     ut_a(slot->type.is_read() || !slot->skip_punch_hole);
     return (os_file_io_complete(slot->type, slot->file.m_file, slot->buf,
-                                nullptr, slot->type.get_original_size(),
-                                slot->offset, slot->len));
+                                nullptr, slot->original_len, slot->offset,
+                                slot->len));
   }
 
  private:
   /** Check whether the page was encrypted.
   @param[in]	slot		The slot that contains the IO request
-  @return true if it was an encrypted page */
+  @return true if it was an encyrpted page */
   static bool is_encrypted_page(const Slot *slot) {
     return (Encryption::is_encrypted_page(slot->buf));
   }
@@ -1236,13 +1239,13 @@ dberr_t AIOHandler::check_read(Slot *slot, ulint n_bytes) {
   dberr_t err;
 
   ut_ad(slot->type.is_read());
-  ut_ad(slot->type.get_original_size() > slot->len);
+  ut_ad(slot->original_len > slot->len);
 
   if (is_compressed_page(slot)) {
     if (can_decompress(slot)) {
       ut_a(slot->offset > 0);
 
-      slot->len = slot->type.get_original_size();
+      slot->len = slot->original_len;
 #ifdef _WIN32
       slot->n_bytes = static_cast<DWORD>(n_bytes);
 #else
@@ -1261,7 +1264,7 @@ dberr_t AIOHandler::check_read(Slot *slot, ulint n_bytes) {
              (slot->type.is_log() && slot->offset >= LOG_FILE_HDR_SIZE)) {
     ut_a(slot->offset > 0);
 
-    slot->len = slot->type.get_original_size();
+    slot->len = slot->original_len;
 #ifdef _WIN32
     slot->n_bytes = static_cast<DWORD>(n_bytes);
 #else
@@ -1300,7 +1303,7 @@ dberr_t AIOHandler::post_io_processing(Slot *slot) {
 
   /* Compressed writes can be smaller than the original length.
   Therefore they can be processed without further IO. */
-  if (n_bytes == slot->type.get_original_size() ||
+  if (n_bytes == slot->original_len ||
       (slot->type.is_write() && slot->type.is_compressed() &&
        slot->len == static_cast<ulint>(slot->n_bytes))) {
     if ((slot->type.is_log() && slot->offset >= LOG_FILE_HDR_SIZE) ||
@@ -1308,7 +1311,7 @@ dberr_t AIOHandler::post_io_processing(Slot *slot) {
       ut_a(slot->offset > 0);
 
       if (slot->type.is_read()) {
-        slot->len = slot->type.get_original_size();
+        slot->len = slot->original_len;
       }
 
       /* The punch hole has been done on collect() */
@@ -1345,7 +1348,7 @@ dberr_t AIOHandler::post_io_processing(Slot *slot) {
     }
   } else if ((ulint)slot->n_bytes == (ulint)slot->len) {
     /* It *must* be a partial read. */
-    ut_ad(slot->len < slot->type.get_original_size());
+    ut_ad(slot->len < slot->original_len);
 
     /* Has to be a read request, if it is less than
     the original length. */
@@ -2178,9 +2181,9 @@ file::Block *os_file_compress_page(IORequest &type, void *&buf, ulint *n) {
   return (block);
 }
 
-file::Block *os_file_encrypt_page(const IORequest &type, void *&buf, ulint n) {
+file::Block *os_file_encrypt_page(const IORequest &type, void *&buf, ulint *n) {
   byte *encrypted_page;
-  ulint encrypted_len = n;
+  ulint encrypted_len = *n;
   byte *buf_ptr;
   Encryption encryption(type.encryption_algorithm());
 
@@ -2191,14 +2194,14 @@ file::Block *os_file_encrypt_page(const IORequest &type, void *&buf, ulint n) {
 
   encrypted_page = static_cast<byte *>(ut_align(block->m_ptr, os_io_ptr_align));
 
-  buf_ptr = encryption.encrypt(type, reinterpret_cast<byte *>(buf), n,
+  buf_ptr = encryption.encrypt(type, reinterpret_cast<byte *>(buf), *n,
                                encrypted_page, &encrypted_len);
-  block->m_size = encrypted_len;
 
   bool encrypted = buf_ptr != buf;
 
   if (encrypted) {
     buf = buf_ptr;
+    *n = encrypted_len;
   }
 
   return (block);
@@ -2212,9 +2215,9 @@ file::Block *os_file_encrypt_page(const IORequest &type, void *&buf, ulint n) {
                                 offset
 @return pointer to the encrypted log blocks */
 static file::Block *os_file_encrypt_log(const IORequest &type, void *&buf,
-                                        byte *&scratch, ulint n) {
+                                        byte *&scratch, ulint *n) {
   byte *encrypted_log;
-  ulint encrypted_len = n;
+  ulint encrypted_len = *n;
   byte *buf_ptr;
   Encryption encryption(type.encryption_algorithm());
   file::Block *block{};
@@ -2222,27 +2225,27 @@ static file::Block *os_file_encrypt_log(const IORequest &type, void *&buf,
   ut_ad(type.is_write());
   ut_ad(type.is_encrypted());
   ut_ad(type.is_log());
-  ut_ad(n % OS_FILE_LOG_BLOCK_SIZE == 0);
+  ut_ad(*n % OS_FILE_LOG_BLOCK_SIZE == 0);
 
-  if (n <= BUFFER_BLOCK_SIZE - os_io_ptr_align) {
+  if (*n <= BUFFER_BLOCK_SIZE - os_io_ptr_align) {
     block = os_alloc_block();
     buf_ptr = static_cast<byte *>(ut_align(block->m_ptr, os_io_ptr_align));
     scratch = nullptr;
   } else {
-    buf_ptr = static_cast<byte *>(ut::aligned_alloc(n, os_io_ptr_align));
+    buf_ptr = static_cast<byte *>(ut::aligned_alloc(*n, os_io_ptr_align));
     scratch = buf_ptr;
   }
 
   encrypted_log = buf_ptr;
 
-  encrypted_log = encryption.encrypt_log(type, reinterpret_cast<byte *>(buf), n,
-                                         encrypted_log, &encrypted_len);
-  block->m_size = encrypted_len;
+  encrypted_log = encryption.encrypt_log(type, reinterpret_cast<byte *>(buf),
+                                         *n, encrypted_log, &encrypted_len);
 
   bool encrypted = encrypted_log != buf;
 
   if (encrypted) {
     buf = encrypted_log;
+    *n = encrypted_len;
   }
 
   return (block);
@@ -2392,7 +2395,7 @@ class LinuxAIOHandler {
   /** Slot array */
   AIO *m_array;
 
-  /** Number of slots in the local segment */
+  /** Number of slots inthe local segment */
   ulint m_n_slots;
 
   /** The local segment to check */
@@ -2412,9 +2415,8 @@ dberr_t LinuxAIOHandler::resubmit(Slot *slot) {
 
   ut_ad(m_array->is_mutex_owned());
 
-  ut_ad(n_bytes < slot->type.get_original_size());
-  ut_ad(static_cast<ulint>(slot->n_bytes) <
-        slot->type.get_original_size() - n_bytes);
+  ut_ad(n_bytes < slot->original_len);
+  ut_ad(static_cast<ulint>(slot->n_bytes) < slot->original_len - n_bytes);
   /* Partial read or write scenario */
   ut_ad(slot->len >= static_cast<ulint>(slot->n_bytes));
 #endif /* UNIV_DEBUG */
@@ -2576,11 +2578,6 @@ void LinuxAIOHandler::collect() {
       /* We have not overstepped to next segment. */
       ut_a(slot->pos < end_pos);
 
-      /** If write of the page is compressed (compression is enabled, it is not
-      the first page, it is not a redolog, not a doublewrite buffer) and punch
-      holes are enabled, call AIOHandler::io_complete to check if hole punching
-      is needed.
-      Keep in sync with os_aio_windows_handler(). */
       if (slot->offset > 0 && !slot->skip_punch_hole &&
           slot->type.is_compression_enabled() && !slot->type.is_log() &&
           slot->type.is_write() && slot->type.is_compressed() &&
@@ -2938,7 +2935,8 @@ bool AIO::linux_create_io_ctx(ulint max_events, io_context_t *io_ctx) {
 
           ib::warn(ER_IB_MSG_758) << "io_setup() attempt " << n_retries << ".";
 
-          std::this_thread::sleep_for(OS_AIO_IO_SETUP_RETRY_SLEEP);
+          std::this_thread::sleep_for(
+              std::chrono::milliseconds(OS_AIO_IO_SETUP_RETRY_SLEEP_MS));
 
           continue;
         }
@@ -3094,7 +3092,7 @@ static ulint os_file_get_last_error_low(bool report_all_errors,
   int err = errno;
 
   if (err == 0) {
-    return 0;
+    return (0);
   }
 
   if (report_all_errors ||
@@ -3130,30 +3128,28 @@ static ulint os_file_get_last_error_low(bool report_all_errors,
 
   switch (err) {
     case ENOSPC:
-      return OS_FILE_DISK_FULL;
+      return (OS_FILE_DISK_FULL);
     case ENOENT:
-      return OS_FILE_NOT_FOUND;
+      return (OS_FILE_NOT_FOUND);
     case EEXIST:
-      return OS_FILE_ALREADY_EXISTS;
+      return (OS_FILE_ALREADY_EXISTS);
     case EXDEV:
     case ENOTDIR:
     case EISDIR:
-      return OS_FILE_PATH_ERROR;
+      return (OS_FILE_PATH_ERROR);
     case EAGAIN:
       if (srv_use_native_aio) {
-        return OS_FILE_AIO_RESOURCES_RESERVED;
+        return (OS_FILE_AIO_RESOURCES_RESERVED);
       }
       break;
     case EINTR:
-      return OS_FILE_AIO_INTERRUPTED;
+      return (OS_FILE_AIO_INTERRUPTED);
     case EACCES:
-      return OS_FILE_ACCESS_VIOLATION;
+      return (OS_FILE_ACCESS_VIOLATION);
     case ENAMETOOLONG:
-      return OS_FILE_NAME_TOO_LONG;
-    case EMFILE:
-      return OS_FILE_TOO_MANY_OPENED;
+      return (OS_FILE_NAME_TOO_LONG);
   }
-  return OS_FILE_ERROR_MAX + err;
+  return (OS_FILE_ERROR_MAX + err);
 }
 
 /** Wrapper to fsync(2)/fdatasync(2) that retries the call on some errors.
@@ -4159,7 +4155,7 @@ ssize_t SyncFileIO::execute(const IORequest &request) {
   }
 
   /* Sync IO can't be done on a file opened in AIO mode. */
-  ut_a(ret || GetLastError() != ERROR_IO_PENDING);
+  // ut_a(GetLastError() != ERROR_IO_PENDING);
 
   return (ret ? static_cast<ssize_t>(n_bytes) : -1);
 }
@@ -4180,9 +4176,37 @@ ssize_t SyncFileIO::execute(Slot *slot) {
   }
 
   /* Sync IO can't be done on a file opened in AIO mode. */
-  ut_a(ret || GetLastError() != ERROR_IO_PENDING);
+  // ut_a(GetLastError() != ERROR_IO_PENDING);
 
   return (ret ? static_cast<ssize_t>(slot->n_bytes) : -1);
+}
+
+/** Check if the file system supports sparse files.
+@param[in]	 name		File name
+@return true if the file system supports sparse files */
+static bool os_is_sparse_file_supported_win32(const char *filename) {
+  char volname[MAX_PATH];
+  BOOL result = GetVolumePathName(filename, volname, MAX_PATH);
+
+  if (!result) {
+    ib::error(ER_IB_MSG_785)
+        << "os_is_sparse_file_supported: "
+        << "Failed to get the volume path name for: " << filename
+        << "- OS error number " << GetLastError();
+
+    return false;
+  }
+
+  DWORD flags;
+
+  result = GetVolumeInformation(volname, NULL, MAX_PATH, NULL, NULL, &flags,
+                                NULL, MAX_PATH);
+
+  if (!result) {
+    return false;
+  }
+
+  return (flags & FILE_SUPPORTS_SPARSE_FILES) ? true : false;
 }
 
 /** Free storage space associated with a section of the file.
@@ -4199,34 +4223,12 @@ static dberr_t os_file_punch_hole_win32(os_file_t fh, os_offset_t off,
   punch.FileOffset.QuadPart = off;
   punch.BeyondFinalZero.QuadPart = off + len;
 
-  /* We need a fresh, not shared instance of Event for the OVERLAPPED structure.
-  Both are stopped being used at most at the end of this method, as we wait for
-  the result with GetOverlappedResult. Otherwise the kernel would be modifying
-  the structure after we leave this method and if the overlapped struct was
-  allocated on stack, it would corrupt the stack.
-  To not create a fresh Event each time this method is called, we will use a
-  static one, that is initialized once on first usage and is destroyed at latest
-  at program exit.
-  To make it not being used concurrently, we make it thread_local (which implies
-  static) - this way each invocation will have its own Event not used by anyone
-  else. The event will be destroyed at thread exit. */
-  thread_local Scoped_event local_event;
-
-  OVERLAPPED overlapped{};
-  overlapped.hEvent = local_event.get_handle();
-
-  ut_a(overlapped.hEvent != NULL);
-
+  /* If lpOverlapped is NULL, lpBytesReturned cannot be NULL,
+  therefore we pass a dummy parameter. */
   DWORD temp;
 
   BOOL result = DeviceIoControl(fh, FSCTL_SET_ZERO_DATA, &punch, sizeof(punch),
-                                NULL, 0, &temp, &overlapped);
-
-  if (!result) {
-    if (GetLastError() == ERROR_IO_PENDING) {
-      result = GetOverlappedResult(fh, &overlapped, &temp, true);
-    }
-  }
+                                NULL, 0, &temp, NULL);
 
   return (!result ? DB_IO_NO_PUNCH_HOLE : DB_SUCCESS);
 }
@@ -4358,7 +4360,7 @@ static ulint os_file_get_last_error_low(bool report_all_errors,
   ulint err = (ulint)GetLastError();
 
   if (err == ERROR_SUCCESS) {
-    return 0;
+    return (0);
   }
 
   if (report_all_errors || (!on_error_silent && err != ERROR_DISK_FULL &&
@@ -4413,29 +4415,25 @@ static ulint os_file_get_last_error_low(bool report_all_errors,
   }
 
   if (err == ERROR_FILE_NOT_FOUND) {
-    return OS_FILE_NOT_FOUND;
+    return (OS_FILE_NOT_FOUND);
   } else if (err == ERROR_PATH_NOT_FOUND) {
-    return OS_FILE_NAME_TOO_LONG;
+    return (OS_FILE_NAME_TOO_LONG);
   } else if (err == ERROR_DISK_FULL) {
-    return OS_FILE_DISK_FULL;
+    return (OS_FILE_DISK_FULL);
   } else if (err == ERROR_FILE_EXISTS) {
-    return OS_FILE_ALREADY_EXISTS;
+    return (OS_FILE_ALREADY_EXISTS);
   } else if (err == ERROR_SHARING_VIOLATION || err == ERROR_LOCK_VIOLATION) {
-    return OS_FILE_SHARING_VIOLATION;
+    return (OS_FILE_SHARING_VIOLATION);
   } else if (err == ERROR_WORKING_SET_QUOTA ||
              err == ERROR_NO_SYSTEM_RESOURCES) {
-    return OS_FILE_INSUFFICIENT_RESOURCE;
+    return (OS_FILE_INSUFFICIENT_RESOURCE);
   } else if (err == ERROR_OPERATION_ABORTED) {
-    return OS_FILE_OPERATION_ABORTED;
+    return (OS_FILE_OPERATION_ABORTED);
   } else if (err == ERROR_ACCESS_DENIED) {
-    return OS_FILE_ACCESS_VIOLATION;
-  } else if (err ==
-
-             ERROR_TOO_MANY_OPEN_FILES) {
-    return OS_FILE_TOO_MANY_OPENED;
+    return (OS_FILE_ACCESS_VIOLATION);
   }
 
-  return OS_FILE_ERROR_MAX + err;
+  return (OS_FILE_ERROR_MAX + err);
 }
 
 /** NOTE! Use the corresponding macro os_file_create_simple(), not directly
@@ -4552,8 +4550,9 @@ os_file_t os_file_create_simple_func(const char *name, ulint create_mode,
 
       DWORD temp;
 
-      /* This is a best effort use case, if it fails then we will find out when
-      we try and punch the hole. */
+      /* This is a best effort use case, if it fails then
+      we will find out when we try and punch the hole. */
+
       DeviceIoControl(file, FSCTL_SET_SPARSE, NULL, 0, NULL, 0, &temp, NULL);
     }
 
@@ -4875,14 +4874,6 @@ pfs_os_file_t os_file_create_simple_no_error_handling_func(const char *name,
                            NULL);  // No template file
 
   *success = (file.m_file != INVALID_HANDLE_VALUE);
-
-  if (*success) {
-    DWORD temp;
-    /* This is a best effort use case, if it fails then we will find out when
-    we try and punch the hole. */
-    DeviceIoControl(file.m_file, FSCTL_SET_SPARSE, NULL, 0, NULL, 0, &temp,
-                    NULL);
-  }
 
   return (file);
 }
@@ -5454,7 +5445,7 @@ NUM_RETRIES_ON_PARTIAL_IO times to read/write the complete data.
       encrypted tablespace, we reach here. */
       if (e_block == nullptr) {
         ut_ad(type.encryption_algorithm().has_key());
-        block = os_file_encrypt_page(type, buf, n);
+        block = os_file_encrypt_page(type, buf, &n);
       } else {
         block = const_cast<file::Block *>(e_block);
       }
@@ -5465,7 +5456,7 @@ NUM_RETRIES_ON_PARTIAL_IO times to read/write the complete data.
     } else {
       /* Skip encrypt log file header */
       if (offset >= LOG_FILE_HDR_SIZE) {
-        block = os_file_encrypt_log(type, buf, encrypt_log_buf, n);
+        block = os_file_encrypt_log(type, buf, encrypt_log_buf, &n);
       }
     }
   }
@@ -5654,7 +5645,7 @@ NUM_RETRIES_ON_PARTIAL_IO times to read/write the complete data.
   meb_mutex.unlock();
 #endif /* UNIV_HOTBACKUP */
 
-  const auto start_time = trx_stats::start_io_read(trx, n);
+  const ib_time_monotonic_us_t start_time = trx_stats::start_io_read(trx, n);
 
   os_n_pending_reads.fetch_add(1);
   MONITOR_ATOMIC_INC(MONITOR_OS_PENDING_READS);
@@ -6415,6 +6406,9 @@ bool os_is_sparse_file_supported(const char *path, pfs_os_file_t fh) {
   Transparent Page Compression is still being tested. */
   DBUG_EXECUTE_IF("ignore_punch_hole", return (true););
 
+#ifdef _WIN32
+  return (os_is_sparse_file_supported_win32(path));
+#else
   dberr_t err;
 
   /* We don't know the FS block size, use the sector size. The FS
@@ -6422,6 +6416,7 @@ bool os_is_sparse_file_supported(const char *path, pfs_os_file_t fh) {
   err = os_file_punch_hole(fh.m_file, 0, UNIV_PAGE_SIZE);
 
   return (err == DB_SUCCESS);
+#endif /* _WIN32 */
 }
 
 dberr_t os_get_free_space(const char *path, uint64_t &free_space) {
@@ -6883,7 +6878,7 @@ bool AIO::start(ulint n_per_seg, ulint n_readers, ulint n_writers,
     os_aio_segment_wait_events[i] = os_event_create();
   }
 
-  os_last_printout = std::chrono::steady_clock::now();
+  os_last_printout = ut_time_monotonic();
 
   return true;
 }
@@ -7251,7 +7246,7 @@ Slot *AIO::reserve_slot(IORequest &type, fil_node_t *m1, void *m2,
   }
 
   slot->is_reserved = true;
-  slot->reservation_time = std::chrono::steady_clock::now();
+  slot->reservation_time = ut_time_monotonic();
   slot->m1 = m1;
   slot->m2 = m2;
   slot->file = file;
@@ -7266,17 +7261,7 @@ Slot *AIO::reserve_slot(IORequest &type, fil_node_t *m1, void *m2,
   slot->ptr = slot->buf;
   slot->offset = offset;
   slot->err = DB_SUCCESS;
-  if (type.is_read()) {
-    /* The original size must not be specified for reads. */
-    ut_ad(!slot->type.get_original_size());
-    slot->type.set_original_size(static_cast<uint32_t>(len));
-  } else if (type.is_write()) {
-    /* The original size may be supplied by user in case the punch hole is
-    requested, otherwise use the IO length specified. */
-    if (slot->type.get_original_size() == 0) {
-      slot->type.set_original_size(static_cast<uint32_t>(len));
-    }
-  }
+  slot->original_len = static_cast<uint32>(len);
   slot->io_already_done = false;
   slot->space_id = space_id;
   slot->buf_block = nullptr;
@@ -7320,7 +7305,8 @@ Slot *AIO::reserve_slot(IORequest &type, fil_node_t *m1, void *m2,
       (type.encryption_algorithm().get_type() != Encryption::KEYRING ||
        (type.encryption_algorithm().has_key() &&
         Encryption::can_page_be_keyring_encrypted(slot->buf)))) {
-    file::Block *encrypted_block = nullptr;
+    ulint encrypted_len = slot->len;
+    file::Block *encrypted_block;
     byte *encrypt_log_buf;
 
     release();
@@ -7328,7 +7314,7 @@ Slot *AIO::reserve_slot(IORequest &type, fil_node_t *m1, void *m2,
     void *src_buf = slot->buf;
     if (!type.is_log()) {
       if (e_block == nullptr) {
-        encrypted_block = os_file_encrypt_page(type, src_buf, slot->len);
+        encrypted_block = os_file_encrypt_page(type, src_buf, &encrypted_len);
       } else {
         encrypted_block = const_cast<file::Block *>(e_block);
       }
@@ -7341,9 +7327,8 @@ Slot *AIO::reserve_slot(IORequest &type, fil_node_t *m1, void *m2,
     } else {
       /* Skip encrypt log file header */
       if (offset >= LOG_FILE_HDR_SIZE) {
-        ut_ad(e_block == nullptr);
         encrypted_block =
-            os_file_encrypt_log(type, src_buf, encrypt_log_buf, slot->len);
+            os_file_encrypt_log(type, src_buf, encrypt_log_buf, &encrypted_len);
 
         if (slot->buf_block != nullptr) {
           os_free_block(slot->buf_block);
@@ -7363,13 +7348,11 @@ Slot *AIO::reserve_slot(IORequest &type, fil_node_t *m1, void *m2,
 
     slot->ptr = slot->buf;
 
-    if (encrypted_block != nullptr) {
 #ifdef _WIN32
-      slot->len = static_cast<DWORD>(encrypted_block->m_size);
+    slot->len = static_cast<DWORD>(encrypted_len);
 #else
-      slot->len = static_cast<ulint>(encrypted_block->m_size);
+    slot->len = static_cast<ulint>(encrypted_len);
 #endif /* _WIN32 */
-    }
 
     acquire();
   }
@@ -7550,6 +7533,7 @@ therefore no other thread is allowed to do the freeing!
 static dberr_t os_aio_windows_handler(ulint segment, ulint pos, fil_node_t **m1,
                                       void **m2, IORequest *type) {
   Slot *slot;
+  dberr_t err;
   AIO *array{};
   ulint orig_seg = segment;
 
@@ -7620,11 +7604,14 @@ static dberr_t os_aio_windows_handler(ulint segment, ulint pos, fil_node_t **m1,
 
   BOOL retry = FALSE;
 
-  dberr_t err = DB_IO_ERROR;
   if (ret && slot->n_bytes == slot->len) {
     err = DB_SUCCESS;
+
   } else if (os_file_handle_error(slot->name, "Windows aio")) {
     retry = true;
+
+  } else {
+    err = DB_IO_ERROR;
   }
 
   array->release();
@@ -7671,19 +7658,6 @@ static dberr_t os_aio_windows_handler(ulint segment, ulint pos, fil_node_t **m1,
   }
 
   if (err == DB_SUCCESS) {
-    /** If write of the page is compressed (compression is enabled, it is not
-    the first page, it is not a redolog, not a doublewrite buffer) and punch
-    holes are enabled, call AIOHandler::io_complete to check if hole punching is
-    needed.
-    Keep in sync with LinuxAIOHandler::collect(). */
-    if (slot->offset > 0 && !slot->skip_punch_hole &&
-        slot->type.is_compression_enabled() && !slot->type.is_log() &&
-        slot->type.is_write() && slot->type.is_compressed() &&
-        slot->type.punch_hole() && !slot->type.is_dblwr()) {
-      slot->err = AIOHandler::io_complete(slot);
-    } else {
-      slot->err = DB_SUCCESS;
-    }
     err = AIOHandler::post_io_processing(slot);
   }
 
@@ -7861,7 +7835,7 @@ class SimulatedAIOHandler {
   /** Reset the state of the handler
   @param[in]	n_slots	Number of pending AIO operations supported */
   void init(ulint n_slots) {
-    m_oldest = std::chrono::seconds::zero();
+    m_oldest = 0;
     m_n_elems = 0;
     m_n_slots = n_slots;
     m_lowest_offset = IB_UINT64_MAX;
@@ -8091,28 +8065,23 @@ class SimulatedAIOHandler {
     return (m_n_elems > 0);
   }
 
-  typedef std::vector<Slot *> slots_t;
-
- private:
   /** Select the slot if it is older than the current oldest slot.
   @param[in]	slot		The slot to check */
   void select_if_older(Slot *slot) {
-    const auto time_diff =
-        std::max(std::chrono::steady_clock::now() - slot->reservation_time,
-                 std::chrono::steady_clock::duration{0});
+    const auto time_diff = ut_time_monotonic() - slot->reservation_time;
 
-    if (time_diff >= std::chrono::seconds{2}) {
-      if ((time_diff > m_oldest) ||
-          (time_diff == m_oldest && slot->offset < m_lowest_offset)) {
-        /* Found an i/o request */
-        m_slots[0] = slot;
+    const uint64_t age = time_diff > 0 ? (uint64_t)time_diff : 0;
 
-        m_n_elems = 1;
+    if ((age >= 2 && age > m_oldest) ||
+        (age >= 2 && age == m_oldest && slot->offset < m_lowest_offset)) {
+      /* Found an i/o request */
+      m_slots[0] = slot;
 
-        m_oldest = time_diff;
+      m_n_elems = 1;
 
-        m_lowest_offset = slot->offset;
-      }
+      m_oldest = age;
+
+      m_lowest_offset = slot->offset;
     }
   }
 
@@ -8135,7 +8104,10 @@ class SimulatedAIOHandler {
     return (m_n_elems > 0);
   }
 
-  std::chrono::steady_clock::duration m_oldest;
+  typedef std::vector<Slot *> slots_t;
+
+ private:
+  ulint m_oldest;
   ulint m_n_elems;
   os_offset_t m_lowest_offset;
 
@@ -8461,11 +8433,8 @@ void os_aio_print(FILE *file) {
   AIO::print_all(file);
 
   putc('\n', file);
-  const auto current_time = std::chrono::steady_clock::now();
-  const auto time_elapsed_s =
-      0.001 + std::chrono::duration_cast<std::chrono::duration<double>>(
-                  current_time - os_last_printout)
-                  .count();
+  const auto current_time = ut_time_monotonic();
+  const auto time_elapsed = 0.001 + (current_time - os_last_printout);
 
   fprintf(file,
           "Pending flushes (fsync) log: " ULINTPF
@@ -8490,12 +8459,12 @@ void os_aio_print(FILE *file) {
   }
 
   fprintf(file,
-          "%.2lf reads/s, %lu avg bytes/read,"
-          " %.2lf writes/s, %.2lf fsyncs/s\n",
-          (os_n_file_reads - os_n_file_reads_old) / time_elapsed_s,
+          "%.2f reads/s, %lu avg bytes/read,"
+          " %.2f writes/s, %.2f fsyncs/s\n",
+          (os_n_file_reads - os_n_file_reads_old) / time_elapsed,
           (ulong)avg_bytes_read,
-          (os_n_file_writes - os_n_file_writes_old) / time_elapsed_s,
-          (os_n_fsyncs - os_n_fsyncs_old) / time_elapsed_s);
+          (os_n_file_writes - os_n_file_writes_old) / time_elapsed,
+          (os_n_fsyncs - os_n_fsyncs_old) / time_elapsed);
 
   os_n_file_reads_old = os_n_file_reads;
   os_n_file_writes_old = os_n_file_writes;
@@ -8519,7 +8488,7 @@ void os_aio_refresh_stats() {
 
   os_bytes_read_since_printout = 0;
 
-  os_last_printout = std::chrono::steady_clock::now();
+  os_last_printout = ut_time_monotonic();
 }
 
 /** Checks that all slots in the system have been freed, that is, there are

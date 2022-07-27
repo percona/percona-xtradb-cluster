@@ -2180,7 +2180,7 @@ static bool fil_crypt_find_space_to_rotate(key_state_t *key_state,
   /* we need iops to start rotating */
   while (!state->should_shutdown() && !fil_crypt_alloc_iops(state)) {
     os_event_reset(fil_crypt_threads_event);
-    os_event_wait_time(fil_crypt_threads_event, std::chrono::milliseconds{100});
+    os_event_wait_time(fil_crypt_threads_event, 100000);
   }
 
   if (state->should_shutdown()) {
@@ -2549,15 +2549,13 @@ static buf_block_t *fil_crypt_get_page_throttle_func(rotate_thread_t *state,
 
   state->crypt_stat.pages_read_from_disk++;
 
-  const auto start = std::chrono::steady_clock::now();
+  const auto start = ut_time_monotonic_us();
   block = buf_page_get_gen(page_id, page_size, RW_X_LATCH, NULL,
                            Page_fetch::POSSIBLY_FREED, file, line, mtr, false);
-  const auto end = std::chrono::steady_clock::now();
+  const auto end = ut_time_monotonic_us();
 
   state->cnt_waited++;
-  state->sum_waited_us +=
-      std::chrono::duration_cast<std::chrono::microseconds>(end - start)
-          .count();
+  state->sum_waited_us += (end - start);
 
   /* average page load */
   ulint add_sleeptime_ms = 0;
@@ -2766,8 +2764,7 @@ static void fil_crypt_rotate_page(const key_state_t *key_state,
 
   if (sleeptime_ms) {
     os_event_reset(fil_crypt_throttle_sleep_event);
-    os_event_wait_time(fil_crypt_throttle_sleep_event,
-                       std::chrono::milliseconds{sleeptime_ms});
+    os_event_wait_time(fil_crypt_throttle_sleep_event, 1000 * sleeptime_ms);
   }
 }
 
@@ -3297,21 +3294,20 @@ static dberr_t fil_crypt_flush_space(rotate_thread_t *state) {
 
   ulint number_of_pages_flushed_now = 0;
   log_free_check();
-  const auto start = std::chrono::steady_clock::now();
+  const auto start = ut_time_monotonic_us();
 
   crypt_data->rotate_state.flush_observer->flush();
 
-  const auto end = std::chrono::steady_clock::now();
+  const auto end = ut_time_monotonic_us();
 
   number_of_pages_flushed_now =
       crypt_data->rotate_state.flush_observer->get_number_of_pages_flushed() -
       number_of_pages_flushed_so_far;
 
-  if (number_of_pages_flushed_now > 0) {
+  if (number_of_pages_flushed_now > 0 && end > start) {
     state->cnt_waited += number_of_pages_flushed_now;
-    state->sum_waited_us +=
-        std::chrono::duration_cast<std::chrono::microseconds>(end - start)
-            .count();
+    state->sum_waited_us += (end - start);
+
     /* statistics */
     state->crypt_stat.pages_flushed += number_of_pages_flushed_now;
   }
@@ -3586,8 +3582,7 @@ void fil_crypt_thread() {
 
       /* if there was a timeout on fil_crypt_threads_event - do not reset
        * fil_crypt_threds_event before we start another wait on it. */
-      if (os_event_wait_time(fil_crypt_threads_event,
-                             std::chrono::seconds{1}) == 0) {
+      if (os_event_wait_time(fil_crypt_threads_event, 1000000) == 0) {
         os_event_reset(fil_crypt_threads_event);
         break;
       }
@@ -3719,7 +3714,7 @@ void fil_crypt_set_thread_cnt(const uint new_cnt) {
 
   while (srv_threads.m_crypt_threads_n != srv_n_fil_crypt_threads_requested) {
     os_event_reset(fil_crypt_event);
-    os_event_wait_time(fil_crypt_event, std::chrono::milliseconds{100});
+    os_event_wait_time(fil_crypt_event, 100000);
   }
 
   /* Send a message to encryption threads that there could be

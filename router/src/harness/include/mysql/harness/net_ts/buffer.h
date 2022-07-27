@@ -675,7 +675,7 @@ class transfer_exactly {
    */
   size_t operator()(const std::error_code &ec, size_t n) const {
     // "unspecificed non-zero number"
-    constexpr size_t N = std::numeric_limits<size_t>::max();
+    size_t N = std::numeric_limits<size_t>::max();
 
     if (!ec && n < exact_) return std::min(exact_ - n, N);
 
@@ -858,11 +858,8 @@ read(SyncReadStream &stream, DynamicBuffer &&b, CompletionCondition cond) {
 
       // if socket was non-blocking and some bytes where already read, return
       // the success
-      const auto ec = res.error();
-      if ((ec == make_error_condition(
-                     std::errc::resource_unavailable_try_again) ||
-           ec == make_error_condition(std::errc::operation_would_block) ||
-           ec == net::stream_errc::eof) &&
+      if ((res.error() == std::errc::resource_unavailable_try_again ||
+           res.error() == net::stream_errc::eof) &&
           transferred != 0) {
         return transferred;
       }

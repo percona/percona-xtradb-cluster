@@ -1906,10 +1906,9 @@ static int do_sub(const decimal_t *from1, const decimal_t *from2,
   int intg1 = ROUND_UP(from1->intg), intg2 = ROUND_UP(from2->intg),
       frac1 = ROUND_UP(from1->frac), frac2 = ROUND_UP(from2->frac);
   int frac0 = std::max(frac1, frac2), error;
-  dec1 *buf1, *buf2, *buf0, *stop1, *stop2, *start1, *start2;
-  bool carry = false;
+  dec1 *buf1, *buf2, *buf0, *stop1, *stop2, *start1, *start2, carry = 0;
 
-  /* let carry:=true if from2 > from1 */
+  /* let carry:=1 if from2 > from1 */
   start1 = buf1 = from1->buf;
   stop1 = buf1 + intg1;
   start2 = buf2 = from2->buf;
@@ -1925,7 +1924,7 @@ static int do_sub(const decimal_t *from1, const decimal_t *from2,
     intg2 = (int)(stop2 - buf2);
   }
   if (intg2 > intg1)
-    carry = true;
+    carry = 1;
   else if (intg2 == intg1) {
     dec1 *end1 = stop1 + (frac1 - 1);
     dec1 *end2 = stop2 + (frac2 - 1);
@@ -1938,10 +1937,10 @@ static int do_sub(const decimal_t *from1, const decimal_t *from2,
       if (buf2 <= end2)
         carry = *buf2 > *buf1;
       else
-        carry = false;
+        carry = 0;
     } else {
       if (buf2 <= end2)
-        carry = true;
+        carry = 1;
       else /* short-circuit everything: from1 == from2 */
       {
         if (to == nullptr) /* decimal_cmp() */
@@ -1979,7 +1978,7 @@ static int do_sub(const decimal_t *from1, const decimal_t *from2,
     frac2 = std::min(frac2, frac0);
     intg2 = std::min(intg2, intg1);
   }
-  carry = false;
+  carry = 0;
 
   /* part 1 - max(frac) ... min (frac) */
   if (frac1 > frac2) {

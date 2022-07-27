@@ -212,9 +212,7 @@ ulint buf_read_ahead_random(const page_id_t &page_id,
     bpage = buf_page_hash_get_s_locked(buf_pool, page_id_t(page_id.space(), i),
                                        &hash_lock);
 
-    if (bpage != nullptr &&
-        buf_page_is_accessed(bpage) !=
-            std::chrono::steady_clock::time_point{} &&
+    if (bpage != nullptr && buf_page_is_accessed(bpage) &&
         buf_page_peek_if_young(bpage)) {
       recent_blocks++;
 
@@ -333,7 +331,7 @@ ulint buf_read_ahead_linear(const page_id_t &page_id,
   buf_page_t *bpage;
   buf_frame_t *frame;
   buf_page_t *pred_bpage = nullptr;
-  std::chrono::steady_clock::time_point pred_bpage_is_accessed;
+  unsigned pred_bpage_is_accessed = 0;
   page_no_t pred_offset;
   page_no_t succ_offset;
   int asc_or_desc;
@@ -424,8 +422,7 @@ ulint buf_read_ahead_linear(const page_id_t &page_id,
     bpage = buf_page_hash_get_s_locked(buf_pool, page_id_t(page_id.space(), i),
                                        &hash_lock);
 
-    if (bpage == nullptr || buf_page_is_accessed(bpage) ==
-                                std::chrono::steady_clock::time_point{}) {
+    if (bpage == nullptr || !buf_page_is_accessed(bpage)) {
       /* Not accessed */
       fail_count++;
 
@@ -438,14 +435,8 @@ ulint buf_read_ahead_linear(const page_id_t &page_id,
       the latest access times were linear.  The
       threshold (srv_read_ahead_factor) should help
       a little against this. */
-      int res = 0;
-      if (buf_page_is_accessed(bpage) == pred_bpage_is_accessed) {
-        res = 0;
-      } else if (buf_page_is_accessed(bpage) < pred_bpage_is_accessed) {
-        res = -1;
-      } else {
-        res = 1;
-      }
+      int res =
+          ut_ulint_cmp(buf_page_is_accessed(bpage), pred_bpage_is_accessed);
       /* Accesses not in the right order */
       if (res != 0 && res != asc_or_desc) {
         fail_count++;
@@ -461,8 +452,7 @@ ulint buf_read_ahead_linear(const page_id_t &page_id,
     }
 
     if (bpage) {
-      if (buf_page_is_accessed(bpage) !=
-          std::chrono::steady_clock::time_point{}) {
+      if (buf_page_is_accessed(bpage)) {
         pred_bpage = bpage;
         pred_bpage_is_accessed = buf_page_is_accessed(bpage);
       }

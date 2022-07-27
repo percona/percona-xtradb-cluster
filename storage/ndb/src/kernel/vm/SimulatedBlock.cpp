@@ -4856,13 +4856,9 @@ SimulatedBlock::execLOCAL_ROUTE_ORD(Signal* signal)
   }
 
   LocalRouteOrd* ord = (LocalRouteOrd*)signal->getDataPtr();
-  const Uint32 pathcnt = ord->cnt >> 16;
-  const Uint32 dstcnt = ord->cnt & 0xFFFF;
+  Uint32 pathcnt = ord->cnt >> 16;
+  Uint32 dstcnt = ord->cnt & 0xFFFF;
   Uint32 sigLen = signal->getLength();
-
-  ndbrequire(sigLen >= (LocalRouteOrd::StaticLen +
-                        (pathcnt * 2) +
-                        (dstcnt)));
 
   if (pathcnt == 0)
   {
@@ -4872,8 +4868,6 @@ SimulatedBlock::execLOCAL_ROUTE_ORD(Signal* signal)
     jam();
     Uint32 gsn = ord->gsn;
     Uint32 prio = ord->prio;
-    ndbrequire(dstcnt <= LocalRouteOrd::MaxDstCount);
-    NDB_STATIC_ASSERT(25 + LocalRouteOrd::MaxDstCount <= NDB_ARRAY_SIZE(signal->theData));
     memcpy(signal->theData+25, ord->path, 4*dstcnt);
     SectionHandle handle(this, signal);
     if (sigLen > LocalRouteOrd::StaticLen + dstcnt)
@@ -5175,7 +5169,6 @@ SimulatedBlock::execSYNC_PATH_REQ(Signal* signal)
 {
   jamEntry();
   SyncPathReq * req = CAST_PTR(SyncPathReq, signal->getDataPtrSend());
-  ndbrequire(req->pathlen <= SyncPathReq::MaxPathLen);
   if (req->pathlen == 1)
   {
     jam();
