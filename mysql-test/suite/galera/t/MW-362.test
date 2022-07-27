@@ -23,5 +23,8 @@ SET SESSION WSREP_ON=ON;
 # The CREATE above is no longer in the binlog
 
 SHOW BINARY LOGS;
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
+--let $binlog_file = mysqld-bin.000001
+--let $binlog_start = 125
+--let $keep_gtid_events = 1
+--source include/show_binlog_events.inc
 

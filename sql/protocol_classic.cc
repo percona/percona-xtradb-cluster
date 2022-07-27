@@ -1419,6 +1419,13 @@ int Protocol_classic::read_packet() {
   }
 
   bad_packet = true;
+  /*
+    XXX: This place seems erroneous.
+    -1 means request of current thread shutdown and
+    1 is just return with error (see do_command() description).
+    Now all errors except NET_ERROR_SOCKET_UNUSABLE request shutdown,
+    probably NET_ERROR_SOCKET_RECOVERABLE should be here instead of it.
+  */
   return m_thd->net.error == NET_ERROR_SOCKET_UNUSABLE ? 1 : -1;
 }
 
@@ -2784,7 +2791,7 @@ static bool parse_query_bind_params(
 
       enum enum_field_types type =
           has_new_types ? params[i].type
-                        : stmt_data->param_array[i]->data_type_actual();
+                        : stmt_data->param_array[i]->data_type_source();
       if (type == MYSQL_TYPE_BOOL)
         return true;  // unsupported in this version of the Server
       if (stmt_data && i < stmt_data->param_count && stmt_data->param_array &&

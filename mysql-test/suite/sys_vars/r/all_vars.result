@@ -168,8 +168,6 @@ terminology_use_previous
 terminology_use_previous
 tls_ciphersuites
 tls_ciphersuites
-tls_version
-tls_version
 use_secondary_engine
 wsrep_min_log_verbosity
 wsrep_min_log_verbosity

@@ -3,9 +3,9 @@ RESET MASTER;
 RESET MASTER;
 wsrep_last_applied_correct
 1
-SHOW BINLOG EVENTS FROM 125;
+include/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000001	125	Previous_gtids	1	156	
+mysqld-bin.000001	#	Previous_gtids	#	#	
 RESET MASTER;
 RESET MASTER;
 wsrep_last_applied_correct
@@ -16,22 +16,22 @@ COUNT(*) = 1
 SELECT COUNT(*) = 1 FROM t1;
 COUNT(*) = 1
 1
-SHOW BINLOG EVENTS FROM 125;
+include/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000001	125	Previous_gtids	1	156	
-mysqld-bin.000001	156	Anonymous_Gtid	1	235	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
-mysqld-bin.000001	235	Query	1	315	BEGIN
-mysqld-bin.000001	315	Table_map	1	363	table_id: ### (test.t1)
-mysqld-bin.000001	363	Write_rows	1	403	table_id: ### flags: STMT_END_F
-mysqld-bin.000001	403	Xid	1	434	COMMIT /* xid=### */
-SHOW BINLOG EVENTS FROM 125;
+mysqld-bin.000001	#	Previous_gtids	#	#	
+mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	#	Query	#	#	BEGIN
+mysqld-bin.000001	#	Table_map	#	#	table_id: # (test.t1)
+mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F
+mysqld-bin.000001	#	Xid	#	#	COMMIT /* XID */
+include/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000001	125	Previous_gtids	2	156	
-mysqld-bin.000001	156	Anonymous_Gtid	1	235	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
-mysqld-bin.000001	235	Query	1	310	BEGIN
-mysqld-bin.000001	310	Table_map	1	358	table_id: ### (test.t1)
-mysqld-bin.000001	358	Write_rows	1	398	table_id: ### flags: STMT_END_F
-mysqld-bin.000001	398	Xid	1	429	COMMIT /* xid=### */
+mysqld-bin.000001	#	Previous_gtids	#	#	
+mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	#	Query	#	#	BEGIN
+mysqld-bin.000001	#	Table_map	#	#	table_id: # (test.t1)
+mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F
+mysqld-bin.000001	#	Xid	#	#	COMMIT /* XID */
 TRUNCATE TABLE t1;
 RESET MASTER;
 ERROR 23000: Duplicate entry '1' for key 't1.PRIMARY'
@@ -40,7 +40,7 @@ wsrep_last_applied_correct
 SELECT COUNT(*) = 0 FROM t1;
 COUNT(*) = 0
 1
-SHOW BINLOG EVENTS FROM 125;
+include/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000001	125	Previous_gtids	1	156	
+mysqld-bin.000001	#	Previous_gtids	#	#	
 DROP TABLE t1;

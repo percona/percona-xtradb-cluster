@@ -427,6 +427,7 @@ fi
             -DWITH_EDITLINE=bundled \
             -DWITH_ZLIB=bundled \
             -DWITH_ZSTD=bundled \
+            -DWITH_FIDO=bundled \
             -DWITH_NUMA=ON \
             -DWITH_LDAP=system \
             -DWITH_BOOST="$TARGETDIR/libboost" \
@@ -465,6 +466,7 @@ fi
             -DWITH_LIBEVENT=bundled \
             -DWITH_ZLIB=bundled \
             -DWITH_ZSTD=bundled \
+            -DWITH_FIDO=bundled \
             -DWITH_NUMA=ON \
             -DWITH_LDAP=system \
             -DWITH_BOOST="$TARGETDIR/libboost" \

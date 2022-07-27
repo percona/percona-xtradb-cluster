@@ -1371,24 +1371,22 @@ send_data_from_donor_to_joiner()
 
     set +e
 
-    if [[ $tfmt == "nc" ]]; then
-        # if using nc as a transfer method, then implement the retry
-        # logic ourselves
-        local rc=1
-        local counter=1
+    # Implement retry logic ourselves, as nc needs it, and socat has a bug
+    # when retry is used together with timeout
+    local rc=1
+    local counter=1
 
-        while [[ $rc -ne 0 && counter -le 30 ]]; do
-            timeit "$msg" "$strmcmd | $tcmd; RC=( "\${PIPESTATUS[@]}" )"
+    # remove the retry parameter from the command
+    local ltcmd=$(echo $tcmd | sed s/,retry=[0-9]*//)
 
-            # Retry if nc returns an error
-            rc=${RC[1]}
-            counter=$((counter+1))
-            sleep 1
-        done
-    else
-        # If using socat, then we can rely on the built-in socat retry logic
-        timeit "$msg" "$strmcmd | $tcmd; RC=( "\${PIPESTATUS[@]}" )"
-    fi
+    while [[ $rc -ne 0 && counter -le 30 ]]; do
+        timeit "$msg" "$strmcmd | $ltcmd; RC=( "\${PIPESTATUS[@]}" )"
+
+        # Retry if socat or nc returns an error
+        rc=${RC[1]}
+        counter=$((counter+1))
+        sleep 1
+    done
 
     set -e
     popd 1>/dev/null
@@ -1660,7 +1658,7 @@ fi
 # 2.4.20  Transition-key fixes
 #
 
-XB_2x_REQUIRED_VERSION="2.4.24"
+XB_2x_REQUIRED_VERSION="2.4.26"
 
 if [[ ! -x $XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN ]]; then
     wsrep_log_error "******************* FATAL ERROR ********************** "
@@ -1686,7 +1684,7 @@ fi
 # 8.0.11  Transition-key fixes
 #
 
-XB_8x_REQUIRED_VERSION="8.0.27"
+XB_8x_REQUIRED_VERSION="8.0.28"
 
 if [[ ! -x $XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN ]]; then
     wsrep_log_error "******************* FATAL ERROR ********************** "

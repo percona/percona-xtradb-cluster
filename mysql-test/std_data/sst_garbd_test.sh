@@ -1,33 +1,35 @@
 #!/bin/bash
 
 set -x
+socat_pid=
 
-# Stability improvement for the parallel backup test:
-# makes the SST process longer
-sleep 3
-
-FIRST_RECEIVED=0
-SST_FAILED=0
 function handle_sigint() {
-  if (( $FIRST_RECEIVED == 0 )); then
-    echo "SST request failed"
-    SST_FAILED=1
-    kill $(ps -s $$ -o pid=)
+  if [[ -n "${socat_pid}" ]]; then
+      echo "SST request failed"
+      echo "killing ${socat_pid}"    
+      kill -9 ${socat_pid} ||:
+      exit 1
   fi
 }
 
-trap 'handle_sigint' 2
+trap 'handle_sigint' SIGINT
+trap 'handle_sigint' SIGTERM
 
 echo 1
 
-(socat TCP-LISTEN:$1 - > /dev/null) &
-wait $!
+(socat TCP-LISTEN:$1,reuseaddr - </dev/null > /dev/null) &
+socat_pid=$!
+echo "socat_pid: ${socat_pid}"
+wait ${socat_pid}
+socat_pid=
 
-FIRST_RECEIVED=1
-if (( $SST_FAILED == 0 )); then
-  echo 2
-  (socat TCP-LISTEN:$1 - > /dev/null) &
-  wait $!
-  echo 3
-fi
-exit $SST_FAILED
+
+echo 2
+socat TCP-LISTEN:$1,reuseaddr - > /dev/null
+echo 3
+
+sleep 5
+
+echo 4
+
+exit 0

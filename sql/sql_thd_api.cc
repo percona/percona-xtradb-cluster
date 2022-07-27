@@ -369,7 +369,7 @@ void **wsrep_thd_ha_data(const MYSQL_THD thd, const struct handlerton *hton) {
 #endif /* WITH_WSREP */
 
 void thd_storage_lock_wait(MYSQL_THD thd, long long value) {
-  thd->utime_after_lock += value;
+  thd->inc_lock_usec(value);
 }
 
 /**
