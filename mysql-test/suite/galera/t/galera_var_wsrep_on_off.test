@@ -138,8 +138,7 @@ set session wsrep_on = ON;
 insert into t values (3);
 drop table t;
 
---replace_regex /table_id: [0-9]+/table_id: #/ /xid=[0-9]+/xid=#/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
-
-
-
+--let $binlog_file = mysqld-bin.000001
+--let $binlog_start = 125
+--let $keep_gtid_events = 1
+--source include/show_binlog_events.inc

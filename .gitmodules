@@ -9,3 +9,4 @@
 [submodule "extra/coredumper"]
 	path = extra/coredumper
 	url = https://github.com/Percona-Lab/coredumper.git
+

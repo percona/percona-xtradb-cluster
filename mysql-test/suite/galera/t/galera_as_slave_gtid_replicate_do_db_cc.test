@@ -121,9 +121,10 @@ START SLAVE;
 --let $gtid_executed_node2 = `SELECT @@global.gtid_executed;`
 --let $effective_uuid = `SELECT LEFT(@@global.gtid_executed, 36)`
 
---replace_result $effective_uuid <effective_uuid>
---replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
+--let $binlog_file = mysqld-bin.000001
+--let $binlog_start = 125
+--let $keep_gtid_events = 1
+--source include/show_binlog_events.inc
 
 --error 1049
 USE test2;
@@ -137,9 +138,10 @@ USE test2;
 --error 1049
 USE test2;
 
---replace_result $effective_uuid <effective_uuid>
---replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
+--let $binlog_file = mysqld-bin.000001
+--let $binlog_start = 125
+--let $keep_gtid_events = 1
+--source include/show_binlog_events.inc
 
 #
 # Cleanup

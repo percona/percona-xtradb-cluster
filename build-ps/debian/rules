@@ -47,6 +47,8 @@ builddir = builddir
 galeradir = percona-xtradb-cluster-galera
 builddebug = debug
 
+rpath = '$$ORIGIN/../../private/debug'
+
 override_dh_auto_configure:
 	@echo "RULES.$@"
 
@@ -96,6 +98,7 @@ ifeq ($(SKIP_DEBUG_BINARY),)
                 -DWITH_ZLIB=bundled \
                 -DWITH_EDITLINE=bundled \
                 -DWITH_LIBEVENT=bundled \
+                -DWITH_FIDO=bundled \
                 -DWITH_NUMA=ON \
 		-DWITH_EXTRA_CHARSETS=all ..
 endif
@@ -145,6 +148,7 @@ endif
                 -DWITH_ZLIB=bundled \
                 -DWITH_EDITLINE=bundled \
                 -DWITH_LIBEVENT=bundled \
+                -DWITH_FIDO=bundled \
                 -DWITH_NUMA=ON \
 		-DWITH_EXTRA_CHARSETS=all ..
 
@@ -241,6 +245,13 @@ override_dh_auto_install:
 	# install AppArmor profile for PXC
 	install -d $(TMP)/etc/apparmor.d
 	install -d $(TMP)/etc/apparmor.d/local
+
+override_dh_install:
+	dh_install
+	mkdir -p debian/percona-xtradb-cluster-server-debug/usr/lib/mysql/private/debug
+	cp ./builddir/library_output_directory/libprotobuf-lite.so* debian/percona-xtradb-cluster-server-debug/usr/lib/mysql/private/debug
+	patchelf --debug --set-rpath $(rpath) debian/percona-xtradb-cluster-server-debug/usr/lib/mysql/plugin/debug/group_replication.so
+	@echo "RULES.$@"
 
 override_dh_strip:
 	dh_strip --dbg-package=percona-xtradb-cluster-dbg 

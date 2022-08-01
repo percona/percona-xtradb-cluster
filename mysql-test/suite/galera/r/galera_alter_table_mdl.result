@@ -96,24 +96,25 @@ ALTER TABLE t1 ENGINE=InnoDB, ALGORITHM= INPLACE, LOCK= EXCLUSIVE;
 affected rows: 0
 info: Records: 0  Duplicates: 0  Warnings: 0
 ALTER TABLE t1 CHANGE COLUMN b c INT, ALGORITHM= INPLACE, LOCK= NONE;
-ERROR 0A000: LOCK=NONE is not supported for this operation. Try LOCK=SHARED.
-ALTER TABLE t1 CHANGE COLUMN b c INT, ALGORITHM= INPLACE, LOCK= SHARED;
 affected rows: 0
 info: Records: 0  Duplicates: 0  Warnings: 0
-ALTER TABLE t1 CHANGE COLUMN c b INT, ALGORITHM= INPLACE, LOCK= EXCLUSIVE;
+ALTER TABLE t1 CHANGE COLUMN c b INT, ALGORITHM= INPLACE, LOCK= SHARED;
+affected rows: 0
+info: Records: 0  Duplicates: 0  Warnings: 0
+ALTER TABLE t1 CHANGE COLUMN b c INT, ALGORITHM= INPLACE, LOCK= EXCLUSIVE;
 affected rows: 0
 info: Records: 0  Duplicates: 0  Warnings: 0
 SHOW CREATE TABLE t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `a` int NOT NULL,
-  `b` int DEFAULT NULL,
+  `c` int DEFAULT NULL,
   PRIMARY KEY (`a`),
-  KEY `i1` (`b`),
-  KEY `i2` (`b`),
-  KEY `i3` (`b`),
-  KEY `i4` (`b`),
-  KEY `i5` (`b`)
+  KEY `i1` (`c`),
+  KEY `i2` (`c`),
+  KEY `i3` (`c`),
+  KEY `i4` (`c`),
+  KEY `i5` (`c`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 affected rows: 1
 ALTER TABLE t1 DROP INDEX i2, ALGORITHM= INPLACE, LOCK= DEFAULT;

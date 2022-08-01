@@ -43,6 +43,9 @@ GRANT SHUTDOWN ON *.* TO 'mysql.session'@localhost;
 GRANT CONNECTION_ADMIN ON *.* TO 'mysql.session'@localhost;
 GRANT SYSTEM_USER ON *.* TO 'mysql.session'@localhost;
 
+-- this is a plugin priv that might not be registered
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.session', 'localhost', 'AUDIT_ABORT_EXEMPT', 'N');
+
 -- Create an user that is definer for information_schema view
 CREATE USER 'mysql.infoschema'@localhost IDENTIFIED WITH caching_sha2_password
  AS '$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED'
@@ -90,3 +93,6 @@ GRANT ALTER, CREATE, SELECT, INSERT ON PERCONA_SCHEMA.xtrabackup_history
 GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost;
 -- Need this to create the PERCONA_SCHEMA database if needed
 GRANT CREATE ON PERCONA_SCHEMA.* to 'mysql.pxc.sst.role'@localhost;
+
+-- this is a plugin priv that might not be registered
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.infoschema', 'localhost', 'AUDIT_ABORT_EXEMPT', 'N');
