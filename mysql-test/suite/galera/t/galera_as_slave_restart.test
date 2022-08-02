@@ -1,0 +1,83 @@
+#
+# Test Galera as a replica to a MySQL source being restarted.
+# While restarting Galera replica, new events appear on source.
+# As soon as async replica is started, they are replicated
+# but if WSREP not ready yet (Galera replica node is not in sync state)
+# applying them should be delayed to not cause
+# 'WSREP has not yet prepared node for application use' error.
+#
+# The galera/galera_2node_slave.cnf describes the setup of the nodes
+#
+
+--source include/have_debug.inc
+--source include/have_log_bin.inc
+--source include/force_restart.inc
+
+# As node #1 is not a Galera node, we connect to node #3 in order to run include/galera_cluster.inc
+--connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
+--source include/galera_cluster_master_slave.inc
+
+--connection node_3
+--echo #node-3 (async slave)
+call mtr.add_suppression("Recovery from master pos");
+call mtr.add_suppression("when attempting to connect");
+--disable_query_log
+--eval CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1',SOURCE_USER='root',SOURCE_PORT=$NODE_MYPORT_1;
+--enable_query_log
+START REPLICA;
+
+#
+# Test if replication is working fine.
+--connection node_1
+--echo #node-1 (source)
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+INSERT INTO t1 VALUES(1);
+
+--connection node_3
+--echo #node-3 (async replica)
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+--source include/wait_condition.inc
+--let $wait_condition = SELECT COUNT(*) = 1 FROM t1;
+--source include/wait_condition.inc
+
+#
+# shutdown node-3
+--echo #Shutting down node-3 (async replica) ...
+--source include/shutdown_mysqld.inc
+
+#
+# Some new events to be replicated when node-3 restarts.
+--connection node_1
+--echo #node-1 (source)
+INSERT INTO t1 VALUES(2);
+
+#
+# Start node-3 but force async replication to start before WSREP reports being ready.
+--connection node_3
+--echo #node-3 (async replica)
+--let $start_mysqld_params="--debug='+d,pause_before_wsrep_ready'"
+--source include/start_mysqld.inc
+
+#
+# re-test if replication is working fine.
+--connection node_1
+--echo #node-1 (source)
+INSERT INTO t1 VALUES (3);
+
+--connection node_3
+--echo #node-3 (async replica)
+--let $wait_condition = SELECT COUNT(*) = 3 FROM t1;
+--source include/wait_condition.inc
+
+--connection node_1
+DROP TABLE t1;
+
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+--source include/wait_condition.inc
+
+STOP REPLICA;
+RESET REPLICA ALL;
+
+--connection node_1
+RESET MASTER;
