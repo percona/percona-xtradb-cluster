@@ -32,6 +32,10 @@
 #include "wsrep_utils.h"
 #include "wsrep_xid.h"
 
+#include <chrono>
+#include <thread>
+#include "my_dbug.h"
+
 #include "log.h"         /* sql_print_xxx() */
 #include "sql_base.h"    /* close_thread_tables */
 #include "sql_class.h"   /* system variables */
@@ -342,6 +346,28 @@ void Wsrep_server_service::log_state_change(
   mysql_mutex_lock(&LOCK_status);
   switch (current_state) {
     case Wsrep_server_state::s_synced:
+      /* This happens when the server starts. We are in wsrep applier context.
+         The intention here is to simulate delays in setting wsrep_ready = true,
+         to check how things initializing asynchronously in parallel react to
+         wsrep_ready == false.
+         We can't block here on DEBUG_SYNC because:
+         1. Whoever needs wsrep_ready == true, needs to wait calling
+         Wsrep_server_state::instance().wait_until_state(Wsrep_server_state::s_synced)
+         Such a call is unblocked by current context, just after returning
+         from this method, so we've got the situation when a client would need
+         to a) wait on wait_until_state() but that unblocks only after
+         signalling the DEBUG_SYNC and b) signal this debug sync after the wait,
+         which situations are mutually exclusive.
+         2. If we blocked here with DEBUG_SYNC's WAIT_FOR signal, there would be
+         no way to signal it from user's connection, because we are owning
+         wsrep::server_state::mutex_, which in case of wsrep_ready==false is
+         acquired by the connection as well in
+         block_write_while_in_rolling_upgrade(), so we would have a deadlock.
+         Introducing a delay is enough for testing. */
+      DBUG_EXECUTE_IF("pause_before_wsrep_ready", {
+        using namespace std::chrono_literals;
+        std::this_thread::sleep_for(15s);
+      };);
       wsrep_ready = true;
       WSREP_INFO("Synchronized with group, ready for connections");
       [[fallthrough]];
