@@ -34,11 +34,11 @@
 #include "my_psi_config.h"
 #include "my_sqlcommand.h"
 #include "my_sys.h"
+#include "mysql/components/services/bits/mysql_mutex_bits.h"
 #include "mysql/components/services/bits/psi_bits.h"
+#include "mysql/components/services/bits/psi_mutex_bits.h"
 #include "mysql/components/services/log_builtins.h"
 #include "mysql/components/services/log_shared.h"
-#include "mysql/components/services/mysql_mutex_bits.h"
-#include "mysql/components/services/psi_mutex_bits.h"
 #include "mysql/mysql_lex_string.h"
 #include "mysql/plugin.h"
 #include "mysql/psi/mysql_mutex.h"
@@ -405,9 +405,8 @@ int mysql_audit_notify(THD *thd, mysql_event_general_subclass_t subclass,
         cmd_class_lowercase = msg;
         std::transform(cmd_class_lowercase.begin(), cmd_class_lowercase.end(),
                        cmd_class_lowercase.begin(), ::tolower);
-        MYSQL_LEX_CSTRING command_class = {
-            STRING_WITH_LEN(cmd_class_lowercase.c_str())};
-        event.general_sql_command = command_class;
+        event.general_sql_command.str = cmd_class_lowercase.c_str();
+        event.general_sql_command.length = cmd_class_lowercase.length();
         break;
     }
   } else {

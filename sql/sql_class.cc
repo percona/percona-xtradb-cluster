@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2000, 2021, Oracle and/or its affiliates.
+   Copyright (c) 2000, 2022, Oracle and/or its affiliates.
    Copyright (c) 2016, Percona Inc. All Rights Reserved.
 
    This program is free software; you can redistribute it and/or modify
@@ -42,9 +42,9 @@
 #include "my_systime.h"
 #include "my_thread.h"
 #include "my_time.h"
+#include "mysql/components/services/bits/psi_error_bits.h"
 #include "mysql/components/services/log_builtins.h"  // LogErr
 #include "mysql/components/services/log_shared.h"
-#include "mysql/components/services/psi_error_bits.h"
 #include "mysql/plugin_audit.h"
 #include "mysql/psi/mysql_cond.h"
 #include "mysql/psi/mysql_error.h"
@@ -767,6 +767,8 @@ THD::THD(bool enable_plugins)
       skip_gtid_rollback(false),
       is_commit_in_middle_of_statement(false),
       has_gtid_consistency_violation(false),
+      main_mem_root(key_memory_thd_main_mem_root,
+                    global_system_variables.query_alloc_block_size),
       main_da(false),
       m_parser_da(false),
       m_query_rewrite_plugin_da(false),
@@ -781,9 +783,6 @@ THD::THD(bool enable_plugins)
   main_lex->reset();
   set_psi(nullptr);
   mdl_context.init(this);
-  init_sql_alloc(key_memory_thd_main_mem_root, &main_mem_root,
-                 global_system_variables.query_alloc_block_size,
-                 global_system_variables.query_prealloc_size);
   stmt_arena = this;
   thread_stack = nullptr;
   m_catalog.str = "std";
@@ -1244,8 +1243,11 @@ void THD::init(void) {
 
   clear_slow_extended();
 
-  // This will clear the writeset session history.
-  rpl_thd_ctx.dependency_tracker_ctx().set_last_session_sequence_number(0);
+  /*
+    This will clear the writeset session history and re-set delegate state to
+    INIT
+  */
+  rpl_thd_ctx.init();
 
   /*
     This variable is used to temporarily disable the password validation plugin
@@ -1291,6 +1293,8 @@ void THD::cleanup_connection(void) {
   debug_sync_end_thread(this);
 #endif /* defined(ENABLED_DEBUG_SYNC) */
   killed = NOT_KILLED;
+  rpl_thd_ctx.set_tx_rpl_delegate_stage_status(
+      Rpl_thd_context::TX_RPL_STAGE_CONNECTION_CLEANED);
   running_explain_analyze = false;
   m_thd_life_cycle_stage = enum_thd_life_cycle_stages::ACTIVE;
   init();
@@ -1348,6 +1352,7 @@ void THD::cleanup(void) {
   DEBUG_SYNC(this, "thd_cleanup_start");
 
   killed = KILL_CONNECTION;
+<<<<<<< HEAD
 
 #ifdef WITH_WSREP
   if (wsrep_cs().state() != wsrep::client_state::s_none) {
@@ -1357,6 +1362,10 @@ void THD::cleanup(void) {
   wsrep_aborter = 0;
 #endif /* WITH_WSREP */
 
+||||||| merged common ancestors
+=======
+
+>>>>>>> Percona-Server-8.0.29-21
   if (trn_ctx->xid_state()->has_state(XID_STATE::XA_PREPARED)) {
     /*
       Return error is not an option as XA is in prepared state and
@@ -2220,15 +2229,13 @@ bool THD::convert_string(LEX_STRING *to, const CHARSET_INFO *to_cs,
                          from_length, from_cs, 6);
     if (report_error) {
       my_error(ER_CANNOT_CONVERT_STRING, MYF(0), printable_buff,
-               replace_utf8_utf8mb3(from_cs->csname),
-               replace_utf8_utf8mb3(to_cs->csname));
+               from_cs->csname, to_cs->csname);
       return true;
     } else {
       push_warning_printf(this, Sql_condition::SL_WARNING,
                           ER_INVALID_CHARACTER_STRING,
                           ER_THD(this, ER_CANNOT_CONVERT_STRING),
-                          printable_buff, replace_utf8_utf8mb3(from_cs->csname),
-                          replace_utf8_utf8mb3(to_cs->csname));
+                          printable_buff, from_cs->csname, to_cs->csname);
     }
   }
 
@@ -3802,8 +3809,6 @@ void THD::disable_mem_cnt() {
   @param db         Schema name in which table is being created.
   @param tablename  Table name being created.
   @param hton       Handlerton representing engine used for table.
-
-  @returns void
 */
 void Transactional_ddl_context::init(dd::String_type db,
                                      dd::String_type tablename,
@@ -3817,8 +3822,6 @@ void Transactional_ddl_context::init(dd::String_type db,
 /**
   Remove the table share used while creating the table, if the transaction
   is being rolledback.
-
-  @returns void
 */
 void Transactional_ddl_context::rollback() {
   if (!inited()) return;
@@ -3843,8 +3846,6 @@ void Transactional_ddl_context::rollback() {
   End the transactional context created by calling post ddl hook for engine
   on which table is being created. This is done after transaction rollback
   and commit.
-
-  @returns void
 */
 void Transactional_ddl_context::post_ddl() {
   if (!inited()) return;

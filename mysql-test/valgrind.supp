@@ -1,4 +1,4 @@
-# Copyright (c) 2005, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2005, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -1376,40 +1376,25 @@ g   codership/mysql-wsrep/issues#176
    fun:numa_node_*_cpu*
 }
 
+# _Znwm is operator new(unsigned long)
+# google::protobuf::internal::LazyString::Init() const
 {
    General protobuf globals
    Memcheck:Leak
    fun:_Znwm
    ...
-   fun:_GLOBAL__sub_I_mysqlx*.pb.cc
+   fun:_ZNK6google8protobuf8internal10LazyString4InitEv
    ...
 }
 
+# _Znwm is operator new(unsigned long)
 {
    General protobuf globals
    Memcheck:Leak
    match-leak-kinds: reachable
    fun:_Znwm
    ...
-   fun:_Z41__static_initialization_and_destruction_0ii
-}
-
-{
-   General protobuf globals
-   Memcheck:Leak
-   match-leak-kinds: reachable
-   fun:_Znwm
-   ...
-   fun:_ZN6Mysqlx23protobuf_mysqlx_2eproto27StaticDescriptorInitializerC1Ev
-}
-
-{
-   General protobuf globals
-   Memcheck:Leak
-   match-leak-kinds: reachable
-   fun:_Znwm
-   ...
-   fun:_ZN6google8protobuf8internal11InitSCCImplEPNS1_11SCCInfoBaseE
+   fun:_dl_init
 }
 
 {
@@ -2905,34 +2890,6 @@ g   codership/mysql-wsrep/issues#176
    Memcheck:Leak
    match-leak-kinds: reachable
    ...
-   fun:_ZN7rocksdb19ThreadStatusUpdater14RegisterThreadENS_12ThreadStatus10ThreadTypeEm
-}
-{
-   RocksDB still reachable
-   Memcheck:Leak
-   match-leak-kinds: reachable
-   ...
-   fun:_ZN7rocksdb19ThreadStatusUpdater19NewColumnFamilyInfoEPKvRKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEES2_SA_
-}
-{
-   RocksDB still reachable
-   Memcheck:Leak
-   match-leak-kinds: reachable
-   ...
-   fun:_ZN7rocksdb24RegisterCacheDeleterRoleEPFvRKNS_5SliceEPvENS_14CacheEntryRoleE
-}
-{
-   RocksDB still reachable
-   Memcheck:Leak
-   match-leak-kinds: reachable
-   ...
-   fun:_ZN7rocksdb24CacheEntryStatsCollectorINS_13InternalStats19CacheEntryRoleStatsEE9GetSharedEPNS_5CacheEPNS_11SystemClockEPSt10shared_ptrIS3_E
-}
-{
-   RocksDB still reachable
-   Memcheck:Leak
-   match-leak-kinds: reachable
-   ...
    fun:_ZN7rocksdb12_GLOBAL__N_111GetRegistryEv
 }
 {
@@ -2953,10 +2910,6 @@ g   codership/mysql-wsrep/issues#176
    fun:tls_get_addr_tail
    fun:__tls_get_addr
 }
-<<<<<<< HEAD
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-=======
 
 #  The ... is for malloc or realloc
 {
@@ -2968,5 +2921,66 @@ g   codership/mysql-wsrep/issues#176
    fun:asprintf
    fun:dlerror
    fun:_ZN36mysql_dynamic_loader_scheme_file_imp4loadEPKcPP17mysql_component_t
+   ...
+}
+
+{
+   ThreadLocalPtr::StaticMeta* ThreadLocalPtr::Instance() allocates method static variable.
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:_ZN7rocksdb14ThreadLocalPtr10StaticMeta10SetHandlerEjPFvPvE
+   ...
+}
+
+{
+   Registry& GetRegistry() creates methods static pointer to Registry
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:_ZN7rocksdb12_GLOBAL__N_18Registry8RegisterEPFvRKNS_5SliceEPvENS_14CacheEntryRoleE
+   ...
+}
+
+{
+   Registry& GetRegistry() creates methods static pointer to Registry
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:_ZN7rocksdb24RegisterCacheDeleterRoleEPFvRKNS_5SliceEPvENS_14CacheEntryRoleE
+   ...
+}
+<<<<<<< HEAD
+||||||| merged common ancestors
+>>>>>>>>> Temporary merge branch 2
+=======
+
+
+{
+   ThreadStatusUpdater is the member of PosixEnv, which is static method object inside Env* Env::Default()
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:_ZN7rocksdb19ThreadStatusUpdater14RegisterThreadENS_12ThreadStatus10ThreadTypeEm
+   ...
+}
+
+{
+   ThreadStatusUpdater is the member of PosixEnv, which is static method object inside Env* Env::Default()
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:_ZN7rocksdb19ThreadStatusUpdater19NewColumnFamilyInfoEPKvRKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEES2_SA_
+   ...
+}
+
+
+{
+   static Status GetShared(Cache *cache, SystemClock *clock, std::shared_ptr<CacheEntryStatsCollector> *ptr) creates static pointer inside metod
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:_ZN7rocksdb24CacheEntryStatsCollectorINS_13InternalStats19CacheEntryRoleStatsEE9GetSharedEPNS_5CacheEPNS_11SystemClockEPSt10shared_ptrIS3_E
+   ...
 }
 >>>>>>> tag/Percona-Server-8.0.28-19

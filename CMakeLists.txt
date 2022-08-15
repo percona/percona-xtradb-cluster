@@ -1,4 +1,4 @@
-# Copyright (c) 2006, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2006, 2022, Oracle and/or its affiliates.
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -243,6 +243,14 @@ ENDIF()
 CMAKE_MINIMUM_REQUIRED(VERSION 3.5.1)
 INCLUDE(cmake_policies NO_POLICY_SCOPE)
 
+MACRO(STRING_APPEND STRING_VAR INPUT)
+  SET(${STRING_VAR} "${${STRING_VAR}}${INPUT}")
+ENDMACRO()
+
+MACRO(STRING_PREPEND STRING_VAR INPUT)
+  SET(${STRING_VAR} "${INPUT}${${STRING_VAR}}")
+ENDMACRO()
+
 IF(MY_HOST_SYSTEM_NAME MATCHES "SunOS")
   SET(SOLARIS 1)
 ENDIF()
@@ -316,9 +324,14 @@ IF(CMAKE_HOST_UNIX AND NOT FORCE_UNSUPPORTED_COMPILER
       IF(LINUX_RHEL6)
         SET(ALTERNATIVE_PATHS "/opt/rh/devtoolset-8")
       ELSEIF(LINUX_RHEL7)
-        SET(ALTERNATIVE_PATHS "/opt/rh/devtoolset-10")
+        # gcc11 not available yet
+        IF(MY_HOST_MACHINE_NAME MATCHES "aarch64")
+          SET(ALTERNATIVE_PATHS "/opt/rh/devtoolset-10")
+        ELSE()
+          SET(ALTERNATIVE_PATHS "/opt/rh/devtoolset-11")
+        ENDIF()
       ELSEIF(LINUX_RHEL8)
-        SET(ALTERNATIVE_PATHS "/opt/rh/gcc-toolset-10")
+        SET(ALTERNATIVE_PATHS "/opt/rh/gcc-toolset-11")
       ENDIF()
 
       FOREACH(OPT_PATH ${ALTERNATIVE_PATHS})
@@ -343,6 +356,12 @@ IF(CMAKE_HOST_UNIX AND NOT FORCE_UNSUPPORTED_COMPILER
       ENDFOREACH()
       # A missing ALTERNATIVE_LD may generate bad executables.
       IF(ALTERNATIVE_GCC AND ALTERNATIVE_GPP AND ALTERNATIVE_LD)
+        # Set correct search path for executables, libraries, and data files.
+        GET_FILENAME_COMPONENT(GCC_B_PREFIX ${ALTERNATIVE_GCC} DIRECTORY)
+        STRING_PREPEND(CMAKE_C_FLAGS "-B${GCC_B_PREFIX} ")
+        GET_FILENAME_COMPONENT(GPP_B_PREFIX ${ALTERNATIVE_GPP} DIRECTORY)
+        STRING_PREPEND(CMAKE_CXX_FLAGS "-B${GPP_B_PREFIX} ")
+
         SET(CMAKE_C_COMPILER ${ALTERNATIVE_GCC})
         SET(CMAKE_CXX_COMPILER ${ALTERNATIVE_GPP})
         SET(CMAKE_LINKER ${ALTERNATIVE_LD})
@@ -362,11 +381,16 @@ IF(CMAKE_HOST_UNIX AND NOT FORCE_UNSUPPORTED_COMPILER
           SET(DEV_PACKAGES
             "devtoolset-8-gcc devtoolset-8-gcc-c++ devtoolset-8-binutils")
         ELSEIF(LINUX_RHEL7)
-          SET(DEV_PACKAGES
-            "devtoolset-10-gcc devtoolset-10-gcc-c++ devtoolset-10-binutils")
+          IF(MY_HOST_MACHINE_NAME MATCHES "aarch64")
+            SET(DEV_PACKAGES
+              "devtoolset-10-gcc devtoolset-10-gcc-c++ devtoolset-10-binutils")
+          ELSE()
+            SET(DEV_PACKAGES
+              "devtoolset-11-gcc devtoolset-11-gcc-c++ devtoolset-11-binutils")
+          ENDIF()
         ELSEIF(LINUX_RHEL8)
           SET(DEV_PACKAGES
-            "gcc-toolset-10-gcc gcc-toolset-10-gcc-c++ gcc-toolset-10-binutils")
+            "gcc-toolset-11-gcc gcc-toolset-11-gcc-c++ gcc-toolset-11-binutils")
         ENDIF()
         MESSAGE(WARNING
           "Could not find devtoolset compiler/linker in ${ALTERNATIVE_PATHS}")
@@ -585,15 +609,6 @@ MACRO(REPORT_CXX_FLAGS)
   ENDFOREACH()
 ENDMACRO()
 
-# STRING(APPEND ...) from cmake VERSION 3.4
-MACRO(STRING_APPEND STRING_VAR INPUT)
-  SET(${STRING_VAR} "${${STRING_VAR}}${INPUT}")
-ENDMACRO()
-
-MACRO(STRING_PREPEND STRING_VAR INPUT)
-  SET(${STRING_VAR} "${INPUT}${${STRING_VAR}}")
-ENDMACRO()
-
 # Write content to file, using CONFIGURE_FILE
 # The advantage compared to FILE(WRITE) is that timestamp
 # does not change if file already has the same content
@@ -748,18 +763,6 @@ IF(WITH_DEFAULT_COMPILER_OPTIONS)
   INCLUDE(${CMAKE_SOURCE_DIR}/cmake/build_configurations/compiler_options.cmake)
 ENDIF()
 
-# Set correct search path for executables, libraries, and data files.
-IF(LINUX_RHEL)
-  IF(ALTERNATIVE_GCC)
-    GET_FILENAME_COMPONENT(GCC_B_PREFIX ${ALTERNATIVE_GCC} DIRECTORY)
-    STRING_PREPEND(CMAKE_C_FLAGS "-B${GCC_B_PREFIX} ")
-  ENDIF()
-  IF(ALTERNATIVE_GPP)
-    GET_FILENAME_COMPONENT(GPP_B_PREFIX ${ALTERNATIVE_GPP} DIRECTORY)
-    STRING_PREPEND(CMAKE_CXX_FLAGS "-B${GPP_B_PREFIX} ")
-  ENDIF()
-ENDIF()
-
 INCLUDE(CMakePushCheckState)
 
 # Add macros
@@ -797,6 +800,7 @@ INCLUDE(rapidjson)
 INCLUDE(fprofile)
 INCLUDE(gloves)
 INCLUDE(fido2)
+INCLUDE(win_jemalloc)
 
 IF(UNIX)
   OPTION(WITH_VALGRIND "Valgrind instrumentation" OFF)
@@ -1145,6 +1149,10 @@ OPTION(HANDLE_FATAL_SIGNALS
   "Handle fatal signals with internal signal handler"
   ${HANDLE_FATAL_SIGNALS_DEFAULT})
 
+IF(CMAKE_C_FLAGS MATCHES "-fsanitize" OR CMAKE_CXX_FLAGS MATCHES "-fsanitize")
+  SET(CMAKE_COMPILER_FLAG_WITH_SANITIZE 1)
+ENDIF()
+
 # Older versions of ccache must be disabled: export CCACHE_DISABLE=1
 # See http://www.cmake.org/Wiki/CTest/Coverage
 OPTION(ENABLE_GCOV "Enable gcov (debug, Linux builds only)" OFF)
@@ -1231,6 +1239,41 @@ IF(LINUX_STANDALONE)
     ${COMPRESS_DEBUG_SECTIONS_DEFAULT})
 ELSE()
   SET(COMPRESS_DEBUG_SECTIONS OFF)
+ENDIF()
+
+# Newer versions of gcc produce huge amounts of debug information
+# with the default debug level.
+#
+# From 'man gcc':
+# Level 1 produces minimal information, enough for making backtraces in
+# parts of the program that you don't plan to debug.  This includes
+# descriptions of functions and external variables, and line number
+# tables, but no information about local variables.
+#
+# clang documentation says: -gline-tables-only, -g1, -gmlt
+# Emit debug line number tables only
+IF(UNIX AND MY_COMPILER_IS_GNU_OR_CLANG)
+  # By default, do this for STANDALONE and tarball builds.
+  # Off by default for sanitizer or valgrind builds.
+  # Off by default for Apple Clang.
+  IF((INSTALL_LAYOUT MATCHES "STANDALONE" OR
+        INSTALL_LAYOUT MATCHES "TARGZ" OR
+        INSTALL_LAYOUT MATCHES "SVR4"
+        )
+      AND NOT CMAKE_COMPILER_FLAG_WITH_SANITIZE AND NOT WITH_VALGRIND
+      AND NOT APPLE)
+    SET(MINIMAL_RELWITHDEBINFO_DEFAULT ON)
+  ELSE()
+    SET(MINIMAL_RELWITHDEBINFO_DEFAULT OFF)
+  ENDIF()
+  OPTION(MINIMAL_RELWITHDEBINFO
+    "Reduce debug information for gcc RelWithDebInfo builds"
+    ${MINIMAL_RELWITHDEBINFO_DEFAULT})
+  # Appending here will override any earlier -g options.
+  IF(MINIMAL_RELWITHDEBINFO)
+    STRING_APPEND(CMAKE_C_FLAGS_RELWITHDEBINFO   " -g1")
+    STRING_APPEND(CMAKE_CXX_FLAGS_RELWITHDEBINFO " -g1")
+  ENDIF()
 ENDIF()
 
 # For aarch64 some sub-architectures support LSE atomics and some don't. Thus,
@@ -1597,17 +1640,31 @@ ENDIF(WITH_LTO)
 # is required by JSON_SCHEMA_VALID, so don't add it automatically until an
 # official version with full support for std::regex is released. The bundled
 # version has the necessary patches to make it work.
+#
+# "system" versions of these for macOS are available from Xcode or Homebrew.
+# Libraries from Xcode have file extension '.tbd'.
+# Libraries from Homebrew have file extension '.dylib'.
+# To get all the Homebrew libraries, do 'brew install' <name of lib>.
 SET(SYSTEM_LIBRARIES
-  CURL
-  ICU
-  LIBEVENT
-  LZ4
-  PROTOBUF
-  SSL
-  ZLIB
-  ZSTD
-  FIDO
+  CURL      # Xcode
+  ICU       # Homebrew  icu4c
+  LIBEVENT  # Homebrew  libevent
+  LZ4       # Homebrew  lz4
+  PROTOBUF  # Homebrew  protobuf
+  SSL       # Homebrew  openssl@1.1
+  ZLIB      # Xcode
+  ZSTD      # Homebrew  zstd
+  FIDO      # Homebrew  libfido2
   )
+
+IF(APPLE)
+  # Homebrew default location is
+  IF(APPLE_ARM)
+    SET(HOMEBREW_HOME "/opt/homebrew/opt")
+  ELSE()
+    SET(HOMEBREW_HOME "/usr/local/opt")
+  ENDIF()
+ENDIF()
 
 SET(WITH_SYSTEM_LIBS_DEFAULT OFF)
 OPTION(WITH_SYSTEM_LIBS
@@ -1697,6 +1754,11 @@ MYSQL_CHECK_SASL_DLLS()
 MYSQL_CHECK_LDAP()
 MYSQL_CHECK_LDAP_DLLS()
 
+# Add Windows specific jemalloc DLL
+IF(WIN32)
+  MYSQL_CHECK_WIN_JEMALLOC()
+ENDIF()
+
 # Custom versions of LDAP / SASL / SSL.
 IF(LINUX AND KNOWN_CUSTOM_LIBRARIES)
   # Custom libraries are not targets, we install them as FILES.
@@ -1775,12 +1837,22 @@ MYSQL_CHECK_LIBEVENT()
 # Add lz4 library
 MYSQL_CHECK_LZ4()
 # Add icu library
-MYSQL_CHECK_ICU()
+IF(NOT WITHOUT_SERVER)
+  MYSQL_CHECK_ICU()
+ENDIF()
 # Add protoc and libprotobuf
 IF(NOT WITHOUT_SERVER)
   MYSQL_CHECK_PROTOBUF()
   MYSQL_CHECK_PROTOBUF_DLLS()
 ENDIF()
+
+IF(NOT WITHOUT_SERVER)
+  # Check BISON_VERSION and set BISON_FLAGS_WARNINGS
+  # Do it here, before any other cmake file does FIND_PACKAGE(BISON REQUIRED)
+  # so that our search for custom bison installations can run first.
+  INCLUDE(bison)
+ENDIF()
+
 # Try and set CURL_LIBRARY
 MYSQL_CHECK_CURL()
 MYSQL_CHECK_CURL_DLLS()
@@ -1800,6 +1872,30 @@ MYSQL_CHECK_COREDUMPER()
 # Look for fido2 library
 MYSQL_CHECK_FIDO()
 MYSQL_CHECK_FIDO_DLLS()
+
+IF(APPLE)
+  IF(EXISTS ${HOMEBREW_HOME}/boost)
+    FOREACH(SYSTEM_LIB ICU LIBEVENT LZ4 PROTOBUF ZSTD FIDO)
+      IF(WITH_${SYSTEM_LIB} STREQUAL "system")
+        MESSAGE(FATAL_ERROR
+          "WITH_${SYSTEM_LIB}=system is not compatible with Homebrew boost\n"
+          "MySQL depends on ${BOOST_PACKAGE_NAME} with a set of patches.\n"
+          "Including system headers from ${HOMEBREW_HOME} will break the build.\n"
+          "Please use WITH_${SYSTEM_LIB}=bundled\n"
+          "or do 'brew uninstall boost'"
+          )
+      ENDIF()
+    ENDFOREACH()
+  ENDIF()
+  # Ensure that we look in /usr/local/include or /opt/homebre/include
+  FOREACH(SYSTEM_LIB ICU LIBEVENT LZ4 PROTOBUF ZSTD FIDO)
+    IF(WITH_${SYSTEM_LIB} STREQUAL "system")
+      GET_FILENAME_COMPONENT(HOMEBREW_BASE ${HOMEBREW_HOME} DIRECTORY)
+      INCLUDE_DIRECTORIES(SYSTEM ${HOMEBREW_BASE}/include)
+      BREAK()
+    ENDIF()
+  ENDFOREACH()
+ENDIF()
 
 IF(WITH_AUTHENTICATION_FIDO OR WITH_AUTHENTICATION_CLIENT_PLUGINS)
   IF(WITH_FIDO STREQUAL "system" AND
@@ -1912,6 +2008,15 @@ IF(WITH_PROTOBUF STREQUAL "bundled" OR WITH_FIDO STREQUAL "bundled")
   ENDIF()
 ENDIF()
 
+<<<<<<< HEAD
+||||||| merged common ancestors
+ADD_SUBDIRECTORY(extra/libkmip)
+=======
+IF(NOT DEFINED WITH_COMPONENT_KEYRING_KMIP AND NOT DEFINED WITHOUT_COMPONENT_KEYRING_KMIP
+   OR WITH_COMPONENT_KEYRING_KMIP)
+  ADD_SUBDIRECTORY(extra/libkmip)
+ENDIF()
+>>>>>>> Percona-Server-8.0.29-21
 
 #
 # Setup maintainer mode options by the end. Platform checks are
@@ -1965,6 +2070,11 @@ OPTION(WITH_HYPERGRAPH_OPTIMIZER
   ${WITH_HYPERGRAPH_OPTIMIZER_DEFAULT}
   )
 
+OPTION(WITH_ENCRYPTION_UDF "Build Encryption UDF plugin" ON)
+IF(WITH_ENCRYPTION_UDF)
+  ADD_SUBDIRECTORY(extra/opensslpp)
+ENDIF()
+
 # Utility target to build every executable tagged with ADD_TEST.
 ADD_CUSTOM_TARGET(unittest_all)
 
@@ -1973,6 +2083,24 @@ ADD_CUSTOM_TARGET(plugin_all)
 
 # Utility target to build every target added with MYSQL_ADD_COMPONENT.
 ADD_CUSTOM_TARGET(component_all)
+
+# Utility target to generate all sources from .proto files.
+ADD_CUSTOM_TARGET(protobuf_generated_all)
+
+# Utility target to generate sources needed for clang-tidy.
+# Example usage:
+#
+# export CC=clang
+# export CXX=clang++
+# mkdir build-clang-tidy; cd build-clang-tidy
+# cmake .. -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -DWITH_SYSTEM_LIBS=1
+# make clang_tidy_prerequisites
+# clang-tidy -p .
+#     --checks=modernize-use-nullptr,-clang-analyzer-core.NullDereference
+#     ../sql/sys_vars.cc
+ADD_CUSTOM_TARGET(clang_tidy_prerequisites)
+ADD_DEPENDENCIES(clang_tidy_prerequisites protobuf_generated_all)
+ADD_DEPENDENCIES(clang_tidy_prerequisites GenError)
 
 ADD_SUBDIRECTORY(include)
 ADD_SUBDIRECTORY(strings)
@@ -2321,14 +2449,25 @@ ENDIF()
 SET(DOXYGEN_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/doxygen")
 FIND_PACKAGE(Doxygen)
 IF(DOXYGEN_FOUND)
+  # We want output on stdout in pushbuild.
+  IF(DEFINED ENV{PB2WORKDIR})
+    SET(REDIRECT_DOXYGEN_STDOUT_DEFAULT FALSE)
+  ELSE()
+    SET(REDIRECT_DOXYGEN_STDOUT_DEFAULT TRUE)
+  ENDIF()
+  OPTION(REDIRECT_DOXYGEN_STDOUT "Redirect doxygen output to a file"
+    ${REDIRECT_DOXYGEN_STDOUT_DEFAULT})
+
   CONFIGURE_FILE(Doxyfile.in Doxyfile @ONLY)
   ADD_CUSTOM_TARGET(
     doxygen
     COMMAND ${CMAKE_COMMAND}
     -DDOXYGEN_EXECUTABLE=${DOXYGEN_EXECUTABLE}
+    -DDOXYGEN_DOT_EXECUTABLE=${DOXYGEN_DOT_EXECUTABLE}
     -DDOXYFILE=${CMAKE_BINARY_DIR}/Doxyfile
     -DERROR_FILE=${CMAKE_BINARY_DIR}/doxyerror.log
     -DOUTPUT_FILE=${CMAKE_BINARY_DIR}/doxyoutput.log
+    -DREDIRECT_DOXYGEN_STDOUT=${REDIRECT_DOXYGEN_STDOUT}
     -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
     -DTOFIX_FILE=${CMAKE_BINARY_DIR}/tofix-all.log
     -DREGRESSION_FILE=${CMAKE_BINARY_DIR}/tofix-regressions.log

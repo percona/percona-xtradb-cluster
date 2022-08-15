@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 # Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
+||||||| merged common ancestors
+# Copyright (c) 2015, 2021, Oracle and/or its affiliates.
+=======
+# Copyright (c) 2015, 2022, Oracle and/or its affiliates.
+>>>>>>> Percona-Server-8.0.29-21
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -42,10 +48,18 @@ PIDFile=@SYSTEMD_PID_DIR@/mysqld.pid
 TimeoutSec=0
 
 # Execute pre and post scripts as root
-PermissionsStartOnly=true
+@SYSTEMD_START_ONLY@
 
+<<<<<<< HEAD
 # Needed to create system tables and to check for cluster crash recovery
 ExecStartPre=@bindir@/mysqld_pre_systemd --pre
+||||||| merged common ancestors
+# Needed to create system tables
+ExecStartPre=@bindir@/mysqld_pre_systemd
+=======
+# Needed to create system tables
+ExecStartPre=@SYSTEMD_EXE_PREFIX@@bindir@/mysqld_pre_systemd
+>>>>>>> Percona-Server-8.0.29-21
 
 # Start main service
 ExecStart=@libexecdir@/mysqld --daemonize --pid-file=@SYSTEMD_PID_DIR@/mysqld.pid $MYSQLD_OPTS $MYSQLD_RECOVER_START

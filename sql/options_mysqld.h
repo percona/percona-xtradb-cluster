@@ -1,4 +1,4 @@
-/* Copyright (c) 2015, 2021, Oracle and/or its affiliates.
+/* Copyright (c) 2015, 2022, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -126,6 +126,7 @@ enum options_mysqld {
   OPT_USE_SSL,
   OPT_USE_ADMIN_SSL,
   OPT_TRANSACTION_WRITE_SET_EXTRACTION,
+<<<<<<< HEAD
   OPT_SHOW_SLAVE_AUTH_INFO_DEPRECATED
 #ifdef WITH_WSREP
   ,
@@ -135,6 +136,15 @@ enum options_mysqld {
   OPT_WSREP_START_POSITION,
   OPT_WSREP_RECOVER
 #endif /* WITH_WSREP */
+||||||| merged common ancestors
+  OPT_SHOW_SLAVE_AUTH_INFO_DEPRECATED
+=======
+  OPT_SHOW_SLAVE_AUTH_INFO_DEPRECATED,
+  OPT_DISCONNECT_SLAVE_EVENT_COUNT,
+  OPT_ABORT_SLAVE_EVENT_COUNT,
+  OPT_REPLICA_PARALLEL_TYPE,
+  OPT_SSL_SESSION_CACHE_TIMEOUT
+>>>>>>> Percona-Server-8.0.29-21
 };
 
 #endif  // OPTIONS_MYSQLD_INCLUDED

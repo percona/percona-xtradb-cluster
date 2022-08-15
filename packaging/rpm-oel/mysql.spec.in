@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 # Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
+||||||| merged common ancestors
+# Copyright (c) 2000, 2021, Oracle and/or its affiliates.
+=======
+# Copyright (c) 2000, 2022, Oracle and/or its affiliates.
+>>>>>>> Percona-Server-8.0.29-21
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -37,12 +43,42 @@
 %{?with_aws_sdk: %global aws_sdk_option -DWITH_KEYRING_AWS=1 -DWITH_AWS_SDK=%{with_aws_sdk}}
 %{?with_aws_sdk: %global aws_sdk 1}
 
+<<<<<<< HEAD
+||||||| merged common ancestors
+# Pass alternative ssl setting if provided. Can be used for newer OpenSSL.
+%{?with_ssl: %global ssl_option -DWITH_SSL=%{with_ssl}}
+%{?with_ssl: %global ssl_bundled 1}
+
+=======
+# Pass alternative ssl setting if provided. Can be used for newer OpenSSL.
+%{?with_ssl: %global ssl_option -DWITH_SSL=%{with_ssl}}
+%{?with_ssl: %global ssl_bundled 1}
+
+# Tell build not to use minimal debug
+%{?full_debug: %global no_mini_debug 1}
+
+>>>>>>> Percona-Server-8.0.29-21
 # Regression tests may take a long time, override the default to skip them
 %{!?runselftest:%global runselftest 0}
 
 %{!?with_systemd:                %global systemd 0}
 %{?el7:                          %global systemd 1}
 %{?el8:                          %global systemd 1}
+
+# Two workarounds on el6 and el7
+%if 0%{?rhel} == 6 || 0%{?rhel} == 7
+# - Avoid compiling Python 3 code with Python 2
+%global __os_install_post %(echo '%{__os_install_post}' | sed -e 's!/usr/lib[^[:space:]]*/brp-python-bytecompile[[:space:]].*$!!g')
+# - Ship debuginfo for community
+%if 0%{?commercial}
+%if 0%{?no_mini_debug}
+%else
+%global mini_debug_option -DMINIMAL_RELWITHDEBINFO=1
+%endif # no_mini_debug
+%else
+%global with_debuginfo 1
+%endif # commercial
+%endif # rhel6|7
 
 %{?el8:                          %global with_debuginfo 1}
 %{!?with_debuginfo:              %global without_debuginfo 1}
@@ -120,12 +156,18 @@ BuildRequires:  devtoolset-8-gcc-c++
 %{?el6:BuildRequires:  devtoolset-8-gcc}
 %{?el6:BuildRequires:  devtoolset-8-gcc-c++}
 %{?el6:BuildRequires:  devtoolset-8-binutils}
+%ifarch aarch64
 %{?el7:BuildRequires:  devtoolset-10-gcc}
 %{?el7:BuildRequires:  devtoolset-10-gcc-c++}
 %{?el7:BuildRequires:  devtoolset-10-binutils}
-%{?el8:BuildRequires:  gcc-toolset-10-gcc}
-%{?el8:BuildRequires:  gcc-toolset-10-gcc-c++}
-%{?el8:BuildRequires:  gcc-toolset-10-binutils}
+%else
+%{?el7:BuildRequires:  devtoolset-11-gcc}
+%{?el7:BuildRequires:  devtoolset-11-gcc-c++}
+%{?el7:BuildRequires:  devtoolset-11-binutils}
+%endif
+%{?el8:BuildRequires:  gcc-toolset-11-gcc}
+%{?el8:BuildRequires:  gcc-toolset-11-gcc-c++}
+%{?el8:BuildRequires:  gcc-toolset-11-binutils}
 BuildRequires:  bison >= 2.1
 BuildRequires:  perl
 %{?el7:BuildRequires: perl(Env)}
@@ -224,12 +266,18 @@ Provides:       MySQL-server-advanced%{?_isa} = %{version}-%{release}
 Obsoletes:      MySQL-server-advanced < %{version}-%{release}
 Obsoletes:      MySQL-embedded-advanced < %{version}-%{release}
 Obsoletes:      mysql-community-server < %{version}-%{release}
+%if 0%{?without_debuginfo}
+Obsoletes:      mysql-community-server-debug < %{version}-%{release}
+%endif
 %if 0%{?cluster}
 Provides:       MySQL-Cluster-server-advanced%{?_isa} = %{version}-%{release}
 Obsoletes:      MySQL-Cluster-server-advanced < %{version}-%{release}
 Obsoletes:      MySQL-Cluster-embedded-advanced < %{version}-%{release}
 Obsoletes:      mysql-commercial-server < %{version}-%{release}
 Obsoletes:      mysql-cluster-community-server < %{version}-%{release}
+%if 0%{?without_debuginfo}
+Obsoletes:      mysql-cluster-community-server-debug < %{version}-%{release}
+%endif
 Obsoletes:      mysql-cluster-commercial-embedded < 8.0.1
 Obsoletes:      mysql-cluster-commercial-embedded-devel < 8.0.1
 %endif
@@ -777,6 +825,13 @@ mkdir debug
            -DWITH_CURL=system \
            %{?aws_sdk_option} \
 %endif
+<<<<<<< HEAD
+||||||| merged common ancestors
+           %{?ssl_option} \
+=======
+           %{?ssl_option} \
+           %{?mini_debug_option} \
+>>>>>>> Percona-Server-8.0.29-21
            -DWITH_INNODB_MEMCACHED=1 \
            -DROUTER_INSTALL_LIBDIR="%{_lib}" \
            -DROUTER_INSTALL_PLUGINDIR="%{_lib}/mysqlrouter" \
@@ -820,6 +875,13 @@ mkdir release
            -DWITH_CURL=system \
            %{?aws_sdk_option} \
 %endif
+<<<<<<< HEAD
+||||||| merged common ancestors
+           %{?ssl_option} \
+=======
+           %{?ssl_option} \
+           %{?mini_debug_option} \
+>>>>>>> Percona-Server-8.0.29-21
            -DWITH_INNODB_MEMCACHED=1 \
            -DROUTER_INSTALL_LIBDIR="%{_lib}" \
            -DROUTER_INSTALL_PLUGINDIR="%{_lib}/mysqlrouter" \
@@ -836,6 +898,11 @@ mkdir release
 )
 
 %install
+# /usr/bin/strip is too old on el6
+%if 0%{?rhel} == 6
+export STRIP=/opt/rh/devtoolset-8/root/usr/bin/strip
+%endif
+
 %if 0%{?compatlib}
 # Install compat libs
 dirs="libmysql libmysql_r"
@@ -1058,8 +1125,16 @@ fi
 %attr(755, root, root) %{_sbindir}/mysqld
 
 %dir %{_libdir}/mysql/private
+<<<<<<< HEAD
 %attr(755, root, root) %{_libdir}/mysql/private/libprotobuf-lite.so.3.6.1
 %attr(755, root, root) %{_libdir}/mysql/private/libprotobuf.so.3.6.1
+||||||| merged common ancestors
+%attr(755, root, root) %{_libdir}/mysql/private/libprotobuf-lite.so.3.11.4
+%attr(755, root, root) %{_libdir}/mysql/private/libprotobuf.so.3.11.4
+=======
+%attr(755, root, root) %{_libdir}/mysql/private/libprotobuf-lite.so.3.19.4
+%attr(755, root, root) %{_libdir}/mysql/private/libprotobuf.so.3.19.4
+>>>>>>> Percona-Server-8.0.29-21
 
 %dir %{_libdir}/mysql/plugin
 %attr(755, root, root) %{_libdir}/mysql/plugin/adt_null.so
@@ -1143,6 +1218,7 @@ fi
 
 %if 0%{?with_debuginfo}
 %files server-debug
+%doc %{?license_files_server}
 %endif # with_debuginfo
 %attr(755, root, root) %{_sbindir}/mysqld-debug
 %dir %{_libdir}/mysql/plugin/debug
@@ -1468,6 +1544,7 @@ fi
 %attr(755, root, root) %{_libdir}/mysql/plugin/test_udf_services.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/udf_example.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/component_mysqlx_global_reset.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/component_test_sensitive_system_variables.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth_test_plugin.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/authentication_ldap_sasl_client.so
@@ -1554,6 +1631,7 @@ fi
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/test_udf_services.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/udf_example.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_mysqlx_global_reset.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_test_sensitive_system_variables.so
 
 %if 0%{?rhel} == 7
 %files embedded-compat
@@ -1665,17 +1743,24 @@ fi
 %{_libdir}/mysqlrouter/private/libmysqlharness_stdx.so.*
 %{_libdir}/mysqlrouter/private/libmysqlharness_tls.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_connection_pool.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_http.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_http_auth_backend.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_http_auth_realm.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_io_component.so.*
-%{_libdir}/mysqlrouter/private/libprotobuf-lite.so.3.11.4
+%{_libdir}/mysqlrouter/private/libmysqlrouter_metadata_cache.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_mysqlxmessages.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_routing.so.*
+%{_libdir}/mysqlrouter/private/libprotobuf-lite.so.3.19.4
 %dir %{_libdir}/mysqlrouter
 %{_libdir}/mysqlrouter/*.so*
 %dir %attr(755, mysqlrouter, mysqlrouter) /var/log/mysqlrouter
 %dir %attr(755, mysqlrouter, mysqlrouter) /var/run/mysqlrouter
 
 %changelog
+* Mon Jan 03 2022 Harin Vadodaria <harin.vadodaria@oracle.com> - 8.0.29-1
+- Added component_test_sensitive_system_variables
+
 * Tue Aug 31 2021 Harin Vadodaria <harin.vadodaria@oracle.com> - 8.0.27-1
 - Added authentication_oci_client
 

@@ -1,4 +1,4 @@
-/* Copyright (c) 2005, 2021, Oracle and/or its affiliates.
+/* Copyright (c) 2005, 2022, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -51,9 +51,9 @@
 #include "my_loglevel.h"
 #include "my_psi_config.h"
 #include "my_thread_local.h"
-#include "mysql/components/services/mysql_mutex_bits.h"
-#include "mysql/components/services/mysql_rwlock_bits.h"
-#include "mysql/components/services/psi_file_bits.h"
+#include "mysql/components/services/bits/mysql_mutex_bits.h"
+#include "mysql/components/services/bits/mysql_rwlock_bits.h"
+#include "mysql/components/services/bits/psi_file_bits.h"
 #include "mysql/psi/mysql_mutex.h"
 #include "mysql_com.h"
 #include "sql/auth/sql_security_ctx.h"  // Security_context
@@ -138,7 +138,55 @@ struct TABLE_LIST;
 */
 int log_vmessage(int log_type, va_list lili);
 int log_message(int log_type, ...);
+<<<<<<< HEAD
 
+||||||| merged common ancestors
+>>>>>>>>> Temporary merge branch 2
+
+<<<<<<<<< Temporary merge branch 1
+  /** Path to log file. */
+  char log_file_name[FN_REFLEN];
+
+  /** Last seen current database. */
+  char db[NAME_LEN + 1];
+
+  /** Have we already printed ER_ERROR_ON_WRITE? */
+  bool write_error;
+
+  IO_CACHE log_file;
+
+  /** True if the file log is open, false otherwise. */
+  volatile bool log_open;
+
+#ifdef HAVE_PSI_INTERFACE
+  /** Instrumentation key to use for file io in @c log_file */
+  PSI_file_key m_log_file_key;
+#endif
+||||||||| merged common ancestors
+  /** Path to log file. */
+  char log_file_name[FN_REFLEN];
+
+  /** Last seen current database. */
+  char db[NAME_LEN + 1];
+
+  /** Have we already printed ER_ERROR_ON_WRITE? */
+  bool write_error;
+
+  IO_CACHE log_file;
+
+  /** True if the file log is open, false otherwise. */
+  volatile bool log_open;
+
+  ulong cur_log_ext;
+
+#ifdef HAVE_PSI_INTERFACE
+  /** Instrumentation key to use for file io in @c log_file */
+  PSI_file_key m_log_file_key;
+#endif
+=========
+=======
+
+>>>>>>> Percona-Server-8.0.29-21
 /**
   A helper that we can stubify so we don't have to pull all of THD
   into the unit tests.
@@ -1127,9 +1175,6 @@ log_line *log_line_init();
 
 /**
   Release a log_line allocated with log_line_init.
-
-  @retval nullptr  could not set up buffer (too small?)
-  @retval other    address of the newly initialized log_line
 */
 void log_line_exit(log_line *ll);
 

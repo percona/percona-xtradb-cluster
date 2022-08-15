@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2021, Oracle and/or its affiliates.
+/* Copyright (c) 2000, 2022, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -140,7 +140,7 @@ static const TABLE_FIELD_TYPE slow_query_log_table_fields[SQLT_FIELD_COUNT] = {
      {nullptr, 0}},
     {{STRING_WITH_LEN("user_host")},
      {STRING_WITH_LEN("mediumtext")},
-     {STRING_WITH_LEN("utf8")}},
+     {STRING_WITH_LEN("utf8mb3")}},
     {{STRING_WITH_LEN("query_time")},
      {STRING_WITH_LEN("time(6)")},
      {nullptr, 0}},
@@ -153,7 +153,7 @@ static const TABLE_FIELD_TYPE slow_query_log_table_fields[SQLT_FIELD_COUNT] = {
      {nullptr, 0}},
     {{STRING_WITH_LEN("db")},
      {STRING_WITH_LEN("varchar(512)")},
-     {STRING_WITH_LEN("utf8")}},
+     {STRING_WITH_LEN("utf8mb3")}},
     {{STRING_WITH_LEN("last_insert_id")},
      {STRING_WITH_LEN("int")},
      {nullptr, 0}},
@@ -187,7 +187,7 @@ static const TABLE_FIELD_TYPE general_log_table_fields[GLT_FIELD_COUNT] = {
      {nullptr, 0}},
     {{STRING_WITH_LEN("user_host")},
      {STRING_WITH_LEN("mediumtext")},
-     {STRING_WITH_LEN("utf8")}},
+     {STRING_WITH_LEN("utf8mb3")}},
     {{STRING_WITH_LEN("thread_id")},
      {STRING_WITH_LEN("bigint unsigned")},
      {nullptr, 0}},
@@ -196,7 +196,7 @@ static const TABLE_FIELD_TYPE general_log_table_fields[GLT_FIELD_COUNT] = {
      {nullptr, 0}},
     {{STRING_WITH_LEN("command_type")},
      {STRING_WITH_LEN("varchar(64)")},
-     {STRING_WITH_LEN("utf8")}},
+     {STRING_WITH_LEN("utf8mb3")}},
     {{STRING_WITH_LEN("argument")},
      {STRING_WITH_LEN("mediumblob")},
      {nullptr, 0}}};
@@ -1810,6 +1810,10 @@ bool log_slow_applicable(THD *thd, int sp_sql_command) {
 
   if (unlikely(thd->killed == THD::KILL_CONNECTION)) return false;
 
+  if (unlikely(thd->is_error()) &&
+      (unlikely(thd->get_stmt_da()->mysql_errno() == ER_PARSE_ERROR)))
+    return false;
+
   /*
     Do not log administrative statements unless the appropriate option is
     set.
@@ -2090,7 +2094,51 @@ static bool is_n_digit_number(const char *str, int n_digit, ulong *res) {
   if (res) *res = atol(start);
   return true;
 }
+<<<<<<< HEAD
 
+||||||| merged common ancestors
+>>>>>>>>> Temporary merge branch 2
+
+<<<<<<<<< Temporary merge branch 1
+/**
+ * Get biggest known numeric extension for a file name.
+ *
+ * Provided with the full path to the file it searches file's directory for
+ * files with the same name and six digit extension which is preceded by a dot.
+ * Max found extension number is returned. Extension equal to zero is returned
+ * in case there is no such file or there is no such files with numeric
+ * extension yet.
+ *
+ * @param name Full path to the log file name
+ * @return Biggest known numeric extension for the log file name
+ *         or 0 if not found
+ */
+static size_t get_last_extension(const char *const name)
+{
+  DBUG_ENTER("get_last_extension");
+  char buff[FN_REFLEN];
+  ulong max_found = 0;
+  ulong number = 0;
+  size_t buf_length;
+  size_t length;
+
+  length = dirname_part(buff, name, &buf_length);
+  const char *const start = name + length;
+  const char *const end = strend(start);
+  length = (size_t)(end - start);
+
+  MY_DIR *const dir_info = my_dir(buff, MYF(MY_DONT_SORT));
+  const struct fileinfo *file_info = dir_info->dir_entry;
+||||||||| merged common ancestors
+  *need_purge= false;
+  if (my_b_tell(&log_file) > max_size)
+  {
+    if ((error= new_file()))
+      DBUG_RETURN(error);
+=========
+=======
+
+>>>>>>> Percona-Server-8.0.29-21
 /**
  * Get biggest known numeric extension for a file name.
  *
@@ -2177,6 +2225,9 @@ bool File_query_log::set_rotated_name(const bool need_lock) {
     }
 
     if (need_lock) mysql_mutex_lock(&LOCK_global_system_variables);
+    if (opt_slow_logname != NULL) {
+      my_free(opt_slow_logname);
+    }
     opt_slow_logname =
         my_strdup(key_memory_LOG_name, log_file_name, MYF(MY_WME));
     if (need_lock) mysql_mutex_unlock(&LOCK_global_system_variables);
