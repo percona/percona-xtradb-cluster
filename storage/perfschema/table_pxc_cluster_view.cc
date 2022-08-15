@@ -65,6 +65,11 @@ TABLE_FIELD_DEF
 table_pxc_cluster_view::m_field_def=
 { 5, field_types };
 
+PFS_engine_table_share_state
+table_pxc_cluster_view::m_share_state = {
+  false /* m_checked */
+};
+
 PFS_engine_table_share
 table_pxc_cluster_view::m_share=
 {
@@ -77,8 +82,9 @@ table_pxc_cluster_view::m_share=
   sizeof(PFS_simple_index),
   &m_table_lock,
   &m_field_def,
-  false, /* checked */
-  false  /* perpetual */
+  false, /* m_perpetual */
+  false, /* m_optional */
+  &m_share_state
 };
 
 PFS_engine_table*

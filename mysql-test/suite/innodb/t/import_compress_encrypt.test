@@ -13,15 +13,11 @@
 call mtr.add_suppression("Resizing redo log");
 call mtr.add_suppression("Starting to delete and rewrite log files");
 call mtr.add_suppression("New log files created");
-<<<<<<< HEAD
-# zipped datadir doesn't have perfschema table 'performance_schema.pxc_cluster_view' 
-call mtr.add_suppression("Native table .* has the wrong structure");
-||||||| da46e5474f9
-=======
 # Table 'performance_schema'.'processlist' was added in 5.7.39
 # It is not present in the 5.7.32 import test file.
 call mtr.add_suppression("Optional native table 'performance_schema'.'processlist' has the wrong structure or is missing");
->>>>>>> faeafe98e2c1a532038db0fe0536080784af99da
+# zipped datadir doesn't have perfschema table 'performance_schema.pxc_cluster_view'
+call mtr.add_suppression("Native table .* has the wrong structure");
 --enable_query_log
 
 --echo # SETUP

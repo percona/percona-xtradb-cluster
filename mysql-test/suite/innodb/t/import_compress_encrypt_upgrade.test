@@ -18,6 +18,10 @@ call mtr.add_suppression("New log files created");
 # Table 'performance_schema'.'processlist' was added in 5.7.39
 # It is not present in the 5.7.32 import test file.
 call mtr.add_suppression("Optional native table 'performance_schema'.'processlist' has the wrong structure or is missing");
+# Table 'performance_schema'.'pxc_cluster_view' is PXC only
+# It is not present in the 5.7.32 import test file from MySQL.
+call mtr.add_suppression("Native table 'performance_schema'.'pxc_cluster_view' has the wrong structure");
+
 --enable_query_log
 
 --echo

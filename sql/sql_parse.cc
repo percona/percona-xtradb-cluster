@@ -6047,7 +6047,7 @@ end_with_restore_list:
   case SQLCOM_UNINSTALL_PLUGIN:
   case SQLCOM_SHUTDOWN:
   case SQLCOM_ALTER_INSTANCE:
-<<<<<<< HEAD
+  case SQLCOM_SHOW_PROCESSLIST:
 #ifdef WITH_WSREP
   {
     if (lex->sql_command == SQLCOM_XA_START    ||
@@ -6066,10 +6066,6 @@ end_with_restore_list:
       }
     }
 #endif /* WITH_WSREP */
-||||||| da46e5474f9
-=======
-  case SQLCOM_SHOW_PROCESSLIST:
->>>>>>> faeafe98e2c1a532038db0fe0536080784af99da
     assert(lex->m_sql_cmd != NULL);
     res= lex->m_sql_cmd->execute(thd);
     break;
