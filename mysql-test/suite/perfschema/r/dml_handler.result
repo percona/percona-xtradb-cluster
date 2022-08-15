@@ -108,9 +108,16 @@ ERROR HY000: Table storage engine for 'replication_applier_status' doesn't have 
 SELECT TABLE_NAME INTO @table_name FROM table_list WHERE id=56;
 HANDLER performance_schema.replication_applier_configuration OPEN;
 ERROR HY000: Table storage engine for 'replication_applier_configuration' doesn't have this option
+<<<<<<< HEAD
 SELECT TABLE_NAME INTO @table_name FROM table_list WHERE id=55;
 HANDLER performance_schema.pxc_cluster_view OPEN;
 ERROR HY000: Table storage engine for 'pxc_cluster_view' doesn't have this option
+||||||| da46e5474f9
+=======
+SELECT TABLE_NAME INTO @table_name FROM table_list WHERE id=55;
+HANDLER performance_schema.processlist OPEN;
+ERROR HY000: Table storage engine for 'processlist' doesn't have this option
+>>>>>>> faeafe98e2c1a532038db0fe0536080784af99da
 SELECT TABLE_NAME INTO @table_name FROM table_list WHERE id=54;
 HANDLER performance_schema.prepared_statements_instances OPEN;
 ERROR HY000: Table storage engine for 'prepared_statements_instances' doesn't have this option

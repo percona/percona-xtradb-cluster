@@ -61,7 +61,12 @@ mutex_instances
 objects_summary_global_by_type
 performance_timers
 prepared_statements_instances
+<<<<<<< HEAD
 pxc_cluster_view
+||||||| da46e5474f9
+=======
+processlist
+>>>>>>> faeafe98e2c1a532038db0fe0536080784af99da
 replication_applier_configuration
 replication_applier_status
 replication_applier_status_by_coordinator
