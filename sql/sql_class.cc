@@ -1353,7 +1353,6 @@ void THD::cleanup(void) {
   if (wsrep_cs().state() != wsrep::client_state::s_none) {
     wsrep_cs().cleanup();
   }
-  wsrep_client_thread = false;
   wsrep_allow_mdl_conflict = false;
   wsrep_aborter = 0;
 #endif /* WITH_WSREP */

@@ -1037,6 +1037,7 @@ void end_connection(THD *thd) {
     wsrep_after_command_ignore_result(thd);
   }
   wsrep_close(thd);
+  thd->wsrep_client_thread = false;
 #endif /* WITH_WSREP */
 
   mysql_audit_notify(thd, AUDIT_EVENT(MYSQL_AUDIT_CONNECTION_DISCONNECT), 0);
