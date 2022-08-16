@@ -46,6 +46,8 @@ private:
   void make_row(uint index);
   /** Table share lock. */
   static THR_LOCK m_table_lock;
+
+  static PFS_engine_table_share_state m_share_state;
   /** Fields definition. */
   static TABLE_FIELD_DEF m_field_def;
   /** True if the current row exists. */

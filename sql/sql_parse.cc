@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2021, Oracle and/or its affiliates.
+/* Copyright (c) 2000, 2022, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -146,7 +146,6 @@ static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
    (LP)->sql_command == SQLCOM_DROP_FUNCTION ? \
    "FUNCTION" : "PROCEDURE")
 
-static bool execute_sqlcom_select(THD *thd, TABLE_LIST *all_tables);
 static void sql_kill(THD *thd, my_thread_id id, bool only_kill_query);
 
 
@@ -4518,17 +4517,6 @@ end_with_restore_list:
     }
   }
   break;
-  case SQLCOM_SHOW_PROCESSLIST:
-    if (!thd->security_context()->priv_user().str[0] &&
-        check_global_access(thd,PROCESS_ACL))
-      break;
-    mysqld_list_processes(
-      thd,
-      (thd->security_context()->check_access(PROCESS_ACL) ?
-         NullS :
-        thd->security_context()->priv_user().str),
-      lex->verbose);
-    break;
   case SQLCOM_SHOW_PRIVILEGES:
     res= mysqld_show_privileges(thd);
     break;
@@ -6059,6 +6047,7 @@ end_with_restore_list:
   case SQLCOM_UNINSTALL_PLUGIN:
   case SQLCOM_SHUTDOWN:
   case SQLCOM_ALTER_INSTANCE:
+  case SQLCOM_SHOW_PROCESSLIST:
 #ifdef WITH_WSREP
   {
     if (lex->sql_command == SQLCOM_XA_START    ||
@@ -6517,7 +6506,7 @@ finish:
   DBUG_RETURN(res || thd->is_error());
 }
 
-static bool execute_sqlcom_select(THD *thd, TABLE_LIST *all_tables)
+bool execute_sqlcom_select(THD *thd, TABLE_LIST *all_tables)
 {
   LEX	*lex= thd->lex;
   bool statement_timer_armed= false;

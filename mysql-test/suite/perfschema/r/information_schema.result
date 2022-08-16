@@ -56,6 +56,7 @@ performance_schema	mutex_instances	def
 performance_schema	objects_summary_global_by_type	def
 performance_schema	performance_timers	def
 performance_schema	prepared_statements_instances	def
+performance_schema	processlist	def
 performance_schema	pxc_cluster_view	def
 performance_schema	replication_applier_configuration	def
 performance_schema	replication_applier_status	def
@@ -148,6 +149,7 @@ mutex_instances	BASE TABLE	PERFORMANCE_SCHEMA
 objects_summary_global_by_type	BASE TABLE	PERFORMANCE_SCHEMA
 performance_timers	BASE TABLE	PERFORMANCE_SCHEMA
 prepared_statements_instances	BASE TABLE	PERFORMANCE_SCHEMA
+processlist	BASE TABLE	PERFORMANCE_SCHEMA
 pxc_cluster_view	BASE TABLE	PERFORMANCE_SCHEMA
 replication_applier_configuration	BASE TABLE	PERFORMANCE_SCHEMA
 replication_applier_status	BASE TABLE	PERFORMANCE_SCHEMA
@@ -240,6 +242,7 @@ mutex_instances	10	Dynamic
 objects_summary_global_by_type	10	Dynamic
 performance_timers	10	Fixed
 prepared_statements_instances	10	Dynamic
+processlist	10	Dynamic
 pxc_cluster_view	10	Fixed
 replication_applier_configuration	10	Fixed
 replication_applier_status	10	Fixed
@@ -331,6 +334,7 @@ mutex_instances	0
 objects_summary_global_by_type	0
 performance_timers	0
 prepared_statements_instances	0
+processlist	0
 pxc_cluster_view	0
 replication_applier_configuration	0
 replication_applier_status	0
@@ -430,6 +434,7 @@ mutex_instances	0	0
 objects_summary_global_by_type	0	0
 performance_timers	0	0
 prepared_statements_instances	0	0
+processlist	0	0
 pxc_cluster_view	0	0
 replication_applier_configuration	0	0
 replication_applier_status	0	0
@@ -522,6 +527,7 @@ mutex_instances	0	0	NULL
 objects_summary_global_by_type	0	0	NULL
 performance_timers	0	0	NULL
 prepared_statements_instances	0	0	NULL
+processlist	0	0	NULL
 pxc_cluster_view	0	0	NULL
 replication_applier_configuration	0	0	NULL
 replication_applier_status	0	0	NULL
@@ -614,6 +620,7 @@ mutex_instances	NULL	NULL	NULL
 objects_summary_global_by_type	NULL	NULL	NULL
 performance_timers	NULL	NULL	NULL
 prepared_statements_instances	NULL	NULL	NULL
+processlist	NULL	NULL	NULL
 pxc_cluster_view	NULL	NULL	NULL
 replication_applier_configuration	NULL	NULL	NULL
 replication_applier_status	NULL	NULL	NULL
@@ -706,6 +713,7 @@ mutex_instances	utf8_general_ci	NULL
 objects_summary_global_by_type	utf8_general_ci	NULL
 performance_timers	utf8_general_ci	NULL
 prepared_statements_instances	utf8_general_ci	NULL
+processlist	utf8_general_ci	NULL
 pxc_cluster_view	utf8_general_ci	NULL
 replication_applier_configuration	utf8_general_ci	NULL
 replication_applier_status	utf8_general_ci	NULL
@@ -798,6 +806,7 @@ mutex_instances
 objects_summary_global_by_type	
 performance_timers	
 prepared_statements_instances	
+processlist	
 pxc_cluster_view	
 replication_applier_configuration	
 replication_applier_status	
@@ -890,6 +899,7 @@ mutex_instances
 objects_summary_global_by_type	
 performance_timers	
 prepared_statements_instances	
+processlist	
 pxc_cluster_view	
 replication_applier_configuration	
 replication_applier_status	
