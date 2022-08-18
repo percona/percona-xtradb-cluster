@@ -940,23 +940,17 @@ plugin_ref intern_plugin_lock(LEX *lex, plugin_ref rc) {
   st_plugin_int *pi = plugin_ref_to_int(rc);
   DBUG_TRACE;
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   // TODO why plugin_ref could be NULL ?
   if (!rc) return NULL;
 #endif /* WITH_WSREP */
 
-  mysql_mutex_assert_owner(&LOCK_plugin);
-||||||| merged common ancestors
-  mysql_mutex_assert_owner(&LOCK_plugin);
-=======
 #ifndef NDEBUG
   // See force_plugin_lock, in System_variable_tracker::visit_plugin_variable.
   if (current_thd != nullptr) {
     mysql_mutex_assert_owner(&LOCK_plugin);
   }
 #endif
->>>>>>> Percona-Server-8.0.29-21
 
   if (pi->state & (PLUGIN_IS_READY | PLUGIN_IS_UNINITIALIZED)) {
     plugin_ref plugin;

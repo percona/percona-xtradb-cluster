@@ -42,13 +42,7 @@
 #include <string>
 
 #include "lex_string.h"
-<<<<<<< HEAD
-||||||| merged common ancestors
-#include "m_string.h"  // native_strncasecmp
 #include "my_aes.h"
-=======
-#include "my_aes.h"
->>>>>>> Percona-Server-8.0.29-21
 #include "libbinlogevents/include/binlog_event.h"
 #include "libbinlogevents/include/control_events.h"
 #include "libbinlogevents/include/load_data_events.h"

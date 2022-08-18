@@ -175,7 +175,7 @@ static bool row_upd_index_is_referenced(dict_index_t *index) /*!< in: index */
 #ifdef WITH_WSREP
 static bool wsrep_row_upd_index_is_foreign(dict_index_t *index, trx_t *trx) {
   dict_table_t *table = index->table;
-  ibool is_referenced = false;
+  bool is_referenced = false;
 
   if (table->foreign_set.empty()) {
     return (false);
@@ -332,10 +332,10 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
 
   trx = thr_get_trx(thr);
 
-  rec = btr_pcur_get_rec(pcur);
+  rec = pcur->get_rec();
   ut_ad(rec_offs_validate(rec, index, offsets));
 
-  heap = mem_heap_create(500);
+  heap = mem_heap_create(500, UT_LOCATION_HERE);
 
   entry = row_rec_to_index_entry(rec, index, offsets, heap);
 
@@ -374,7 +374,7 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
 
       if (foreign->referenced_table != NULL) {
         if (opened) {
-          dict_table_close(foreign->referenced_table, FALSE, FALSE);
+          dict_table_close(foreign->referenced_table, false, false);
           opened = false;
         }
       }
@@ -2301,17 +2301,11 @@ code or DB_LOCK_WAIT */
 
   auto referenced = row_upd_index_is_referenced(index);
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   bool foreign = wsrep_row_upd_index_is_foreign(index, trx);
 #endif /* WITH_WSREP */
 
-  heap = mem_heap_create(1024);
-||||||| merged common ancestors
-  heap = mem_heap_create(1024);
-=======
   heap = mem_heap_create(1024, UT_LOCATION_HERE);
->>>>>>> Percona-Server-8.0.29-21
 
   if (!node->is_delete && dict_index_is_spatial(index) &&
       index->srid_is_valid) {
@@ -2472,17 +2466,11 @@ code or DB_LOCK_WAIT */
       delete marked if we return after a lock wait in
       row_ins_sec_index_entry() below */
       if (!rec_get_deleted_flag(rec, dict_table_is_comp(index->table))) {
-<<<<<<< HEAD
 #ifdef WITH_WSREP
         que_node_t *parent = que_node_get_parent(node);
 #endif /* WITH_WSREP */
 
-        err = btr_cur_del_mark_set_sec_rec(flags, btr_cur, TRUE, thr, &mtr);
-||||||| merged common ancestors
-        err = btr_cur_del_mark_set_sec_rec(flags, btr_cur, TRUE, thr, &mtr);
-=======
         err = btr_cur_del_mark_set_sec_rec(flags, btr_cur, true, thr, &mtr);
->>>>>>> Percona-Server-8.0.29-21
         if (err != DB_SUCCESS) {
           break;
         }
@@ -2747,23 +2735,12 @@ static inline bool row_upd_clust_rec_by_insert_inherit(
     upd_node_t *node,    /*!< in/out: row update node */
     dict_index_t *index, /*!< in: clustered index of the record */
     que_thr_t *thr,      /*!< in: query thread */
-<<<<<<< HEAD
-    ibool referenced,    /*!< in: TRUE if index may be referenced in
-                      a foreign key constraint */
-#ifdef WITH_WSREP
-    bool foreign, /*!< in: TRUE if index is foreign key index */
-#endif            /* WITH_WSREP */
-
-    mtr_t *mtr) /*!< in/out: mtr; gets committed here */
-||||||| merged common ancestors
-    ibool referenced,    /*!< in: TRUE if index may be referenced in
-                      a foreign key constraint */
-    mtr_t *mtr)          /*!< in/out: mtr; gets committed here */
-=======
     bool referenced,     /*!< in: true if index may be referenced in
                        a foreign key constraint */
+#ifdef WITH_WSREP
+    bool foreign,        /*!< in: TRUE if index is foreign key index */
+#endif /* WITH_WSREP */
     mtr_t *mtr)          /*!< in/out: mtr; gets committed here */
->>>>>>> Percona-Server-8.0.29-21
 {
   mem_heap_t *heap;
   btr_pcur_t *pcur;
@@ -3146,20 +3123,12 @@ func_exit:
     ulint *offsets,      /*!< in/out: rec_get_offsets() for the
                          record under the cursor */
     que_thr_t *thr,      /*!< in: query thread */
-<<<<<<< HEAD
-    ibool referenced,
+    bool referenced,
+    /*!< in: TRUE if index may be referenced in
+    a foreign key constraint */
 #ifdef WITH_WSREP
     bool foreign, /*!< in: TRUE if index is foreign key index */
 #endif            /* WITH_WSREP */
-    /*!< in: TRUE if index may be referenced in
-||||||| merged common ancestors
-    ibool referenced,
-    /*!< in: TRUE if index may be referenced in
-=======
-    bool referenced,
-    /*!< in: true if index may be referenced in
->>>>>>> Percona-Server-8.0.29-21
-    a foreign key constraint */
     mtr_t *mtr) /*!< in: mtr; gets committed here */
 {
   btr_pcur_t *pcur;
@@ -3168,6 +3137,7 @@ func_exit:
 
 #ifdef WITH_WSREP
   que_node_t *parent = que_node_get_parent(node);
+  trx_t *const trx = thr_get_trx(thr);
 #endif /* WITH_WSREP */
 
   ut_ad(node);
@@ -3246,16 +3216,10 @@ func_exit:
 
   index = node->table->first_index();
 
-<<<<<<< HEAD
-  referenced = row_upd_index_is_referenced(index, trx);
-#ifdef WITH_WSREP
-  bool foreign = wsrep_row_upd_index_is_foreign(index, thr_get_trx(thr));
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-  referenced = row_upd_index_is_referenced(index, trx);
-=======
   auto referenced = row_upd_index_is_referenced(index);
->>>>>>> Percona-Server-8.0.29-21
+#ifdef WITH_WSREP
+  bool foreign = wsrep_row_upd_index_is_foreign(index, trx);
+#endif /* WITH_WSREP */
 
   pcur = node->pcur;
 

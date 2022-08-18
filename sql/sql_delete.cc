@@ -1180,121 +1180,7 @@ bool DeleteRowsIterator::DoDelayedDeletes() {
     TABLE *const table = m_delayed_tables[counter];
     if (m_tempfiles[counter]->get(table)) return true;
 
-<<<<<<< HEAD
-  /* the error was handled or nothing deleted and no side effects return */
-  if (error_handled ||
-      (!thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT) &&
-       deleted_rows == 0))
-    return;
-
-  /*
-    If rows from the first table only has been deleted and it is
-    transactional, just do rollback.
-    The same if all tables are transactional, regardless of where we are.
-    In all other cases do attempt deletes ...
-  */
-  if (!delete_completed && thd->get_transaction()->has_modified_non_trans_table(
-                               Transaction_ctx::STMT)) {
-    // Execute the recorded do_deletes() and write info into the error log
-    non_transactional_delete_aborted = true;
-    send_eof(thd);
-    assert(error_handled);
-    return;
-  }
-
-  if (thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT)) {
-    /*
-       there is only side effects; to binlog with the error
-    */
-#ifdef WITH_WSREP
-    if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open()) {
-#else
-    if (mysql_bin_log.is_open()) {
-#endif /* WITH_WSREP */
-      int errcode = query_error_code(thd, thd->killed == THD::NOT_KILLED);
-      /* possible error of writing binary log is ignored deliberately */
-      (void)thd->binlog_query(THD::ROW_QUERY_TYPE, thd->query().str,
-                              thd->query().length, transactional_table_map != 0,
-                              false, false, errcode);
-    }
-  }
-}
-
-/**
-  Do delete from other tables.
-
-  @return true on error
-*/
-
-bool Query_result_delete::do_deletes(THD *thd) {
-  DBUG_TRACE;
-  assert(!delete_completed);
-
-  delete_completed = true;  // Mark operation as complete
-  if (!has_buffered_rows) return false;
-
-  for (uint counter = 0; counter < tables.size(); counter++) {
-    TABLE *const table = tables[counter];
-    if (tempfiles[counter]->get(table)) return true;
-
-    if (do_table_deletes(thd, table) || thd->killed) {
-||||||| merged common ancestors
-  /* the error was handled or nothing deleted and no side effects return */
-  if (error_handled ||
-      (!thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT) &&
-       deleted_rows == 0))
-    return;
-
-  /*
-    If rows from the first table only has been deleted and it is
-    transactional, just do rollback.
-    The same if all tables are transactional, regardless of where we are.
-    In all other cases do attempt deletes ...
-  */
-  if (!delete_completed && thd->get_transaction()->has_modified_non_trans_table(
-                               Transaction_ctx::STMT)) {
-    // Execute the recorded do_deletes() and write info into the error log
-    non_transactional_delete_aborted = true;
-    send_eof(thd);
-    assert(error_handled);
-    return;
-  }
-
-  if (thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT)) {
-    /*
-       there is only side effects; to binlog with the error
-    */
-    if (mysql_bin_log.is_open()) {
-      int errcode = query_error_code(thd, thd->killed == THD::NOT_KILLED);
-      /* possible error of writing binary log is ignored deliberately */
-      (void)thd->binlog_query(THD::ROW_QUERY_TYPE, thd->query().str,
-                              thd->query().length, transactional_table_map != 0,
-                              false, false, errcode);
-    }
-  }
-}
-
-/**
-  Do delete from other tables.
-
-  @return true on error
-*/
-
-bool Query_result_delete::do_deletes(THD *thd) {
-  DBUG_TRACE;
-  assert(!delete_completed);
-
-  delete_completed = true;  // Mark operation as complete
-  if (!has_buffered_rows) return false;
-
-  for (uint counter = 0; counter < tables.size(); counter++) {
-    TABLE *const table = tables[counter];
-    if (tempfiles[counter]->get(table)) return true;
-
-    if (do_table_deletes(thd, table) || thd->killed) {
-=======
     if (DoDelayedDeletesFromTable(table) || thd()->killed) {
->>>>>>> Percona-Server-8.0.29-21
       return true;
     }
   }
@@ -1405,16 +1291,10 @@ int DeleteRowsIterator::Read() {
       !local_error ? THD::NOT_KILLED : thd()->killed.load();
 
   if (!local_error ||
-<<<<<<< HEAD
-      thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT)) {
-#ifdef WITH_WSREP
-    if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open()) {
-#else
-||||||| merged common ancestors
-      thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT)) {
-=======
       thd()->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT)) {
->>>>>>> Percona-Server-8.0.29-21
+#ifdef WITH_WSREP
+    if (WSREP_EMULATE_BINLOG(thd()) || mysql_bin_log.is_open()) {
+#else
     if (mysql_bin_log.is_open()) {
 #endif /* WITH_WSREP */
       int errcode = 0;

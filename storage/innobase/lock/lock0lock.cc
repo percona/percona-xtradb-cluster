@@ -1708,7 +1708,7 @@ static void lock_rec_add_to_queue(ulint type_mode, const buf_block_t *block,
     if (other_lock && !wsrep_thd_is_BF(trx->mysql_thd, false) &&
         !wsrep_thd_is_BF(other_lock->trx->mysql_thd, true)) {
       ib::info() << "WSREP BF lock conflict for my lock:\n BF:"
-                 << ((wsrep_thd_is_BF(trx->mysql_thd, FALSE)) ? "BF" : "normal")
+                 << ((wsrep_thd_is_BF(trx->mysql_thd, false)) ? "BF" : "normal")
                  << " exec: " << wsrep_thd_client_state_str(trx->mysql_thd)
                  << " conflict: "
                  << wsrep_thd_transaction_state_str(trx->mysql_thd)
@@ -1716,7 +1716,7 @@ static void lock_rec_add_to_queue(ulint type_mode, const buf_block_t *block,
                  << " SQL: " << wsrep_thd_query(trx->mysql_thd);
       trx_t *otrx = other_lock->trx;
       ib::info() << "WSREP other lock:\n BF:"
-                 << ((wsrep_thd_is_BF(otrx->mysql_thd, FALSE)) ? "BF"
+                 << ((wsrep_thd_is_BF(otrx->mysql_thd, false)) ? "BF"
                                                                : "normal")
                  << " exec: " << wsrep_thd_client_state_str(otrx->mysql_thd)
                  << " conflict: "
@@ -2116,8 +2116,7 @@ static const lock_t *lock_rec_has_to_wait_in_queue(
 
     if ((blocking_trx == nullptr || blocking_trx == lock->trx) &&
         heap_no < lock_rec_get_n_bits(lock) && (p[bit_offset] & bit_mask) &&
-<<<<<<< HEAD
-        lock_has_to_wait(wait_lock, lock)) {
+        locksys::rec_lock_has_to_wait(wait_lock, lock, wait_lock_cache)) {
 #ifdef WITH_WSREP
       /* As per parallel applying algorithm of the wsrep slave threads
       locks are not considered conflicting and so if requesting and waiting
@@ -2155,11 +2154,6 @@ static const lock_t *lock_rec_has_to_wait_in_queue(
       }
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-        lock_has_to_wait(wait_lock, lock)) {
-=======
-        locksys::rec_lock_has_to_wait(wait_lock, lock, wait_lock_cache)) {
->>>>>>> Percona-Server-8.0.29-21
       return (lock);
     }
   }

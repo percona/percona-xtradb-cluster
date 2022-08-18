@@ -2094,51 +2094,7 @@ static bool is_n_digit_number(const char *str, int n_digit, ulong *res) {
   if (res) *res = atol(start);
   return true;
 }
-<<<<<<< HEAD
 
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-
-<<<<<<<<< Temporary merge branch 1
-/**
- * Get biggest known numeric extension for a file name.
- *
- * Provided with the full path to the file it searches file's directory for
- * files with the same name and six digit extension which is preceded by a dot.
- * Max found extension number is returned. Extension equal to zero is returned
- * in case there is no such file or there is no such files with numeric
- * extension yet.
- *
- * @param name Full path to the log file name
- * @return Biggest known numeric extension for the log file name
- *         or 0 if not found
- */
-static size_t get_last_extension(const char *const name)
-{
-  DBUG_ENTER("get_last_extension");
-  char buff[FN_REFLEN];
-  ulong max_found = 0;
-  ulong number = 0;
-  size_t buf_length;
-  size_t length;
-
-  length = dirname_part(buff, name, &buf_length);
-  const char *const start = name + length;
-  const char *const end = strend(start);
-  length = (size_t)(end - start);
-
-  MY_DIR *const dir_info = my_dir(buff, MYF(MY_DONT_SORT));
-  const struct fileinfo *file_info = dir_info->dir_entry;
-||||||||| merged common ancestors
-  *need_purge= false;
-  if (my_b_tell(&log_file) > max_size)
-  {
-    if ((error= new_file()))
-      DBUG_RETURN(error);
-=========
-=======
-
->>>>>>> Percona-Server-8.0.29-21
 /**
  * Get biggest known numeric extension for a file name.
  *

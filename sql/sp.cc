@@ -2685,6 +2685,8 @@ int wsrep_create_sp(THD *thd, uchar **buf, size_t *buf_len) {
   String log_query;
   sp_head *sp = thd->lex->sphead;
   ulong saved_mode = thd->variables.sql_mode;
+  bool if_not_exists = thd->lex->create_info->options & HA_LEX_CREATE_IF_NOT_EXISTS;
+
   String retstr(64);
   retstr.set_charset(system_charset_info);
 
@@ -2701,7 +2703,7 @@ int wsrep_create_sp(THD *thd, uchar **buf, size_t *buf_len) {
                      sp->m_params.length, retstr.c_ptr(), retstr.length(),
                      sp->m_body.str, sp->m_body.length, sp->m_chistics,
                      thd->lex->definer->user, thd->lex->definer->host,
-                     saved_mode)) {
+                     saved_mode, if_not_exists)) {
     WSREP_WARN("Store Procedure create string failed: schema: %s, query: %s",
                (thd->db().str ? thd->db().str : "(null)"), thd->query().str);
     return 1;

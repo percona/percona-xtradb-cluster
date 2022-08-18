@@ -83,10 +83,5 @@ int log_message(int, ...) {
 bool acl_is_utility_user(const char *, const char *, const char *) {
   return false;
 }
-<<<<<<< HEAD
-
-||||||| merged common ancestors
-=======
 
 void reset_status_by_thd() {}
->>>>>>> Percona-Server-8.0.29-21

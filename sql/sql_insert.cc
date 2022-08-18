@@ -2259,15 +2259,9 @@ ok_or_after_trg_err:
   if (!table->file->has_transactions())
     thd->get_transaction()->mark_modified_non_trans_table(
         Transaction_ctx::STMT);
-<<<<<<< HEAD
-  mem_root.Clear();
 #ifdef WITH_WSREP
   thd->wsrep_post_insert_error |= trg_error;
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-  mem_root.Clear();
-=======
->>>>>>> Percona-Server-8.0.29-21
   return trg_error;
 
 err : {
@@ -2282,15 +2276,9 @@ before_trg_err:
   table->file->restore_auto_increment(prev_insert_id);
   if (key) my_safe_afree(key, table->s->max_unique_length, MAX_KEY_LENGTH);
   table->column_bitmaps_set(save_read_set, save_write_set);
-<<<<<<< HEAD
-  mem_root.Clear();
 #ifdef WITH_WSREP
   thd->wsrep_post_insert_error |= trg_error;
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-  mem_root.Clear();
-=======
->>>>>>> Percona-Server-8.0.29-21
   return true;
 }
 

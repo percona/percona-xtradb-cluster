@@ -643,18 +643,12 @@ std::chrono::seconds get_srv_flush_log_at_timeout();
 extern bool srv_adaptive_flushing;
 extern bool srv_flush_sync;
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 /* When this event is reset we do not allow any file writes to take place. */
 extern os_event_t srv_allow_writes_event;
 #endif /* WITH_WSREP */
 
-/* If this flag is TRUE, then we will load the indexes' (and tables') metadata
-||||||| merged common ancestors
-/* If this flag is TRUE, then we will load the indexes' (and tables') metadata
-=======
 /* If this flag is true, then we will load the indexes' (and tables') metadata
->>>>>>> Percona-Server-8.0.29-21
 even if they are marked as "corrupted". Mostly it is for DBA to process
 corrupted index and table */
 extern bool srv_load_corrupted;

@@ -3564,7 +3564,7 @@ bool trx_is_strict(trx_t *trx) /*!< in: transaction */
 #ifdef WITH_WSREP
 /** Determines if the currently running transaction is a wsrep transaction.
  @return true if transaction is a wsrep transaction */
-ibool trx_is_wsrep_trx(const trx_t *trx) /*!< in: transaction */
+bool trx_is_wsrep_trx(const trx_t *trx) /*!< in: transaction */
 {
   return (trx && wsrep_on(trx->mysql_thd));
 }
@@ -8742,7 +8742,7 @@ int wsrep_innobase_mysql_sort(int mysql_type, uint charset_number,
  @return key value length as stored in buff */
 uint wsrep_store_key_val_for_row(THD *thd, TABLE *table, uint keynr, char *buff,
                                  uint buff_len, const uchar *record,
-                                 ibool *key_is_null, row_prebuilt_t *prebuilt) {
+                                 bool *key_is_null, row_prebuilt_t *prebuilt) {
   KEY *key_info = table->key_info + keynr;
   KEY_PART_INFO *key_part = key_info->key_part;
   KEY_PART_INFO *end = key_part + key_info->user_defined_key_parts;
@@ -8758,7 +8758,7 @@ uint wsrep_store_key_val_for_row(THD *thd, TABLE *table, uint keynr, char *buff,
 
   for (; key_part != end; key_part++) {
     uchar sorted[REC_VERSION_56_MAX_INDEX_COL_LEN] = {'\0'};
-    ibool part_is_null = FALSE;
+    bool part_is_null = false;
 
     if (key_part->null_bit) {
       if (buff_space > 0) {
@@ -8776,7 +8776,7 @@ uint wsrep_store_key_val_for_row(THD *thd, TABLE *table, uint keynr, char *buff,
       }
     }
 
-    if (!part_is_null) *key_is_null = FALSE;
+    if (!part_is_null) *key_is_null = false;
 
     field = key_part->field;
     mysql_type = field->type();
@@ -12858,7 +12858,7 @@ dict_index_t *wsrep_dict_foreign_find_index(dict_table_t *table,
                                             const char **col_names,
                                             const char **columns, ulint n_cols,
                                             dict_index_t *types_idx,
-                                            ibool check_charsets,
+                                            bool check_charsets,
                                             ulint check_null);
 
 inline const char *wsrep_key_type_to_str(Wsrep_service_key_type type) {
@@ -12880,7 +12880,7 @@ extern dberr_t wsrep_append_foreign_key(
     dict_foreign_t *foreign,         /*!< in: foreign key constraint */
     const rec_t *rec,                /*!< in: clustered index record */
     dict_index_t *index,             /*!< in: clustered index */
-    ibool referenced,                /*!< in: is check for referenced table */
+    bool referenced,                /*!< in: is check for referenced table */
     Wsrep_service_key_type key_type) /*!< in: access type of this key
                              (shared, exclusive, reference...) */
 {
@@ -12958,7 +12958,7 @@ extern dberr_t wsrep_append_foreign_key(
                                     wsrep_protocol_version > 1);
   if (rcode != DB_SUCCESS) {
     WSREP_ERROR(
-        "FK key set failed: %d (%lu %s), index: %s %s, %s", rcode, referenced,
+        "FK key set failed: %d (%d %s), index: %s %s, %s", rcode, referenced,
         wsrep_key_type_to_str(key_type),
         (index && index->name) ? (const char *)(index->name) : "void index",
         (index && index->table_name) ? (index->table_name) : "void table",
@@ -13105,7 +13105,7 @@ int ha_innobase::wsrep_append_keys(
     uint len;
     char keyval[WSREP_MAX_SUPPORTED_KEY_LENGTH + 1] = {'\0'};
     char *key = &keyval[0];
-    ibool is_null;
+    bool is_null;
 
     len = wsrep_store_key_val_for_row(thd, table, 0, key,
                                       WSREP_MAX_SUPPORTED_KEY_LENGTH, record0,
@@ -13160,12 +13160,12 @@ int ha_innobase::wsrep_append_keys(
       if ((!hasPK && wsrep_certify_nonPK) || key_info->flags & HA_NOSAME ||
           ((tab && wsrep_is_FK_index(tab, idx)) ||
            (!tab && referenced_by_fk))) {
-        ibool is_null0;
+        bool is_null0;
         uint len0 = wsrep_store_key_val_for_row(thd, table, i, key0,
                                                 WSREP_MAX_SUPPORTED_KEY_LENGTH,
                                                 record0, &is_null0, m_prebuilt);
         if (record1) {
-          ibool is_null1;
+          bool is_null1;
           uint len1 = wsrep_store_key_val_for_row(
               thd, table, i, key1, WSREP_MAX_SUPPORTED_KEY_LENGTH, record1,
               &is_null1, m_prebuilt);
@@ -24995,7 +24995,7 @@ void wsrep_abort_slave_trx(wsrep_seqno_t bf_seqno, wsrep_seqno_t victim_seqno) {
 
 int wsrep_innobase_kill_one_trx(void *const bf_thd_ptr,
                                 const trx_t *const bf_trx, trx_t *victim_trx,
-                                ibool signal) {
+                                bool signal) {
   // This is there in upstream codership 5.6 but causes
   // crashes, hence disabled
   // ut_ad(trx_mutex_own(victim_trx));

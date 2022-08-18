@@ -332,8 +332,7 @@ constexpr uint32_t TRX_SYS_MYSQL_LOG_NAME = 12;
 are persisted to table */
 #define TRX_SYS_TRX_NUM_GTID \
   (TRX_SYS_MYSQL_LOG_INFO + TRX_SYS_MYSQL_LOG_NAME + TRX_SYS_MYSQL_LOG_NAME_LEN)
-<<<<<<< HEAD
-#define TRX_SYS_TRX_NUM_END = (TRX_SYS_TRX_NUM_GTID + 8)
+#define TRX_SYS_TRX_NUM_END (TRX_SYS_TRX_NUM_GTID + 8)
 
 #ifdef WITH_WSREP
 /* The offset to WSREP XID headers */
@@ -349,12 +348,6 @@ are persisted to table */
 #define TRX_SYS_WSREP_XID_DATA 16
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-#define TRX_SYS_TRX_NUM_END = (TRX_SYS_TRX_NUM_GTID + 8)
-
-=======
-#define TRX_SYS_TRX_NUM_END (TRX_SYS_TRX_NUM_GTID + 8)
->>>>>>> Percona-Server-8.0.29-21
 /** Doublewrite buffer */
 /** @{ */
 /** The offset of the doublewrite buffer header on the trx system header page */

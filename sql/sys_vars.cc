@@ -1367,7 +1367,7 @@ static bool binlog_format_check(sys_var *self, THD *thd, set_var *var) {
     WSREP_ERROR(
         "Percona-XtraDB-Cluster prohibits setting"
         " binlog_format to STATEMENT or MIXED");
-    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), self->name.str,
              var->save_result.ulonglong_value == BINLOG_FORMAT_STMT
                  ? "STATEMENT"
                  : "MIXED");
@@ -6317,22 +6317,6 @@ static bool check_log_path(sys_var *self, THD *, set_var *var) {
 
   return false;
 }
-<<<<<<< HEAD
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-
-
-static bool fix_general_log_file(sys_var *self, THD *thd, enum_var_type type)
-{
-  bool res;
-
-  if (!opt_general_logname) // SET ... = DEFAULT
-||||||||| merged common ancestors
-static bool fix_general_log_file(sys_var *self, THD *thd, enum_var_type type)
-{
-  if (!opt_general_logname) // SET ... = DEFAULT
-=========
-=======
 
 static bool check_log_path_allow_empty(sys_var *self, THD *thd, set_var *var) {
   if (!var->value) return false;
@@ -6345,7 +6329,6 @@ static bool check_log_path_allow_empty(sys_var *self, THD *thd, set_var *var) {
 
   return true;
 }
->>>>>>> Percona-Server-8.0.29-21
 
 static bool fix_general_log_file(sys_var *, THD *, enum_var_type) {
   bool res;
@@ -6760,61 +6743,7 @@ static bool fix_slow_log_state(sys_var *, THD *thd, enum_var_type) {
     query_logger.deactivate_log_handler(QUERY_LOG_SLOW);
   } else {
     res = query_logger.activate_log_handler(thd, QUERY_LOG_SLOW);
-<<<<<<< HEAD
   }
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-  }
-<<<<<<<<< Temporary merge branch 1
-  else
-  {
-    res= query_logger.activate_log_handler(thd, QUERY_LOG_SLOW);
-  }
-
-  mysql_mutex_lock(&LOCK_global_system_variables);
-
-  if (res)
-    opt_slow_log= false;
-
-  return res;
-}
-static Sys_var_mybool Sys_slow_query_log(
-       "slow_query_log",
-       "Log slow queries to a table or log file. Defaults logging to a file "
-       "hostname-slow.log or a table mysql.slow_log if --log-output=TABLE is "
-       "used. Must be enabled to activate other slow log options",
-       GLOBAL_VAR(opt_slow_log), CMD_LINE(OPT_ARG),
-       DEFAULT(FALSE), NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
-       ON_UPDATE(fix_slow_log_state));
-
-static bool check_not_empty_set(sys_var *self, THD *thd, set_var *var)
-{
-||||||||| merged common ancestors
-  else
-  {
-    mysql_mutex_unlock(&LOCK_global_system_variables);
-    bool res= query_logger.activate_log_handler(thd, QUERY_LOG_SLOW);
-    mysql_mutex_lock(&LOCK_global_system_variables);
-    if (res)
-      opt_slow_log= false;
-    return res;
-  }
-}
-static Sys_var_mybool Sys_slow_query_log(
-       "slow_query_log",
-       "Log slow queries to a table or log file. Defaults logging to a file "
-       "hostname-slow.log or a table mysql.slow_log if --log-output=TABLE is "
-       "used. Must be enabled to activate other slow log options",
-       GLOBAL_VAR(opt_slow_log), CMD_LINE(OPT_ARG),
-       DEFAULT(FALSE), NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
-       ON_UPDATE(fix_slow_log_state));
-
-static bool check_not_empty_set(sys_var *self, THD *thd, set_var *var)
-{
-=========
-=======
-  }
->>>>>>> Percona-Server-8.0.29-21
 
   mysql_mutex_lock(&LOCK_global_system_variables);
 

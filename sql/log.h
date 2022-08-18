@@ -138,55 +138,7 @@ struct TABLE_LIST;
 */
 int log_vmessage(int log_type, va_list lili);
 int log_message(int log_type, ...);
-<<<<<<< HEAD
 
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-
-<<<<<<<<< Temporary merge branch 1
-  /** Path to log file. */
-  char log_file_name[FN_REFLEN];
-
-  /** Last seen current database. */
-  char db[NAME_LEN + 1];
-
-  /** Have we already printed ER_ERROR_ON_WRITE? */
-  bool write_error;
-
-  IO_CACHE log_file;
-
-  /** True if the file log is open, false otherwise. */
-  volatile bool log_open;
-
-#ifdef HAVE_PSI_INTERFACE
-  /** Instrumentation key to use for file io in @c log_file */
-  PSI_file_key m_log_file_key;
-#endif
-||||||||| merged common ancestors
-  /** Path to log file. */
-  char log_file_name[FN_REFLEN];
-
-  /** Last seen current database. */
-  char db[NAME_LEN + 1];
-
-  /** Have we already printed ER_ERROR_ON_WRITE? */
-  bool write_error;
-
-  IO_CACHE log_file;
-
-  /** True if the file log is open, false otherwise. */
-  volatile bool log_open;
-
-  ulong cur_log_ext;
-
-#ifdef HAVE_PSI_INTERFACE
-  /** Instrumentation key to use for file io in @c log_file */
-  PSI_file_key m_log_file_key;
-#endif
-=========
-=======
-
->>>>>>> Percona-Server-8.0.29-21
 /**
   A helper that we can stubify so we don't have to pull all of THD
   into the unit tests.

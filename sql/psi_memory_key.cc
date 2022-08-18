@@ -403,16 +403,6 @@ static PSI_memory_info all_server_memory[] = {
      "Mem root for temporary objects allocated while dropping tables or the "
      "whole database."},
     {&key_memory_rm_db_mdl_reqs_root, "rm_db::mdl_reqs_root", PSI_FLAG_THREAD,
-<<<<<<< HEAD
-     0, "Mem root for allocating MDL requests while dropping datbase."}
-#ifdef WITH_WSREP
-    ,
-    {&key_memory_wsrep, "wsrep", PSI_FLAG_ONLY_GLOBAL_STAT, 0, PSI_DOCUMENT_ME}
-#endif /* WITH_WSREP */
-};
-||||||| merged common ancestors
-     0, "Mem root for allocating MDL requests while dropping datbase."}};
-=======
      0, "Mem root for allocating MDL requests while dropping datbase."},
     {&key_memory_persisted_variables_memroot, "Persisted_variables::memroot",
      PSI_FLAG_ONLY_GLOBAL_STAT, 0,
@@ -423,8 +413,12 @@ static PSI_memory_info all_server_memory[] = {
      "Memory allocated for in-memory maps for persisted variables"},
     {&key_memory_persisted_variables_unordered_set,
      "Persisted_variables::unordered_set", PSI_FLAG_ONLY_GLOBAL_STAT, 0,
-     "Memory allocated for in-memory sets for persisted variables"}};
->>>>>>> Percona-Server-8.0.29-21
+     "Memory allocated for in-memory sets for persisted variables"}
+#ifdef WITH_WSREP
+    ,
+    {&key_memory_wsrep, "wsrep", PSI_FLAG_ONLY_GLOBAL_STAT, 0, PSI_DOCUMENT_ME}
+#endif /* WITH_WSREP */
+};
 
 void register_server_memory_keys() {
   const char *category = "sql";

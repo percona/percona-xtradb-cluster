@@ -679,7 +679,6 @@ constexpr ulint REC_2BYTE_OFFS_LIMIT = 0x7FFFUL;
 two upmost bits in a two byte offset for special purposes */
 constexpr ulint REC_MAX_DATA_SIZE = 16384;
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 dberr_t wsrep_rec_get_foreign_key(
     byte *buf,               /* out: extracted key */
@@ -687,18 +686,15 @@ dberr_t wsrep_rec_get_foreign_key(
     const rec_t *rec,        /* in: physical record */
     dict_index_t *index_for, /* in: index for foreign table */
     dict_index_t *index_ref, /* in: index for referenced table */
-    ibool new_protocol);     /* in: protocol > 1 */
+    bool new_protocol);     /* in: protocol > 1 */
 #endif                       /* WITH_WSREP */
 
-||||||| merged common ancestors
-=======
 /** For a given clustered index, version is to be stored on physical record.
 @param[in]  index           clustered index
 @param[in]  n_tuple_fields  number of fields in tuple
 @return true, if version is to be stored */
 bool is_store_version(const dict_index_t *index, size_t n_tuple_fields);
 
->>>>>>> Percona-Server-8.0.29-21
 #include "rem0rec.ic"
 
 #endif

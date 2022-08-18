@@ -2846,7 +2846,7 @@ void wsrep_trx_print_locking(
     ulint max_query_len) /*!< in: max query length to print,
                          or 0 to use the default max length */
 {
-  ibool newline;
+  bool newline;
   const char *op_info;
 
   fprintf(f, "TRANSACTION " TRX_ID_FMT, trx->id);

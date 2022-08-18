@@ -202,32 +202,6 @@ static srv_slot_t *lock_wait_table_reserve_slot(
   ut_error;
 }
 
-#ifdef WITH_WSREP
-/*
-check if lock timeout was for priority thread,
-as a side effect trigger lock monitor
-@return	false for regular lock timeout
-in: trx to check for lock priority
-*/
-static bool wsrep_is_BF_lock_timeout(trx_t *trx) {
-  if (wsrep_on(trx->mysql_thd) && wsrep_thd_is_BF(trx->mysql_thd, FALSE)) {
-    size_t unused;
-    ib::warn() << "WSREP: BF lock wait long\n"
-               << " THD: " << wsrep_thd_thread_id(trx->mysql_thd)
-               << " Trx id: " << trx_get_id_for_print(trx)
-               << " WSREP trx_id: " << wsrep_thd_transaction_id(trx->mysql_thd)
-               << " Seqno: " << wsrep_thd_trx_seqno(trx->mysql_thd) << "\n"
-               << " Query: "
-               << innobase_get_stmt_unsafe(trx->mysql_thd, &unused);
-    srv_print_innodb_monitor = true;
-    srv_print_innodb_lock_monitor = true;
-    os_event_set(srv_monitor_event);
-    return true;
-  }
-  return false;
-}
-#endif /* WITH_WSREP */
-
 /** Print lock wait timeout info to stderr. It's supposed this function
 is executed in trx's THD thread as it calls some non-thread-safe
 functions to get some info from THD.
@@ -445,36 +419,12 @@ void lock_wait_suspend_thread(que_thr_t *thr) {
     return;
   }
 
-<<<<<<< HEAD
-#ifdef WITH_WSREP
-  if (lock_wait_timeout < std::chrono::seconds(100000000) &&
-      wait_time > lock_wait_timeout) {
-    if (!wsrep_on(trx->mysql_thd) ||
-        (!wsrep_is_BF_lock_timeout(trx) && trx->error_state != DB_DEADLOCK)) {
-      trx->error_state = DB_LOCK_WAIT_TIMEOUT;
-      if (srv_print_lock_wait_timeout_info)
-        print_lock_wait_timeout(*trx, blocking, blocking_count);
-
-      MONITOR_INC(MONITOR_TIMEOUT);
-    }
-  }
-#else
-  if (lock_wait_timeout < std::chrono::seconds(100000000) &&
-      wait_time > lock_wait_timeout && !trx_is_high_priority(trx)) {
-    trx->error_state = DB_LOCK_WAIT_TIMEOUT;
-||||||| merged common ancestors
-  if (lock_wait_timeout < std::chrono::seconds(100000000) &&
-      wait_time > lock_wait_timeout && !trx_is_high_priority(trx)) {
-    trx->error_state = DB_LOCK_WAIT_TIMEOUT;
-=======
   if (trx->error_state == DB_LOCK_WAIT_TIMEOUT) {
     MONITOR_INC(MONITOR_TIMEOUT);
 
->>>>>>> Percona-Server-8.0.29-21
     if (srv_print_lock_wait_timeout_info)
       print_lock_wait_timeout(*trx, blocking, blocking_count);
   }
-#endif /* WITH_WSREP */
 
   if (trx_is_interrupted(trx)) {
     trx->error_state = DB_INTERRUPTED;
@@ -613,16 +563,6 @@ static void lock_wait_check_and_cancel(
     nothing. */
     if (trx->lock.wait_lock != nullptr) {
       ut_a(trx->lock.que_state == TRX_QUE_LOCK_WAIT);
-<<<<<<< HEAD
-
-#ifdef WITH_WSREP
-      if (!wsrep_is_BF_lock_timeout(trx)) {
-        lock_cancel_waiting_and_release(trx->lock.wait_lock);
-      }
-#else
-||||||| merged common ancestors
-
-=======
       if (trx_is_high_priority(trx)) {
         /* We read blocking_trx under Global exclusive latch so it can't change
         and we know that wait_lock is non-null so there must be a blocker. */
@@ -656,9 +596,7 @@ static void lock_wait_check_and_cancel(
       }
       /* Cancel the lock request queued by the transaction and release possible
       other transactions waiting behind. */
->>>>>>> Percona-Server-8.0.29-21
       lock_cancel_waiting_and_release(trx->lock.wait_lock);
-#endif /* WITH_WSREP */
     }
 
     trx_mutex_exit(trx);

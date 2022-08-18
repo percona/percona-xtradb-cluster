@@ -87,10 +87,10 @@ bool wsrep_sst_donor_rejects_queries = false;
 
 /* Function checks if the new value for sst_method is valid.
 @return false if no error encountered with check else return true. */
-bool wsrep_sst_method_check(sys_var *, THD *, set_var *var) {
+bool wsrep_sst_method_check(sys_var *self, THD *, set_var *var) {
   if ((!var->save_result.string_value.str) ||
       (var->save_result.string_value.length == 0)) {
-    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), self->name.str,
              var->save_result.string_value.str
                  ? var->save_result.string_value.str
                  : "NULL");
@@ -98,7 +98,7 @@ bool wsrep_sst_method_check(sys_var *, THD *, set_var *var) {
   }
 
   if (strcmp(var->save_result.string_value.str, WSREP_SST_XTRABACKUP_V2) != 0) {
-    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), self->name.str,
              var->save_result.string_value.str
                  ? var->save_result.string_value.str
                  : "NULL");
@@ -112,7 +112,7 @@ bool wsrep_sst_method_update(sys_var *, THD *, enum_var_type) { return 0; }
 
 /* Function checks if the new value for sst_recieve_address is valid.
 @return false if no error encountered with check else return true. */
-bool wsrep_sst_receive_address_check(sys_var *, THD *, set_var *var) {
+bool wsrep_sst_receive_address_check(sys_var *self, THD *, set_var *var) {
   char addr_buf[FN_REFLEN];
 
   if ((!var->save_result.string_value.str) ||
@@ -128,7 +128,7 @@ bool wsrep_sst_receive_address_check(sys_var *, THD *, set_var *var) {
   return false;
 
 err:
-  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), self->name.str,
            var->save_result.string_value.str ? var->save_result.string_value.str
                                              : "NULL");
   return true;

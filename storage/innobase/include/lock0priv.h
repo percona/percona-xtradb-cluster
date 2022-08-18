@@ -765,13 +765,7 @@ class RecLock {
 
   /**
   Add the lock to the record lock hash and the transaction's lock list
-<<<<<<< HEAD
-  @param[in,out] lock Newly created record lock to add to the
-||||||| merged common ancestors
-  @param[in,out] lock	Newly created record lock to add to the
-=======
   @param[in,out] lock   Newly created record lock to add to the
->>>>>>> Percona-Server-8.0.29-21
                           rec hash and the transaction lock list */
   void lock_add(lock_t *lock);
 

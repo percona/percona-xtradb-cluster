@@ -8684,34 +8684,12 @@ int mysqld_main(int argc, char **argv)
     unireg_abort(MYSQLD_ABORT_EXIT); /* purecov: inspected */
   }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   // Initialize wsrep_provider_set before anything else wsrep related
   wsrep_provider_set =
       wsrep_provider != nullptr && strcmp(wsrep_provider, WSREP_NONE) != 0;
 #endif
 
-  if (initialize_manifest_file_components()) unireg_abort(MYSQLD_ABORT_EXIT);
-
-  /*
-    If keyring component was loaded through manifest file, services provided
-    by such a component should get priority over keyring plugin. That's why
-    we have to set defaults before proxy keyring services are loaded.
-  */
-  set_srv_keyring_implementation_as_default();
-
-||||||| merged common ancestors
-  if (initialize_manifest_file_components()) unireg_abort(MYSQLD_ABORT_EXIT);
-
-  /*
-    If keyring component was loaded through manifest file, services provided
-    by such a component should get priority over keyring plugin. That's why
-    we have to set defaults before proxy keyring services are loaded.
-  */
-  set_srv_keyring_implementation_as_default();
-
-=======
->>>>>>> Percona-Server-8.0.29-21
   /*
    The subsequent calls may take a long time : e.g. innodb log read.
    Thus set the long running service control manager timeout
@@ -8887,7 +8865,6 @@ int mysqld_main(int argc, char **argv)
     if (mysql_bin_log.write_event_to_binlog_and_sync(&prev_gtids_ev))
       unireg_abort(MYSQLD_ABORT_EXIT);
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
     /* In wsrep_recovery mode, PXC avoid creation of new binlog file for
     the reason mentioned above. In light of the said flow avoid purge
@@ -8903,22 +8880,6 @@ int mysqld_main(int argc, char **argv)
       to be empty. */
     if (!wsrep_recovery) {
 #endif /* WITH_WSREP */
-    if (expire_logs_days > 0 || binlog_expire_logs_seconds > 0) {
-      time_t purge_time = my_time(0) - binlog_expire_logs_seconds -
-                          expire_logs_days * 24 * 60 * 60;
-      DBUG_EXECUTE_IF("expire_logs_always_at_start",
-                      { purge_time = my_time(0); });
-      mysql_bin_log.purge_logs_before_date(purge_time, true);
-    }
-||||||| merged common ancestors
-    if (expire_logs_days > 0 || binlog_expire_logs_seconds > 0) {
-      time_t purge_time = my_time(0) - binlog_expire_logs_seconds -
-                          expire_logs_days * 24 * 60 * 60;
-      DBUG_EXECUTE_IF("expire_logs_always_at_start",
-                      { purge_time = my_time(0); });
-      mysql_bin_log.purge_logs_before_date(purge_time, true);
-    }
-=======
     // run auto purge member function. It will evaluate auto purge controls
     // and configuration, calculate which log files are to be purged, and
     // if any file is to be purged, it will purge it. This is all encapsulated
@@ -8935,7 +8896,6 @@ int mysqld_main(int argc, char **argv)
       mysql_bin_log.auto_purge_at_server_startup();
     else if (expire_logs_days > 0 || binlog_expire_logs_seconds > 0)
       mysql_bin_log.purge_logs_before_date(time(nullptr), true);
->>>>>>> Percona-Server-8.0.29-21
 
     if (binlog_space_limit) mysql_bin_log.purge_logs_by_size(true);
 
@@ -11397,7 +11357,9 @@ SHOW_VAR status_vars[] = {
     {"Uptime_since_flush_status", (char *)&show_flushstatustime, SHOW_FUNC,
      SHOW_SCOPE_GLOBAL},
 #endif
-<<<<<<< HEAD
+    {"Ssl_session_cache_timeout",
+     (char *)&Ssl_mysql_main_status::show_ssl_ctx_sess_timeout, SHOW_FUNC,
+     SHOW_SCOPE_GLOBAL},
 #ifdef WITH_WSREP
     {"wsrep_connected", (char *)&wsrep_connected, SHOW_BOOL, SHOW_SCOPE_GLOBAL},
     {"wsrep_ready", (char *)&wsrep_show_ready, SHOW_FUNC, SHOW_SCOPE_GLOBAL},
@@ -11427,12 +11389,6 @@ SHOW_VAR status_vars[] = {
      SHOW_CHAR_PTR, SHOW_SCOPE_GLOBAL},
     {"wsrep", (char *)&wsrep_show_status, SHOW_FUNC, SHOW_SCOPE_ALL},
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-=======
-    {"Ssl_session_cache_timeout",
-     (char *)&Ssl_mysql_main_status::show_ssl_ctx_sess_timeout, SHOW_FUNC,
-     SHOW_SCOPE_GLOBAL},
->>>>>>> Percona-Server-8.0.29-21
     {NullS, NullS, SHOW_LONG, SHOW_SCOPE_ALL}};
 
 void add_terminator(vector<my_option> *options) {

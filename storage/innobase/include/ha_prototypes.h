@@ -466,7 +466,7 @@ extern bool innodb_inited;
 #if defined(WITH_WSREP) && !defined(UNIV_INNOCHECKSUM)
 
 int wsrep_innobase_kill_one_trx(void *bf_thd_ptr, const trx_t *bf_trx,
-                                trx_t *victim_trx, ibool signal);
+                                trx_t *victim_trx, bool signal);
 
 int wsrep_innobase_mysql_sort(int mysql_type, uint charset_number,
                               unsigned char *str, unsigned int str_length,

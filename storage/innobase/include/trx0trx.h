@@ -320,31 +320,13 @@ bool trx_can_be_handled_by_current_thread_or_is_hp_victim(const trx_t *trx);
 bool trx_is_interrupted(const trx_t *trx); /*!< in: transaction */
 /** Determines if the currently running transaction is in strict mode.
  @return true if strict */
-<<<<<<< HEAD
-ibool trx_is_strict(trx_t *trx); /*!< in: transaction */
+bool trx_is_strict(trx_t *trx); /*!< in: transaction */
 
 #ifdef WITH_WSREP
 /** Determines if the currently running transaction is a wsrep transaction.
  @return true if transaction is a wsrep transaction */
-ibool trx_is_wsrep_trx(const trx_t *trx); /*!< in: transaction */
+bool trx_is_wsrep_trx(const trx_t *trx); /*!< in: transaction */
 #endif /* WITH_WSREP */
-
-/** Calculates the "weight" of a transaction. The weight of one transaction
- is estimated as the number of altered rows + the number of locked rows.
- @param t transaction
- @return transaction weight */
-#define TRX_WEIGHT(t) ((t)->undo_no + UT_LIST_GET_LEN((t)->lock.trx_locks))
-||||||| merged common ancestors
-ibool trx_is_strict(trx_t *trx); /*!< in: transaction */
-
-/** Calculates the "weight" of a transaction. The weight of one transaction
- is estimated as the number of altered rows + the number of locked rows.
- @param t transaction
- @return transaction weight */
-#define TRX_WEIGHT(t) ((t)->undo_no + UT_LIST_GET_LEN((t)->lock.trx_locks))
-=======
-bool trx_is_strict(trx_t *trx); /*!< in: transaction */
->>>>>>> Percona-Server-8.0.29-21
 
 /** Compares the "weight" (or size) of two transactions. Transactions that
  have edited non-transactional tables are considered heavier than ones

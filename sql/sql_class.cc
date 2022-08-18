@@ -1352,7 +1352,6 @@ void THD::cleanup(void) {
   DEBUG_SYNC(this, "thd_cleanup_start");
 
   killed = KILL_CONNECTION;
-<<<<<<< HEAD
 
 #ifdef WITH_WSREP
   if (wsrep_cs().state() != wsrep::client_state::s_none) {
@@ -1362,10 +1361,6 @@ void THD::cleanup(void) {
   wsrep_aborter = 0;
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-=======
-
->>>>>>> Percona-Server-8.0.29-21
   if (trn_ctx->xid_state()->has_state(XID_STATE::XA_PREPARED)) {
     /*
       Return error is not an option as XA is in prepared state and

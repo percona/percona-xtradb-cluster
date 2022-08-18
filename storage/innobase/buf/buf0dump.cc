@@ -55,19 +55,13 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 enum status_severity { STATUS_VERBOSE, STATUS_INFO, STATUS_ERR };
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 extern bool wsrep_recovery;
 #endif /* WITH_WSREP */
 
-#define SHUTTING_DOWN() (srv_shutdown_state.load() >= SRV_SHUTDOWN_CLEANUP)
-||||||| merged common ancestors
-#define SHUTTING_DOWN() (srv_shutdown_state.load() >= SRV_SHUTDOWN_CLEANUP)
-=======
 static inline bool SHUTTING_DOWN() {
   return srv_shutdown_state.load() >= SRV_SHUTDOWN_CLEANUP;
 }
->>>>>>> Percona-Server-8.0.29-21
 
 /* Flags that tell the buffer pool dump/load thread which action should it
 take after being waked up. */
@@ -713,22 +707,14 @@ void buf_dump_thread() {
   }
 
   if (srv_buffer_pool_dump_at_shutdown && srv_fast_shutdown != 2) {
-<<<<<<< HEAD
 #ifdef WITH_WSREP
     if (!get_wsrep_recovery()) {
-      buf_dump(FALSE /* ignore shutdown down flag,
+      buf_dump(false /* ignore shutdown down flag,
                      keep going even if we are in a shutdown state */);
     }
 #else
-    buf_dump(FALSE /* ignore shutdown down flag,
+    buf_dump(false /* ignore shutdown down flag,
 		keep going even if we are in a shutdown state */);
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-    buf_dump(FALSE /* ignore shutdown down flag,
-		keep going even if we are in a shutdown state */);
-=======
-    buf_dump(false /* ignore shutdown down flag,
-                keep going even if we are in a shutdown state */);
->>>>>>> Percona-Server-8.0.29-21
   }
 }

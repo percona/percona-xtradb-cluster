@@ -48,17 +48,11 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "my_dbug.h"
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 #include <ha_prototypes.h>
 #endif /* WITH_WSREP */
 
-/*			PHYSICAL RECORD (OLD STYLE)
-||||||| merged common ancestors
-/*			PHYSICAL RECORD (OLD STYLE)
-=======
 /*                      PHYSICAL RECORD (OLD STYLE)
->>>>>>> Percona-Server-8.0.29-21
                         ===========================
 
 The physical record, which is the data type of all the records
@@ -1860,15 +1854,6 @@ trx_id_t rec_get_trx_id(const rec_t *rec,          /*!< in: record */
   return (trx_read_trx_id(trx_id));
 }
 #endif /* !UNIV_HOTBACKUP */
-<<<<<<< HEAD
-
-/** Mark the nth field as externally stored.
-@param[in]	offsets		array returned by rec_get_offsets()
-@param[in]	n		nth field */
-void rec_offs_make_nth_extern(ulint *offsets, const ulint n) {
-  ut_ad(!rec_offs_nth_sql_null(offsets, n));
-  rec_offs_base(offsets)[1 + n] |= REC_OFFS_EXTERNAL;
-}
 
 #ifdef WITH_WSREP
 dberr_t wsrep_rec_get_foreign_key(
@@ -1877,7 +1862,7 @@ dberr_t wsrep_rec_get_foreign_key(
     const rec_t *rec,        /* in: physical record */
     dict_index_t *index_for, /* in: index in foreign table */
     dict_index_t *index_ref, /* in: index in referenced table */
-    ibool new_protocol)      /* in: protocol > 1 */
+    bool new_protocol)      /* in: protocol > 1 */
 {
   const byte *data;
   ulint len;
@@ -1907,7 +1892,7 @@ dberr_t wsrep_rec_get_foreign_key(
     dict_field_t *field_r = index_ref->get_field(i);
     const dict_col_t *col_r = field_r->col;
 
-    data = rec_get_nth_field(rec, offsets, i, &len);
+    data = rec_get_nth_field(index_for, rec, offsets, i, &len);
     if (key_len + ((len != UNIV_SQL_NULL) ? len + 1 : 1) > *buf_len) {
       fprintf(stderr, "WSREP: FK key len exceeded %lu %lu %lu\n", key_len, len,
               *buf_len);
@@ -1989,14 +1974,3 @@ err_out:
   return DB_ERROR;
 }
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-
-/** Mark the nth field as externally stored.
-@param[in]	offsets		array returned by rec_get_offsets()
-@param[in]	n		nth field */
-void rec_offs_make_nth_extern(ulint *offsets, const ulint n) {
-  ut_ad(!rec_offs_nth_sql_null(offsets, n));
-  rec_offs_base(offsets)[1 + n] |= REC_OFFS_EXTERNAL;
-}
-=======
->>>>>>> Percona-Server-8.0.29-21

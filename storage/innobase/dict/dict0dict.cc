@@ -3434,7 +3434,7 @@ dict_index_t *wsrep_dict_foreign_find_index(
     ulint n_cols,            /*!< in: number of columns */
     dict_index_t *types_idx, /*!< in: NULL or an index to whose types the
                              column types must match */
-    ibool check_charsets,
+    bool check_charsets,
     /*!< in: whether to check charsets.
     only has an effect if types_idx != NULL */
     ulint check_null)

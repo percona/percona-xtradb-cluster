@@ -1771,7 +1771,6 @@ static void check_secondary_engine_statement(THD *thd,
                                              Parser_state *parser_state,
                                              const char *query_string,
                                              size_t query_length) {
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (WSREP(thd)) {
     /* While running in cluster mode disable the check for now */
@@ -1779,11 +1778,8 @@ static void check_secondary_engine_statement(THD *thd,
   }
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-=======
   bool use_secondary_engine = false;
 
->>>>>>> Percona-Server-8.0.29-21
   // Only restart the statement if a non-fatal error was raised.
   if (!thd->is_error() || thd->is_killed() || thd->is_fatal_error()) return;
 
@@ -4704,19 +4700,13 @@ int mysql_execute_command(THD *thd, bool first_level) {
     {
       if (check_access(thd, INSERT_ACL, "mysql", nullptr, nullptr, true, false))
         break;
-<<<<<<< HEAD
 #ifdef WITH_WSREP
       WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
 #endif /* WITH_WSREP */
-      if (!(res = mysql_create_function(thd, &lex->udf))) my_ok(thd);
-||||||| merged common ancestors
-      if (!(res = mysql_create_function(thd, &lex->udf))) my_ok(thd);
-=======
       if (!(res = mysql_create_function(
                 thd, &lex->udf,
                 lex->create_info->options & HA_LEX_CREATE_IF_NOT_EXISTS)))
         my_ok(thd);
->>>>>>> Percona-Server-8.0.29-21
       break;
     }
     case SQLCOM_CREATE_USER: {
@@ -5211,67 +5201,10 @@ int mysql_execute_command(THD *thd, bool first_level) {
       */
       thd->binlog_invoker();
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
       WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
 #endif /* WITH_WSREP */
 
-      if (!(res = sp_create_routine(thd, lex->sphead, thd->lex->definer))) {
-        /* only add privileges if really necessary */
-
-        Security_context security_context;
-        bool restore_backup_context = false;
-        Security_context *backup = nullptr;
-        /*
-          We're going to issue an implicit GRANT statement so we close all
-          open tables. We have to keep metadata locks as this ensures that
-          this statement is atomic against concurent FLUSH TABLES WITH READ
-          LOCK. Deadlocks which can arise due to fact that this implicit
-          statement takes metadata locks should be detected by a deadlock
-          detector in MDL subsystem and reported as errors.
-
-          No need to commit/rollback statement transaction, it's not started.
-
-          TODO: Long-term we should either ensure that implicit GRANT statement
-                is written into binary log as a separate statement or make both
-                creation of routine and implicit GRANT parts of one fully atomic
-                statement.
-        */
-        assert(thd->get_transaction()->is_empty(Transaction_ctx::STMT));
-        close_thread_tables(thd);
-        /*
-          Check if invoker exists on slave, then use invoker privilege to
-          insert routine privileges to mysql.procs_priv. If invoker is not
-          available then consider using definer.
-||||||| merged common ancestors
-      if (!(res = sp_create_routine(thd, lex->sphead, thd->lex->definer))) {
-        /* only add privileges if really necessary */
-
-        Security_context security_context;
-        bool restore_backup_context = false;
-        Security_context *backup = nullptr;
-        /*
-          We're going to issue an implicit GRANT statement so we close all
-          open tables. We have to keep metadata locks as this ensures that
-          this statement is atomic against concurent FLUSH TABLES WITH READ
-          LOCK. Deadlocks which can arise due to fact that this implicit
-          statement takes metadata locks should be detected by a deadlock
-          detector in MDL subsystem and reported as errors.
-
-          No need to commit/rollback statement transaction, it's not started.
-
-          TODO: Long-term we should either ensure that implicit GRANT statement
-                is written into binary log as a separate statement or make both
-                creation of routine and implicit GRANT parts of one fully atomic
-                statement.
-        */
-        assert(thd->get_transaction()->is_empty(Transaction_ctx::STMT));
-        close_thread_tables(thd);
-        /*
-          Check if invoker exists on slave, then use invoker privilege to
-          insert routine privileges to mysql.procs_priv. If invoker is not
-          available then consider using definer.
-=======
       bool sp_already_exists = false;
       if (!(res = sp_create_routine(
                 thd, lex->sphead, thd->lex->definer,
@@ -5304,7 +5237,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
             Check if invoker exists on slave, then use invoker privilege to
             insert routine privileges to mysql.procs_priv. If invoker is not
             available then consider using definer.
->>>>>>> Percona-Server-8.0.29-21
 
             Check if the definer exists on slave,
             then use definer privilege to insert routine privileges to
