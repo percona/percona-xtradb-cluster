@@ -188,16 +188,11 @@ enum options_client {
   OPT_DELETE_MASTER_LOGS_DEPRECATED,
   OPT_MYSQLDUMP_SLAVE_DATA_DEPRECATED,
   OPT_MYSQLDUMP_INCLUDE_MASTER_HOST_PORT_DEPRECATED,
-<<<<<<< HEAD
+  OPT_SSL_SESSION_DATA,
+  OPT_SSL_SESSION_DATA_CONTINUE_ON_FAILED_REUSE,
 #ifdef WITH_WSREP
   OPT_USE_SET_PASSWORD,
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-=======
-  OPT_SSL_SESSION_DATA,
-  OPT_SSL_SESSION_DATA_CONTINUE_ON_FAILED_REUSE,
->>>>>>> Percona-Server-8.0.29-21
   /* Add new option above this */
   OPT_MAX_CLIENT_OPTION
 };

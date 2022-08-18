@@ -1,10 +1,4 @@
-<<<<<<< HEAD
-# Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
-||||||| merged common ancestors
-# Copyright (c) 2000, 2021, Oracle and/or its affiliates.
-=======
 # Copyright (c) 2000, 2022, Oracle and/or its affiliates.
->>>>>>> Percona-Server-8.0.29-21
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -43,13 +37,6 @@
 %{?with_aws_sdk: %global aws_sdk_option -DWITH_KEYRING_AWS=1 -DWITH_AWS_SDK=%{with_aws_sdk}}
 %{?with_aws_sdk: %global aws_sdk 1}
 
-<<<<<<< HEAD
-||||||| merged common ancestors
-# Pass alternative ssl setting if provided. Can be used for newer OpenSSL.
-%{?with_ssl: %global ssl_option -DWITH_SSL=%{with_ssl}}
-%{?with_ssl: %global ssl_bundled 1}
-
-=======
 # Pass alternative ssl setting if provided. Can be used for newer OpenSSL.
 %{?with_ssl: %global ssl_option -DWITH_SSL=%{with_ssl}}
 %{?with_ssl: %global ssl_bundled 1}
@@ -57,7 +44,6 @@
 # Tell build not to use minimal debug
 %{?full_debug: %global no_mini_debug 1}
 
->>>>>>> Percona-Server-8.0.29-21
 # Regression tests may take a long time, override the default to skip them
 %{!?runselftest:%global runselftest 0}
 
@@ -825,13 +811,8 @@ mkdir debug
            -DWITH_CURL=system \
            %{?aws_sdk_option} \
 %endif
-<<<<<<< HEAD
-||||||| merged common ancestors
-           %{?ssl_option} \
-=======
            %{?ssl_option} \
            %{?mini_debug_option} \
->>>>>>> Percona-Server-8.0.29-21
            -DWITH_INNODB_MEMCACHED=1 \
            -DROUTER_INSTALL_LIBDIR="%{_lib}" \
            -DROUTER_INSTALL_PLUGINDIR="%{_lib}/mysqlrouter" \
@@ -875,13 +856,8 @@ mkdir release
            -DWITH_CURL=system \
            %{?aws_sdk_option} \
 %endif
-<<<<<<< HEAD
-||||||| merged common ancestors
-           %{?ssl_option} \
-=======
            %{?ssl_option} \
            %{?mini_debug_option} \
->>>>>>> Percona-Server-8.0.29-21
            -DWITH_INNODB_MEMCACHED=1 \
            -DROUTER_INSTALL_LIBDIR="%{_lib}" \
            -DROUTER_INSTALL_PLUGINDIR="%{_lib}/mysqlrouter" \
@@ -1125,16 +1101,8 @@ fi
 %attr(755, root, root) %{_sbindir}/mysqld
 
 %dir %{_libdir}/mysql/private
-<<<<<<< HEAD
-%attr(755, root, root) %{_libdir}/mysql/private/libprotobuf-lite.so.3.6.1
-%attr(755, root, root) %{_libdir}/mysql/private/libprotobuf.so.3.6.1
-||||||| merged common ancestors
-%attr(755, root, root) %{_libdir}/mysql/private/libprotobuf-lite.so.3.11.4
-%attr(755, root, root) %{_libdir}/mysql/private/libprotobuf.so.3.11.4
-=======
 %attr(755, root, root) %{_libdir}/mysql/private/libprotobuf-lite.so.3.19.4
 %attr(755, root, root) %{_libdir}/mysql/private/libprotobuf.so.3.19.4
->>>>>>> Percona-Server-8.0.29-21
 
 %dir %{_libdir}/mysql/plugin
 %attr(755, root, root) %{_libdir}/mysql/plugin/adt_null.so

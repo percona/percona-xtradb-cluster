@@ -2008,15 +2008,10 @@ IF(WITH_PROTOBUF STREQUAL "bundled" OR WITH_FIDO STREQUAL "bundled")
   ENDIF()
 ENDIF()
 
-<<<<<<< HEAD
-||||||| merged common ancestors
-ADD_SUBDIRECTORY(extra/libkmip)
-=======
 IF(NOT DEFINED WITH_COMPONENT_KEYRING_KMIP AND NOT DEFINED WITHOUT_COMPONENT_KEYRING_KMIP
    OR WITH_COMPONENT_KEYRING_KMIP)
   ADD_SUBDIRECTORY(extra/libkmip)
 ENDIF()
->>>>>>> Percona-Server-8.0.29-21
 
 #
 # Setup maintainer mode options by the end. Platform checks are
