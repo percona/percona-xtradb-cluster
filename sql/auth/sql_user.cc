@@ -2004,11 +2004,6 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
       thd->set_query(query_save);
       return (ret != 1);
     }
-    // we start TOI only for WSREP threads
-    if (start_toi_after_open_grant_tables(thd, WSREP_MYSQL_DB, "user")) {
-      commit_and_close_mysql_tables(thd);
-      return true;
-    }
   } else {
     if ((ret = open_grant_tables(thd, tables, &transactional_tables)))
       return (ret != 1);
@@ -2041,6 +2036,18 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
       my_error(ER_PASSWORD_NO_MATCH, MYF(0));
       return true;
     }
+
+#ifdef WITH_WSREP
+    /* We can start TOI after acl cache lock is acquired.
+       Doing it before acquiring the lock, would lead to the deadlock,
+       because all other functions using start_toi_after_open_grant_tables()
+       do it in the order: acl_cache_lock.lock() -> start TOI */
+    if (!thd->wsrep_applier &&
+        start_toi_after_open_grant_tables(thd, WSREP_MYSQL_DB, "user")) {
+      commit_and_close_mysql_tables(thd);
+      return true;
+    }
+#endif
 
     assert(acl_user->plugin.length != 0);
     is_role = acl_user->is_role;
@@ -2978,7 +2985,15 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
     User_params user_params(&extra_users);
     result = log_and_commit_acl_ddl(thd, transactional_tables, &extra_users,
                                     &user_params);
+#ifndef WITH_WSREP
+    // clang-format off
+    /* We already started TOI. Below we will acquire ACL lock again.
+       If we do this leaving critical section, someone else can acquire
+       ACL lock before us, and then attempt to start TOI which will block.
+       In such a case when we try to acquire ACL lock below, we will end up
+       in a deadlock */
   } /* Critical section */
+#endif
 
   if (!result) {
     LEX_USER *processed_user;
@@ -2987,9 +3002,11 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
       if ((processed_user = get_current_user(thd, one_user))) {
         /* reset connection resources for processed users */
         reset_mqh(thd, processed_user, false);
+#ifndef WITH_WSREP
         Acl_cache_lock_guard acl_cache_lock{thd,
                                             Acl_cache_lock_mode::READ_MODE};
         if (!acl_cache_lock.lock(false)) return true;
+#endif
         ACL_USER *acl_user = find_acl_user(processed_user->host.str,
                                            processed_user->user.str, true);
         if (acl_user && acl_user->m_mfa) {
@@ -3002,17 +3019,30 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
         }
       }
     }
+#ifndef WITH_WSREP
     /* Notify storage engines */
     acl_notify_htons(thd, SQLCOM_CREATE_USER, &list);
+#endif
   }
+#ifdef WITH_WSREP
+  } /* Critical section */
+#endif
 
   if (result == 0) {
+#ifdef WITH_WSREP
+    /* Notify storage engines */
+    acl_notify_htons(thd, SQLCOM_CREATE_USER, &list);
+#endif
     if (generated_passwords.size() == 0) {
       my_ok(thd);
     } else if (send_password_result_set(thd, generated_passwords)) {
       result = 1;
     }
   }  // end if
+
+#ifdef WITH_WSREP
+  // clang-format on
+#endif
 
   /*
     If this is a slave thread we should never have generated random passwords
@@ -3660,7 +3690,15 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
             audit_user->first_factor_auth_info.plugin.str,
             is_role_id(audit_user), nullptr, nullptr);
     }
+#ifndef WITH_WSREP
+    // clang-format off
+    /* We already started TOI. Below we will acquire ACL lock again.
+       If we do this leaving critical section, someone else can acquire
+       ACL lock before us, and then attempt to start TOI which will block.
+       In such a case when we try to acquire ACL lock below, we will end up
+       in a deadlock */
   } /* Critical section */
+#endif
 
   if (!result) {
     LEX_USER *extra_user;
@@ -3675,9 +3713,11 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
     LEX_USER *user;
     for (LEX_USER *one_user : mfa_users) {
       if ((user = get_current_user(thd, one_user))) {
+#ifndef WITH_WSREP
         Acl_cache_lock_guard acl_cache_lock{thd,
                                             Acl_cache_lock_mode::READ_MODE};
         if (!acl_cache_lock.lock(false)) return true;
+#endif
         ACL_USER *acl_user =
             find_acl_user(user->host.str, user->user.str, true);
         if (acl_user && acl_user->m_mfa) {
@@ -3691,11 +3731,20 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
         }
       }
     }
+#ifndef WITH_WSREP
     /* Notify storage engines (including rewrite list) */
     acl_notify_htons(thd, SQLCOM_ALTER_USER, &list, &extra_users);
+#endif
   }
+#ifdef WITH_WSREP
+  } /* Critical section */
+#endif
 
   if (result == 0) {
+#ifdef WITH_WSREP
+    /* Notify storage engines (including rewrite list) */
+    acl_notify_htons(thd, SQLCOM_ALTER_USER, &list, &extra_users);
+#endif
     if (generated_passwords.size() == 0 && server_challenge.size() == 0) {
       my_ok(thd);
     } else {
