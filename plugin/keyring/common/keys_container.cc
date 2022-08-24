@@ -200,6 +200,10 @@ bool Keys_container::load_keys_from_keyring_storage() {
   bool was_error = false;
   ISerialized_object *serialized_keys = nullptr;
   was_error = keyring_io->get_serialized_object(&serialized_keys);
+#ifdef WITH_WSREP
+  // remove all keys from hash. It is going to be repopulated.
+  keys_hash->clear();
+#endif
   while (was_error == false && serialized_keys != nullptr) {
     IKey *key_loaded = nullptr;
     while (serialized_keys->has_next_key()) {
@@ -208,6 +212,10 @@ bool Keys_container::load_keys_from_keyring_storage() {
           store_key_in_hash(key_loaded)) {
 #ifdef WITH_WSREP
         if (forceKeysFetch) {
+          // If this key insertion failed, it was probably already there.
+          // Just continue.
+          // KH: TODO:
+          // probably not needed anymore, as we clear the hash before the loop.
           continue;
         }
 #endif
