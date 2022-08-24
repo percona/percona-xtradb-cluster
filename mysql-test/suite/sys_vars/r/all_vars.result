@@ -173,7 +173,6 @@ terminology_use_previous
 tls_ciphersuites
 tls_ciphersuites
 use_secondary_engine
-<<<<<<< HEAD
 wsrep_min_log_verbosity
 wsrep_min_log_verbosity
 wsrep_restart_slave
@@ -184,10 +183,7 @@ wsrep_slave_UK_checks
 wsrep_slave_UK_checks
 wsrep_slave_threads
 wsrep_slave_threads
-||||||| merged common ancestors
-=======
 xa_detach_on_prepare
 xa_detach_on_prepare
->>>>>>> Percona-Server-8.0.29-21
 drop table t1;
 drop table t2;

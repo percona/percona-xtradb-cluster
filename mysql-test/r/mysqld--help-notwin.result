@@ -1750,7 +1750,6 @@ The following options may be given as the first argument:
  inversion optimization for moving window frames also for
  floating values.
  (Defaults to on; use --skip-windowing-use-high-precision to disable.)
-<<<<<<< HEAD
  --wsrep-OSU-method[=name] 
  Method for Online Schema Upgrade
  --wsrep-RSU-commit-timeout[=#] 
@@ -1869,8 +1868,6 @@ The following options may be given as the first argument:
  --wsrep-trx-fragment-unit=name 
  Unit for streaming replication transaction fragments'
  size: bytes, rows, statements
-||||||| merged common ancestors
-=======
  --xa-detach-on-prepare 
  When set, XA transactions will be detached (AKA
  dissociated or disconnected) from connection as part of
@@ -1883,7 +1880,6 @@ The following options may be given as the first argument:
  same connection until the session disconnects. ON is the
  only safe choice for replication.
  (Defaults to on; use --skip-xa-detach-on-prepare to disable.)
->>>>>>> Percona-Server-8.0.29-21
 
 Variables (--variable-name=value)
 abort-slave-event-count 0
@@ -2344,7 +2340,6 @@ validate-user-plugins TRUE
 verbose TRUE
 wait-timeout 28800
 windowing-use-high-precision TRUE
-<<<<<<< HEAD
 wsrep-OSU-method TOI
 wsrep-RSU-commit-timeout 5000
 wsrep-SR-store table
@@ -2391,10 +2386,7 @@ wsrep-start-position 00000000-0000-0000-0000-000000000000:-1
 wsrep-sync-wait 0
 wsrep-trx-fragment-size 0
 wsrep-trx-fragment-unit bytes
-||||||| merged common ancestors
-=======
 xa-detach-on-prepare TRUE
->>>>>>> Percona-Server-8.0.29-21
 
 To see what values a running MySQL server is using, type
 'mysqladmin variables' instead of 'mysqld --verbose --help'.

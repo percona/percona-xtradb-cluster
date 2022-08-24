@@ -2950,11 +2950,6 @@ g   codership/mysql-wsrep/issues#176
    fun:_ZN7rocksdb24RegisterCacheDeleterRoleEPFvRKNS_5SliceEPvENS_14CacheEntryRoleE
    ...
 }
-<<<<<<< HEAD
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-=======
-
 
 {
    ThreadStatusUpdater is the member of PosixEnv, which is static method object inside Env* Env::Default()
@@ -2983,4 +2978,3 @@ g   codership/mysql-wsrep/issues#176
    fun:_ZN7rocksdb24CacheEntryStatsCollectorINS_13InternalStats19CacheEntryRoleStatsEE9GetSharedEPNS_5CacheEPNS_11SystemClockEPSt10shared_ptrIS3_E
    ...
 }
->>>>>>> tag/Percona-Server-8.0.28-19
