@@ -1,4 +1,4 @@
-/* Copyright (c) 2016, 2021, Oracle and/or its affiliates.
+/* Copyright (c) 2016, 2022, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License, version 2.0,
@@ -94,6 +94,13 @@ bool Rotate_innodb_key::acquire_backup_locks() {
       acquire_shared_backup_lock(m_thd, m_thd->variables.lock_wait_timeout)) {
     // MDL subsystem has to set an error in Diagnostics Area
     assert(m_thd->get_stmt_da()->is_error());
+    return true;
+  }
+
+  // Acquire Percona's LOCK TABLES FOR BACKUP lock
+  if (m_thd->backup_tables_lock.abort_if_acquired() ||
+      m_thd->backup_tables_lock.acquire_protection(
+          m_thd, MDL_TRANSACTION, m_thd->variables.lock_wait_timeout)) {
     return true;
   }
   return false;
@@ -361,6 +368,13 @@ bool Reload_keyring::execute() {
     my_error(ER_RELOAD_KEYRING_FAILURE, MYF(0));
     return true;
   }
+
+  /*
+    Persisted variables require keyring support to
+    persist SENSITIVE varaiables in a secure manner.
+  */
+  persisted_variables_refresh_keyring_support();
+
   my_ok(m_thd);
   return false;
 }

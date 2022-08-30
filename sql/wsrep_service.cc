@@ -164,7 +164,7 @@ int Sql_service_context::start_result_metadata(
     uint ncols, uint flags MY_ATTRIBUTE((unused)),
     const CHARSET_INFO *resultcs) {
   DBUG_ENTER("Sql_service_context::start_result_metadata");
-  DBUG_PRINT("info", ("resultcs->name: %s", resultcs->name));
+  DBUG_PRINT("info", ("resultcs->name: %s", resultcs->m_coll_name));
   if (resultset) {
     resultset->set_cols(ncols);
     resultset->set_charset(resultcs);

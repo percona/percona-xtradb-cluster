@@ -1,4 +1,4 @@
-# Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2017, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -184,6 +184,7 @@ usr/lib/mysql/plugin/debug/component_test_audit_api_message.so
 usr/lib/mysql/plugin/debug/component_test_udf_services.so
 usr/lib/mysql/plugin/debug/component_test_mysql_system_variable_set.so
 usr/lib/mysql/plugin/debug/component_test_table_access.so
+usr/lib/mysql/plugin/debug/component_test_sensitive_system_variables.so
 ")
 
 IF (DEB_PRODUCT STREQUAL "commercial")

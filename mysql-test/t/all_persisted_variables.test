@@ -42,8 +42,16 @@ call mtr.add_suppression("Failed to set up SSL because of the following SSL libr
 call mtr.add_suppression("\\[Warning\\] .*MY-\\d+.* Changing innodb_extend_and_initialize not supported on this platform.");
 call mtr.add_suppression("Failed to initialize TLS for channel: mysql_main");
 
+<<<<<<< HEAD
 let $total_global_vars=`SELECT COUNT(*) FROM performance_schema.global_variables where variable_name NOT LIKE 'ndb_%'`;
 let $total_persistent_vars=541;
+||||||| merged common ancestors
+let $total_global_vars=`SELECT COUNT(*) FROM performance_schema.global_variables where variable_name NOT LIKE 'ndb_%'`;
+let $total_persistent_vars=501;
+=======
+let $total_global_vars=`SELECT COUNT(*) FROM performance_schema.global_variables where variable_name NOT LIKE 'ndb_%' AND variable_name NOT LIKE 'debug_%'`;
+let $total_persistent_vars=507;
+>>>>>>> Percona-Server-8.0.29-21
 
 --echo ***************************************************************
 --echo * 0. Verify that variables present in performance_schema.global
@@ -139,6 +147,7 @@ WHERE variable_name NOT IN
 'pxc_maint_mode',
 'pxc_strict_mode')
 AND variable_name NOT LIKE 'ndb_%'
+AND variable_name NOT LIKE 'debug_%'
 ORDER BY variable_name;
 
 --let $count_vars= `SELECT COUNT(*) FROM all_vars;`
