@@ -152,6 +152,79 @@ DROP TABLE c1;
 DROP TABLE p1;
 
 #
+# Similar to the above, but for DROP INDEX
+#
+# Test that DROP INDEX on parent table is properly ordered with simultaneous
+# transactions that perform DML on child table.
+#
+# UPDATE should fail certification as its certification keys conflict
+# with DROP INDEX certification keys.
+#
+# Without the fix, UPDATE is certified, then aborted by already replicated TOI
+# transaction which causes its replay. When replaying it conflicts with TOI
+# causing BF-BF conflict.
+#
+# This test checks if parent table is included into the certification keys
+# of the writeset related to TOI done on child table.
+#
+
+--connection node_1_toi
+CREATE TABLE p1 (pk INTEGER PRIMARY KEY, f2 INTEGER, KEY f2_key (f2));
+CREATE TABLE c1 (pk INTEGER PRIMARY KEY, data INTEGER, fk INTEGER, FOREIGN KEY (fk) REFERENCES p1(pk));
+
+INSERT INTO p1 VALUES (0, 0);
+INSERT INTO c1 VALUES (0, 0, 0);
+
+# Replicate DROP INDEX, but stop just after replicaton, before local execution
+--let $galera_sync_point = apply_monitor_master_enter_sync
+--source include/galera_set_sync_point.inc
+--send DROP INDEX f2_key ON p1;
+
+--connection node_1
+SET SESSION wsrep_sync_wait=0;
+--let $galera_sync_point = apply_monitor_master_enter_sync
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+# Without the fix, UPDATE will replicate and the test will stop the execution
+# just after the certification (before the local commit)
+# With the fix, COMMIT will fail certification
+--let $galera_sync_point = apply_monitor_master_enter_sync
+--source include/galera_set_sync_point.inc
+BEGIN;
+UPDATE c1 SET data = 1 WHERE pk = 0;
+--send COMMIT
+
+--connection node_1a
+# Now unblock DROP INDEX. Without the fix it will BF-abort already certified
+# UPDATE which will cause its replay.
+--let $galera_sync_point = apply_monitor_master_enter_sync
+--source include/galera_signal_sync_point.inc
+
+
+# Without the fix, if UPDATE was replicated, let node_1 to continue.
+# As it was replicated, it needs to replay (hp service)
+# It can now trigger BF-BF conflict with DROP INDEX
+# With the fix, it already failed certification.
+--let $galera_sync_point = apply_monitor_master_enter_sync
+--source include/galera_signal_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+# wait for both to finish
+--connection node_1
+--error ER_LOCK_DEADLOCK
+--reap
+
+--connection node_1_toi
+--reap
+--let $wait_condition = SELECT COUNT(*)=1 FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_NAME='p1';
+--source include/wait_condition.inc
+
+DROP TABLE c1;
+DROP TABLE p1;
+
+#
+#
 # Similar to the above, but for DROP TABLE
 # Additionally we test multi table drop with temporary tables included.
 #

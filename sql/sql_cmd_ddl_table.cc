@@ -627,9 +627,21 @@ bool Sql_cmd_create_or_drop_index_base::execute(THD *thd) {
   if (check_one_table_access(thd, INDEX_ACL, all_tables)) return true;
 
 #ifdef WITH_WSREP
-  if (WSREP(thd) && wsrep_to_isolation_begin(thd, first_table->db,
-                                             first_table->table_name, NULL)) {
+  wsrep::key_array keys;
+  if (wsrep_append_fk_parent_table(thd, first_table, &keys) ||
+      wsrep_append_child_tables(thd, first_table, &keys)) {
+    WSREP_DEBUG("TOI replication for CREATE/DROP INDEX failed");
     return true;
+  }
+  if (keys.empty()) {
+    WSREP_TO_ISOLATION_BEGIN_IF(first_table->db, first_table->table_name,
+                                NULL) {
+      return true;
+    }
+  } else {
+    WSREP_TO_ISOLATION_BEGIN_FK_TABLES_IF(NULL, NULL, first_table, &keys) {
+      return true;
+    }
   }
 #endif /* WITH_WSREP */
 
