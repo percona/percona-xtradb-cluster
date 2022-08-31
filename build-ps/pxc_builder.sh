@@ -361,7 +361,7 @@ install_deps() {
         fi
         if [ "x${RHEL}" = "x8" ]; then
             yum -y install centos-release-stream
-            yum -y install git gcc-toolset-11-gcc gcc-toolset-11-gcc-c++ gcc-toolset-11-annobin
+            yum -y install git gcc-toolset-11-gcc gcc-toolset-11-gcc-c++ gcc-toolset-11-annobin-plugin-gcc
             source /opt/rh/gcc-toolset-11/enable
         fi
         if [ "x${RHEL}" = "x7" ]; then
@@ -422,6 +422,7 @@ install_deps() {
         apt-get -y install patchelf
         apt-get -y install libsasl2-dev libsasl2-modules-gssapi-mit
         apt-get -y install stunnel libkrb5-dev
+        apt-get -y install libudev-dev
         if [ x"${DIST}" = xfocal -o x"${DIST}" = xbullseye ]; then
             apt-get -y install python3-mysqldb
         else
@@ -922,7 +923,7 @@ build_tarball(){
 
         mkdir pxb-8.0
         pushd pxb-8.0
-        yumdownloader percona-xtrabackup-80-8.0.28
+        yumdownloader percona-xtrabackup-80-8.0.29
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
         mv usr/bin ./
         mv usr/lib64 ./
