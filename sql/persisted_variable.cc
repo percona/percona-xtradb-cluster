@@ -379,6 +379,28 @@ bool Persisted_variables_cache::set_variable(THD *thd, set_var *setvar) {
     bool is_null = false;
 
     std::string var_name{tolower_varname(setvar->m_var_tracker.get_var_name())};
+#ifdef WITH_WSREP
+    /* Some of the wsrep_variables both have
+     * 1. uppercase characters in them
+     * 2. aliases
+     *
+     * eg:
+     * wsrep_slave_FK_checks, wsrep_applier_FK_checks
+     * wsrep_slave_UK_checks, wsrep_applier_UK_checks
+     *
+     * SET PERSIST of these variables can result in multiple entries in the
+     * performance_schema.persisted_variables. After server restart, any
+     * attempt to RESET PERSIST of these variables may fail the operation and
+     * result in an inconsistent state.
+     *
+     * So, temporarily we skip converting "wsrep_" variables to lowercase
+     * before persisting them. */
+    static const std::string wsrep_prefix("wsrep_");
+    if (!var_name.rfind(wsrep_prefix, 0)) {
+      // name starts with wsrep_
+      var_name.assign(setvar->m_var_tracker.get_var_name());
+    }
+#endif /* WITH_WSREP */
 
     // 1. Fetch value into local variable var_value.
 
@@ -2094,6 +2116,28 @@ bool Persisted_variables_cache::reset_persisted_variables(THD *thd,
   } else {
     auto erase_variable = [&](const char *name_cptr) -> bool {
       string name_str{tolower_varname(name_cptr)};
+#ifdef WITH_WSREP
+      /* Some of the wsrep_variables both have
+       * 1. uppercase characters in them
+       * 2. aliases
+       *
+       * e.g:
+       * wsrep_slave_FK_checks, wsrep_applier_FK_checks
+       * wsrep_slave_UK_checks, wsrep_applier_UK_checks
+       *
+       * SET PERSIST of these variables can result in multiple entries in the
+       * performance_schema.persisted_variables. After server restart, any
+       * attempt to RESET PERSIST of these variables may fail the operation and
+       * result in an inconsistent state.
+       *
+       * So, temporarily we skip converting "wsrep_" variables to lowercase
+       * before persisting them. */
+      static const std::string wsrep_prefix("wsrep_");
+      if (!name_str.rfind(wsrep_prefix, 0)) {
+        // name starts with wsrep_
+        name_str.assign(name_cptr);
+      }
+#endif /* WITH_WSREP */
 
       auto checkvariable = [&name_str](st_persist_var const &s) -> bool {
         return s.key == name_str;

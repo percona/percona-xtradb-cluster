@@ -26,13 +26,7 @@ VARIABLE_NAME LIKE '%applier%') AND
 (VARIABLE_NAME NOT LIKE 'innodb%')
 ORDER BY VARIABLE_NAME;
 
-<<<<<<< HEAD
-include/assert.inc [Expect 126 variables in the table.]
-||||||| merged common ancestors
-include/assert.inc [Expect 117 variables in the table.]
-=======
-include/assert.inc [Expect 118 variables in the table.]
->>>>>>> Percona-Server-8.0.29-21
+include/assert.inc [Expect 127 variables in the table.]
 
 # Test SET PERSIST
 SET PERSIST binlog_cache_size = @@GLOBAL.binlog_cache_size;
