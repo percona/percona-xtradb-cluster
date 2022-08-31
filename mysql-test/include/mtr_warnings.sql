@@ -417,6 +417,8 @@ INSERT INTO global_suppressions VALUES
 
  /* MySQL supression needed by Galera */
  ("Slave I/O.*: Get master clock failed with error:.*"),
+ ("Trying to access missing tablespace.*"),
+ ("Allocated tablespace ID .*, old maximum was.*"),
 
 
 -- this is not from galera but from PS/MySQL but upstream doesn't need it as the

@@ -38,6 +38,18 @@ wsrep_provider_options='base_port=@mysqld.3.#galera_port;gmcast.peer_timeout=PT1
 wsrep_sst_receive_address=127.0.0.2:@mysqld.3.#sst_port
 wsrep_node_incoming_address=127.0.0.1:@mysqld.3.port
 
+[mysqld.1]
+early_plugin_load=keyring_file.so
+keyring_file_data=@ENV.MYSQL_TMP_DIR/mysqld.1/keyring.1
+
+[mysqld.2]
+early_plugin_load=keyring_file.so
+keyring_file_data=@ENV.MYSQL_TMP_DIR/mysqld.2/keyring.2
+
+[mysqld.3]
+early_plugin_load=keyring_file.so
+keyring_file_data=@ENV.MYSQL_TMP_DIR/mysqld.3/keyring.3
+
 [ENV]
 NODE_MYPORT_1= @mysqld.1.port
 NODE_MYSOCK_1= @mysqld.1.socket

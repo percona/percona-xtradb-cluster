@@ -40,6 +40,14 @@ wsrep_node_incoming_address=127.0.0.1:@mysqld.2.port
 # Required for Galera
 innodb_autoinc_lock_mode=2
 
+[mysqld.1]
+early_plugin_load=keyring_file.so
+keyring_file_data=@ENV.MYSQL_TMP_DIR/mysqld.1/keyring.1
+
+[mysqld.2]
+early_plugin_load=keyring_file.so
+keyring_file_data=@ENV.MYSQL_TMP_DIR/mysqld.2/keyring.2
+
 [ENV]
 NODE_MYPORT_1= @mysqld.1.port
 NODE_MYSOCK_1= @mysqld.1.socket

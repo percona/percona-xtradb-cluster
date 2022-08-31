@@ -1,1 +1,1 @@
---wsrep_provider=$WSREP_PROVIDER --wsrep_cluster_address='gcomm://' --wsrep_new_cluster --log-error-verbosity=2 --wsrep_debug=1 --wsrep_cluster_address=gcomm:// --wsrep_cluster_name=pxc-cluster
+--wsrep_provider=$WSREP_PROVIDER --wsrep_cluster_address='gcomm://' --wsrep_new_cluster --log-error-verbosity=2 --wsrep_debug=1 --wsrep_cluster_address=gcomm:// --wsrep_cluster_name=pxc-cluster --early-plugin-load=$KEYRING_PLUGIN --keyring_file_data=@ENV.MYSQL_TMP_DIR/keyring

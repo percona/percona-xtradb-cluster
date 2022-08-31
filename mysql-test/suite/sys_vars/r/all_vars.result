@@ -169,6 +169,10 @@ terminology_use_previous
 tls_ciphersuites
 tls_ciphersuites
 use_secondary_engine
+wsrep_disk_pages_encrypt
+wsrep_disk_pages_encrypt
+wsrep_gcache_encrypt
+wsrep_gcache_encrypt
 wsrep_min_log_verbosity
 wsrep_min_log_verbosity
 wsrep_restart_slave

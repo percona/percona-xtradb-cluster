@@ -8555,6 +8555,20 @@ static Sys_var_bool Sys_pxc_encrypt_cluster_traffic(
     READ_ONLY GLOBAL_VAR(pxc_encrypt_cluster_traffic), CMD_LINE(OPT_ARG),
     DEFAULT(true), NO_MUTEX_GUARD, NOT_IN_BINLOG);
 
+static const char *wsrep_encrypt_modes[] = {"OFF", "ON", "NONE",
+                                        NullS};
+static Sys_var_enum Sys_wsrep_gcache_encrypt(
+    "wsrep_gcache_encrypt", "Encrypt GCache. This variable is solely for testing purposes. "
+    "wsrep_provider_options should be used in production.",
+    GLOBAL_VAR(wsrep_gcache_encrypt), CMD_LINE(OPT_ARG), wsrep_encrypt_modes,
+    DEFAULT(WSREP_ENCRYPT_MODE_NONE), NO_MUTEX_GUARD, NOT_IN_BINLOG);
+
+static Sys_var_enum Sys_wsrep_disk_pages_encrypt(
+    "wsrep_disk_pages_encrypt", "Encrypt WriteSet cache. This variable is solely for testing purposes. "
+    "wsrep_provider_options should be used in production.",
+    GLOBAL_VAR(wsrep_disk_pages_encrypt), CMD_LINE(OPT_ARG), wsrep_encrypt_modes,
+    DEFAULT(WSREP_ENCRYPT_MODE_NONE), NO_MUTEX_GUARD, NOT_IN_BINLOG);
+
 #endif /* WITH_WSREP */
 
 static bool check_set_require_row_format(sys_var *, THD *thd, set_var *var) {

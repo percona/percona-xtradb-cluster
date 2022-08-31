@@ -154,6 +154,14 @@ extern bool wsrep_pxc_maint_mode_forced;
 extern ulong pxc_maint_transition_period;
 extern bool pxc_encrypt_cluster_traffic;
 
+enum enump_wsrep_encrypt_modes {
+  WSREP_ENCRYPT_MODE_OFF = 0,
+  WSREP_ENCRYPT_MODE_ON,
+  WSREP_ENCRYPT_MODE_NONE,
+};
+extern ulong wsrep_gcache_encrypt;
+extern ulong wsrep_disk_pages_encrypt;
+
 extern bool pxc_force_flush_error_message;
 
 // MySQL status variables

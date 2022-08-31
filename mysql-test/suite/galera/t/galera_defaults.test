@@ -10,6 +10,13 @@
 
 --source include/galera_cluster.inc
 
+# We use 'combinations' file to run the suite with encryption on/off.
+# It changes the default value of the following variables.
+--let $wsrep_gcache_encrypt_saved = `SELECT @@wsrep_gcache_encrypt`
+--let $wsrep_disk_pages_encrypt_saved = `SELECT @@wsrep_disk_pages_encrypt`
+SET GLOBAL wsrep_gcache_encrypt = DEFAULT;
+SET GLOBAL wsrep_disk_pages_encrypt = DEFAULT;
+
 # Global Variables
 SELECT UPPER(VARIABLE_NAME), VARIABLE_VALUE
 FROM performance_schema.global_variables
@@ -60,3 +67,6 @@ SELECT UPPER(VARIABLE_NAME) FROM performance_schema.global_status
 WHERE VARIABLE_NAME LIKE 'wsrep_%'
 AND VARIABLE_NAME != 'wsrep_debug_sync_waiters'
 ORDER BY VARIABLE_NAME;
+
+--eval SET GLOBAL wsrep_gcache_encrypt = $wsrep_gcache_encrypt_saved;
+--eval SET GLOBAL wsrep_disk_pages_encrypt = $wsrep_disk_pages_encrypt_saved;

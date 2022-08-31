@@ -58,6 +58,18 @@ innodb_flush_log_at_trx_commit=2
 [mysqld.3]
 server-id=3
 
+[mysqld.1]
+early_plugin_load=keyring_file.so
+keyring_file_data=@ENV.MYSQL_TMP_DIR/mysqld.1/keyring.1
+
+[mysqld.2]
+early_plugin_load=keyring_file.so
+keyring_file_data=@ENV.MYSQL_TMP_DIR/mysqld.2/keyring.2
+
+[mysqld.3]
+early_plugin_load=keyring_file.so
+keyring_file_data=@ENV.MYSQL_TMP_DIR/mysqld.3/keyring.3
+
 [ENV]
 NODE_MYPORT_1= @mysqld.1.port
 NODE_MYSOCK_1= @mysqld.1.socket

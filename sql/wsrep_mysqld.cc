@@ -143,6 +143,9 @@ ulong pxc_maint_transition_period = 30;
 /* enables PXC SSL auto-config */
 bool pxc_encrypt_cluster_traffic = 0;
 
+ulong wsrep_gcache_encrypt = WSREP_ENCRYPT_MODE_NONE;
+ulong wsrep_disk_pages_encrypt = WSREP_ENCRYPT_MODE_NONE;
+
 /* force flush of error message if error is detected at early stage
    during SST or other initialization. */
 bool pxc_force_flush_error_message = false;
@@ -1063,6 +1066,50 @@ void wsrep_deinit_server() {
   Wsrep_server_state::destroy();
 }
 
+static void override_galera_option(const std::string& option, const std::string& new_value, std::string& options) {
+  size_t option_pos = options.find(option + "=");
+  if (option_pos == std::string::npos) {
+    option_pos = options.find(option + " ");
+  }
+  // option_pos == std::string::npos means there is no such
+  // option in the string. We just need to add the new one.
+  // All below logic still works.
+
+  // pos points to the beginning of the option we want to override.
+  // Find the separator
+  size_t separator_pos = options.find(";", option_pos);
+
+  // erase the option form the original string
+  std::string modified_options = options.substr(0, option_pos);
+  if (separator_pos != std::string::npos) {
+    modified_options += options.substr(separator_pos+1);
+  }
+
+  // add the new value of the option at the end
+  modified_options += ";" + option + "=" + new_value;
+
+  options = modified_options;
+}
+
+static void setup_galera_encryption_params(char* provider_options, size_t buf_size) {
+  std::string options(provider_options);
+  static const std::string yes("yes");
+  static const std::string no("no");
+
+  if (wsrep_gcache_encrypt != WSREP_ENCRYPT_MODE_NONE) {
+    const std::string& val = wsrep_gcache_encrypt == WSREP_ENCRYPT_MODE_ON ? yes : no;
+    override_galera_option("gcache.encryption", val, options);
+  }
+  if (wsrep_disk_pages_encrypt != WSREP_ENCRYPT_MODE_NONE) {
+    const std::string& val = wsrep_disk_pages_encrypt == WSREP_ENCRYPT_MODE_ON ? yes : no;
+    override_galera_option("allocator.disk_pages_encryption", val, options);
+  }
+
+  // todo: strncpy, buffer size, etc
+  snprintf(provider_options, buf_size, "%s", options.c_str());
+  provider_options[buf_size] = 0;
+}
+
 int wsrep_init() {
   assert(wsrep_provider);
 
@@ -1097,7 +1144,8 @@ int wsrep_init() {
   global_system_variables.wsrep_on = 1;
 
   const char *provider_options = wsrep_provider_options;
-  char buffer[4096];
+  static const size_t buf_size = 4096;
+  char buffer[buf_size];
 
   if (pxc_encrypt_cluster_traffic) {
     if (!server_main_callback.is_wsrep_context_initialized()) {
@@ -1108,37 +1156,27 @@ int wsrep_init() {
       return 1;
     }
 
-    char ssl_opts[4096];
+    char ssl_opts[buf_size];
     server_main_callback.populate_wsrep_ssl_options(ssl_opts, sizeof(ssl_opts));
     MY_COMPILER_GCC_DIAGNOSTIC_PUSH();
     MY_COMPILER_GCC_DIAGNOSTIC_IGNORE("-Wformat-truncation");
-    snprintf(buffer, sizeof(buffer), "%s%s%s",
+    snprintf(buffer, buf_size, "%s%s%s",
              provider_options ? provider_options : "",
              ((provider_options && *provider_options) ? ";" : ""), ssl_opts);
     MY_COMPILER_GCC_DIAGNOSTIC_POP();
-    provider_options = buffer;
-
-#if 0
-    if (opt_ssl_ca == 0 || *opt_ssl_ca == 0 || opt_ssl_cert == 0 ||
-        *opt_ssl_cert == 0 || opt_ssl_key == 0 || *opt_ssl_key == 0) {
-      WSREP_ERROR(
-          "ssl-ca, ssl-cert, and ssl-key must all be defined"
-          " to use encrypted mode traffic. Unable to configure SSL."
-          " Must shutdown.");
-      return 1;
-    }
-    // Append the SSL options to the end of the provider
-    // options strings (so that it overrides the SSL values
-    // provided by the user).
-    snprintf(buffer, sizeof(buffer),
-             "%s%ssocket.ssl_key=%s;socket.ssl_ca=%s;socket.ssl_cert=%s",
-             provider_options ? provider_options : "",
-             (provider_options && *provider_options) ? ";" : "", opt_ssl_key,
-             opt_ssl_ca, opt_ssl_cert);
-    buffer[sizeof(buffer) - 1] = 0;
-    provider_options = buffer;
-#endif /* 0 */
+  } else {
+    snprintf(buffer, buf_size, "%s", provider_options ? provider_options : "");
   }
+  buffer[buf_size] = 0;
+
+  /* Setup GCache and WSCache encryption according to
+      wsrep_gcache_encrypt and wsrep_disk_pages_encrypt.
+      This is mainly for integration with MTR test suite
+      which does not allow overriding of particular wsrep_provider_options'
+      options via combinations file */
+  setup_galera_encryption_params(buffer, buf_size);
+
+  provider_options = buffer;
 
   if (!wsrep_data_home_dir || strlen(wsrep_data_home_dir) == 0)
     wsrep_data_home_dir = mysql_real_data_home;
