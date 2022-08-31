@@ -9,13 +9,15 @@
 #
 
 --source include/galera_cluster.inc
+# Force a restart at the end of the test
+--source include/force_restart.inc
 
 # We use 'combinations' file to run the suite with encryption on/off.
 # It changes the default value of the following variables.
---let $wsrep_gcache_encrypt_saved = `SELECT @@wsrep_gcache_encrypt`
---let $wsrep_disk_pages_encrypt_saved = `SELECT @@wsrep_disk_pages_encrypt`
-SET GLOBAL wsrep_gcache_encrypt = DEFAULT;
-SET GLOBAL wsrep_disk_pages_encrypt = DEFAULT;
+# Let's use node_2 for this test and restart it with gcache.encrypt default value
+--connection node_2
+--let $restart_parameters = "restart:--wsrep-gcache-encrypt=NONE --wsrep-disk-pages-encrypt=NONE"
+--source include/restart_mysqld.inc
 
 # Global Variables
 SELECT UPPER(VARIABLE_NAME), VARIABLE_VALUE
@@ -29,7 +31,8 @@ AND VARIABLE_NAME NOT IN (
 	'WSREP_PROVIDER',
 	'WSREP_DATA_HOME_DIR',
 	'WSREP_NODE_INCOMING_ADDRESS',
-	'WSREP_START_POSITION'
+	'WSREP_START_POSITION',
+	'WSREP_CLUSTER_ADDRESS'
 )
 ORDER BY VARIABLE_NAME;
 
@@ -67,6 +70,3 @@ SELECT UPPER(VARIABLE_NAME) FROM performance_schema.global_status
 WHERE VARIABLE_NAME LIKE 'wsrep_%'
 AND VARIABLE_NAME != 'wsrep_debug_sync_waiters'
 ORDER BY VARIABLE_NAME;
-
---eval SET GLOBAL wsrep_gcache_encrypt = $wsrep_gcache_encrypt_saved;
---eval SET GLOBAL wsrep_disk_pages_encrypt = $wsrep_disk_pages_encrypt_saved;
