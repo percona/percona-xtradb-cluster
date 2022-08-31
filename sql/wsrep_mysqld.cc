@@ -165,7 +165,6 @@ static char provider_vendor[256] = {
 
 /* Set to true on successful connect and false on disconnect. */
 bool wsrep_connected = false;
-bool forceKeysFetch = false;
 
 // wsrep status variable - start
 bool wsrep_ready = false;  // node can accept queries
@@ -1227,12 +1226,10 @@ void wsrep_init_startup(bool sst_first) {
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
 
-  // This is definitely a hack, but we need to force keyring cache to repopulate
+  // We need to force keyring cache to repopulate
   // after SST, because SST might have add some keys.
-  // forceKeysFetch is a weak symbol, so if keyring plugin provides its own
-  // instance, we are good, if not... GCache necryption won't work.
-  // If not this way, we need to change keyring plugin interface.
-  forceKeysFetch = true;
+  // GCache recovery won't work without this.
+  plugin_reinit_keyring();
 }
 
 void wsrep_deinit() {

@@ -160,6 +160,7 @@ extern bool plugin_register_dynamic_and_init_all(int *argc, char **argv,
                                                  int init_flags);
 #ifdef WITH_WSREP
 extern bool plugin_register_keyring(int *argc, char **argv);
+extern bool plugin_reinit_keyring();
 #endif
 
 namespace dd {

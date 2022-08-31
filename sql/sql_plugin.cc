@@ -1672,6 +1672,23 @@ bool plugin_register_builtin_and_init_core_se(int *argc, char **argv) {
   return plugin_register_builtin_and_init_core_se_internal(
       argc, argv, mysql_mandatory_plugins);
 }
+
+bool plugin_reinit_keyring() {
+  bool ret = false;
+  size_t count = plugin_array->size();
+  for (size_t i = 0; i < count; i++) {
+    st_plugin_int *plugin = plugin_array->at(i);
+    if (plugin->state == PLUGIN_IS_READY) {
+      if (plugin->plugin->type == MYSQL_KEYRING_PLUGIN) {
+        plugin_deinitialize(plugin, false);
+        mysql_mutex_lock(&LOCK_plugin);
+        ret |= plugin_initialize(plugin);
+        mysql_mutex_unlock(&LOCK_plugin);
+      }
+    }
+  }
+  return ret;
+}
 #endif
 
 bool is_builtin_and_core_se_initialized() { return initialized; }
