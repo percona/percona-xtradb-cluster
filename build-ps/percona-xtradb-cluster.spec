@@ -900,6 +900,10 @@ install -D -p -m 0644 packaging/rpm-common/mysqlrouter.conf.in %{buildroot}%{_sy
 %{__rm} -f $RBR/%{_prefix}/COPYING.GPLv2
 %{__rm} -f $RBR/%{_prefix}/PATENTS
 %endif
+%{__rm} -f $RBR/usr/include/kmip.h
+%{__rm} -f $RBR/usr/include/kmippp.h
+%{__rm} -f $RBR/usr/lib/libkmip.a
+%{__rm} -f $RBR/usr/lib/libkmippp.a
 #
 
 install -d $RBR%{_sysconfdir}/ld.so.conf.d
