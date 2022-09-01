@@ -1854,15 +1854,14 @@ then
     donor_tmpdir=$(mktemp --tmpdir="${tmpdirbase}" --directory donor_tmp_XXXX)
 
     # raise error if keyring_plugin is enabled but transit encryption is not
-    # KH: commented out just to allow standard gcache MTR suites
-    #if [[ $keyring_plugin -eq 1 && $encrypt -le 0 ]]; then
-    #    wsrep_log_error "******************* FATAL ERROR ********************** "
-    #    wsrep_log_error "FATAL: keyring plugin is enabled but transit channel" \
-    #                    "is unencrypted. Enable encryption for SST traffic"
-    #    wsrep_log_error "Line $LINENO"
-    #    wsrep_log_error "****************************************************** "
-    #    exit 22
-    #fi
+    if [[ $keyring_plugin -eq 1 && $encrypt -le 0 ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "FATAL: keyring plugin is enabled but transit channel" \
+                        "is unencrypted. Enable encryption for SST traffic"
+        wsrep_log_error "Line $LINENO"
+        wsrep_log_error "****************************************************** "
+        exit 22
+    fi
 
     # Create the SST info file
     # This file contains SST information that is passed from the
