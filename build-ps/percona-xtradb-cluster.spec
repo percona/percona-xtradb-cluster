@@ -900,6 +900,10 @@ install -D -p -m 0644 packaging/rpm-common/mysqlrouter.conf.in %{buildroot}%{_sy
 %{__rm} -f $RBR/%{_prefix}/COPYING.GPLv2
 %{__rm} -f $RBR/%{_prefix}/PATENTS
 %endif
+%{__rm} -f $RBR/usr/include/kmip.h
+%{__rm} -f $RBR/usr/include/kmippp.h
+%{__rm} -f $RBR/usr/lib/libkmip.a
+%{__rm} -f $RBR/usr/lib/libkmippp.a
 #
 
 install -d $RBR%{_sysconfdir}/ld.so.conf.d
@@ -1776,11 +1780,15 @@ fi
 %{_libdir}/mysqlrouter/private/libmysqlharness_stdx.so.*
 %{_libdir}/mysqlrouter/private/libmysqlharness_tls.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_connection_pool.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_http.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_http_auth_backend.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_http_auth_realm.so.*
 %{_libdir}/mysqlrouter/private/libprotobuf-lite.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_io_component.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_metadata_cache.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_mysqlxmessages.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_routing.so.*
 %dir %{_libdir}/mysqlrouter
 %dir %{_libdir}/mysqlrouter/private
 %{_libdir}/mysqlrouter/*.so*

@@ -362,12 +362,12 @@ install_deps() {
         fi
         if [ "x${RHEL}" = "x8" ]; then
             yum -y install centos-release-stream
-            yum -y install git gcc-toolset-10-gcc gcc-toolset-10-gcc-c++ gcc-toolset-10-annobin
-            source /opt/rh/gcc-toolset-10/enable
+            yum -y install git gcc-toolset-11-gcc gcc-toolset-11-gcc-c++ gcc-toolset-11-annobin-plugin-gcc
+            source /opt/rh/gcc-toolset-11/enable
         fi
         if [ "x${RHEL}" = "x7" ]; then
-            yum -y install devtoolset-10
-            source /opt/rh/devtoolset-10/enable
+            yum -y install devtoolset-11
+            source /opt/rh/devtoolset-11/enable
         fi
          if [ "x${RHEL}" = "x6" ]; then
             source /opt/rh/devtoolset-8/enable
@@ -381,16 +381,16 @@ install_deps() {
             yum -y install libevent-devel
         fi
         if [ "x$RHEL" = "x7" ]; then
-            yum -y --enablerepo=centos-sclo-rh-testing install devtoolset-10-gcc-c++ devtoolset-10-binutils devtoolset-10-valgrind devtoolset-10-valgrind-devel devtoolset-10-libatomic-devel
-            yum -y --enablerepo=centos-sclo-rh-testing install devtoolset-10-libasan-devel devtoolset-10-libubsan-devel
+            yum -y --enablerepo=centos-sclo-rh-testing install devtoolset-11-gcc-c++ devtoolset-11-binutils devtoolset-11-valgrind devtoolset-11-valgrind-devel devtoolset-11-libatomic-devel
+            yum -y --enablerepo=centos-sclo-rh-testing install devtoolset-11-libasan-devel devtoolset-11-libubsan-devel
             rm -f /usr/bin/cmake
             cp -p /usr/bin/cmake3 /usr/bin/cmake
         fi
         if [ "x$RHEL" = "x8" ]; then
             yum -y install centos-release-stream
-            yum -y install gcc-toolset-10-gcc-c++ gcc-toolset-10-binutils
-            yum -y install gcc-toolset-10-valgrind gcc-toolset-10-valgrind-devel gcc-toolset-10-libatomic-devel
-            yum -y install gcc-toolset-10-libasan-devel gcc-toolset-10-libubsan-devel
+            yum -y install gcc-toolset-11-gcc-c++ gcc-toolset-11-binutils
+            yum -y install gcc-toolset-11-valgrind gcc-toolset-11-valgrind-devel gcc-toolset-11-libatomic-devel
+            yum -y install gcc-toolset-11-libasan-devel gcc-toolset-11-libubsan-devel
             yum -y remove centos-release-stream
         fi
         yum -y install yum-utils patchelf
@@ -423,6 +423,7 @@ install_deps() {
         apt-get -y install patchelf
         apt-get -y install libsasl2-dev libsasl2-modules-gssapi-mit
         apt-get -y install stunnel libkrb5-dev
+        apt-get -y install libudev-dev
         if [ x"${DIST}" = xfocal -o x"${DIST}" = xbullseye ]; then
             apt-get -y install python3-mysqldb
         else
@@ -654,10 +655,10 @@ build_rpm(){
         source /opt/rh/devtoolset-8/enable
     fi
     if [ "x${RHEL}" = "x7" ]; then
-        source /opt/rh/devtoolset-10/enable
+        source /opt/rh/devtoolset-11/enable
     fi
     if [ "x${RHEL}" = "x8" ]; then
-        source /opt/rh/gcc-toolset-10/enable
+        source /opt/rh/gcc-toolset-11/enable
     fi
 
     build_mecab_lib
@@ -668,10 +669,10 @@ build_rpm(){
         source /opt/rh/devtoolset-8/enable
     fi
     if [ "x${RHEL}" = "x7" ]; then
-        source /opt/rh/devtoolset-10/enable
+        source /opt/rh/devtoolset-11/enable
     fi
     if [ "x${RHEL}" = "x8" ]; then
-        source /opt/rh/gcc-toolset-10/enable
+        source /opt/rh/gcc-toolset-11/enable
     fi
 
     source ${WORKDIR}/pxc-80.properties
@@ -874,10 +875,10 @@ build_tarball(){
         source /opt/rh/devtoolset-8/enable
     fi
     if [ "x${RHEL}" = "x7" ]; then
-        source /opt/rh/devtoolset-10/enable
+        source /opt/rh/devtoolset-11/enable
     fi
     if [ "x${RHEL}" = "x8" ]; then
-        source /opt/rh/gcc-toolset-10/enable
+        source /opt/rh/gcc-toolset-11/enable
     fi
 
     fi
@@ -923,7 +924,7 @@ build_tarball(){
 
         mkdir pxb-8.0
         pushd pxb-8.0
-        yumdownloader percona-xtrabackup-80-8.0.28
+        yumdownloader percona-xtrabackup-80-8.0.29
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
         mv usr/bin ./
         mv usr/lib64 ./
