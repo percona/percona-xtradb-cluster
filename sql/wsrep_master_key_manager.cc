@@ -98,9 +98,6 @@ void MasterKeyManager::DeInit() {
 bool MasterKeyManager::GenerateKey(const std::string &keyId) {
   if (keyring_generator_service_->generate(keyId.c_str(), nullptr, key_type,
                                            KEY_LEN) == true) {
-    logger_(
-        "MasterKey generation FAILED. Check if Keyring component "
-        "is installed.");
     return true;
   }
   return false;
