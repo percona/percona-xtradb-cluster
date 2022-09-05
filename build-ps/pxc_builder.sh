@@ -201,10 +201,10 @@ get_sources(){
         source /opt/rh/devtoolset-8/enable
     fi
     if [ "x${RHEL}" = "x7" ]; then
-        source /opt/rh/devtoolset-10/enable
+        source /opt/rh/devtoolset-11/enable
     fi
     if [ "x${RHEL}" = "x8" ]; then
-        source /opt/rh/gcc-toolset-10/enable
+        source /opt/rh/gcc-toolset-11/enable
     fi
 
       if [ "x${RHEL}" = "x8" ]; then
