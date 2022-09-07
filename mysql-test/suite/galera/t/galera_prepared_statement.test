@@ -64,3 +64,55 @@ execute stmt;
 execute stmt;
 drop view v1;
 drop table t1;
+
+#
+# Re-execution of the prepared statement with parallel DDL (PXC-4033)
+#
+CREATE TABLE t1 (id INT PRIMARY KEY, f1 int);
+INSERT INTO t1 VALUES (0, 0);
+
+PREPARE stmt FROM 'UPDATE t1 SET f1 = ? WHERE id = ?';
+
+# DDL will change table's metadata, so prepared stmt executed after it will be aborted, it will be re-prepared and re-executed
+CREATE INDEX idx1 ON t1 (f1);
+
+SET @value=10;
+SET @id=0;
+EXECUTE stmt USING @value, @id;
+
+--let $assert_text = Value should be updated
+--let $assert_cond = [SELECT COUNT(*) FROM t1 WHERE f1=10] = 1
+--source include/assert.inc
+
+DROP TABLE t1;
+
+#
+# Similar to the above but for multi statement transaction.
+# Re-execution of the prepared statement with parallel DDL (PXC-4033)
+#
+
+CREATE TABLE t1 (id INT PRIMARY KEY, f1 int);
+INSERT INTO t1 VALUES (0, 0);
+
+PREPARE stmt FROM 'UPDATE t1 SET f1 = ? WHERE id = ?';
+
+# DDL will change table's metadata, so prepared stmt executed after it will be aborted, it will be re-prepared and re-executed
+CREATE INDEX idx1 ON t1 (f1);
+
+BEGIN;
+SET @value=10;
+SET @id=0;
+EXECUTE stmt USING @value, @id;
+COMMIT;
+
+--let $assert_text = Value should be updated
+--let $assert_cond = [SELECT COUNT(*) FROM t1 WHERE f1=10] = 1
+--source include/assert.inc
+
+# Without the fix, the value is updated on node_1, but the change is not replicated
+--connection node_2
+--let $assert_text = Value should be updated
+--let $assert_cond = [SELECT COUNT(*) FROM t1 WHERE f1=10] = 1
+--source include/assert.inc
+
+DROP TABLE t1;
