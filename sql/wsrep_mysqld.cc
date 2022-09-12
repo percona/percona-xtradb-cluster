@@ -1857,7 +1857,30 @@ int wsrep_to_buf_helper(THD *thd, const char *query, uint query_len,
 
   /* continue to append the actual query */
   Query_log_event ev(thd, query, query_len, false, false, false, 0);
+
+  /* Below commands will enter the row in mysql.password_history table.
+     They need to be replicated with usec part of the timestamp, because
+     the timestamp is the part of primary key. If we've got only second
+     resolution, we can end up with the PK conflict on replica and node
+     failure.
+     During async replication, query_start_usec_used flag is set when
+     the user's password is validated, then the event is written to
+     the binlog and replicated. Here we replicate TOI, so we are at
+     the beginning of query processing.
+     Let's play safe, and change the flag only for the time of creation
+     of the event which is replicated. This way we will not affect non-wsrep
+     related logic. If it decides to cut precission, it will be still possible.
+   */
+  bool query_start_usec_used_tmp = thd->query_start_usec_used;
+  enum_sql_command command = thd->lex->sql_command;
+  if (command == SQLCOM_CREATE_USER || command == SQLCOM_ALTER_USER ||
+      command == SQLCOM_SET_PASSWORD) {
+    thd->query_start_usec_used = true;
+  }
+
   if (!ret && ev.write(&tmp_io_cache)) ret = 1;
+
+  thd->query_start_usec_used = query_start_usec_used_tmp;
 
   if (!ret && wsrep_write_cache_buf(&tmp_io_cache, buf, buf_len)) ret = 1;
 
