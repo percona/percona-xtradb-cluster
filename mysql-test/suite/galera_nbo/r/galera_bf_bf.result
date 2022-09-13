@@ -29,6 +29,26 @@ ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 SET SESSION wsrep_osu_method=TOI;
 DROP TABLE c1;
 DROP TABLE p1;
+CREATE TABLE p1 (pk INTEGER PRIMARY KEY, f2 INTEGER, KEY f2_key (f2));
+CREATE TABLE c1 (pk INTEGER PRIMARY KEY, data INTEGER, fk INTEGER, FOREIGN KEY (fk) REFERENCES p1(pk));
+INSERT INTO p1 VALUES (0, 0);
+INSERT INTO c1 VALUES (0, 0, 0);
+SET GLOBAL wsrep_provider_options = 'dbug=d,apply_monitor_master_enter_sync';
+DROP INDEX f2_key ON p1;;
+SET SESSION wsrep_sync_wait=0;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'dbug=d,apply_monitor_master_enter_sync';
+BEGIN;
+UPDATE c1 SET data = 1 WHERE pk = 0;
+COMMIT;
+SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_master_enter_sync';
+SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_master_enter_sync';
+SET GLOBAL wsrep_provider_options = 'dbug=';
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+DROP TABLE c1;
+DROP TABLE p1;
 CALL mtr.add_suppression(".*Unable to collect FKs metadata.*");
 SET wsrep_retry_autocommit = 1;
 CREATE TABLE t1 (a INT PRIMARY KEY);

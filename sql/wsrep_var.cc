@@ -66,7 +66,7 @@ int wsrep_init_vars() {
 /* Function checks if the new value for wsrep_on is valid.
 Toggling of the value inside function or transaction is not allowed
 @return false if no error encountered with check else return true. */
-bool wsrep_on_check(sys_var *, THD *thd, set_var *var) {
+bool wsrep_on_check(sys_var *self, THD *thd, set_var *var) {
   bool new_wsrep_on = (bool)var->save_result.ulonglong_value;
 
   // if (!thd->security_context()->check_access(SUPER_ACL)) return true;
@@ -76,7 +76,7 @@ bool wsrep_on_check(sys_var *, THD *thd, set_var *var) {
     WSREP_WARN(
         "Cannot modify @@session.wsrep_on inside a stored function "
         " or trigger");
-    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), self->name.str,
              var->save_result.ulonglong_value ? "ON" : "OFF");
     return true;
   }
@@ -84,7 +84,7 @@ bool wsrep_on_check(sys_var *, THD *thd, set_var *var) {
   /* Make the session variable 'wsrep_on' read-only inside a transaction. */
   if (thd->in_active_multi_stmt_transaction()) {
     WSREP_WARN("Cannot modify @@session.wsrep_on inside a transaction");
-    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), self->name.str,
              var->save_result.ulonglong_value ? "ON" : "OFF");
     return true;
   }
@@ -220,7 +220,7 @@ static int wsrep_start_position_verify(const char *start_str) {
 
 /* Function checks if the new value for start_position is valid.
 @return false if no error encountered with check else return true. */
-bool wsrep_start_position_check(sys_var *, THD *, set_var *var) {
+bool wsrep_start_position_check(sys_var *self, THD *, set_var *var) {
   if ((Wsrep_server_state::instance().state() !=
        wsrep::server_state::s_disconnected) ||
       (strcmp(wsrep_provider, WSREP_NONE))) {
@@ -245,7 +245,7 @@ bool wsrep_start_position_check(sys_var *, THD *, set_var *var) {
   if (!wsrep_start_position_verify(start_pos_buf)) return false;
 
 err:
-  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), self->name.str,
            var->save_result.string_value.str ? var->save_result.string_value.str
                                              : "NULL");
   return true;
@@ -346,7 +346,7 @@ static int wsrep_provider_verify(const char *provider_str) {
 
 /* Function checks if the new value for provider is valid.
 @return false if no error encountered with check else return true. */
-bool wsrep_provider_check(sys_var *, THD *thd, set_var *var) {
+bool wsrep_provider_check(sys_var *self, THD *thd, set_var *var) {
   char wsrep_provider_buf[FN_REFLEN];
 
   if ((!var->save_result.string_value.str) ||
@@ -358,7 +358,7 @@ bool wsrep_provider_check(sys_var *, THD *thd, set_var *var) {
     WSREP_WARN(
         "Cannot modify wsrep_provider inside a stored function "
         " or trigger");
-    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), self->name.str,
              var->save_result.string_value.str);
     return true;
   }
@@ -366,7 +366,7 @@ bool wsrep_provider_check(sys_var *, THD *thd, set_var *var) {
   /* Changing wsrep_provider in middle of transaction is not allowed. */
   if (thd->in_active_multi_stmt_transaction()) {
     WSREP_WARN("Cannot modify wsrep_provider inside a transaction");
-    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), self->name.str,
              var->save_result.string_value.str);
     return true;
   }
@@ -378,7 +378,7 @@ bool wsrep_provider_check(sys_var *, THD *thd, set_var *var) {
   if (!wsrep_provider_verify(wsrep_provider_buf)) return false;
 
 err:
-  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), self->name.str,
            var->save_result.string_value.str ? var->save_result.string_value.str
                                              : "NULL");
   return true;
@@ -522,7 +522,7 @@ static int wsrep_cluster_address_verify(const char *) {
 
 /* Function checks if the new value for cluster_address is valid.
 @return false if no error encountered with check else return true. */
-bool wsrep_cluster_address_check(sys_var *, THD *, set_var *var) {
+bool wsrep_cluster_address_check(sys_var *self, THD *, set_var *var) {
   char addr_buf[FN_REFLEN];
 
   if ((!var->save_result.string_value.str) ||
@@ -536,7 +536,7 @@ bool wsrep_cluster_address_check(sys_var *, THD *, set_var *var) {
   if (!wsrep_cluster_address_verify(addr_buf)) return false;
 
 err:
-  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), self->name.str,
            var->save_result.string_value.str ? var->save_result.string_value.str
                                              : "NULL");
   return true;
@@ -601,12 +601,12 @@ void wsrep_cluster_address_init(const char *value) {
 
 /* Function checks if the new value for cluster_name is valid.
 @return false if no error encountered with check else return true. */
-bool wsrep_cluster_name_check(sys_var *, THD *, set_var *var) {
+bool wsrep_cluster_name_check(sys_var *self, THD *, set_var *var) {
   if (!var->save_result.string_value.str ||
       (var->save_result.string_value.length == 0) ||
       (var->save_result.string_value.length > WSREP_CLUSTER_NAME_MAX_LEN)) {
     my_error(
-        ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+        ER_WRONG_VALUE_FOR_VAR, MYF(0), self->name.str,
         (var->save_result.string_value.str ? var->save_result.string_value.str
                                            : "NULL"));
     return true;
@@ -618,11 +618,11 @@ bool wsrep_cluster_name_update(sys_var *, THD *, enum_var_type) { return 0; }
 
 /* Function checks if the new value for node_name is valid.
 @return false if no error encountered with check else return true. */
-bool wsrep_node_name_check(sys_var *, THD *, set_var *var) {
+bool wsrep_node_name_check(sys_var *self, THD *, set_var *var) {
   // TODO: for now 'allow' 0-length string to be valid (default)
   if (!var->save_result.string_value.str) {
     my_error(
-        ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+        ER_WRONG_VALUE_FOR_VAR, MYF(0), self->name.str,
         (var->save_result.string_value.str ? var->save_result.string_value.str
                                            : "NULL"));
     return true;
@@ -635,7 +635,7 @@ bool wsrep_node_name_update(sys_var *, THD *, enum_var_type) { return 0; }
 /* Function checks if the new value for node_address is valid.
 TODO: do something more elaborate, like checking connectivity
 @return false if no error encountered with check else return true. */
-bool wsrep_node_address_check(sys_var *, THD *, set_var *var) {
+bool wsrep_node_address_check(sys_var *self, THD *, set_var *var) {
   char addr_buf[FN_REFLEN];
 
   if ((!var->save_result.string_value.str) ||
@@ -650,7 +650,7 @@ bool wsrep_node_address_check(sys_var *, THD *, set_var *var) {
   return false;
 
 err:
-  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), self->name.str,
            var->save_result.string_value.str ? var->save_result.string_value.str
                                              : "NULL");
   return true;

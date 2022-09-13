@@ -30,6 +30,7 @@ INCLUDE_DIRECTORIES(SYSTEM ${BOOST_PATCHES_DIR} ${BOOST_INCLUDE_DIR})
 
 SET(MYSYS_SOURCES
   array.cc
+  buffered_error_log.cc
   charset.cc
   charset-def.cc
   dbug.cc
@@ -154,6 +155,7 @@ IF (WIN32)
     my_winerr.cc
     my_winfile.cc
     win_timers.cc
+    my_nojemalloc.cc
   )
 ENDIF()
 

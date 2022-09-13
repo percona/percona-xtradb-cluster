@@ -1,4 +1,4 @@
-# Copyright (c) 2017, 2021, Oracle and/or its affiliates.
+# Copyright (c) 2017, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -2967,29 +2967,29 @@ ER_UDF_EXISTS
         swe "Funktionen '%-.192s' finns redan"
         ukr "Функція '%-.192s' вже існує"
 ER_CANT_OPEN_LIBRARY
-        cze "Nemohu otevřít sdílenou knihovnu '%-.192s' (errno: %d %-.128s)"
-        dan "Kan ikke åbne delt bibliotek '%-.192s' (errno: %d %-.128s)"
-        nla "Kan shared library '%-.192s' niet openen (Errcode: %d %-.128s)"
-        eng "Can't open shared library '%-.192s' (errno: %d %-.128s)"
-        est "Ei suuda avada jagatud teeki '%-.192s' (veakood: %d %-.128s)"
-        fre "Impossible d'ouvrir la bibliothèque partagée '%-.192s' (errno: %d %-.128s)"
-        ger "Kann Shared Library '%-.192s' nicht öffnen (Fehler: %d %-.128s)"
-        greek "Δεν είναι δυνατή η ανάγνωση της shared library '%-.192s' (κωδικός λάθους: %d %-.128s)"
-        hun "A(z) '%-.192s' megosztott konyvtar nem hasznalhato (hibakod: %d %-.128s)"
-        ita "Impossibile aprire la libreria condivisa '%-.192s' (errno: %d %-.128s)"
-        jpn "共有ライブラリ '%-.192s' を開く事ができません。(エラー番号: %d %-.128s)"
-        kor "'%-.192s' 공유 라이버러리를 열수 없습니다.(에러번호: %d %-.128s)"
-        nor "Can't open shared library '%-.192s' (errno: %d %-.128s)"
-        norwegian-ny "Can't open shared library '%-.192s' (errno: %d %-.128s)"
-        pol "Can't open shared library '%-.192s' (errno: %d %-.128s)"
-        por "Não pode abrir biblioteca compartilhada '%-.192s' (erro no. %d '%-.128s')"
-        rum "Nu pot deschide libraria shared '%-.192s' (Eroare: %d %-.128s)"
-        rus "Невозможно открыть динамическую библиотеку '%-.192s' (ошибка: %d %-.128s)"
-        serbian "Ne mogu da otvorim share-ovanu biblioteku '%-.192s' (errno: %d %-.128s)"
-        slo "Nemôžem otvoriť zdieľanú knižnicu '%-.192s' (chybový kód: %d %-.128s)"
-        spa "No puedo abrir libraria conjugada '%-.192s' (errno: %d %-.128s)"
-        swe "Kan inte öppna det dynamiska biblioteket '%-.192s' (Felkod: %d %-.128s)"
-        ukr "Не можу відкрити розділювану бібліотеку '%-.192s' (помилка: %d %-.128s)"
+        cze "Nemohu otevřít sdílenou knihovnu '%-.192s' (errno: %d %-.192s)"
+        dan "Kan ikke åbne delt bibliotek '%-.192s' (errno: %d %-.192s)"
+        nla "Kan shared library '%-.192s' niet openen (Errcode: %d %-.192s)"
+        eng "Can't open shared library '%-.192s' (errno: %d %-.192s)"
+        est "Ei suuda avada jagatud teeki '%-.192s' (veakood: %d %-.192s)"
+        fre "Impossible d'ouvrir la bibliothèque partagée '%-.192s' (errno: %d %-.192s)"
+        ger "Kann Shared Library '%-.192s' nicht öffnen (Fehler: %d %-.192s)"
+        greek "Δεν είναι δυνατή η ανάγνωση της shared library '%-.192s' (κωδικός λάθους: %d %-.192s)"
+        hun "A(z) '%-.192s' megosztott konyvtar nem hasznalhato (hibakod: %d %-.192s)"
+        ita "Impossibile aprire la libreria condivisa '%-.192s' (errno: %d %-.192s)"
+        jpn "共有ライブラリ '%-.192s' を開く事ができません。(エラー番号: %d %-.192s)"
+        kor "'%-.192s' 공유 라이버러리를 열수 없습니다.(에러번호: %d %-.192s)"
+        nor "Can't open shared library '%-.192s' (errno: %d %-.192s)"
+        norwegian-ny "Can't open shared library '%-.192s' (errno: %d %-.192s)"
+        pol "Can't open shared library '%-.192s' (errno: %d %-.192s)"
+        por "Não pode abrir biblioteca compartilhada '%-.192s' (erro no. %d '%-.192s')"
+        rum "Nu pot deschide libraria shared '%-.192s' (Eroare: %d %-.192s)"
+        rus "Невозможно открыть динамическую библиотеку '%-.192s' (ошибка: %d %-.192s)"
+        serbian "Ne mogu da otvorim share-ovanu biblioteku '%-.192s' (errno: %d %-.192s)"
+        slo "Nemôžem otvoriť zdieľanú knižnicu '%-.192s' (chybový kód: %d %-.192s)"
+        spa "No puedo abrir libraria conjugada '%-.192s' (errno: %d %-.192s)"
+        swe "Kan inte öppna det dynamiska biblioteket '%-.192s' (Felkod: %d %-.192s)"
+        ukr "Не можу відкрити розділювану бібліотеку '%-.192s' (помилка: %d %-.192s)"
 ER_CANT_FIND_DL_ENTRY
         cze "Nemohu najít funkci '%-.128s' v knihovně"
         dan "Kan ikke finde funktionen '%-.128s' i bibliotek"
@@ -6511,7 +6511,7 @@ ER_ACCESS_DENIED_NO_PASSWORD_ERROR 28000
         swe "Användare '%-.48s'@'%-.64s' är ej berättigad att logga in"
         ukr "Доступ заборонено для користувача: '%-.48s'@'%-.64s'"
 
-ER_SET_PASSWORD_AUTH_PLUGIN
+OBSOLETE_ER_SET_PASSWORD_AUTH_PLUGIN
         eng "SET PASSWORD has no significance for users authenticating via plugins"
 
 OBSOLETE_ER_GRANT_PLUGIN_USER_EXISTS
@@ -9700,6 +9700,41 @@ ER_DEFINITION_CONTAINS_INVALID_STRING
 ER_CANT_EXECUTE_COMMAND_WITH_ASSIGNED_GTID_NEXT
   eng "Can't execute the given command when @@SESSION.GTID_NEXT == 'UUID:NUMBER'."
 
+ER_XA_TEMP_TABLE
+  eng "XA: Temporary tables cannot be accessed inside XA transactions when xa_detach_on_prepare=ON"
+
+ER_INNODB_MAX_ROW_VERSION
+  eng "Maximum row versions reached for table %s. No more columns can be added or dropped instantly. Please use COPY/INPLACE."
+
+ER_INNODB_INSTANT_ADD_NOT_SUPPORTED_MAX_SIZE
+  eng "Column can't be added with ALGORITHM=INSTANT as after this max possible row size crosses max permissible row size. Try ALGORITHM=INPLACE/COPY."
+
+ER_OPERATION_NOT_ALLOWED_WHILE_PRIMARY_CHANGE_IS_RUNNING
+  eng "All queries have been blocked while function 'group_replication_set_as_primary()' is executing. Please refer timeout parameter of function 'group_replication_set_as_primary()'."
+
+ER_WARN_DEPRECATED_DATETIME_DELIMITER
+  eng "Delimiter '%s' in position %d in datetime value '%s' at row %d is deprecated. Prefer the standard '%c'."
+
+ER_WARN_DEPRECATED_SUPERFLUOUS_DELIMITER
+  eng "Delimiter '%s' in position %d in datetime value '%s' at row %d is superfluous and is deprecated. Please remove."
+
+ER_CANNOT_PERSIST_SENSITIVE_VARIABLES
+  eng "Cannot persist SENSITIVE system variable '%s' because keyring component support is unavailable."
+
+ER_WARN_CANNOT_SECURELY_PERSIST_SENSITIVE_VARIABLES
+  eng "SENSITIVE system variable '%s' was persisted without encryption. Consider restarting server with keyring component support to persist SENSITIVE variables securely."
+
+ER_WARN_TRG_ALREADY_EXISTS
+  eng "Trigger '%-.192s' already exists on the table '%-.192s'.'%-.192s'."
+
+ER_IF_NOT_EXISTS_UNSUPPORTED_TRG_EXISTS_ON_DIFFERENT_TABLE
+  eng "Trigger '%-.192s'.'%-.192s' already exists on a different table. The 'IF NOT EXISTS' clause is only supported for triggers associated with the same table."
+
+ER_IF_NOT_EXISTS_UNSUPPORTED_UDF_NATIVE_FCT_NAME_COLLISION
+  eng "This function '%-.192s' has the same name as a native function. The 'IF NOT EXISTS' clause is not supported while creating a loadable function with the same name as a native function."
+
+ER_SET_PASSWORD_AUTH_PLUGIN_ERROR
+  eng "SET PASSWORD has no significance for user '%s'@'%s' as the authentication method used doesn't store authentication data in the MySQL server. Please consider using ALTER USER instead if you want to change authentication parameters."
 
 #
 #  End of 8.0 error messages (server-to-client).
@@ -9883,7 +9918,7 @@ ER_RDB_TTL_UNSUPPORTED
   eng "TTL support is currently disabled when table has a hidden PK."
 
 ER_RDB_TTL_COL_FORMAT
-  eng "TTL column (%s) in MyRocks must be an unsigned non-null 64-bit integer, exist inside the table, and have an accompanying ttl duration."
+  eng "TTL column (%s) in MyRocks must be an unsigned non-null 64-bit integer or non-null timestamp, exist inside the table, and have an accompanying ttl duration."
 
 ER_RDB_TTL_DURATION_FORMAT
   eng "TTL duration (%s) in MyRocks must be an unsigned non-null 64-bit integer."
