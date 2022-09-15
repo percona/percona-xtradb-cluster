@@ -44,3 +44,24 @@ execute stmt;
 ERROR 42S01: Table 'v1' already exists
 drop view v1;
 drop table t1;
+CREATE TABLE t1 (id INT PRIMARY KEY, f1 int);
+INSERT INTO t1 VALUES (0, 0);
+PREPARE stmt FROM 'UPDATE t1 SET f1 = ? WHERE id = ?';
+CREATE INDEX idx1 ON t1 (f1);
+SET @value=10;
+SET @id=0;
+EXECUTE stmt USING @value, @id;
+include/assert.inc [Value should be updated]
+DROP TABLE t1;
+CREATE TABLE t1 (id INT PRIMARY KEY, f1 int);
+INSERT INTO t1 VALUES (0, 0);
+PREPARE stmt FROM 'UPDATE t1 SET f1 = ? WHERE id = ?';
+CREATE INDEX idx1 ON t1 (f1);
+BEGIN;
+SET @value=10;
+SET @id=0;
+EXECUTE stmt USING @value, @id;
+COMMIT;
+include/assert.inc [Value should be updated]
+include/assert.inc [Value should be updated]
+DROP TABLE t1;
