@@ -234,7 +234,6 @@ verify_sig(const fido_blob_t *dgst, const fido_blob_t *x5c,
 	BIO		*rawcert = NULL;
 	X509		*cert = NULL;
 	EVP_PKEY	*pkey = NULL;
-	EC_KEY		*ec;
 	int		 ok = -1;
 
 	/* openssl needs ints */
@@ -247,15 +246,8 @@ verify_sig(const fido_blob_t *dgst, const fido_blob_t *x5c,
 	/* fetch key from x509 */
 	if ((rawcert = BIO_new_mem_buf(x5c->ptr, (int)x5c->len)) == NULL ||
 	    (cert = d2i_X509_bio(rawcert, NULL)) == NULL ||
-	    (pkey = X509_get_pubkey(cert)) == NULL ||
-	    (ec = EVP_PKEY_get0_EC_KEY(pkey)) == NULL) {
+	    (pkey = X509_get_pubkey(cert)) == NULL ) {
 		fido_log_debug("%s: x509 key", __func__);
-		goto fail;
-	}
-
-	if (ECDSA_verify(0, dgst->ptr, (int)dgst->len, sig->ptr,
-	    (int)sig->len, ec) != 1) {
-		fido_log_debug("%s: ECDSA_verify", __func__);
 		goto fail;
 	}
 
