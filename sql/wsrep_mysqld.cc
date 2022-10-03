@@ -1024,6 +1024,12 @@ int wsrep_init()
             wsrep->provider_version, sizeof(provider_version) - 1);
     strncpy(provider_vendor,
             wsrep->provider_vendor,  sizeof(provider_vendor) - 1);
+
+    /* All three buffers are zero-initialized on declaration, but
+       let's avoid the confusion */
+    provider_name[sizeof(provider_name) - 1] = '\0';
+    provider_version[sizeof(provider_version) - 1] = '\0';
+    provider_vendor[sizeof(provider_vendor) - 1] = '\0';
   }
 
   /* wsrep_cluster_name is restricted to WSREP_CLUSTER_NAME_MAX_LEN characters
@@ -1058,12 +1064,12 @@ int wsrep_init()
   if (!wsrep_data_home_dir || strlen(wsrep_data_home_dir) == 0)
     wsrep_data_home_dir = mysql_real_data_home;
 
-  char node_addr[512]= { 0, };
-  size_t const node_addr_max= sizeof(node_addr) - 1;
+  static const size_t node_addr_buf_size= 512;
+  char node_addr[node_addr_buf_size];
   if (!wsrep_node_address || !strcmp(wsrep_node_address, ""))
   {
-    size_t const ret= wsrep_guess_ip(node_addr, node_addr_max);
-    if (!(ret > 0 && ret < node_addr_max))
+    size_t const ret= wsrep_guess_ip(node_addr, node_addr_buf_size);
+    if (!(ret > 0 && ret < node_addr_buf_size))
     {
       WSREP_WARN("Failed to guess base node address. Set it explicitly via "
                  "wsrep_node_address.");
@@ -1072,7 +1078,22 @@ int wsrep_init()
   }
   else
   {
-    strncpy(node_addr, wsrep_node_address, node_addr_max);
+    /* node_addr is 512 bytes, wsrep_node_address is <ip_address>[:port]
+       so for ipv6 host part is at most 45 characters (IPv4-mapped IPv6).
+       The whole wsrep_node_address will entirely fit into ip_buf leaving
+       space for trailing zero. */
+    if (unlikely(strlen(wsrep_node_address) >= node_addr_buf_size))
+    {
+      WSREP_ERROR("Failed to initialize node address: "
+                  "Host address does not fit into temporary buffer. "
+                  "wsrep_node_address: %s, length: %lu",
+                  wsrep_node_address, strlen(wsrep_node_address));
+      node_addr[0]= '\0';
+    }
+    else {
+      strncpy(node_addr, wsrep_node_address, node_addr_buf_size - 1);
+      node_addr[node_addr_buf_size - 1] = '\0';
+    }
   }
 
   char inc_addr[512]= { 0, };
@@ -1361,8 +1382,9 @@ void wsrep_filter_new_cluster (int* argc, char* argv[])
   {
     /* make a copy of the argument to convert possible underscores to hyphens.
      * the copy need not to be longer than WSREP_NEW_CLUSTER option */
-    char arg[sizeof(WSREP_NEW_CLUSTER) + 1]= { 0, };
+    char arg[sizeof(WSREP_NEW_CLUSTER) + 1];
     strncpy(arg, argv[i], sizeof(arg) - 1);
+    arg[sizeof(arg) - 1]= '\0';
     char* underscore(arg);
     while (NULL != (underscore= strchr(underscore, '_'))) *underscore= '-';
 
