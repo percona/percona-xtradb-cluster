@@ -778,6 +778,7 @@ void wsrep_ready_wait() {
 
 void wsrep_update_cluster_state_uuid(const char *uuid) {
   strncpy(cluster_uuid_str, uuid, sizeof(cluster_uuid_str) - 1);
+  cluster_uuid_str[sizeof(cluster_uuid_str) - 1] = '\0';
 }
 
 static void wsrep_init_position() {}
@@ -943,6 +944,12 @@ static void wsrep_init_provider_status_variables() {
           sizeof(provider_version) - 1);
   strncpy(provider_vendor, provider.vendor().c_str(),
           sizeof(provider_vendor) - 1);
+
+  /* All three buffers are zero-initialized on declaration, but
+     let's avoid the confusion */
+  provider_name[sizeof(provider_name) - 1] = '\0';
+  provider_version[sizeof(provider_version) - 1] = '\0';
+  provider_vendor[sizeof(provider_vendor) - 1] = '\0';
 }
 
 /**
@@ -1309,12 +1316,11 @@ void wsrep_filter_new_cluster(int *argc, char *argv[]) {
   for (i = *argc - 1; i > 0; i--) {
     /* make a copy of the argument to convert possible underscores to hyphens.
      * the copy need not to be longer than WSREP_NEW_CLUSTER option */
-    char arg[sizeof(WSREP_NEW_CLUSTER) + 1] = {
-        0,
-    };
+    char arg[sizeof(WSREP_NEW_CLUSTER) + 1];
     strncpy(arg, argv[i], sizeof(arg) - 1);
-    char *underscore(arg);
-    while (NULL != (underscore = strchr(underscore, '_'))) *underscore = '-';
+    arg[sizeof(arg) - 1]= '\0';
+    char* underscore(arg);
+    while (NULL != (underscore= strchr(underscore, '_'))) *underscore= '-';
 
     if (!strcmp(arg, WSREP_NEW_CLUSTER)) {
       wsrep_new_cluster = true;
@@ -3092,8 +3098,8 @@ enum wsrep::streaming_context::fragment_unit wsrep_fragment_unit(ulong unit) {
 }
 
 void wsrep_set_thd_proc_info(THD *thd, const char *str) {
-  thd->wsrep_info[sizeof(thd->wsrep_info) - 1] = '\0';
   strncpy(thd->wsrep_info, str, (sizeof(thd->wsrep_info) - 1));
+  thd->wsrep_info[sizeof(thd->wsrep_info) - 1] = '\0';
 }
 
 const char *wsrep_get_thd_proc_info(THD *thd) { return (thd->wsrep_info); }
