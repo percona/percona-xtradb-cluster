@@ -11,9 +11,24 @@ COUNT(*) = 0
 /*!50003 SET @OLD_COMPLETION_TYPE=@@COMPLETION_TYPE,COMPLETION_TYPE=0*/;
 DELIMITER /*!*/;
 # at 4
-<ISO TIMESTAMP> server id 2  end_log_pos 120 	Start: binlog v 4, server v x.y.z created ###### ##:##:## at startup
-# Warning: this binlog is either in use or was not closed properly.
+<ISO TIMESTAMP> server id 2  end_log_pos 0 	Start: binlog v 4, server v x.y.z created ###### ##:##:## at startup
 ROLLBACK/*!*/;
+# at 126
+<ISO TIMESTAMP> server id 1  end_log_pos 0 	Query	thread_id=<THREAD_ID>	exec_time=0	error_code=0
+use `test`/*!*/;
+SET TIMESTAMP=<TIMESTAMP>/*!*/;
+SET @@session.pseudo_thread_id=<PSEUDO_THREAD_ID>/*!*/;
+SET @@session.foreign_key_checks=1, @@session.sql_auto_is_null=0, @@session.unique_checks=1, @@session.autocommit=1/*!*/;
+SET @@session.sql_mode=1168113696/*!*/;
+SET @@session.auto_increment_increment=1, @@session.auto_increment_offset=1/*!*/;
+/*!\C utf8mb4 *//*!*/;
+SET @@session.character_set_client=255,@@session.collation_connection=255,@@session.collation_server=255/*!*/;
+SET @@session.lc_time_names=0/*!*/;
+SET @@session.collation_database=DEFAULT/*!*/;
+/*!80011 SET @@session.default_collation_for_utf8mb4=255*//*!*/;
+/*!80013 SET @@session.sql_require_primary_key=0*//*!*/;
+CREATE TABLE t1 (f1 INTEGER)
+/*!*/;
 SET @@SESSION.GTID_NEXT= 'AUTOMATIC' /* added by mysqlbinlog */ /*!*/;
 DELIMITER ;
 # End of log file

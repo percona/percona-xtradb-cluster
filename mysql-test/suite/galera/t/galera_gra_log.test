@@ -25,16 +25,20 @@ CREATE TABLE t1 (f1 INTEGER);
 --source include/wsrep_wait_membership.inc
 SELECT COUNT(*) = 0 FROM t1;
 
-# Compose a valid binlog from a header file and the GRA file
-
+# GRA file already contains a header
 --let $gra_binlog_file = $MYSQLTEST_VARDIR/tmp/gra.log
 --exec rm -rf $gra_binlog_file 
---exec cp std_data/binlog-header.log $gra_binlog_file
 --exec cat $MYSQLTEST_VARDIR/mysqld.2/data/GRA_*.log >> $gra_binlog_file
 
 # Make sure the binlog thus produced is readable and contains the failure
 --replace_regex /SET TIMESTAMP=[0-9]+/SET TIMESTAMP=<TIMESTAMP>/ /#[0-9]+ +[0-9]+:[0-9]+:[0-9]+/<ISO TIMESTAMP>/ /pseudo_thread_id=[0-9]+/pseudo_thread_id=<PSEUDO_THREAD_ID>/ /thread_id=[0-9]+/thread_id=<THREAD_ID>/ /server v [0-9].[0-9].[0-9]+.* created/server v x.y.z created/  /created [0-9]+ ( )?[0-9]+:[0-9]+:[0-9]+ at startup/created ###### ##:##:## at startup/
 --exec $MYSQL_BINLOG --base64-output=never $gra_binlog_file
+
+--let ABORT_ON = NOT_FOUND
+--let SEARCH_FILE = $gra_binlog_file
+--let SEARCH_PATTERN = CREATE TABLE t1
+--source include/search_pattern_in_file.inc
+
 --remove_file $gra_binlog_file
 
 # restart and reconnect node_2
