@@ -34,7 +34,7 @@ static bool wsrep_dump_cache_common(
     std::function<bool(unsigned char *, my_off_t)> dumpFn) {
   my_off_t const saved_pos(cache->position());
 
-  unsigned char *read_pos = NULL;
+  unsigned char *read_pos = nullptr;
   my_off_t read_len = 0;
 
   if (cache->begin(&read_pos, &read_len)) {
@@ -59,7 +59,6 @@ static bool wsrep_dump_cache_common(
   if (cache->truncate(saved_pos)) {
     WSREP_WARN("Failed to reinitialize io-cache");
     res = true;
-    ;
   }
 
   return res;
@@ -129,7 +128,7 @@ int wsrep_write_cache_buf(IO_CACHE_binlog_cache_storage *cache, uchar **buf,
 
   if (res) {
     my_free(*buf);
-    *buf = NULL;
+    *buf = nullptr;
     *buf_len = 0;
     return ER_ERROR_ON_WRITE;
   }
