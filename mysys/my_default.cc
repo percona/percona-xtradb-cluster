@@ -210,9 +210,8 @@ bool no_defaults = false;
 char wsrep_defaults_file[FN_REFLEN + 10] = {
     0,
 };
-char wsrep_defaults_group_suffix[FN_EXTLEN] = {
-    0,
-};
+static const char wsrep_defaults_group_suffix_empty = '\0';
+const char *wsrep_defaults_group_suffix = &wsrep_defaults_group_suffix_empty;
 #endif /* WITH_WREP */
 
 /* Which directories are searched for options (and in which order) */
@@ -607,8 +606,7 @@ int get_defaults_options(int argc, char **argv, char **defaults,
 #ifdef WITH_WSREP
       /* make sure we do this only once - for top-level file */
       if ('\0' == wsrep_defaults_group_suffix[0])
-        strncpy(wsrep_defaults_group_suffix, *group_suffix,
-                sizeof(wsrep_defaults_group_suffix) - 1);
+        wsrep_defaults_group_suffix = *group_suffix;
 #endif /* WITH_WSREP */
 
       argc--;
@@ -944,8 +942,21 @@ static int search_default_file_with_ext(Process_option_func opt_handler,
   }
 #ifdef WITH_WSREP
   /* make sure we do this only once - for top-level file */
-  if ('\0' == wsrep_defaults_file[0])
+  if ('\0' == wsrep_defaults_file[0]) {
+    /* We are safe here to not truncate the filename, because of the check
+       done at the beginning of this function.
+       At this point 'name' is at most the sum of:
+       converted_dir_len + config_file: (FN_REFLEN-3)+1
+       dot: 1
+       ext: 4
+       terminating null: 1
+       => FN_REFLEN + 4
+       fn_format() which expands ~ to home directory path prevents overflowing
+       FN_REFLEN as well.
+        */
     strncpy(wsrep_defaults_file, name, sizeof(wsrep_defaults_file) - 1);
+    wsrep_defaults_file[sizeof(wsrep_defaults_file) - 1] = 0;
+  }
 #endif /* WITH_WSREP */
 
   while (true) {
