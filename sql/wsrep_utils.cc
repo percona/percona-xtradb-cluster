@@ -1057,7 +1057,8 @@ size_t wsrep_guess_ip(char *buf, size_t buf_len) {
 
     if (INADDR_ANY != ip_type) {
       if (strlen(my_bind_addr_str) >= buf_len) {
-        WSREP_WARN("default_ip(): buffer too short: %zu <= %zd", buf_len, strlen(my_bind_addr_str));
+        WSREP_WARN("default_ip(): buffer too short: %zu <= %zd", buf_len,
+                   strlen(my_bind_addr_str));
         return 0;
       }
       strncpy(buf, my_bind_addr_str, buf_len);

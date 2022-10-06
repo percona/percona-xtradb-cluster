@@ -1318,9 +1318,9 @@ void wsrep_filter_new_cluster(int *argc, char *argv[]) {
      * the copy need not to be longer than WSREP_NEW_CLUSTER option */
     char arg[sizeof(WSREP_NEW_CLUSTER) + 1];
     strncpy(arg, argv[i], sizeof(arg) - 1);
-    arg[sizeof(arg) - 1]= '\0';
-    char* underscore(arg);
-    while (NULL != (underscore= strchr(underscore, '_'))) *underscore= '-';
+    arg[sizeof(arg) - 1] = '\0';
+    char *underscore(arg);
+    while (NULL != (underscore = strchr(underscore, '_'))) *underscore = '-';
 
     if (!strcmp(arg, WSREP_NEW_CLUSTER)) {
       wsrep_new_cluster = true;
