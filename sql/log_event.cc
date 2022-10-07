@@ -10397,7 +10397,11 @@ end:
       *not* try to free the memory here. It will be done latter
       in dispatch_command() after command execution is completed.
      */
+#ifdef WITH_WSREP
+    if (thd->wsrep_applier || thd->slave_thread) thd->mem_root->ClearForReuse();
+#else
     if (thd->slave_thread) thd->mem_root->ClearForReuse();
+#endif
   }
   return error;
 }
