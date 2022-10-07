@@ -22,11 +22,56 @@
 #include "binlog.h"
 #include "log.h"
 #include "log_event.h"  // Log_event_writer
+#include "mutex_lock.h"
 #include "mysql/psi/mysql_file.h"
 #include "service_wsrep.h"
+#include "sql/sql_base.h"  // TEMP_PREFIX
 #include "transaction.h"
 #include "wsrep_applier.h"
-#include "mutex_lock.h"
+
+static bool wsrep_dump_cache_common(
+    IO_CACHE_binlog_cache_storage *cache,
+    std::function<bool(unsigned char *, my_off_t)> dumpFn) {
+  my_off_t const saved_pos(cache->position());
+
+  unsigned char *read_pos = nullptr;
+  my_off_t read_len = 0;
+
+  if (cache->begin(&read_pos, &read_len)) {
+    WSREP_ERROR("Failed to initialize io-cache");
+    return true;
+  }
+
+  if (read_len == 0 && cache->next(&read_pos, &read_len)) {
+    WSREP_ERROR("Failed to read from io-cache");
+    return true;
+  }
+
+  bool res = false;
+  while (read_len > 0) {
+    if (dumpFn(read_pos, read_len)) {
+      res = true;
+      break;
+    }
+    cache->next(&read_pos, &read_len);
+  }
+
+  if (cache->truncate(saved_pos)) {
+    WSREP_WARN("Failed to reinitialize io-cache");
+    res = true;
+  }
+
+  return res;
+}
+
+bool wsrep_write_cache_file(IO_CACHE_binlog_cache_storage *cache, File file) {
+  return wsrep_dump_cache_common(
+      cache, [file](unsigned char *data, my_off_t size) {
+        size_t written = mysql_file_write(file, data, size, MYF(0));
+        if (written != size) return true;
+        return false;
+      });
+}
 
 /*
   Write the contents of a cache to a memory buffer.
@@ -45,25 +90,12 @@
  */
 int wsrep_write_cache_buf(IO_CACHE_binlog_cache_storage *cache, uchar **buf,
                           size_t *buf_len) {
-  my_off_t const saved_pos(cache->position());
-
-  unsigned char *read_pos = NULL;
-  my_off_t read_len = 0;
-
-  if (cache->begin(&read_pos, &read_len)) {
-    WSREP_ERROR("Failed to initialize io-cache");
-    return ER_ERROR_ON_WRITE;
-  }
-
-  if (read_len == 0 && cache->next(&read_pos, &read_len)) {
-    WSREP_ERROR("Failed to read from io-cache");
-    return ER_ERROR_ON_WRITE;
-  }
-
   size_t total_length = *buf_len;
 
-  while (read_len > 0) {
-    total_length += read_len;
+  bool res = wsrep_dump_cache_common(cache, [&total_length, buf, buf_len](
+                                                unsigned char *data,
+                                                my_off_t size) {
+    total_length += size;
 
     /*
       Bail out if buffer grows too large.
@@ -74,7 +106,7 @@ int wsrep_write_cache_buf(IO_CACHE_binlog_cache_storage *cache, uchar **buf,
     if (total_length > wsrep_max_ws_size) {
       WSREP_WARN("Transaction/Write-set size limit (%lu) exceeded: %zu",
                  wsrep_max_ws_size, total_length);
-      goto error;
+      return true;
     }
 
     uchar *tmp =
@@ -85,33 +117,22 @@ int wsrep_write_cache_buf(IO_CACHE_binlog_cache_storage *cache, uchar **buf,
           " write-set for replication."
           " Existing Size: %zu, Requested Size: %lu",
           *buf_len, (long unsigned)total_length);
-      goto error;
+      return true;
     }
     *buf = tmp;
 
-    memcpy(*buf + *buf_len, read_pos, read_len);
+    memcpy(*buf + *buf_len, data, size);
     *buf_len = total_length;
-    cache->next(&read_pos, &read_len);
-  }
+    return false;
+  });
 
-  if (cache->truncate(saved_pos)) {
-    WSREP_WARN("Failed to reinitialize io-cache");
-    goto cleanup;
+  if (res) {
+    my_free(*buf);
+    *buf = nullptr;
+    *buf_len = 0;
+    return ER_ERROR_ON_WRITE;
   }
-
   return 0;
-
-error:
-
-  if (cache->truncate(saved_pos)) {
-    WSREP_WARN("Failed to reinitialize io-cache");
-  }
-
-cleanup:
-  my_free(*buf);
-  *buf = NULL;
-  *buf_len = 0;
-  return ER_ERROR_ON_WRITE;
 }
 
 #define STACK_SIZE                                   \
@@ -256,11 +277,7 @@ void wsrep_dump_rbr_buf_with_header(THD *thd, const void *rbr_buf,
   DBUG_ENTER("wsrep_dump_rbr_buf_with_header");
 
   File file;
-  Binlog_cache_storage cache;
-  // IO_CACHE cache;
-  // assert(0);
-  // TODO: need to find way to persist event (Format_description_log_event to
-  // cache) Log_event_writer writer(&cache, 0);
+  IO_CACHE_binlog_cache_storage tmp_io_cache;
   Format_description_log_event *ev = 0;
 
   longlong thd_trx_seqno = (long long)wsrep_thd_trx_seqno(thd);
@@ -293,11 +310,11 @@ void wsrep_dump_rbr_buf_with_header(THD *thd, const void *rbr_buf,
     goto cleanup1;
   }
 
-  if (cache.open(file, 1024000)) {
+  if (tmp_io_cache.open(mysql_tmpdir, TEMP_PREFIX, 1024000, 1024000)) {
     goto cleanup2;
   }
 
-  if (cache.write((const uchar *)BINLOG_MAGIC, BIN_LOG_HEADER_SIZE)) {
+  if (tmp_io_cache.write((const uchar *)BINLOG_MAGIC, BIN_LOG_HEADER_SIZE)) {
     goto cleanup2;
   }
 
@@ -308,17 +325,20 @@ void wsrep_dump_rbr_buf_with_header(THD *thd, const void *rbr_buf,
   ev = (thd->wsrep_applier) ? wsrep_get_apply_format(thd)
                             : (new Format_description_log_event());
 
-  // if (writer.write(ev) || my_b_write(&cache, (uchar *)rbr_buf, buf_len) ||
-  if (((ev->write(&cache) ||
-        cache.write(static_cast<uchar *>(const_cast<void *>(rbr_buf)),
-                    buf_len) ||
-        cache.flush()))) {
+  if (((ev->write(&tmp_io_cache) ||
+        tmp_io_cache.write(static_cast<uchar *>(const_cast<void *>(rbr_buf)),
+                           buf_len)))) {
+    WSREP_ERROR("Failed to write to populate io cache");
+    goto cleanup2;
+  }
+
+  if (wsrep_write_cache_file(&tmp_io_cache, file)) {
     WSREP_ERROR("Failed to write to '%s'.", filename);
     goto cleanup2;
   }
 
 cleanup2:
-  // end_io_cache(&cache);
+  tmp_io_cache.close();
 
 cleanup1:
   free(filename);
