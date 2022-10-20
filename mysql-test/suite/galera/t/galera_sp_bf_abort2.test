@@ -24,6 +24,16 @@ BEGIN
   COMMIT;
 END|
 
+CREATE PROCEDURE proc_with_transaction_and_select()
+BEGIN
+  START TRANSACTION;
+    SELECT 1;
+    UPDATE t1 SET f2 = "from sp" WHERE f1 > 1;
+    INSERT INTO t1 VALUES (10, "from sp");
+  COMMIT;
+END|
+
+
 CREATE PROCEDURE proc_with_transaction_continue_handler()
 BEGIN
   DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN END;
@@ -105,6 +115,23 @@ SET SESSION wsrep_retry_autocommit = 1;
 
 
 # ------------------------------------
+# Test 2a-1: no handlers, wsrep_retry_autocommit=1,
+# but there are no retry due to the presence of SELECT
+# statement in the procedure (see
+# wsrep_should_retry_in_autocommit).
+# The call to the SP will fail and return an error.
+#
+--connection node_1a
+--echo # Node 1a
+USE database1;
+SET SESSION wsrep_retry_autocommit = 1;
+--let $galera_sp_bf_abort_proc = proc_with_transaction_and_select
+
+--let $galera_sp_bf_abort2_expect_error = 1
+--source galera_sp_bf_abort2.inc
+
+
+# -----------------------------------
 # Test 2b: exit handler, wsrep_retry_autocommit=1
 # The first call to the SP will fail, but it will be retried
 # and will return success.

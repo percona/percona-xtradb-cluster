@@ -246,6 +246,10 @@ public:
       return m_lex ? m_lex->sql_command : -1;
   }
 
+#ifdef WITH_WSREP
+  const LEX *get_lex() const { return m_lex; }
+#endif
+
   const LEX_CSTRING *get_prepared_stmt_name() const {
     return m_lex ? &m_lex->prepared_stmt_name : NULL;
   }
