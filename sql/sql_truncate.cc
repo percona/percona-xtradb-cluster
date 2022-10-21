@@ -493,7 +493,14 @@ bool Sql_cmd_truncate_table::truncate_table(THD *thd, TABLE_LIST *table_ref)
 
 #ifdef WITH_WSREP
     error= true;
-    WSREP_TO_ISOLATION_BEGIN(table_ref->db, table_ref->table_name, NULL);
+    /* We are going to skip replication for Performance Schema tables,
+       but at this moment tables are closed and we have no clue if
+       P_S table (or even existing schema) is referred.
+       The best we can do is to recognize P_S by name. */
+    if (!is_perfschema_db(table_ref->db))
+    {
+      WSREP_TO_ISOLATION_BEGIN(table_ref->db, table_ref->table_name, NULL);
+    }
 #endif /* WITH_WSREP */
 
     if (lock_table(thd, table_ref, &hton_can_recreate))
