@@ -500,17 +500,19 @@ void Sql_cmd_truncate_table::truncate_base(THD *thd, TABLE_LIST *table_ref) {
   if (mdl_locker.ensure_locked(table_ref->db)) return;
 
 #ifdef WITH_WSREP
-  wsrep::key_array keys;
-  if (wsrep_append_fk_parent_table(thd, table_ref, &keys)) {
-    return;
-  }
-  if (keys.empty()) {
-    WSREP_TO_ISOLATION_BEGIN_IF(table_ref->db, table_ref->table_name, NULL) {
+  if (!is_perfschema_db(table_ref->db)) {
+    wsrep::key_array keys;
+    if (wsrep_append_fk_parent_table(thd, table_ref, &keys)) {
       return;
     }
-  } else {
-    WSREP_TO_ISOLATION_BEGIN_FK_TABLES_IF(NULL, NULL, table_ref, &keys) {
-      return;
+    if (keys.empty()) {
+      WSREP_TO_ISOLATION_BEGIN_IF(table_ref->db, table_ref->table_name, NULL) {
+        return;
+      }
+    } else {
+      WSREP_TO_ISOLATION_BEGIN_FK_TABLES_IF(NULL, NULL, table_ref, &keys) {
+        return;
+      }
     }
   }
 #endif /* WITH_WSREP */
