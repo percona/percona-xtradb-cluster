@@ -1965,5 +1965,10 @@ int ha_perfschema::index_next_same(uchar *buf, const uchar *key, uint keylen) {
 bool ha_perfschema::is_executed_by_slave() const {
   assert(table != nullptr);
   assert(table->in_use != nullptr);
+#ifdef WITH_WSREP
+  if (table->in_use->wsrep_applier) {
+    return true;
+  }
+#endif
   return table->in_use->slave_thread;
 }

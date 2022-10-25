@@ -73,3 +73,5 @@ INSERT INTO t1 (id, related_id) VALUES (1,1);
 TRUNCATE TABLE t1;
 INSERT INTO t1 (id, related_id) VALUES (1,1);
 DROP TABLE t1;
+include/assert.inc ["performance_schema.events_statements_summary_by_digest table should be truncated"]
+include/assert.inc ["performance_schema.events_statements_summary_by_digest table should not be truncated"]

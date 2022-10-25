@@ -103,3 +103,34 @@ TRUNCATE TABLE t1;
 INSERT INTO t1 (id, related_id) VALUES (1,1);
 
 DROP TABLE t1;
+
+#
+# TRUNCATE TABLE performance_schema.<table> should not be replicated
+#
+--disable_query_log
+--disable_result_log
+
+--connection node_2
+# We need to execute SELECT COUNT before geting the actual result to have it already in events_statements_summary_by_digest table 
+SELECT COUNT(*) FROM performance_schema.events_statements_summary_by_digest;
+--let $node_2_count_before = `SELECT COUNT(*) FROM performance_schema.events_statements_summary_by_digest`
+
+--connection node_1
+TRUNCATE TABLE performance_schema.events_statements_summary_by_digest;
+
+# It should be 1 at the moment. We will not use assert.inc directly, as it sends more queries, and the result is not deterministic.
+--let $node_1_count = `SELECT COUNT(*) FROM performance_schema.events_statements_summary_by_digest`
+--let $assert_text = "performance_schema.events_statements_summary_by_digest table should be truncated"
+--let $assert_cond = $node_1_count = 1
+--source include/assert.inc
+
+--connection node_2
+--let $node_2_count_after = `SELECT COUNT(*) FROM performance_schema.events_statements_summary_by_digest`
+
+# Check if node_2 is not affected
+--let $assert_text = "performance_schema.events_statements_summary_by_digest table should not be truncated"
+--let $assert_cond = $node_2_count_before = $node_2_count_after
+--source include/assert.inc
+
+--enable_result_log
+--enable_query_log
