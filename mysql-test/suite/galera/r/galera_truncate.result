@@ -27,3 +27,5 @@ DROP TABLE t1;
 DROP TABLE t2;
 DROP TABLE t3;
 DROP TABLE t4;
+include/assert.inc ["performance_schema.events_statements_summary_by_digest table should be truncated"]
+include/assert.inc ["performance_schema.events_statements_summary_by_digest table should not be truncated"]

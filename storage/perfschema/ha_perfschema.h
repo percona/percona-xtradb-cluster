@@ -237,6 +237,11 @@ private:
   {
     assert(table != NULL);
     assert(table->in_use != NULL);
+  #ifdef WITH_WSREP
+    if (table->in_use->wsrep_applier) {
+      return true;
+    }
+  #endif
     return table->in_use->slave_thread;
 
   }
