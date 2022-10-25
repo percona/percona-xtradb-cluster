@@ -359,6 +359,7 @@ Group:          Applications/Databases
 Requires:       %{distro_requires}
 Requires:             percona-xtradb-cluster-client = %{version}-%{release}
 Requires:             percona-xtradb-cluster-shared = %{version}-%{release}
+Requires:             percona-xtradb-cluster-icu-data-files = %{version}-%{release}
 Requires:             selinux-policy
 Requires:             policycoreutils
 Requires(pre):        policycoreutils
