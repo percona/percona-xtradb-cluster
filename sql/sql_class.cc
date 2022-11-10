@@ -1583,6 +1583,7 @@ THD::THD(bool enable_plugins)
   wsrep_skip_wsrep_GTID   = false;
   wsrep_split_trx         = false;
   m_wsrep_next_trx_id     = WSREP_UNDEFINED_TRX_ID;
+  m_wsrep_forced_binlog_format_override = BINLOG_FORMAT_UNSPEC;
   wsrep_skip_SE_checkpoint = false;
   wsrep_skip_wsrep_hton   = false;
 #endif /* WITH_WSREP */
@@ -1984,6 +1985,7 @@ void THD::init(void)
   wsrep_gtid_event_buf    = NULL;
   wsrep_gtid_event_buf_len = 0;
   m_wsrep_next_trx_id     = WSREP_UNDEFINED_TRX_ID;
+  m_wsrep_forced_binlog_format_override = BINLOG_FORMAT_UNSPEC;
   wsrep_sst_donor= false;
   wsrep_void_applier_trx  = true;
   wsrep_skip_SE_checkpoint = false;
@@ -4558,7 +4560,7 @@ extern "C" int thd_binlog_format(const MYSQL_THD thd)
 #ifdef WITH_WSREP
   if (((WSREP(thd) && wsrep_emulate_bin_log) || mysql_bin_log.is_open()) &&
       !(thd->variables.option_bits & OPTION_BIN_LOG_INTERNAL_OFF))
-    return (int) WSREP_BINLOG_FORMAT(thd->variables.binlog_format);
+    return (int) WSREP_BINLOG_FORMAT(thd, thd->variables.binlog_format);
 #else
   if (mysql_bin_log.is_open() && (thd->variables.option_bits & OPTION_BIN_LOG))
     return (int) thd->variables.binlog_format;

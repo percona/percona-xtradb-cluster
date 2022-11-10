@@ -270,11 +270,11 @@ enum enum_binlog_format {
 };
 
 #ifdef WITH_WSREP
-#define WSREP_BINLOG_FORMAT(my_format)                         \
-   ((wsrep_forced_binlog_format != BINLOG_FORMAT_UNSPEC) ?     \
-   wsrep_forced_binlog_format : my_format)
-#else
-#define WSREP_BINLOG_FORMAT(my_format) my_format
+#define WSREP_BINLOG_FORMAT(thd, my_format)                                 \
+   ((thd->wsrep_forced_binlog_format_override() != BINLOG_FORMAT_UNSPEC) ?  \
+     thd->wsrep_forced_binlog_format_override() :                           \
+     ((wsrep_forced_binlog_format != BINLOG_FORMAT_UNSPEC) ?                \
+       wsrep_forced_binlog_format : my_format))
 #endif /* WITH_WSREP */
 
 /* Bits for different SQL modes modes (including ANSI mode) */
@@ -2557,7 +2557,7 @@ public:
     assert(current_stmt_binlog_format == BINLOG_FORMAT_STMT ||
            current_stmt_binlog_format == BINLOG_FORMAT_ROW);
 #ifdef WITH_WSREP
-    return (WSREP_BINLOG_FORMAT((ulong)current_stmt_binlog_format) ==
+    return (WSREP_BINLOG_FORMAT(this, (ulong)current_stmt_binlog_format) ==
             BINLOG_FORMAT_ROW);
 #else
     return current_stmt_binlog_format == BINLOG_FORMAT_ROW;
@@ -3661,6 +3661,11 @@ public:
     return m_wsrep_next_trx_id;
   }
 
+  ulong wsrep_forced_binlog_format_override() const
+  {
+    return m_wsrep_forced_binlog_format_override;
+  }
+
 private:
   /* Imagine this be a query-id that is assigned to all statements
   including non-replicating statement like SELECT/SET.
@@ -3668,6 +3673,24 @@ private:
   For data-changing DML statement wsrep_ws_handle trx_id is set
   to real-transaction-id. */
   wsrep_trx_id_t m_wsrep_next_trx_id; /* cast from query_id_t */
+
+  /**
+    Used for overriding wsrep_forced_binlog_format variable per session.
+
+    Main idea: stay unspecified most part of time (BINLOG_FORMAT_UNSPEC),
+    but after clear_current_stmt_binlog_format_row become BINLOG_FORMAT_STMT
+    to override global variable. And after set_current_stmt_binlog_format_row
+    become unspeficied again.
+
+    Because wsrep_forced_binlog_format is also used for overriding original
+    binlog format, this is pretty tricky logic. Probably it should be refactored,
+    but because wsrep_forced_binlog_format is deprecated, that's considered OK.
+
+    @see WSREP_BINLOG_FORMAT
+    @see set_current_stmt_binlog_format_row
+    @see clear_current_stmt_binlog_format_row
+  */
+  ulong m_wsrep_forced_binlog_format_override;
 public:
 #endif /* WITH_WSREP */
   /**
@@ -4405,7 +4428,7 @@ public:
       lex->binlog_row_based_if_mixed upwards to the caller.
     */
 #ifdef WITH_WSREP
-    if ((WSREP_BINLOG_FORMAT(variables.binlog_format) == BINLOG_FORMAT_MIXED) &&
+    if ((WSREP_BINLOG_FORMAT(this, variables.binlog_format) == BINLOG_FORMAT_MIXED) &&
 #else
     if ((variables.binlog_format == BINLOG_FORMAT_MIXED) &&
 #endif /* WITH_WSREP */
@@ -4417,12 +4440,20 @@ public:
   inline void set_current_stmt_binlog_format_row()
   {
     DBUG_ENTER("set_current_stmt_binlog_format_row");
+#ifdef WITH_WSREP
+    m_wsrep_forced_binlog_format_override= BINLOG_FORMAT_UNSPEC;
+#endif
     current_stmt_binlog_format= BINLOG_FORMAT_ROW;
     DBUG_VOID_RETURN;
   }
   inline void clear_current_stmt_binlog_format_row()
   {
     DBUG_ENTER("clear_current_stmt_binlog_format_row");
+#ifdef WITH_WSREP
+    if (wsrep_forced_binlog_format != BINLOG_FORMAT_UNSPEC &&
+        wsrep_forced_binlog_format != BINLOG_FORMAT_STMT)
+      m_wsrep_forced_binlog_format_override= BINLOG_FORMAT_STMT;
+#endif
     current_stmt_binlog_format= BINLOG_FORMAT_STMT;
     DBUG_VOID_RETURN;
   }
@@ -4436,7 +4467,7 @@ public:
     if (in_sub_stmt == 0)
     {
 #ifdef WITH_WSREP
-      if (WSREP_BINLOG_FORMAT(variables.binlog_format) == BINLOG_FORMAT_ROW)
+      if (WSREP_BINLOG_FORMAT(this, variables.binlog_format) == BINLOG_FORMAT_ROW)
 #else
       if (variables.binlog_format == BINLOG_FORMAT_ROW)
 #endif /* WITH_WSREP */

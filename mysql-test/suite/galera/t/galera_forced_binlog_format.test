@@ -1,11 +1,11 @@
-#
-# Test that wsrep_forced_binlog_format=ROW indeed prevents the log to be switched to STATEMENT format on a per-connection basis
-# 
-
+--source include/have_debug.inc
 --source include/have_log_bin.inc
 --source include/have_innodb.inc
 --source include/galera_cluster.inc
 
+#
+# Test that wsrep_forced_binlog_format=ROW indeed prevents the log to be switched to STATEMENT format on a per-connection basis
+#
 --connection node_1
 RESET MASTER;
 
@@ -27,3 +27,12 @@ INSERT INTO t1 VALUES (2);
 SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123;
 
 DROP TABLE t1;
+
+#
+# PXC-512: Replication slave from PXC can crash if wsrep_forced_binlog_format=ROW
+# https://jira.percona.com/browse/PXC-512
+#
+DELIMITER |;
+CREATE PROCEDURE p1() BEGIN SELECT(1); END |
+DELIMITER ;|
+DROP PROCEDURE p1;

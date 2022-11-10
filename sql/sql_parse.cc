@@ -3928,7 +3928,7 @@ case SQLCOM_PREPARE:
       if (thd->query_name_consts && 
           mysql_bin_log.is_open() &&
 #ifdef WITH_WSREP
-          WSREP_BINLOG_FORMAT(thd->variables.binlog_format) == BINLOG_FORMAT_STMT &&
+          WSREP_BINLOG_FORMAT(thd, thd->variables.binlog_format) == BINLOG_FORMAT_STMT &&
 #else
           thd->variables.binlog_format == BINLOG_FORMAT_STMT &&
 #endif /* WITH_WSREP */

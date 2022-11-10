@@ -11942,7 +11942,7 @@ int THD::decide_logging_format(TABLE_LIST *tables, bool use_cached_table_flags)
 #ifdef WITH_WSREP
   if ((WSREP_EMULATE_BINLOG_NNULL(this) ||
        (mysql_bin_log.is_open() && (variables.option_bits & OPTION_BIN_LOG))) &&
-      !(WSREP_BINLOG_FORMAT(variables.binlog_format) == BINLOG_FORMAT_STMT    &&
+      !(WSREP_BINLOG_FORMAT(this, variables.binlog_format) == BINLOG_FORMAT_STMT    &&
         !binlog_filter->db_ok(m_db.str)))
 #else
   if (mysql_bin_log.is_open() && (variables.option_bits & OPTION_BIN_LOG) &&
@@ -12036,7 +12036,7 @@ int THD::decide_logging_format(TABLE_LIST *tables, bool use_cached_table_flags)
 #endif
 
 #ifdef WITH_WSREP
-    if (WSREP_BINLOG_FORMAT(variables.binlog_format) != BINLOG_FORMAT_ROW && tables)
+    if (WSREP_BINLOG_FORMAT(this, variables.binlog_format) != BINLOG_FORMAT_ROW && tables)
 #else
     if (variables.binlog_format != BINLOG_FORMAT_ROW && tables)
 #endif /* WITH_WSREP */
@@ -12294,7 +12294,7 @@ int THD::decide_logging_format(TABLE_LIST *tables, bool use_cached_table_flags)
         my_error((error= ER_BINLOG_ROW_INJECTION_AND_STMT_ENGINE), MYF(0));
       }
 #ifdef WITH_WSREP
-      else if (WSREP_BINLOG_FORMAT(variables.binlog_format) == BINLOG_FORMAT_ROW &&
+      else if (WSREP_BINLOG_FORMAT(this, variables.binlog_format) == BINLOG_FORMAT_ROW &&
                sqlcom_can_generate_row_events(this->lex->sql_command))
 #else
       else if (variables.binlog_format == BINLOG_FORMAT_ROW &&
@@ -12342,7 +12342,7 @@ int THD::decide_logging_format(TABLE_LIST *tables, bool use_cached_table_flags)
     {
       /* binlog_format = STATEMENT */
 #ifdef WITH_WSREP
-      if (WSREP_BINLOG_FORMAT(variables.binlog_format) == BINLOG_FORMAT_STMT)
+      if (WSREP_BINLOG_FORMAT(this, variables.binlog_format) == BINLOG_FORMAT_STMT)
 #else
       if (variables.binlog_format == BINLOG_FORMAT_STMT)
 #endif /* WITH_WSREP */
@@ -12534,7 +12534,7 @@ int THD::decide_logging_format(TABLE_LIST *tables, bool use_cached_table_flags)
                         mysql_bin_log.is_open(),
                         (variables.option_bits & OPTION_BIN_LOG),
 #ifdef WITH_WSREP
-                        WSREP_BINLOG_FORMAT(variables.binlog_format),
+                        WSREP_BINLOG_FORMAT(this, variables.binlog_format),
                         binlog_filter->db_ok(m_db.str)));
 #else
                         variables.binlog_format,
