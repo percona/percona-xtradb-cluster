@@ -404,10 +404,9 @@ fi
     echo "$(pwd)"
 
     if [[ $CMAKE_BUILD_TYPE == 'Debug' ]]; then
-        cmake ../../ ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
+        cmake $SOURCEDIR/ ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
             -DCMAKE_BUILD_TYPE=Debug \
             $DEBUG_EXTRA \
-            -DFEATURE_SET=community \
             -DCMAKE_INSTALL_PREFIX="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" \
             -DMYSQL_DATADIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/data" \
             -DCOMPILATION_COMMENT="$COMMENT - UNIV_DEBUG ON" \
@@ -422,7 +421,6 @@ fi
             -DWITH_RAPIDJSON=bundled \
             -DWITH_ICU=bundled \
             -DWITH_LZ4=bundled \
-            -DWITH_RE2=bundled \
             -DWITH_LIBEVENT=bundled \
             -DWITH_EDITLINE=bundled \
             -DWITH_ZLIB=bundled \
@@ -442,9 +440,8 @@ fi
         (cp -v runtime_output_directory/mysqld-debug $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/mysqld) || true
         echo "mysqld in build in debug mode"
     else
-        cmake ../../ ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
+        cmake $SOURCEDIR/ ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
             -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
-            -DFEATURE_SET=community \
             -DCMAKE_INSTALL_PREFIX="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" \
             -DMYSQL_DATADIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/data" \
             -DROUTER_INSTALL_LIBDIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib/mysqlrouter/private" \
@@ -461,7 +458,6 @@ fi
             -DWITH_RAPIDJSON=bundled \
             -DWITH_ICU=bundled \
             -DWITH_LZ4=bundled \
-            -DWITH_RE2=bundled \
             -DWITH_EDITLINE=bundled \
             -DWITH_LIBEVENT=bundled \
             -DWITH_ZLIB=bundled \
