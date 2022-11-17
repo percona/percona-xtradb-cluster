@@ -43,7 +43,12 @@
 #include <mysql/service_plugin_registry.h>
 
 constexpr auto KEYRING_ITEM_BUFFER_SIZE = 256;
+#ifdef WITH_WSREP
+/* GCache Master Key ID is GaleraKey-<enc_mk_const_id>@<enc_mk_uuid>-<enc_mk_id>*/
+constexpr auto MAX_FIELD_LENGTH = 255;
+#else
 constexpr auto MAX_FIELD_LENGTH = 64;
+#endif /* WITH_WSREP */
 
 THR_LOCK table_keyring_keys::s_table_lock;
 
