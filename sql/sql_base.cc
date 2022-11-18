@@ -4980,7 +4980,7 @@ thr_lock_type read_lock_type_for_table(THD *thd,
 #ifdef WITH_WSREP
   ulong binlog_format= thd->variables.binlog_format;
   if (log_on == false ||
-      (WSREP_BINLOG_FORMAT(binlog_format) == BINLOG_FORMAT_ROW))
+      (WSREP_BINLOG_FORMAT(thd, binlog_format) == BINLOG_FORMAT_ROW))
 #else
   if (log_on == false ||
       thd->variables.binlog_format == BINLOG_FORMAT_ROW)
