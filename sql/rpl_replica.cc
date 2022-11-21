@@ -7065,22 +7065,10 @@ wsrep_restart_point :
   rli->events_until_exit = abort_slave_event_count;
 #endif
 
-<<<<<<< HEAD
-  thd = new THD;                     // note that contructor of THD uses DBUG_ !
-  thd->thread_stack = (char *)&thd;  // remember where our stack is
-  mysql_mutex_lock(&rli->info_thd_lock);
-  rli->info_thd = thd;
-||||||| merged common ancestors
-    thd = new THD;  // note that contructor of THD uses DBUG_ !
-    thd->thread_stack = (char *)&thd;  // remember where our stack is
-    mysql_mutex_lock(&rli->info_thd_lock);
-    rli->info_thd = thd;
-=======
     thd = new THD;  // note that constructor of THD uses DBUG_ !
     thd->thread_stack = (char *)&thd;  // remember where our stack is
     mysql_mutex_lock(&rli->info_thd_lock);
     rli->info_thd = thd;
->>>>>>> tag/Percona-Server-8.0.30-22
 
 #ifdef HAVE_PSI_THREAD_INTERFACE
   // save the instrumentation for SQL thread in rli->info_thd
@@ -7158,16 +7146,10 @@ wsrep_restart_point :
         (rli->get_require_table_primary_key_check() ==
          Relay_log_info::PK_CHECK_ON);
 
-<<<<<<< HEAD
-  rli->transaction_parser.reset();
-||||||| merged common ancestors
-    rli->transaction_parser.reset();
-=======
-    // Replicas shall not create GIPKs if source tables have no PKs
-    thd->variables.sql_generate_invisible_primary_key = false;
+  // Replicas shall not create GIPKs if source tables have no PKs
+  thd->variables.sql_generate_invisible_primary_key = false;
 
-    rli->transaction_parser.reset();
->>>>>>> tag/Percona-Server-8.0.30-22
+  rli->transaction_parser.reset();
 
   thd_manager->add_thd(thd);
   thd_added = true;
@@ -7519,41 +7501,6 @@ err:
   rli->cached_charset_invalidate();
   rli->save_temporary_tables = thd->temporary_tables;
 
-<<<<<<< HEAD
-  /*
-    TODO: see if we can do this conditionally in next_event() instead
-    to avoid unneeded position re-init
-  */
-  thd->temporary_tables =
-      nullptr;  // remove tempation from destructor to close them
-  // destructor will not free it, because we are weird
-  thd->get_protocol_classic()->end_net();
-  assert(rli->info_thd == thd);
-  THD_CHECK_SENTRY(thd);
-  mysql_mutex_lock(&rli->info_thd_lock);
-  rli->info_thd = nullptr;
-  if (commit_order_mngr) {
-    rli->set_commit_order_manager(nullptr);
-    delete commit_order_mngr;
-  }
-||||||| merged common ancestors
-    /*
-      TODO: see if we can do this conditionally in next_event() instead
-      to avoid unneeded position re-init
-    */
-    thd->temporary_tables =
-        nullptr;  // remove tempation from destructor to close them
-    // destructor will not free it, because we are weird
-    thd->get_protocol_classic()->end_net();
-    assert(rli->info_thd == thd);
-    THD_CHECK_SENTRY(thd);
-    mysql_mutex_lock(&rli->info_thd_lock);
-    rli->info_thd = nullptr;
-    if (commit_order_mngr) {
-      rli->set_commit_order_manager(nullptr);
-      delete commit_order_mngr;
-    }
-=======
     /*
       TODO: see if we can do this conditionally in next_event() instead
       to avoid unneeded position re-init
@@ -7570,7 +7517,6 @@ err:
       rli->set_commit_order_manager(nullptr);
       delete commit_order_mngr;
     }
->>>>>>> tag/Percona-Server-8.0.30-22
 
   mysql_mutex_unlock(&rli->info_thd_lock);
   set_thd_in_use_temporary_tables(

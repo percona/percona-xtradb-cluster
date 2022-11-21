@@ -1085,8 +1085,26 @@ static bool plugin_add(MEM_ROOT *tmp_root, LEX_CSTRING name,
       tmp.name.length = name_len;
       tmp.ref_count = 0;
       tmp.state = PLUGIN_IS_UNINITIALIZED;
+#ifdef WITH_WSREP
+      /*
+        PXC needs these plugins loaded to avoid node level inconsistency.
+        PXC expect user to operate all nodes with same configuration and failure
+        to load plugin will suppress the check that can create a scenario
+        where-in some node of the cluster operates with plugin enabled
+        and some with plugin disabled even though the configuration is same
+        on all nodes. */
+      std::optional<enum_plugin_load_option> force_load_option;
+      if (wsrep_provider_set &&
+          !(my_strcasecmp(&my_charset_latin1, tmp.name.str, "keyring_file") &&
+            my_strcasecmp(&my_charset_latin1, tmp.name.str, "keyring_vault")))
+        force_load_option = PLUGIN_FORCE;
+
+      /* tmp.load_option is set by test_plugin_options */
+      if (test_plugin_options(tmp_root, &tmp, argc, argv, force_load_option))
+#else
       /* tmp.load_option is set by test_plugin_options */
       if (test_plugin_options(tmp_root, &tmp, argc, argv))
+#endif /* WITH_WSREP */
         tmp.state = PLUGIN_IS_DISABLED;
 
       if ((tmp_plugin_ptr = plugin_insert_or_reuse(&tmp))) {
@@ -3585,20 +3603,6 @@ static int test_plugin_options(
                          : (tmp->plugin->flags & PLUGIN_OPT_DEFAULT_OFF)
                                ? PLUGIN_OFF
                                : PLUGIN_ON;
-
-#ifdef WITH_WSREP
-  /*
-    PXC needs these plugins loaded to avoid node level inconsistency.
-    PXC expect user to operate all nodes with same configuration and failure
-    to load plugin will suppress the check that can create a scenario
-    where-in some node of the cluster operates with plugin enabled
-    and some with plugin disabled even though the configuration is same
-    on all nodes. */
-  if (wsrep_provider_set &&
-      !(my_strcasecmp(&my_charset_latin1, tmp->name.str, "keyring_file") &&
-        my_strcasecmp(&my_charset_latin1, tmp->name.str, "keyring_vault")))
-    plugin_load_option = PLUGIN_FORCE;
-#endif /* WITH_WSREP */
 
   for (opt = tmp->plugin->system_vars; opt && *opt; opt++)
     count += 2; /* --{plugin}-{optname} and --plugin-{plugin}-{optname} */

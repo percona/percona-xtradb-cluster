@@ -26,6 +26,10 @@
 #include "sql/raii/sentry.h"             // raii::Sentry<>
 #include "sql/xa/xid_extract.h"          // xa::XID_extractor
 
+#ifdef WITH_WSREP
+#include "sql/wsrep_mysqld.h"  // WSREP_DEBUG
+#endif
+
 binlog::Binlog_recovery::Binlog_recovery(Binlog_file_reader &binlog_file_reader)
     : m_reader{binlog_file_reader},
       m_mem_root{key_memory_binlog_recover_exec,
@@ -60,6 +64,73 @@ binlog::Binlog_recovery &binlog::Binlog_recovery::recover() {
   it.set_copy_event_buffer();
   this->m_valid_pos = this->m_reader.position();
 
+#ifdef WITH_WSREP
+  /*
+    If binlog is enabled then SE will persist redo at following stages:
+    - during prepare
+    - during binlog write
+    - during innodb-commit
+    3rd stage (fsync) can be skipped as transaction can be recovered
+    from binlog.
+
+    During 3rd stage, commit co-ordinates are also recorded in sysheader
+    under wsrep placeholder. These co-ordinates are then used to stop
+    binlog scan (in addition to get recovery position in case of node-crash).
+
+    Since fsync of 3rd stage is delayed (as transaction can be recovered
+    using binlog) it is possible that even though transaction is reported
+    as success to end-user said co-ordinates are not persisted to disk.
+
+    On restart, a prepare state transaction could be recovered and committed
+    but since wsrep co-ordinates are not persisted a successfully committed
+    transaction recovery is skipped causing data inconsistency from end-user
+    application perspective.
+
+    This behavior is now changed to let recovery proceed independent of
+    wsrep co-ordinates and wsrep co-ordinates are updated to reflect
+    the recovery committed transaction.
+  */
+  if (WSREP_ON) {
+    wsrep::gtid gtid = wsrep_get_SE_checkpoint();
+    std::ostringstream oss;
+    oss << gtid;
+    WSREP_INFO("Before binlog recovery (wsrep position: %s)",
+               oss.str().c_str());
+  }
+
+  /* Pre-notes:
+  Logic below will scan for xid events and will add them to the xid vector/set.
+  Note: being a set it can hold only unique event.
+
+  Ideally xid should be unique but in case of PXC if there is node-local
+  transaction then it would get logged to binlog with MySQL XID and not with
+  WSREP XID. MySQL has different logic to generate xid and wsrep has different
+  logic. This would end up in a situation where-in 2 different event with be
+  logged to binlog with different GTID (if enabled) but same XID.
+
+  MySQL logic below doesn't expect this situation but till MySQL-5.7 use of HASH
+  ignored unique insert so duplicate XID were getting inserted.
+  Though this also means, if 2 transactions (one with WSREP XID and other with
+  MySQL XID) with same XID (but different GTID) are logged and MySQL recover
+  both of these transactions as part of recovery, then both of them will
+  under-go a commit_by_xid flow ir-respective of which transaction wrote
+  XID event to binlog as xid is common for both of them.
+
+  This effectively boils down to:
+  - Avoid node local changes in PXC.
+  - If there are node-local changes then these changes should not be binlogged.
+  - If there is non-replicating-atomic-ddl then it should not be binlogged too.
+
+  There-by ensuring that there is no MySQL XID transactions.
+
+  This also means 2 important things, node local transaction or non-replicating
+  ddl transaction will not be replicated even through async replication
+  as they are not being binlogged.
+
+  Note: operation to temporary tables (that are session specific) are never
+  binlogged */
+#endif /* WITH_WSREP */
+
   for (Log_event *ev = it.begin(); ev != it.end(); ev = it.next()) {
     switch (ev->get_type_code()) {
       case binary_log::QUERY_EVENT: {
@@ -91,6 +162,15 @@ binlog::Binlog_recovery &binlog::Binlog_recovery::recover() {
     this->m_is_malformed = it.has_error() || this->m_is_malformed;
     if (this->m_is_malformed) break;
   }
+
+#ifdef WITH_WSREP
+  if (WSREP_ON) {
+    wsrep::gtid gtid = wsrep_get_SE_checkpoint();
+    std::ostringstream oss;
+    oss << gtid;
+    WSREP_INFO("After binlog recovery (wsrep position: %s)", oss.str().c_str());
+  }
+#endif /* WITH_WSREP */
 
   if (!this->m_is_malformed && total_ha_2pc > 1) {
     Xa_state_list xa_list{this->m_external_xids};

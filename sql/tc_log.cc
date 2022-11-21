@@ -245,38 +245,26 @@ int TC_LOG_DUMMY::open(const char *) {
 }
 
 TC_LOG::enum_result TC_LOG_DUMMY::commit(THD *thd, bool all) {
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   return wsrep_thd_binlog_commit(thd, all);
 #else
-  return ha_commit_low(thd, all) ? RESULT_ABORTED : RESULT_SUCCESS;
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-  return ha_commit_low(thd, all) ? RESULT_ABORTED : RESULT_SUCCESS;
-=======
   if (all) {
     CONDITIONAL_SYNC_POINT_FOR_TIMESTAMP("before_commit_in_tc");
   }
   return trx_coordinator::commit_in_engines(thd, all) ? RESULT_ABORTED
                                                       : RESULT_SUCCESS;
->>>>>>> tag/Percona-Server-8.0.30-22
+#endif /* WITH_WSREP */
 }
 
 int TC_LOG_DUMMY::rollback(THD *thd, bool all) {
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   return wsrep_thd_binlog_rollback(thd, all);
 #else
-  return ha_rollback_low(thd, all);
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-  return ha_rollback_low(thd, all);
-=======
   if (all) {
     CONDITIONAL_SYNC_POINT_FOR_TIMESTAMP("before_rollback_in_tc");
   }
   return trx_coordinator::rollback_in_engines(thd, all);
->>>>>>> tag/Percona-Server-8.0.30-22
+#endif /* WITH_WSREP */
 }
 
 int TC_LOG_DUMMY::prepare(THD *thd, bool all) {

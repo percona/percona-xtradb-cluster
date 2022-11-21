@@ -720,8 +720,6 @@ bool upgrade_pxc_only(THD *thd) {
   Server_option_guard<bool> slow_log_guard(&opt_slow_log, false);
   Server_option_guard<bool> bin_log_guard(&thd->variables.sql_log_bin, false);
 
-  log_sink_buffer_check_timeout();
-
   bootstrap_error_handler.set_log_error(false);
 
   const bool err = pxc_fix_mysql_tables(thd);
@@ -731,8 +729,6 @@ bool upgrade_pxc_only(THD *thd) {
   if (!err) {
     WSREP_SYSTEM("PXC upgrade completed successfully");
   }
-
-  log_sink_buffer_check_timeout();
 
   return dd::end_transaction(thd, err);
 }

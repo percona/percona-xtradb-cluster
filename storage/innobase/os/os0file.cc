@@ -3725,13 +3725,6 @@ pfs_os_file_t os_file_create_simple_no_error_handling_func(const char *name,
 @param[out]     exist           indicate if file pre-exist
 @return true if success */
 bool os_file_delete_if_exists_func(const char *name, bool *exist) {
-<<<<<<< HEAD
-#ifdef WITH_WSREP
-  WAIT_ALLOW_WRITES();
-#endif /* WITH_WSREP */
-
-||||||| merged common ancestors
-=======
   if (Fil_path::get_file_type(name) == OS_FILE_TYPE_MISSING) {
     if (exist != nullptr) {
       *exist = false;
@@ -3739,7 +3732,10 @@ bool os_file_delete_if_exists_func(const char *name, bool *exist) {
     return true;
   }
 
->>>>>>> tag/Percona-Server-8.0.30-22
+#ifdef WITH_WSREP
+  WAIT_ALLOW_WRITES();
+#endif /* WITH_WSREP */
+
   if (!os_file_can_delete(name)) {
     return (false);
   }

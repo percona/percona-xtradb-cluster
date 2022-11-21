@@ -1882,7 +1882,7 @@ dberr_t wsrep_rec_get_foreign_key(
   ut_ad(index_ref);
 
   rec_offs_init(offsets_);
-  offsets = rec_get_offsets(rec, index_for, offsets_, ULINT_UNDEFINED, &heap);
+  offsets = rec_get_offsets(rec, index_for, offsets_, ULINT_UNDEFINED, UT_LOCATION_HERE, &heap);
 
   ut_ad(rec_offs_validate(rec, NULL, offsets));
 

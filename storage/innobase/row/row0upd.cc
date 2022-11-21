@@ -2485,7 +2485,7 @@ code or DB_LOCK_WAIT */
             !wsrep_thd_is_BF(trx->mysql_thd, false) && err == DB_SUCCESS &&
             !referenced && foreign && !row_upd_parent_has_cascade(parent)) {
           ulint *offsets =
-              rec_get_offsets(rec, index, NULL, ULINT_UNDEFINED, &heap);
+              rec_get_offsets(rec, index, NULL, ULINT_UNDEFINED, UT_LOCATION_HERE, &heap);
           err = wsrep_row_upd_check_foreign_constraints(
               node, &pcur, index->table, index, offsets, thr, &mtr);
           switch (err) {

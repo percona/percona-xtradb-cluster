@@ -2597,114 +2597,8 @@ bool UpdateRowsIterator::DoImmediateUpdatesAndBufferRowIds(
   return false;
 }
 
-<<<<<<< HEAD
-void Query_result_update::send_error(THD *, uint errcode, const char *err) {
-  /* First send error what ever it is ... */
-  my_error(errcode, MYF(0), err);
-}
-
-void Query_result_update::abort_result_set(THD *thd) {
-  /* the error was handled or nothing deleted and no side effects return */
-  if (error_handled ||
-      (!thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT) &&
-       updated_rows == 0))
-    return;
-
-  /*
-    If all tables that has been updated are trans safe then just do rollback.
-    If not attempt to do remaining updates.
-  */
-
-  if (!trans_safe) {
-    assert(
-        thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT));
-    if (!update_completed && update_table_count > 1) {
-      /* @todo: Add warning here */
-      (void)do_updates(thd);
-    }
-  }
-  if (thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT)) {
-    /*
-      The query has to binlog because there's a modified non-transactional table
-      either from the query's list or via a stored routine: bug#13270,23333
-    */
-#ifdef WITH_WSREP
-    if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open()) {
-#else
-    if (mysql_bin_log.is_open()) {
-#endif /* WITH_WSREP */
-      /*
-        THD::killed status might not have been set ON at time of an error
-        got caught and if happens later the killed error is written
-        into repl event.
-      */
-      int errcode = query_error_code(thd, thd->killed == THD::NOT_KILLED);
-      /* the error of binary logging is ignored */
-      (void)thd->binlog_query(THD::ROW_QUERY_TYPE, thd->query().str,
-                              thd->query().length, transactional_tables, false,
-                              false, errcode);
-    }
-  }
-  assert(trans_safe || updated_rows == 0 ||
-         thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT));
-}
-
-bool Query_result_update::do_updates(THD *thd) {
-  TABLE_LIST *cur_table;
-||||||| merged common ancestors
-void Query_result_update::send_error(THD *, uint errcode, const char *err) {
-  /* First send error what ever it is ... */
-  my_error(errcode, MYF(0), err);
-}
-
-void Query_result_update::abort_result_set(THD *thd) {
-  /* the error was handled or nothing deleted and no side effects return */
-  if (error_handled ||
-      (!thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT) &&
-       updated_rows == 0))
-    return;
-
-  /*
-    If all tables that has been updated are trans safe then just do rollback.
-    If not attempt to do remaining updates.
-  */
-
-  if (!trans_safe) {
-    assert(
-        thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT));
-    if (!update_completed && update_table_count > 1) {
-      /* @todo: Add warning here */
-      (void)do_updates(thd);
-    }
-  }
-  if (thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT)) {
-    /*
-      The query has to binlog because there's a modified non-transactional table
-      either from the query's list or via a stored routine: bug#13270,23333
-    */
-    if (mysql_bin_log.is_open()) {
-      /*
-        THD::killed status might not have been set ON at time of an error
-        got caught and if happens later the killed error is written
-        into repl event.
-      */
-      int errcode = query_error_code(thd, thd->killed == THD::NOT_KILLED);
-      /* the error of binary logging is ignored */
-      (void)thd->binlog_query(THD::ROW_QUERY_TYPE, thd->query().str,
-                              thd->query().length, transactional_tables, false,
-                              false, errcode);
-    }
-  }
-  assert(trans_safe || updated_rows == 0 ||
-         thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT));
-}
-
-bool Query_result_update::do_updates(THD *thd) {
-  TABLE_LIST *cur_table;
-=======
 bool UpdateRowsIterator::DoDelayedUpdates(bool *trans_safe,
                                           bool *transactional_tables) {
->>>>>>> tag/Percona-Server-8.0.30-22
   int local_error = 0;
   ha_rows org_updated;
   TABLE *table, *tmp_table;
@@ -3033,19 +2927,11 @@ int UpdateRowsIterator::Read() {
     either from the query's list or via a stored routine: bug#13270,23333
   */
 
-<<<<<<< HEAD
-  if (local_error == 0 ||
-      thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT)) {
-#ifdef WITH_WSREP
-    if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open()) {
-#else
-||||||| merged common ancestors
-  if (local_error == 0 ||
-      thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT)) {
-=======
   if (!local_error ||
       thd()->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT)) {
->>>>>>> tag/Percona-Server-8.0.30-22
+#ifdef WITH_WSREP
+    if (WSREP_EMULATE_BINLOG(thd()) || mysql_bin_log.is_open()) {
+#else
     if (mysql_bin_log.is_open()) {
 #endif /* WITH_WSREP */
       int errcode = 0;

@@ -2947,7 +2947,7 @@ constexpr const decltype(
 /**
   Engine support replication through wsrep-replication provider plugin
 */
-#define HTON_WSREP_REPLICATION (1 << 21)
+#define HTON_WSREP_REPLICATION (1 << 22)
 #endif /* WITH_WSREP */
 
 inline bool ddl_is_atomic(const handlerton *hton) {

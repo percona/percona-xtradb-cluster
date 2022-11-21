@@ -64,6 +64,9 @@ bool Sql_cmd_xa_commit::execute(THD *thd) {
 
   if (!st) {
     thd->mdl_context.release_transactional_locks();
+#ifdef WITH_WSREP
+    WSREP_DEBUG("XA commit failed, MDL released: %u", thd->thread_id());
+#endif /* WITH_WSREP */
     /*
         We've just done a commit, reset transaction
         isolation level and access mode to the session default.

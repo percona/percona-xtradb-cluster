@@ -206,7 +206,13 @@ bool xa::recovery::recover_one_ht(THD *, plugin_ref plugin, void *arg) {
 
       for (int i = 0; i < got; ++i) {
         auto &xa_trx = info->list[i];
+#ifdef WITH_WSREP
+        my_xid xid = (wsrep_is_wsrep_xid(&xa_trx.id)
+                        ? wsrep_xid_seqno(xa_trx.id).get()
+                        : xa_trx.id.get_my_xid());
+#else
         my_xid xid = xa_trx.id.get_my_xid();
+#endif /* WITH_WSREP */
 
         if (!xid) {  // Externally coordinated transaction
           ::recover_one_external_trx(*info, *ht, xa_trx, external_stats);

@@ -11001,7 +11001,8 @@ bool mysql_create_like_table(THD *thd, TABLE_LIST *table, TABLE_LIST *src_table,
       String query(buf, sizeof(buf), system_charset_info);
       query.length(0);  // Have to zero it since constructor doesn't
 
-      (void)store_create_info(thd, &tbl, &query, NULL, true);
+      (void)store_create_info(thd, &tbl, &query, NULL, true /* show_database */,
+                             false /* SHOW CREATE TABLE */);
       WSREP_DEBUG(
           "Initiating creation of temporary table to satisfy"
           " CREATE TABLE LIKE : %s",
@@ -19569,21 +19570,14 @@ static bool check_engine(THD *thd, const char *db_name, const char *table_name,
         ((thd->lex->sql_command == SQLCOM_ALTER_TABLE) &&
          (create_info->used_fields & HA_CREATE_USED_ENGINE) == 0) ||
         (thd->lex->sql_command == SQLCOM_OPTIMIZE) ||
-<<<<<<< HEAD
-#ifdef WITH_WSREP
-        dd::get_dictionary()->is_dd_table_name(db_name, table_name) ||
-        is_wsrep_system_table(db_name, strlen(db_name), table_name,
-                              strlen(table_name));
-#else
-        dd::get_dictionary()->is_dd_table_name(db_name, table_name);
-#endif
-||||||| merged common ancestors
-        dd::get_dictionary()->is_dd_table_name(db_name, table_name);
-=======
         dd::get_dictionary()->is_dd_table_name(db_name, table_name)
         // Allow creation of the new redo log table
         || (strcmp(db_name, "performance_schema") == 0);
->>>>>>> tag/Percona-Server-8.0.30-22
+
+#ifdef WITH_WSREP
+    enforcement_forbidden |=  is_wsrep_system_table(db_name, strlen(db_name), table_name,
+                              strlen(table_name));
+#endif
 
     if (!enforcement_forbidden) {
       handlerton *enf_engine = ha_enforce_handlerton(thd);

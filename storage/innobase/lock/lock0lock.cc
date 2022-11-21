@@ -504,144 +504,44 @@ static inline Conflict rec_lock_check_conflict(const trx_t *trx,
   ut_ad(trx && lock2);
   ut_ad(lock_get_type_low(lock2) == LOCK_REC);
 
-<<<<<<< HEAD
-  const bool is_hp = trx_is_high_priority(trx);
-  if (trx != lock2->trx &&
-      !lock_mode_compatible(static_cast<lock_mode>(LOCK_MODE_MASK & type_mode),
-                            lock_get_mode(lock2))) {
-#ifdef WITH_WSREP
-    if (wsrep_on(trx->mysql_thd) && is_hp && trx_is_high_priority(lock2->trx)) {
-      /* conflicting high priority locks are supposed to be false positives
-         i.e. locks not on actual certified pay load data or GAP locks.
-         these should not block applier execution, hence returning false here */
-      if (wsrep_debug) {
-        ib::info() << "BF-BF lock conflict skipped, \n"
-                   << " trx-1 lock request: " << trx->id
-                   << " trx-2 lock holder: " << lock2->trx->id;
-      }
-      // print additional information if requested
-      if (wsrep_log_conflicts) {
-        ib::info() << "*** Lock requesting TRANSACTION:";
-        wsrep_trx_print_locking(stderr, trx, 3000);
-        ib::info() << "*** Lock holder TRANSACTION:";
-        wsrep_trx_print_locking(stderr, lock2->trx, 3000);
-      }
-      return (false);
-    }
-
-    if (wsrep_on(trx->mysql_thd) && !is_hp &&
-        trx_is_high_priority(lock2->trx)) {
-      return (true);
-    }
-#endif /* WITH_WSREP */
-    /* If our trx is High Priority and the existing lock is WAITING and not
-        high priority, then we can ignore it. */
-    if (is_hp && lock2->is_waiting() && !trx_is_high_priority(lock2->trx)) {
-      return (false);
-    }
-
-    /* We have somewhat complex rules when gap type record locks
-    cause waits */
-
-    if ((lock_is_on_supremum || (type_mode & LOCK_GAP)) &&
-        !(type_mode & LOCK_INSERT_INTENTION)) {
-      /* Gap type locks without LOCK_INSERT_INTENTION flag
-      do not need to wait for anything. This is because
-      different users can have conflicting lock types
-      on gaps. */
-
-      return (false);
-    }
-
-    if (!(type_mode & LOCK_INSERT_INTENTION) && lock_rec_get_gap(lock2)) {
-      /* Record lock (LOCK_ORDINARY or LOCK_REC_NOT_GAP
-      does not need to wait for a gap type lock */
-
-      return (false);
-    }
-
-    if ((type_mode & LOCK_GAP) && lock_rec_get_rec_not_gap(lock2)) {
-      /* Lock on gap does not need to wait for
-      a LOCK_REC_NOT_GAP type lock */
-
-      return (false);
-    }
-
-    if (lock_rec_get_insert_intention(lock2)) {
-      /* No lock request needs to wait for an insert
-      intention lock to be removed. This is ok since our
-      rules allow conflicting locks on gaps. This eliminates
-      a spurious deadlock caused by a next-key lock waiting
-      for an insert intention lock; when the insert
-      intention lock was granted, the insert deadlocked on
-      the waiting next-key lock.
-
-      Also, insert intention locks do not disturb each
-      other. */
-
-      return (false);
-    }
-||||||| merged common ancestors
-  const bool is_hp = trx_is_high_priority(trx);
-  if (trx != lock2->trx &&
-      !lock_mode_compatible(static_cast<lock_mode>(LOCK_MODE_MASK & type_mode),
-                            lock_get_mode(lock2))) {
-    /* If our trx is High Priority and the existing lock is WAITING and not
-        high priority, then we can ignore it. */
-    if (is_hp && lock2->is_waiting() && !trx_is_high_priority(lock2->trx)) {
-      return (false);
-    }
-
-    /* We have somewhat complex rules when gap type record locks
-    cause waits */
-
-    if ((lock_is_on_supremum || (type_mode & LOCK_GAP)) &&
-        !(type_mode & LOCK_INSERT_INTENTION)) {
-      /* Gap type locks without LOCK_INSERT_INTENTION flag
-      do not need to wait for anything. This is because
-      different users can have conflicting lock types
-      on gaps. */
-
-      return (false);
-    }
-
-    if (!(type_mode & LOCK_INSERT_INTENTION) && lock_rec_get_gap(lock2)) {
-      /* Record lock (LOCK_ORDINARY or LOCK_REC_NOT_GAP
-      does not need to wait for a gap type lock */
-
-      return (false);
-    }
-
-    if ((type_mode & LOCK_GAP) && lock_rec_get_rec_not_gap(lock2)) {
-      /* Lock on gap does not need to wait for
-      a LOCK_REC_NOT_GAP type lock */
-
-      return (false);
-    }
-
-    if (lock_rec_get_insert_intention(lock2)) {
-      /* No lock request needs to wait for an insert
-      intention lock to be removed. This is ok since our
-      rules allow conflicting locks on gaps. This eliminates
-      a spurious deadlock caused by a next-key lock waiting
-      for an insert intention lock; when the insert
-      intention lock was granted, the insert deadlocked on
-      the waiting next-key lock.
-
-      Also, insert intention locks do not disturb each
-      other. */
-
-      return (false);
-    }
-=======
   if (trx == lock2->trx ||
       lock_mode_compatible(static_cast<lock_mode>(LOCK_MODE_MASK & type_mode),
                            lock_get_mode(lock2))) {
     return Conflict::NO_CONFLICT;
   }
->>>>>>> tag/Percona-Server-8.0.30-22
 
   const bool is_hp = trx_is_high_priority(trx);
+
+#ifdef WITH_WSREP
+  if (wsrep_on(trx->mysql_thd) && is_hp && trx_is_high_priority(lock2->trx)) {
+    /* conflicting high priority locks are supposed to be false positives
+        i.e. locks not on actual certified pay load data or GAP locks.
+        these should not block applier execution, hence returning false here */
+    if (wsrep_debug) {
+      ib::info() << "BF-BF lock conflict skipped, \n"
+                  << " trx-1 lock request: " << trx->id
+                  << " trx-2 lock holder: " << lock2->trx->id;
+    }
+    // print additional information if requested
+    if (wsrep_log_conflicts) {
+      ib::info() << "*** Lock requesting TRANSACTION:";
+      wsrep_trx_print_locking(stderr, trx, 3000);
+      ib::info() << "*** Lock holder TRANSACTION:";
+      wsrep_trx_print_locking(stderr, lock2->trx, 3000);
+    }
+    return Conflict::NO_CONFLICT;
+  }
+
+  /* If any of the transaction is NBO, let standard logic make decision,
+     as they can coexist. */
+  bool nbo = (wsrep_on(trx->mysql_thd) && wsrep_thd_is_in_nbo(trx->mysql_thd)) ||
+             (wsrep_on(lock2->trx->mysql_thd) && wsrep_thd_is_in_nbo(lock2->trx->mysql_thd));
+  if (!nbo && wsrep_on(trx->mysql_thd) && !is_hp &&
+      trx_is_high_priority(lock2->trx)) {
+    return Conflict::HAS_TO_WAIT;
+  }
+#endif /* WITH_WSREP */
+
   /* If our trx is High Priority and the existing lock is WAITING and not
       high priority, then we can ignore it. */
   if (is_hp && lock2->is_waiting() && !trx_is_high_priority(lock2->trx)) {
@@ -1047,7 +947,6 @@ MY_NODISCARD static const lock_t *lock_rec_other_has_expl_req(
 }
 #endif /* UNIV_DEBUG */
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 static bool
 wsrep_kill_victim(const trx_t * const trx, trx_t *victim_trx) {
@@ -1094,8 +993,6 @@ wsrep_kill_victim(const trx_t * const trx, trx_t *victim_trx) {
 }
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-=======
 namespace locksys {
 struct Conflicting {
   /** a conflicting lock or null if no conflicting lock found */
@@ -1104,7 +1001,6 @@ struct Conflicting {
   bool bypassed;
 };
 } /*namespace locksys*/
->>>>>>> tag/Percona-Server-8.0.30-22
 /** Checks if some other transaction has a conflicting explicit lock request
  in the queue, so that we have to wait.
  @param[in]     mode        LOCK_S or LOCK_X, possibly ORed to
@@ -2373,174 +2269,42 @@ void lock_make_trx_hit_list(trx_t *hp_trx, hit_list_t &hit_list) {
             return true;
           }
 
-<<<<<<< HEAD
-  /* Current implementation of lock_make_trx_hit_list requires latching whole
-  lock_sys for following reasons:
-  1. it may call lock_cancel_waiting_and_release on a lock from completely
-  different shard of lock_sys than hp_trx->lock.wait_lock. Trying to latch
-  this other shard might create a deadlock cycle if it violates ordering of
-  shard latches (and there is 50% chance it will violate it). Moreover the
-  lock_cancel_waiting_and_release() requires an exclusive latch to avoid
-  deadlocks among trx->mutex-es, and trx->lock.wait_lock might be a table lock,
-  in which case exclusive latch is also needed to traverse table locks.
-  2. it may call trx_mutex_enter on a transaction which is waiting for a
-  lock, which violates one of assumptions used in the proof that a deadlock due
-  to acquiring trx->mutex-es is impossible
-  3. it attempts to read hp_trx->lock.wait_lock which might be modified by a
-  thread during B-tree reorganization when moving locks between queues
-  4. it attempts to operate on trx->lock.wait_lock of other transactions */
-  locksys::Global_exclusive_latch_guard guard{UT_LOCATION_HERE};
-
-  /* Check again */
-  const lock_t *lock = hp_trx->lock.wait_lock;
-  if (lock == nullptr || !lock->is_record_lock()) {
-    return;
-  }
-  RecID rec_id{lock, lock_rec_find_set_bit(lock)};
-  Lock_iter::for_each(
-      rec_id,
-      [&](lock_t *next) {
-        trx_t *trx = next->trx;
-        /* Check only for conflicting, granted locks on the current
-        row. Currently, we don't rollback read only transactions,
-        transactions owned by background threads. */
-        if (trx == hp_trx || next->is_waiting() || trx->read_only ||
-            trx->mysql_thd == nullptr || !lock_has_to_wait(lock, next)) {
-          return true;
-        }
-
-        trx_mutex_enter(trx);
-
-        /* Skip high priority transactions, if already marked for
-        abort by some other transaction or if ASYNC rollback is
-        disabled. A transaction must complete kill/abort of a
-        victim transaction once marked and added to hit list. */
-#ifdef WITH_WSREP
-        if ((trx_is_high_priority(trx) && // !wsrep_thd_is_async_slave(trx->mysql_thd) &&
-             wsrep_thd_order_before(trx->mysql_thd, hp_trx->mysql_thd)) ||
-            (trx->in_innodb & TRX_FORCE_ROLLBACK) != 0 ||
-            (!trx_is_wsrep_trx(trx) &&
-             (trx->in_innodb & TRX_FORCE_ROLLBACK_DISABLE) != 0) || trx->abort) {
-#else
-        if (trx_is_high_priority(trx) ||
-            (trx->in_innodb & TRX_FORCE_ROLLBACK) != 0 ||
-            (trx->in_innodb & TRX_FORCE_ROLLBACK_DISABLE) != 0 || trx->abort) {
-#endif
-          trx_mutex_exit(trx);
-
-#ifdef WITH_WSREP
-              if (wsrep_debug)
-                ib::info() << "hit list skip, BF order before " <<
-                  wsrep_thd_order_before(trx->mysql_thd, hp_trx->mysql_thd) <<
-                  " is BF " << trx_is_high_priority(trx) <<
-                  " is aborted " << trx->abort <<
-                  " innodb rollback " <<  (trx->in_innodb & TRX_FORCE_ROLLBACK);
-#endif /* WITH_WSREP */
-          return true;
-        }
-#ifdef WITH_WSREP
-        if (wsrep_kill_victim(hp_trx, trx)) {
-            if (wsrep_debug)
-                ib::info() << "BF abort skipped for " << trx->id;
-
-            trx_mutex_exit(trx);
-            return true;
-        }
-#endif /* WITH_WSREP */
-
-        /* If the transaction is waiting on some other resource then
-        wake it up with DEAD_LOCK error so that it can rollback. */
-        if (trx->lock.que_state == TRX_QUE_LOCK_WAIT) {
-          /* Assert that it is not waiting for current record. */
-          ut_ad(trx->lock.wait_lock != next);
-#ifdef UNIV_DEBUG
-          ib::info(ER_IB_MSG_639)
-              << "High Priority Transaction (ID): " << lock->trx->id
-              << " waking up blocking"
-              << " transaction (ID): " << trx->id;
-#endif /* UNIV_DEBUG */
-          trx->lock.was_chosen_as_deadlock_victim = true;
-
-          lock_cancel_waiting_and_release(trx->lock.wait_lock);
-||||||| merged common ancestors
-  /* Current implementation of lock_make_trx_hit_list requires latching whole
-  lock_sys for following reasons:
-  1. it may call lock_cancel_waiting_and_release on a lock from completely
-  different shard of lock_sys than hp_trx->lock.wait_lock. Trying to latch
-  this other shard might create a deadlock cycle if it violates ordering of
-  shard latches (and there is 50% chance it will violate it). Moreover the
-  lock_cancel_waiting_and_release() requires an exclusive latch to avoid
-  deadlocks among trx->mutex-es, and trx->lock.wait_lock might be a table lock,
-  in which case exclusive latch is also needed to traverse table locks.
-  2. it may call trx_mutex_enter on a transaction which is waiting for a
-  lock, which violates one of assumptions used in the proof that a deadlock due
-  to acquiring trx->mutex-es is impossible
-  3. it attempts to read hp_trx->lock.wait_lock which might be modified by a
-  thread during B-tree reorganization when moving locks between queues
-  4. it attempts to operate on trx->lock.wait_lock of other transactions */
-  locksys::Global_exclusive_latch_guard guard{UT_LOCATION_HERE};
-
-  /* Check again */
-  const lock_t *lock = hp_trx->lock.wait_lock;
-  if (lock == nullptr || !lock->is_record_lock()) {
-    return;
-  }
-  RecID rec_id{lock, lock_rec_find_set_bit(lock)};
-  Lock_iter::for_each(
-      rec_id,
-      [&](lock_t *next) {
-        trx_t *trx = next->trx;
-        /* Check only for conflicting, granted locks on the current
-        row. Currently, we don't rollback read only transactions,
-        transactions owned by background threads. */
-        if (trx == hp_trx || next->is_waiting() || trx->read_only ||
-            trx->mysql_thd == nullptr || !lock_has_to_wait(lock, next)) {
-          return true;
-        }
-
-        trx_mutex_enter(trx);
-
-        /* Skip high priority transactions, if already marked for
-        abort by some other transaction or if ASYNC rollback is
-        disabled. A transaction must complete kill/abort of a
-        victim transaction once marked and added to hit list. */
-        if (trx_is_high_priority(trx) ||
-            (trx->in_innodb & TRX_FORCE_ROLLBACK) != 0 ||
-            (trx->in_innodb & TRX_FORCE_ROLLBACK_DISABLE) != 0 || trx->abort) {
-          trx_mutex_exit(trx);
-
-          return true;
-        }
-
-        /* If the transaction is waiting on some other resource then
-        wake it up with DEAD_LOCK error so that it can rollback. */
-        if (trx->lock.que_state == TRX_QUE_LOCK_WAIT) {
-          /* Assert that it is not waiting for current record. */
-          ut_ad(trx->lock.wait_lock != next);
-#ifdef UNIV_DEBUG
-          ib::info(ER_IB_MSG_639)
-              << "High Priority Transaction (ID): " << lock->trx->id
-              << " waking up blocking"
-              << " transaction (ID): " << trx->id;
-#endif /* UNIV_DEBUG */
-          trx->lock.was_chosen_as_deadlock_victim = true;
-
-          lock_cancel_waiting_and_release(trx->lock.wait_lock);
-=======
           trx_mutex_enter(trx);
 
           /* Skip high priority transactions, if already marked for
           abort by some other transaction or if ASYNC rollback is
           disabled. A transaction must complete kill/abort of a
           victim transaction once marked and added to hit list. */
+#ifdef WITH_WSREP  // KH: My brain hurts! Is it OK?
+          if ((!trx_is_high_priority(trx) || !wsrep_thd_order_before(trx->mysql_thd, hp_trx->mysql_thd)) &&
+              (trx->in_innodb & TRX_FORCE_ROLLBACK) == 0 &&
+              (trx_is_wsrep_trx(trx) || (trx->in_innodb & TRX_FORCE_ROLLBACK_DISABLE) == 0) &&
+              !trx->abort) {
+            if (wsrep_kill_victim(hp_trx, trx)) {
+                if (wsrep_debug)
+                    ib::info() << "BF abort skipped for " << trx->id;
+
+                trx_mutex_exit(trx);
+                return true;
+            }
+#else
           if (!trx_is_high_priority(trx) &&
               (trx->in_innodb & TRX_FORCE_ROLLBACK) == 0 &&
               (trx->in_innodb & TRX_FORCE_ROLLBACK_DISABLE) == 0 &&
               !trx->abort) {
+#endif
             /* Mark for ASYNC Rollback and add to hit list. */
             lock_mark_trx_for_rollback(hit_list, hp_trx_id, trx);
           }
->>>>>>> tag/Percona-Server-8.0.30-22
+#ifdef WITH_WSREP
+          else if (wsrep_debug) {
+            ib::info() << "hit list skip, BF order before " <<
+              wsrep_thd_order_before(trx->mysql_thd, hp_trx->mysql_thd) <<
+              " is BF " << trx_is_high_priority(trx) <<
+              " is aborted " << trx->abort <<
+              " innodb rollback " <<  (trx->in_innodb & TRX_FORCE_ROLLBACK);
+          }
+#endif /* WITH_WSREP */
 
           trx_mutex_exit(trx);
           return true;
@@ -3938,7 +3702,7 @@ static inline lock_t *lock_table_create(
       lock_grant, which wants to grant trx mutex again */
       /* caller has trx_mutex, have to release for lock cancel */
       trx_mutex_exit(trx);
-      lock_cancel_waiting_and_release(c_lock->trx->lock.wait_lock);
+      lock_cancel_waiting_and_release(c_lock->trx);
       trx_mutex_enter(trx);
 
       /* trx might not wait for c_lock, but some other lock
@@ -5973,24 +5737,16 @@ dberr_t lock_rec_insert_check_and_lock(
 
       const ulint type_mode = LOCK_X | LOCK_GAP | LOCK_INSERT_INTENTION;
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
-  if (wsrep_log_conflicts) mutex_enter(&trx_sys->mutex);
+      if (wsrep_log_conflicts) mutex_enter(&trx_sys->mutex);
 #endif /* WITH_WSREP */
 
-  const lock_t *wait_for =
-      lock_rec_other_has_conflicting(type_mode, block, heap_no, trx);
-
-#ifdef WITH_WSREP
-  if (wsrep_log_conflicts) mutex_exit(&trx_sys->mutex);
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-      const lock_t *wait_for =
-          lock_rec_other_has_conflicting(type_mode, block, heap_no, trx);
-=======
       const auto conflicting =
           lock_rec_other_has_conflicting(type_mode, block, heap_no, trx);
->>>>>>> tag/Percona-Server-8.0.30-22
+
+#ifdef WITH_WSREP
+      if (wsrep_log_conflicts) mutex_exit(&trx_sys->mutex);
+#endif /* WITH_WSREP */
 
       /* LOCK_INSERT_INTENTION locks can not be allowed to bypass waiting locks,
       because they allow insertion of a record which splits the gap which would

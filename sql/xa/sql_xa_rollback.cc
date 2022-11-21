@@ -32,6 +32,10 @@
 #include "sql/transaction.h"  // trans_reset_one_shot_chistics, trans_track_end_trx
 #include "sql/transaction_info.h"  // Transaction_ctx
 
+#ifdef WITH_WSREP
+#include "sql/wsrep_mysqld.h"  // WSREP_DEBUG
+#endif
+
 Sql_cmd_xa_rollback::Sql_cmd_xa_rollback(xid_t *xid_arg)
     : Sql_cmd_xa_second_phase{xid_arg} {}
 
@@ -44,6 +48,9 @@ bool Sql_cmd_xa_rollback::execute(THD *thd) {
 
   if (!st) {
     thd->mdl_context.release_transactional_locks();
+#ifdef WITH_WSREP
+    WSREP_DEBUG("XA rollback failed, MDL released: %u", thd->thread_id());
+#endif /* WITH_WSREP */
     /*
       We've just done a rollback, reset transaction
       isolation level and access mode to the session default.

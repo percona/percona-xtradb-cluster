@@ -3798,6 +3798,10 @@ int wsrep_signal_replicator(trx_t *victim_trx, trx_t *bf_trx) {
     victim_trx->lock.was_chosen_as_wsrep_victim = true;
   }
   wsrep_thd_UNLOCK(thd);
+// KH: TODO: we should have it wrapped with
+// trx_mutex_enter(chosen_victim);
+// trx_mutex_exit(chosen_victim);
+// like in static void lock_wait_rollback_deadlock_victim(trx_t *chosen_victim)
 
   if (wsrep_thd_bf_abort(bf_thd, thd, true)) {
     if (victim_trx->lock.wait_lock) {
@@ -3807,7 +3811,7 @@ int wsrep_signal_replicator(trx_t *victim_trx, trx_t *bf_trx) {
       if (wait_lock) {
         WSREP_DEBUG("canceling wait lock");
         victim_trx->lock.was_chosen_as_deadlock_victim = true;
-        lock_cancel_waiting_and_release(wait_lock);
+        lock_cancel_waiting_and_release(victim_trx);
       }
     }
   }

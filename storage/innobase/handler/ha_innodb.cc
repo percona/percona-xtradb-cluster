@@ -200,7 +200,6 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "sql-common/json_binary.h"
 #include "sql-common/json_dom.h"
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 #include "my_md5.h"
 #include "tc_log.h"
@@ -216,11 +215,6 @@ extern bool wsrep_prepare_key_for_innodb(const uchar *cache_key,
                                          wsrep_buf_t *key, size_t *key_len);
 #endif /* WITH_WSREP */
 
-#include "log0log.h"
-||||||| merged common ancestors
-#include "log0log.h"
-=======
->>>>>>> tag/Percona-Server-8.0.30-22
 #include "os0enc.h"
 #include "os0file.h"
 
@@ -5817,29 +5811,15 @@ static int innodb_init(void *p) {
   innobase_hton->unlock_hton_log = innobase_unlock_hton_log;
   innobase_hton->collect_hton_log_info = innobase_collect_hton_log_info;
   innobase_hton->fill_is_table = innobase_fill_i_s_table;
-<<<<<<< HEAD
-  innobase_hton->flags =
-      HTON_SUPPORTS_EXTENDED_KEYS | HTON_SUPPORTS_FOREIGN_KEYS |
-      HTON_SUPPORTS_ATOMIC_DDL | HTON_CAN_RECREATE |
-      HTON_SUPPORTS_SECONDARY_ENGINE | HTON_SUPPORTS_TABLE_ENCRYPTION |
-      HTON_SUPPORTS_ONLINE_BACKUPS | HTON_SUPPORTS_COMPRESSED_COLUMNS;
-#ifdef WITH_WSREP
-  innobase_hton->flags |= HTON_WSREP_REPLICATION;
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-  innobase_hton->flags =
-      HTON_SUPPORTS_EXTENDED_KEYS | HTON_SUPPORTS_FOREIGN_KEYS |
-      HTON_SUPPORTS_ATOMIC_DDL | HTON_CAN_RECREATE |
-      HTON_SUPPORTS_SECONDARY_ENGINE | HTON_SUPPORTS_TABLE_ENCRYPTION |
-      HTON_SUPPORTS_ONLINE_BACKUPS | HTON_SUPPORTS_COMPRESSED_COLUMNS;
-=======
   innobase_hton->flags = HTON_SUPPORTS_EXTENDED_KEYS |
                          HTON_SUPPORTS_FOREIGN_KEYS | HTON_SUPPORTS_ATOMIC_DDL |
                          HTON_CAN_RECREATE | HTON_SUPPORTS_SECONDARY_ENGINE |
                          HTON_SUPPORTS_TABLE_ENCRYPTION |
                          HTON_SUPPORTS_ONLINE_BACKUPS | HTON_SUPPORTS_COMPRESSED_COLUMNS |
                          HTON_SUPPORTS_GENERATED_INVISIBLE_PK;
->>>>>>> tag/Percona-Server-8.0.30-22
+#ifdef WITH_WSREP
+  innobase_hton->flags |= HTON_WSREP_REPLICATION;
+#endif /* WITH_WSREP */
 
   innobase_hton->replace_native_transaction_in_thd = innodb_replace_trx_in_thd;
   innobase_hton->file_extensions = ha_innobase_exts;

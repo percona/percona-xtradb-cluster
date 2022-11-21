@@ -1388,228 +1388,6 @@ void trans_register_ha(THD *thd, bool all, handlerton *ht_arg,
 #endif
 }
 
-<<<<<<< HEAD
-/** XA Prepare one SE.
-@param[in]	thd	Session THD
-@param[in]	ht	SE handlerton
-@return 0 for success, 1 for error - entire transaction is rolled back. */
-static int prepare_one_ht(THD *thd, handlerton *ht) {
-  DBUG_TRACE;
-  assert(!thd->status_var_aggregated);
-  thd->status_var.ha_prepare_count++;
-  if (ht->prepare) {
-    DBUG_EXECUTE_IF("simulate_xa_failure_prepare", {
-      ha_rollback_trans(thd, true);
-      return 1;
-    });
-    if (ht->prepare(ht, thd, true)) {
-      ha_rollback_trans(thd, true);
-      return 1;
-    }
-  } else {
-    push_warning_printf(thd, Sql_condition::SL_WARNING, ER_ILLEGAL_HA,
-                        ER_THD(thd, ER_ILLEGAL_HA),
-                        ha_resolve_storage_engine_name(ht));
-  }
-  return 0;
-}
-
-/**
-  @retval
-    0   ok
-  @retval
-    1   error, transaction was rolled back
-*/
-int ha_xa_prepare(THD *thd) {
-  int error = 0;
-  Transaction_ctx *trn_ctx = thd->get_transaction();
-  DBUG_TRACE;
-
-  if (trn_ctx->is_active(Transaction_ctx::SESSION)) {
-    const Ha_trx_info *ha_info = trn_ctx->ha_trx_info(Transaction_ctx::SESSION);
-    bool gtid_error = false;
-    bool need_clear_owned_gtid = false;
-    std::tie(gtid_error, need_clear_owned_gtid) = commit_owned_gtids(thd, true);
-    if (gtid_error) {
-      assert(need_clear_owned_gtid);
-
-      ha_rollback_trans(thd, true);
-      error = 1;
-      goto err;
-    }
-
-    /*
-      Ensure externalization order for applier threads.
-
-      Note: the calls to Commit_order_manager::wait/wait_and_finish() will be
-            no-op for threads other than replication applier threads.
-    */
-    if (Commit_order_manager::wait(thd)) {
-      thd->commit_error = THD::CE_NONE;
-      ha_rollback_trans(thd, true);
-      error = 1;
-      gtid_error = true;
-      goto err;
-    }
-
-    /* Allow GTID to be read by SE for XA prepare. */
-    {
-      Clone_handler::XA_Operation xa_guard(thd);
-
-      /* Prepare binlog SE first, if there. */
-      while (ha_info != nullptr && error == 0) {
-        auto ht = ha_info->ht();
-        if (ht->db_type == DB_TYPE_BINLOG) {
-          error = prepare_one_ht(thd, ht);
-          break;
-        }
-        ha_info = ha_info->next();
-      }
-      /* Prepare all SE other than binlog. */
-      ha_info = trn_ctx->ha_trx_info(Transaction_ctx::SESSION);
-      while (ha_info != nullptr && error == 0) {
-#ifdef PXC
-        /* ha_prepare is called for XA transaction. It is disabled for wsrep */
-        assert(ht->db_type != DB_TYPE_WSREP);
-#endif /* PXC */
-        auto ht = ha_info->ht();
-        error = prepare_one_ht(thd, ht);
-        if (error != 0) {
-          break;
-        }
-        ha_info = ha_info->next();
-      }
-    }
-
-    assert(error != 0 ||
-           thd->get_transaction()->xid_state()->has_state(XID_STATE::XA_IDLE));
-
-  err:
-    /*
-      After ensuring externalization order for applier thread, remove it
-      from waiting (Commit Order Queue) and allow next applier thread to
-      be ordered.
-
-      Note: the calls to Commit_order_manager::wait_and_finish() will be
-            no-op for threads other than replication applier threads.
-    */
-    Commit_order_manager::wait_and_finish(thd, error);
-    gtid_state_commit_or_rollback(thd, need_clear_owned_gtid, !gtid_error);
-  }
-
-  return error;
-}
-
-||||||| merged common ancestors
-/** XA Prepare one SE.
-@param[in]	thd	Session THD
-@param[in]	ht	SE handlerton
-@return 0 for success, 1 for error - entire transaction is rolled back. */
-static int prepare_one_ht(THD *thd, handlerton *ht) {
-  DBUG_TRACE;
-  assert(!thd->status_var_aggregated);
-  thd->status_var.ha_prepare_count++;
-  if (ht->prepare) {
-    DBUG_EXECUTE_IF("simulate_xa_failure_prepare", {
-      ha_rollback_trans(thd, true);
-      return 1;
-    });
-    if (ht->prepare(ht, thd, true)) {
-      ha_rollback_trans(thd, true);
-      return 1;
-    }
-  } else {
-    push_warning_printf(thd, Sql_condition::SL_WARNING, ER_ILLEGAL_HA,
-                        ER_THD(thd, ER_ILLEGAL_HA),
-                        ha_resolve_storage_engine_name(ht));
-  }
-  return 0;
-}
-
-/**
-  @retval
-    0   ok
-  @retval
-    1   error, transaction was rolled back
-*/
-int ha_xa_prepare(THD *thd) {
-  int error = 0;
-  Transaction_ctx *trn_ctx = thd->get_transaction();
-  DBUG_TRACE;
-
-  if (trn_ctx->is_active(Transaction_ctx::SESSION)) {
-    const Ha_trx_info *ha_info = trn_ctx->ha_trx_info(Transaction_ctx::SESSION);
-    bool gtid_error = false;
-    bool need_clear_owned_gtid = false;
-    std::tie(gtid_error, need_clear_owned_gtid) = commit_owned_gtids(thd, true);
-    if (gtid_error) {
-      assert(need_clear_owned_gtid);
-
-      ha_rollback_trans(thd, true);
-      error = 1;
-      goto err;
-    }
-
-    /*
-      Ensure externalization order for applier threads.
-
-      Note: the calls to Commit_order_manager::wait/wait_and_finish() will be
-            no-op for threads other than replication applier threads.
-    */
-    if (Commit_order_manager::wait(thd)) {
-      thd->commit_error = THD::CE_NONE;
-      ha_rollback_trans(thd, true);
-      error = 1;
-      gtid_error = true;
-      goto err;
-    }
-
-    /* Allow GTID to be read by SE for XA prepare. */
-    {
-      Clone_handler::XA_Operation xa_guard(thd);
-
-      /* Prepare binlog SE first, if there. */
-      while (ha_info != nullptr && error == 0) {
-        auto ht = ha_info->ht();
-        if (ht->db_type == DB_TYPE_BINLOG) {
-          error = prepare_one_ht(thd, ht);
-          break;
-        }
-        ha_info = ha_info->next();
-      }
-      /* Prepare all SE other than binlog. */
-      ha_info = trn_ctx->ha_trx_info(Transaction_ctx::SESSION);
-      while (ha_info != nullptr && error == 0) {
-        auto ht = ha_info->ht();
-        error = prepare_one_ht(thd, ht);
-        if (error != 0) {
-          break;
-        }
-        ha_info = ha_info->next();
-      }
-    }
-
-    assert(error != 0 ||
-           thd->get_transaction()->xid_state()->has_state(XID_STATE::XA_IDLE));
-
-  err:
-    /*
-      After ensuring externalization order for applier thread, remove it
-      from waiting (Commit Order Queue) and allow next applier thread to
-      be ordered.
-
-      Note: the calls to Commit_order_manager::wait_and_finish() will be
-            no-op for threads other than replication applier threads.
-    */
-    Commit_order_manager::wait_and_finish(thd, error);
-    gtid_state_commit_or_rollback(thd, need_clear_owned_gtid, !gtid_error);
-  }
-
-  return error;
-}
-
-=======
->>>>>>> tag/Percona-Server-8.0.30-22
 /**
   Check if we can skip the two-phase commit.
 
@@ -2095,7 +1873,6 @@ int ha_commit_low(THD *thd, bool all, bool run_after_commit) {
 
   DBUG_TRACE;
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (thd->run_wsrep_commit_hooks && wsrep_before_commit(thd, all)) {
     thd->run_wsrep_commit_hooks = false;
@@ -2103,12 +1880,7 @@ int ha_commit_low(THD *thd, bool all, bool run_after_commit) {
   }
 #endif /* WITH_WSREP */
 
-  if (ha_info) {
-||||||| merged common ancestors
-  if (ha_info) {
-=======
   if (ha_list) {
->>>>>>> tag/Percona-Server-8.0.30-22
     bool restore_backup_ha_data = false;
     /*
       At execution of XA COMMIT ONE PHASE binlog or slave applier
@@ -2246,17 +2018,11 @@ int ha_rollback_low(THD *thd, bool all) {
 
   (void)RUN_HOOK(transaction, before_rollback, (thd, all));
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   (void)wsrep_before_rollback(thd, all);
 #endif /* WITH_WSREP */
 
-  if (ha_info) {
-||||||| merged common ancestors
-  if (ha_info) {
-=======
   if (ha_list) {
->>>>>>> tag/Percona-Server-8.0.30-22
     bool restore_backup_ha_data = false;
     /*
       Similarly to the commit case, the binlog or slave applier
@@ -2562,8 +2328,7 @@ int ha_rollback_to_savepoint(THD *thd, SAVEPOINT *sv) {
   ha_list = trn_ctx->ha_trx_info(trx_scope);
   for (auto ha_info = ha_list.begin(); ha_info != sv->ha_list; ++ha_info) {
     int err;
-<<<<<<< HEAD
-    handlerton *ht = ha_info->ht();
+    auto *ht = ha_info->ht();
 
 #ifdef WITH_WSREP
     if (WSREP(thd) && (ht->flags & HTON_WSREP_REPLICATION)) {
@@ -2574,11 +2339,6 @@ int ha_rollback_to_savepoint(THD *thd, SAVEPOINT *sv) {
     }
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-    handlerton *ht = ha_info->ht();
-=======
-    auto ht = ha_info->ht();
->>>>>>> tag/Percona-Server-8.0.30-22
     if ((err = ht->rollback(ht, thd, !thd->in_sub_stmt))) {  // cannot happen
       char errbuf[MYSQL_ERRMSG_SIZE];
       my_error(ER_ERROR_DURING_ROLLBACK, MYF(0), err,
@@ -2617,24 +2377,21 @@ int ha_prepare_low(THD *thd, bool all) {
   int error = 0;
   Transaction_ctx::enum_trx_scope trx_scope =
       all ? Transaction_ctx::SESSION : Transaction_ctx::STMT;
-<<<<<<< HEAD
-  Ha_trx_info *ha_info = thd->get_transaction()->ha_trx_info(trx_scope);
+  auto ha_list = thd->get_transaction()->ha_trx_info(trx_scope);
 
-  DBUG_TRACE;
+  if (ha_list) {
+    for (auto const &ha_info : ha_list) {
+      if (!ha_info.is_trx_read_write() &&  // Do not call two-phase commit if
+                                           // transaction is read-only
+          !thd_holds_xa_transaction(thd))  // but only if is not an XA
+                                           // transaction
+        continue;
 
-  if (ha_info) {
-    for (; ha_info && !error; ha_info = ha_info->next()) {
-      int err = 0;
-      handlerton *ht = ha_info->ht();
-      /*
-        Do not call two-phase commit if this particular
-        transaction is read-only. This allows for simpler
-        implementation in engines that are always read-only.
-      */
-      if (!ha_info->is_trx_read_write()) continue;
+      auto ht = ha_info.ht();
 
 #ifdef WITH_WSREP
       const bool run_wsrep_hooks = wsrep_run_commit_hook(thd, all);
+      int err;
 
       if (run_wsrep_hooks && (ht->flags & HTON_WSREP_REPLICATION) &&
           (err = wsrep_before_prepare(thd, all))) {
@@ -2664,42 +2421,7 @@ int ha_prepare_low(THD *thd, bool all) {
       /* core-prepare logic is no more affected by the pxc error.
       pxc replication and certification is now take care above as part of
       wsrep_before_prepare. */
-      if ((err = ht->prepare(ht, thd, all))) {
-        char errbuf[MYSQL_ERRMSG_SIZE];
-        my_error(ER_ERROR_DURING_COMMIT, MYF(0), err,
-                 my_strerror(errbuf, MYSQL_ERRMSG_SIZE, err));
-||||||| merged common ancestors
-  Ha_trx_info *ha_info = thd->get_transaction()->ha_trx_info(trx_scope);
-
-  DBUG_TRACE;
-
-  if (ha_info) {
-    for (; ha_info && !error; ha_info = ha_info->next()) {
-      int err = 0;
-      handlerton *ht = ha_info->ht();
-      /*
-        Do not call two-phase commit if this particular
-        transaction is read-only. This allows for simpler
-        implementation in engines that are always read-only.
-      */
-      if (!ha_info->is_trx_read_write()) continue;
-      if ((err = ht->prepare(ht, thd, all))) {
-        char errbuf[MYSQL_ERRMSG_SIZE];
-        my_error(ER_ERROR_DURING_COMMIT, MYF(0), err,
-                 my_strerror(errbuf, MYSQL_ERRMSG_SIZE, err));
-=======
-  auto ha_list = thd->get_transaction()->ha_trx_info(trx_scope);
-
-  if (ha_list) {
-    for (auto const &ha_info : ha_list) {
-      if (!ha_info.is_trx_read_write() &&  // Do not call two-phase commit if
-                                           // transaction is read-only
-          !thd_holds_xa_transaction(thd))  // but only if is not an XA
-                                           // transaction
-        continue;
-
-      auto ht = ha_info.ht();
-      int err = ht->prepare(ht, thd, all);
+      err = ht->prepare(ht, thd, all);
       if (err) {
         if (!thd_holds_xa_transaction(
                 thd)) {  // If XA PREPARE, let error be handled by caller
@@ -2707,7 +2429,6 @@ int ha_prepare_low(THD *thd, bool all) {
           my_error(ER_ERROR_DURING_COMMIT, MYF(0), err,
                    my_strerror(errbuf, MYSQL_ERRMSG_SIZE, err));
         }
->>>>>>> tag/Percona-Server-8.0.30-22
         error = 1;
       }
 
@@ -2722,10 +2443,14 @@ int ha_prepare_low(THD *thd, bool all) {
         error = 1;
       }
 #else
-      if ((err = ht->prepare(ht, thd, all))) {
-        char errbuf[MYSQL_ERRMSG_SIZE];
-        my_error(ER_ERROR_DURING_COMMIT, MYF(0), err,
-                 my_strerror(errbuf, MYSQL_ERRMSG_SIZE, err));
+      int err = ht->prepare(ht, thd, all);
+      if (err) {
+        if (!thd_holds_xa_transaction(
+                thd)) {  // If XA PREPARE, let error be handled by caller
+          char errbuf[MYSQL_ERRMSG_SIZE];
+          my_error(ER_ERROR_DURING_COMMIT, MYF(0), err,
+                   my_strerror(errbuf, MYSQL_ERRMSG_SIZE, err));
+        }
         error = 1;
       }
 #endif /* WITH_WSREP */

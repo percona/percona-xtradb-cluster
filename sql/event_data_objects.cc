@@ -1083,19 +1083,11 @@ bool Event_job_data::execute(THD *thd, bool drop) {
     goto end;
   }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (wsrep_is_bf_aborted(thd)) {
     goto end;
   }
 #endif
-  if (construct_sp_sql(thd, &sp_sql)) goto end;
-
-||||||| merged common ancestors
-  if (construct_sp_sql(thd, &sp_sql)) goto end;
-
-=======
->>>>>>> tag/Percona-Server-8.0.30-22
   /*
     Set up global thread attributes to reflect the properties of
     this Event. We can simply reset these instead of usual
