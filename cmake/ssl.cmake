@@ -28,17 +28,10 @@
 #   or
 #     - cmake -DWITH_SSL=</path/to/custom/openssl>
 #
-<<<<<<< HEAD
-# The default value for WITH_SSL is "system"
-# set in cmake/build_configurations/feature_set.cmake
-||||||| merged common ancestors
-# The default value for WITH_SSL is "system".
-=======
 # - openssl11 which is an alternative system SSL package on el7.
 #   The RPM package openssl11-devel must be installed.
 #
 # The default value for WITH_SSL is "system".
->>>>>>> tag/Percona-Server-8.0.30-22
 #
 # WITH_SSL="system" means: use the SSL library that comes with the operating
 # system. This typically means you have to do 'yum install openssl-devel'

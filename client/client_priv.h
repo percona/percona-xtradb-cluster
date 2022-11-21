@@ -190,14 +190,10 @@ enum options_client {
   OPT_MYSQLDUMP_INCLUDE_MASTER_HOST_PORT_DEPRECATED,
   OPT_SSL_SESSION_DATA,
   OPT_SSL_SESSION_DATA_CONTINUE_ON_FAILED_REUSE,
-<<<<<<< HEAD
+  OPT_LONG_QUERY_TIME,
 #ifdef WITH_WSREP
   OPT_USE_SET_PASSWORD,
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-=======
-  OPT_LONG_QUERY_TIME,
->>>>>>> tag/Percona-Server-8.0.30-22
   /* Add new option above this */
   OPT_MAX_CLIENT_OPTION
 };

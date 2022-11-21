@@ -1,10 +1,4 @@
-<<<<<<< HEAD
-# Copyright (c) 2006, 2020, Oracle and/or its affiliates.
-||||||| merged common ancestors
-# Copyright (c) 2006, 2021, Oracle and/or its affiliates.
-=======
 # Copyright (c) 2006, 2022, Oracle and/or its affiliates.
->>>>>>> tag/Percona-Server-8.0.30-22
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
