@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 -- Copyright (c) 2014, 2020, Oracle and/or its affiliates.
+||||||| merged common ancestors
+-- Copyright (c) 2014, 2021, Oracle and/or its affiliates.
+=======
+-- Copyright (c) 2014, 2022, Oracle and/or its affiliates.
+>>>>>>> tag/Percona-Server-8.0.30-22
 --
 -- This program is free software; you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -30,3 +36,7 @@ VALUES ('mysql.sys','localhost','SYSTEM_USER','N');
 -- GRANT AUDIT_ABORT_EXEMPT ON *.* TO 'mysql.sys'@localhost
 INSERT IGNORE INTO mysql.global_grants (USER,HOST,PRIV,WITH_GRANT_OPTION)
 VALUES ('mysql.sys','localhost','AUDIT_ABORT_EXEMPT','N');
+
+-- GRANT FIREWALL_EXEMPT ON *.* TO 'mysql.sys'@localhost
+INSERT IGNORE INTO mysql.global_grants (USER,HOST,PRIV,WITH_GRANT_OPTION)
+VALUES ('mysql.sys','localhost','FIREWALL_EXEMPT','N');

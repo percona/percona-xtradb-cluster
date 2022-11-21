@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 -- Copyright (C) 2007 MySQL AB
+||||||| merged common ancestors
+-- Copyright (c) 2007, 2021, Oracle and/or its affiliates.
+=======
+-- Copyright (c) 2007, 2022, Oracle and/or its affiliates.
+>>>>>>> tag/Percona-Server-8.0.30-22
 -- Use is subject to license terms
 -- 
 -- This program is free software; you can redistribute it and/or modify

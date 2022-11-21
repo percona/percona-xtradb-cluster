@@ -1,4 +1,13 @@
 MYSQL_VERSION_MAJOR=8
 MYSQL_VERSION_MINOR=0
+<<<<<<< HEAD
 MYSQL_VERSION_PATCH=29
 MYSQL_VERSION_EXTRA=-21
+||||||| merged common ancestors
+MYSQL_VERSION_PATCH=29
+MYSQL_VERSION_EXTRA=-21
+>>>>>>>>> Temporary merge branch 2
+=======
+MYSQL_VERSION_PATCH=30
+MYSQL_VERSION_EXTRA=-22
+>>>>>>> tag/Percona-Server-8.0.30-22
