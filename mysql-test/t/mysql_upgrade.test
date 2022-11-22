@@ -140,6 +140,9 @@ SHOW GRANTS for u34068378;
 # remove SENSITIVE_VARIABLES_OBSERVER from root
 REVOKE SENSITIVE_VARIABLES_OBSERVER ON *.* FROM root@localhost;
 
+# remove SENSITIVE_VARIABLES_OBSERVER from mysql.pxc.internal.session
+REVOKE SENSITIVE_VARIABLES_OBSERVER ON *.* FROM 'mysql.pxc.internal.session'@localhost;
+
 --let $restart_parameters = restart:--upgrade=FORCE
 --let $wait_counter= 10000
 --source include/restart_mysqld.inc
@@ -147,6 +150,7 @@ REVOKE SENSITIVE_VARIABLES_OBSERVER ON *.* FROM root@localhost;
 --echo # Must have SENSITIVE_VARIABLES_OBSERVER privilege
 SHOW GRANTS for u34068378;
 SHOW GRANTS for root@localhost;
+SHOW GRANTS for 'mysql.pxc.internal.session'@localhost;
 
 # cleanup
 DROP USER u34068378;

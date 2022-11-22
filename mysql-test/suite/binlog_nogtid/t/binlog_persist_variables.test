@@ -73,13 +73,7 @@ INSERT INTO rplvars (varname, varvalue)
 # 9. wsrep_replicate_myisam
 
 --echo
-<<<<<<< HEAD
---let $expected = 127
-||||||| merged common ancestors
---let $expected = 118
-=======
---let $expected = 119
->>>>>>> tag/Percona-Server-8.0.30-22
+--let $expected = 128
 --let $assert_text = Expect $expected variables in the table.
 --let $assert_cond = [SELECT COUNT(*) as count FROM rplvars, count, 1] = $expected
 --source include/assert.inc

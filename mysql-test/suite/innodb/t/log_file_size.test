@@ -14,19 +14,6 @@ let args=--console --log-error-verbosity=3 > $SEARCH_FILE 2>&1;
 
 let MYSQLD_REDODIR = $MYSQLD_DATADIR/#innodb_redo;
 
-<<<<<<< HEAD
---error 1,42
---exec $MYSQLD_CMD $args --innodb-read-only
-let SEARCH_PATTERN= Can.t initiate database recovery, running in read-only-mode;
---source include/search_pattern.inc
---remove_file $SEARCH_FILE
-||||||| merged common ancestors
---error 1
---exec $MYSQLD_CMD $args --innodb-read-only
-let SEARCH_PATTERN= Can.t initiate database recovery, running in read-only-mode;
---source include/search_pattern.inc
---remove_file $SEARCH_FILE
-=======
 perl;
 foreach (0, 1, 64*1024-1, 64*1024+1) {
     my $expected_file_size = $_;
@@ -39,27 +26,16 @@ foreach (0, 1, 64*1024-1, 64*1024+1) {
     print "Prepared a file with size = $actual_file_size bytes\n";
 }
 EOF
->>>>>>> tag/Percona-Server-8.0.30-22
 
 --echo #
 --echo # Create #ib_redo0 as empty file and start MySQL.
 --echo # We should detect that #ib_redo0 is empty.
 --echo #
 
-<<<<<<< HEAD
---error 1,42
---exec $MYSQLD_CMD $args --innodb-read-only
-let SEARCH_PATTERN= Can.t initiate database recovery, running in read-only-mode;
-||||||| merged common ancestors
---error 1
---exec $MYSQLD_CMD $args --innodb-read-only
-let SEARCH_PATTERN= Can.t initiate database recovery, running in read-only-mode;
-=======
 --move_file $MYSQLD_REDODIR/#ib_redo_prepared_0 $MYSQLD_REDODIR/#ib_redo0
 --error 1,42
 --exec $MYSQLD_CMD $args
 let SEARCH_PATTERN= redo log file .*#ib_redo0 is empty;
->>>>>>> tag/Percona-Server-8.0.30-22
 --source include/search_pattern.inc
 --remove_file $SEARCH_FILE
 --remove_file $MYSQLD_REDODIR/#ib_redo0
@@ -69,20 +45,10 @@ let SEARCH_PATTERN= redo log file .*#ib_redo0 is empty;
 --echo # We should detect that #ib_redo0 is too small.
 --echo #
 
-<<<<<<< HEAD
---error 1,42
---exec $MYSQLD_CMD $args --innodb-read-only
-let SEARCH_PATTERN= Cannot create log files in read-only mode;
-||||||| merged common ancestors
---error 1
---exec $MYSQLD_CMD $args --innodb-read-only
-let SEARCH_PATTERN= Cannot create log files in read-only mode;
-=======
 --move_file $MYSQLD_REDODIR/#ib_redo_prepared_1 $MYSQLD_REDODIR/#ib_redo0
 --error 1,42
 --exec $MYSQLD_CMD $args
 let SEARCH_PATTERN= redo log file .*#ib_redo0 is smaller than 65536 bytes;
->>>>>>> tag/Percona-Server-8.0.30-22
 --source include/search_pattern.inc
 --remove_file $SEARCH_FILE
 --remove_file $MYSQLD_REDODIR/#ib_redo0
@@ -92,43 +58,14 @@ let SEARCH_PATTERN= redo log file .*#ib_redo0 is smaller than 65536 bytes;
 --echo # We should detect that #ib_redo0 is too small.
 --echo #
 
-<<<<<<< HEAD
-# We should have perfectly synced files here.
-# Rename the log files, and trigger an error in recovery.
---move_file $MYSQLD_DATADIR/ib_logfile101 $MYSQLD_DATADIR/ib_logfile0
---move_file $MYSQLD_DATADIR/ib_logfile1 $MYSQLD_DATADIR/ib_logfile1_hidden
---error 1,42
-||||||| merged common ancestors
-# We should have perfectly synced files here.
-# Rename the log files, and trigger an error in recovery.
---move_file $MYSQLD_DATADIR/ib_logfile101 $MYSQLD_DATADIR/ib_logfile0
---move_file $MYSQLD_DATADIR/ib_logfile1 $MYSQLD_DATADIR/ib_logfile1_hidden
---error 1
-=======
 --move_file $MYSQLD_REDODIR/#ib_redo_prepared_65535 $MYSQLD_REDODIR/#ib_redo0
 --error 1,42
->>>>>>> tag/Percona-Server-8.0.30-22
 --exec $MYSQLD_CMD $args
 let SEARCH_PATTERN= redo log file .*#ib_redo0 is smaller than 65536 bytes;
 --source include/search_pattern.inc
 --remove_file $SEARCH_FILE
 --remove_file $MYSQLD_REDODIR/#ib_redo0
 
-<<<<<<< HEAD
-perl;
-die unless open(FILE, ">$ENV{MYSQLD_DATADIR}/ib_logfile0");
-print FILE "garbage";
-close(FILE);
-EOF
---error 1,42
-||||||| merged common ancestors
-perl;
-die unless open(FILE, ">$ENV{MYSQLD_DATADIR}/ib_logfile0");
-print FILE "garbage";
-close(FILE);
-EOF
---error 1
-=======
 --echo #
 --echo # Create #ib_redo0 with 64kB+1 bytes inside and start MySQL.
 --echo # We should detect that #ib_redo0's size is not divisible by page size.
@@ -136,7 +73,6 @@ EOF
 
 --move_file $MYSQLD_REDODIR/#ib_redo_prepared_65537 $MYSQLD_REDODIR/#ib_redo0
 --error 1,42
->>>>>>> tag/Percona-Server-8.0.30-22
 --exec $MYSQLD_CMD $args
 let SEARCH_PATTERN= .*#ib_redo0 size 65537 is not a multiple of innodb_page_size;
 --source include/search_pattern.inc
@@ -145,47 +81,9 @@ let SEARCH_PATTERN= .*#ib_redo0 size 65537 is not a multiple of innodb_page_size
 
 --echo
 
-<<<<<<< HEAD
---error 1,42
---exec $MYSQLD_CMD $args
-let SEARCH_PATTERN= Log file .*ib_logfile1 is of different size 1048576 bytes than other log files;
---source include/search_pattern.inc
---remove_file $SEARCH_FILE
---remove_file $MYSQLD_DATADIR/ib_logfile1
---move_file $MYSQLD_DATADIR/ib_logfile0 $MYSQLD_DATADIR/ib_logfile101
---move_file $MYSQLD_DATADIR/ib_logfile1_hidden $MYSQLD_DATADIR/ib_logfile1
-
---echo --innodb-force-recovery-crash=10
---error 137,3
---exec $MYSQLD_CMD $crash=10 --log-error-verbosity=3
-let SEARCH_PATTERN= Creating log file .*ib_logfile[0-9]+;
---source include/search_pattern.inc
-let SEARCH_PATTERN= Renaming log file .*ib_logfile101 to .*ib_logfile0;
---source include/search_pattern.inc
---remove_file $SEARCH_FILE
-||||||| merged common ancestors
---error 1
---exec $MYSQLD_CMD $args
-let SEARCH_PATTERN= Log file .*ib_logfile1 is of different size 1048576 bytes than other log files;
---source include/search_pattern.inc
---remove_file $SEARCH_FILE
---remove_file $MYSQLD_DATADIR/ib_logfile1
---move_file $MYSQLD_DATADIR/ib_logfile0 $MYSQLD_DATADIR/ib_logfile101
---move_file $MYSQLD_DATADIR/ib_logfile1_hidden $MYSQLD_DATADIR/ib_logfile1
-
---echo --innodb-force-recovery-crash=10
---error 137,3
---exec $MYSQLD_CMD $crash=10 --log-error-verbosity=3
-let SEARCH_PATTERN= Creating log file .*ib_logfile[0-9]+;
---source include/search_pattern.inc
-let SEARCH_PATTERN= Renaming log file .*ib_logfile101 to .*ib_logfile0;
---source include/search_pattern.inc
---remove_file $SEARCH_FILE
-=======
 --echo #
 --echo # Start MySQL afterwards.
 --echo #
->>>>>>> tag/Percona-Server-8.0.30-22
 
 --let $restart_parameters= restart:
 --source include/start_mysqld.inc

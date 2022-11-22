@@ -710,11 +710,11 @@ ALTER SCHEMA S READ ONLY=1;;
 # Verify lock state and let the INSERT continue.
 connection default;
 SELECT object_schema, object_name, lock_type, lock_status
-FROM performance_schema.metadata_locks WHERE object_schema in ('s', 'S');
+FROM performance_schema.metadata_locks WHERE object_schema in ('s', 'S') ORDER BY object_schema, object_name, lock_type, lock_status;
 object_schema	object_name	lock_type	lock_status
-s	t	SHARED_WRITE	GRANTED
 s	NULL	EXCLUSIVE	GRANTED
 s	t	EXCLUSIVE	PENDING
+s	t	SHARED_WRITE	GRANTED
 SET DEBUG_SYNC = 'now SIGNAL continue';
 # Verify that the statements complete. Note deadlock for the insert
 # due to acquiring IX on schema name.
@@ -740,9 +740,9 @@ connection default;
 SELECT object_schema, object_name, lock_type, lock_status
 FROM performance_schema.metadata_locks WHERE object_schema in ('s', 'S');
 object_schema	object_name	lock_type	lock_status
-s	NULL	EXCLUSIVE	GRANTED
 s	t	EXCLUSIVE	GRANTED
 s	t	SHARED_WRITE	PENDING
+s	NULL	EXCLUSIVE	GRANTED
 SET DEBUG_SYNC = 'now SIGNAL continue';
 # Verify that the statements complete.
 connection con1;

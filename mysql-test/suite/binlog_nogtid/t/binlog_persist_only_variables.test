@@ -95,13 +95,7 @@ INSERT INTO aliases(name) VALUES
 # 5. wsrep_replicate_myisam
 # 6. wsrep_restart_replica
 --echo
-<<<<<<< HEAD
---let $expected = 124
-||||||| merged common ancestors
---let $expected = 118
-=======
---let $expected = 119
->>>>>>> tag/Percona-Server-8.0.30-22
+--let $expected = 125
 --let $assert_text = Expect $expected variables in the table.
 --let $assert_cond = [SELECT COUNT(*) as count FROM rplvars, count, 1] = $expected
 --source include/assert.inc

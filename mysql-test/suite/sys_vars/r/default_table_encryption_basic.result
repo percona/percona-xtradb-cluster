@@ -109,46 +109,6 @@ SELECT @@global.default_table_encryption = false;
 1
 Warnings:
 Warning	1292	Truncated incorrect DOUBLE value: 'OFF'
-<<<<<<< HEAD
-SELECT @@session.default_table_encryption;
-@@session.default_table_encryption
-OFF
-SET SESSION default_table_encryption=KEYRING_ON;
-ERROR 42000: Variable 'default_table_encryption' can't be set to the value of 'KEYRING_ON'
-SELECT @@session.default_table_encryption;
-@@session.default_table_encryption
-OFF
-SET SESSION default_table_encryption=ONLINE_TO_KEYRING;
-ERROR 42000: Keyring encryption is not supported in Percona XtraDB Cluster.
-SELECT @@session.default_table_encryption;
-@@session.default_table_encryption
-OFF
-SET SESSION default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
-ERROR 42000: Keyring encryption is not supported in Percona XtraDB Cluster.
-SELECT @@session.default_table_encryption;
-@@session.default_table_encryption
-OFF
-||||||| merged common ancestors
-SELECT @@session.default_table_encryption;
-@@session.default_table_encryption
-OFF
-SET SESSION default_table_encryption=KEYRING_ON;
-ERROR 42000: Variable 'default_table_encryption' can't be set to the value of 'KEYRING_ON'
-SELECT @@session.default_table_encryption;
-@@session.default_table_encryption
-OFF
-SET SESSION default_table_encryption=ONLINE_TO_KEYRING;
-ERROR HY000: The default_table_encryption option cannot be changed, keyring plugin is not available
-SELECT @@session.default_table_encryption;
-@@session.default_table_encryption
-OFF
-SET SESSION default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
-ERROR HY000: The default_table_encryption option cannot be changed, keyring plugin is not available
-SELECT @@session.default_table_encryption;
-@@session.default_table_encryption
-OFF
-=======
->>>>>>> tag/Percona-Server-8.0.30-22
 SET GLOBAL default_table_encryption=OFF;
 SELECT @@global.default_table_encryption;
 @@global.default_table_encryption
@@ -157,40 +117,6 @@ SET PERSIST default_table_encryption=ON;
 SELECT @@global.default_table_encryption;
 @@global.default_table_encryption
 ON
-<<<<<<< HEAD
-SET PERSIST default_table_encryption=KEYRING_ON;
-ERROR 42000: Variable 'default_table_encryption' can't be set to the value of 'KEYRING_ON'
-SELECT @@global.default_table_encryption;
-@@global.default_table_encryption
-ON
-SET PERSIST default_table_encryption=ONLINE_TO_KEYRING;
-ERROR 42000: Keyring encryption is not supported in Percona XtraDB Cluster.
-SELECT @@global.default_table_encryption;
-@@global.default_table_encryption
-ON
-SET PERSIST default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
-ERROR 42000: Keyring encryption is not supported in Percona XtraDB Cluster.
-SELECT @@global.default_table_encryption;
-@@global.default_table_encryption
-ON
-||||||| merged common ancestors
-SET PERSIST default_table_encryption=KEYRING_ON;
-ERROR 42000: Variable 'default_table_encryption' can't be set to the value of 'KEYRING_ON'
-SELECT @@global.default_table_encryption;
-@@global.default_table_encryption
-ON
-SET PERSIST default_table_encryption=ONLINE_TO_KEYRING;
-ERROR HY000: The default_table_encryption option cannot be changed, keyring plugin is not available
-SELECT @@global.default_table_encryption;
-@@global.default_table_encryption
-ON
-SET PERSIST default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
-ERROR HY000: The default_table_encryption option cannot be changed, keyring plugin is not available
-SELECT @@global.default_table_encryption;
-@@global.default_table_encryption
-ON
-=======
->>>>>>> tag/Percona-Server-8.0.30-22
 SET PERSIST default_table_encryption=ON;
 SELECT @@global.default_table_encryption;
 @@global.default_table_encryption
@@ -221,40 +147,6 @@ SET GLOBAL default_table_encryption=OFF;
 SELECT @@global.default_table_encryption;
 @@global.default_table_encryption
 OFF
-<<<<<<< HEAD
-SET PERSIST default_table_encryption=KEYRING_ON;
-ERROR 42000: Variable 'default_table_encryption' can't be set to the value of 'KEYRING_ON'
-SELECT @@global.default_table_encryption;
-@@global.default_table_encryption
-OFF
-SET PERSIST default_table_encryption=ONLINE_TO_KEYRING;
-ERROR 42000: Keyring encryption is not supported in Percona XtraDB Cluster.
-SELECT @@global.default_table_encryption;
-@@global.default_table_encryption
-OFF
-SET PERSIST default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
-ERROR 42000: Keyring encryption is not supported in Percona XtraDB Cluster.
-SELECT @@global.default_table_encryption;
-@@global.default_table_encryption
-OFF
-||||||| merged common ancestors
-SET PERSIST default_table_encryption=KEYRING_ON;
-ERROR 42000: Variable 'default_table_encryption' can't be set to the value of 'KEYRING_ON'
-SELECT @@global.default_table_encryption;
-@@global.default_table_encryption
-OFF
-SET PERSIST default_table_encryption=ONLINE_TO_KEYRING;
-ERROR HY000: The default_table_encryption option cannot be changed, keyring plugin is not available
-SELECT @@global.default_table_encryption;
-@@global.default_table_encryption
-OFF
-SET PERSIST default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
-ERROR HY000: The default_table_encryption option cannot be changed, keyring plugin is not available
-SELECT @@global.default_table_encryption;
-@@global.default_table_encryption
-OFF
-=======
->>>>>>> tag/Percona-Server-8.0.30-22
 SET PERSIST default_table_encryption=ON;
 SELECT @@global.default_table_encryption;
 @@global.default_table_encryption

@@ -342,16 +342,10 @@ my @mysqld_rules = (
   { 'loose-mysqlx-ssl-key'                         => "" },
   { 'pid-file'                                     => \&fix_pidfile },
   { 'server-id'                                    => \&fix_server_id, },
-<<<<<<< HEAD
   { 'plugin-dir'                                   => sub { $::plugindir } },
   { 'general_log'                                  => 1 },
   { 'general-log-file'                             => \&fix_log },
-  { 'slow_query_log'                               => 1 },
-||||||| merged common ancestors
-  { 'slow_query_log'                               => 1 },
-=======
   { 'slow_query_log'                               => \&fix_slow_query_log },
->>>>>>> tag/Percona-Server-8.0.30-22
   { 'slow_query_log_file'                          => \&fix_log_slow_queries },
   { 'socket'                                       => \&fix_socket },
   { 'ssl-ca'                                       => \&fix_ssl_ca },

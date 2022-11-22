@@ -41,8 +41,15 @@
 --let $log_services="log_filter_internal,log_sink_internal,log_sink_json"
 --let $log_sup_list="ER_CHANGED_MAX_OPEN_FILES,ER_DD_INIT_FAILED,ER_SEC_FILE_PRIV_DIRECTORY_PERMISSIONS,ER_SEC_FILE_PRIV_DIRECTORY_PERMISSIONS,ER_BASEDIR_SET_TO,ER_WARN_COMPONENTS_INFRASTRUCTURE_MANIFEST_NOT_RO"
 
+# We specify '--skip-innodb-doublewrite' for this instance of 'mysqld'
+# because immediately after the first (original) instance releases a lock
+# on './ibdata1', this instance (the one started with '--exec_in_background')
+# will acquire its own lock on './ibdata1' and will try to create doublewrite
+# buffer file './#ib_16384_0.dblwr'. However, there is a chance that by that
+# moment it will not be able to do so as InnoDB doublewrite component will not
+# be properly shut down by the first (original) instance.
 --let LOG_FILE1= $MYSQLTEST_VARDIR/tmp/test1.err
---let restart_parameters="restart: --log-error=$LOG_FILE_TRAD --log-error-services=$log_services --log-error-suppression-list=$log_sup_list"
+--let restart_parameters="restart: --skip-innodb-doublewrite --log-error=$LOG_FILE_TRAD --log-error-services=$log_services --log-error-suppression-list=$log_sup_list"
 --replace_result $LOG_FILE_TRAD LOG_FILE_TRAD
 --source include/restart_mysqld.inc
 

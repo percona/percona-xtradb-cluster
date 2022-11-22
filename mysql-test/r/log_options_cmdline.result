@@ -33,14 +33,7 @@ SELECT @@GLOBAL.LOG_ERROR_SERVICES;
 log_filter_internal; log_sink_internal
 SET GLOBAL LOG_ERROR_SERVICES=@@GLOBAL.LOG_ERROR_SERVICES;
 Pattern "\[Warning\].*Cannot set services "abcd" requested in --log-error-services, using defaults" found
-<<<<<<< HEAD
 # restart: --log-error=LOG_FILE10 --log-error-verbosity=3 --wsrep-min-log-verbosity=1 --log-error-services=log_sink_json 
-Pattern "\[Warning\].*Cannot set services "log_sink_json" requested in --log-error-services, using defaults" found
-||||||| merged common ancestors
-# restart: --log-error=LOG_FILE10 --log-error-verbosity=3 --log-error-services=log_sink_json 
-Pattern "\[Warning\].*Cannot set services "log_sink_json" requested in --log-error-services, using defaults" found
-=======
-# restart: --log-error=LOG_FILE10 --log-error-verbosity=3 --log-error-services=log_sink_json 
 # Empty result expected:
 SELECT component_urn from mysql.component WHERE component_urn LIKE "log_%";
 component_urn
@@ -59,7 +52,6 @@ SELECT @@global.log_error_services;
 @@global.log_error_services
 log_filter_internal; log_sink_internal
 # INSTALL the component.
->>>>>>> tag/Percona-Server-8.0.30-22
 INSTALL COMPONENT "file://component_log_sink_json";
 # No issues expected:
 SHOW WARNINGS;
