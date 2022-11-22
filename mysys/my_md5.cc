@@ -89,14 +89,29 @@ int compute_md5_hash(char *digest, const char *buf, int len) {
 
 #ifdef WITH_WSREP
 
-/* Percona Server (in turn PXC) is build with OpenSSL.
-Leave Yassl code for merge compatibility. */
-
 /* For certification we need to identify each row uniquely.
 Generally this is done using PK but if table is created w/o PK
 then a md5-hash (16 bytes) string is generated using the complete record.
 Following functions act as helper function in generation of this md5-hash. */
 
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+void *wsrep_md5_init() {
+  EVP_MD_CTX *ctx = EVP_MD_CTX_new();
+  EVP_DigestInit_ex2(ctx, EVP_md5(), nullptr);
+  return (void *)ctx;
+}
+
+void wsrep_md5_update(void *ctx, char *buf, int len) {
+  EVP_DigestUpdate((EVP_MD_CTX *)ctx, buf, len);
+}
+
+void wsrep_compute_md5_hash(unsigned char *digest, void *ctx) {
+  unsigned int md_len;
+  EVP_DigestFinal_ex((EVP_MD_CTX *)ctx, digest, &md_len);
+  EVP_MD_CTX_free((EVP_MD_CTX *)ctx);
+}
+
+#else  /* OPENSSL_VERSION_NUMBER >= 0x30000000L */
 void *wsrep_md5_init() {
   MD5_CTX *ctx = new MD5_CTX();
   MD5_Init(ctx);
@@ -107,9 +122,11 @@ void wsrep_md5_update(void *ctx, char *buf, int len) {
   MD5_Update((MD5_CTX *)(ctx), buf, len);
 }
 
-void wsrep_compute_md5_hash(char *digest, void *ctx) {
-  MD5_Final((unsigned char *)digest, (MD5_CTX *)ctx);
+void wsrep_compute_md5_hash(unsigned char *digest, void *ctx) {
+  MD5_Final(digest, (MD5_CTX *)ctx);
   delete (MD5_CTX *)ctx;
 }
+#endif /* OPENSSL_VERSION_NUMBER >= 0x30000000L */
 
 #endif /* WITH_WSREP */
+ 

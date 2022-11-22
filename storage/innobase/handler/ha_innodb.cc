@@ -10687,7 +10687,7 @@ static int wsrep_calc_row_hash(byte *digest, const uchar *row, TABLE *table,
       wsrep_md5_update(ctx, (char *)ptr, len);
     }
   }
-  wsrep_compute_md5_hash((char *)digest, ctx);
+  wsrep_compute_md5_hash(digest, ctx);
   return (0);
 }
 #endif /* WITH_WSREP */
