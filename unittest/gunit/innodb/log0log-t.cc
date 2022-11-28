@@ -47,6 +47,10 @@
 #include <mysql/components/minimal_chassis.h> /* minimal_chassis_init() */
 #include <mysql/components/service.h>         /* SERVICE_TYPE_NO_CONST */
 
+#ifdef WITH_WSREP
+#include <sql/wsrep_server_state.h>
+#endif
+
 static std::map<std::string, std::vector<std::string>> log_sync_points = {
     {"log_buffer_exclussive_access",
      {"log_buffer_x_lock_enter_before_lock",
@@ -716,6 +720,12 @@ static void execute_disturbed_test(
 
 TEST(log0log, log_random_disturb) {
   std::unique_ptr<Log_test_disturber> disturber;
+
+#ifdef WITH_WSREP
+  wsrep::gtid gtid;
+  Wsrep_server_state::init_once(std::string(), std::string(), std::string(),
+                                std::string(), gtid, 0);
+#endif
 
   disturber.reset(new Log_buf_resizer{256 * 1024, 1024 * 1024});
   execute_disturbed_test(std::move(disturber));
