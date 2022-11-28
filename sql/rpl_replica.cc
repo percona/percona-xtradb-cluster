@@ -7065,10 +7065,10 @@ wsrep_restart_point :
   rli->events_until_exit = abort_slave_event_count;
 #endif
 
-    thd = new THD;  // note that constructor of THD uses DBUG_ !
-    thd->thread_stack = (char *)&thd;  // remember where our stack is
-    mysql_mutex_lock(&rli->info_thd_lock);
-    rli->info_thd = thd;
+  thd = new THD;  // note that constructor of THD uses DBUG_ !
+  thd->thread_stack = (char *)&thd;  // remember where our stack is
+  mysql_mutex_lock(&rli->info_thd_lock);
+  rli->info_thd = thd;
 
 #ifdef HAVE_PSI_THREAD_INTERFACE
   // save the instrumentation for SQL thread in rli->info_thd
@@ -7488,7 +7488,7 @@ err:
 #ifndef NDEBUG
     bool set_rli_description_event_failed = false;
 #endif
-      assert(set_rli_description_event_failed);
+    assert(set_rli_description_event_failed);
   }
   /* Wake up source_pos_wait() */
   DBUG_PRINT("info",
@@ -7501,22 +7501,22 @@ err:
   rli->cached_charset_invalidate();
   rli->save_temporary_tables = thd->temporary_tables;
 
-    /*
-      TODO: see if we can do this conditionally in next_event() instead
-      to avoid unneeded position re-init
-    */
-    thd->temporary_tables =
-        nullptr;  // remove temptation from destructor to close them
-    // destructor will not free it, because we are weird
-    thd->get_protocol_classic()->end_net();
-    assert(rli->info_thd == thd);
-    THD_CHECK_SENTRY(thd);
-    mysql_mutex_lock(&rli->info_thd_lock);
-    rli->info_thd = nullptr;
-    if (commit_order_mngr) {
-      rli->set_commit_order_manager(nullptr);
-      delete commit_order_mngr;
-    }
+  /*
+    TODO: see if we can do this conditionally in next_event() instead
+    to avoid unneeded position re-init
+  */
+  thd->temporary_tables =
+      nullptr;  // remove temptation from destructor to close them
+  // destructor will not free it, because we are weird
+  thd->get_protocol_classic()->end_net();
+  assert(rli->info_thd == thd);
+  THD_CHECK_SENTRY(thd);
+  mysql_mutex_lock(&rli->info_thd_lock);
+  rli->info_thd = nullptr;
+  if (commit_order_mngr) {
+    rli->set_commit_order_manager(nullptr);
+    delete commit_order_mngr;
+  }
 
   mysql_mutex_unlock(&rli->info_thd_lock);
   set_thd_in_use_temporary_tables(
@@ -7573,7 +7573,7 @@ err:
   DBUG_EXECUTE_IF("simulate_replica_delay_at_terminate_bug38694",
                   sleep(5););
   mysql_mutex_unlock(&rli->run_lock);  // tell the world we are done
- }
+}
   my_thread_end();
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
   ERR_remove_thread_state(0);
