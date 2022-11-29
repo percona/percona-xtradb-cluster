@@ -710,11 +710,11 @@ ALTER SCHEMA S READ ONLY=1;;
 # Verify lock state and let the INSERT continue.
 connection default;
 SELECT object_schema, object_name, lock_type, lock_status
-FROM performance_schema.metadata_locks WHERE object_schema in ('s', 'S');
+FROM performance_schema.metadata_locks WHERE object_schema in ('s', 'S') ORDER BY object_schema, object_name, lock_type, lock_status;
 object_schema	object_name	lock_type	lock_status
-s	t	SHARED_WRITE	GRANTED
 s	NULL	EXCLUSIVE	GRANTED
 s	t	EXCLUSIVE	PENDING
+s	t	SHARED_WRITE	GRANTED
 SET DEBUG_SYNC = 'now SIGNAL continue';
 # Verify that the statements complete. Note deadlock for the insert
 # due to acquiring IX on schema name.
@@ -740,9 +740,9 @@ connection default;
 SELECT object_schema, object_name, lock_type, lock_status
 FROM performance_schema.metadata_locks WHERE object_schema in ('s', 'S');
 object_schema	object_name	lock_type	lock_status
-s	NULL	EXCLUSIVE	GRANTED
 s	t	EXCLUSIVE	GRANTED
 s	t	SHARED_WRITE	PENDING
+s	NULL	EXCLUSIVE	GRANTED
 SET DEBUG_SYNC = 'now SIGNAL continue';
 # Verify that the statements complete.
 connection con1;
@@ -816,13 +816,13 @@ ALTER SCHEMA S READ ONLY = 1 COLLATE utf8_bin;
 ERROR HY000: Schema 's' is in read only mode.
 ALTER SCHEMA S READ ONLY = 0 COLLATE utf8_bin;
 Warnings:
-Warning	3778	'utf8_bin' is a collation of the deprecated character set UTF8MB3. Please consider using UTF8MB4 with an appropriate collation instead.
+Warning	3778	'utf8mb3_bin' is a collation of the deprecated character set UTF8MB3. Please consider using UTF8MB4 with an appropriate collation instead.
 SHOW CREATE SCHEMA S;
 Database	Create Database
-S	CREATE DATABASE `S` /*!40100 DEFAULT CHARACTER SET utf8mb3 COLLATE utf8_bin */ /*!80016 DEFAULT ENCRYPTION='N' */
+S	CREATE DATABASE `S` /*!40100 DEFAULT CHARACTER SET utf8mb3 COLLATE utf8mb3_bin */ /*!80016 DEFAULT ENCRYPTION='N' */
 ALTER SCHEMA S READ ONLY = 1 COLLATE utf8_general_ci;
 Warnings:
-Warning	3778	'utf8_general_ci' is a collation of the deprecated character set UTF8MB3. Please consider using UTF8MB4 with an appropriate collation instead.
+Warning	3778	'utf8mb3_general_ci' is a collation of the deprecated character set UTF8MB3. Please consider using UTF8MB4 with an appropriate collation instead.
 ALTER SCHEMA S READ ONLY=0;
 DROP SCHEMA S;
 #--------------------------------------------------------------------

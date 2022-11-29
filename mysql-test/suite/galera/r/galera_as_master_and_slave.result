@@ -130,6 +130,7 @@ Warning	1287	'@@slave_parallel_workers' is deprecated and will be removed in a f
 set global slave_parallel_workers=0;
 Warnings:
 Warning	1287	'@@slave_parallel_workers' is deprecated and will be removed in a future release. Please use replica_parallel_workers instead.
+Warning	1287	'0' is deprecated and will be removed in a future release. Please use 1 instead
 select @@slave_parallel_workers;
 @@slave_parallel_workers
 0
