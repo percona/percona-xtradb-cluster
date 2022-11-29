@@ -1004,10 +1004,28 @@ bool log_syslog_find_facility(char *f, SYSLOG_FACILITY *rsf);
 bool log_syslog_init();
 void log_syslog_exit();
 
+<<<<<<< HEAD
 #ifdef WITH_WSREP
 IO_CACHE* wsrep_get_trans_log(THD * thd, bool transaction);
 bool wsrep_trans_cache_is_empty(THD *thd);
 void wsrep_thd_binlog_flush_pending_rows_event(THD *thd, bool stmt_end);
 void wsrep_thd_binlog_trx_reset(THD * thd);
 #endif /* WITH_WSREP */
+||||||| b0a7dc2da2e
+=======
+/* 26 for regular timestamp, plus 7 (".123456") when using micro-seconds */
+static const int iso8601_size = 33;
+
+/**
+  Make and return an ISO 8601 / RFC 3339 compliant timestamp.
+  Heeds log_timestamps.
+
+  @param buf       A buffer of at least 26 bytes to store the timestamp in
+                   (19 + tzinfo tail + \0)
+  @param seconds   Seconds since the epoch, or 0 for "now"
+
+  @return          length of timestamp (excluding \0)
+*/
+int make_iso8601_timestamp(char *buf, ulonglong utime = 0);
+>>>>>>> fde2cca41b14185d354d2f1ce94dc3ac5b3cbd39
 #endif /* LOG_H */
