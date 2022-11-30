@@ -190,14 +190,9 @@
 #cmakedefine HAVE_ULONG 1
 #cmakedefine HAVE_U_INT32_T 1
 #cmakedefine HAVE_STRUCT_TIMESPEC
-<<<<<<< HEAD
 #cmakedefine HAVE_EXECVPE 1
-||||||| b0a7dc2da2e
-
-=======
 #cmakedefine HAVE_TM_GMTOFF 1
 
->>>>>>> fde2cca41b14185d354d2f1ce94dc3ac5b3cbd39
 /* Support for tagging symbols with __attribute__((visibility("hidden"))) */
 #cmakedefine HAVE_VISIBILITY_HIDDEN 1
 
