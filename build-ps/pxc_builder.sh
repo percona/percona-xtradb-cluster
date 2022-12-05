@@ -309,31 +309,48 @@ install_deps() {
         yum install -y perl
         yum install -y https://repo.percona.com/yum/percona-release-latest.noarch.rpm
         percona-release enable tools testing
-        add_percona_yum_repo
-        if [ "x${RHEL}" = "x8" ]; then
+        if [ "${RHEL}" -lt 9 ]; then
+            add_percona_yum_repo
+        fi
+        if [ "x$RHEL" = "x8" -o "x$RHEL" = "x9" ]; then
             yum -y install dnf-plugins-core epel-release
             yum config-manager --set-enabled powertools
 	    yum -y install git
             yum -y install python2-scons || true
             yum -y install python2-pip python36-devel
             yum -y install autoconf automake binutils bison boost-static cmake gcc gcc-c++ make
-            yum -y install git gperf glibc glibc-devel jemalloc jemalloc-devel libaio-devel
-            yum -y install libstdc++-devel libtirpc-devel make ncurses-devel numactl-devel
+            yum -y install gperf glibc glibc-devel jemalloc jemalloc-devel libaio-devel
+            yum -y install libstdc++-devel make ncurses-devel numactl-devel
             yum -y install openldap-devel openssl-devel pam-devel perl-Data-Dumper
-            yum -y install perl-Dig perl-Digest perl-Digest-MD5 perl-Env perl-JSON perl-Time-HiRes
+            yum -y install perl-Digest perl-Digest-MD5 perl-Env perl-JSON perl-Time-HiRes
             yum -y install readline-devel rpm-build rsync tar time unzip wget zlib-devel selinux-policy-devel
-            yum -y install bison boost-devel check-devel cmake gcc-c++ glibc-devel libaio-devel libcurl-devel libudev-devel
+            yum -y install bison boost-devel check-devel cmake gcc-c++ libaio-devel libcurl-devel libudev-devel
+            yum -y install redhat-rpm-config
             wget https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/30/Everything/x86_64/os/Packages/r/rpcgen-1.4-2.fc30.x86_64.rpm
             wget ftp://ftp.pbone.net/mirror/archive.fedoraproject.org/fedora/linux/releases/29/Everything/x86_64/os/Packages/g/gperf-3.1-6.fc29.x86_64.rpm
             yum -y install rpcgen-1.4-2.fc30.x86_64.rpm gperf-3.1-6.fc29.x86_64.rpm
 
-            wget https://jenkins.percona.com/yum-repo/percona-dev.repo
-            mv -vf percona-dev.repo /etc/yum.repos.d
-            yum -y clean all
-            yum -y install python2-scons python2-pip python36-devel
-            yum -y install redhat-rpm-config python2-devel
-            /usr/bin/pip3.6 install --user typing pyyaml regex Cheetah3
-            /usr/bin/pip2.7 install --user typing pyyaml regex Cheetah
+            if [ "x${RHEL}" = "x9" ]; then
+                yum install -y https://yum.oracle.com/repo/OracleLinux/OL9/distro/builder/x86_64/getPackage/procps-ng-devel-3.3.17-8.el9.x86_64.rpm
+                yum -y install dnf-utils
+                dnf config-manager --enable ol9_codeready_builder
+                yum -y install libedit-devel
+                yum -y install libtirpc-devel
+                yum -y install gcc
+                yum -y install scons pip python3-devel
+                pip install --user typing pyyaml regex Cheetah3
+            else
+                wget https://jenkins.percona.com/yum-repo/percona-dev.repo
+                mv -vf percona-dev.repo /etc/yum.repos.d
+                yum -y clean all
+                yum -y install libtirpc-devel
+                yum -y install perl-Dig
+                yum -y install python2-scons python2-pip python36-devel
+                yum -y install python2-devel
+                /usr/bin/pip3.6 install --user typing pyyaml regex Cheetah3
+                /usr/bin/pip2.7 install --user typing pyyaml regex Cheetah
+            fi
+
             dnf -y module disable mysql
         else
             yum -y install epel-release
@@ -424,13 +441,23 @@ install_deps() {
         apt-get -y install libsasl2-dev libsasl2-modules-gssapi-mit
         apt-get -y install stunnel libkrb5-dev
         apt-get -y install libudev-dev
-        if [ x"${DIST}" = xfocal -o x"${DIST}" = xbullseye ]; then
+        if [ x"${DIST}" = xfocal -o x"${DIST}" = xbullseye -o x"${DIST}" = jammy ]; then
             apt-get -y install python3-mysqldb
         else
             apt-get -y install python-mysqldb
         fi
         if [ x"${DIST}" = xbionic ]; then
             apt-get -y install gcc-8 g++-8
+            wget http://jenkins.percona.com/downloads/libfido2-1/libcbor0.6_0.6.0-0ubuntu1_amd64.deb
+            wget http://jenkins.percona.com/downloads/libfido2-1/libfido2-1_1.3.1-1ubuntu2_amd64.deb
+            dpkg -i libcbor0.6_0.6.0-0ubuntu1_amd64.deb
+            dpkg -i libfido2-1_1.3.1-1ubuntu2_amd64.deb
+        fi
+        if [ x"${DIST}" = xbuster ]; then
+            wget http://jenkins.percona.com/downloads/libfido2-1/libfido2-1_1.5.0-2~bpo10+1_amd64.deb
+            wget http://jenkins.percona.com/downloads/libfido2-1/libcbor0_0.5.0+dfsg-2_amd64.deb
+            dpkg -i libcbor0_0.5.0+dfsg-2_amd64.deb
+            dpkg -i libfido2-1_1.5.0-2~bpo10+1_amd64.deb
         fi
         apt-get -y install libmecab2 mecab mecab-ipadic
         apt-get -y install build-essential devscripts
@@ -439,7 +466,7 @@ install_deps() {
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
         apt-get -y install --download-only percona-xtrabackup-24=2.4.26-1.${DIST}
-        apt-get -y install --download-only percona-xtrabackup-80=8.0.29-22-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-80=8.0.30-23-1.${DIST}
     fi
     return;
 }
@@ -819,7 +846,7 @@ build_deb(){
         rm -rf usr *.deb DEBIAN
     cd ../ || exit
 
-    if [[ "x$DEBIAN_VERSION" == "xbionic" || "x$DEBIAN_VERSION" == "xstretch" || "x$DEBIAN_VERSION" == "xfocal" || "x$DEBIAN_VERSION" == "xbullseye" ]]; then
+    if [[ "x$DEBIAN_VERSION" == "xbionic" || "x$DEBIAN_VERSION" == "xstretch" || "x$DEBIAN_VERSION" == "xfocal" || "x$DEBIAN_VERSION" == "xbullseye" || "x$DEBIAN_VERSION" == "xjammy" ]]; then
         sed -i 's/fabi-version=2/fabi-version=2 -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -Wno-error=literal-suffix -Wno-misleading-indentation/' cmake/build_configurations/compiler_options.cmake
         sed -i 's/gnu++11/gnu++11 -Wno-virtual-move-assign/' cmake/build_configurations/compiler_options.cmake
     fi
@@ -829,7 +856,7 @@ build_deb(){
     export MYSQL_BUILD_CFLAGS="$CFLAGS"
     export MYSQL_BUILD_CXXFLAGS="$CXXFLAGS"
 
-    if [[ "x$DEBIAN_VERSION" == "xfocal" || "x${DEBIAN_VERSION}" == "xbionic" || "x${DEBIAN_VERSION}" == "xbuster" || "x$DEBIAN_VERSION" == "xbullseye" ]]; then
+    if [[ "x$DEBIAN_VERSION" == "xfocal" || "x${DEBIAN_VERSION}" == "xbionic" || "x${DEBIAN_VERSION}" == "xbuster" || "x$DEBIAN_VERSION" == "xbullseye" || "x$DEBIAN_VERSION" == "xjammy" ]]; then
         sed -i "s:iproute:iproute2:g" debian/control
     fi
     sed -i "s:libcurl4-gnutls-dev:libcurl4-openssl-dev:g" debian/control
@@ -924,7 +951,7 @@ build_tarball(){
 
         mkdir pxb-8.0
         pushd pxb-8.0
-        yumdownloader percona-xtrabackup-80-8.0.29
+        yumdownloader percona-xtrabackup-80-8.0.30
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
         mv usr/bin ./
         mv usr/lib64 ./
