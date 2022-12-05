@@ -851,6 +851,9 @@ int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
 
     thd->release_resources();
     thd_manager->remove_thd(thd);
+#ifdef HAVE_PSI_THREAD_INTERFACE
+    mysql_thread_set_psi_THD(nullptr);
+#endif
   });
 
   cv.wait(lk, [&] { return entered_nbo_mode; });

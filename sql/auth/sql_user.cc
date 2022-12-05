@@ -1998,11 +1998,20 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
     w/o re-writting then applier will not be able to establish user context).
   */
   if (WSREP(thd) && !thd->wsrep_applier) {
-    char buff[2048];
+    constexpr size_t query_length_max =
+        strlen("SET PASSWORD FOR ''@''=''") + 3 * 120 + 1;
+    char *buff = (char *)thd->alloc(query_length_max);
+    if (!buff) {
+      my_error(ER_OUTOFMEMORY, MYF(ME_FATALERROR), 0);
+      return true;
+    }
+
     ulong query_length =
-        sprintf(buff, "SET PASSWORD FOR '%-.120s'@'%-.120s'='%-.120s'",
-                lex_user->user.str ? lex_user->user.str : "",
-                lex_user->host.str ? lex_user->host.str : "", new_password);
+        snprintf(buff, query_length_max,
+                 "SET PASSWORD FOR '%-.120s'@'%-.120s'='%-.120s'",
+                 lex_user->user.str ? lex_user->user.str : "",
+                 lex_user->host.str ? lex_user->host.str : "", new_password);
+    buff[query_length_max - 1] = 0;
     thd->set_query(buff, query_length);
 
     if ((ret = open_grant_tables(thd, tables, &transactional_tables))) {

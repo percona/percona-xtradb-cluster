@@ -936,7 +936,7 @@ void process::terminate() {
   }
 }
 
-thd::thd(bool won) : init(), ptr(new THD) {
+thd::thd(bool won) : ptr(new THD) {
   if (ptr) {
     ptr->thread_stack = (char *)(&ptr);
     wsrep_assign_from_threadvars(ptr);
