@@ -1,3 +1,5 @@
+RETURN() # Disable MyRocks
+
 # TODO: Copyrights
 SET(CMAKE_CXX_STANDARD 11)
 

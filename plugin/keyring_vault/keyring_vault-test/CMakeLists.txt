@@ -7,6 +7,7 @@ INCLUDE_DIRECTORIES(SYSTEM
 
 INCLUDE_DIRECTORIES(
   ${CMAKE_SOURCE_DIR}/sql
+  ${CMAKE_SOURCE_DIR}/wsrep/src
   ${CMAKE_SOURCE_DIR}/plugin/keyring
   ${CMAKE_SOURCE_DIR}/plugin/keyring/common
   ${CMAKE_SOURCE_DIR}/plugin/keyring_vault

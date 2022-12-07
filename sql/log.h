@@ -1004,12 +1004,6 @@ bool log_syslog_find_facility(char *f, SYSLOG_FACILITY *rsf);
 bool log_syslog_init();
 void log_syslog_exit();
 
-#ifdef WITH_WSREP
-IO_CACHE* wsrep_get_trans_log(THD * thd, bool transaction);
-bool wsrep_trans_cache_is_empty(THD *thd);
-void wsrep_thd_binlog_flush_pending_rows_event(THD *thd, bool stmt_end);
-void wsrep_thd_binlog_trx_reset(THD * thd);
-#endif /* WITH_WSREP */
 /* 26 for regular timestamp, plus 7 (".123456") when using micro-seconds */
 static const int iso8601_size = 33;
 
@@ -1024,4 +1018,12 @@ static const int iso8601_size = 33;
   @return          length of timestamp (excluding \0)
 */
 int make_iso8601_timestamp(char *buf, ulonglong utime = 0);
+
+#ifdef WITH_WSREP
+IO_CACHE* wsrep_get_trans_log(THD * thd, bool transaction);
+bool wsrep_trans_cache_is_empty(THD *thd);
+void wsrep_thd_binlog_flush_pending_rows_event(THD *thd, bool stmt_end);
+void wsrep_thd_binlog_trx_reset(THD * thd);
+#endif /* WITH_WSREP */
+
 #endif /* LOG_H */
