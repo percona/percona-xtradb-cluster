@@ -1,0 +1,1 @@
+--thread-handling=pool-of-threads --thread-pool-size=2

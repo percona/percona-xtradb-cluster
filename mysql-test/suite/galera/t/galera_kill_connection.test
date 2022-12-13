@@ -1,0 +1,86 @@
+# Test that rollback of the local transaction caused by connection kill is handled properly
+# if parallel wsrep-replicated conflicting transaction is being applied.
+# We cannot use DEBUG_SYNC WAIT_FOR facitlity in killed connection, because it doesn't work for THDs marked as killed ones.
+# Instead of this, we will create the transaction which rollback takes significant amount of time
+# and when its rollback is in progress, we will replicate conflicting transaction from node_2
+
+--source include/have_debug_sync.inc
+--source include/big_test.inc
+--source include/have_innodb.inc
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+# Save original values, because they may be auto enabled when replication transaction waits for
+# killed transaction rollback.
+--let $innodb_status_output_saved = `SELECT @@GLOBAL.innodb_status_output`
+--let $innodb_status_output_locks_saved = `SELECT @@GLOBAL.innodb_status_output_locks`
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--let $node1a_connection_id = `SELECT CONNECTION_ID()`
+
+CREATE TABLE t1 (id INT PRIMARY KEY AUTO_INCREMENT);
+INSERT INTO t1 VALUES (NULL);
+
+# Probably cnt=10 would be enough, but as we rely on rollback taking significant time,
+# let's play safe
+--echo Making t1 bigger...
+--let cnt = 20
+--disable_query_log
+while ($cnt)
+{
+  INSERT INTO t1 SELECT NULL from t1; 
+  --dec $cnt
+}
+--enable_query_log
+
+# SIGNAL works for killed threads. Signal, that at least one ha_info has been cleared.
+# This condition is enough for bug reproduction.
+SET DEBUG_SYNC = 'ha_rollback_low_after_ha_reset SIGNAL ha_rollback_low_after_ha_reset.reached';
+
+# Now start the transactions which is going to be rolled back
+BEGIN;
+INSERT INTO t1 SELECT NULL FROM t1; 
+
+--connection node_1
+# Kill the connection. This will trigger started transaction's rollback.
+--disable_query_log
+--echo # Killing query on node_1a
+--eval KILL $node1a_connection_id
+--enable_query_log
+
+# Wait for 1st ha_info being cleaned.
+SET DEBUG_SYNC = 'now WAIT_FOR ha_rollback_low_after_ha_reset.reached';
+
+--connection node_2
+# This transaction will conflict with the ongoing transaction on node_1, so when replicated it will trigger BF-abort
+# This is two-node cluster, so inserting 2 rows with consecutive auto increment values is enough to have PK clash
+--let $max_id = `SELECT id FROM t1 ORDER BY id DESC LIMIT 1`
+
+BEGIN;
+--echo Inserting conflicting rows.
+--disable_query_log
+--let $cnt = 2
+while ($cnt)
+{
+--inc $max_id
+--eval INSERT INTO t1 VALUES ($max_id)
+--dec $cnt
+}
+--enable_query_log
+COMMIT;
+
+--echo Waiting for node_2 transaction to be replicated. This needs node_1 rollback to finish first.
+--connection node_1
+--let $wait_condition = SELECT COUNT(*) = 1 FROM t1 WHERE id = $max_id
+--source include/wait_condition.inc
+--echo node_2 transaction replicated.
+
+# cleanup
+# node_1a is already disconnected
+DROP TABLE t1;
+SET DEBUG_SYNC='RESET';
+--disable_query_log
+--eval SET @@GLOBAL.innodb_status_output = $innodb_status_output_saved
+--eval SET @@GLOBAL.innodb_status_output_locks = $innodb_status_output_locks_saved
+--enable_query_log
+--source include/wait_until_count_sessions.inc
