@@ -1247,32 +1247,29 @@ enum wsrep_trx_status wsrep_pre_commit(THD *thd)
 
 bool wsrep_replicate_GTID(THD *thd)
 {
-  if (thd->slave_thread)
+  WSREP_DEBUG("GTID replication");
+  assert (WSREP_UNDEFINED_TRX_ID == thd->wsrep_ws_handle.trx_id);
+  (void)wsrep_ws_handle_for_trx(&thd->wsrep_ws_handle, thd->query_id);
+  assert (WSREP_UNDEFINED_TRX_ID != thd->wsrep_ws_handle.trx_id);
+  WSREP_DEBUG("slave trx using query ID %lu for replicating GTID",
+              (long unsigned int) thd->wsrep_ws_handle.trx_id);
+
+  enum wsrep_trx_status rcode= wsrep_run_wsrep_commit(thd, wsrep_hton, true);
+  if (rcode)
   {
-    WSREP_DEBUG("GTID replication");
-    assert (WSREP_UNDEFINED_TRX_ID == thd->wsrep_ws_handle.trx_id);
-    (void)wsrep_ws_handle_for_trx(&thd->wsrep_ws_handle, thd->query_id);
-    assert (WSREP_UNDEFINED_TRX_ID != thd->wsrep_ws_handle.trx_id);
-    WSREP_DEBUG("slave trx using query ID %lu for replicating GTID",
-                (long unsigned int) thd->wsrep_ws_handle.trx_id);
+    /*
+      TODO: should error here cause stopping of MySQL slave?
+      Slave applying was totally filtered out, and fauílure in replicating
+      GTID event, would cause a hole in GTID history in other cluster nodes
 
-    enum wsrep_trx_status rcode= wsrep_run_wsrep_commit(thd, wsrep_hton, true);
-    if (rcode)
-    {
-      /*
-        TODO: should error here cause stopping of MySQL slave?
-        Slave applying was totally filtered out, and fauílure in replicating
-        GTID event, would cause a hole in GTID history in other cluster nodes
-
-      */
-      WSREP_INFO("GTID replication failed: %d", rcode);
-      wsrep->post_rollback(wsrep, &thd->wsrep_ws_handle);
-      thd->wsrep_replicate_GTID= false;
-      my_message(ER_ERROR_DURING_COMMIT, "WSREP GTID replication was interrupted", MYF(0));
-      return true;
-    }
-    wsrep_post_commit(thd, true);
+    */
+    WSREP_INFO("GTID replication failed: %d", rcode);
+    wsrep->post_rollback(wsrep, &thd->wsrep_ws_handle);
+    thd->wsrep_replicate_GTID= false;
+    my_message(ER_ERROR_DURING_COMMIT, "WSREP GTID replication was interrupted", MYF(0));
+    return true;
   }
+  wsrep_post_commit(thd, true);
   thd->wsrep_replicate_GTID= false;
 
   return false;

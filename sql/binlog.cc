@@ -1680,10 +1680,18 @@ int MYSQL_BIN_LOG::gtid_end_transaction(THD *thd)
       assert(!qinfo.is_using_immediate_logging());
 
 #ifdef WITH_WSREP
-  if (WSREP_ON && thd->slave_thread && !thd->wsrep_applier)
-  {
-    thd->wsrep_replicate_GTID= true;
-  }
+      /* If the galera node is acting as async slave then capture
+        GTID event from the async slave applied thread and mark it for
+        replication in galera channel. */
+        /* We need to replicate GTID events, if their origin is not
+        slave thread as well (events do not originate from async master).
+        This is needed for the situation when PXC cluster acts as async
+        slave to some master, and we are going to skip transaction on PXC
+        (async replica) by commiting an empty transaction. */
+      if (WSREP_ON && !thd->wsrep_applier)
+      {
+        thd->wsrep_replicate_GTID= true;
+      }
 #endif /* WITH_WSREP */
       /*
         Write BEGIN event and then commit (which will generate commit
@@ -9626,9 +9634,11 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
     to the binary log so we have to report this as a "bad" failure
     (failed to commit, but logged something).
   */
-  if (stmt_stuff_logged || trx_stuff_logged)
-  {
+
 #ifdef WITH_WSREP
+  bool replicate_gtid = WSREP_ON && thd->wsrep_replicate_GTID;
+  if (replicate_gtid)
+  {
     /* Action below will log an empty group of GTID.
     This is done when the real action fails to generate any meaningful result on
     executing slave.
@@ -9642,13 +9652,18 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
       eco-system too will capture this dummy trx and will execute it for
       internal replication to keep GTID sequence consistent across
       the cluster. */
-    if (WSREP_ON && thd->wsrep_replicate_GTID &&
-        wsrep_replicate_GTID(thd))
+    if (wsrep_replicate_GTID(thd))
     {
       /* GTID replication failed */
       DBUG_RETURN(RESULT_ABORTED);
     }
-#endif /* WITH_WSREP */
+  }
+
+  if (stmt_stuff_logged || trx_stuff_logged || replicate_gtid)
+#else
+  if (stmt_stuff_logged || trx_stuff_logged)
+#endif  // WITH_WSREP
+  {
     if (RUN_HOOK(transaction,
                  before_commit,
                  (thd, all,
