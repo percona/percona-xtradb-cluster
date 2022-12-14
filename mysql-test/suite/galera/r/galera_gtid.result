@@ -1,5 +1,9 @@
 CREATE TABLE t1 (f1 INT PRIMARY KEY);
 INSERT INTO t1 VALUES (1);
+SET @@SESSION.GTID_NEXT= 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa:1';
+BEGIN;
+COMMIT;
+SET @@SESSION.GTID_NEXT= 'automatic';
 UPDATE t1 SET f1 = 2;
 SET SESSION wsrep_sync_wait = 7;
 gtid_executed_equal
