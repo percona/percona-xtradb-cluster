@@ -16,6 +16,8 @@
 # cmake include to wrap if compiler supports std cxx11 and alters compiler flags
 # On return, HAVE_STDCXX11 will be set
 
+RETURN() # Disable Tokudb
+
 # by default TokuDB is attempted to build, if environment is unsupported,
 # TokuDB is gently skipped
 IF (NOT DEFINED WITH_TOKUDB)
