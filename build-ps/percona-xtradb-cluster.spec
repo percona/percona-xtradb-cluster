@@ -838,6 +838,10 @@ popd
 ##############################################################################
 %install
 
+%if 0%{?rhel} == 9
+    sed -i 's/python2$/python/' %{buildroot}/scripts/pyclustercheck
+%endif
+
 %if 0%{?compatlib}
 # Install compat libs
 %if 0%{?rhel} > 6
