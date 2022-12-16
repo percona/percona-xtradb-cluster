@@ -839,7 +839,7 @@ popd
 %install
 
 %if 0%{?rhel} == 9
-    sed -i 's/python2$/python/' scripts/pyclustercheck
+    sed -i 's/python2$/python3/' scripts/pyclustercheck
 %endif
 
 %if 0%{?compatlib}
