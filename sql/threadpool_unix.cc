@@ -1580,6 +1580,31 @@ static void handle_event(connection_t *connection)
   }
   else
   {
+#ifdef WITH_WSREP
+    /* This is the new request to be handled.
+     It can be connection KILL request. In such a case if there is
+     an open transaction in this connection, we will start rollback
+     process in connection_abort() above.
+     We need to keep query_state marked as QUERY_EXEC for all the
+     rollback time to be able to properly handle BF abort which may
+     happen in the meantime from the applier thread.
+     In such a case we want applier thread to wait until KILL-triggered
+     abort is over than see our thd as being idle and delegate the rollback
+     to the wsrep rollbacker thread. In such a case we would have two
+     parallel rollback requests for the same transaction which is asking
+     for troubles.
+     In other words, we want our thd to be QUERY_EXEC during the rollback
+     which will cause applier thread to execute the flow as the transaction
+     was killed by applier (force its rollback, wait till it is finished
+     and continue) */
+    if (WSREP_ON)
+    {
+      mysql_mutex_lock(&connection->thd->LOCK_wsrep_thd);
+      wsrep_thd_set_query_state(connection->thd, QUERY_EXEC);
+      mysql_mutex_unlock(&connection->thd->LOCK_wsrep_thd);
+    }
+#endif /* WITH_WSREP */
+
     err= threadpool_process_request(connection->thd);
   }
 
@@ -1592,6 +1617,16 @@ static void handle_event(connection_t *connection)
 end:
   if (err)
     connection_abort(connection);
+
+#ifdef WITH_WSREP
+  /* Set the thd->wsrep_query_state back to the QUERY_IDLE state. */
+  if (WSREP_ON)
+  {
+    mysql_mutex_lock(&connection->thd->LOCK_wsrep_thd);
+    wsrep_thd_set_query_state(connection->thd, QUERY_IDLE);
+    mysql_mutex_unlock(&connection->thd->LOCK_wsrep_thd);
+  }
+#endif /* WITH_WSREP */
 
   DBUG_VOID_RETURN;
 }

@@ -23360,10 +23360,10 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 
 	WSREP_LOG_CONFLICT(bf_thd, thd, TRUE);
 
-        WSREP_DEBUG("BF thread %u (with write-set: %lld)"
-                    " aborting Victim thread %u with transaction (%llu)",
-                    wsrep_thd_thread_id(bf_thd), (long long) bf_seqno,
-                    wsrep_thd_thread_id(thd), (long long)victim_trx->id);
+	WSREP_DEBUG("BF thread %u (with write-set: %lld)"
+				" aborting Victim thread %u with transaction (%llu)",
+				wsrep_thd_thread_id(bf_thd), (long long) bf_seqno,
+				wsrep_thd_thread_id(thd), (long long)victim_trx->id);
 
 	WSREP_DEBUG("Aborting query: %s", 
 		    (thd && wsrep_thd_query(thd)) ? wsrep_thd_query(thd) : "void");
