@@ -1,0 +1,15 @@
+CREATE TABLE t1 (id INT PRIMARY KEY AUTO_INCREMENT);
+INSERT INTO t1 VALUES (NULL);
+Making t1 bigger...
+SET DEBUG_SYNC = 'ha_rollback_low_after_ha_reset SIGNAL ha_rollback_low_after_ha_reset.reached';
+BEGIN;
+INSERT INTO t1 SELECT NULL FROM t1;
+# Killing query on node_1a
+SET DEBUG_SYNC = 'now WAIT_FOR ha_rollback_low_after_ha_reset.reached';
+BEGIN;
+Inserting conflicting rows.
+COMMIT;
+Waiting for node_2 transaction to be replicated. This needs node_1 rollback to finish first.
+node_2 transaction replicated.
+DROP TABLE t1;
+SET DEBUG_SYNC='RESET';
