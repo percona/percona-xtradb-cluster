@@ -2060,6 +2060,9 @@ int ha_rollback_low(THD *thd, bool all) {
       assert(!thd->status_var_aggregated);
       thd->status_var.ha_rollback_count++;
       ha_info.reset(); /* keep it conveniently zero-filled */
+#ifdef WITH_WSREP
+      DEBUG_SYNC(thd, "ha_rollback_low_after_ha_reset");
+#endif
     }
     if (restore_backup_ha_data) thd->rpl_reattach_engine_ha_data();
     trn_ctx->reset_scope(trx_scope);

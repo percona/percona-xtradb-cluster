@@ -1976,10 +1976,15 @@ int MYSQL_BIN_LOG::gtid_end_transaction(THD *thd) {
       assert(!qinfo.is_using_immediate_logging());
 
 #ifdef WITH_WSREP
-      if (WSREP_ON && thd->slave_thread && !thd->wsrep_applier) {
+      if (WSREP_ON && !thd->wsrep_applier) {
         /* If the galera node is acting as async slave then capture
         GTID event from the async slave applied thread and mark it for
         replication in galera channel. */
+        /* We need to replicate GTID events, if their origin is not
+        slave thread as well (events do not originate from async master).
+        This is needed for the situation when PXC cluster acts as async
+        slave to some master, and we are going to skip transaction on PXC
+        (async replica) by commiting an empty transaction. */
         thd->wsrep_replicate_GTID = true;
 
         /* Replicating DDL (from async-master) with replication filter will
