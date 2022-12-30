@@ -26,6 +26,8 @@
 #include "wsrep/streaming_context.hpp"
 #include "wsrep_api.h"
 #include "wsrep_server_state.h"
+#include "mysql/components/services/log_builtins.h"  // LogEvent
+#include "sql/system_variables.h"  // struct System_variables. Needed by WSREP_ON
 
 #define WSREP_UNDEFINED_TRX_ID ULLONG_MAX
 

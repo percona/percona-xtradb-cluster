@@ -1,1 +1,1 @@
---gtid-mode=ON --log-bin --log-slave-updates --enforce-gtid-consistency --innodb_track_changed_pages=1
+--gtid-mode=ON --log-bin --log-slave-updates --enforce-gtid-consistency

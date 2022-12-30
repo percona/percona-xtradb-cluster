@@ -47,7 +47,8 @@ builddir = builddir
 galeradir = percona-xtradb-cluster-galera
 builddebug = debug
 
-rpath = '$$ORIGIN/../../private/debug'
+rpathdebug = '$$ORIGIN/../../private/debug'
+rpath = '$$ORIGIN/../private'
 
 override_dh_auto_configure:
 	@echo "RULES.$@"
@@ -172,6 +173,9 @@ endif
 
 	touch $@
 
+override_dh_builddeb:
+	dh_builddeb -- -Zgzip
+
 override_dh_auto_install:
 	@echo "RULES.$@"
 
@@ -250,7 +254,8 @@ override_dh_install:
 	dh_install
 	mkdir -p debian/percona-xtradb-cluster-server-debug/usr/lib/mysql/private/debug
 	cp ./builddir/library_output_directory/libprotobuf-lite.so* debian/percona-xtradb-cluster-server-debug/usr/lib/mysql/private/debug
-	patchelf --debug --set-rpath $(rpath) debian/percona-xtradb-cluster-server-debug/usr/lib/mysql/plugin/debug/group_replication.so
+	patchelf --debug --set-rpath $(rpathdebug) debian/percona-xtradb-cluster-server-debug/usr/lib/mysql/plugin/debug/group_replication.so
+	patchelf --debug --set-rpath $(rpath) debian/percona-xtradb-cluster-server/usr/lib/mysql/plugin/authentication_fido.so
 	@echo "RULES.$@"
 
 override_dh_strip:

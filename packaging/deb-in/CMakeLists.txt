@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2022, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -23,6 +23,8 @@
 IF(NOT LINUX)
   RETURN()
 ENDIF()
+
+# bionic, buster, etc
 IF (NOT DEFINED DEB_CODENAME)
   execute_process(
     COMMAND lsb_release -cs
@@ -31,12 +33,39 @@ IF (NOT DEFINED DEB_CODENAME)
   )
   SET (DEB_CODENAME ${DEB_CODENAME} CACHE STRING "")
 ENDIF()
+
+# debian, ubuntu
+IF (NOT DEFINED DEB_ID)
+  execute_process(
+    COMMAND lsb_release -is
+    OUTPUT_VARIABLE DEB_ID
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+  SET (DEB_ID ${DEB_ID} CACHE STRING "")
+ENDIF()
+
+# 18.04, 9.x, etc
+IF (NOT DEFINED DEB_RELEASE)
+  execute_process(
+    COMMAND lsb_release -rs
+    OUTPUT_VARIABLE DEB_RELEASE
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+  SET (DEB_RELEASE ${DEB_RELEASE} CACHE STRING "")
+ENDIF()
+
+# Change uppercase first letter of Ubuntu/Debian
+string(TOLOWER "${DEB_ID}" DEB_ID)
+
 IF (WITH_NDBCLUSTER)
   SET (DEB_BASE_PRODUCT "cluster-")
   SET (DEB_BASE_PRODUCTC "Cluster ")
   SET (DEB_BASE_VERSION ${MYSQL_CLUSTER_VERSION})
   SET (DEB_CONTROL_SERVER_CONFLICT_NDB "mysql-community-server, mysql-commercial-server")
   SET (DEB_CONTROL_CLIENT_CONFLICT_NDB "mysql-community-client, mysql-commercial-client")
+  SET (DEB_NOMEB "1")
+  SET (DEB_NOROUTER "1")
+  SET (DEB_CMAKE_EXTRAS "${DEB_CMAKE_EXTRAS} -DWITH_MEB=0 -DWITH_ROUTER=0")
 ELSE()
   SET (DEB_BASE_PRODUCT "")
   SET (DEB_BASE_PRODUCTC "")
@@ -74,11 +103,13 @@ usr/lib/mysql/plugin/data_masking.so
 usr/lib/mysql/plugin/keyring_okv.so
 usr/lib/mysql/plugin/keyring_encrypted_file.so
 usr/lib/mysql/plugin/keyring_hashicorp.so
+usr/lib/mysql/plugin/keyring_oci.so
 usr/lib/mysql/plugin/openssl_udf.so
 usr/lib/mysql/plugin/thread_pool.so
 usr/lib/mysql/plugin/firewall.so
 usr/lib/mysql/plugin/authentication_fido.so
 usr/lib/mysql/plugin/component_keyring_encrypted_file.so
+usr/lib/mysql/plugin/component_enterprise_encryption.so
 ")
 
    SET (DEB_INSTALL_TEST_PLUGINS
@@ -99,6 +130,10 @@ usr/lib/mysql/plugin/keyring_aws.so
   ENDIF()
   SET (DEB_REMOVEPATTERN "gpl.in")
   INCLUDE (deb_commercial.cmake)
+
+  IF (NOT DEFINED DEB_NOMEB)
+    INCLUDE(deb_meb.cmake)
+  ENDIF()
 ELSE()
   SET (DEB_PRODUCT "${DEB_BASE_PRODUCT}community")
   SET (DEB_COPYRIGHT_UPSTREAMNAME "MySQL Server ${MYSQL_BASE_VERSION}")
@@ -216,95 +251,14 @@ IF(DEB_ID STREQUAL "ubuntu")
   SET (DEB_RULES_APPARMOR_LOAD "dh_apparmor -pmysql-${DEB_PRODUCTNAME}-server --profile-name=usr.sbin.mysqld")
   SET (DEB_INSTALL_SERVER_APPARMOR "etc/apparmor.d/usr.sbin.mysqld")
   SET (DEB_INSTALL_ROUTER_APPARMOR "etc/apparmor.d/usr.bin.mysqlrouter")
-  SET (DEB_INIT_APPARMOR "/lib/apparmor/profile-load usr.sbin.mysqld")
-  SET (DEB_CONTROL_DBGSYM ${DEB_CONTROL_DBGSYM_DEFAULT})
-  SET (DEB_RULES_STRIP ${DEB_RULES_STRIP_DEFAULT})
-ELSEIF(DEB_CODENAME STREQUAL "bionic")
-  SET (DEB_PLATFORMRELEASE "ubuntu18.04")
-  SET (DEB_CONTROL_BDEPS ", dh-apparmor, dh-systemd (>=1.5)")
-  SET (DEB_INSTALL_SOURCE_XZ "../*.tar.xz usr/src/mysql/")
-  SET (DEB_RULES_INSTALL_APPARMOR
-  "
-	install -g root -o root -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld
-	install -g root -o root -m 0644 -D debian/extra/apparmor-profile-router debian/tmp/etc/apparmor.d/usr.bin.mysqlrouter
-  ")
-  SET (DEB_RULES_APPARMOR_LOAD
-  "
-	dh_apparmor -pmysql-${DEB_PRODUCTNAME}-server --profile-name=usr.sbin.mysqld
-	dh_apparmor -pmysql-router-${DEB_PRODUCTNAME} --profile-name=usr.bin.mysqlrouter
-  ")
-  SET (DEB_INSTALL_SERVER_APPARMOR "etc/apparmor.d/usr.sbin.mysqld")
-  SET (DEB_INSTALL_ROUTER_APPARMOR "etc/apparmor.d/usr.bin.mysqlrouter")
-  SET (DEB_INIT_APPARMOR "/lib/apparmor/profile-load usr.sbin.mysqld")
-  SET (DEB_CONTROL_DBGSYM "")
-  SET (DEB_RULES_STRIP "")
-ELSEIF(DEB_CODENAME STREQUAL "cosmic")
-  # Ubuntu 18.10 has OpenSSL 1.1.1, which we don't support yet
-  SET (DEB_CONTROL_BDEPS_SSL ",libssl1.0-dev")
-  SET (DEB_PLATFORMRELEASE "ubuntu18.10")
-  SET (DEB_CONTROL_BDEPS ", dh-apparmor, dh-systemd (>=1.5)")
-  SET (DEB_INSTALL_SOURCE_XZ "../*.tar.xz usr/src/mysql/")
-  SET (DEB_RULES_INSTALL_APPARMOR
-  "
-	install -g root -o root -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld
-	install -g root -o root -m 0644 -D debian/extra/apparmor-profile-router debian/tmp/etc/apparmor.d/usr.bin.mysqlrouter
-  ")
-  SET (DEB_RULES_APPARMOR_LOAD
-  "
-	dh_apparmor -pmysql-${DEB_PRODUCTNAME}-server --profile-name=usr.sbin.mysqld
-	dh_apparmor -pmysql-router-${DEB_PRODUCTNAME} --profile-name=usr.bin.mysqlrouter
-  ")
-  SET (DEB_INSTALL_SERVER_APPARMOR "etc/apparmor.d/usr.sbin.mysqld")
-  SET (DEB_INSTALL_ROUTER_APPARMOR "etc/apparmor.d/usr.bin.mysqlrouter")
-  SET (DEB_INIT_APPARMOR "/lib/apparmor/profile-load usr.sbin.mysqld")
-  SET (DEB_CONTROL_DBGSYM "")
-  SET (DEB_RULES_STRIP "")
-ELSEIF(DEB_CODENAME STREQUAL "disco")
-  SET (DEB_PLATFORMRELEASE "ubuntu19.04")
-  SET (DEB_CONTROL_BDEPS ", dh-apparmor, dh-systemd (>=1.5)")
-  SET (DEB_INSTALL_SOURCE_XZ "../*.tar.xz usr/src/mysql/")
-  SET (DEB_RULES_INSTALL_SYSTEMD
-    "install -m 0755 debian/extra/mysql-systemd-start debian/tmp/usr/share/mysql/")
-  SET (DEB_RULES_INSTALL_APPARMOR
-  "
-	install -g root -o root -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld
-  ")
-  SET (DEB_RULES_APPARMOR_LOAD
-  "
-	dh_apparmor -pmysql-${DEB_PRODUCTNAME}-server --profile-name=usr.sbin.mysqld
-  ")
-  SET (DEB_RULES_SYSTEMD_ENABLE "dh_systemd_enable --name=mysql")
-  SET (DEB_RULES_SYSTEMD_START "dh_systemd_start --restart-after-upgrade")
-  SET (DEB_INSTALL_SERVER_SYSTEMD "usr/share/mysql/mysql-systemd-start")
-  SET (DEB_INSTALL_SERVER_APPARMOR "etc/apparmor.d/usr.sbin.mysqld")
-  SET (DEB_SERVICE_SERVER_EXECPRE
-    "ExecStartPre=/usr/share/mysql/mysql-systemd-start pre")
-  SET (DEB_INIT_APPARMOR "/lib/apparmor/profile-load usr.sbin.mysqld")
-  SET (DEB_CONTROL_DBGSYM "")
-  SET (DEB_RULES_STRIP "")
-ELSEIF(DEB_CODENAME STREQUAL "eoan")
-  SET (DEB_PLATFORMRELEASE "ubuntu19.10")
-  SET (DEB_CONTROL_BDEPS ", dh-apparmor, dh-systemd (>=1.5)")
-  SET (DEB_INSTALL_SOURCE_XZ "../*.tar.xz usr/src/mysql/")
-  SET (DEB_RULES_INSTALL_APPARMOR
-  "
-	install -g root -o root -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld
-	install -g root -o root -m 0644 -D debian/extra/apparmor-profile-router debian/tmp/etc/apparmor.d/usr.bin.mysqlrouter
-  ")
-  SET (DEB_RULES_APPARMOR_LOAD
-  "
-	dh_apparmor -pmysql-${DEB_PRODUCTNAME}-server --profile-name=usr.sbin.mysqld
-	dh_apparmor -pmysql-router-${DEB_PRODUCTNAME} --profile-name=usr.bin.mysqlrouter
-  ")
-  SET (DEB_INSTALL_SERVER_APPARMOR "etc/apparmor.d/usr.sbin.mysqld")
-  SET (DEB_INSTALL_ROUTER_APPARMOR "etc/apparmor.d/usr.bin.mysqlrouter")
-  SET (DEB_INIT_APPARMOR "/lib/apparmor/profile-load usr.sbin.mysqld")
-  SET (DEB_CONTROL_DBGSYM "")
-  SET (DEB_RULES_STRIP "")
-ELSE()
-  MESSAGE(STATUS
-    "Skipping deb packaging on unsupported platform ${DEB_CODENAME}.")
-  RETURN()
+  SET (DEB_INIT_SERVER_APPARMOR "/lib/apparmor/profile-load usr.sbin.mysqld")
+  SET (DEB_INIT_ROUTER_APPARMOR "/lib/apparmor/profile-load usr.bin.mysqlrouter")
+
+  # Ubuntu 16.04 doesn't automatically create debug symbol packages
+  IF(DEB_CODENAME STREQUAL "xenial")
+    SET (DEB_CONTROL_DBGSYM ${DEB_CONTROL_DBGSYM_DEFAULT})
+    SET (DEB_RULES_STRIP ${DEB_RULES_STRIP_DEFAULT})
+  ENDIF()
 ENDIF()
 
 IF (NOT DEFINED DEB_NOROUTER)

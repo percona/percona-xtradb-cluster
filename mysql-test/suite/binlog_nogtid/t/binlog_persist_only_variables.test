@@ -63,7 +63,7 @@ INSERT INTO non_persisted VALUES
   ('log_bin_basename'), ('log_bin_index'), ('relay_log'), ('relay_log_basename'),
   ('relay_log_index'), ('relay_log_info_file'), ('replica_load_tmpdir'),
   ('slave_load_tmpdir'), ('log_bin_use_v1_row_events'),
-  ('have_backup_safe_binlog_info');
+  ('have_backup_safe_binlog_info'), ('replica_enable_event');
 
 CREATE TABLE aliases (
   name VARCHAR(100) PRIMARY KEY
@@ -95,7 +95,7 @@ INSERT INTO aliases(name) VALUES
 # 5. wsrep_replicate_myisam
 # 6. wsrep_restart_replica
 --echo
---let $expected = 124
+--let $expected = 125
 --let $assert_text = Expect $expected variables in the table.
 --let $assert_cond = [SELECT COUNT(*) as count FROM rplvars, count, 1] = $expected
 --source include/assert.inc

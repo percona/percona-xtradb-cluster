@@ -219,10 +219,17 @@ Prefix: %{_sysconfdir}
               %define distro_buildreq       gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake
               %define distro_requires       chkconfig coreutils grep procps shadow-utils %distro_req
             else
-              %define distro_description    Red Hat Enterprise Linux 8
-              %define distro_releasetag     rhel8
-              %define distro_buildreq       gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake
-              %define distro_requires       chkconfig coreutils grep procps shadow-utils %distro_req
+             %if 0%{?rhel} < 9
+               %define distro_description    Red Hat Enterprise Linux 8
+               %define distro_releasetag     rhel8
+               %define distro_buildreq       gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake
+               %define distro_requires       chkconfig coreutils grep procps shadow-utils %distro_req
+             else
+               %define distro_description    Red Hat Enterprise Linux 9
+               %define distro_releasetag     rhel9
+               %define distro_buildreq       gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake
+               %define distro_requires       chkconfig coreutils grep procps shadow-utils %distro_req
+             %endif
             %endif
           %endif    
         %endif
@@ -268,7 +275,7 @@ Prefix: %{_sysconfdir}
 %endif
 
 # Version for compat libs
-%if 0%{?rhel} > 6
+%if 0%{?rhel} == 7 || 0%{?rhel} == 8
 %global compatver             5.6.28
 %global percona_compatver     25.14
 %global compatlib             18
@@ -365,7 +372,7 @@ Requires:             policycoreutils
 Requires(pre):        policycoreutils
 Requires(post):       policycoreutils
 Requires(postun):     policycoreutils
-%if 0%{?rhel} == 8
+%if 0%{?rhel} == 8 || 0%{?rhel} == 9
 Requires:             policycoreutils-python-utils
 Requires(pre):        policycoreutils-python-utils
 Requires(post):       policycoreutils-python-utils
@@ -396,7 +403,7 @@ Requires(preun):  /sbin/chkconfig
 Requires(preun):  /sbin/service
 %endif
 Provides:       mysql-server MySQL-server
-%if 0%{?rhel} == 8
+%if 0%{?rhel} == 8 || 0%{?rhel} == 9
 Obsoletes:      mariadb-connector-c-config
 %endif
 Conflicts:      Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56 Percona-Server-server-57
@@ -530,7 +537,7 @@ Group:          Applications/Databases
 Provides:       mysql-libs-compat = %{version}-%{release}
 Provides:       mysql-libs-compat%{?_isa} = %{version}-%{release}
 Provides:       MySQL-shared-compat%{?_isa} = %{version}-%{release}
-%if 0%{?rhel} > 6
+%if 0%{?rhel} == 7 || 0%{?rhel} == 8
 Provides:       libmysqlclient.so.18()(64bit)
 Provides:       libmysqlclient.so.18(libmysqlclient_16)(64bit)
 Provides:       libmysqlclient.so.18(libmysqlclient_18)(64bit)
@@ -623,7 +630,7 @@ export CFLAGS=${MYSQL_BUILD_CFLAGS:-${CFLAGS:-$RPM_OPT_FLAGS}}
 export CXXFLAGS=${MYSQL_BUILD_CXXFLAGS:-${CXXFLAGS:-$RPM_OPT_FLAGS -felide-constructors}}
 export LDFLAGS=${MYSQL_BUILD_LDFLAGS:-${LDFLAGS:-}}
 
-%if 0%{?rhel} == 8
+%if 0%{?rhel} == 8 || 0%{?rhel} == 9
 export CMAKE=${MYSQL_BUILD_CMAKE:-${CMAKE:-/usr/bin/cmake}}
 %else
 export CMAKE=${MYSQL_BUILD_CMAKE:-${CMAKE:-/usr/bin/cmake3}}
@@ -655,7 +662,7 @@ mkdir pxc_extra
 pushd pxc_extra
 mkdir pxb-2.4
 pushd pxb-2.4
-yumdownloader percona-xtrabackup-24-2.4.26
+yumdownloader percona-xtrabackup-24-2.4.27
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib* ./
@@ -669,7 +676,7 @@ popd
 
 mkdir pxb-8.0
 pushd pxb-8.0
-yumdownloader percona-xtrabackup-80-8.0.29
+yumdownloader percona-xtrabackup-80-8.0.30
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib64 ./
@@ -689,19 +696,25 @@ mkdir debug
   cd debug
   # Attempt to remove any optimisation flags from the debug build
   CFLAGS=`echo " ${CFLAGS} " | \
-            sed -e 's/ -O[0-9]* / /' \
+            sed -e 's/ -unroll2 / /' \
+%if 0%{?rhel} < 9
+                -e 's/ -O[0-9]* / /' \
                 -e 's/-Wp,-D_FORTIFY_SOURCE=2/ -Wno-missing-field-initializers -Wno-error /' \
-                -e 's/ -unroll2 / /' \
+%endif
                 -e 's/ -ip / /' \
                 -e 's/^ //' \
                 -e 's/ $//'`
   CXXFLAGS=`echo " ${CXXFLAGS} " | \
-              sed -e 's/ -O[0-9]* / /' \
-                  -e 's/-Wp,-D_FORTIFY_SOURCE=2/ -Wno-missing-field-initializers -Wno-error /' \
-                  -e 's/ -unroll2 / /' \
-                  -e 's/ -ip / /' \
-                  -e 's/^ //' \
-                  -e 's/ $//'`
+            sed -e 's/ -unroll2 / /' \
+%if 0%{?rhel} < 9
+                -e 's/ -O[0-9]* / /' \
+                -e 's/-Wp,-D_FORTIFY_SOURCE=2/ -Wno-missing-field-initializers -Wno-error /' \
+%else
+                -e 's/-D_FORTIFY_SOURCE=2/-D_FORTIFY_SOURCE=2 -Wno-error=stringop-truncation -Wno-error=maybe-uninitialized/' \
+%endif
+                -e 's/ -ip / /' \
+                -e 's/^ //' \
+                -e 's/ $//'`
   # XXX: MYSQL_UNIX_ADDR should be in cmake/* but mysql_version is included before
   # XXX: install_layout so we can't just set it based on INSTALL_LAYOUT=RPM
   ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
@@ -709,6 +722,9 @@ mkdir debug
            -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=%{_prefix} \
            -DWITH_EMBEDDED_SERVER=OFF \
            -DWITH_INNODB_MEMCACHED=ON \
+           -DUSE_LD_LLD=0 \
+           -DWITH_AUTHENTICATION_CLIENT_PLUGINS=1 \
+           -DWITH_CURL=system \
 %if 0%{?systemd}
            -DWITH_SYSTEMD=OFF \
 %endif
@@ -727,7 +743,6 @@ mkdir debug
            -DWITH_INNODB_DISALLOW_WRITES=ON \
            -DWITH_EMBEDDED_SERVER=0 \
            -DWITH_EMBEDDED_SHARED_LIBRARY=0 \
-           -DWITH_PAM=1 \
            -DWITH_INNODB_MEMCACHED=1 \
            -DWITH_ZSTD=bundled \
            -DWITH_FIDO=bundled \
@@ -750,6 +765,9 @@ mkdir release
            -DCMAKE_BUILD_TYPE=RelWithDebInfo  -DCMAKE_INSTALL_PREFIX=%{_prefix} \
            -DWITH_EMBEDDED_SERVER=OFF \
            -DWITH_INNODB_MEMCACHED=ON \
+           -DUSE_LD_LLD=0 \
+           -DWITH_AUTHENTICATION_CLIENT_PLUGINS=1 \
+           -DWITH_CURL=system \
 %if 0%{?systemd}
            -DWITH_SYSTEMD=OFF \
 %endif
@@ -768,7 +786,6 @@ mkdir release
            -DWITH_INNODB_DISALLOW_WRITES=ON \
            -DWITH_EMBEDDED_SERVER=0 \
            -DWITH_EMBEDDED_SHARED_LIBRARY=0 \
-           -DWITH_PAM=1 \
            -DWITH_INNODB_MEMCACHED=1 \
            -DWITH_ZSTD=bundled \
            -DWITH_FIDO=bundled \
@@ -820,6 +837,10 @@ popd
 
 ##############################################################################
 %install
+
+%if 0%{?rhel} == 9
+    sed -i 's/python2$/python3/' scripts/pyclustercheck
+%endif
 
 %if 0%{?compatlib}
 # Install compat libs
@@ -978,6 +999,9 @@ install -d $RBR%{_libdir}/mysql
 #%if 0%{?mecab}
 #    mv $RBR%{_libdir}/mecab $RBR%{_libdir}/mysql
 #%endif
+
+# set rpath for plugin to use private/libfido2.so
+patchelf --debug --set-rpath '$ORIGIN/../private' %{buildroot}/%{_libdir}/mysql/plugin/authentication_fido.so
 
 ##############################################################################
 #  Post processing actions, i.e. when installed
@@ -1733,7 +1757,9 @@ else
             else
                 echo "Not bootstrapping with $(( numint-1 )) nodes already in cluster PC"
                 echo "Restarting with mysql.service in its stead"
-                %systemd_postun
+                %if 0%{?rhel} < 9
+                    %systemd_postun
+                %endif
                 /usr/bin/systemctl stop mysql@bootstrap.service
                 /usr/bin/systemctl start mysql.service
             fi

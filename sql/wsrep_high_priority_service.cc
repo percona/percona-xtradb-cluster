@@ -735,6 +735,7 @@ int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
 
     // Applier threads can't be killed and are required for IST applying
     replayer_thd->wsrep_applier = true;
+    replayer_thd->thd_tx_priority = 1;
 
     THD *thd = replayer_thd;
 #ifdef HAVE_PSI_THREAD_INTERFACE
@@ -850,6 +851,9 @@ int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
 
     thd->release_resources();
     thd_manager->remove_thd(thd);
+#ifdef HAVE_PSI_THREAD_INTERFACE
+    mysql_thread_set_psi_THD(nullptr);
+#endif
   });
 
   cv.wait(lk, [&] { return entered_nbo_mode; });

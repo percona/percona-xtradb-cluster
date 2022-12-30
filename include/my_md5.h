@@ -1,7 +1,7 @@
 #ifndef MY_MD5_INCLUDED
 #define MY_MD5_INCLUDED
 
-/* Copyright (c) 2000, 2021, Oracle and/or its affiliates.
+/* Copyright (c) 2000, 2022, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -59,7 +59,7 @@ void *wsrep_md5_init();
 
 void wsrep_md5_update(void *ctx, char *buf, int len);
 
-void wsrep_compute_md5_hash(char *digest, void *ctx);
+void wsrep_compute_md5_hash(unsigned char *digest, void *ctx);
 
 #endif /* WITH_WSREP */
 

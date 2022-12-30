@@ -39,6 +39,7 @@
 #include <unistd.h>    // pipe()
 
 #include "sql/conn_handler/socket_connection.h"  // MY_BIND_ALL_ADDRESSES
+#include "sql/raii/sentry.h"
 #include "sql/sql_lex.h"                         // lex_start/lex_end
 
 #ifdef HAVE_SYS_PRCTL_H
@@ -936,7 +937,7 @@ void process::terminate() {
   }
 }
 
-thd::thd(bool won) : init(), ptr(new THD) {
+thd::thd(bool won) : ptr(new THD) {
   if (ptr) {
     ptr->thread_stack = (char *)(&ptr);
     wsrep_assign_from_threadvars(ptr);
@@ -1045,27 +1046,28 @@ size_t wsrep_guess_ip(char *buf, size_t buf_len) {
 
     if (!single_addr) return 0;
 
+    raii::Sentry<> single_addr_sentry(
+        [single_addr]() { my_free(single_addr); });
+
     wsrep_get_single_address(my_bind_addr_str, single_addr,
                              single_addr_buf_size);
     unsigned int const ip_type = wsrep_check_ip(single_addr, &unused);
 
     if (INADDR_NONE == ip_type) {
       WSREP_ERROR("Networking not configured, cannot receive state transfer.");
-      my_free(single_addr);
       return 0;
     }
 
     if (INADDR_ANY != ip_type) {
-      if (strlen(my_bind_addr_str) >= buf_len) {
+      if (strlen(single_addr) >= buf_len) {
         WSREP_WARN("default_ip(): buffer too short: %zu <= %zd", buf_len,
-                   strlen(my_bind_addr_str));
+                   strlen(single_addr));
         return 0;
       }
-      strncpy(buf, my_bind_addr_str, buf_len);
+      strncpy(buf, single_addr, buf_len);
       return strlen(buf);
     }
 
-    my_free(single_addr);
   }
 
   // mysqld binds to all interfaces - try IP from wsrep_node_address
