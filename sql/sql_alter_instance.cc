@@ -185,6 +185,66 @@ bool Rotate_innodb_master_key::execute() {
   return false;
 }
 
+#ifdef WITH_WSREP
+/*
+  @brief
+  Executes GCache master key rotation.
+
+  @returns false on success
+           true on error
+
+  In case of failure, appropriate error
+  is logged by function.
+*/
+extern bool wsrep_rotate_master_key();
+bool Rotate_gcache_master_key::execute() {
+  if (check_security_context()) return true;
+
+  /*
+    Acquire protection against GRL and check for concurrent change of read_only
+    value since encryption key rotation is not allowed in read_only/
+    super_read_only mode.
+  */
+  if (acquire_shared_global_read_lock(m_thd,
+                                      m_thd->variables.lock_wait_timeout)) {
+    // MDL subsystem has to set an error in Diagnostics Area
+    assert(m_thd->get_stmt_da()->is_error());
+    return true;
+  }
+
+  if (WSREP(m_thd) &&
+      wsrep_to_isolation_begin(m_thd, WSREP_MYSQL_DB, NULL, NULL)) {
+    WSREP_ERROR("Failed to replicate the %s command in cluster mode",
+                m_thd->query().str);
+    return (true);
+  }
+
+  if (wsrep_rotate_master_key()) {
+    my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, MYF(0));
+    return true;
+  }
+
+  if (log_to_binlog()) {
+    /*
+      Though we failed to write to binlog,
+      there is no way we can undo this operation.
+      So, covert error to a warning and let user
+      know that something went wrong while trying
+      to make entry in binlog.
+    */
+    m_thd->clear_error();
+    m_thd->get_stmt_da()->reset_diagnostics_area();
+
+    push_warning(m_thd, Sql_condition::SL_WARNING,
+                 ER_MASTER_KEY_ROTATION_BINLOG_FAILED,
+                 ER_THD(m_thd, ER_MASTER_KEY_ROTATION_BINLOG_FAILED));
+  }
+
+  my_ok(m_thd);
+  return false;
+}
+#endif /* WITH_WSREP */
+
 bool Rotate_percona_system_key::rotate() {
   size_t key_length{0};
 

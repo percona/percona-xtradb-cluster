@@ -160,6 +160,11 @@ extern bool plugin_register_dynamic_and_init_all(int *argc, char **argv,
                                                  int init_flags);
 extern bool update_persisted_plugin_sysvars(const char *name);
 
+#ifdef WITH_WSREP
+extern bool plugin_register_keyring(int *argc, char **argv);
+extern bool plugin_reinit_keyring();
+#endif
+
 namespace dd {
 namespace upgrade {
 extern bool plugin_initialize_delayed_after_upgrade();
