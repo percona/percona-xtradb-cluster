@@ -9508,6 +9508,7 @@ no_commit:
 			dberr_t err = row_lock_table_for_mysql(
 			    m_prebuilt, locked_table[i], LOCK_IX);
 			ut_ad(err == DB_SUCCESS);
+			(void)err;
 		}
                 locked_table.clear();
 

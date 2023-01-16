@@ -7655,6 +7655,7 @@ extern "C" void *start_wsrep_THD(void *arg)
   return(NULL);
 }
 
+#if 0
 /**/
 static inline bool is_client_connection(THD *thd)
 {
@@ -7683,7 +7684,6 @@ static inline bool is_committing_connection(THD *thd)
   return ret;
 }
 
-#if 0
 /*
    returns the number of wsrep appliers running.
    However, the caller (thd parameter) is not taken in account
