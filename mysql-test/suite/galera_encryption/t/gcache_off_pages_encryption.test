@@ -1,0 +1,74 @@
+#
+# Test GCache off-pages encryption
+#
+
+--source include/galera_cluster.inc
+
+--connection node_2
+
+--let $MYSQL_DATA_DIR = `select @@datadir`
+
+# Restart the server without GCache ring buffer and encryption disabled.
+# This warning may happen, if there is someting already in GCache (e.g. from previous tests).
+# We are shrinking ring buffer to zero, so offset in the preamble will not be valid.
+call mtr.add_suppression("Bogus offset in GCache ring buffer preamble");
+--let $do_not_echo_parameters = 1
+--let $restart_parameters = "restart: --wsrep_provider_options='base_port=$NODE_GALERAPORT_2;gcache.encryption=no;gcache.encryption_cache_page_size=4k;gcache.encryption_cache_size=4k;gcache.size=0;gcache.page_size=16k'"
+--source include/restart_mysqld.inc
+--source include/wait_until_connected_again.inc
+--source include/galera_wait_ready.inc
+
+CREATE DATABASE test2;
+USE test2;
+
+--let $cnt = 100
+--disable_query_log
+while ($cnt)
+{
+  --eval CREATE TABLE t_$cnt(a int primary key);
+  --dec $cnt
+}
+--enable_query_log
+
+# Check that GCache off page contains CREATE TABLE clear text
+--let $assert_text = Assert that GCache off page is not encrypted
+--let $assert_file = $MYSQL_DATA_DIR/gcache.page.000000
+--let $assert_select = CREATE TABLE t_100
+--let $assert_count = 1
+--source include/assert_grep.inc
+
+DROP DATABASE test2;
+
+# Restart the server without GCache ring buffer and encryption enabled
+--let $do_not_echo_parameters = 1
+--let $restart_parameters = "restart: --wsrep_provider_options='base_port=$NODE_GALERAPORT_2;gcache.encryption=yes;gcache.encryption_cache_page_size=4k;gcache.encryption_cache_size=4k;gcache.size=0;gcache.page_size=16k'"
+--source include/restart_mysqld.inc
+--source include/wait_until_connected_again.inc
+--source include/galera_wait_ready.inc
+
+CREATE DATABASE test2;
+USE test2;
+
+--let $cnt = 100
+--disable_query_log
+while ($cnt)
+{
+  --eval CREATE TABLE t_$cnt(a int primary key);
+  --dec $cnt
+}
+--enable_query_log
+
+# Check that GCache off page contains CREATE TABLE clear text
+--let $assert_text = Assert that GCache off page is encrypted
+--let $assert_file = $MYSQL_DATA_DIR/gcache.page.000002
+--let $assert_select = CREATE TABLE t_
+--let $assert_count = 0
+--source include/assert_grep.inc
+
+
+# cleanup
+DROP DATABASE test2;
+
+--let $do_not_echo_parameters = 1
+--let $restart_parameters = restart:
+--source include/restart_mysqld.inc

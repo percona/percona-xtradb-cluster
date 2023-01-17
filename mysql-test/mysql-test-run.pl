@@ -316,6 +316,7 @@ our @DEFAULT_SUITES = qw(
   galera_3nodes_sr
   galera_nbo
   galera_3nodes_nbo
+  galera_encryption
   wsrep
   );
 

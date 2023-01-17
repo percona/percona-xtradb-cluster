@@ -1,0 +1,13 @@
+CREATE TABLE t1(id int PRIMARY KEY AUTO_INCREMENT, data MEDIUMBLOB);
+SET DEBUG_SYNC = 'now WAIT_FOR before_cert';
+Unencrypted content NOT found - this is expected result.
+SET DEBUG_SYNC = 'now SIGNAL continue';
+DROP TABLE t1;
+# restart:<hidden args>
+CREATE TABLE t1(id int PRIMARY KEY AUTO_INCREMENT, data MEDIUMBLOB);
+SET DEBUG_SYNC = 'now WAIT_FOR before_cert';
+Unencrypted content found - this is expected result.
+SET DEBUG_SYNC = 'now SIGNAL continue';
+DROP TABLE t1;
+SET DEBUG_SYNC = 'reset';
+# restart:<hidden args>

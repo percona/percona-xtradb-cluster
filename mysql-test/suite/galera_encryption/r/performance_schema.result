@@ -1,0 +1,2 @@
+ALTER INSTANCE ROTATE GCACHE MASTER KEY;
+include/assert.inc [There should be new GaleraKey visible in P_S]

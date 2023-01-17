@@ -1,0 +1,11 @@
+ALTER INSTANCE ROTATE GCACHE MASTER KEY;
+CREATE TABLE t1(a INT PRIMARY KEY);
+include/assert_grep.inc [Assert that GCache uses MK id is not 1]
+INSERT INTO t1 VALUES (0);
+# restart:<hidden args>
+include/assert_grep.inc [Assert that GCache ring buffer reset was done]
+include/assert_grep.inc [Assert that GCache uses MK id 1]
+include/assert.inc [UUIDs should differ]
+include/assert.inc [Constant part of MK should remain the same]
+DROP TABLE t1;
+# restart:<hidden args>

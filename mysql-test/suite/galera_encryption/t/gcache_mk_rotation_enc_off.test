@@ -1,0 +1,106 @@
+#
+# Test rotation of GCache Master Key when one of the nodes has GCache encryption disabled
+#
+
+--source include/have_util_sed.inc
+--source include/galera_cluster.inc
+
+--connection node_1
+--let $NODE1_DATA_DIR = `select @@datadir`
+--connection node_2
+--let $NODE2_DATA_DIR = `select @@datadir`
+
+--connection node_1
+# In this MTR suite the server is started with GCache encryption enabled
+# The test may use server instance with already rotated MK.
+# We will check Master Key rotations later in the test, so for making it easier
+# to track rotations, force GCache reset. It will cause usage of key id 1.
+
+# Spoil preamble CRC
+--exec $SED -i "s/enc_crc:.*/enc_crc: 1234/" $NODE1_DATA_DIR/galera.cache
+call mtr.add_suppression("Encryption header CRC mismatch");
+--let $do_not_echo_parameters = 1
+--let $restart_parameters = "restart: --wsrep_cluster_address=gcomm://127.0.0.1:$NODE_GALERAPORT_2 --wsrep_provider_options='base_port=$NODE_GALERAPORT_1;gcache.encryption=yes'"
+--source include/restart_mysqld.inc
+--source include/galera_wait_ready.inc
+
+
+CREATE TABLE t1(a INT PRIMARY KEY);
+INSERT INTO t1 VALUES (0);
+
+#
+# Disable GCache encryption on node_2
+#
+--connection node_2
+--let $do_not_echo_parameters = 1
+--let $restart_parameters = "restart: --wsrep_provider_options='base_port=$NODE_GALERAPORT_2;gcache.encryption=no'"
+--source include/restart_mysqld.inc
+--source include/galera_wait_ready.inc
+
+#
+# Test that replication still works in both directions
+#
+INSERT INTO t1 VALUES (1);
+
+--connection node_1
+INSERT INTO t1 VALUES (2);
+
+--let $wait_condition = SELECT COUNT(*) = 3 FROM t1
+--source include/wait_condition.inc
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 3 FROM t1
+--source include/wait_condition.inc
+
+#
+# Rotate MK on node_1. It will have no effect on node_2
+#
+--connection node_1
+ALTER INSTANCE ROTATE GCACHE MASTER KEY;
+
+#
+# Check that GCache ring buffer file on node_1 is using MK id 2
+#
+--let $assert_text = Assert that node_1 GCache uses MK id 2
+--let $assert_file = $NODE1_DATA_DIR/galera.cache
+--let $assert_select = enc_mk_id: 2
+--let $assert_count = 1
+--source include/assert_grep.inc
+
+#
+# Check that GCache ring buffer file on node_2 is using MK id 0 (no MK)
+#
+--connection node_2
+--let $assert_text = Assert that node_2 GCache uses MK id 0
+--let $assert_file = $NODE2_DATA_DIR/galera.cache
+--let $assert_select = enc_mk_id: 0
+--let $assert_count = 1
+--source include/assert_grep.inc
+
+#
+# Rotate MK on node_2. It will have no effect on node_2
+# but query will be replicated to node_1 and cause rotation
+#
+--connection node_2
+ALTER INSTANCE ROTATE GCACHE MASTER KEY;
+
+#
+# Check that GCache ring buffer file on node_1 is using MK id 3
+#
+--let $assert_text = Assert that node_1 GCache uses MK id 3
+--let $assert_file = $NODE1_DATA_DIR/galera.cache
+--let $assert_select = enc_mk_id: 3
+--let $assert_count = 1
+--source include/assert_grep.inc
+
+#
+# Check that GCache ring buffer file on node_2 is using MK id 0 (no MK)
+#
+--connection node_2
+--let $assert_text = Assert that node_2 GCache uses MK id 0
+--let $assert_file = $NODE2_DATA_DIR/galera.cache
+--let $assert_select = enc_mk_id: 0
+--let $assert_count = 1
+--source include/assert_grep.inc
+
+# cleanup
+DROP TABLE t1;

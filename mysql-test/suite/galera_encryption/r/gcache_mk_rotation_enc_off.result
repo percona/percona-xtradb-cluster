@@ -1,0 +1,14 @@
+call mtr.add_suppression("Encryption header CRC mismatch");
+# restart:<hidden args>
+CREATE TABLE t1(a INT PRIMARY KEY);
+INSERT INTO t1 VALUES (0);
+# restart:<hidden args>
+INSERT INTO t1 VALUES (1);
+INSERT INTO t1 VALUES (2);
+ALTER INSTANCE ROTATE GCACHE MASTER KEY;
+include/assert_grep.inc [Assert that node_1 GCache uses MK id 2]
+include/assert_grep.inc [Assert that node_2 GCache uses MK id 0]
+ALTER INSTANCE ROTATE GCACHE MASTER KEY;
+include/assert_grep.inc [Assert that node_1 GCache uses MK id 3]
+include/assert_grep.inc [Assert that node_2 GCache uses MK id 0]
+DROP TABLE t1;
