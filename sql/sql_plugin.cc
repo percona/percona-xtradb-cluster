@@ -1615,9 +1615,20 @@ bool plugin_register_builtin_and_init_core_se(int *argc, char **argv) {
 
   initialized = true;
 
+#ifdef WITH_WSREP
+  /* First we register requested plugins.
+     Note that for PXC this function is internal/static. It is used by
+     1. plugin_register_builtin_and_init_core_se() which registers all besides
+        keyring
+     2. plugin_register_keyring() which registers only keyring.
+  */
+  for (struct st_mysql_plugin **builtins = plugins; *builtins || mandatory;
+       builtins++) {
+#else
   /* First we register the builtin mandatory and optional plugins */
-  for (struct st_mysql_plugin **builtins = plugins /*mysql_mandatory_plugins*/;
+  for (struct st_mysql_plugin **builtins = mysql_mandatory_plugins;
        *builtins || mandatory; builtins++) {
+#endif
     /* Switch to optional plugins when done with the mandatory ones */
     if (!*builtins) {
 #ifdef WITH_WSREP

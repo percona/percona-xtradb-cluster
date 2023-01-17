@@ -96,11 +96,8 @@ void MasterKeyManager::DeInit() {
 }
 
 bool MasterKeyManager::GenerateKey(const std::string &keyId) {
-  if (keyring_generator_service_->generate(keyId.c_str(), nullptr, key_type,
-                                           KEY_LEN) == true) {
-    return true;
-  }
-  return false;
+  return keyring_generator_service_->generate(keyId.c_str(), nullptr, key_type,
+                                              KEY_LEN);
 }
 
 std::string MasterKeyManager::GetKey(const std::string &keyId) {
@@ -136,10 +133,8 @@ std::string MasterKeyManager::GetKey(const std::string &keyId) {
   /* Allocate requried memory for key and secret_type */
   std::vector<unsigned char> secret_v;
   std::vector<char> secret_type_v;
-  secret_v.reserve(secret_length);
-  secret_type_v.reserve(secret_type_length + 1);
-  memset(secret_v.data(), 0, secret_length);
-  memset(secret_type_v.data(), 0, secret_type_length + 1);
+  secret_v.resize(secret_length);
+  secret_type_v.resize(secret_type_length + 1);
 
   if (keyring_reader_service_->fetch(reader_object, secret_v.data(),
                                      secret_length, &secret_length,

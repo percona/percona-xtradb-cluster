@@ -1112,7 +1112,6 @@ static void setup_galera_encryption_params(char* provider_options, size_t buf_si
     override_galera_option("allocator.disk_pages_encryption", val, options);
   }
 
-  // todo: strncpy, buffer size, etc
   snprintf(provider_options, buf_size, "%s", options.c_str());
   provider_options[buf_size] = 0;
 }
@@ -3194,8 +3193,7 @@ static void wsrep_deinit_master_key() {
 }
 
 std::string wsrep_get_master_key(const std::string &keyId) {
-  std::string mk = masterKeyManager->GetKey(keyId);
-  return mk;
+  return masterKeyManager->GetKey(keyId);
 }
 
 bool wsrep_new_master_key(const std::string &keyId) {
