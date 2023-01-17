@@ -1,0 +1,14 @@
+#
+# GCache encryption information visible through P_S
+#
+
+--source include/galera_cluster.inc
+
+--let $mk_cnt_before = `SELECT COUNT(*) FROM performance_schema.keyring_keys WHERE KEY_ID LIKE 'GaleraKey-%'`
+ALTER INSTANCE ROTATE GCACHE MASTER KEY;
+--let $mk_cnt_after = `SELECT COUNT(*) FROM performance_schema.keyring_keys WHERE KEY_ID LIKE 'GaleraKey-%'`
+
+--let $assert_text = There should be new GaleraKey visible in P_S
+--let $assert_cond= [SELECT $mk_cnt_before+1 = $mk_cnt_after] = 1
+--source include/assert.inc
+

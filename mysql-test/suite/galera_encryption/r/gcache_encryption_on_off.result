@@ -1,0 +1,17 @@
+CREATE TABLE t1(a INT PRIMARY KEY);
+include/assert_grep.inc [Assert that GCache is encrypted]
+include/assert_grep.inc [Assert that GCache is encrypted]
+# restart:<hidden args>
+include/assert_grep.inc [Assert that GCache ring buffer recovery took place]
+include/assert_grep.inc [Assert that GCache ring buffer reset was not done]
+# restart:<hidden args>
+include/assert_grep.inc [Assert that GCache ring buffer reset was done]
+include/assert_grep.inc [Assert that GCache is not encrypted]
+CREATE TABLE t2(a INT PRIMARY KEY);
+include/assert_grep.inc [Assert that GCache is not encrypted]
+# restart:<hidden args>
+include/assert_grep.inc [Assert that GCache ring buffer reset was done]
+include/assert_grep.inc [Assert that GCache is encrypted]
+DROP TABLE t1;
+DROP TABLE t2;
+# restart:<hidden args>

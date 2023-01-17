@@ -1,0 +1,82 @@
+#
+# Test recovery in the case of spoiled GCache preamble
+#
+
+--source include/have_util_sed.inc
+--source include/have_grep.inc
+--source include/galera_cluster.inc
+
+--let $enc_ids_file = $MYSQLTEST_VARDIR/tmp/enc_ids_file
+
+# This will cause next MK id to be used on both nodes
+ALTER INSTANCE ROTATE GCACHE MASTER KEY;
+
+--connection node_2
+--let $NODE2_DATA_DIR = `select @@datadir`
+--let $ofile= $MYSQLTEST_VARDIR/tmp/node.2.err
+
+# In this MTR suite the server is started with GCache encryption enabled
+CREATE TABLE t1(a INT PRIMARY KEY);
+
+# Master Key ID should be greater than 1 because of the previous rotation
+--let $assert_text = Assert that GCache uses MK id is not 1
+--let $assert_file = $NODE2_DATA_DIR/galera.cache
+--let $assert_select = enc_mk_id: 1
+--let $assert_count = 0
+--source include/assert_grep.inc
+
+# Get Master Key ID
+--exec echo -n "--let \$enc_mk_uuid_before = " > $enc_ids_file
+--exec $GREP -a "^enc_mk_uuid: .*$" $NODE2_DATA_DIR/galera.cache >> $enc_ids_file
+--exec echo -n "--let \$enc_mk_const_id_before = " >> $enc_ids_file
+--exec $GREP -a "^enc_mk_const_id: .*$" $NODE2_DATA_DIR/galera.cache >> $enc_ids_file
+
+# Spoil preamble CRC
+--exec $SED -i "s/enc_crc:.*/enc_crc: 1234/" $NODE2_DATA_DIR/galera.cache
+
+# Replication still works, as the Master Key is already set in cipher
+INSERT INTO t1 VALUES (0);
+
+# Restart node_2. As it has invalid CRC in GCache preamble, it will trigger GCache reset.
+# The new Master Key will be used.
+--let $do_not_echo_parameters = 1
+--let $restart_parameters = "restart: --log-error=$ofile"
+--source include/restart_mysqld.inc
+
+# This will trigger GCache reset
+--let $assert_text = Assert that GCache ring buffer reset was done
+--let $assert_file = $ofile
+--let $assert_select = GCache ring buffer forced reset
+--let $assert_count = 1
+--source include/assert_grep.inc
+
+# And generation of the new Master Key
+--let $assert_text = Assert that GCache uses MK id 1
+--let $assert_file = $NODE2_DATA_DIR/galera.cache
+--let $assert_select = enc_mk_id: 1
+--let $assert_count = 1
+--source include/assert_grep.inc
+
+# Ensure that old MK with ID 1 was not reused
+# Get Master Key ID
+--exec echo -n "--let \$enc_mk_uuid_after = " >> $enc_ids_file
+--exec $GREP -a "^enc_mk_uuid: .*$" $NODE2_DATA_DIR/galera.cache >> $enc_ids_file
+--exec echo -n "--let \$enc_mk_const_id_after = " >> $enc_ids_file
+--exec $GREP -a "^enc_mk_const_id: .*$" $NODE2_DATA_DIR/galera.cache >> $enc_ids_file
+
+--source $enc_ids_file
+--let $assert_text = UUIDs should differ
+--let $assert_cond= [SELECT "$enc_mk_uuid_before" = "$enc_mk_uuid_after"] = 0
+--source include/assert.inc
+--let $assert_text = Constant part of MK should remain the same
+--let $assert_cond= [SELECT "$enc_mk_const_id_before" = "$enc_mk_const_id_after"] = 1
+--source include/assert.inc
+
+# cleanup
+DROP TABLE t1;
+--remove_file $ofile
+--remove_file $enc_ids_file
+
+--let $do_not_echo_parameters = 1
+--let $restart_parameters = restart:
+--source include/restart_mysqld.inc

@@ -1,0 +1,107 @@
+#
+# Test basic functionality, that encryption can be turned on, off and on again,
+# the server can be restarted and GCache recovery takes place.
+#
+
+--source include/galera_cluster.inc
+
+--connection node_2
+
+--let $MYSQL_DATA_DIR = `select @@datadir`
+--let $ofile= $MYSQLTEST_VARDIR/tmp/node.2.err
+
+# In this MTR suite the server is started with GCache encryption enabled
+CREATE TABLE t1(a INT PRIMARY KEY);
+
+# Check that GCache ring buffer file content is encrypted
+--let $assert_text = Assert that GCache is encrypted
+--let $assert_file = $MYSQL_DATA_DIR/galera.cache
+--let $assert_select = enc_encrypted: 1
+--let $assert_count = 1
+--source include/assert_grep.inc
+
+# Check that CREATE query string is not in GCache in plain text
+--let $assert_text = Assert that GCache is encrypted
+--let $assert_file = $MYSQL_DATA_DIR/galera.cache
+--let $assert_select = CREATE TABLE t1
+--let $assert_count = 0
+--source include/assert_grep.inc
+
+# Restart the server.
+--let $do_not_echo_parameters = 1
+--let $restart_parameters = "restart: --log-error=$ofile"
+--source include/restart_mysqld.inc
+--source include/galera_wait_ready.inc
+
+# It should be able to recover GCache.
+--let $assert_text = Assert that GCache ring buffer recovery took place
+--let $assert_file = $ofile
+--let $assert_select = Recovering GCache ring buffer: found gapless sequence
+--let $assert_count = 1
+--source include/assert_grep.inc
+
+# We do not expect GCache reset
+--let $assert_text = Assert that GCache ring buffer reset was not done
+--let $assert_file = $ofile
+--let $assert_select = GCache ring buffer forced reset
+--let $assert_count = 0
+--source include/assert_grep.inc
+
+# Now let's restart the server with encryption disabled.
+--remove_file $ofile
+--let $do_not_echo_parameters = 1
+--let $restart_parameters = "restart: --wsrep_provider_options='base_port=$NODE_GALERAPORT_2;gcache.encryption=no' --log-error=$ofile"
+--source include/restart_mysqld.inc
+--source include/galera_wait_ready.inc
+
+# This will trigger GCache reset.
+--let $assert_text = Assert that GCache ring buffer reset was done
+--let $assert_file = $ofile
+--let $assert_select = GCache ring buffer forced reset
+--let $assert_count = 1
+--source include/assert_grep.inc
+
+# Check that GCache ring buffer file content is not encrypted
+--let $assert_text = Assert that GCache is not encrypted
+--let $assert_file = $MYSQL_DATA_DIR/galera.cache
+--let $assert_select = enc_encrypted: 0
+--let $assert_count = 1
+--source include/assert_grep.inc
+
+CREATE TABLE t2(a INT PRIMARY KEY);
+# Check that CREATE query string is in GCache in plain text
+--let $assert_text = Assert that GCache is not encrypted
+--let $assert_file = $MYSQL_DATA_DIR/galera.cache
+--let $assert_select = CREATE TABLE t2
+--let $assert_count = 1
+--source include/assert_grep.inc
+
+# Now let's restart the server with encryption enabled again.
+--remove_file $ofile
+--let $do_not_echo_parameters = 1
+--let $restart_parameters = "restart: --log-error=$ofile"
+--source include/restart_mysqld.inc
+--source include/galera_wait_ready.inc
+
+# This will trigger GCache reset.
+--let $assert_text = Assert that GCache ring buffer reset was done
+--let $assert_file = $ofile
+--let $assert_select = GCache ring buffer forced reset
+--let $assert_count = 1
+--source include/assert_grep.inc
+
+# Check that GCache ring buffer file content is encrypted
+--let $assert_text = Assert that GCache is encrypted
+--let $assert_file = $MYSQL_DATA_DIR/galera.cache
+--let $assert_select = enc_encrypted: 1
+--let $assert_count = 1
+--source include/assert_grep.inc
+
+# cleanup
+DROP TABLE t1;
+DROP TABLE t2;
+--remove_file $ofile
+
+--let $do_not_echo_parameters = 1
+--let $restart_parameters = restart:
+--source include/restart_mysqld.inc

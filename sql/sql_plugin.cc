@@ -322,6 +322,9 @@ static PSI_memory_key key_memory_plugin_bookmark;
 
 extern st_mysql_plugin *mysql_optional_plugins[];
 extern st_mysql_plugin *mysql_mandatory_plugins[];
+#ifdef WITH_WSREP
+extern st_mysql_plugin *mysql_mandatory_keyring_plugin[];
+#endif
 
 /**
   @note The order of the enumeration is critical.
@@ -1581,25 +1584,56 @@ bool update_persisted_plugin_sysvars(const char *name) {
   @param argv actual arguments, propagated to the plugin
   @return Operation outcome, false means no errors
  */
+#ifdef WITH_WSREP
+static bool plugin_register_builtin_and_init_core_se_internal(
+    int *argc, char **argv, st_mysql_plugin **plugins, bool keyring = false) {
+#else
 bool plugin_register_builtin_and_init_core_se(int *argc, char **argv) {
+#endif
   bool mandatory = true;
   DBUG_TRACE;
 
   /* Don't allow initializing twice */
+#ifdef WITH_WSREP
+  /* We need to set 'initialized' flag below, because plugin_foreach_with_mask()
+     uses it in its logic, when key is generated/accessed.
+     However we will call this function again for other plugins than keyring
+     and then assert will fail.
+  */
+  if (keyring) {
+    assert(!initialized);
+  }
+#else
   assert(!initialized);
+#endif
 
   /* Allocate the temporary mem root, will be freed before returning */
   MEM_ROOT tmp_root(key_memory_plugin_init_tmp, 4096);
 
   mysql_rwlock_wrlock(&LOCK_system_variables_hash);
   mysql_mutex_lock(&LOCK_plugin);
+
   initialized = true;
 
+#ifdef WITH_WSREP
+  /* First we register requested plugins.
+     Note that for PXC this function is internal/static. It is used by
+     1. plugin_register_builtin_and_init_core_se() which registers all besides
+        keyring
+     2. plugin_register_keyring() which registers only keyring.
+  */
+  for (struct st_mysql_plugin **builtins = plugins; *builtins || mandatory;
+       builtins++) {
+#else
   /* First we register the builtin mandatory and optional plugins */
   for (struct st_mysql_plugin **builtins = mysql_mandatory_plugins;
        *builtins || mandatory; builtins++) {
+#endif
     /* Switch to optional plugins when done with the mandatory ones */
     if (!*builtins) {
+#ifdef WITH_WSREP
+      if (keyring) break;
+#endif
       builtins = mysql_optional_plugins;
       mandatory = false;
       if (!*builtins) break;
@@ -1697,9 +1731,17 @@ bool plugin_register_builtin_and_init_core_se(int *argc, char **argv) {
     }
   }
 
+#ifdef WITH_WSREP
+  if (!keyring) {
+    /* Should now be set to MyISAM storage engine */
+    assert(global_system_variables.table_plugin);
+    assert(global_system_variables.temp_table_plugin);
+  }
+#else
   /* Should now be set to MyISAM storage engine */
   assert(global_system_variables.table_plugin);
   assert(global_system_variables.temp_table_plugin);
+#endif
 
   mysql_mutex_unlock(&LOCK_plugin);
   mysql_rwlock_unlock(&LOCK_system_variables_hash);
@@ -1713,6 +1755,37 @@ err_unlock:
   tmp_root.Clear();
   return true;
 }
+
+#ifdef WITH_WSREP
+bool plugin_register_keyring(int *argc, char **argv) {
+  return plugin_register_builtin_and_init_core_se_internal(
+      argc, argv, mysql_mandatory_keyring_plugin, true);
+}
+
+bool plugin_register_builtin_and_init_core_se(int *argc, char **argv) {
+  return plugin_register_builtin_and_init_core_se_internal(
+      argc, argv, mysql_mandatory_plugins);
+}
+
+bool plugin_reinit_keyring() {
+  bool ret = false;
+  size_t count = plugin_array->size();
+  for (size_t i = 0; i < count; i++) {
+    st_plugin_int *plugin = plugin_array->at(i);
+    if (plugin->state == PLUGIN_IS_READY) {
+      if (plugin->plugin->type == MYSQL_KEYRING_PLUGIN) {
+        plugin_deinitialize(plugin, false);
+        mysql_rwlock_wrlock(&LOCK_system_variables_hash);
+        mysql_mutex_lock(&LOCK_plugin);
+        ret |= plugin_initialize(plugin);
+        mysql_mutex_unlock(&LOCK_plugin);
+        mysql_rwlock_unlock(&LOCK_system_variables_hash);
+      }
+    }
+  }
+  return ret;
+}
+#endif
 
 bool is_builtin_and_core_se_initialized() { return initialized; }
 

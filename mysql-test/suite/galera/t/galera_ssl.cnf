@@ -4,6 +4,10 @@
 [mysqld]
 mysqlx=0
 
+ssl-ca=@ENV.MYSQLTEST_VARDIR/std_data/cacert.pem
+ssl-cert=@ENV.MYSQLTEST_VARDIR/std_data/server-cert.pem
+ssl-key=@ENV.MYSQLTEST_VARDIR/std_data/server-key.pem
+
 [mysqld.1]
 binlog-format=row
 
@@ -39,6 +43,17 @@ wsrep_node_incoming_address=127.0.0.1:@mysqld.2.port
 
 # Required for Galera
 innodb_autoinc_lock_mode=2
+
+[mysqld.1]
+early_plugin_load=keyring_file.so
+keyring_file_data=@ENV.MYSQL_TMP_DIR/mysqld.1/keyring.1
+
+[mysqld.2]
+early_plugin_load=keyring_file.so
+keyring_file_data=@ENV.MYSQL_TMP_DIR/mysqld.2/keyring.2
+
+[sst]
+encrypt=4
 
 [ENV]
 NODE_MYPORT_1= @mysqld.1.port

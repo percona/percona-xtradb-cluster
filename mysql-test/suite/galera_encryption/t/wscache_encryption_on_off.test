@@ -1,0 +1,130 @@
+#
+# Test basic functionality, that write set cache encryption can be turned on and off
+#
+
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+--connection node_2
+
+# No $ as we need it in Perl
+--let MYSQL_DATA_DIR = `select @@datadir`
+--let $ofile= $MYSQLTEST_VARDIR/tmp/node.2.err
+
+# In this MTR suite the server is started with GCache encryption enabled
+CREATE TABLE t1(id int PRIMARY KEY AUTO_INCREMENT, data MEDIUMBLOB);
+
+--let $cnt = 64
+--disable_query_log
+BEGIN;
+while ($cnt)
+{
+  --eval INSERT INTO t1(data) VALUES (REPEAT("test_data_", 128*1024));
+  --dec $cnt
+}
+
+SET DEBUG_SYNC = 'wsrep_before_certification SIGNAL before_cert WAIT_FOR continue';
+--send COMMIT
+--enable_query_log
+
+--connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--connection node_2a
+SET DEBUG_SYNC = 'now WAIT_FOR before_cert';
+
+# WriteSet data has been written to the cache
+perl;
+@arr=glob ("$ENV{'MYSQL_DATA_DIR'}/*_data.00000*");
+if (!@arr) {
+  print "###\n";
+  print "### No WriteSet cache files found\n";
+  print "###\n";
+  die;
+}
+for (@arr) {
+  open my $fh, $_ or die("Cannot open file $_");
+  while (my $line = <$fh>) {
+    if ($line =~ "test_data") {
+      print "###\n";
+      print "### Unencrypted content found\n";
+      print "###\n";
+      die("Unencrypted content found");
+    }
+  }
+}
+print "Unencrypted content NOT found - this is expected result.\n";
+EOF
+
+SET DEBUG_SYNC = 'now SIGNAL continue';
+--disconnect node_2a
+
+--connection node_2
+--reap
+DROP TABLE t1;
+
+
+# Now let's restart the server with WriteSet cache encryption disabled.
+--connection node_2
+
+--let $do_not_echo_parameters = 1
+--let $restart_parameters = "restart: --wsrep_provider_options='base_port=$NODE_GALERAPORT_2;allocator.disk_pages_encryption=no'"
+--source include/restart_mysqld.inc
+--source include/galera_wait_ready.inc
+
+CREATE TABLE t1(id int PRIMARY KEY AUTO_INCREMENT, data MEDIUMBLOB);
+
+--let $cnt = 64
+--disable_query_log
+BEGIN;
+while ($cnt)
+{
+  --eval INSERT INTO t1(data) VALUES (REPEAT("test_data_", 128*1024));
+  --dec $cnt
+}
+
+SET DEBUG_SYNC = 'wsrep_before_certification SIGNAL before_cert WAIT_FOR continue';
+--send COMMIT
+--enable_query_log
+
+--connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--connection node_2a
+SET DEBUG_SYNC = 'now WAIT_FOR before_cert';
+
+# WriteSet data has been written to the cache
+perl;
+@arr=glob ("$ENV{'MYSQL_DATA_DIR'}/*_data.00000*");
+if (!@arr) {
+  print "###\n";
+  print "### No WriteSet cache files found\n";
+  print "###\n";
+  die;
+}
+for (@arr) {
+  open my $fh, $_ or die("Cannot open file $_");
+  while (my $line = <$fh>) {
+    if ($line =~ "test_data") {
+      print "Unencrypted content found - this is expected result.\n";
+      exit;
+    }
+  }
+}
+print "###\n";
+print "### Unencrypted content NOT found\n";
+print "###\n";
+die("Unencrypted content NOT found");
+EOF
+
+SET DEBUG_SYNC = 'now SIGNAL continue';
+--disconnect node_2a
+
+--connection node_2
+--reap
+DROP TABLE t1;
+
+
+# cleanup
+SET DEBUG_SYNC = 'reset';
+--source include/wait_until_count_sessions.inc
+
+--let $do_not_echo_parameters = 1
+--let $restart_parameters = restart:
+--source include/restart_mysqld.inc
