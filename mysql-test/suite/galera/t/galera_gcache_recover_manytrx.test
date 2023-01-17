@@ -128,6 +128,9 @@ DELIMITER ;|
 --connection node_2
 SET SESSION wsrep_sync_wait = 0;
 
+# we need to give it a chance to put something in gcache and in case of encryption for some enc cache pages to be flushed
+--sleep 18
+
 # Make sure that node_2 is not killed while TOIs are applied.
 # Otherwhise we risk that grastate file is marked unsafe, and
 # as a consequence the node cannot rejoin with IST.

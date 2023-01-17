@@ -2759,7 +2759,7 @@ static void unireg_abort(int exit_code) {
         state != wsrep::server_state::s_disconnecting) {
       Wsrep_server_state::instance().disconnect();
     }
-
+    wsrep_deinit();
     THD *thd = current_thd;
     if (thd) {
       Global_THD_manager *thd_manager = Global_THD_manager::get_instance();

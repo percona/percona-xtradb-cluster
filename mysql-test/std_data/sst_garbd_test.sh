@@ -17,7 +17,7 @@ trap 'handle_sigint' SIGTERM
 
 echo 1
 
-(socat TCP-LISTEN:$1,reuseaddr - </dev/null > /dev/null) &
+(socat openssl-listen:$1,reuseaddr,$2 - </dev/null > /dev/null) &
 socat_pid=$!
 echo "socat_pid: ${socat_pid}"
 wait ${socat_pid}
@@ -25,7 +25,7 @@ socat_pid=
 
 
 echo 2
-socat TCP-LISTEN:$1,reuseaddr - > /dev/null
+socat openssl-listen:$1,reuseaddr,$2 - > /dev/null
 echo 3
 
 sleep 5
