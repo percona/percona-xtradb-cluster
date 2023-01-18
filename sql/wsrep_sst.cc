@@ -50,6 +50,7 @@ extern const char *wsrep_defaults_group_suffix;
 #define WSREP_SST_OPT_AUTH "--auth"
 #define WSREP_SST_OPT_DATA "--datadir"
 #define WSREP_SST_OPT_BASEDIR "--basedir"
+#define WSREP_SST_OPT_PLUGINDIR "--plugindir"
 #define WSREP_SST_OPT_CONF "--defaults-file"
 #define WSREP_SST_OPT_CONF_SUFFIX "--defaults-group-suffix"
 #define WSREP_SST_OPT_PARENT "--parent"
@@ -700,18 +701,20 @@ static ssize_t sst_prepare_other(const char *method, const char *addr_in,
   }
   if (strlen(binlog_opt_val)) binlog_opt = WSREP_SST_OPT_BINLOG;
 
-  ret = snprintf(
-      cmd_str(), cmd_len,
-      "wsrep_sst_%s " WSREP_SST_OPT_ROLE " 'joiner' " WSREP_SST_OPT_ADDR
-      " '%s' " WSREP_SST_OPT_DATA " '%s' " WSREP_SST_OPT_BASEDIR
-      " '%s' " WSREP_SST_OPT_CONF " '%s' " WSREP_SST_OPT_CONF_SUFFIX
-      " '%s' " WSREP_SST_OPT_PARENT " '%d' " WSREP_SST_OPT_VERSION
-      " '%s' "
-      " %s '%s' ",
-      method, addr_in, mysql_real_data_home,
-      mysql_home_ptr ? mysql_home_ptr : "", wsrep_defaults_file,
-      wsrep_defaults_group_suffix, (int)getpid(),
-      MYSQL_SERVER_VERSION MYSQL_SERVER_SUFFIX_DEF, binlog_opt, binlog_opt_val);
+  ret = snprintf(cmd_str(), cmd_len,
+                 "wsrep_sst_%s " WSREP_SST_OPT_ROLE
+                 " 'joiner' " WSREP_SST_OPT_ADDR " '%s' " WSREP_SST_OPT_DATA
+                 " '%s' " WSREP_SST_OPT_BASEDIR " '%s' " WSREP_SST_OPT_PLUGINDIR
+                 " '%s' " WSREP_SST_OPT_CONF " '%s' " WSREP_SST_OPT_CONF_SUFFIX
+                 " '%s' " WSREP_SST_OPT_PARENT " '%d' " WSREP_SST_OPT_VERSION
+                 " '%s' "
+                 " %s '%s' ",
+                 method, addr_in, mysql_real_data_home,
+                 mysql_home_ptr ? mysql_home_ptr : "",
+                 opt_plugin_dir_ptr ? opt_plugin_dir_ptr : "",
+                 wsrep_defaults_file, wsrep_defaults_group_suffix,
+                 (int)getpid(), MYSQL_SERVER_VERSION MYSQL_SERVER_SUFFIX_DEF,
+                 binlog_opt, binlog_opt_val);
   my_free(binlog_opt_val);
 
   if (ret < 0 || ret >= cmd_len) {
@@ -1415,14 +1418,16 @@ static int sst_donate_other(const char *method, const char *addr,
       cmd_str(), cmd_len,
       "wsrep_sst_%s " WSREP_SST_OPT_ROLE " 'donor' " WSREP_SST_OPT_ADDR
       " '%s' " WSREP_SST_OPT_SOCKET " '%s' " WSREP_SST_OPT_DATA
-      " '%s' " WSREP_SST_OPT_BASEDIR " '%s' " WSREP_SST_OPT_CONF
-      " '%s' " WSREP_SST_OPT_CONF_SUFFIX " '%s' " WSREP_SST_OPT_VERSION
+      " '%s' " WSREP_SST_OPT_BASEDIR " '%s' " WSREP_SST_OPT_PLUGINDIR
+      " '%s' " WSREP_SST_OPT_CONF " '%s' " WSREP_SST_OPT_CONF_SUFFIX
+      " '%s' " WSREP_SST_OPT_VERSION
       " '%s' "
       " %s '%s' " WSREP_SST_OPT_GTID
       " '%s:%lld' "
       "%s",
       method, addr, mysqld_unix_port, mysql_real_data_home,
-      mysql_home_ptr ? mysql_home_ptr : "", wsrep_defaults_file,
+      mysql_home_ptr ? mysql_home_ptr : "",
+      opt_plugin_dir_ptr ? opt_plugin_dir_ptr : "", wsrep_defaults_file,
       wsrep_defaults_group_suffix, MYSQL_SERVER_VERSION MYSQL_SERVER_SUFFIX_DEF,
       binlog_opt, binlog_opt_val, uuid_oss.str().c_str(), gtid.seqno().get(),
       bypass ? " " WSREP_SST_OPT_BYPASS : "");
