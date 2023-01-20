@@ -92,6 +92,41 @@ class Table_access_map {
 };
 typedef std::unordered_set<std::string> Grant_acl_set;
 
+#ifdef WITH_WSREP
+/**
+  Fix for PXC-3872 (commit 487328e781d5acd44cd94e526969874372080b51) moved
+  starting TOI after open_grant_tables(). Before the fix, TOI was started at the
+  beginning of open_grant_tables() (so effectively, 'before'
+  open_grant_tables()). open_grant_tables() calls decide_logging_format(), where
+  we make a check if we are in local mode and doing streaming replication (SR).
+  wsrep_thd_is_local() is used as a part of the decision input. If we are in TOI
+  mode, wsrep_thd_is_local() returns 'false' (before above mentioned commit),
+  but if we didn't start TOI yet, it returns 'true', so the error is returned,
+  as local + STMT + SR is not allowed.
+  We need to inform decide_logging_format() logic that our intention is to
+  start TOI soon.
+
+  Another working solution would be disabling SR for the time of
+  query execution, but this way does not follow the conception, that TOI can be
+  executed while SR is enabled (these are two separate things).
+*/
+class Enable_TOI_preparation_guard {
+ public:
+  Enable_TOI_preparation_guard(THD *thd) : m_thd(thd) {
+    m_thd->wsrep_TOI_preparation = true;
+  }
+
+  ~Enable_TOI_preparation_guard() {
+    m_thd->wsrep_TOI_preparation = false;
+  }
+
+  bool start_toi(const char *db = WSREP_MYSQL_DB, const char *table = nullptr);
+
+ private:
+  THD *m_thd;
+};
+#endif /* WITH_WSREP */
+
 std::string create_authid_str_from(const LEX_USER *user);
 std::string create_authid_str_from(const ACL_USER *user);
 std::string create_authid_str_from(const Auth_id_ref &user);
@@ -205,11 +240,6 @@ int replace_routine_table(THD *thd, GRANT_NAME *grant_name, TABLE *table,
                           const char *routine_name, bool is_proc, ulong rights,
                           bool revoke_grant);
 int open_grant_tables(THD *thd, TABLE_LIST *tables, bool *transactional_tables);
-#ifdef WITH_WSREP
-bool start_toi_after_open_grant_tables(THD *thd,
-                                       const char *db = WSREP_MYSQL_DB,
-                                       const char *table = nullptr);
-#endif /* WITH_WSREP */
 void acl_tables_setup_for_read(TABLE_LIST *tables);
 void acl_print_ha_error(int handler_error);
 bool check_engine_type_for_acl_table(TABLE_LIST *tables, bool report_error);

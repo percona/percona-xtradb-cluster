@@ -1989,8 +1989,8 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
     values when we are out of this function scope
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
-
 #ifdef WITH_WSREP
+  Enable_TOI_preparation_guard toi_guard(thd);
   /*
     Rewrite query to ensure it is safe to replay on slave thread with proper
     user context established (this is important if original query fails to
@@ -2056,8 +2056,7 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
        Doing it before acquiring the lock, would lead to the deadlock,
        because all other functions using start_toi_after_open_grant_tables()
        do it in the order: acl_cache_lock.lock() -> start TOI */
-    if (!thd->wsrep_applier &&
-        start_toi_after_open_grant_tables(thd, WSREP_MYSQL_DB, "user")) {
+    if (!thd->wsrep_applier && toi_guard.start_toi(WSREP_MYSQL_DB, "user")) {
       commit_and_close_mysql_tables(thd);
       return true;
     }
@@ -2779,6 +2778,9 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
     values when we are out of this function scope
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
+#ifdef WITH_WSREP
+  Enable_TOI_preparation_guard toi_guard(thd);
+#endif
 
   /* CREATE USER may be skipped on replication client. */
   if ((result = open_grant_tables(thd, tables, &transactional_tables)))
@@ -2798,7 +2800,7 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
     }
 
 #ifdef WITH_WSREP
-    if (start_toi_after_open_grant_tables(thd)) {
+    if (toi_guard.start_toi()) {
       commit_and_close_mysql_tables(thd);
       return true;
     }
@@ -3108,7 +3110,9 @@ bool mysql_drop_user(THD *thd, List<LEX_USER> &list, bool if_exists,
     values when we are out of this function scope
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
-
+#ifdef WITH_WSREP
+  Enable_TOI_preparation_guard toi_guard(thd);
+#endif
   /* DROP USER may be skipped on replication client. */
   if ((result = open_grant_tables(thd, tables, &transactional_tables)))
     return result != 1;
@@ -3126,7 +3130,7 @@ bool mysql_drop_user(THD *thd, List<LEX_USER> &list, bool if_exists,
     }
 
 #ifdef WITH_WSREP
-    if (start_toi_after_open_grant_tables(thd)) {
+    if (toi_guard.start_toi()) {
       commit_and_close_mysql_tables(thd);
       return true;
     }
@@ -3284,7 +3288,9 @@ bool mysql_rename_user(THD *thd, List<LEX_USER> &list) {
     values when we are out of this function scope
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
-
+#ifdef WITH_WSREP
+  Enable_TOI_preparation_guard toi_guard(thd);
+#endif
   /* RENAME USER may be skipped on replication client. */
   if ((result = open_grant_tables(thd, tables, &transactional_tables)))
     return result != 1;
@@ -3327,7 +3333,7 @@ bool mysql_rename_user(THD *thd, List<LEX_USER> &list) {
       assert(user_to != nullptr); /* Syntax enforces pairs of users. */
 
 #ifdef WITH_WSREP
-      if (start_toi_after_open_grant_tables(thd)) {
+      if (toi_guard.start_toi()) {
         commit_and_close_mysql_tables(thd);
         return true;
       }
@@ -3486,7 +3492,9 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
     values when we are out of this function scope
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
-
+#ifdef WITH_WSREP
+  Enable_TOI_preparation_guard toi_guard(thd);
+#endif
   if ((result = open_grant_tables(thd, tables, &transactional_tables)))
     return result != 1;
 
@@ -3504,7 +3512,7 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
     }
 
 #ifdef WITH_WSREP
-    if (start_toi_after_open_grant_tables(thd)) {
+    if (toi_guard.start_toi()) {
       commit_and_close_mysql_tables(thd);
       return true;
     }

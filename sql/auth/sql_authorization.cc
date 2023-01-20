@@ -2786,7 +2786,9 @@ int mysql_table_grant(THD *thd, TABLE_LIST *table_list,
     values when we are out of this function scope
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
-
+#ifdef WITH_WSREP
+  Enable_TOI_preparation_guard toi_guard(thd);
+#endif
   /*
     The lock api is depending on the thd->lex variable which needs to be
     re-initialized.
@@ -2819,7 +2821,7 @@ int mysql_table_grant(THD *thd, TABLE_LIST *table_list,
     }
 
 #ifdef WITH_WSREP
-    if (start_toi_after_open_grant_tables(thd)) {
+    if (toi_guard.start_toi()) {
       commit_and_close_mysql_tables(thd);
       return true;
     }
@@ -3014,6 +3016,9 @@ bool mysql_routine_grant(THD *thd, TABLE_LIST *table_list, bool is_proc,
     values when we are out of this function scope
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
+#ifdef WITH_WSREP
+  Enable_TOI_preparation_guard toi_guard(thd);
+#endif
   if ((ret = open_grant_tables(thd, tables, &transactional_tables)))
     return ret != 1;
 
@@ -3031,7 +3036,7 @@ bool mysql_routine_grant(THD *thd, TABLE_LIST *table_list, bool is_proc,
     }
 
 #ifdef WITH_WSREP
-    if (start_toi_after_open_grant_tables(thd)) {
+    if (toi_guard.start_toi()) {
       commit_and_close_mysql_tables(thd);
       return true;
     }
@@ -3172,6 +3177,9 @@ bool mysql_revoke_role(THD *thd, const List<LEX_USER> *users,
   TABLE *table = nullptr;
   int ret;
   bool transactional_tables;
+#ifdef WITH_WSREP
+  Enable_TOI_preparation_guard toi_guard(thd);
+#endif
   if ((ret = open_grant_tables(thd, tables, &transactional_tables)))
     return ret != 1; /* purecov: deadcode */
 
@@ -3189,7 +3197,7 @@ bool mysql_revoke_role(THD *thd, const List<LEX_USER> *users,
     }
 
 #ifdef WITH_WSREP
-    if (start_toi_after_open_grant_tables(thd)) {
+    if (toi_guard.start_toi()) {
       commit_and_close_mysql_tables(thd);
       return true;
     }
@@ -3434,6 +3442,9 @@ bool mysql_grant_role(THD *thd, const List<LEX_USER> *users,
   int ret;
   bool transactional_tables;
 
+#ifdef WITH_WSREP
+  Enable_TOI_preparation_guard toi_guard(thd);
+#endif
   if ((ret = open_grant_tables(thd, tables, &transactional_tables)))
     return ret != 1; /* purecov: deadcode */
 
@@ -3451,7 +3462,7 @@ bool mysql_grant_role(THD *thd, const List<LEX_USER> *users,
     }
 
 #ifdef WITH_WSREP
-    if (start_toi_after_open_grant_tables(thd)) {
+    if (toi_guard.start_toi()) {
       commit_and_close_mysql_tables(thd);
       return true;
     }
@@ -3584,6 +3595,9 @@ bool mysql_grant(THD *thd, const char *db, List<LEX_USER> &list, ulong rights,
     values when we are out of this function scope
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
+#ifdef WITH_WSREP
+  Enable_TOI_preparation_guard toi_guard(thd);
+#endif
   if ((ret = open_grant_tables(thd, tables, &transactional_tables)))
     return ret != 1;
 
@@ -3616,7 +3630,7 @@ bool mysql_grant(THD *thd, const char *db, List<LEX_USER> &list, ulong rights,
     }
 
 #ifdef WITH_WSREP
-    if (start_toi_after_open_grant_tables(thd)) {
+    if (toi_guard.start_toi()) {
       commit_and_close_mysql_tables(thd);
       return true;
     }
@@ -5274,6 +5288,9 @@ bool mysql_revoke_all(THD *thd, List<LEX_USER> &list) {
     values when we are out of this function scope
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
+#ifdef WITH_WSREP
+  Enable_TOI_preparation_guard toi_guard(thd);
+#endif
   if ((ret = open_grant_tables(thd, tables, &transactional_tables)))
     return ret != 1;
 
@@ -5291,7 +5308,7 @@ bool mysql_revoke_all(THD *thd, List<LEX_USER> &list) {
     }
 
 #ifdef WITH_WSREP
-    if (start_toi_after_open_grant_tables(thd)) {
+    if (toi_guard.start_toi()) {
       commit_and_close_mysql_tables(thd);
       return true;
     }
@@ -5446,6 +5463,9 @@ bool sp_revoke_privileges(THD *thd, const char *sp_db, const char *sp_name,
   bool transactional_tables;
   DBUG_TRACE;
 
+#ifdef WITH_WSREP
+  Enable_TOI_preparation_guard toi_guard(thd);
+#endif
   if (0 != (int_result = open_grant_tables(thd, tables, &transactional_tables)))
     return int_result != 1;
 
@@ -5456,7 +5476,7 @@ bool sp_revoke_privileges(THD *thd, const char *sp_db, const char *sp_name,
   }
 
 #ifdef WITH_WSREP
-  if (start_toi_after_open_grant_tables(thd)) {
+  if (toi_guard.start_toi()) {
     commit_and_close_mysql_tables(thd);
     return true;
   }
@@ -6579,6 +6599,9 @@ bool mysql_alter_or_clear_default_roles(THD *thd, role_enum role_type,
     values when we are out of this function scope
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
+#ifdef WITH_WSREP
+  Enable_TOI_preparation_guard toi_guard(thd);
+#endif
 
   if ((result = open_grant_tables(thd, tables, &transactional_tables)))
     return result != 1;
@@ -6606,7 +6629,7 @@ bool mysql_alter_or_clear_default_roles(THD *thd, role_enum role_type,
     }
 
 #ifdef WITH_WSREP
-    if (start_toi_after_open_grant_tables(thd)) {
+    if (toi_guard.start_toi()) {
       commit_and_close_mysql_tables(thd);
       return true;
     }
