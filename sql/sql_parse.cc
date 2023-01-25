@@ -7968,7 +7968,7 @@ static uint kill_one_thread(THD *thd, my_thread_id id, bool only_kill_query)
 }
 
 #ifdef WITH_WSREP
-static bool wsrep_should_retry_in_autocommit(const THD* thd)
+static bool wsrep_should_retry_in_autocommit(THD *thd, const LEX *lex)
 {
   /*
     We are here could mean that the query resulted in a cluster-wide
@@ -7992,15 +7992,30 @@ static bool wsrep_should_retry_in_autocommit(const THD* thd)
     below list.
   */
 
-  switch (thd->lex->sql_command)
+  sp_head * sp;
+  sp_instr *i;
+  switch (lex->sql_command)
   {
     case SQLCOM_CHECK:
     case SQLCOM_SELECT:
       return false;
+    case SQLCOM_CALL:
+      sp= sp_find_routine(thd, SP_TYPE_PROCEDURE, lex->spname,
+                          &thd->sp_proc_cache, TRUE);
+      for (uint ip= 0; (i= sp->get_instr(ip)); ip++)
+      {
+        sp_lex_instr *lex_i= dynamic_cast<sp_lex_instr *>(i);
+        if (lex_i && !wsrep_should_retry_in_autocommit(thd, lex_i->get_lex()))
+        {
+          return false;
+        }
+      }
+      return true;
     case SQLCOM_ALTER_TABLE:
     {
-      return (thd->lex->alter_info.flags & Alter_info::ALTER_ADMIN_PARTITION ?
-              false : true);
+      return (lex->alter_info.flags & Alter_info::ALTER_ADMIN_PARTITION
+                  ? false
+                  : true);
     }
     default:
       return true;
@@ -8110,8 +8125,9 @@ static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
         mysql_reset_thd_for_next_command(thd);
         thd->killed= THD::NOT_KILLED;
         if (is_autocommit &&
-            wsrep_should_retry_in_autocommit(thd) &&
-           (thd->wsrep_retry_counter < thd->variables.wsrep_retry_autocommit))
+            wsrep_should_retry_in_autocommit(thd, thd->lex) &&
+            (thd->wsrep_retry_counter <
+             thd->variables.wsrep_retry_autocommit))
         {
           WSREP_DEBUG("Retrying auto-commit query (on abort): %s", WSREP_QUERY(thd));
 

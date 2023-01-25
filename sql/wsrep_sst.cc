@@ -780,6 +780,14 @@ static void* sst_joiner_thread (void* a)
 
 #define WSREP_SST_AUTH_ENV "WSREP_SST_OPT_AUTH"
 
+#if defined(HAVE_ASAN)
+/*
+ * When MySQL is built with ASAN, libasan will be propagated to child processes
+ * via LD_PRELOAD. This can be annoying because unix utils including bash can
+ * have memory errors itself. Let's unset LD_PRELOAD on ASAN builds.
+ */
+static void reset_ld_preload(wsp::env &env) { env.append("LD_PRELOAD="); }
+#endif
 static int sst_append_auth_env(wsp::env& env, const char* sst_auth)
 {
   int const sst_auth_size= strlen(WSREP_SST_AUTH_ENV) + 1 /* = */
@@ -856,6 +864,10 @@ static ssize_t sst_prepare_other (const char*  method,
     WSREP_ERROR("sst_prepare_other(): env. var ctor failed: %d", -env.error());
     return -env.error();
   }
+
+#if defined(HAVE_ASAN)
+  reset_ld_preload(env);
+#endif
 
   if ((ret= sst_append_auth_env(env, sst_auth)))
   {
@@ -1605,6 +1617,10 @@ wsrep_cb_status_t wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
     WSREP_ERROR("wsrep_sst_donate_cb(): env var ctor failed: %d", -env.error());
     return WSREP_CB_FAILURE;
   }
+
+#if defined(HAVE_ASAN)
+  reset_ld_preload(env);
+#endif
 
   /* Wait for wsrep-SE to initialize that also signals
   completion of init_server_component which is important before we initiate
