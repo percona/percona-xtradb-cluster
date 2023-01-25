@@ -1,6 +1,6 @@
 show variables like 'wsrep_trx_fragment_%';
 Variable_name	Value
-wsrep_trx_fragment_size	0
+wsrep_trx_fragment_size	1048576
 wsrep_trx_fragment_unit	bytes
 CREATE USER 'x'@'localhost' IDENTIFIED BY 'x';
 GRANT CREATE USER, EXECUTE, ALTER ROUTINE, DROP ROLE, ROLE_ADMIN, SELECT, UPDATE, SYSTEM_VARIABLES_ADMIN ON *.* TO 'x'@'localhost' WITH GRANT OPTION;

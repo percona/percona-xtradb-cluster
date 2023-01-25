@@ -2032,25 +2032,27 @@ int open_grant_tables(THD *thd, TABLE_LIST *tables,
 }
 
 #ifdef WITH_WSREP
-bool start_toi_after_open_grant_tables(THD *thd, const char *db,
-                                       const char *table) {
+bool Enable_TOI_preparation_guard::start_toi(const char *db,
+                                                        const char *table) {
   /* CREATE/DROP function/procedure implicitly grant privileges.
   Check for detail comment in respected switch handler in sql_parse.cc
   Since the original statement is already replicated using TOI
   sub-action of grant/revoke privileges doesn't need to get replicated. */
-  bool skip_toi = (thd->lex->sql_command == SQLCOM_CREATE_SPFUNCTION ||
-                   thd->lex->sql_command == SQLCOM_CREATE_PROCEDURE ||
-                   thd->lex->sql_command == SQLCOM_DROP_FUNCTION ||
-                   thd->lex->sql_command == SQLCOM_DROP_PROCEDURE);
+  bool skip_toi = (m_thd->lex->sql_command == SQLCOM_CREATE_SPFUNCTION ||
+                   m_thd->lex->sql_command == SQLCOM_CREATE_PROCEDURE ||
+                   m_thd->lex->sql_command == SQLCOM_DROP_FUNCTION ||
+                   m_thd->lex->sql_command == SQLCOM_DROP_PROCEDURE);
   /*
     Perform the TOI after the replication filter check to avoid
     replicating commands that won't be applied locally (due to a filter).
   */
-  if (WSREP(thd) && !skip_toi &&
-      wsrep_to_isolation_begin(thd, db, table, NULL)) {
-    WSREP_ERROR("Fail to replicate: %s", thd->query().str);
+  if (WSREP(m_thd) && !skip_toi &&
+      wsrep_to_isolation_begin(m_thd, db, table, NULL)) {
+    WSREP_ERROR("Fail to replicate: %s", m_thd->query().str);
     return true;
   }
+
+  m_thd->wsrep_TOI_preparation = false;
   return false;
 }
 #endif

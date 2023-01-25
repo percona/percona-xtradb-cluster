@@ -1,0 +1,1 @@
+--utility_user=utilityuser@localhost --utility_user_password=utilityuserpass --wsrep_trx_fragment_size=1048576 --wsrep_trx_fragment_unit=bytes
