@@ -101,8 +101,9 @@ ulong wsrep_max_ws_rows = 65536;             // max number of rows in ws
 int wsrep_to_isolation = 0;                  // # of active TO isolation threads
 bool wsrep_certify_nonPK = 1;  // certify, even when no primary key
 ulong wsrep_certification_rules = WSREP_CERTIFICATION_RULES_STRICT;
-long wsrep_max_protocol_version = 4;  // maximum protocol version to use
-long int wsrep_protocol_version = wsrep_max_protocol_version;
+static constexpr WsrepVersion wsrep_max_protocol_version =
+    WsrepVersion::V4;  // maximum protocol version to use
+WsrepVersion wsrep_protocol_version = wsrep_max_protocol_version;
 ulong wsrep_trx_fragment_unit = WSREP_FRAG_BYTES;
 // unit for fragment size
 ulong wsrep_SR_store_type = WSREP_SR_STORE_TABLE;
@@ -636,7 +637,7 @@ void wsrep_init_sidno(const wsrep::id &uuid) {
     uuid.
   */
   rpl_sid sid;
-  if (wsrep_protocol_version >= 4) {
+  if (wsrep_protocol_version >= WsrepVersion::V4) {
     memcpy((void *)&sid, (const uchar *)uuid.data(), 16);
   } else {
     wsrep_uuid_t ltid_uuid;
@@ -1536,13 +1537,13 @@ static bool wsrep_prepare_key_for_isolation(const char *db, const char *table,
   if (*key_len < 2) return false;
 
   switch (wsrep_protocol_version) {
-    case 0:
+    case WsrepVersion::UNSPECIFIED:
       *key_len = 0;
       break;
-    case 1:
-    case 2:
-    case 3:
-    case 4: {
+    case WsrepVersion::V1:
+    case WsrepVersion::V2:
+    case WsrepVersion::V3:
+    case WsrepVersion::V4: {
       *key_len = 0;
       if (db) {
         key[*key_len].ptr = db;
@@ -1672,17 +1673,17 @@ bool wsrep_prepare_key_for_innodb(const uchar *cache_key, size_t cache_key_len,
 
   *key_len = 0;
   switch (wsrep_protocol_version) {
-    case 0: {
+    case WsrepVersion::UNSPECIFIED: {
       key[0].ptr = cache_key;
       key[0].len = cache_key_len;
 
       *key_len = 1;
       break;
     }
-    case 1:
-    case 2:
-    case 3:
-    case 4: {
+    case WsrepVersion::V1:
+    case WsrepVersion::V2:
+    case WsrepVersion::V3:
+    case WsrepVersion::V4: {
       key[0].ptr = cache_key;
       key[0].len =
           strlen(reinterpret_cast<char *>(const_cast<uchar *>(cache_key)));
