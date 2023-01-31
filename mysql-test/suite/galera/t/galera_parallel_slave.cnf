@@ -1,0 +1,11 @@
+!include ../galera_2nodes_as_slave.cnf
+
+[mysqld]
+# default is 0 for MTR, but that can cause shutdown crashes with slave threads active
+pxc_maint_transition_period=10
+
+gtid-mode=ON
+log-bin=mysqld-bin
+log-slave-updates
+enforce-gtid-consistency
+binlog-format=ROW

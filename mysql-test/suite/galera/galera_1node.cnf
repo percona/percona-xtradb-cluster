@@ -1,0 +1,46 @@
+# Use default setting for mysqld processes
+!include include/default_mysqld.cnf
+
+[mysqld]
+#default-storage-engine=InnoDB
+#mysqlx=0
+
+ssl-ca=@ENV.MYSQLTEST_VARDIR/std_data/cacert.pem
+ssl-cert=@ENV.MYSQLTEST_VARDIR/std_data/server-cert.pem
+ssl-key=@ENV.MYSQLTEST_VARDIR/std_data/server-key.pem
+
+[mysqld.1]
+#log-bin=mysqld-bin
+#binlog-format=row
+
+wsrep_provider=@ENV.WSREP_PROVIDER
+wsrep_cluster_address='gcomm://'
+wsrep_provider_options='repl.causal_read_timeout=PT90S;base_port=@mysqld.1.#galera_port;gmcast.peer_timeout=PT10S;evs.suspect_timeout=PT12S;evs.inactive_timeout=PT30S;evs.install_timeout=PT15S'
+
+# enforce read-committed characteristics across the cluster
+wsrep_causal_reads = ON
+wsrep_sync_wait = 15
+
+wsrep_node_address=127.0.0.1
+wsrep_sst_receive_address=127.0.0.1:@mysqld.1.#sst_port
+wsrep_node_incoming_address=127.0.0.1:@mysqld.1.port
+
+# Required for Galera
+innodb_autoinc_lock_mode=2
+
+innodb_flush_log_at_trx_commit=2
+wsrep_node_name=node1
+
+early_plugin_load=keyring_file.so
+keyring_file_data=@ENV.MYSQL_TMP_DIR/mysqld.1/keyring.1
+
+[sst]
+encrypt=4
+
+[ENV]
+NODE_MYPORT_1= @mysqld.1.port
+NODE_MYSOCK_1= @mysqld.1.socket
+
+NODE_GALERAPORT_1= @mysqld.1.#galera_port
+
+NODE_SSTPORT_1= @mysqld.1.#sst_port

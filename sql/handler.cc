@@ -2412,6 +2412,14 @@ int ha_prepare_low(THD *thd, bool all) {
       const bool run_wsrep_hooks = wsrep_run_commit_hook(thd, all);
       int err;
 
+      auto rpl_com = get_commit_order_manager(thd);
+      if (run_wsrep_hooks && (ht->flags & HTON_WSREP_REPLICATION) && rpl_com != nullptr) {
+        if (rpl_com->wait_on_graph((Slave_worker*)thd->rli_slave)) {
+          error = 1;
+          continue;
+        }
+      }
+
       if (run_wsrep_hooks && (ht->flags & HTON_WSREP_REPLICATION) &&
           (err = wsrep_before_prepare(thd, all))) {
         // before prepare can fail during certify due to local certification

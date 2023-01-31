@@ -218,7 +218,10 @@ class Commit_order_manager {
   */
   void register_trx(Slave_worker *worker);
 
+#ifndef WITH_WSREP
  private:
+#endif /* WITH_WSREP */
+
   /**
     Determines if the worker passed as a parameter must wait on the MDL graph
     for other workers to commit and, if it must, will wait for it's turn to
@@ -229,6 +232,10 @@ class Commit_order_manager {
     @return false if the worker is ready to commit, true if not.
    */
   bool wait_on_graph(Slave_worker *worker);
+
+#ifdef WITH_WSREP
+ private:
+#endif /* WITH_WSREP */
   /**
     Wait for its turn to commit or unregister.
 
@@ -511,5 +518,9 @@ class Commit_order_lock_graph : public MDL_wait_for_subgraph {
   @retval true   Commit_order_manager object is initialized
 */
 bool has_commit_order_manager(THD *thd);
+
+#ifdef WITH_WSREP
+Commit_order_manager* get_commit_order_manager(THD *thd);
+#endif /* WITH_WSREP */
 
 #endif /*RPL_REPLICA_COMMIT_ORDER_MANAGER*/
