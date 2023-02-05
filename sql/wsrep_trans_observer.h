@@ -547,7 +547,6 @@ static inline enum wsrep::provider::status wsrep_current_error_status(
 */
 static inline void wsrep_commit_empty(THD *thd, bool all) {
   DBUG_ENTER("wsrep_commit_empty");
-  WSREP_DEBUG("wsrep_commit_empty(%u)", thd->thread_id());
   if (wsrep_is_real(thd, all) && wsrep_thd_is_local(thd) &&
       thd->wsrep_trx().active() &&
       thd->wsrep_trx().state() != wsrep::transaction::s_committed) {
