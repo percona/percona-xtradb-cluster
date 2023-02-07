@@ -1,0 +1,34 @@
+# LP #1250380: Handle full tables more gracefully
+# https://jira.percona.com/browse/PXC-924
+
+--source include/galera_cluster.inc
+--source include/have_innodb.inc
+
+--connection node_2
+call mtr.add_suppression("The table 't1' is full");
+
+--connection node_1
+
+CREATE TABLE t1(a INT);
+INSERT INTO t1 VALUES (10);
+# Insert data until the second node is full
+--let $count = 20
+while ($count)
+{
+  INSERT INTO t1 SELECT * FROM t1;
+  --dec $count
+}
+# Check that rows amount differs
+SELECT COUNT(*) FROM t1;
+
+--connection node_2
+
+# Check that rows amount differs
+SELECT COUNT(*) FROM t1;
+# Check that the node in the cluster, not aborted
+SHOW STATUS LIKE 'wsrep_cluster_size';
+# Check that the node state is Desynced
+SHOW STATUS LIKE 'wsrep_local_state_comment';
+
+--connection node_1
+DROP TABLE t1;

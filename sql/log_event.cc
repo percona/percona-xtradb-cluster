@@ -11845,6 +11845,23 @@ AFTER_MAIN_EXEC_ROW_LOOP:
     }
   } // if (table)
 
+#ifdef WITH_WSREP
+  if (WSREP(thd) && error == HA_ERR_RECORD_FILE_FULL)
+  {
+    /*
+      Prevent a node to be aborted to make it easier for an administrator
+      to solve the problem later.
+
+      Aborting the commit is required to release Galera monitor from the
+      transaction.
+    */
+    wsrep->desync(wsrep);
+    wsrep->abort_pre_commit(wsrep, wsrep_thd_trx_seqno(thd),
+                            (wsrep_trx_id_t)wsrep_thd_trx_id(thd));
+    error= 0;
+  }
+#endif
+
   if (error)
   {
     slave_rows_error_report(ERROR_LEVEL, error, rli, thd, table,
