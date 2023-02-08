@@ -1,0 +1,5 @@
+!include ../galera_2nodes.cnf
+
+[mysqld.2]
+# Check that SSL is disabled although ssk_key is specified
+wsrep_provider_options='base_port=@mysqld.2.#galera_port;socket.ssl=NO;socket.ssl_key=@ENV.MYSQL_TEST_DIR/std_data/galera-key.pem'
