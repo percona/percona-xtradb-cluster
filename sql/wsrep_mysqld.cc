@@ -30,6 +30,7 @@
 #include "sql_class.h"
 #include "sql_parse.h"
 #include "sql_plugin.h"  // SHOW_MY_BOOL
+#include "sql/server_component/mysql_server_keyring_lockable_imp.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -1273,6 +1274,9 @@ void wsrep_init_startup(bool sst_first) {
   // We need to force keyring cache to repopulate
   // after SST, because SST might have add some keys.
   // GCache recovery won't work without this.
+  if (keyring_status_no_error() && srv_keyring_load) {
+    srv_keyring_load->load(opt_plugin_dir, mysql_real_data_home);
+  }
   plugin_reinit_keyring();
 }
 

@@ -1,0 +1,138 @@
+# === Purpose ===
+#
+# This tests verifies that snapshot transfer is handled properly by the SST
+# script when the cluster uses components. This tests also verifies that gcache
+# encryption works well with components.
+#
+# === References ===
+#
+# PXC-3989: Support for Keyring Components in PXC
+
+--source include/galera_cluster.inc
+
+# Create a helper inc file for test validation
+--write_file $MYSQLTEST_VARDIR/tmp/pxc_keyring_validation.inc END_OF_PROCEDURE
+  # Ensure that the server is component enabled
+  --connection node_1
+  --let $assert_text= Assert that the server has started with a keyring component
+  --let $assert_cond= [SELECT STATUS_VALUE = "Active" FROM performance_schema.keyring_component_status WHERE STATUS_KEY="Component_status"]
+  --source include/assert.inc
+
+  --let $assert_text= Assert that the server is component_keyring_file enabled
+  --let $assert_cond= [SELECT STATUS_VALUE = "component_keyring_file" FROM performance_schema.keyring_component_status WHERE STATUS_KEY="Implementation_name"]
+  --source include/assert.inc
+
+  --let $assert_text= Assert that the server has no keys created in the keyring
+  --let $assert_cond= [SELECT COUNT(*) = 0 from performance_schema.keyring_keys]
+  --source include/assert.inc
+
+  --connection node_2
+  --let $assert_text= Assert that the server has started with a keyring component
+  --let $assert_cond= [SELECT STATUS_VALUE = "Active" FROM performance_schema.keyring_component_status WHERE STATUS_KEY="Component_status"]
+  --source include/assert.inc
+
+  --let $assert_text= Assert that the server is component_keyring_file enabled
+  --let $assert_cond= [SELECT STATUS_VALUE = "component_keyring_file" FROM performance_schema.keyring_component_status WHERE STATUS_KEY="Implementation_name"]
+  --source include/assert.inc
+
+  --connection node_1
+  # Create an encrypted table
+  CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENCRYPTION='Y';
+  INSERT INTO t1 VALUES (1),(2),(3),(4);
+
+  --let $assert_text= Assert that the server has created the master key on node_1
+  --let $assert_cond= [SELECT COUNT(*) = 1 from performance_schema.keyring_keys]
+  --source include/assert.inc
+
+  --connection node_2
+  # Joiner will have two keys. The one restored by PXB, and the other one by server.
+  --let $assert_text= Assert that the server has created the master key on node_2
+  --let $assert_cond= [SELECT COUNT(*) = 2 from performance_schema.keyring_keys]
+  --source include/assert.inc
+
+  SHOW CREATE TABLE t1;
+  SELECT * FROM t1;
+
+  ALTER INSTANCE ROTATE INNODB MASTER KEY;
+
+  --let $assert_text= Assert that the server has rotated the master key on node_2
+  --let $assert_cond= [SELECT COUNT(*) = 3 from performance_schema.keyring_keys]
+  --source include/assert.inc
+
+  --connection node_1
+  --let $assert_text= Assert that the server has rotated the master key on node_1
+  --let $assert_cond= [SELECT COUNT(*) = 2 from performance_schema.keyring_keys]
+
+  # Test with record set and gcache encryption
+  --let $restart_parameters = "restart:--wsrep-disk-pages-encrypt=ON --wsrep-gcache-encrypt=ON"
+  --source suite/galera/include/restart_cluster_with_sst.inc
+
+  # Check that GCache ring buffer file content is encrypted on node_1
+  --connection node_1
+  --let $MYSQL_DATA_DIR = `SELECT @@datadir`
+  --let $assert_text = Assert that GCache is encrypted on node_1
+  --let $assert_file = $MYSQL_DATA_DIR/galera.cache
+  --let $assert_select = enc_encrypted: 1
+  --let $assert_count = 1
+  --source include/assert_grep.inc
+
+  # Check that GCache ring buffer file content is encrypted on node_2
+  --connection node_2
+  --let $MYSQL_DATA_DIR = `SELECT @@datadir`
+  --let $assert_text = Assert that GCache is encrypted on node_2
+  --let $assert_file = $MYSQL_DATA_DIR/galera.cache
+  --let $assert_select = enc_encrypted: 1
+  --let $assert_count = 1
+  --source include/assert_grep.inc
+
+  --let $restart_parameters = "restart"
+  --source suite/galera/include/restart_cluster_with_sst.inc
+
+  # Check that GCache ring buffer file content is not encrypted on node_1
+  --connection node_1
+  --let $MYSQL_DATA_DIR = `SELECT @@datadir`
+  --let $assert_text = Assert that GCache is not encrypted on node_1
+  --let $assert_file = $MYSQL_DATA_DIR/galera.cache
+  --let $assert_select = enc_encrypted: 0
+  --let $assert_count = 1
+  --source include/assert_grep.inc
+
+  # Check that GCache ring buffer file content is not encrypted on node_2
+  --connection node_2
+  --let $MYSQL_DATA_DIR = `SELECT @@datadir`
+  --let $assert_text = Assert that GCache is not encrypted on node_2
+  --let $assert_file = $MYSQL_DATA_DIR/galera.cache
+  --let $assert_select = enc_encrypted: 0
+  --let $assert_count = 1
+  --source include/assert_grep.inc
+
+  DROP TABLE t1;
+END_OF_PROCEDURE
+
+--echo # Scenario 1
+--echo # Donor: Global manifest, local config
+--echo # Joiner: Global manifest, local config
+
+--let $global_manifest = 1
+--let $donor_local_manifest = 0
+--let $joiner_local_manifest = 0
+
+--source ../include/pxc_setup_components_2nodes.inc
+--source ../include/restart_cluster_with_sst.inc
+--source $MYSQLTEST_VARDIR/tmp/pxc_keyring_validation.inc
+--source ../include/pxc_teardown_components_2nodes.inc
+
+--echo # Scenario 2
+--echo # Donor: local manifest, local config
+--echo # Joiner: local manifest, local config
+
+--let $global_manifest = 0
+--let $donor_local_manifest = 1
+--let $joiner_local_manifest = 1
+
+--source ../include/pxc_setup_components_2nodes.inc
+--source ../include/restart_cluster_with_sst.inc
+--source $MYSQLTEST_VARDIR/tmp/pxc_keyring_validation.inc
+--source ../include/pxc_teardown_components_2nodes.inc
+
+--remove_file $MYSQLTEST_VARDIR/tmp/pxc_keyring_validation.inc
