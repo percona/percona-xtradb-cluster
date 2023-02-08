@@ -476,7 +476,7 @@ INSERT INTO global_suppressions VALUES
    enabling pxc_encrypt_cluster_traffic.
  */
  ("You have enabled keyring plugin. SST encryption is mandatory."),
- ("No suitable 'keyring_component_metadata_query' service"),
+ ("No suitable '.*' service implementation found"),
 
 
  ("THE_LAST_SUPPRESSION");

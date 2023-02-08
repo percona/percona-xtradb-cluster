@@ -1,0 +1,157 @@
+# Scenario 1
+# Donor: Global manifest, local config
+# Joiner: Global manifest, local config
+# ----------------------------------------------------------------------
+# Setup
+# Taking backup of global manifest file for MySQL server
+# Creating custom global manifest file for MySQL server
+# Creating local configuration file for keyring component: component_keyring_file
+# Creating local configuration file for keyring component: component_keyring_file
+# ----------------------------------------------------------------------
+# shutting down node2
+[connection node_2]
+SET SESSION wsrep_sync_wait = 0;
+# shutting down node1
+[connection node_1]
+SET SESSION wsrep_sync_wait = 0;
+"Restarting node 1"
+# restart
+"Restarting node 2"
+# restart
+include/assert.inc [Assert that the server has started with a keyring component]
+include/assert.inc [Assert that the server is component_keyring_file enabled]
+include/assert.inc [Assert that the server has no keys created in the keyring]
+include/assert.inc [Assert that the server has started with a keyring component]
+include/assert.inc [Assert that the server is component_keyring_file enabled]
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENCRYPTION='Y';
+INSERT INTO t1 VALUES (1),(2),(3),(4);
+include/assert.inc [Assert that the server has created the master key on node_1]
+include/assert.inc [Assert that the server has created the master key on node_2]
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int NOT NULL,
+  PRIMARY KEY (`f1`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci ENCRYPTION='Y'
+SELECT * FROM t1;
+f1
+1
+2
+3
+4
+ALTER INSTANCE ROTATE INNODB MASTER KEY;
+include/assert.inc [Assert that the server has rotated the master key on node_2]
+# shutting down node2
+[connection node_2]
+SET SESSION wsrep_sync_wait = 0;
+# shutting down node1
+[connection node_1]
+SET SESSION wsrep_sync_wait = 0;
+"Restarting node 1"
+# restart:--wsrep-disk-pages-encrypt=ON --wsrep-gcache-encrypt=ON
+"Restarting node 2"
+# restart:--wsrep-disk-pages-encrypt=ON --wsrep-gcache-encrypt=ON
+include/assert_grep.inc [Assert that GCache is encrypted on node_1]
+include/assert_grep.inc [Assert that GCache is encrypted on node_2]
+# shutting down node2
+[connection node_2]
+SET SESSION wsrep_sync_wait = 0;
+# shutting down node1
+[connection node_1]
+SET SESSION wsrep_sync_wait = 0;
+"Restarting node 1"
+# restart
+"Restarting node 2"
+# restart
+include/assert_grep.inc [Assert that GCache is not encrypted on node_1]
+include/assert_grep.inc [Assert that GCache is not encrypted on node_2]
+DROP TABLE t1;
+# ----------------------------------------------------------------------
+# Teardown
+# Restore global manifest file for MySQL server from backup
+# Removing local keyring file for keyring component: component_keyring_file
+# Removing local keyring file for keyring component: component_keyring_file
+# Removing local configuration file for keyring component: component_keyring_file
+# Removing local configuration file for keyring component: component_keyring_file
+# Restarting server without the manifest file
+# ----------------------------------------------------------------------
+# Scenario 2
+# Donor: local manifest, local config
+# Joiner: local manifest, local config
+# ----------------------------------------------------------------------
+# Setup
+# Creating global manifest file for MySQL server
+# Creating manifest file for current MySQL server instance
+# Creating local configuration file for keyring component: component_keyring_file
+# Creating global manifest file for MySQL server
+# Creating manifest file for current MySQL server instance
+# Creating local configuration file for keyring component: component_keyring_file
+# ----------------------------------------------------------------------
+# shutting down node2
+[connection node_2]
+SET SESSION wsrep_sync_wait = 0;
+# shutting down node1
+[connection node_1]
+SET SESSION wsrep_sync_wait = 0;
+"Restarting node 1"
+# restart
+"Restarting node 2"
+# restart
+include/assert.inc [Assert that the server has started with a keyring component]
+include/assert.inc [Assert that the server is component_keyring_file enabled]
+include/assert.inc [Assert that the server has no keys created in the keyring]
+include/assert.inc [Assert that the server has started with a keyring component]
+include/assert.inc [Assert that the server is component_keyring_file enabled]
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENCRYPTION='Y';
+INSERT INTO t1 VALUES (1),(2),(3),(4);
+include/assert.inc [Assert that the server has created the master key on node_1]
+include/assert.inc [Assert that the server has created the master key on node_2]
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int NOT NULL,
+  PRIMARY KEY (`f1`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci ENCRYPTION='Y'
+SELECT * FROM t1;
+f1
+1
+2
+3
+4
+ALTER INSTANCE ROTATE INNODB MASTER KEY;
+include/assert.inc [Assert that the server has rotated the master key on node_2]
+# shutting down node2
+[connection node_2]
+SET SESSION wsrep_sync_wait = 0;
+# shutting down node1
+[connection node_1]
+SET SESSION wsrep_sync_wait = 0;
+"Restarting node 1"
+# restart:--wsrep-disk-pages-encrypt=ON --wsrep-gcache-encrypt=ON
+"Restarting node 2"
+# restart:--wsrep-disk-pages-encrypt=ON --wsrep-gcache-encrypt=ON
+include/assert_grep.inc [Assert that GCache is encrypted on node_1]
+include/assert_grep.inc [Assert that GCache is encrypted on node_2]
+# shutting down node2
+[connection node_2]
+SET SESSION wsrep_sync_wait = 0;
+# shutting down node1
+[connection node_1]
+SET SESSION wsrep_sync_wait = 0;
+"Restarting node 1"
+# restart
+"Restarting node 2"
+# restart
+include/assert_grep.inc [Assert that GCache is not encrypted on node_1]
+include/assert_grep.inc [Assert that GCache is not encrypted on node_2]
+DROP TABLE t1;
+# ----------------------------------------------------------------------
+# Teardown
+# Removing manifest file for current MySQL server instance
+# Removing manifest file for current MySQL server instance
+# Removing local keyring file for keyring component: component_keyring_file
+# Removing local keyring file for keyring component: component_keyring_file
+# Removing local configuration file for keyring component: component_keyring_file
+# Removing local configuration file for keyring component: component_keyring_file
+# Restarting server without the manifest file
+# ----------------------------------------------------------------------

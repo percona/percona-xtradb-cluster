@@ -23,6 +23,7 @@ WSREP_SST_OPT_BINLOG=""
 WSREP_SST_OPT_CONF_SUFFIX=""
 WSREP_SST_OPT_DATA=""
 WSREP_SST_OPT_BASEDIR=""
+WSREP_SST_OPT_PLUGINDIR=""
 WSREP_SST_OPT_USER=""
 WSREP_SST_OPT_PSWD=""
 WSREP_SST_OPT_VERSION=""
@@ -37,6 +38,7 @@ readonly MYSQLD_NAME=mysqld
 readonly MYSQLADMIN_NAME=mysqladmin
 readonly MYSQL_CLIENT_NAME=mysql
 
+declare MYSQLD_PATH=""
 declare MYSQL_UPGRADE_TMPDIR=""
 declare WSREP_LOG_DIR=""
 
@@ -97,6 +99,10 @@ case "$1" in
         # Ignore (read value from stdin)
         shift
         ;;
+    '--plugindir')
+        readonly WSREP_SST_OPT_PLUGINDIR="$2"
+        shift
+        ;;
     '--port')
         readonly WSREP_SST_OPT_PORT="$2"
         shift
@@ -139,6 +145,40 @@ done
 readonly WSREP_SST_OPT_BYPASS
 readonly WSREP_SST_OPT_BINLOG
 readonly WSREP_SST_OPT_CONF_SUFFIX
+
+# try to use my_print_defaults, mysql and mysqldump that come with the sources
+# (for MTR suite)
+SCRIPTS_DIR="$(cd $(dirname "$0"); pwd -P)"
+EXTRA_DIR="$SCRIPTS_DIR/../extra"
+CLIENT_DIR="$SCRIPTS_DIR/../client"
+
+if [ -x "$CLIENT_DIR/mysql" ]; then
+    MYSQL_CLIENT="$CLIENT_DIR/mysql"
+else
+    MYSQL_CLIENT=$(which mysql)
+fi
+
+if [ -x "$CLIENT_DIR/mysqldump" ]; then
+    MYSQLDUMP="$CLIENT_DIR/mysqldump"
+else
+    MYSQLDUMP=$(which mysqldump)
+fi
+
+if [ -x "$SCRIPTS_DIR/my_print_defaults" ]; then
+    MY_PRINT_DEFAULTS="$SCRIPTS_DIR/my_print_defaults"
+elif [ -x "$EXTRA_DIR/my_print_defaults" ]; then
+    MY_PRINT_DEFAULTS="$EXTRA_DIR/my_print_defaults"
+else
+    MY_PRINT_DEFAULTS=$(which my_print_defaults)
+fi
+
+
+if [ -n "${WSREP_SST_OPT_DATA:-}" ]
+then
+    SST_PROGRESS_FILE="$WSREP_SST_OPT_DATA/sst_in_progress"
+else
+    SST_PROGRESS_FILE=""
+fi
 
 #
 # user can specify xtrabackup specific settings that will be used during sst
@@ -205,42 +245,6 @@ normalize_boolean()
     return 0
 }
 
-
-# try to use my_print_defaults, mysql and mysqldump that come with the sources
-# (for MTR suite)
-SCRIPTS_DIR="$(cd $(dirname "$0"); pwd -P)"
-EXTRA_DIR="$SCRIPTS_DIR/../extra"
-CLIENT_DIR="$SCRIPTS_DIR/../client"
-
-if [ -x "$CLIENT_DIR/mysql" ]; then
-    MYSQL_CLIENT="$CLIENT_DIR/mysql"
-else
-    MYSQL_CLIENT=$(which mysql)
-fi
-
-if [ -x "$CLIENT_DIR/mysqldump" ]; then
-    MYSQLDUMP="$CLIENT_DIR/mysqldump"
-else
-    MYSQLDUMP=$(which mysqldump)
-fi
-
-if [ -x "$SCRIPTS_DIR/my_print_defaults" ]; then
-    MY_PRINT_DEFAULTS="$SCRIPTS_DIR/my_print_defaults"
-elif [ -x "$EXTRA_DIR/my_print_defaults" ]; then
-    MY_PRINT_DEFAULTS="$EXTRA_DIR/my_print_defaults"
-else
-    MY_PRINT_DEFAULTS=$(which my_print_defaults)
-fi
-
-
-if [ -n "${WSREP_SST_OPT_DATA:-}" ]
-then
-    SST_PROGRESS_FILE="$WSREP_SST_OPT_DATA/sst_in_progress"
-else
-    SST_PROGRESS_FILE=""
-fi
-
-
 WSREP_LOG_DEBUG=$(parse_cnf sst wsrep-debug "")
 if [ -z "$WSREP_LOG_DEBUG" ]; then
     WSREP_LOG_DEBUG=$(parse_cnf mysqld wsrep-debug "")
@@ -275,6 +279,40 @@ wsrep_log_debug()
     if [[ -n "$WSREP_LOG_DEBUG" ]]; then
         wsrep_log "DBG:(debug) $*"
     fi
+}
+
+#
+# This functions stores the mysqld path in the MYSQLD_PATH
+# global variable
+#
+get_mysqld_path()
+{
+    # Locate mysqld
+    # mysqld (depending on the distro) may be in a different
+    # directory from the SST scripts (it may be in /usr/sbin not /usr/bin)
+    # So, first, try to use readlink to read from /proc/<pid>/exe
+    if which readlink >/dev/null; then
+        # Check to see if the symlink for the exe exists
+        if [[ -L /proc/${WSREP_SST_OPT_PARENT}/exe ]]; then
+            MYSQLD_PATH=$(readlink -f /proc/${WSREP_SST_OPT_PARENT}/exe)
+        fi
+    fi
+    if [[ -z $MYSQLD_PATH ]]; then
+        # We don't have readlink, so look for mysqld in the path
+        MYSQLD_PATH=$(which ${MYSQLD_NAME})
+    fi
+
+    if [[ -z $MYSQLD_PATH ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "Could not locate ${MYSQLD_NAME} (needed for post-processing)"
+        wsrep_log_error "Please ensure that ${MYSQLD_NAME} is in the path"
+        wsrep_log_error "Line $LINENO"
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        exit 22
+    fi
+
+    wsrep_log_debug "Found the ${MYSQLD_NAME} binary in ${MYSQLD_PATH}"
+    wsrep_log_debug "--$("$MYSQLD_PATH" --version | cut -d' ' -f2-)"
 }
 
 wsrep_cleanup_progress_file()
@@ -530,6 +568,7 @@ EOF
 #   WSREP_SST_OPT_CONF
 #   WSREP_SST_OPT_CONF_SUFFIX
 #   WSREP_SST_OPT_BASEDIR
+#   WSREP_SST_OPT_PLUGINDIR
 #   MYSQL_UPGRADE_TMPDIR    (This path will be deleted on exit)
 #
 # Arguments
@@ -650,21 +689,7 @@ function run_post_processing_steps()
         return 0
     fi
 
-    # Locate mysqld
-    # mysqld (depending on the distro) may be in a different
-    # directory from the SST scripts (it may be in /usr/sbin not /usr/bin)
-    # So, first, try to use readlink to read from /proc/<pid>/exe
-    if which readlink >/dev/null; then
-
-        # Check to see if the symlink for the exe exists
-        if [[ -L /proc/${WSREP_SST_OPT_PARENT}/exe ]]; then
-            mysqld_path=$(readlink -f /proc/${WSREP_SST_OPT_PARENT}/exe)
-        fi
-    fi
-    if [[ -z $mysqld_path ]]; then
-        # We don't have readlink, so look for mysqld in the path
-        mysqld_path=$(which ${MYSQLD_NAME})
-    fi
+    local mysqld_path=$MYSQLD_PATH
     if [[ $mysqld_path == *"memcheck"* ]]; then
       wsrep_log_debug "Detected valgrind, adjusting mysqld path accordingly"
       while read -r line
@@ -675,16 +700,6 @@ function run_post_processing_steps()
         fi
       done < <(cat /proc/${WSREP_SST_OPT_PARENT}/cmdline | strings -1)
     fi
-    if [[ -z $mysqld_path ]]; then
-        wsrep_log_error "******************* FATAL ERROR ********************** "
-        wsrep_log_error "Could not locate ${MYSQLD_NAME} (needed for post-processing)"
-        wsrep_log_error "Please ensure that ${MYSQLD_NAME} is in the path"
-        wsrep_log_error "Line $LINENO"
-        wsrep_log_error "******************* FATAL ERROR ********************** "
-        return 2
-    fi
-    wsrep_log_debug "Found the ${MYSQLD_NAME} binary in ${mysqld_path}"
-    wsrep_log_debug "--$("$mysqld_path" --version | cut -d' ' -f2-)"
 
     # Verify any other needed programs
     wsrep_check_program "${MYSQLADMIN_NAME}"
@@ -797,6 +812,10 @@ function run_post_processing_steps()
 
     if [[ -n $WSREP_SST_OPT_BASEDIR ]]; then
         mysqld_cmdline+=" --basedir=${WSREP_SST_OPT_BASEDIR}"
+    fi
+
+    if [[ -n $WSREP_SST_OPT_PLUGINDIR ]]; then
+        mysqld_cmdline+=" --plugin-dir=${WSREP_SST_OPT_PLUGINDIR}"
     fi
 
     # Generate a new random password to be used by the JOINER
@@ -936,6 +955,33 @@ EOF
     return 0
 }
 
+function exec_sql() {
+  local user=$1
+  local password=$2
+  local socket=$3
+  local query=$4
+  local args=""
+  local retvalue
+  local retoutput
+  local default_auth=""
+
+  if [[ $# -ge 5 ]]; then
+    args=$5
+  fi
+
+  defaults=$(printf '[client]\nuser=%s\npassword="%s"\nsocket=%s\n%s' \
+    "${user}" \
+    "${password}" \
+    "${socket}" \
+    "${default_auth}"
+  )
+
+  retoutput=$(mysql --defaults-file=<(echo "${defaults}") --unbuffered --batch --silent ${args} -e "$query")
+  retvalue=$?
+
+  printf "%s" "${retoutput}"
+  return $retvalue
+}
 
 # Reads incoming data from STDIN and sets the variables
 #
