@@ -192,7 +192,7 @@ proc_param).
 
   - #Table_trigger_dispatcher::create_trigger()
 
-  - #Table_trigger_dispatcher::check_n_load()
+  - #dd::load_triggers()
 
   See the C++ class #Table_trigger_dispatcher in general.
 
@@ -2883,7 +2883,7 @@ bool sp_head::execute_procedure(THD *thd, mem_root_deque<Item *> *args) {
       arguments evaluation. If arguments evaluation required prelocking mode,
       we'll leave it here.
     */
-    thd->lex->cleanup(thd, true);
+    thd->lex->cleanup(true);
 
     if (!thd->in_sub_stmt) {
       thd->get_stmt_da()->set_overwrite_status(true);

@@ -55,7 +55,19 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #define INNODB_VERSION_BUGFIX MYSQL_VERSION_PATCH
 
 #ifndef PERCONA_INNODB_VERSION
+<<<<<<< HEAD
 #define PERCONA_INNODB_VERSION 22
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+#define PERCONA_INNODB_VERSION 42
+||||||||| merged common ancestors
+#define PERCONA_INNODB_VERSION 41
+=========
+#define PERCONA_INNODB_VERSION 22
+>>>>>>>>> Temporary merge branch 2
+=======
+#define PERCONA_INNODB_VERSION 23
+>>>>>>> Percona-Server-8.0.31-23
 #endif
 
 /* The following is the InnoDB version as shown in
