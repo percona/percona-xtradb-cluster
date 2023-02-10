@@ -40,35 +40,8 @@ where name like 'Wait/Synch/Cond/sql/%'
 'wait/synch/cond/sql/DEBUG_SYNC::cond',
 'wait/synch/cond/sql/COND_socket_listener_active',
 'wait/synch/cond/sql/COND_start_signal_handler')
-<<<<<<< HEAD
 and name not like 'wait/synch/cond/sql/COND_wsrep_%'
   order by name limit 10;
-NAME	ENABLED	TIMED	PROPERTIES	VOLATILITY	DOCUMENTATION
-wait/synch/cond/sql/Commit_order_manager::m_workers.cond	YES	YES		0	NULL
-wait/synch/cond/sql/COND_compress_gtid_table	YES	YES	singleton	0	NULL
-wait/synch/cond/sql/COND_connection_count	YES	YES	singleton	0	NULL
-wait/synch/cond/sql/COND_flush_thread_cache	YES	YES	singleton	0	NULL
-wait/synch/cond/sql/COND_manager	YES	YES	singleton	0	NULL
-wait/synch/cond/sql/COND_queue_state	YES	YES	singleton	0	NULL
-wait/synch/cond/sql/COND_server_started	YES	YES	singleton	0	NULL
-wait/synch/cond/sql/COND_thd_list	YES	YES		0	NULL
-wait/synch/cond/sql/COND_thr_lock	YES	YES		0	NULL
-wait/synch/cond/sql/COND_thread_cache	YES	YES	singleton	0	NULL
-||||||| merged common ancestors
-order by name limit 10;
-NAME	ENABLED	TIMED	PROPERTIES	VOLATILITY	DOCUMENTATION
-wait/synch/cond/sql/Commit_order_manager::m_workers.cond	YES	YES		0	NULL
-wait/synch/cond/sql/COND_compress_gtid_table	YES	YES	singleton	0	NULL
-wait/synch/cond/sql/COND_connection_count	YES	YES	singleton	0	NULL
-wait/synch/cond/sql/COND_flush_thread_cache	YES	YES	singleton	0	NULL
-wait/synch/cond/sql/COND_manager	YES	YES	singleton	0	NULL
-wait/synch/cond/sql/COND_queue_state	YES	YES	singleton	0	NULL
-wait/synch/cond/sql/COND_server_started	YES	YES	singleton	0	NULL
-wait/synch/cond/sql/COND_thd_list	YES	YES		0	NULL
-wait/synch/cond/sql/COND_thr_lock	YES	YES		0	NULL
-wait/synch/cond/sql/COND_thread_cache	YES	YES	singleton	0	NULL
-=======
-order by name limit 10;
 NAME	ENABLED	TIMED	PROPERTIES	FLAGS	VOLATILITY	DOCUMENTATION
 wait/synch/cond/sql/Commit_order_manager::m_workers.cond	YES	YES		NULL	0	NULL
 wait/synch/cond/sql/COND_compress_gtid_table	YES	YES	singleton	NULL	0	NULL
@@ -80,7 +53,6 @@ wait/synch/cond/sql/COND_server_started	YES	YES	singleton	NULL	0	NULL
 wait/synch/cond/sql/COND_thd_list	YES	YES		NULL	0	NULL
 wait/synch/cond/sql/COND_thr_lock	YES	YES		NULL	0	NULL
 wait/synch/cond/sql/COND_thread_cache	YES	YES	singleton	NULL	0	NULL
->>>>>>> Percona-Server-8.0.31-23
 select * from performance_schema.setup_instruments
 where name='Wait';
 select * from performance_schema.setup_instruments

@@ -1257,7 +1257,6 @@ end:
     set_connection_admin_flag(thd);
   }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   // Transaction might have been aborted at the stage
   // when set_system_user_flag() is called.
@@ -1268,12 +1267,7 @@ end:
   wsrep_close(thd);
 #endif /* WITH_WSREP */
 
-  thd->lex->cleanup(thd, true);
-||||||| merged common ancestors
-  thd->lex->cleanup(thd, true);
-=======
   thd->lex->cleanup(true);
->>>>>>> Percona-Server-8.0.31-23
   thd->end_statement();
   thd->cleanup_after_query();
   /* Avoid races with SHOW PROCESSLIST */

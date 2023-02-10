@@ -129,27 +129,6 @@
    MAX_TIME_ZONE_NAME_LENGTH /* type, length, time_zone */ + 1U +             \
    2 /* type, lc_time_names_number */ + 1U +                                  \
    2 /* type, charset_database_number */ + 1U +                               \
-<<<<<<< HEAD
-   8 /* type, table_map_for_update */ + 1U +                                  \
-   4 /* type, master_data_written */ + /* type, db_1, db_2, ... */            \
-   1U + (MAX_DBS_IN_EVENT_MTS * (1 + NAME_LEN)) + 3U +                        \
-   /* type, microseconds */ +1U + 32 * 3 + /* type, user_len, user */         \
-   1 + 255 /* host_len, host */ + 1U + 1 /* type, explicit_def..ts*/ + 1U +   \
-   8 /* type, xid of DDL */ + 1U +                                            \
-   2 /* type, default_collation_for_utf8mb4_number */ + 1U +                  \
-   1 /* type, sql_require_primary_key */ + 1U +                                     \
-   1 /* type, default_table_encryption */ + 1U +                              \
-   1 /* type, binlog_ddl_skip_rewrite */)
-||||||| merged common ancestors
-   8 /* type, table_map_for_update */ + 1U +                                  \
-   4 /* type, master_data_written */ + /* type, db_1, db_2, ... */            \
-   1U + (MAX_DBS_IN_EVENT_MTS * (1 + NAME_LEN)) + 3U +                        \
-   /* type, microseconds */ +1U + 32 * 3 + /* type, user_len, user */         \
-   1 + 255 /* host_len, host */ + 1U + 1 /* type, explicit_def..ts*/ + 1U +   \
-   8 /* type, xid of DDL */ + 1U +                                            \
-   2 /* type, default_collation_for_utf8mb4_number */ +                       \
-   1 /* sql_require_primary_key */ + 1 /* type, default_table_encryption */)
-=======
    8 /* type, table_map_for_update */ + 1U + 1 +                              \
    32 * 3 /* type, user_len, user */ + 1 + 255 /* host_len, host */           \
    + 1U + 1 +                                                                 \
@@ -158,8 +137,8 @@
    1U + 8 /* type, xid of DDL */ + 1U +                                       \
    2 /* type, default_collation_for_utf8mb4_number */ + 1U +                  \
    1 /* sql_require_primary_key */ + 1U +                                     \
-   1 /* type, default_table_encryption */)
->>>>>>> Percona-Server-8.0.31-23
+   1 /* type, default_table_encryption */+ 1U +                               \
+   1 /* type, binlog_ddl_skip_rewrite*/)
 
 /**
    Uninitialized timestamp value (for either last committed or sequence number).

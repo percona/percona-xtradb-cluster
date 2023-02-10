@@ -2953,26 +2953,6 @@ dberr_t Encryption::set_algorithm(const char *option,
   } else if (innobase_strcasecmp(option, "y") == 0) {
     encryption->m_type = AES;
 
-<<<<<<< HEAD
-  } else if (innobase_strcasecmp(option, "KEYRING") == 0) {
-#ifdef WITH_WSREP
-    return (DB_UNSUPPORTED);
-#else
-    encryption->m_type = KEYRING;
-#endif
-  } else if (innobase_strcasecmp(option, "ONLINE_TO_KEYRING") == 0) {
-#ifdef WITH_WSREP
-    return (DB_UNSUPPORTED);
-#else
-    encryption->m_type = KEYRING;
-#endif
-||||||| merged common ancestors
-  } else if (innobase_strcasecmp(option, "KEYRING") == 0) {
-    encryption->m_type = KEYRING;
-  } else if (innobase_strcasecmp(option, "ONLINE_TO_KEYRING") == 0) {
-    encryption->m_type = KEYRING;
-=======
->>>>>>> Percona-Server-8.0.31-23
   } else {
     return (DB_UNSUPPORTED);
   }
@@ -4109,19 +4089,8 @@ void Validate_files::check(const Const_iter &begin, const Const_iter &end,
     It's safe to pass space_name in tablename charset because filename is
     already in filename charset. */
     bool validate = recv_needed_recovery && srv_force_recovery == 0;
-<<<<<<< HEAD
-    dberr_t err =
-        fil_ibd_open(validate || is_enc_in_progress, FIL_TYPE_TABLESPACE,
-                     space_id, fsp_flags, space_name, filename, false,
-                     false, keyring_encryption_info);
-||||||| merged common ancestors
-    dberr_t err = fil_ibd_open(
-        validate || is_enc_in_progress, FIL_TYPE_TABLESPACE, space_id, fsp_flags,
-        space_name, filename, false, false, keyring_encryption_info);
-=======
     dberr_t err = fil_ibd_open(validate, FIL_TYPE_TABLESPACE, space_id,
                                fsp_flags, space_name, filename, false, false);
->>>>>>> Percona-Server-8.0.31-23
 
     switch (err) {
       case DB_SUCCESS: {
@@ -4822,17 +4791,8 @@ error_exit:
 bool innobase_fix_default_table_encryption(ulong encryption_option,
                                            bool is_server_starting) {
   if (!srv_read_only_mode) {
-<<<<<<< HEAD
-    return fil_crypt_set_encrypt_tables(
-        static_cast<enum_default_table_encryption>(encryption_option),
-        is_server_starting);
-||||||| merged common ancestors
-    return fil_crypt_set_encrypt_tables(
-        static_cast<enum_default_table_encryption>(encryption_option), is_server_starting);
-=======
     srv_default_table_encryption =
         static_cast<enum_default_table_encryption>(encryption_option);
->>>>>>> Percona-Server-8.0.31-23
   }
   return false;
 }
@@ -5684,31 +5644,15 @@ static int innodb_init(void *p) {
   innobase_hton->unlock_hton_log = innobase_unlock_hton_log;
   innobase_hton->collect_hton_log_info = innobase_collect_hton_log_info;
   innobase_hton->fill_is_table = innobase_fill_i_s_table;
-<<<<<<< HEAD
-  innobase_hton->flags = HTON_SUPPORTS_EXTENDED_KEYS |
-                         HTON_SUPPORTS_FOREIGN_KEYS | HTON_SUPPORTS_ATOMIC_DDL |
-                         HTON_CAN_RECREATE | HTON_SUPPORTS_SECONDARY_ENGINE |
-                         HTON_SUPPORTS_TABLE_ENCRYPTION |
-                         HTON_SUPPORTS_ONLINE_BACKUPS | HTON_SUPPORTS_COMPRESSED_COLUMNS |
-                         HTON_SUPPORTS_GENERATED_INVISIBLE_PK;
 #ifdef WITH_WSREP
   innobase_hton->flags |= HTON_WSREP_REPLICATION;
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-  innobase_hton->flags = HTON_SUPPORTS_EXTENDED_KEYS |
-                         HTON_SUPPORTS_FOREIGN_KEYS | HTON_SUPPORTS_ATOMIC_DDL |
-                         HTON_CAN_RECREATE | HTON_SUPPORTS_SECONDARY_ENGINE |
-                         HTON_SUPPORTS_TABLE_ENCRYPTION |
-                         HTON_SUPPORTS_ONLINE_BACKUPS | HTON_SUPPORTS_COMPRESSED_COLUMNS |
-                         HTON_SUPPORTS_GENERATED_INVISIBLE_PK;
-=======
   innobase_hton->flags =
       HTON_SUPPORTS_EXTENDED_KEYS | HTON_SUPPORTS_FOREIGN_KEYS |
       HTON_SUPPORTS_ATOMIC_DDL | HTON_CAN_RECREATE |
       HTON_SUPPORTS_SECONDARY_ENGINE | HTON_SUPPORTS_TABLE_ENCRYPTION |
       HTON_SUPPORTS_ONLINE_BACKUPS | HTON_SUPPORTS_COMPRESSED_COLUMNS |
       HTON_SUPPORTS_GENERATED_INVISIBLE_PK;
->>>>>>> Percona-Server-8.0.31-23
 
   innobase_hton->replace_native_transaction_in_thd = innodb_replace_trx_in_thd;
   innobase_hton->file_extensions = ha_innobase_exts;
@@ -24163,234 +24107,6 @@ static int innodb_srv_empty_free_list_algorithm_validate(
   return (0);
 }
 
-<<<<<<< HEAD
-static int innodb_encryption_threads_validate(
-    /*=================================*/
-    THD *thd,                     /*!< in: thread handle */
-    SYS_VAR *var,                 /*!< in: pointer to system
-                                                  variable */
-    void *save,                   /*!< out: immediate result
-                                  for update function */
-    struct st_mysql_value *value) /*!< in: incoming string */
-{
-  long long intbuf;
-
-  DBUG_TRACE;
-
-  if (value->val_int(value, &intbuf)) {
-    /* The value is NULL. That is invalid. */
-    return 1;
-  }
-
-  bool is_val_fixed = false;
-  long long requested_threads = intbuf;
-  if (intbuf < 0) {
-    requested_threads = 0;
-    is_val_fixed = true;
-  } else if (intbuf > MAX_ENCRYPTION_THREADS) {
-    requested_threads = MAX_ENCRYPTION_THREADS;
-    is_val_fixed = true;
-  }
-
-  if (throw_bounds_warning(thd, "innodb_encryption_threads", is_val_fixed,
-                           intbuf)) {
-    return 1;
-  }
-
-  if (srv_n_fil_crypt_threads_requested == 0 && requested_threads > 0) {
-    // We are starting encryption threads, we must lock
-    // the keyring plugins
-    uint number_of_keyrings_locked = lock_keyrings(NULL);
-
-    if (number_of_keyrings_locked == 0) {
-      my_printf_error(ER_WRONG_ARGUMENTS,
-                      "InnoDB: cannot enable encryption threads, "
-                      "keyring plugin is not available",
-                      MYF(0));
-      return 1;
-    }
-    if (Encryption::is_keyring_alive() == false) {
-      my_printf_error(
-          ER_WRONG_ARGUMENTS,
-          "InnoDB: keyring plugin is installed but it seems it was not "
-          "properly initialized. Cannot enable encryption threads.",
-          MYF(0));
-      unlock_keyrings(NULL);
-      return 1;
-    }
-  } else if (requested_threads == 0 && srv_n_fil_crypt_threads_requested >
-                                           0) {  // We are disabling encryption
-                                                 // threads, unlock the keyrings
-    unlock_keyrings(NULL);
-  }
-
-  *reinterpret_cast<ulong *>(save) = static_cast<ulong>(requested_threads);
-
-  return 0;
-}
-
-/******************************************************************
-Update the system variable innodb_encryption_threads */
-static void innodb_encryption_threads_update(
-    /*=============================*/
-    THD *thd,         /*!< in: thread handle */
-    SYS_VAR *var,     /*!< in: pointer to
-                                      system variable */
-    void *var_ptr,    /*!< out: where the
-                      formal string goes */
-    const void *save) /*!< in: immediate result
-                      from check function */
-{
-  mysql_mutex_unlock(&LOCK_global_system_variables);
-  fil_crypt_set_thread_cnt(*static_cast<const uint *>(save));
-  mysql_mutex_lock(&LOCK_global_system_variables);
-}
-
-/******************************************************************
-Update the system variable innodb_encryption_rotate_key_age */
-static void innodb_encryption_rotate_key_age_update(
-    /*====================================*/
-    THD *thd,         /*!< in: thread handle */
-    SYS_VAR *var,     /*!< in: pointer to
-                                      system variable */
-    void *var_ptr,    /*!< out: where the
-                      formal string goes */
-    const void *save) /*!< in: immediate result
-                      from check function */
-{
-  fil_crypt_set_rotate_key_age(*static_cast<const uint *>(save));
-}
-
-/******************************************************************
-Update the system variable innodb_encryption_rotation_iops */
-static void innodb_encryption_rotation_iops_update(
-    /*===================================*/
-    THD *thd,         /*!< in: thread handle */
-    SYS_VAR *var,     /*!< in: pointer to
-                                      system variable */
-    void *var_ptr,    /*!< out: where the
-                      formal string goes */
-    const void *save) /*!< in: immediate result
-                      from check function */
-{
-  fil_crypt_set_rotation_iops(*static_cast<const uint *>(save));
-}
-
-||||||| merged common ancestors
-static int innodb_encryption_threads_validate(
-    /*=================================*/
-    THD *thd,                     /*!< in: thread handle */
-    SYS_VAR *var,                 /*!< in: pointer to system
-                                                  variable */
-    void *save,                   /*!< out: immediate result
-                                  for update function */
-    struct st_mysql_value *value) /*!< in: incoming string */
-{
-  long long intbuf;
-
-  DBUG_TRACE;
-
-  if (value->val_int(value, &intbuf)) {
-    /* The value is NULL. That is invalid. */
-    return 1;
-  }
-
-  bool is_val_fixed = false;
-  long long requested_threads = intbuf;
-  if (intbuf < 0) {
-    requested_threads = 0;
-    is_val_fixed = true;
-  } else if (intbuf > MAX_ENCRYPTION_THREADS) {
-    requested_threads = MAX_ENCRYPTION_THREADS;
-    is_val_fixed = true;
-  }
-
-  if (throw_bounds_warning(thd, "innodb_encryption_threads", is_val_fixed,
-                           intbuf)) {
-    return 1;
-  }
-
-  if (srv_n_fil_crypt_threads_requested == 0 && requested_threads > 0) {
-    // We are starting encryption threads, we must lock
-    // the keyring plugins
-    uint number_of_keyrings_locked = lock_keyrings(NULL);
-
-    if (number_of_keyrings_locked == 0) {
-      my_printf_error(ER_WRONG_ARGUMENTS,
-                      "InnoDB: cannot enable encryption threads, "
-                      "keyring plugin is not available",
-                      MYF(0));
-      return 1;
-    }
-    if (Encryption::is_keyring_alive() == false) {
-      my_printf_error(
-          ER_WRONG_ARGUMENTS,
-          "InnoDB: keyring plugin is installed but it seems it was not "
-          "properly initialized. Cannot enable encryption threads.",
-          MYF(0));
-      unlock_keyrings(NULL);
-      return 1;
-    }
-  } else if (requested_threads == 0 && srv_n_fil_crypt_threads_requested > 0) {
-    // We are disabling encryption
-    // threads, unlock the keyrings
-    unlock_keyrings(NULL);
-  }
-
-  *reinterpret_cast<ulong *>(save) = static_cast<ulong>(requested_threads);
-
-  return 0;
-}
-
-/******************************************************************
-Update the system variable innodb_encryption_threads */
-static void innodb_encryption_threads_update(
-    /*=============================*/
-    THD *thd,         /*!< in: thread handle */
-    SYS_VAR *var,     /*!< in: pointer to
-                                      system variable */
-    void *var_ptr,    /*!< out: where the
-                      formal string goes */
-    const void *save) /*!< in: immediate result
-                      from check function */
-{
-  mysql_mutex_unlock(&LOCK_global_system_variables);
-  fil_crypt_set_thread_cnt(*static_cast<const uint *>(save));
-  mysql_mutex_lock(&LOCK_global_system_variables);
-}
-
-/******************************************************************
-Update the system variable innodb_encryption_rotate_key_age */
-static void innodb_encryption_rotate_key_age_update(
-    /*====================================*/
-    THD *thd,         /*!< in: thread handle */
-    SYS_VAR *var,     /*!< in: pointer to
-                                      system variable */
-    void *var_ptr,    /*!< out: where the
-                      formal string goes */
-    const void *save) /*!< in: immediate result
-                      from check function */
-{
-  fil_crypt_set_rotate_key_age(*static_cast<const uint *>(save));
-}
-
-/******************************************************************
-Update the system variable innodb_encryption_rotation_iops */
-static void innodb_encryption_rotation_iops_update(
-    /*===================================*/
-    THD *thd,         /*!< in: thread handle */
-    SYS_VAR *var,     /*!< in: pointer to
-                                      system variable */
-    void *var_ptr,    /*!< out: where the
-                      formal string goes */
-    const void *save) /*!< in: immediate result
-                      from check function */
-{
-  fil_crypt_set_rotation_iops(*static_cast<const uint *>(save));
-}
-
-=======
->>>>>>> Percona-Server-8.0.31-23
 /** Update the innodb_log_checksums parameter.
 @param[out]     var_ptr   current value
 @param[in]      save      immediate result from check function */

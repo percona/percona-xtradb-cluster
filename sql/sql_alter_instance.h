@@ -62,19 +62,6 @@ class Rotate_binlog_master_key : public Alter_instance {
   ~Rotate_binlog_master_key() override = default;
 };
 
-<<<<<<< HEAD
-class Rotate_redo_system_key final : public Alter_instance {
- public:
-  explicit Rotate_redo_system_key(THD *thd)
-      : Alter_instance(thd), rotate_percona_system_key(PERCONA_REDO_KEY_NAME) {}
-
-  bool execute() override;
-  ~Rotate_redo_system_key() override {}
-
- private:
-  Rotate_percona_system_key rotate_percona_system_key;
-};
-
 #ifdef WITH_WSREP
 class Rotate_gcache_master_key final : public Rotate_innodb_key {
  public:
@@ -85,21 +72,6 @@ class Rotate_gcache_master_key final : public Rotate_innodb_key {
 };
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-class Rotate_redo_system_key final : public Alter_instance {
- public:
-  explicit Rotate_redo_system_key(THD *thd)
-      : Alter_instance(thd), rotate_percona_system_key(PERCONA_REDO_KEY_NAME) {}
-
-  bool execute() override;
-  ~Rotate_redo_system_key() override {}
-
- private:
-  Rotate_percona_system_key rotate_percona_system_key;
-};
-
-=======
->>>>>>> Percona-Server-8.0.31-23
 /** Alter Innodb redo log properties. */
 class Innodb_redo_log : public Alter_instance {
  public:

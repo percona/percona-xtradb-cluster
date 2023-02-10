@@ -1055,7 +1055,6 @@ bool Srv_session::close() {
 
   if (backup.attach_error) return true;
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   wsrep_close(&thd);
   mysql_mutex_lock(&thd.LOCK_wsrep_thd);
@@ -1063,12 +1062,7 @@ bool Srv_session::close() {
   mysql_mutex_unlock(&thd.LOCK_wsrep_thd);
 #endif /* WITH_WSREP */
 
-  state = SRV_SESSION_CLOSED;
-||||||| merged common ancestors
-  state = SRV_SESSION_CLOSED;
-=======
   m_state = SRV_SESSION_CLOSED;
->>>>>>> Percona-Server-8.0.31-23
 
   server_session_list.remove(m_thd);
 
@@ -1204,7 +1198,6 @@ int Srv_session::execute_command(enum enum_server_command command,
   }
   int ret = dispatch_command(m_thd, data, command);
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (thd.wsrep_cs().state() == wsrep::client_state::s_exec) {
     wsrep_after_command_before_result(&thd);
@@ -1212,15 +1205,8 @@ int Srv_session::execute_command(enum enum_server_command command,
   wsrep_after_command_after_result(&thd);
 #endif /* WITH_WSREP */
 
-  thd.pop_protocol();
-  assert(thd.get_protocol() == &protocol_error);
-||||||| merged common ancestors
-  thd.pop_protocol();
-  assert(thd.get_protocol() == &protocol_error);
-=======
   m_thd->pop_protocol();
   assert(m_thd->get_protocol() == &m_protocol_error);
->>>>>>> Percona-Server-8.0.31-23
   return ret;
 }
 

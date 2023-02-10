@@ -80,14 +80,6 @@ BuildRequires:  devtoolset-8-gcc
 BuildRequires:  devtoolset-8-gcc-c++
 %endif
 BuildRequires:  bison >= 2.1
-<<<<<<< HEAD
-BuildRequires:  perl
-BuildRequires:  perl(Time::HiRes)
-BuildRequires:  perl(Env)
-||||||| merged common ancestors
-=======
-BuildRequires:  elfutils
->>>>>>> Percona-Server-8.0.31-23
 BuildRequires:  time
 BuildRequires:  cyrus-sasl-devel
 BuildRequires:  libaio-devel

@@ -161,16 +161,8 @@ IF(NOT CPACK_PACKAGE_FILE_NAME)
 ENDIF()
 
 IF(NOT CPACK_SOURCE_PACKAGE_FILE_NAME)
-<<<<<<< HEAD
   SET(CPACK_SOURCE_PACKAGE_FILE_NAME "Percona-XtraDB-Cluster-${VERSION}")
   IF(WITH_NDBCLUSTER)
-||||||| merged common ancestors
-  SET(CPACK_SOURCE_PACKAGE_FILE_NAME "percona-server-${VERSION}")
-  IF(WITH_NDBCLUSTER)
-=======
-  SET(CPACK_SOURCE_PACKAGE_FILE_NAME "percona-server-${VERSION}")
-  IF(WITH_NDB)
->>>>>>> Percona-Server-8.0.31-23
     SET(CPACK_SOURCE_PACKAGE_FILE_NAME "percona-server-mysql-cluster-gpl-${MYSQL_CLUSTER_VERSION}")
     MESSAGE(STATUS "Percona Server MySQL Cluster package name: ${CPACK_SOURCE_PACKAGE_FILE_NAME}")
   ELSE()

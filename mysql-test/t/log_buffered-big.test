@@ -49,13 +49,7 @@ SET PERSIST log_error_suppression_list="ER_BASEDIR_SET_TO,ER_DD_INIT_FAILED";
 # moment it will not be able to do so as InnoDB doublewrite component will not
 # be properly shut down by the first (original) instance.
 --let LOG_FILE1= $MYSQLTEST_VARDIR/tmp/test1.err
-<<<<<<< HEAD
---let restart_parameters="restart: --skip-innodb-doublewrite --log-error=$LOG_FILE_TRAD --log-error-services=$log_services --log-error-suppression-list=$log_sup_list"
-||||||| merged common ancestors
---let restart_parameters="restart: --log-error=$LOG_FILE_TRAD --log-error-services=$log_services --log-error-suppression-list=$log_sup_list"
-=======
---let restart_parameters="restart: --log-error=$LOG_FILE_TRAD --log-error-verbosity=3"
->>>>>>> Percona-Server-8.0.31-23
+--let restart_parameters="restart: --skip-innodb-doublewrite --log-error=$LOG_FILE_TRAD --log-error-verbosity=3"
 --replace_result $LOG_FILE_TRAD LOG_FILE_TRAD
 --source include/restart_mysqld.inc
 

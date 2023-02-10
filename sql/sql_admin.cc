@@ -2197,27 +2197,11 @@ bool Sql_cmd_alter_instance::execute(THD *thd) {
     case ROTATE_INNODB_MASTER_KEY:
       alter_instance = new Rotate_innodb_master_key(thd);
       break;
-<<<<<<< HEAD
-    case ROTATE_INNODB_SYSTEM_KEY:
-      alter_instance = new Rotate_innodb_system_key(thd, system_key_id);
-      break;
-    case ROTATE_REDO_SYSTEM_KEY:
-      alter_instance = new Rotate_redo_system_key(thd);
-      break;
 #ifdef WITH_WSREP
     case ROTATE_GCACHE_MASTER_KEY:
       alter_instance = new Rotate_gcache_master_key(thd);
       break;
 #endif
-||||||| merged common ancestors
-    case ROTATE_INNODB_SYSTEM_KEY:
-      alter_instance = new Rotate_innodb_system_key(thd, system_key_id);
-      break;
-    case ROTATE_REDO_SYSTEM_KEY:
-      alter_instance = new Rotate_redo_system_key(thd);
-      break;
-=======
->>>>>>> Percona-Server-8.0.31-23
     case ALTER_INSTANCE_RELOAD_TLS:
       alter_instance = new Alter_instance_reload_tls(thd, channel_name_, true);
       break;

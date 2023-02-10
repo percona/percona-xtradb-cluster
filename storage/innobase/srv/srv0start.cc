@@ -205,18 +205,10 @@ mysql_pfs_key_t srv_ts_alter_encrypt_thread_key;
 mysql_pfs_key_t parallel_rseg_init_thread_key;
 #endif /* UNIV_PFS_THREAD */
 
-<<<<<<< HEAD
-int unlock_keyrings(THD *thd);
-
 #ifdef WITH_WSREP
 extern bool wsrep_recovery;
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-int unlock_keyrings(THD *thd);
-
-=======
->>>>>>> Percona-Server-8.0.31-23
 #ifdef HAVE_PSI_STAGE_INTERFACE
 /** Array of all InnoDB stage events for monitoring activities via
 performance schema. */

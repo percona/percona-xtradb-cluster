@@ -360,17 +360,9 @@ class Sql_cmd_alter_user_default_role : public Sql_cmd {
 
 enum alter_instance_action_enum {
   ROTATE_INNODB_MASTER_KEY,
-<<<<<<< HEAD
-  ROTATE_INNODB_SYSTEM_KEY,
-  ROTATE_REDO_SYSTEM_KEY,
 #ifdef WITH_WSREP
   ROTATE_GCACHE_MASTER_KEY,
 #endif
-||||||| merged common ancestors
-  ROTATE_INNODB_SYSTEM_KEY,
-  ROTATE_REDO_SYSTEM_KEY,
-=======
->>>>>>> Percona-Server-8.0.31-23
   ALTER_INSTANCE_RELOAD_TLS,
   ALTER_INSTANCE_RELOAD_TLS_ROLLBACK_ON_ERROR,
   ROTATE_BINLOG_MASTER_KEY,
