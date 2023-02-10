@@ -897,13 +897,13 @@ bool Srv_session::open() {
   m_state = SRV_SESSION_OPENED;
 
 #ifdef WITH_WSREP
-  if (thd.wsrep_cs().state() != wsrep::client_state::s_none) {
-    thd.wsrep_cs().cleanup();
+  if (m_thd->wsrep_cs().state() != wsrep::client_state::s_none) {
+    m_thd->wsrep_cs().cleanup();
   }
-  mysql_mutex_lock(&thd.LOCK_wsrep_thd);
-  thd.wsrep_client_thread = true;
-  mysql_mutex_unlock(&thd.LOCK_wsrep_thd);
-  wsrep_open(&thd);
+  mysql_mutex_lock(&m_thd->LOCK_wsrep_thd);
+  m_thd->wsrep_client_thread = true;
+  mysql_mutex_unlock(&m_thd->LOCK_wsrep_thd);
+  wsrep_open(m_thd);
 #endif  /* WITH_WSREP */
 
   return false;
@@ -1056,10 +1056,10 @@ bool Srv_session::close() {
   if (backup.attach_error) return true;
 
 #ifdef WITH_WSREP
-  wsrep_close(&thd);
-  mysql_mutex_lock(&thd.LOCK_wsrep_thd);
-  thd.wsrep_client_thread = false;
-  mysql_mutex_unlock(&thd.LOCK_wsrep_thd);
+  wsrep_close(m_thd);
+  mysql_mutex_lock(&m_thd->LOCK_wsrep_thd);
+  m_thd->wsrep_client_thread = false;
+  mysql_mutex_unlock(&m_thd->LOCK_wsrep_thd);
 #endif /* WITH_WSREP */
 
   m_state = SRV_SESSION_CLOSED;
@@ -1172,7 +1172,7 @@ int Srv_session::execute_command(enum enum_server_command command,
   mysql_audit_release(m_thd);
 
 #ifdef WITH_WSREP
-  wsrep_before_command(&thd);
+  wsrep_before_command(m_thd);
 #endif /* WITH_WSREP */
 
   /*
@@ -1199,10 +1199,10 @@ int Srv_session::execute_command(enum enum_server_command command,
   int ret = dispatch_command(m_thd, data, command);
 
 #ifdef WITH_WSREP
-  if (thd.wsrep_cs().state() == wsrep::client_state::s_exec) {
-    wsrep_after_command_before_result(&thd);
+  if (m_thd->wsrep_cs().state() == wsrep::client_state::s_exec) {
+    wsrep_after_command_before_result(m_thd);
   }
-  wsrep_after_command_after_result(&thd);
+  wsrep_after_command_after_result(m_thd);
 #endif /* WITH_WSREP */
 
   m_thd->pop_protocol();

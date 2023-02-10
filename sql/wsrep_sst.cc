@@ -1104,7 +1104,7 @@ static uint server_session_execute(MYSQL_SESSION session, std::string query,
 
   /* execute sql command */
   command_service_run_command(
-      session, COM_QUERY, &cmd, &my_charset_utf8_general_ci,
+      session, COM_QUERY, &cmd, &my_charset_utf8mb4_general_ci,
       &wsp::Sql_service_context_base::sql_service_callbacks,
       CS_TEXT_REPRESENTATION, ctx);
   delete ctx;

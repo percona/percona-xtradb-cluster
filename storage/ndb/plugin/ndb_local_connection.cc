@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2011, 2022, Oracle and/or its affiliates.
+   Copyright (c) 2011, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -153,7 +153,7 @@ bool Ndb_local_connection::execute_query_iso(const std::string &sql_query,
       "Mismatched type for variable used to save option_bits");
   m_thd->variables.option_bits &= ~OPTION_BIN_LOG;
 #ifdef WITH_WSREP
-  thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+  m_thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
 #endif
 
   /*

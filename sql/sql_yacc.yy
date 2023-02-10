@@ -16343,12 +16343,12 @@ alter_instance_action:
             }
             else if (is_identifier($2, "BINLOG"))
             {
-              $$= NEW_PTN PT_alter_instance(ROTATE_BINLOG_MASTER_KEY, EMPTY_CSTR, 0);
+              $$= NEW_PTN PT_alter_instance(ROTATE_BINLOG_MASTER_KEY, EMPTY_CSTR);
             }
 #ifdef WITH_WSREP
             else if (is_identifier($2, "GCACHE"))
             {
-              $$= NEW_PTN PT_alter_instance(ROTATE_GCACHE_MASTER_KEY, EMPTY_CSTR, 0);
+              $$= NEW_PTN PT_alter_instance(ROTATE_GCACHE_MASTER_KEY, EMPTY_CSTR);
             }
 #endif
             else

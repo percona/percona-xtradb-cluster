@@ -63,9 +63,9 @@ class Rotate_binlog_master_key : public Alter_instance {
 };
 
 #ifdef WITH_WSREP
-class Rotate_gcache_master_key final : public Rotate_innodb_key {
+class Rotate_gcache_master_key final : public Rotate_innodb_master_key {
  public:
-  explicit Rotate_gcache_master_key(THD *thd) : Rotate_innodb_key(thd) {}
+  explicit Rotate_gcache_master_key(THD *thd) : Rotate_innodb_master_key(thd) {}
 
   bool execute() override;
   ~Rotate_gcache_master_key() override {}

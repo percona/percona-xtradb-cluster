@@ -186,7 +186,15 @@ bool Rotate_innodb_master_key::execute() {
 */
 extern bool wsrep_rotate_master_key();
 bool Rotate_gcache_master_key::execute() {
-  if (check_security_context()) return true;
+
+  Security_context *sctx = m_thd->security_context();
+  if (!sctx->check_access(SUPER_ACL) &&
+      !sctx->has_global_grant(STRING_WITH_LEN("BINLOG_ENCRYPTION_ADMIN"))
+           .first) {
+    my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0),
+             "SUPER or BINLOG_ENCRYPTION_ADMIN");
+    return true;
+  }
 
   /*
     Acquire protection against GRL and check for concurrent change of read_only
