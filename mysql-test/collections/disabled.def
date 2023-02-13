@@ -223,7 +223,6 @@ main.partition_pruning : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-330
 main.range_icp : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-330
 main.range_none : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-330
 main.xa_prepared_binlog_off : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-330
-main.percona_rotate_system_key_check_privileges : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
 
 # perf-schema
 perfschema.global_read_lock : BUG#0 Issue#79 2018-07-26 CODERSHIP mw-79
@@ -238,9 +237,6 @@ sys_vars.sql_mode_func                       : BUG#0 Differences in result likel
 #sys_vars.innodb_buffer_pool_populate_basic   : BUG#0 Some of the NUMA modes are not supported on some distros.
 #sys_vars.innodb_support_xa_func              : BUG#0 XA is not supported by PXC
 sys_vars.wsrep_max_ws_size_basic             : BUG#0 Setting this now also set repl.max_ws_size which is galera internal setting.
-
-# innodb
-innodb.table_encrypt_2_keyring : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
 
 # innodb_fts
 innodb_fts.fulltext_table_evict : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-330
