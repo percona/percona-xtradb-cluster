@@ -803,9 +803,9 @@ COMMIT;
 
 -- Add the privilege AUTHENTICATION_POLICY_ADMIN for every user who has the SYSTEM_VARIABLES_ADMIN privilege
 -- provided that there isn't a user who already has the privilege AUTHENTICATION_POLICY_ADMIN.
-SET @hadAuthenticationPolicyAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'AUTHENTICATION_POLICY_ADMIN');
+SET @hadAuthenticationPolicyAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'AUTHENTICATION_POLICY_ADMIN' AND user NOT IN ('mysql.session'));
 INSERT INTO global_grants SELECT mu.user, mu.host, 'AUTHENTICATION_POLICY_ADMIN', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user mu, global_grants gg WHERE mu.user = gg.user AND gg.priv = 'SYSTEM_VARIABLES_ADMIN' AND @hadAuthenticationPolicyAdminPriv = 0;
+FROM mysql.user mu, global_grants gg WHERE mu.user = gg.user AND gg.priv = 'SYSTEM_VARIABLES_ADMIN' AND @hadAuthenticationPolicyAdminPriv = 0 AND mu.user NOT IN ('mysql.session');
 COMMIT;
 
 -- Add the privilege PASSWORDLESS_USER_ADMIN for every user who has the privilege CREATE USER
