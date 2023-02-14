@@ -5644,15 +5644,15 @@ static int innodb_init(void *p) {
   innobase_hton->unlock_hton_log = innobase_unlock_hton_log;
   innobase_hton->collect_hton_log_info = innobase_collect_hton_log_info;
   innobase_hton->fill_is_table = innobase_fill_i_s_table;
-#ifdef WITH_WSREP
-  innobase_hton->flags |= HTON_WSREP_REPLICATION;
-#endif /* WITH_WSREP */
   innobase_hton->flags =
       HTON_SUPPORTS_EXTENDED_KEYS | HTON_SUPPORTS_FOREIGN_KEYS |
       HTON_SUPPORTS_ATOMIC_DDL | HTON_CAN_RECREATE |
       HTON_SUPPORTS_SECONDARY_ENGINE | HTON_SUPPORTS_TABLE_ENCRYPTION |
       HTON_SUPPORTS_ONLINE_BACKUPS | HTON_SUPPORTS_COMPRESSED_COLUMNS |
       HTON_SUPPORTS_GENERATED_INVISIBLE_PK;
+#ifdef WITH_WSREP
+  innobase_hton->flags |= HTON_WSREP_REPLICATION;
+#endif /* WITH_WSREP */
 
   innobase_hton->replace_native_transaction_in_thd = innodb_replace_trx_in_thd;
   innobase_hton->file_extensions = ha_innobase_exts;
