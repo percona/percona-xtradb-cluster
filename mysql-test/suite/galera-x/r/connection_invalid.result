@@ -17,5 +17,12 @@ ERROR 2007 (HY000): Protocol mismatch; server version = 11, client version = 10
 
 #
 # 2. Verify failure at cross connecting x-client to classic-server
+Error, printing flow history:>>>> SEND 16 Mysqlx.Session.AuthenticateStart {
+  mech_name: "SHA256_MEMORY"
+}
+>>>> SEND 10 Mysqlx.Session.AuthenticateStart {
+  mech_name: "MYSQL41"
+}
+
 in main, line 0:ERROR: MySQL server has gone away (code 2006)
 not ok

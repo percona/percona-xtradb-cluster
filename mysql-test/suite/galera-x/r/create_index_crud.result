@@ -306,71 +306,7 @@ Mysqlx.Error {
 RUN ALTER TABLE xplugintest.table2 ADD COLUMN $ix_t13_bf29f74d5ecec695774cb5b3f1ff979e7643bf36 TEXT
 
 0 rows affected
-Records: 0  Duplicates: 0  Warnings: 0
-send Mysqlx.Sql.StmtExecute {
-  stmt: "create_collection_index"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "table2"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "col3_index"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_BOOL
-      v_bool: false
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "$.col3"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "TEXT(13)"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_BOOL
-      v_bool: false
-    }
-  }
-  namespace: "xplugin"
-}
-
+Records: 0  Duplicates: 0  Warnings: 1
 Mysqlx.Sql.StmtExecuteOk {
 }
 

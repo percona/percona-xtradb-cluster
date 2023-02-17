@@ -19,7 +19,7 @@ set password for unpriv@localhost = 'x';
 -->recvresult
 
 -->stmtadmin list_clients	{"what":"all"}
--->expecterror 5015
+-->expecterror 5021
 -->recvresult
 
 

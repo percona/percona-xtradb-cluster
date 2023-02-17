@@ -4,6 +4,12 @@
 --source include/galera_cluster.inc
 --source include/xplugin_preamble.inc
 --source include/xplugin_create_user.inc
+
+--connection node_2
+call mtr.add_suppression("Can't DROP 'timedate'; check that column/key exists");
+call mtr.add_suppression("Query apply failed");
+--connection node_1
+
 ## Test starts here
 CREATE SCHEMA xtest DEFAULT CHARSET 'utf8mb4';
 

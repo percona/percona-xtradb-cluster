@@ -4,6 +4,12 @@
 --source include/xplugin_preamble.inc
 --source include/xplugin_create_user.inc
 
+--connection node_2
+call mtr.add_suppression("Table 'books' already exists");
+call mtr.add_suppression("Unknown database 'nowhere'");
+call mtr.add_suppression("Query apply failed");
+--connection node_1
+
 CREATE SCHEMA xtest DEFAULT CHARSET 'utf8mb4';
 
 ## Test starts here

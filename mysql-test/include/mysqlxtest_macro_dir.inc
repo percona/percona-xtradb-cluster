@@ -15,6 +15,11 @@ print FILE "--let \$MYSQLXTEST_MACRO_DIR= $macro_file\n";
 close(FILE);
 EOF
 
+if (!$MYSQLXTEST_HISTORY_PROTOCOL)
+{
+  --let $MYSQLXTEST_HISTORY_PROTOCOL = true
+}
+
 --source $MYSQL_TMP_DIR/mysqlxtest_macro_dir.tmp.inc
 --remove_file $MYSQL_TMP_DIR/mysqlxtest_macro_dir.tmp.inc
---let $MYSQLXTEST = $MYSQLXTEST --import="$MYSQLXTEST_MACRO_DIR" --history-protocol true $MYSQLXTEST_EXTRA_ARGS
+--let $MYSQLXTEST = $MYSQLXTEST --import="$MYSQLXTEST_MACRO_DIR" --history-protocol $MYSQLXTEST_HISTORY_PROTOCOL $MYSQLXTEST_EXTRA_ARGS

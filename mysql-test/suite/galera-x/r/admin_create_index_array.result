@@ -1,3 +1,8 @@
+call mtr.add_suppression("This version of MySQL doesn't yet support 'more than one multi-valued key part per index'");
+call mtr.add_suppression("Invalid JSON value for CAST for functional index");
+call mtr.add_suppression("Value is out of range for functional index 'mixed_unsigned_idx'");
+call mtr.add_suppression("Data truncated for functional index");
+call mtr.add_suppression("Query apply failed");
 CREATE SCHEMA xtest DEFAULT CHARSET 'utf8mb4';
 
 Create collection 'data'
@@ -221,7 +226,7 @@ Drop array index 'unique_idx'
 =============================
 
 command ok
-Got expected error: Duplicate entry '[3.' for key 'fail_idx' (code 1062)
+Got expected error: Duplicate entry '[3.' for key 'data.fail_idx' (code 1062)
 ## 3. Create 'required' array index
 Got expected error: Unsupported argument specification for '$.integer' (code 5017)
 ## 4. Verify usage array index

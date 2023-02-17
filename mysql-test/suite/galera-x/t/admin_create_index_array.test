@@ -13,6 +13,14 @@
 --source include/xplugin_preamble.inc
 --source include/xplugin_create_user.inc
 
+--connection node_2
+call mtr.add_suppression("This version of MySQL doesn't yet support 'more than one multi-valued key part per index'");
+call mtr.add_suppression("Invalid JSON value for CAST for functional index");
+call mtr.add_suppression("Value is out of range for functional index 'mixed_unsigned_idx'");
+call mtr.add_suppression("Data truncated for functional index");
+call mtr.add_suppression("Query apply failed");
+--connection node_1
+
 ## Test starts here
 --let $xtest_file= $MYSQL_TMP_DIR/admin_create_index_array.xpl
 --write_file $xtest_file

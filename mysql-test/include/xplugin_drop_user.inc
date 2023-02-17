@@ -13,4 +13,5 @@ if ($xplugin_create_user)
   DROP USER 'x_root'@'localhost';
   --enable_query_log
   --let xplugin_create_user=0
+  --let xplugin_user_dropped=1
 }

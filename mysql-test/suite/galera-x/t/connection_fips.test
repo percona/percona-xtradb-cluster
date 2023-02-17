@@ -1,5 +1,7 @@
+--source include/have_util_sed.inc
 --source include/galera_cluster.inc
 --source include/have_fips.inc
+--let $MYSQLXTEST_HISTORY_PROTOCOL=false
 --source include/xplugin_preamble.inc
 
 --disable_query_log
@@ -13,12 +15,8 @@ SHOW STATUS LIKE 'ssl_cipher';
 EOF
 
 --echo ##Test: Restart server and provide weak ssl-cipher at server startup
---exec echo "wait" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
---shutdown_server
---source include/wait_until_disconnected.inc
---exec echo "restart:--ssl-cipher=CAMELLIA256-SHA" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
---enable_reconnect
---source include/wait_until_connected_again.inc
+let $restart_parameters=restart:--ssl-cipher=CAMELLIA256-SHA;
+--source ../include/restart_mysqld.inc
 
 let $wait_condition=SELECT 1 FROM performance_schema.global_status WHERE variable_name='mysqlx_port' AND variable_value!='';
 --source include/wait_condition_or_abort.inc
@@ -28,10 +26,7 @@ let $wait_condition=SELECT 1 FROM performance_schema.global_status WHERE variabl
 --exec $MYSQLXTEST -u root --file=$MYSQL_TMP_DIR/mysqlx_fips_test.tmp --ssl-mode=required --ssl-fips-mode=off --ssl-cipher=CAMELLIA256-SHA 2>&1
 
 --echo ##Cleanup: Restore ssl-cipher to default
---exec echo "wait" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
---shutdown_server
---source include/wait_until_disconnected.inc
---exec echo "restart:" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
---enable_reconnect
---source include/wait_until_connected_again.inc
+
+let $restart_parameters=;
+--source ../include/restart_mysqld.inc
 --remove_file $MYSQL_TMP_DIR/mysqlx_fips_test.tmp

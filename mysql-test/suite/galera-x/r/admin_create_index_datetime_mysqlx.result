@@ -1,3 +1,5 @@
+call mtr.add_suppression("Can't DROP 'timedate'; check that column/key exists");
+call mtr.add_suppression("Query apply failed");
 CREATE SCHEMA xtest DEFAULT CHARSET 'utf8mb4';
 
 command ok

@@ -100,7 +100,7 @@ callmacro Assert_message Mysqlx.Sql.StmtExecuteOk;
 -->echo # I.4
 stmtsql INSERT INTO xtest.xtable_with_pk(description) VALUE('MyCustomRow');
 callmacro Assert_notice_session_state	ROWS_AFFECTED	v_unsigned_int:1;
-callmacro Assert_notice_session_state	GENERATED_INSERT_ID	v_unsigned_int: 2;
+callmacro Assert_notice_session_state	GENERATED_INSERT_ID	v_unsigned_int: 3;
 callmacro Assert_message Mysqlx.Sql.StmtExecuteOk;
 
 

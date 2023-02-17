@@ -155,7 +155,7 @@ Mysqlx.Crud.Insert {
         name: "cast"
         param {
           type : LITERAL
-          literal { type: V_OCTETS v_octets {value:"2011.11.11T3:14"} }
+          literal { type: V_OCTETS v_octets {value:"2011-11-11T3:14"} }
         }
         param {
           type : LITERAL
@@ -170,7 +170,7 @@ Mysqlx.Crud.Insert {
         name: "cast"
         param {
           type : LITERAL
-          literal { type: V_OCTETS v_octets {value:"2012.12.12"} }
+          literal { type: V_OCTETS v_octets {value:"2012-12-12"} }
         }
         param {
           type : LITERAL

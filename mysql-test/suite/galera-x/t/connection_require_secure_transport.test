@@ -1,6 +1,7 @@
 ## UNIX Socket connections
 
 ## Preamble
+--source include/have_util_sed.inc
 --source include/galera_cluster.inc
 --source include/not_windows.inc
 --source include/xplugin_preamble.inc
@@ -37,7 +38,14 @@ EOF
 --echo Test different connection types while secure transport when the server was started with this flag set to ON
 # Cases when the flag is dynamicly changes is tests in related x test file (for example connection_ssl.test)
 let $restart_parameters = restart: --require_secure_transport=ON;
---source include/restart_mysqld.inc
+
+--source include/xplugin_drop_user.inc
+--source include/shutdown_mysqld.inc
+--source include/safe_to_bootstrap.inc
+--source include/start_mysqld_no_echo.inc
+
+--connect(ssl_con1,localhost,root,,,,,SSL)
+--source include/xplugin_create_user.inc
 
 --exec $MYSQLXTEST -n --socket=$MASTER_X_MYSOCK -ux_root --password='' --file=$MYSQL_TMP_DIR/check_plain_connection.tmp 2>&1
 --exec $MYSQLXTEST -n -ux_root --password='' --ssl-ca=$MYSQL_TEST_DIR/std_data/cacert.pem --ssl-key=$MYSQL_TEST_DIR/std_data/client-key.pem --ssl-cert=$MYSQL_TEST_DIR/std_data/client-cert.pem  --file=$MYSQL_TMP_DIR/check_ssl_plain_connection.tmp 2>&1

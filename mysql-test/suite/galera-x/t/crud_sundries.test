@@ -10,7 +10,7 @@ DROP SCHEMA IF EXISTS xtest;
 CREATE SCHEMA xtest;
 USE xtest;
 CREATE TABLE xtable (doc JSON);
-INSERT INTO xtable (doc) VALUES ('{"a":10, "b":20, "c":"30", "d":"40", "e":"foo", "f":"bar", "g":"2015.10.05"}');
+INSERT INTO xtable (doc) VALUES ('{"a":10, "b":20, "c":"30", "d":"40", "e":"foo", "f":"bar", "g":"2015-10-05"}');
 
 ## Test starts here
 --write_file $MYSQL_TMP_DIR/crud_sundries.tmp

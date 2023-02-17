@@ -1,7 +1,8 @@
 ## This is test file for connection authentication using mysqlx.
 ##
+--source include/have_util_sed.inc
 --source include/galera_cluster.inc
---source include/restart_mysqld.inc
+--source ../include/restart_mysqld.inc
 
 --source include/xplugin_preamble.inc
 --source include/xplugin_create_user.inc
@@ -14,7 +15,7 @@ call mtr.add_suppression("Plugin mysqlx reported: '5.1: Unhandled message of typ
 --write_file $MYSQL_TMP_DIR/mysqlx-connection.tmp
 -->sql
 create user killsession@localhost identified by 'killsession';
-select USER,COMMAND,STATE from information_schema.processlist order by ID desc;
+select USER,COMMAND,STATE from information_schema.processlist order by USER, STATE desc;
 -->endsql
 EOF
 
@@ -28,7 +29,7 @@ EOF
 -->fatalerrors
 -->sql
 set @current := connection_id();
-select USER,COMMAND,STATE from information_schema.processlist order by ID desc;
+select USER,COMMAND,STATE from information_schema.processlist order by USER, STATE desc;
 kill %MYSQLTEST_CONNECTION_ID%;
 -->endsql
 -->expecterror ER_QUERY_INTERRUPTED
@@ -39,12 +40,12 @@ EOF
 
 --write_file $MYSQL_TMP_DIR/mysqlx-connection_killiunprivileged.tmp
 -->sql
-select USER,COMMAND,STATE from information_schema.processlist order by ID desc;
+select USER,COMMAND,STATE from information_schema.processlist order by USER, STATE desc;
 -->endsql
 -->expecterror ER_KILL_DENIED_ERROR
 -->sql
 kill %MYSQLTEST_CONNECTION_ID%;
-select USER,COMMAND,STATE from information_schema.processlist order by ID desc;
+select USER,COMMAND,STATE from information_schema.processlist order by USER, STATE desc;
 -->endsql
 EOF
 
@@ -52,7 +53,7 @@ EOF
 -->fatalerrors
 -->sql
 set @current := connection_id();
-select USER,COMMAND,STATE from information_schema.processlist order by ID desc;
+select USER,COMMAND,STATE from information_schema.processlist order by USER, STATE desc;
 -->endsql
 -->expecterror ER_QUERY_INTERRUPTED
 -->sql
@@ -63,7 +64,7 @@ EOF
 --write_file $MYSQL_TMP_DIR/mysqlx-connection_killinvalid.tmp
 -->fatalerrors
 -->sql
-select USER,COMMAND,STATE from information_schema.processlist order by ID desc;
+select USER,COMMAND,STATE from information_schema.processlist order by USER, STATE desc;
 -->endsql
 -->expecterror ER_NO_SUCH_THREAD
 -->sql
@@ -81,7 +82,7 @@ let $MYSQLTEST_CONNID_1=`select connection_id()`;
 --replace_regex /localhost:[0-9]*/localhost/ /kill [0-9]+/kill $CONNECTION_ID/ /thread [0-9]+/thread $CONNECTION_ID/
 --exec $MYSQLXTEST -u killsession --password='killsession' --file=$MYSQL_TMP_DIR/mysqlx-connection_killiunprivileged.tmp -v%MYSQLTEST_CONNECTION_ID%=$MYSQLTEST_CONNID_1 2>&1
 
---connection default
+--connect(default1,localhost,root)
 let $wait_for_status_variable =
  'Mysqlx_sessions_closed',
  'Mysqlx_sessions';
@@ -92,7 +93,7 @@ source ../include/wait_for_status_variables.inc;
 --replace_regex /localhost:[0-9]*/localhost/ /Execute/Query/
 --exec $MYSQLXTEST -u x_root --password='' --file=$MYSQL_TMP_DIR/mysqlx-connection_killinvalid.tmp 2>&1
 
---connection default
+--connection default1
 let $wait_for_status_variable =
  'Mysqlx_sessions_closed',
  'Mysqlx_sessions';
@@ -104,27 +105,27 @@ let $MYSQLTEST_CONNID_2=`select connection_id()`;
 --replace_regex /localhost:[0-9]*/localhost/ /kill [0-9]+/kill CONNECTION_ID/ /Execute/Query/
 --exec $MYSQLXTEST --expect-error CR_SERVER_GONE_ERROR -u x_root --password='' --file=$MYSQL_TMP_DIR/mysqlx-connection.processlist.tmp -v%MYSQLTEST_CONNECTION_ID%=$MYSQLTEST_CONNID_2 2>&1
 
---connection default
+--connection default1
 let $wait_for_status_variable =
  'Mysqlx_sessions_fatal_error',
  'Mysqlx_sessions';
 let $wait_for_status_value = 1, 0;
 source ../include/wait_for_status_variables.inc;
 --replace_regex /Execute/Query/
-select USER,COMMAND,STATE from information_schema.processlist order by ID desc;
+select USER,COMMAND,STATE from information_schema.processlist order by USER, STATE desc;
 
 ###kill mysqlx protocol session using mysqlx protocol when mysqlxplugin installed (expect error again)
 --replace_regex /localhost:[0-9]*/localhost/ /Execute/Query/
 --exec $MYSQLXTEST --expect-error CR_SERVER_GONE_ERROR -u x_root --password='' --file=$MYSQL_TMP_DIR/mysqlx-connection_killmysqlxsession.tmp 2>&1
 
---connection default
+--connection default1
 let $wait_for_status_variable =
  'Mysqlx_sessions_fatal_error',
  'Mysqlx_sessions';
 let $wait_for_status_value = 2, 0;
 source ../include/wait_for_status_variables.inc;
 --replace_regex /Execute/Query/
-select USER,COMMAND,STATE from information_schema.processlist order by ID desc;
+select USER,COMMAND,STATE from information_schema.processlist order by USER, STATE desc;
 ##expect Mysqlx_sessions_fatal_error incremented when killing its own session
 show status like 'Mysqlx_sessions%';
 

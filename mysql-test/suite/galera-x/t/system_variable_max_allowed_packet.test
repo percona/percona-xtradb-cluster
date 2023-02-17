@@ -1,7 +1,8 @@
 ## Various regression tests
 ##
+--source include/have_util_sed.inc
 --source include/galera_cluster.inc
---source include/restart_mysqld.inc
+--source ../include/restart_mysqld.inc
 --source include/xplugin_preamble.inc
 --source include/xplugin_create_user.inc
 

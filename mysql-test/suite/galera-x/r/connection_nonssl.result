@@ -70,7 +70,7 @@ ok
 Application terminated with expected error: Your password has expired. To log in you must change it using a client that supports expired passwords. (code 1862)
 ok
 NOTICE: Account password expired
-RUN ALTER USER USER() IDENTIFIED BY 'alter-new-auth'
+RUN ALTER USER user2_mysqlx@localhost IDENTIFIED BY 'alter-new-auth'
 
 0 rows affected
 Mysqlx.Ok {

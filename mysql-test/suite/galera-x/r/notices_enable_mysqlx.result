@@ -1,3 +1,9 @@
+call mtr.add_suppression("Table '(dup|t1)' already exists");
+call mtr.add_suppression("Specified key was too long; max key length is 3072 bytes.*worklog5743_1");
+call mtr.add_suppression("Table storage engine for 't2' doesn't have this option");
+call mtr.add_suppression("Incorrect index name 'GEN_CLUST_INDEX'");
+call mtr.add_suppression("Unknown table 'demo.oops_it_is_not_here'");
+call mtr.add_suppression("Query apply failed");
 
 ###
 ### General setup for all scenarios
@@ -1494,12 +1500,8 @@ RUN create index idx1 on worklog5743_1(a2(4000))
 While executing create index idx1 on worklog5743_1(a2(4000)):
 Got expected error: Specified key was too long; max key length is 3072 bytes (code 1071)
 RUN set global innodb_large_prefix=1
-Warnings generated:
-WARNING | 1193 | Unknown system variable 'innodb_large_prefix'
-WARNING | 1193 | Unknown system variable 'innodb_large_prefix'
 While executing set global innodb_large_prefix=1:
 Got expected error: Unknown system variable 'innodb_large_prefix' (code 1193)
-Got expected warning: 1193 
 RUN drop table worklog5743_1
 
 0 rows affected
@@ -1600,7 +1602,7 @@ default_storage_engine	InnoDB
 
 ##
 ## Verify the notices statistics
-Verify [Status variable "Mysqlx_notice_warning_sent" needs to have a value of 857]
+Verify [Status variable "Mysqlx_notice_warning_sent" needs to have a value of 855]
 Verify [Status variable "Mysqlx_notice_other_sent" needs to have a value of 168]
 Verify [Status variable "Mysqlx_stmt_disable_notices" needs to have a value of 0]
 Verify [Status variable "Mysqlx_stmt_enable_notices" needs to have a value of 1]
@@ -1757,6 +1759,7 @@ Mysqlx.Ok {
   msg: "bye!"
 }
 ok
+drop user xplugin@localhost;
 Enable multiple notices both read-only and read-write with single StmtExecute,expect success
 
 command ok
@@ -1862,4 +1865,3 @@ Mysqlx.Ok {
 }
 ok
 drop user noti@localhost;
-drop user xplugin@localhost;

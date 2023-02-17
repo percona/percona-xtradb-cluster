@@ -1,3 +1,9 @@
+call mtr.add_suppression("Query apply failed");
+call mtr.add_suppression("Table '.*' already exists");
+call mtr.add_suppression("Specified key was too long; max key length is 3072 bytes");
+call mtr.add_suppression("Table storage engine for 't2' doesn't have this option");
+call mtr.add_suppression("Incorrect index name 'GEN_CLUST_INDEX'");
+call mtr.add_suppression("Unknown table 'demo.oops_it_is_not_here'");
 
 command ok
 check with dropping db which doesn't exists

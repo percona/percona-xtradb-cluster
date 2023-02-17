@@ -44,7 +44,7 @@ EOF
 
 
 --let $restart_parameters = restart: --tls-version=TLSv1
---source ../include/restart_mysqld_and_wait_for_xplugin.inc
+--source ../include/restart_mysqld.inc
 
 --exec $MYSQLXTEST                                     $XTESTPARAMS 2>&1
 --exec $MYSQLXTEST --tls-version=TLSv1,TLSv1.1,TLSv1.2 $XTESTPARAMS 2>&1
@@ -63,7 +63,7 @@ EOF
 
 
 --let $restart_parameters = restart: --tls-version=TLSv1.1
---source ../include/restart_mysqld_and_wait_for_xplugin.inc
+--source ../include/restart_mysqld.inc
 
 --exec $MYSQLXTEST                                     $XTESTPARAMS 2>&1
 --exec $MYSQLXTEST --tls-version=TLSv1,TLSv1.1,TLSv1.2 $XTESTPARAMS 2>&1
@@ -87,5 +87,3 @@ EOF
 
 DROP USER user5_mysqlx@localhost;
 SET GLOBAL mysqlx_connect_timeout = DEFAULT;
-
-

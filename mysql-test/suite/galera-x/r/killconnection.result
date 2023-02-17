@@ -5,24 +5,26 @@ call mtr.add_suppression("Plugin mysqlx reported: '5.1: Unhandled message of typ
 RUN create user killsession@localhost identified by 'killsession'
 
 0 rows affected
-RUN select USER,COMMAND,STATE from information_schema.processlist order by ID desc
+RUN select USER,COMMAND,STATE from information_schema.processlist order by USER, STATE desc
 USER	COMMAND	STATE
-x_root	Query	executing
-root	Sleep	
 event_scheduler	Daemon	Waiting on empty queue
+root	Sleep	
+system user	Sleep	wsrep aborter idle
+system user	Sleep	innobase_commit_low (-1)
+x_root	Query	executing
 0 rows affected
 Mysqlx.Ok {
   msg: "bye!"
 }
 ok
-RUN select USER,COMMAND,STATE from information_schema.processlist order by ID desc
+RUN select USER,COMMAND,STATE from information_schema.processlist order by USER, STATE desc
 USER	COMMAND	STATE
 killsession	Query	executing
 0 rows affected
 RUN kill $CONNECTION_ID
 While executing kill $CONNECTION_ID:
 Got expected error: You are not owner of thread $CONNECTION_ID (code 1095)
-RUN select USER,COMMAND,STATE from information_schema.processlist order by ID desc
+RUN select USER,COMMAND,STATE from information_schema.processlist order by USER, STATE desc
 USER	COMMAND	STATE
 killsession	Query	executing
 0 rows affected
@@ -32,11 +34,14 @@ Mysqlx.Ok {
 ok
 # Syncing with status [ 'Mysqlx_sessions_closed' == 2 ]
 # Syncing with status [ 'Mysqlx_sessions' == 0 ]
-RUN select USER,COMMAND,STATE from information_schema.processlist order by ID desc
+RUN select USER,COMMAND,STATE from information_schema.processlist order by USER, STATE desc
 USER	COMMAND	STATE
-x_root	Query	executing
-root	Sleep	
 event_scheduler	Daemon	Waiting on empty queue
+root	Sleep	
+root	Sleep	
+system user	Sleep	wsrep aborter idle
+system user	Sleep	innobase_commit_low (-1)
+x_root	Query	executing
 0 rows affected
 RUN kill 5126
 While executing kill 5126:
@@ -50,12 +55,15 @@ ok
 RUN set @current := connection_id()
 
 0 rows affected
-RUN select USER,COMMAND,STATE from information_schema.processlist order by ID desc
+RUN select USER,COMMAND,STATE from information_schema.processlist order by USER, STATE desc
 USER	COMMAND	STATE
+event_scheduler	Daemon	Waiting on empty queue
+root	Sleep	
+root	Sleep	
+system user	Sleep	wsrep aborter idle
+system user	Sleep	innobase_commit_low (-1)
 x_root	Query	executing
 x_root	Sleep	
-root	Sleep	
-event_scheduler	Daemon	Waiting on empty queue
 0 rows affected
 RUN kill CONNECTION_ID
 
@@ -67,18 +75,24 @@ Application terminated with expected error: MySQL server has gone away (code 200
 ok
 # Syncing with status [ 'Mysqlx_sessions_fatal_error' == 1 ]
 # Syncing with status [ 'Mysqlx_sessions' == 0 ]
-select USER,COMMAND,STATE from information_schema.processlist order by ID desc;
+select USER,COMMAND,STATE from information_schema.processlist order by USER, STATE desc;
 USER	COMMAND	STATE
-root	Query	executing
 event_scheduler	Daemon	Waiting on empty queue
+root	Query	executing
+root	Sleep	
+system user	Sleep	wsrep aborter idle
+system user	Sleep	innobase_commit_low (-1)
 RUN set @current := connection_id()
 
 0 rows affected
-RUN select USER,COMMAND,STATE from information_schema.processlist order by ID desc
+RUN select USER,COMMAND,STATE from information_schema.processlist order by USER, STATE desc
 USER	COMMAND	STATE
-x_root	Query	executing
-root	Sleep	
 event_scheduler	Daemon	Waiting on empty queue
+root	Sleep	
+root	Sleep	
+system user	Sleep	wsrep aborter idle
+system user	Sleep	innobase_commit_low (-1)
+x_root	Query	executing
 0 rows affected
 RUN kill @current
 While executing kill @current:
@@ -87,10 +101,13 @@ Application terminated with expected error: MySQL server has gone away (code 200
 ok
 # Syncing with status [ 'Mysqlx_sessions_fatal_error' == 2 ]
 # Syncing with status [ 'Mysqlx_sessions' == 0 ]
-select USER,COMMAND,STATE from information_schema.processlist order by ID desc;
+select USER,COMMAND,STATE from information_schema.processlist order by USER, STATE desc;
 USER	COMMAND	STATE
-root	Query	executing
 event_scheduler	Daemon	Waiting on empty queue
+root	Query	executing
+root	Sleep	
+system user	Sleep	wsrep aborter idle
+system user	Sleep	innobase_commit_low (-1)
 show status like 'Mysqlx_sessions%';
 Variable_name	Value
 Mysqlx_sessions	0

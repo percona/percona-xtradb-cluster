@@ -4,6 +4,11 @@
 --source include/galera_cluster.inc
 --source include/xplugin_preamble.inc
 --source include/xplugin_create_user.inc
+
+--connection node_2
+call mtr.add_suppression("Table 'coll' already exists");
+call mtr.add_suppression("Query apply failed");
+--connection node_1
 ## Test starts here
 
 --write_file $MYSQL_TMP_DIR/crud_insert_docid.xpl

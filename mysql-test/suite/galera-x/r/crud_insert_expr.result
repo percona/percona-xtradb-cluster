@@ -21,9 +21,9 @@ hex("one")
 hex("two")
 74776F
 0 rows affected
-doc	_id
-{"_id": "7468726565", "value": 88}	7468726565
-{"_id": "74776F", "value": 77}	74776F
+doc	_id	_json_schema
+{"_id": "7468726565", "value": 88}	7468726565	{"type": "object"}
+{"_id": "74776F", "value": 77}	74776F	{"type": "object"}
 0 rows affected
 
 2 rows affected

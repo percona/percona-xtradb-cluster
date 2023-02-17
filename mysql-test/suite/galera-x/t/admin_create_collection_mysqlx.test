@@ -5,6 +5,11 @@
 --source include/xplugin_preamble.inc
 --source include/xplugin_create_user.inc
 
+--connection node_2
+call mtr.add_suppression("Table 'books1' already exists");
+call mtr.add_suppression("Query apply failed");
+--connection node_1
+
 create schema xtest default charset 'utf8mb4';
 create database xtest_1 default charset 'utf8mb4';
 
@@ -29,7 +34,7 @@ create database xtest_1 default charset 'utf8mb4';
 -->callmacro Admin_stmt	create_collection	{"schema":"xtest"}	5015
 -->callmacro Admin_stmt	create_collection	{"name":"books2"}	5015
 -->callmacro Admin_stmt	create_collection	{}	5015
--->callmacro Admin_stmt	create_collection	{"extra":"nothing", "name":"books2", "schema":"xtest"}	5015
+-->callmacro Admin_stmt	create_collection	{"extra":"nothing", "name":"books2", "schema":"xtest"}	5021
 
 -->callmacro Admin_stmt	create_collection	{"schema":"xtest", "name":""}	5113
 -->callmacro Admin_stmt	create_collection	{"schema":"", "name":"books2"}	5112
@@ -70,7 +75,7 @@ SHOW TABLES FROM xtest
 
 -->callmacro Admin_stmt	drop_collection	{"schema":"xtest"}	5015
 -->callmacro Admin_stmt	drop_collection	{"name":"books2"}	5015
--->callmacro Admin_stmt	drop_collection	{"extra":"nothing", "name":"books2","schema":"xtest"}	5015
+-->callmacro Admin_stmt	drop_collection	{"extra":"nothing", "name":"books2","schema":"xtest"}	5021
 -->callmacro Admin_stmt	drop_collection	{}	5015
 
 -->sql

@@ -73,7 +73,7 @@ RUN INSERT INTO xtest.xtable(phrase, prio) VALUE('Bob has a dog 2', 3)
 # I.4
 RUN INSERT INTO xtest.xtable_with_pk(description) VALUE('MyCustomRow')
 [ASSERT notice session state change - ROWS_AFFECTED, v_unsigned_int:1]
-[ASSERT notice session state change - GENERATED_INSERT_ID, v_unsigned_int: 2]
+[ASSERT notice session state change - GENERATED_INSERT_ID, v_unsigned_int: 3]
 [ASSERT Mysqlx.Sql.StmtExecuteOk]
 
 #

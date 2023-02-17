@@ -2,6 +2,7 @@
 --echo #
 --echo ## Preamble
 --echo #
+--let $MYSQLXTEST_HISTORY_PROTOCOL=false
 --source include/xplugin_preamble.inc
 
 --echo #

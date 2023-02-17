@@ -1,3 +1,5 @@
+call mtr.add_suppression("Table 'coll' already exists");
+call mtr.add_suppression("Query apply failed");
 CREATE SCHEMA xtest;
 
 Insert: doc with _id (literal)
@@ -48,10 +50,10 @@ command ok
 0 rows affected
 
 1 rows affected
-auto-generated id(s): 0000XXXXXXXX0000000000000002
+auto-generated id(s): 0000XXXXXXXX0000000000000003
 Got expected error (code 0)
 doc
-{"_id": "0000XXXXXXXX0000000000000002", "two": 2}
+{"_id": "0000XXXXXXXX0000000000000003", "two": 2}
 0 rows affected
 
 Insert: doc with _id (placeholder)
@@ -75,10 +77,10 @@ command ok
 0 rows affected
 
 1 rows affected
-auto-generated id(s): 0000XXXXXXXX0000000000000003
+auto-generated id(s): 0000XXXXXXXX0000000000000005
 Got expected error (code 0)
 doc
-{"_id": "0000XXXXXXXX0000000000000003", "two": 2}
+{"_id": "0000XXXXXXXX0000000000000005", "two": 2}
 0 rows affected
 
 Insert: 2 doc without _id (literal)
@@ -89,12 +91,12 @@ command ok
 0 rows affected
 
 2 rows affected
-auto-generated id(s): 0000XXXXXXXX0000000000000004,0000XXXXXXXX0000000000000005
+auto-generated id(s): 0000XXXXXXXX0000000000000007,0000XXXXXXXX0000000000000009
 Records: 2  Duplicates: 0  Warnings: 0
 Got expected error (code 0)
 doc
-{"_id": "0000XXXXXXXX0000000000000004", "two": 2}
-{"_id": "0000XXXXXXXX0000000000000005", "three": 3}
+{"_id": "0000XXXXXXXX0000000000000007", "two": 2}
+{"_id": "0000XXXXXXXX0000000000000009", "three": 3}
 0 rows affected
 
 Insert: 2 doc without _id (literal/object)
@@ -105,12 +107,12 @@ command ok
 0 rows affected
 
 2 rows affected
-auto-generated id(s): 0000XXXXXXXX0000000000000006,0000XXXXXXXX0000000000000007
+auto-generated id(s): 0000XXXXXXXX000000000000000b,0000XXXXXXXX000000000000000d
 Records: 2  Duplicates: 0  Warnings: 0
 Got expected error (code 0)
 doc
-{"_id": "0000XXXXXXXX0000000000000006", "three": 3}
-{"_id": "0000XXXXXXXX0000000000000007", "two": 2}
+{"_id": "0000XXXXXXXX000000000000000b", "three": 3}
+{"_id": "0000XXXXXXXX000000000000000d", "two": 2}
 0 rows affected
 
 Insert: 2 doc with/without _id (literal)
@@ -121,11 +123,11 @@ command ok
 0 rows affected
 
 2 rows affected
-auto-generated id(s): 0000XXXXXXXX0000000000000008
+auto-generated id(s): 0000XXXXXXXX000000000000000f
 Records: 2  Duplicates: 0  Warnings: 0
 Got expected error (code 0)
 doc
-{"_id": "0000XXXXXXXX0000000000000008", "three": 3}
+{"_id": "0000XXXXXXXX000000000000000f", "three": 3}
 {"_id": "1", "one": 1}
 0 rows affected
 
@@ -137,11 +139,11 @@ command ok
 0 rows affected
 
 2 rows affected
-auto-generated id(s): 0000XXXXXXXX0000000000000009
+auto-generated id(s): 0000XXXXXXXX0000000000000011
 Records: 2  Duplicates: 0  Warnings: 0
 Got expected error (code 0)
 doc
-{"_id": "0000XXXXXXXX0000000000000009", "two": 2}
+{"_id": "0000XXXXXXXX0000000000000011", "two": 2}
 {"_id": "1", "one": 1}
 0 rows affected
 
@@ -151,7 +153,7 @@ Insert: bad doc (literal) no insert
 command ok
 
 0 rows affected
-Got expected error: Invalid JSON text: "not a JSON text, may need CAST" at position 0 in value for column 'coll.doc'. (code 3140)
+Got expected error: Invalid JSON text: "not a JSON text, may need CAST" at position 0 in value for column 'coll.doc' at row 1. (code 3140)
 doc
 0 rows affected
 
@@ -161,7 +163,7 @@ Insert: 2 doc (literal) one bad, no insert
 command ok
 
 0 rows affected
-Got expected error: Invalid JSON text: "not a JSON text, may need CAST" at position 0 in value for column 'coll.doc'. (code 3140)
+Got expected error: Invalid JSON text: "not a JSON text, may need CAST" at position 0 in value for column 'coll.doc' at row 1. (code 3140)
 doc
 0 rows affected
 
@@ -175,12 +177,12 @@ command ok
 0 rows affected
 
 2 rows affected
-auto-generated id(s): 00ffXXXXXXXX000000000000000a,00ffXXXXXXXX000000000000000b
+auto-generated id(s): 00ffXXXXXXXX0000000000000013,00ffXXXXXXXX0000000000000015
 Records: 2  Duplicates: 0  Warnings: 0
 Got expected error (code 0)
 doc
-{"_id": "00ffXXXXXXXX000000000000000a", "two": 2}
-{"_id": "00ffXXXXXXXX000000000000000b", "three": 3}
+{"_id": "00ffXXXXXXXX0000000000000013", "two": 2}
+{"_id": "00ffXXXXXXXX0000000000000015", "three": 3}
 0 rows affected
 
 Insert: change of "auto_increment_increment"
@@ -193,12 +195,12 @@ command ok
 0 rows affected
 
 2 rows affected
-auto-generated id(s): 00ffXXXXXXXX0000000000000101,00ffXXXXXXXX0000000000000201
+auto-generated id(s): 00ffXXXXXXXX0000000000000017,00ffXXXXXXXX0000000000000019
 Records: 2  Duplicates: 0  Warnings: 0
 Got expected error (code 0)
 doc
-{"_id": "00ffXXXXXXXX0000000000000101", "two": 2}
-{"_id": "00ffXXXXXXXX0000000000000201", "three": 3}
+{"_id": "00ffXXXXXXXX0000000000000017", "two": 2}
+{"_id": "00ffXXXXXXXX0000000000000019", "three": 3}
 0 rows affected
 
 Insert: change of "auto_increment_offset"
@@ -211,12 +213,12 @@ command ok
 0 rows affected
 
 2 rows affected
-auto-generated id(s): 00ffXXXXXXXX0000000000000280,00ffXXXXXXXX0000000000000380
+auto-generated id(s): 00ffXXXXXXXX000000000000001b,00ffXXXXXXXX000000000000001d
 Records: 2  Duplicates: 0  Warnings: 0
 Got expected error (code 0)
 doc
-{"_id": "00ffXXXXXXXX0000000000000280", "two": 2}
-{"_id": "00ffXXXXXXXX0000000000000380", "three": 3}
+{"_id": "00ffXXXXXXXX000000000000001b", "two": 2}
+{"_id": "00ffXXXXXXXX000000000000001d", "three": 3}
 0 rows affected
 
 Insert: reset of "unique_prefix", "auto_increment_increment" and "auto_increment_offset"
@@ -233,12 +235,12 @@ command ok
 0 rows affected
 
 2 rows affected
-auto-generated id(s): 0000XXXXXXXX0000000000000381,0000XXXXXXXX0000000000000382
+auto-generated id(s): 0000XXXXXXXX000000000000001f,0000XXXXXXXX0000000000000021
 Records: 2  Duplicates: 0  Warnings: 0
 Got expected error (code 0)
 doc
-{"_id": "0000XXXXXXXX0000000000000381", "two": 2}
-{"_id": "0000XXXXXXXX0000000000000382", "three": 3}
+{"_id": "0000XXXXXXXX000000000000001f", "two": 2}
+{"_id": "0000XXXXXXXX0000000000000021", "three": 3}
 0 rows affected
 
 Notice: insert doc with _id
@@ -272,7 +274,7 @@ Mysqlx.Notice.Frame {
 Mysqlx.Notice.Frame {
   type: 3
   scope: LOCAL
-  payload: "Mysqlx.Notice.SessionStateChanged { param: GENERATED_DOCUMENT_IDS\nvalue {\n  type: V_OCTETS\n  v_octets {\n    value: \"0000XXXXXXXX0000000000000383\"\n  }\n}\n }"
+  payload: "Mysqlx.Notice.SessionStateChanged { param: GENERATED_DOCUMENT_IDS\nvalue {\n  type: V_OCTETS\n  v_octets {\n    value: \"0000XXXXXXXX0000000000000023\"\n  }\n}\n }"
 }
 
 Mysqlx.Sql.StmtExecuteOk {
@@ -300,7 +302,7 @@ Mysqlx.Notice.Frame {
 Mysqlx.Notice.Frame {
   type: 3
   scope: LOCAL
-  payload: "Mysqlx.Notice.SessionStateChanged { param: GENERATED_DOCUMENT_IDS\nvalue {\n  type: V_OCTETS\n  v_octets {\n    value: \"0000XXXXXXXX0000000000000384\"\n  }\n}\n }"
+  payload: "Mysqlx.Notice.SessionStateChanged { param: GENERATED_DOCUMENT_IDS\nvalue {\n  type: V_OCTETS\n  v_octets {\n    value: \"0000XXXXXXXX0000000000000025\"\n  }\n}\n }"
 }
 
 Mysqlx.Sql.StmtExecuteOk {
@@ -328,7 +330,7 @@ Mysqlx.Notice.Frame {
 Mysqlx.Notice.Frame {
   type: 3
   scope: LOCAL
-  payload: "Mysqlx.Notice.SessionStateChanged { param: GENERATED_DOCUMENT_IDS\nvalue {\n  type: V_OCTETS\n  v_octets {\n    value: \"0000XXXXXXXX0000000000000385\"\n  }\n}\nvalue {\n  type: V_OCTETS\n  v_octets {\n    value: \"0000XXXXXXXX0000000000000386\"\n  }\n}\n }"
+  payload: "Mysqlx.Notice.SessionStateChanged { param: GENERATED_DOCUMENT_IDS\nvalue {\n  type: V_OCTETS\n  v_octets {\n    value: \"0000XXXXXXXX0000000000000027\"\n  }\n}\nvalue {\n  type: V_OCTETS\n  v_octets {\n    value: \"0000XXXXXXXX0000000000000029\"\n  }\n}\n }"
 }
 
 Mysqlx.Sql.StmtExecuteOk {
@@ -344,7 +346,7 @@ command ok
 Mysqlx.Error {
   severity: ERROR
   code: 3140
-  msg: "Invalid JSON text: \"not a JSON text, may need CAST\" at position 0 in value for column \'coll.doc\'."
+  msg: "Invalid JSON text: \"not a JSON text, may need CAST\" at position 0 in value for column \'coll.doc\' at row 1."
   sql_state: "22032"
 }
 

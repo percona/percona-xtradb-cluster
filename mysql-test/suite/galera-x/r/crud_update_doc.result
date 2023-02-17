@@ -1,3 +1,5 @@
+call mtr.add_suppression("Query apply failed");
+call mtr.add_suppression("Table 'coll' already exists");
 CREATE SCHEMA xtest;
 
 Update by ARRAY_APPEND

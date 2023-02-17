@@ -80,12 +80,12 @@ send Mysqlx.Crud.Update {
 1 rows affected
 Rows matched: 1  Changed: 1  Warnings: 0
 RUN select * from maincoll
-doc	_id
-{"_id": "1", "name": "Victor", "amount": 4.99, "last_name": "Otero"}	1
-{"_id": "2", "name": "Gonzalo", "amount": 120.57, "last_name": "Chrystens"}	2
-{"_id": "3", "name": "Abraham", "amount": 74.56, "last_name": "Vega"}	3
-{"_id": "4", "name": "Jennifer", "amount": 387.14, "last_name": "Leon"}	4
-{"_id": "5", "amount": 125.45, "last_name": "Test"}	5
+doc	_id	_json_schema
+{"_id": "1", "name": "Victor", "amount": 4.99, "last_name": "Otero"}	1	{"type": "object"}
+{"_id": "2", "name": "Gonzalo", "amount": 120.57, "last_name": "Chrystens"}	2	{"type": "object"}
+{"_id": "3", "name": "Abraham", "amount": 74.56, "last_name": "Vega"}	3	{"type": "object"}
+{"_id": "4", "name": "Jennifer", "amount": 387.14, "last_name": "Leon"}	4	{"type": "object"}
+{"_id": "5", "amount": 125.45, "last_name": "Test"}	5	{"type": "object"}
 0 rows affected
 Update a valid collection with string value and > operator for multiple docs
 send Mysqlx.Crud.Update {
@@ -133,12 +133,12 @@ send Mysqlx.Crud.Update {
 1 rows affected
 Rows matched: 2  Changed: 1  Warnings: 0
 RUN select * from maincoll
-doc	_id
-{"_id": "1", "name": "Victor", "amount": 4.99, "last_name": "Otero"}	1
-{"_id": "2", "name": "Gonzalo", "amount": 120.57, "last_name": "Chrystens"}	2
-{"_id": "3", "name": "Abraham", "amount": 74.56, "last_name": "Vega"}	3
-{"_id": "4", "amount": 387.14, "last_name": "Leon"}	4
-{"_id": "5", "amount": 125.45, "last_name": "Test"}	5
+doc	_id	_json_schema
+{"_id": "1", "name": "Victor", "amount": 4.99, "last_name": "Otero"}	1	{"type": "object"}
+{"_id": "2", "name": "Gonzalo", "amount": 120.57, "last_name": "Chrystens"}	2	{"type": "object"}
+{"_id": "3", "name": "Abraham", "amount": 74.56, "last_name": "Vega"}	3	{"type": "object"}
+{"_id": "4", "amount": 387.14, "last_name": "Leon"}	4	{"type": "object"}
+{"_id": "5", "amount": 125.45, "last_name": "Test"}	5	{"type": "object"}
 0 rows affected
 Update a valid collection with string value and < operator for multiple docs
 send Mysqlx.Crud.Update {
@@ -186,12 +186,12 @@ send Mysqlx.Crud.Update {
 2 rows affected
 Rows matched: 2  Changed: 2  Warnings: 0
 RUN select * from maincoll
-doc	_id
-{"_id": "1", "amount": 4.99, "last_name": "Otero"}	1
-{"_id": "2", "amount": 120.57, "last_name": "Chrystens"}	2
-{"_id": "3", "name": "Abraham", "amount": 74.56, "last_name": "Vega"}	3
-{"_id": "4", "amount": 387.14, "last_name": "Leon"}	4
-{"_id": "5", "amount": 125.45, "last_name": "Test"}	5
+doc	_id	_json_schema
+{"_id": "1", "amount": 4.99, "last_name": "Otero"}	1	{"type": "object"}
+{"_id": "2", "amount": 120.57, "last_name": "Chrystens"}	2	{"type": "object"}
+{"_id": "3", "name": "Abraham", "amount": 74.56, "last_name": "Vega"}	3	{"type": "object"}
+{"_id": "4", "amount": 387.14, "last_name": "Leon"}	4	{"type": "object"}
+{"_id": "5", "amount": 125.45, "last_name": "Test"}	5	{"type": "object"}
 0 rows affected
 Update a valid collection with string value and <= operator for multiple docs
 send Mysqlx.Crud.Update {
@@ -239,12 +239,12 @@ send Mysqlx.Crud.Update {
 3 rows affected
 Rows matched: 3  Changed: 3  Warnings: 0
 RUN select * from maincoll
-doc	_id
-{"_id": "1", "amount": 4.99}	1
-{"_id": "2", "amount": 120.57}	2
-{"_id": "3", "name": "Abraham", "amount": 74.56}	3
-{"_id": "4", "amount": 387.14, "last_name": "Leon"}	4
-{"_id": "5", "amount": 125.45, "last_name": "Test"}	5
+doc	_id	_json_schema
+{"_id": "1", "amount": 4.99}	1	{"type": "object"}
+{"_id": "2", "amount": 120.57}	2	{"type": "object"}
+{"_id": "3", "name": "Abraham", "amount": 74.56}	3	{"type": "object"}
+{"_id": "4", "amount": 387.14, "last_name": "Leon"}	4	{"type": "object"}
+{"_id": "5", "amount": 125.45, "last_name": "Test"}	5	{"type": "object"}
 0 rows affected
 Update a valid collection with string value and >= operator for multiple docs
 send Mysqlx.Crud.Update {
@@ -292,12 +292,12 @@ send Mysqlx.Crud.Update {
 2 rows affected
 Rows matched: 2  Changed: 2  Warnings: 0
 RUN select * from maincoll
-doc	_id
-{"_id": "1", "amount": 4.99}	1
-{"_id": "2", "amount": 120.57}	2
-{"_id": "3", "name": "Abraham", "amount": 74.56}	3
-{"_id": "4", "amount": 387.14}	4
-{"_id": "5", "amount": 125.45}	5
+doc	_id	_json_schema
+{"_id": "1", "amount": 4.99}	1	{"type": "object"}
+{"_id": "2", "amount": 120.57}	2	{"type": "object"}
+{"_id": "3", "name": "Abraham", "amount": 74.56}	3	{"type": "object"}
+{"_id": "4", "amount": 387.14}	4	{"type": "object"}
+{"_id": "5", "amount": 125.45}	5	{"type": "object"}
 0 rows affected
 Update with order clause update last _id in desc order (_id = 5)
 send Mysqlx.Crud.Update {
@@ -357,12 +357,12 @@ send Mysqlx.Crud.Update {
 1 rows affected
 Rows matched: 1  Changed: 1  Warnings: 0
 RUN select * from maincoll
-doc	_id
-{"_id": "1", "amount": 4.99}	1
-{"_id": "2", "amount": 120.57}	2
-{"_id": "3", "name": "Abraham", "amount": 74.56}	3
-{"_id": "4", "amount": 387.14}	4
-{"_id": "5"}	5
+doc	_id	_json_schema
+{"_id": "1", "amount": 4.99}	1	{"type": "object"}
+{"_id": "2", "amount": 120.57}	2	{"type": "object"}
+{"_id": "3", "name": "Abraham", "amount": 74.56}	3	{"type": "object"}
+{"_id": "4", "amount": 387.14}	4	{"type": "object"}
+{"_id": "5"}	5	{"type": "object"}
 0 rows affected
 Update with order clause update first two _id in asc order (_id = 1,2)
 send Mysqlx.Crud.Update {
@@ -422,12 +422,12 @@ send Mysqlx.Crud.Update {
 2 rows affected
 Rows matched: 2  Changed: 2  Warnings: 0
 RUN select * from maincoll
-doc	_id
-{"_id": "1"}	1
-{"_id": "2"}	2
-{"_id": "3", "name": "Abraham", "amount": 74.56}	3
-{"_id": "4", "amount": 387.14}	4
-{"_id": "5"}	5
+doc	_id	_json_schema
+{"_id": "1"}	1	{"type": "object"}
+{"_id": "2"}	2	{"type": "object"}
+{"_id": "3", "name": "Abraham", "amount": 74.56}	3	{"type": "object"}
+{"_id": "4", "amount": 387.14}	4	{"type": "object"}
+{"_id": "5"}	5	{"type": "object"}
 0 rows affected
 Update a valid collection with string value and != operator for multiple docs
 send Mysqlx.Crud.Update {
@@ -475,12 +475,12 @@ send Mysqlx.Crud.Update {
 2 rows affected
 Rows matched: 4  Changed: 2  Warnings: 0
 RUN select * from maincoll
-doc	_id
-{"_id": "1"}	1
-{"_id": "2"}	2
-{"_id": "3", "name": "Abraham"}	3
-{"_id": "4"}	4
-{"_id": "5"}	5
+doc	_id	_json_schema
+{"_id": "1"}	1	{"type": "object"}
+{"_id": "2"}	2	{"type": "object"}
+{"_id": "3", "name": "Abraham"}	3	{"type": "object"}
+{"_id": "4"}	4	{"type": "object"}
+{"_id": "5"}	5	{"type": "object"}
 0 rows affected
 RUN START TRANSACTION
 
@@ -531,23 +531,23 @@ send Mysqlx.Crud.Update {
 1 rows affected
 Rows matched: 1  Changed: 1  Warnings: 0
 RUN select * from maincoll
-doc	_id
-{"_id": "1"}	1
-{"_id": "2"}	2
-{"_id": "3"}	3
-{"_id": "4"}	4
-{"_id": "5"}	5
+doc	_id	_json_schema
+{"_id": "1"}	1	{"type": "object"}
+{"_id": "2"}	2	{"type": "object"}
+{"_id": "3"}	3	{"type": "object"}
+{"_id": "4"}	4	{"type": "object"}
+{"_id": "5"}	5	{"type": "object"}
 0 rows affected
 RUN ROLLBACK
 
 0 rows affected
 RUN select * from maincoll
-doc	_id
-{"_id": "1"}	1
-{"_id": "2"}	2
-{"_id": "3", "name": "Abraham"}	3
-{"_id": "4"}	4
-{"_id": "5"}	5
+doc	_id	_json_schema
+{"_id": "1"}	1	{"type": "object"}
+{"_id": "2"}	2	{"type": "object"}
+{"_id": "3", "name": "Abraham"}	3	{"type": "object"}
+{"_id": "4"}	4	{"type": "object"}
+{"_id": "5"}	5	{"type": "object"}
 0 rows affected
 RUN START TRANSACTION
 
@@ -601,12 +601,12 @@ RUN COMMIT
 
 0 rows affected
 RUN select * from maincoll
-doc	_id
-{"_id": "1"}	1
-{"_id": "2"}	2
-{"_id": "3"}	3
-{"_id": "4"}	4
-{"_id": "5"}	5
+doc	_id	_json_schema
+{"_id": "1"}	1	{"type": "object"}
+{"_id": "2"}	2	{"type": "object"}
+{"_id": "3"}	3	{"type": "object"}
+{"_id": "4"}	4	{"type": "object"}
+{"_id": "5"}	5	{"type": "object"}
 0 rows affected
 Update with non existing doc member
 send Mysqlx.Crud.Update {
@@ -654,12 +654,12 @@ send Mysqlx.Crud.Update {
 0 rows affected
 Rows matched: 4  Changed: 0  Warnings: 0
 RUN select * from maincoll
-doc	_id
-{"_id": "1"}	1
-{"_id": "2"}	2
-{"_id": "3"}	3
-{"_id": "4"}	4
-{"_id": "5"}	5
+doc	_id	_json_schema
+{"_id": "1"}	1	{"type": "object"}
+{"_id": "2"}	2	{"type": "object"}
+{"_id": "3"}	3	{"type": "object"}
+{"_id": "4"}	4	{"type": "object"}
+{"_id": "5"}	5	{"type": "object"}
 0 rows affected
 Invalid type of update for Document
 send Mysqlx.Crud.Update {
@@ -758,12 +758,12 @@ send Mysqlx.Crud.Update {
 Got expected error: Invalid operator not an operator (code 5150)
 # Remove already removed item
 RUN select * from mysqlxcoll.maincoll
-doc	_id
-{"_id": "1"}	1
-{"_id": "2"}	2
-{"_id": "3"}	3
-{"_id": "4"}	4
-{"_id": "5"}	5
+doc	_id	_json_schema
+{"_id": "1"}	1	{"type": "object"}
+{"_id": "2"}	2	{"type": "object"}
+{"_id": "3"}	3	{"type": "object"}
+{"_id": "4"}	4	{"type": "object"}
+{"_id": "5"}	5	{"type": "object"}
 0 rows affected
 send Mysqlx.Crud.Update {
   collection {
@@ -786,12 +786,12 @@ send Mysqlx.Crud.Update {
 0 rows affected
 Rows matched: 5  Changed: 0  Warnings: 0
 RUN select * from mysqlxcoll.maincoll
-doc	_id
-{"_id": "1"}	1
-{"_id": "2"}	2
-{"_id": "3"}	3
-{"_id": "4"}	4
-{"_id": "5"}	5
+doc	_id	_json_schema
+{"_id": "1"}	1	{"type": "object"}
+{"_id": "2"}	2	{"type": "object"}
+{"_id": "3"}	3	{"type": "object"}
+{"_id": "4"}	4	{"type": "object"}
+{"_id": "5"}	5	{"type": "object"}
 0 rows affected
 send Mysqlx.Crud.Update {
   collection {
@@ -814,12 +814,12 @@ send Mysqlx.Crud.Update {
 0 rows affected
 Rows matched: 5  Changed: 0  Warnings: 0
 RUN select * from mysqlxcoll.maincoll
-doc	_id
-{"_id": "1"}	1
-{"_id": "2"}	2
-{"_id": "3"}	3
-{"_id": "4"}	4
-{"_id": "5"}	5
+doc	_id	_json_schema
+{"_id": "1"}	1	{"type": "object"}
+{"_id": "2"}	2	{"type": "object"}
+{"_id": "3"}	3	{"type": "object"}
+{"_id": "4"}	4	{"type": "object"}
+{"_id": "5"}	5	{"type": "object"}
 0 rows affected
 # Can not remove immutable document member _id
 send Mysqlx.Crud.Update {
@@ -848,12 +848,12 @@ Mysqlx.Error {
 }
 
 RUN select * from mysqlxcoll.maincoll
-doc	_id
-{"_id": "1"}	1
-{"_id": "2"}	2
-{"_id": "3"}	3
-{"_id": "4"}	4
-{"_id": "5"}	5
+doc	_id	_json_schema
+{"_id": "1"}	1	{"type": "object"}
+{"_id": "2"}	2	{"type": "object"}
+{"_id": "3"}	3	{"type": "object"}
+{"_id": "4"}	4	{"type": "object"}
+{"_id": "5"}	5	{"type": "object"}
 0 rows affected
 ================================================================================
 CLEAN UP

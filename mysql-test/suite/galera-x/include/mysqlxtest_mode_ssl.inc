@@ -21,12 +21,12 @@
 --echo ##
 --echo ## * Verify client ssl-mode vs MySQL Server with SSL
 
- --replace_regex /restart\:.*\.pem/$SSL_VERIFICABLE$/
 let $restart_parameters=restart: 
 	--mysqlx_ssl_key=$MYSQL_TEST_DIR/std_data/server-key-verify-pass.pem
 	--mysqlx_ssl_cert=$MYSQL_TEST_DIR/std_data/server-cert-verify-pass.pem
 	--mysqlx_ssl_ca=$MYSQL_TEST_DIR/std_data/ca-cert-verify.pem;
---source restart_mysqld_and_wait_for_xplugin.inc
+let $do_not_echo_parameters=1;
+--source restart_mysqld.inc
 
 --exec $MYSQLXTEST_SSLCA_TEST $USE_SOCKET -v%EXPECT%=OFF --ssl-mode=disabled  2>&1
 
@@ -50,12 +50,12 @@ let $restart_parameters=restart:
 --echo ##
 --echo ## * Verify client ssl-mode vs MySQL Server with SSL
 
---replace_regex /restart\:.*\.pem/$SSL_NOT_VERIFICABLE$/
 let $restart_parameters=restart: 
 	--mysqlx_ssl_key=$MYSQL_TEST_DIR/std_data/server-key-verify-fail.pem
 	--mysqlx_ssl_cert=$MYSQL_TEST_DIR/std_data/server-cert-verify-fail.pem
 	--mysqlx_ssl_ca=$MYSQL_TEST_DIR/std_data/ca-cert-verify.pem;
---source restart_mysqld_and_wait_for_xplugin.inc
+let $do_not_echo_parameters=1;
+--source restart_mysqld.inc
 
 --exec $MYSQLXTEST_SSLCA_TEST $USE_SOCKET -v%EXPECT%=OFF --ssl-mode=disabled  2>&1
 

@@ -4,7 +4,6 @@ Mysqlx.Ok {
 }
 ok
 Test different connection types while secure transport when the server was started with this flag set to ON
-# restart: --require_secure_transport=ON
 send Mysqlx.Session.AuthenticateStart {
   mech_name: "PLAIN"
   auth_data: "\000x_root\000"

@@ -1,8 +1,9 @@
 --echo Preamble
+--source include/have_util_sed.inc
 --source include/galera_cluster.inc
 --source include/xplugin_preamble.inc
 --source include/xplugin_create_user.inc
---source include/restart_mysqld.inc
+--source ../include/restart_mysqld.inc
 
 
 ## Show that Mysqlx_connection_timeout works

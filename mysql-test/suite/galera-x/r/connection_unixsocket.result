@@ -404,22 +404,22 @@ Mysqlx.Session.AuthenticateOk {
 
 ok
 SET GLOBAL require_secure_transport:=0;
-# restart: --mysqlx-socket=SOCKET
-RUN SELECT CONNECTION_TYPE from performance_schema.threads where processlist_command='Query';
-CONNECTION_TYPE
-Socket
-0 rows affected
-Mysqlx.Ok {
-  msg: "bye!"
-}
-ok
-RUN SELECT CONNECTION_TYPE from performance_schema.threads where processlist_command='Query';
-CONNECTION_TYPE
-Socket
-0 rows affected
-Mysqlx.Ok {
-  msg: "bye!"
-}
-ok
 DROP TABLE `city`;
-DROP USER user_127_0_0_1@127.0.0.1,user_8_8_8_8@8.8.8.8, user_all@'%', user_localhost@localhost, user_localhost_8_8_8_8@8.8.8.8, user_localhost_8_8_8_8@localhost;
+DROP USER user_127_0_0_1@127.0.0.1,user_8_8_8_8@8.8.8.8, user_all@'%', user_localhost@localhost, user_localhost_8_8_8_8@8.8.8.8, user_localhost_8_8_8_8@localhost, user_requires_ssl;
+# restart:<hidden args>
+RUN SELECT CONNECTION_TYPE from performance_schema.threads where processlist_command='Query';
+CONNECTION_TYPE
+Socket
+0 rows affected
+Mysqlx.Ok {
+  msg: "bye!"
+}
+ok
+RUN SELECT CONNECTION_TYPE from performance_schema.threads where processlist_command='Query';
+CONNECTION_TYPE
+Socket
+0 rows affected
+Mysqlx.Ok {
+  msg: "bye!"
+}
+ok

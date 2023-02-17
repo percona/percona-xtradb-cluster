@@ -87,7 +87,7 @@ Stmt 3.b. Execute with param
 ============================
 
 1 rows affected
-auto-generated id(s): 0000XXXXXXXX0000000000000002
+auto-generated id(s): 0000XXXXXXXX0000000000000003
 Verify ["SELECT count(*) as count FROM xtest.xcol WHERE doc->>'$.pupil' LIKE 'Bob%'" returns in "count" column, following value 1]
 Verify [Status variable "Mysqlx_prep_execute" needs to have a value of 4]
 
@@ -95,7 +95,7 @@ Stmt 3.c. Execute with params (one extra to ignore)
 ===================================================
 
 1 rows affected
-auto-generated id(s): 0000XXXXXXXX0000000000000003
+auto-generated id(s): 0000XXXXXXXX0000000000000005
 Verify ["SELECT count(*) as count FROM xtest.xcol WHERE doc->>'$.pupil' LIKE 'Ch%'" returns in "count" column, following value 1]
 Verify [Status variable "Mysqlx_prep_execute" needs to have a value of 5]
 
@@ -113,7 +113,7 @@ Stmt 4.a. Execute with params
 =============================
 
 2 rows affected
-auto-generated id(s): 0000XXXXXXXX0000000000000004
+auto-generated id(s): 0000XXXXXXXX0000000000000007
 Records: 2  Duplicates: 0  Warnings: 0
 Verify ["SELECT count(*) as count FROM xtest.xcol WHERE doc->>'$.pupil' LIKE 'David%'" returns in "count" column, following value 1]
 Verify ["SELECT count(*) as count FROM xtest.xcol WHERE doc->>'$.pupil' LIKE 'Eva%'" returns in "count" column, following value 1]
@@ -140,7 +140,7 @@ Mysqlx.Notice.Frame {
 Mysqlx.Notice.Frame {
   type: 3
   scope: LOCAL
-  payload: "Mysqlx.Notice.SessionStateChanged { param: GENERATED_DOCUMENT_IDS\nvalue {\n  type: V_OCTETS\n  v_octets {\n    value: \"0000XXXXXXXX0000000000000005\"\n  }\n}\n }"
+  payload: "Mysqlx.Notice.SessionStateChanged { param: GENERATED_DOCUMENT_IDS\nvalue {\n  type: V_OCTETS\n  v_octets {\n    value: \"0000XXXXXXXX0000000000000009\"\n  }\n}\n }"
 }
 
 Mysqlx.Sql.StmtExecuteOk {

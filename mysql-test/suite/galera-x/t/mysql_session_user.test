@@ -3,6 +3,7 @@
 # affected by the X plugin
 ################################################################################
 
+--source include/have_util_sed.inc
 --source include/galera_cluster.inc
 --source include/not_valgrind.inc
 --source include/mysql_upgrade_preparation.inc
@@ -48,7 +49,7 @@ call mtr.add_suppression("Plugin mysqlx reported: 'Unable to switch context to u
 --echo Run mysql_upgrade
 --let $restart_parameters = restart:--upgrade=FORCE
 --let $wait_counter= 10000
---source include/restart_mysqld.inc
+--source ../include/restart_mysqld.inc
 --source include/mysql_upgrade_cleanup.inc
 
 --source include/xplugin_wait_for_interfaces.inc

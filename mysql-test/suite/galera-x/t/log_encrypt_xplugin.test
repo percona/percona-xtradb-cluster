@@ -2,6 +2,7 @@
 # InnoDB transparent encryption on redo log and undo log using xplugin
 #------------------------------------------------------------------------------
 
+--source include/have_util_sed.inc
 --source include/galera_cluster.inc
 --source include/no_valgrind_without_big.inc
 --source include/have_innodb_max_16k.inc
@@ -141,7 +142,7 @@ DROP DATABASE tde_db;
 
 # restart the server with MTR default
 --let $restart_parameters=
---source include/restart_mysqld.inc
+--source ../include/restart_mysqld.inc
 
 ## Cleanup
 --remove_file $MYSQLTEST_VARDIR/tmp/bootstrap2.log

@@ -1,8 +1,18 @@
 ## This is test file for verification of enaling warning,password_expired,generated_insert_id,rows_affected,produced_message notices and their functionality
 
+--source include/have_util_sed.inc
 --source include/galera_cluster.inc
 --source include/xplugin_preamble.inc
 --source include/xplugin_create_user.inc
+
+--connection node_2
+call mtr.add_suppression("Table '(dup|t1)' already exists");
+call mtr.add_suppression("Specified key was too long; max key length is 3072 bytes.*worklog5743_1");
+call mtr.add_suppression("Table storage engine for 't2' doesn't have this option");
+call mtr.add_suppression("Incorrect index name 'GEN_CLUST_INDEX'");
+call mtr.add_suppression("Unknown table 'demo.oops_it_is_not_here'");
+call mtr.add_suppression("Query apply failed");
+--connection node_1
 
 ## Test starts here
 --let $xtest_result= $MYSQL_TMP_DIR/stmtexecute_query_result_mysqlx.tmp
@@ -404,7 +414,6 @@ create table worklog5743_8(a1 int, a2 TEXT, a3 TEXT) KEY_BLOCK_SIZE=8;
 create index idx1 on worklog5743_1(a2(4000));
 
 -->expecterror ER_UNKNOWN_SYSTEM_VARIABLE
--->expectwarnings ER_UNKNOWN_SYSTEM_VARIABLE
 set global innodb_large_prefix=1;
 
 ## setting back to original value
@@ -770,6 +779,7 @@ EOF
 ##try enable read-only notices with normal user
 create user xplugin@localhost identified by 'xplugin';
 --exec $MYSQLXTEST -uxplugin --password='xplugin' --file=$xtest_enable_notice 2>&1
+drop user xplugin@localhost;
 
 ## Enable multiple notices both read-only and read-write with single StmtExecute,expect success
 --exec $MYSQLXTEST -ux_root --password='' --file=$xtest_multiple_notices 2>&1
@@ -779,18 +789,17 @@ create user xplugin@localhost identified by 'xplugin';
 
 ##verify MYSQLX_NOTICE_OTHER_SENT,MYSQLX_NOTICE_WARNING_SENT
 let $restart_parameters = restart: ;
---source include/restart_mysqld.inc
+--source ../include/restart_mysqld.inc
 --exec $MYSQLXTEST -ux_root --password='' --file=$xtest_stats_noti_no_err 2>&1
 
 ##verify MYSQLX_NOTICE_OTHER_SENT,MYSQLX_NOTICE_WARNING_SENT with unprivileged user
 let $restart_parameters = restart: ;
---source include/restart_mysqld.inc
+--source ../include/restart_mysqld.inc
 create user noti@localhost identified by 'noti';
 --exec $MYSQLXTEST -unoti --password='noti' --file=$xtest_stats_noti 2>&1
 
 ## Cleanup
 drop user noti@localhost;
-drop user xplugin@localhost;
 --remove_file $xtest_result
 --remove_file $xtest_warnings
 --remove_file $xtest_enable_notice

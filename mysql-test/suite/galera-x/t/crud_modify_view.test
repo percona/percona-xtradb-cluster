@@ -5,6 +5,11 @@
 --source include/xplugin_preamble.inc
 --source include/xplugin_create_user.inc
 
+--connection node_2
+call mtr.add_suppression("In definition of view, derived table or common table expression, SELECT list and column names list have different column counts");
+call mtr.add_suppression("Query apply failed");
+--connection node_1
+
 ## Test data
 ## Test starts here
 --let $xtest_file= $MYSQL_TMP_DIR/create_view.tmp

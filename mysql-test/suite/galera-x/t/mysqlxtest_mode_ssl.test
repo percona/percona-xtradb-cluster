@@ -1,13 +1,19 @@
 ## XPLUGIN: Following test cases for mysqlx plugin ssl connection testing
 ##          with SSL cert verification on client side.
 
+--source include/have_util_sed.inc
 --source include/galera_cluster.inc
 --source include/not_have_tlsv13.inc
 --source include/xplugin_preamble.inc
 --source include/xplugin_ssl_warnings_suppression.inc
 --source include/xplugin_create_user.inc
 
-call mtr.add_suppression(".*Failed to set up SSL.*");
+call mtr.add_suppression("Failed to initialize TLS for channel: mysql_main.");
+call mtr.add_suppression("Failed to set up SSL because of the following SSL library error: Failed to set ciphers to use");
+--connection node_2
+call mtr.add_suppression("Failed to initialize TLS for channel: mysql_main.");
+call mtr.add_suppression("Failed to set up SSL because of the following SSL library error: Failed to set ciphers to use");
+--connection node_1
 
 --let $SS_VERIFY=--ssl-ca=$MYSQL_TEST_DIR/std_data/ca-cert-verify.pem
 --let $MYSQLXTEST_SSLCA_TEST=$MYSQLXTEST -u x_root --password='' --file=$MYSQL_TMP_DIR/mysqlx-connection-info.tmp $SS_VERIFY --quiet

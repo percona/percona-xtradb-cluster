@@ -13,6 +13,7 @@
 # # 2. Valgrind would complain about memory leaks when we crash on purpose.
 # # 3. DEBUG_SYNC must be compiled in.
 # # 4. Avoid CrashReporter popup on Mac
+--source include/have_util_sed.inc
 --source include/galera_cluster.inc
 --source include/not_valgrind.inc
 --source include/have_debug_sync.inc
@@ -20,6 +21,7 @@
 --source include/xplugin_preamble.inc
 --source include/xplugin_create_user.inc
 
+--let $_expect_file_name=$MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 
 ## Test starts here
 --write_file $MYSQL_TMP_DIR/mysqlx-in.tmp
@@ -29,6 +31,7 @@ DROP DATABASE IF EXISTS xplugintest;
 CREATE DATABASE xplugintest;
 USE xplugintest;
 CREATE TABLE table1 ( _id INT PRIMARY KEY, doc JSON ) ;
+DROP USER 'x_root'@'localhost';
 -->endsql
 
 #-- "Create table table2 in xplugintest "
@@ -102,15 +105,19 @@ EOF
 
 # Request a crash, and restart the server.
 # Write file to make mysql-test-run.pl restart the server
---exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
+--exec echo "restart" > $_expect_file_name
 --source include/xplugin_wait_for_interfaces.inc
+--let xplugin_create_user=0
+--let xplugin_user_dropped=1
 --error 1
 --exec $MYSQLXTEST -u x_root --password='' --file=$MYSQL_TMP_DIR/mysqlx-in.tmp >$MYSQL_TMP_DIR/mysqlx-out.tmp 2>&1
 #--cat_file $MYSQL_TMP_DIR/mysqlx-out.tmp
 --remove_file $MYSQL_TMP_DIR/mysqlx-in.tmp
 --remove_file $MYSQL_TMP_DIR/mysqlx-out.tmp
---enable_reconnect
---source include/wait_until_connected_again.inc
+--source include/safe_to_bootstrap.inc
+--source include/start_mysqld.inc
+--source include/xplugin_create_user.inc
+
 # No rows
 SELECT * FROM xplugintest.table2;
 
@@ -214,6 +221,7 @@ Mysqlx.Crud.Insert {
 -->sql
 SHOW CREATE TABLE xplugintest.table2;
 SELECT * FROM xplugintest.table2;
+DROP USER 'x_root'@'localhost';
 -->endsql
 #-- "Set crash point after commit. Update will hit this point"
 Mysqlx.Sql.StmtExecute {
@@ -275,13 +283,16 @@ EOF
 
 # Request a crash, and restart the server.
 # Write file to make mysql-test-run.pl restart the server
---exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
+--exec echo "restart" > $_expect_file_name
 --source include/xplugin_wait_for_interfaces.inc
+--let xplugin_create_user=0
+--let xplugin_user_dropped=1
 --error 1
 --exec $MYSQLXTEST -u x_root --password='' --file=$MYSQL_TMP_DIR/mysqlx-in.tmp >$MYSQL_TMP_DIR/mysqlx-out.tmp 2>&1
 #--cat_file $MYSQL_TMP_DIR/mysqlx-out.tmp
---enable_reconnect
---source include/wait_until_connected_again.inc
+--source include/safe_to_bootstrap.inc
+--source include/start_mysqld.inc
+--source include/xplugin_create_user.inc
 
 USE xplugintest;
 SHOW TABLES;
@@ -293,3 +304,5 @@ DROP DATABASE IF EXISTS xplugintest;
 --remove_file $MYSQL_TMP_DIR/mysqlx-in.tmp
 --remove_file $MYSQL_TMP_DIR/mysqlx-out.tmp
 --source include/xplugin_drop_user.inc
+
+# TODO WSREP not ready problem

@@ -3,6 +3,11 @@
 --source include/xplugin_preamble.inc
 --source include/xplugin_create_user.inc
 
+--connection node_2
+call mtr.add_suppression("Table 'coll' already exists");
+call mtr.add_suppression("Query apply failed");
+--connection node_1
+
 ## TEST STARTS HERE
 --write_file $MYSQL_TMP_DIR/mysqlx-update_itemremove.tmp
 -->import wait_until_disconnect.macro

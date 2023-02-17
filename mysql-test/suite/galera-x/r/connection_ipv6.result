@@ -76,7 +76,21 @@ Mysqlx_address	0.0.0.0
 Mysqlx.Ok {
   msg: "bye!"
 }
+DROP USER `user_localhost`@`localhost`;
+DROP USER `user_127_0_0_1`@`127.0.0.1`;
+DROP USER `user_::1`@`::1`;
+DROP USER `user_0:0:0:0:0:0:0:1`@`0:0:0:0:0:0:0:1`;
+DROP USER `user_0::0000:0000:0000:0000:0001`@`0000:0000:0000:0000:0000:0000:0000:0001`;
+DROP USER `user_0:0:0:0:0:FFFF:127.0.0.1`@`0:0:0:0:0:FFFF:127.0.0.1`;
+DROP USER `user_::FFFF:127.0.0.1`@`::FFFF:127.0.0.1`;
 # restart: --loose-mysqlx-bind-address=::
+CREATE USER `user_localhost`@`localhost`;
+CREATE USER `user_127_0_0_1`@`127.0.0.1`;
+CREATE USER `user_::1`@`::1`;
+CREATE USER `user_0:0:0:0:0:0:0:1`@`0:0:0:0:0:0:0:1`;
+CREATE USER `user_0::0000:0000:0000:0000:0001`@`0000:0000:0000:0000:0000:0000:0000:0001`;
+CREATE USER `user_0:0:0:0:0:FFFF:127.0.0.1`@`0:0:0:0:0:FFFF:127.0.0.1`;
+CREATE USER `user_::FFFF:127.0.0.1`@`::FFFF:127.0.0.1`;
 #
 #
 # Server enabled with IPv6 and IPv4, test connectivity from localhosts

@@ -1,4 +1,5 @@
 ##Test: Restart server and provide weak ssl-cipher at server startup
+# restart:--ssl-cipher=CAMELLIA256-SHA
 in main, line 0:ERROR: Failed to set ciphers to use (code 2026)
 not ok
 RUN SHOW STATUS LIKE 'ssl_cipher'
@@ -10,3 +11,4 @@ Mysqlx.Ok {
 }
 ok
 ##Cleanup: Restore ssl-cipher to default
+# restart

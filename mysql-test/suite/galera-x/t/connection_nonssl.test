@@ -76,7 +76,7 @@ EOF
 
 --write_file $MYSQL_TMP_DIR/mysqlx-alter-pwd.tmp
 -->sql
-ALTER USER USER() IDENTIFIED BY 'alter-new-auth';
+ALTER USER user2_mysqlx@localhost IDENTIFIED BY 'alter-new-auth';
 -->endsql
 EOF
 

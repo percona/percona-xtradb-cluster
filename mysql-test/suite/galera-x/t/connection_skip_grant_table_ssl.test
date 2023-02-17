@@ -1,5 +1,6 @@
 ## This is test file for connection authentication using mysqlx.
 ##
+--source include/have_util_sed.inc
 --source include/galera_cluster.inc
 --source include/xplugin_preamble.inc
 --source include/not_windows.inc

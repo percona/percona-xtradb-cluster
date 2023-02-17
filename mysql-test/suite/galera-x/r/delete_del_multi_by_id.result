@@ -14,10 +14,10 @@ RUN insert into mycoll (doc) values ('{"_id": "3", "name": "Joe2", "last_name": 
 
 1 rows affected
 RUN select * from mycoll
-doc	_id
-{"_id": "1", "name": "Joe1"}	1
-{"_id": "2", "name": "Joe2", "last_name": "Smith"}	2
-{"_id": "3", "name": "Joe2", "last_name": "Shmo"}	3
+doc	_id	_json_schema
+{"_id": "1", "name": "Joe1"}	1	{"type": "object"}
+{"_id": "2", "name": "Joe2", "last_name": "Smith"}	2	{"type": "object"}
+{"_id": "3", "name": "Joe2", "last_name": "Shmo"}	3	{"type": "object"}
 0 rows affected
 send Mysqlx.Crud.Delete {
   collection {
@@ -60,8 +60,8 @@ send Mysqlx.Crud.Delete {
 
 2 rows affected
 RUN select * from xtest.mycoll
-doc	_id
-{"_id": "2", "name": "Joe2", "last_name": "Smith"}	2
+doc	_id	_json_schema
+{"_id": "2", "name": "Joe2", "last_name": "Smith"}	2	{"type": "object"}
 0 rows affected
 Mysqlx.Ok {
   msg: "bye!"

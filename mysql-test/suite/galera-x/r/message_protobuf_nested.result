@@ -1,3 +1,5 @@
+call mtr.add_suppression("Table 'coll' already exists");
+call mtr.add_suppression("Query apply failed");
 SET GLOBAL mysqlx_connect_timeout = 300;
 SET GLOBAL mysqlx_wait_timeout = 300;
 
@@ -11,7 +13,7 @@ Try to send number of objects equal to the X Protocol limit, 100 (2 * 50)
 doc
 command ok
 Try to send number of object more than the X Protocol limit 101 (2 * 51)
-Got expected error: X Protocol message recursion limit (100) exceeded (code 5000)
+Got expected error: Parse error unserializing protobuf message (code 5000)
 closing session test_different_messages1
 switched to session default
 Mysqlx.Ok {
@@ -21,7 +23,7 @@ ok
 
 command ok
 Try to send number of object more than the X Protocol limit 101 (2 * 51)
-Got expected error: X Protocol message recursion limit (100) exceeded (code 5000)
+Got expected error: Parse error unserializing protobuf message (code 5000)
 ok
 SET GLOBAL mysqlx_connect_timeout= DEFAULT;
 SET GLOBAL mysqlx_wait_timeout = DEFAULT;

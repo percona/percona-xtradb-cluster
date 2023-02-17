@@ -4,6 +4,13 @@
 --source include/xplugin_preamble.inc
 --source include/xplugin_create_user.inc
 
+--connection node_2
+call mtr.add_suppression("Too many key parts specified; max 1 parts allowed");
+call mtr.add_suppression("All parts of a SPATIAL index must be NOT NULL");
+call mtr.add_suppression("Column '.*' cannot be null");
+call mtr.add_suppression("Query apply failed");
+--connection node_1
+
 ## Test starts here
 --let $xtest_file= $MYSQL_TMP_DIR/admin_create_index_spatial.tmp
 --write_file $xtest_file

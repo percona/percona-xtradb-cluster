@@ -1,11 +1,31 @@
 ## Simple list objects with case sensitive names forced to lower case
 
+--source include/have_util_sed.inc
 --source include/galera_cluster.inc
---source include/have_case_sensitive_file_system.inc
---source include/xplugin_preamble.inc
+
+--source include/shutdown_mysqld.inc
+
+--mkdir $MYSQL_TMP_DIR/datadir
+let $MYSQLD_DATADIR_1 = $MYSQL_TMP_DIR/datadir/data;
+let BOOTSTRAP_SQL=$MYSQL_TMP_DIR/boot.sql;
+--echo # create bootstrap file
+write_file $BOOTSTRAP_SQL;
+CREATE DATABASE test;
+EOF
+
+--exec $MYSQLD --no-defaults --initialize-insecure --lower_case_table_names=1 --datadir=$MYSQLD_DATADIR_1 --init-file=$BOOTSTRAP_SQL
+--let $restart_parameters= restart: --lower_case_table_names=1 --datadir=$MYSQLD_DATADIR_1
+--source include/start_mysqld_no_echo.inc
 
 --let $expect_case_sensitive_variant= 1
 --let $expect_table_error= ER_TABLE_EXISTS_ERROR
 --let $expect_db_error= ER_DB_CREATE_EXISTS
 --source ../include/admin_list_objects_table_names.inc
 
+--let $restart_parameters=
+--source ../include/restart_mysqld.inc
+
+## Cleanup
+--source include/xplugin_drop_user.inc
+--remove_file $BOOTSTRAP_SQL
+--force-rmdir $MYSQL_TMP_DIR/datadir

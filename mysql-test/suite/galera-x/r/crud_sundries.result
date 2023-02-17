@@ -4,7 +4,7 @@ Note	1008	Can't drop database 'xtest'; database doesn't exist
 CREATE SCHEMA xtest;
 USE xtest;
 CREATE TABLE xtable (doc JSON);
-INSERT INTO xtable (doc) VALUES ('{"a":10, "b":20, "c":"30", "d":"40", "e":"foo", "f":"bar", "g":"2015.10.05"}');
+INSERT INTO xtable (doc) VALUES ('{"a":10, "b":20, "c":"30", "d":"40", "e":"foo", "f":"bar", "g":"2015-10-05"}');
 string	number
 foobar	1020
 command ok
@@ -39,7 +39,7 @@ string	number
 1	1
 command ok
 like	regex
-1	1
+1	0
 command ok
 like	regex
 0	1
@@ -48,7 +48,7 @@ command ok
 1 rows affected
 Rows matched: 1  Changed: 1  Warnings: 0
 doc
-{"a": 10, "b": 20, "c": "30", "d": "40", "e": "foo", "f": "bar", "g": "2015.10.05", "sqrt": 3.1622776601683795, "extra": "FOO"}
+{"a": 10, "b": 20, "c": "30", "d": "40", "e": "foo", "f": "bar", "g": "2015-10-05", "sqrt": 3.1622776601683795, "extra": "FOO"}
 0 rows affected
 result-in	result-not_in
 1	1

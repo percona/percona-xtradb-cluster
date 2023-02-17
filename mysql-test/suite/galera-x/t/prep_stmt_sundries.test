@@ -1,6 +1,7 @@
 ## Test of general functionality of prepare statement
 
 ## Preamble
+--source include/have_util_sed.inc
 --source include/galera_cluster.inc
 --source include/no_ps_protocol.inc
 --source include/xplugin_preamble.inc
@@ -438,7 +439,7 @@ EOF
 # which can't be reset by SQL.
 # A restart is going to force, all status variables
 # to be set to zero.
---source include/restart_mysqld.inc
+--source ../include/restart_mysqld.inc
 
 CREATE SCHEMA IF NOT EXISTS xtest;
 USE xtest;

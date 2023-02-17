@@ -5,6 +5,11 @@
 --source include/xplugin_preamble.inc
 --source include/xplugin_create_user.inc
 
+--connection node_2
+call mtr.add_suppression("CHECK OPTION on non-updatable view 'xtest.view_c'");
+call mtr.add_suppression("Query apply failed");
+--connection node_1
+
 ## Test data
 --let $xtest_file= $MYSQL_TMP_DIR/crud_view_sundries.tmp
 --write_file $xtest_file
