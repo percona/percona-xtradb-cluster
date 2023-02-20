@@ -1735,7 +1735,7 @@ fi
 # 2.4.20  Transition-key fixes
 #
 
-XB_2x_REQUIRED_VERSION="2.4.26"
+XB_2x_REQUIRED_VERSION="2.4.27"
 
 if [[ ! -x $XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN ]]; then
     wsrep_log_error "******************* FATAL ERROR ********************** "
@@ -1761,7 +1761,7 @@ fi
 # 8.0.11  Transition-key fixes
 #
 
-XB_8x_REQUIRED_VERSION="8.0.30"
+XB_8x_REQUIRED_VERSION="8.0.31"
 
 if [[ ! -x $XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN ]]; then
     wsrep_log_error "******************* FATAL ERROR ********************** "

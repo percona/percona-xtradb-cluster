@@ -1267,7 +1267,7 @@ end:
   wsrep_close(thd);
 #endif /* WITH_WSREP */
 
-  thd->lex->cleanup(thd, true);
+  thd->lex->cleanup(true);
   thd->end_statement();
   thd->cleanup_after_query();
   /* Avoid races with SHOW PROCESSLIST */
