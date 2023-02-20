@@ -1,0 +1,17 @@
+# PXC-3936: state transfer with SSL disabled in wsrep_provider_options
+# crashes Receiver and Donor node
+# https://jira.percona.com/browse/PXC-3936
+
+--source include/galera_cluster.inc
+
+# Just check that connection is established and there are no server crash -
+# key part of the test is in cnf file.
+--connection node_1
+CREATE TABLE t1(a INT);
+INSERT INTO t1 VALUES(1);
+
+--connection node_1
+SELECT * FROM t1;
+
+--connection node_2
+DROP TABLE t1;
