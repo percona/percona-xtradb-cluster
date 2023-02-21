@@ -4178,7 +4178,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
 
 #ifdef WITH_WSREP
       if (WSREP(thd) &&
-          wsrep_to_isolation_begin(thd, NULL, NULL, first_table)) {
+          wsrep_to_isolation_begin(thd, first_table->db, NULL, first_table)) {
         goto error;
       }
 #endif /* WITH_WSREP */
@@ -4275,7 +4275,8 @@ int mysql_execute_command(THD *thd, bool first_level) {
           if (wsrep_append_fk_parent_table(thd, all_tables, &keys)) {
             return true;
           }
-          WSREP_TO_ISOLATION_BEGIN_FK_TABLES_IF(NULL, NULL, all_tables, &keys) {
+          WSREP_TO_ISOLATION_BEGIN_FK_TABLES_IF(table->db, NULL, all_tables,
+                                                &keys) {
             goto error;
           }
           break;
@@ -4573,6 +4574,10 @@ int mysql_execute_command(THD *thd, bool first_level) {
         break;
 
 #ifdef WITH_WSREP
+      if (thd->locked_tables_mode) {
+        my_error(ER_LOCK_OR_ACTIVE_TRANSACTION, MYF(0));
+        break;
+      }
       WSREP_TO_ISOLATION_BEGIN(lex->name.str, NULL, NULL)
 #endif /* WITH_WSREP */
       /*
@@ -4593,6 +4598,10 @@ int mysql_execute_command(THD *thd, bool first_level) {
                        false))
         break;
 #ifdef WITH_WSREP
+      if (thd->locked_tables_mode) {
+        my_error(ER_LOCK_OR_ACTIVE_TRANSACTION, MYF(0));
+        break;
+      }
       WSREP_TO_ISOLATION_BEGIN(lex->name.str, NULL, NULL)
 #endif /* WITH_WSREP */
       res = mysql_rm_db(thd, to_lex_cstring(lex->name), lex->drop_if_exists);
@@ -4605,6 +4614,10 @@ int mysql_execute_command(THD *thd, bool first_level) {
                        false))
         break;
 #ifdef WITH_WSREP
+      if (thd->locked_tables_mode) {
+        my_error(ER_LOCK_OR_ACTIVE_TRANSACTION, MYF(0));
+        break;
+      }
       WSREP_TO_ISOLATION_BEGIN(lex->name.str, NULL, NULL)
 #endif /* WITH_WSREP */
       /*
@@ -5202,7 +5215,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
       thd->binlog_invoker();
 
 #ifdef WITH_WSREP
-      WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+      WSREP_TO_ISOLATION_BEGIN(lex->sphead->m_db.str, NULL, NULL)
 #endif /* WITH_WSREP */
 
       bool sp_already_exists = false;
@@ -5337,7 +5350,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
             goto error;
 
 #ifdef WITH_WSREP
-          WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+          WSREP_TO_ISOLATION_BEGIN(lex->sphead->m_db.str, NULL, NULL)
 #endif /* WITH_WSREP */
 
           if (!(res = mysql_drop_function(thd, &lex->spname->m_name))) {

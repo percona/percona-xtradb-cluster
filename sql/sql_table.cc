@@ -10984,7 +10984,7 @@ bool mysql_create_like_table(THD *thd, TABLE_LIST *table, TABLE_LIST *src_table,
     } else if (!is_tmp_table) {
       /* this is straight CREATE TABLE LIKE... eith no tmp tables */
       if (WSREP(thd) &&
-          wsrep_to_isolation_begin(thd, table->db, table->table_name, NULL)) {
+          wsrep_to_isolation_begin(thd, table->db, table->table_name, table)) {
         return true;
       }
     } else {

@@ -964,7 +964,7 @@ enum_sp_return_code sp_drop_routine(THD *thd, enum_sp_type type,
     return SP_INTERNAL_ERROR;
 
 #ifdef WITH_WSREP
-  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL)) {
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, name->m_db.str, NULL, NULL)) {
     return SP_INTERNAL_ERROR;
   }
 #endif /* WITH_WSREP */
@@ -1142,7 +1142,7 @@ bool sp_update_routine(THD *thd, enum_sp_type type, sp_name *name,
   }
 
 #ifdef WITH_WSREP
-  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL)) {
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, name->m_db.str, NULL, NULL)) {
     return true;
   }
 #endif /* WITH_WSREP */

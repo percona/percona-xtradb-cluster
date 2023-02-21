@@ -1760,7 +1760,7 @@ bool Sql_cmd_analyze_table::execute(THD *thd) {
   });
 
   if (WSREP(thd) && !thd->lex->no_write_to_binlog &&
-      wsrep_to_isolation_begin(thd, NULL, NULL, first_table)) {
+      wsrep_to_isolation_begin(thd, first_table->db, NULL, first_table)) {
     return true;
   }
 #endif /* WITH_WSREP */

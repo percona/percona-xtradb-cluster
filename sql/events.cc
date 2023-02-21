@@ -365,7 +365,8 @@ bool Events::create_event(THD *thd, Event_parse_data *parse_data,
   if (parse_data->do_not_create) return false;
 
 #ifdef WITH_WSREP
-  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL)) {
+  if (WSREP(thd) &&
+      wsrep_to_isolation_begin(thd, parse_data->dbname.str, NULL, NULL)) {
     return true;
   }
 #endif /* WITH_WSREP */

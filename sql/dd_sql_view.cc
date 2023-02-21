@@ -234,7 +234,10 @@ Uncommitted_tables_guard::~Uncommitted_tables_guard() {
 */
 
 template <typename T>
-static bool prepare_view_tables_list(THD *thd, const char *db,
+#ifndef WITH_WSREP
+static
+#endif /* WITH_WSREP */
+bool prepare_view_tables_list(THD *thd, const char *db,
                                      const char *tbl_or_sf_name,
                                      bool skip_same_db, MEM_ROOT *mem_root,
                                      std::vector<TABLE_LIST *> *views) {

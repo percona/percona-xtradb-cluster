@@ -391,10 +391,8 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
       return true;
     }
 
-    WSREP_TO_ISOLATION_BEGIN_ALTER(
-        ((lex->name.str) ? lex->query_block->db : NULL),
-        ((lex->name.str) ? lex->name.str : NULL), first_table, &alter_info,
-        &keys) {
+    WSREP_TO_ISOLATION_BEGIN_ALTER(first_table->db, first_table->table_name,
+                                   first_table, &alter_info, &keys) {
       WSREP_DEBUG("TOI replication for ALTER failed");
       return true;
     }

@@ -444,7 +444,7 @@ bool Sql_cmd_create_trigger::execute(THD *thd) {
   }
 
 #ifdef WITH_WSREP
-  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL,
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, m_trigger_table->db, NULL,
                                              m_trigger_table, NULL)) {
     return true;
   }
@@ -568,7 +568,7 @@ bool Sql_cmd_drop_trigger::execute(THD *thd) {
     /* Table doesn't exist but query is still being logged
     so replicate a query with NULL construct. */
     if (WSREP(thd) &&
-        wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, tables)) {
+        wsrep_to_isolation_begin(thd, thd->lex->spname->m_db.str, NULL, tables)) {
       return true;
     }
 #endif /* WITH_WSREP */
@@ -585,7 +585,7 @@ bool Sql_cmd_drop_trigger::execute(THD *thd) {
 #ifdef WITH_WSREP
   /* Table exist so log query with normal constrct */
   if (WSREP(thd) &&
-      wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, tables)) {
+      wsrep_to_isolation_begin(thd, thd->lex->spname->m_db.str, NULL, tables)) {
     return true;
   }
 #endif /* WITH_WSREP */

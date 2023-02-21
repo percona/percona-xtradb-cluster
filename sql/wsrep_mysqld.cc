@@ -14,14 +14,18 @@
    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA */
 
 #include "binlog.h"
+#include "handler.h"
 #include "mysql/plugin.h"
 #include "mysqld.h"
 #include "rpl_replica.h"
 #include "sql/dd/cache/dictionary_client.h"  // dd::cache::Dictionary_client
+#include "sql/dd/dd_view.h"
 #include "sql/dd/dictionary.h"
 #include "sql/dd/types/table.h"
+#include "sql/dd_sql_view.h"  // prepare_view_tables_list
 #include "sql/key_spec.h"
 #include "sql/raii/sentry.h"
+#include "sql/server_component/mysql_server_keyring_lockable_imp.h"
 #include "sql/sql_alter.h"
 #include "sql/sql_lex.h"
 #include "sql/ssl_init_callback.h"
@@ -30,7 +34,6 @@
 #include "sql_class.h"
 #include "sql_parse.h"
 #include "sql_plugin.h"  // SHOW_MY_BOOL
-#include "sql/server_component/mysql_server_keyring_lockable_imp.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -42,6 +45,7 @@
 #include "rpl_msr.h"  // channel_map
 #include "sp_head.h"
 #include "sql_base.h"  // TEMP_PREFIX
+#include "sql_db.h"    // check_schema_readonly
 #include "wsrep_applier.h"
 #include "wsrep_binlog.h"
 #include "wsrep_priv.h"
@@ -2130,7 +2134,6 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
 
   switch (lex->sql_command) {
     case SQLCOM_CREATE_TABLE:
-      assert(!table_list);
       if (thd->lex->create_info->options & HA_LEX_CREATE_TMP_TABLE) {
         return false;
       }
@@ -2138,7 +2141,6 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
 
     case SQLCOM_CREATE_VIEW:
 
-      assert(!table_list);
       assert(first_table); /* First table is view name */
       /*
         If any of the remaining tables refer to temporary table error
@@ -2283,6 +2285,125 @@ static void wsrep_NBO_begin_failed(THD *thd,
 fail:
   WSREP_ERROR("Failed to release NBO resources. Need to abort.");
   unireg_abort(1);
+}
+
+/*
+  This function decides whether a DB operation must be replicated if it is
+  internally using a read only schema.
+
+  If a schema is read only, then this function will disallow TOI operations on
+  all database objects(tables, triggers, functions, views, procedures, events)
+  inside the read only schemas except ALTER SCHEMA <schema> READ ONLY = 0
+  and raises ER_SCHEMA_READ_ONLY.
+
+  @param thd          Thread context.
+  @param db_          Name of schema to check.
+  @param table_list   List of tables to check
+
+  @return false if the DB operation can continue, true if not.
+*/
+static bool is_operating_on_read_only_schema(THD *thd, const char *db_,
+                                             const TABLE_LIST *table_list) {
+  LEX *lex = thd->lex;
+  HA_CREATE_INFO *create_info = lex->create_info;
+  bool some_tables_in_read_only_schema = false;
+  std::string first_read_only_schema;
+
+  /* Check if the db is read only */
+  if (db_) {
+    if (check_schema_readonly_no_error(thd, db_)) {
+      some_tables_in_read_only_schema = true;
+      first_read_only_schema.assign(db_);
+    }
+  }
+
+  /* Check if the first table is in read only schema */
+  const TABLE_LIST *first_table = table_list;
+  if (first_table && first_table->db) {
+    if (check_schema_readonly_no_error(thd, first_table->db)) {
+      some_tables_in_read_only_schema = true;
+      first_read_only_schema.assign(first_table->db);
+    }
+  }
+
+  if (!some_tables_in_read_only_schema && table_list) {
+    /*
+      Validate referencing views if it is a DROP TABLE on a table in a different
+      readonly schema. CREATE TABLE LIKE is possible when the table referenced
+      by a view is deleted and recreated.
+    */
+    if (thd->lex->sql_command == SQLCOM_DROP_TABLE ||
+        thd->lex->sql_command == SQLCOM_CREATE_TABLE) {
+      // Prepare the list of referencing views
+      std::vector<TABLE_LIST *> views;
+      MEM_ROOT mem_root(key_memory_wsrep, MEM_ROOT_BLOCK_SIZE);
+      if (prepare_view_tables_list<dd::View_table>(
+              thd, db_, table_list->table_name, false, &mem_root, &views))
+        return true;
+
+      if (!views.empty()) {
+        for (const auto view : views) {
+          if (check_schema_readonly_no_error(thd, view->db)) {
+            some_tables_in_read_only_schema = true;
+            first_read_only_schema.assign(view->db);
+            break;
+          }
+        }
+      }
+    }
+
+    /* Skip table list traversal for CREATE TABLE LIKE command */
+    bool skip_traversal =
+        (create_info && create_info->options & HA_LEX_CREATE_TABLE_LIKE);
+
+    /* Go through the table_list to check if any of the tables are in read
+       only schema. This can happen in case of multi table drop and rename.
+     */
+    for (const TABLE_LIST *table = table_list;
+         table && !some_tables_in_read_only_schema && !skip_traversal;
+         table = table->next_global) {
+      if (check_schema_readonly_no_error(thd, table->db)) {
+        some_tables_in_read_only_schema = true;
+        first_read_only_schema.assign(table->db);
+        break;
+      }
+    }
+  }
+
+  /*
+    If the schema is in read_only state, then the only change allowed is to:
+
+    - Turn off read_only, possibly along with other option changes.
+    - Keep read_only turned on, i.e., a no-op. In this case, other options may
+      not be changed in the same statement.
+
+     This means we fail if:
+
+     - query is not ALTER DB
+     - query is CREATE DB with same DB name, this must result in
+    ER_DB_CREATE_EXISTS
+     - query is ALTER DB but
+          - HA_CREATE_USED_READ_ONLY is not set.
+          - Or if we have set other fields as well and set READ ONLY to true.
+
+  */
+  if (some_tables_in_read_only_schema) {
+    /*
+      We ignore read_only for CREATE SCHEMA to make sure we keep the existing
+      error handling in case the schema exists already.
+    */
+    if (lex->sql_command == SQLCOM_CREATE_DB) return false;
+
+    if (lex->sql_command != SQLCOM_ALTER_DB ||
+        (create_info &&
+         (!(create_info->used_fields & HA_CREATE_USED_READ_ONLY) ||
+          ((create_info->used_fields & ~HA_CREATE_USED_READ_ONLY) &&
+           create_info->schema_read_only)))) {
+      my_error(ER_SCHEMA_READ_ONLY, MYF(0), first_read_only_schema.c_str());
+      return true;
+    }
+  }
+  return false;
 }
 
 /*
@@ -2757,6 +2878,9 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
     same action on all nodes.
   */
   if (thd->is_plugin_fake_ddl()) return 0;
+
+  /* Read only schems need to be handled in a different way */
+  if (is_operating_on_read_only_schema(thd, db_, table_list)) return -1;
 
   /* Generally if node enters non-primary state then execution of DDL+DML
   is blocked on such node but there are some asynchronous pre-register

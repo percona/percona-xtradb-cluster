@@ -1,0 +1,749 @@
+# === Purpose ===
+# This test verifies that operations on read only schemas as handled properly
+# by the cluster.
+#
+# === References ===
+#
+# PXC-4137: WSREP applier threads fail to modify read only schemas
+
+--source include/galera_cluster.inc
+CREATE SCHEMA S;
+
+CREATE TABLE S.t1(i INT, j INT, INDEX i1(i));
+ALTER SCHEMA S read only=1;
+SHOW CREATE SCHEMA S;
+ALTER SCHEMA S read only=0;
+DROP SCHEMA S;
+
+--echo #--------------------------------------------------------------------
+--echo # Invalid option in CREATE SCHEMA.
+--echo #--------------------------------------------------------------------
+--error ER_PARSE_ERROR
+CREATE SCHEMA S read only=0;
+
+--echo #--------------------------------------------------------------------
+--echo # ALTER privilege needed to change read only.
+--echo #--------------------------------------------------------------------
+eval CREATE SCHEMA S;
+CREATE USER s_usr;
+--connect (s_con, localhost, s_usr,,)
+--error ER_DBACCESS_DENIED_ERROR
+ALTER SCHEMA S read only=1;
+
+--connection default
+GRANT ALTER ON S.* TO s_usr;
+
+--connection s_con
+ALTER SCHEMA S read only=1;
+ALTER SCHEMA S read only=0;
+
+--connection default
+--disconnect s_con
+DROP USER s_usr;
+DROP SCHEMA S;
+
+--echo #--------------------------------------------------------------------
+--echo # The read only option affects all users.
+--echo #--------------------------------------------------------------------
+CREATE USER con_adm_usr;
+GRANT ALL ON *.* TO con_adm_usr;
+GRANT CONNECTION_ADMIN ON *.* TO con_adm_usr;
+
+CREATE USER super_usr;
+GRANT ALL ON *.* TO super_usr;
+GRANT SUPER ON *.* TO super_usr;
+
+eval CREATE SCHEMA S;
+
+--connect (root_con, localhost, root,,)
+CREATE TABLE S.t(i INT);
+DROP TABLE S.t;
+ALTER SCHEMA S READ ONLY=1;
+--error ER_SCHEMA_READ_ONLY
+CREATE TABLE S.t(i INT);
+ALTER SCHEMA S READ ONLY=0;
+
+--connect (con_adm_con, localhost, con_adm_usr,,)
+CREATE TABLE S.t(i INT);
+DROP TABLE S.t;
+ALTER SCHEMA S READ ONLY=1;
+--error ER_SCHEMA_READ_ONLY
+CREATE TABLE S.t(i INT);
+ALTER SCHEMA S READ ONLY=0;
+
+--connect (super_con, localhost, super_usr,,)
+CREATE TABLE S.t(i INT);
+DROP TABLE S.t;
+ALTER SCHEMA S READ ONLY=1;
+--error ER_SCHEMA_READ_ONLY
+CREATE TABLE S.t(i INT);
+ALTER SCHEMA S READ ONLY=0;
+
+--connection default
+--disconnect root_con
+--disconnect con_adm_con
+--disconnect super_con
+
+DROP USER con_adm_usr;
+DROP USER super_usr;
+
+DROP SCHEMA S;
+
+--echo #--------------------------------------------------------------------
+--echo # Statements in an init file shall not be affected.
+--echo #--------------------------------------------------------------------
+--connection node_2
+CREATE SCHEMA S;
+let INIT_FILE=$MYSQLTEST_VARDIR/tmp/schema_read_only.sql;
+write_file $INIT_FILE;
+  CREATE SCHEMA schema_read_only;
+  ALTER SCHEMA schema_read_only READ ONLY=1;
+  ALTER SCHEMA schema_read_only COLLATE utf8_bin;
+  CREATE TABLE schema_read_only.t(i INT) TABLESPACE innodb_system;
+  DROP SCHEMA schema_read_only;
+  CREATE TABLE S.init_file(i INT);
+EOF
+
+let $wait_counter= 10000;
+let $restart_parameters= "restart: --init-file=$INIT_FILE";
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
+source include/restart_mysqld.inc;
+
+--error ER_BAD_DB_ERROR
+SHOW CREATE SCHEMA schema_read_only;
+
+SHOW TABLES IN S;
+SHOW CREATE SCHEMA S;
+ALTER SCHEMA S READ ONLY=0;
+DROP SCHEMA S;
+
+--remove_file $INIT_FILE
+--connection node_1
+
+--echo #--------------------------------------------------------------------
+--echo # No ALTER for mysql, I_S, P_S and sys.
+--echo #--------------------------------------------------------------------
+--error ER_NO_SYSTEM_SCHEMA_ACCESS
+ALTER SCHEMA mysql READ ONLY=1;
+--error ER_DBACCESS_DENIED_ERROR
+ALTER SCHEMA information_schema READ ONLY=1;
+--error ER_DBACCESS_DENIED_ERROR
+ALTER SCHEMA performance_schema READ ONLY=1;
+
+#--------------------------------------------------------------------
+# Verify that all schema operations are disallowed when the schema is read
+# only.
+#--------------------------------------------------------------------
+CREATE SCHEMA S;
+CREATE TABLE S.t1(i INT, j INT, INDEX i1(i));
+ALTER SCHEMA S READ ONLY = 1; 
+
+--echo #--------------------------------------------------------------------
+--echo # Schema operations.
+--echo #--------------------------------------------------------------------
+--let $MYSQLD_DATADIR=`SELECT @@DATADIR;`
+--error ER_DB_CREATE_EXISTS
+eval CREATE SCHEMA S;
+--error ER_SCHEMA_READ_ONLY
+ALTER SCHEMA S COLLATE utf8mb4_bin;
+--error ER_SCHEMA_READ_ONLY
+ALTER SCHEMA S CHARACTER SET ascii;
+--error ER_SCHEMA_READ_ONLY
+DROP SCHEMA S;
+
+# Verify that all table operations are disallowed when the schema is read
+# only.
+--echo #--------------------------------------------------------------------
+--echo # Table operations.
+--echo #--------------------------------------------------------------------
+--error ER_SCHEMA_READ_ONLY
+CREATE TABLE S.t2(i INT);
+--error ER_SCHEMA_READ_ONLY
+ALTER TABLE S.t1 ADD COLUMN (k INT), ALGORITHM INSTANT;
+--error ER_SCHEMA_READ_ONLY
+ALTER TABLE S.t1 ADD COLUMN (k INT), ALGORITHM INPLACE;
+--error ER_SCHEMA_READ_ONLY
+ALTER TABLE S.t1 ADD COLUMN (k INT), ALGORITHM COPY;
+--error ER_SCHEMA_READ_ONLY
+CREATE INDEX i2 ON S.t1(j);
+--error ER_SCHEMA_READ_ONLY
+DROP INDEX i1 ON S.t1;
+--error ER_SCHEMA_READ_ONLY
+RENAME TABLE S.t1 TO S.t2;
+CREATE TABLE test.t1 LIKE S.t1;
+--error ER_SCHEMA_READ_ONLY
+RENAME TABLE S.t1 TO S.t2;
+--error ER_SCHEMA_READ_ONLY
+RENAME TABLE test.t1 TO test.t2, S.t1 TO S.t2;
+--error ER_SCHEMA_READ_ONLY
+TRUNCATE TABLE S.t1;
+--error ER_SCHEMA_READ_ONLY
+DROP TABLE S.t1;
+--error ER_SCHEMA_READ_ONLY
+DROP TABLE test.t1, S.t1;
+DROP TABLE test.t1;
+SELECT * FROM S.t1;
+--error ER_SCHEMA_READ_ONLY
+DELETE FROM S.t1;
+--error ER_SCHEMA_READ_ONLY
+INSERT INTO S.t1 VALUES (1, 1);
+--error ER_SCHEMA_READ_ONLY
+REPLACE INTO S.t1 VALUES (1, 1);
+--error ER_SCHEMA_READ_ONLY
+UPDATE S.t1 SET i = j;
+
+
+# Verify that all import operations are disallowed when the schema is read
+# only.
+--echo #--------------------------------------------------------------------
+--echo # Import
+--echo #--------------------------------------------------------------------
+ALTER SCHEMA S READ ONLY=0;
+CREATE TABLE S.t_imp (i INT) ENGINE=MYISAM;
+INSERT INTO S.t_imp VALUES (1), (3), (5);
+SELECT * FROM S.t_imp;
+
+FLUSH TABLES WITH READ LOCK;
+--copy_files_wildcard $MYSQLD_DATADIR/S/ $MYSQL_TMP_DIR t_imp*
+UNLOCK TABLES;
+DROP TABLE S.t_imp;
+
+--copy_files_wildcard $MYSQL_TMP_DIR $MYSQLD_DATADIR/S/ t_imp*
+ALTER SCHEMA S READ ONLY=1;
+USE S;
+--error ER_SCHEMA_READ_ONLY
+IMPORT TABLE FROM 't_imp*.sdi';
+--remove_files_wildcard $MYSQL_TMP_DIR t_imp*
+--remove_files_wildcard $MYSQLD_DATADIR/S/ t_imp*
+
+# Verify that all LOAD DATA operations are disallowed when the schema is read
+# only.
+--echo #--------------------------------------------------------------------
+--echo # LOAD DATA INFILE/XML
+--echo #--------------------------------------------------------------------
+SELECT 1, 1 INTO OUTFILE 't.txt';
+--error ER_SCHEMA_READ_ONLY
+LOAD DATA INFILE 't.txt' INTO TABLE S.t1;
+--remove_file  $MYSQLD_DATADIR/S/t.txt
+
+CREATE TABLE test.t1 LIKE S.t1;
+INSERT INTO test.t1 VALUES (1, 1);
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
+--exec $MYSQL_DUMP --xml test t1 > "$MYSQLTEST_VARDIR/tmp/t1.xml" 2>&1
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
+--error ER_SCHEMA_READ_ONLY
+--eval LOAD XML INFILE "$MYSQLTEST_VARDIR/tmp/t1.xml" INTO TABLE S.t1;
+--remove_file $MYSQLTEST_VARDIR/tmp/t1.xml
+
+# Verify that all view operations are disallowed when the schema is read
+# only.
+--echo #--------------------------------------------------------------------
+--echo # View operations.
+--echo #--------------------------------------------------------------------
+--error ER_SCHEMA_READ_ONLY
+CREATE VIEW S.v1 AS SELECT * FROM S.t1;
+ALTER SCHEMA S READ ONLY=0;
+CREATE VIEW S.v1 AS SELECT * FROM test.t1;
+ALTER SCHEMA S READ ONLY=1;
+
+--echo # Operations altering the validity of a view in a read only schema are
+--echo # rejected.
+--error ER_SCHEMA_READ_ONLY
+DROP TABLE test.t1;
+ALTER SCHEMA S READ ONLY=0;
+DROP TABLE test.t1;
+ALTER SCHEMA S READ ONLY=1;
+--error ER_SCHEMA_READ_ONLY
+CREATE TABLE test.t1 LIKE S.t1;
+
+--error ER_SCHEMA_READ_ONLY
+ALTER VIEW S.v1 AS SELECT * FROM S.t1;
+--error ER_SCHEMA_READ_ONLY
+DROP VIEW S.v1;
+ALTER SCHEMA S READ ONLY=0;
+DROP VIEW S.v1;
+ALTER SCHEMA S READ ONLY=1;
+
+--echo # Inserts in updatable view will fail.
+CREATE VIEW test.v AS SELECT * FROM S.t1;
+SELECT * FROM test.v;
+--error ER_SCHEMA_READ_ONLY
+INSERT INTO test.v VALUES(1, 1);
+DROP VIEW test.v;
+
+--echo #--------------------------------------------------------------------
+--echo # Functions. Recursion not allowed, DDL causing implicit commit not
+--echo # allowed.
+--echo #--------------------------------------------------------------------
+--error ER_SCHEMA_READ_ONLY
+CREATE FUNCTION S.f() RETURNS INT RETURN 1;
+
+CREATE TABLE test.t1 LIKE S.t1;
+
+ALTER SCHEMA S READ ONLY=0;
+delimiter |;
+CREATE FUNCTION S.f(stmt VARCHAR(20)) RETURNS INT
+BEGIN
+  CASE stmt
+    WHEN 'INSERT s' THEN INSERT INTO S.t1 VALUES(1, 1);
+    WHEN 'INSERT test' THEN INSERT INTO test.t1 VALUES(1, 1);
+    ELSE BEGIN END;
+  END CASE;
+  RETURN 1;
+END|
+delimiter ;|
+CREATE VIEW S.v_s AS SELECT S.f('INSERT s');
+CREATE VIEW S.v_test AS SELECT S.f('INSERT test');
+ALTER SCHEMA S READ ONLY=1;
+
+delimiter |;
+CREATE FUNCTION test.f(stmt VARCHAR(20)) RETURNS INT
+BEGIN
+  CASE stmt
+    WHEN 'INSERT s' THEN INSERT INTO S.t1 VALUES(1, 1);
+    WHEN 'INSERT test' THEN INSERT INTO test.t1 VALUES(1, 1);
+    ELSE BEGIN END;
+  END CASE;
+  RETURN 1;
+END|
+delimiter ;|
+CREATE VIEW test.v_s AS SELECT test.f('INSERT s');
+CREATE VIEW test.v_test AS SELECT test.f('INSERT test');
+
+--echo # Fails due to prelocking strategy.
+--error ER_SCHEMA_READ_ONLY
+SELECT S.f('INSERT test');
+--error ER_SCHEMA_READ_ONLY
+SELECT S.f('INSERT s');
+--error ER_SCHEMA_READ_ONLY
+SELECT * FROM S.v_test;
+--error ER_SCHEMA_READ_ONLY
+SELECT * FROM S.v_s;
+--error ER_SCHEMA_READ_ONLY
+DROP FUNCTION S.f;
+
+--echo # Fails due to prelocking strategy.
+--error ER_SCHEMA_READ_ONLY
+SELECT test.f('INSERT test');
+--error ER_SCHEMA_READ_ONLY
+SELECT test.f('INSERT s');
+--error ER_SCHEMA_READ_ONLY
+SELECT * FROM test.v_test;
+--error ER_SCHEMA_READ_ONLY
+SELECT * FROM test.v_s;
+
+ALTER SCHEMA S READ ONLY=0;
+SELECT S.f('INSERT test');
+SELECT S.f('INSERT s');
+SELECT * FROM S.v_test;
+SELECT * FROM S.v_s;
+
+SELECT test.f('INSERT test');
+SELECT test.f('INSERT s');
+SELECT * FROM test.v_test;
+SELECT * FROM test.v_s;
+
+DROP VIEW S.v_s;
+DROP VIEW S.v_test;
+DROP FUNCTION S.f;
+ALTER SCHEMA S READ ONLY=1;
+
+DROP VIEW test.v_s;
+DROP VIEW test.v_test;
+DROP FUNCTION test.f;
+DROP TABLE test.t1;
+
+--echo #--------------------------------------------------------------------
+--echo # Procedures.
+--echo #--------------------------------------------------------------------
+--error ER_SCHEMA_READ_ONLY
+CREATE PROCEDURE S.p() BEGIN END;
+
+CREATE TABLE test.t1 LIKE S.t1;
+
+ALTER SCHEMA S READ ONLY=0;
+delimiter |;
+CREATE PROCEDURE S.p(stmt VARCHAR(20))
+BEGIN
+  CASE stmt
+    WHEN 'INSERT s' THEN INSERT INTO S.t1 VALUES(1, 1);
+    WHEN 'INSERT test' THEN INSERT INTO test.t1 VALUES(1, 1);
+    ELSE BEGIN END;
+  END CASE;
+END|
+delimiter ;|
+ALTER SCHEMA S READ ONLY=1;
+
+delimiter |;
+CREATE PROCEDURE test.p(stmt VARCHAR(20))
+BEGIN
+  CASE stmt
+    WHEN 'INSERT s' THEN INSERT INTO S.t1 VALUES(1, 1);
+    WHEN 'INSERT test' THEN INSERT INTO test.t1 VALUES(1, 1);
+    ELSE BEGIN END;
+  END CASE;
+END|
+delimiter ;|
+
+--error ER_SCHEMA_READ_ONLY
+CALL S.p('INSERT s');
+
+--echo # Succeeds due to no prelocking for CALL.
+CALL S.p('INSERT test');
+
+--error ER_SCHEMA_READ_ONLY
+DROP PROCEDURE S.p;
+
+--error ER_SCHEMA_READ_ONLY
+CALL test.p('INSERT s');
+
+--echo # Succeeds due to no prelocking for CALL.
+CALL test.p('INSERT test');
+
+ALTER SCHEMA S READ ONLY=0;
+CALL S.p('INSERT s');
+CALL S.p('INSERT test');
+DROP PROCEDURE S.p;
+
+CALL test.p('INSERT s');
+CALL test.p('INSERT test');
+ALTER SCHEMA S READ ONLY=1;
+
+DROP PROCEDURE test.p;
+DROP TABLE test.t1;
+
+--echo #--------------------------------------------------------------------
+--echo # Triggers.
+--echo #--------------------------------------------------------------------
+CREATE TABLE test.t1 LIKE S.t1;
+
+--error ER_SCHEMA_READ_ONLY
+CREATE TRIGGER S.eq BEFORE INSERT ON S.t1 FOR EACH ROW SET NEW.j = NEW.i;
+
+ALTER SCHEMA S READ ONLY=0;
+CREATE TRIGGER S.ins_upd
+  BEFORE INSERT ON S.t1 FOR EACH ROW UPDATE test.t1 SET i = j;
+ALTER SCHEMA S READ ONLY=1;
+--error ER_SCHEMA_READ_ONLY
+DROP TRIGGER S.ins_upd;
+
+CREATE TRIGGER test.ins_upd
+  BEFORE INSERT ON test.t1 FOR EACH ROW UPDATE S.t1 SET j = i;
+
+--error ER_SCHEMA_READ_ONLY
+INSERT INTO S.t1 VALUES (1, 2);
+--error ER_SCHEMA_READ_ONLY
+INSERT INTO test.t1 VALUES (3, 4);
+
+ALTER SCHEMA S READ ONLY=0;
+INSERT INTO S.t1 VALUES (1, 2);
+INSERT INTO test.t1 VALUES (3, 4);
+DROP TRIGGER S.ins_upd;
+ALTER SCHEMA S READ ONLY=1;
+
+DROP TRIGGER test.ins_upd;
+DROP TABLE test.t1;
+
+--echo #--------------------------------------------------------------------
+--echo # Events.
+--echo #--------------------------------------------------------------------
+
+--connection node_2
+--echo # Restart to get a separate log file.
+--let $MYSQLD_LOG= $MYSQLTEST_VARDIR/log/event_error.log
+--let $wait_counter= 10000
+--let $restart_parameters= "restart: --log-error=$MYSQLD_LOG"
+--replace_result $MYSQLD_LOG MYSQLD_LOG
+--source include/restart_mysqld.inc
+
+CREATE TABLE test.t1 LIKE S.t1;
+CREATE EVENT test.ev
+  ON SCHEDULE EVERY 1 SECOND DO INSERT INTO S.t1 VALUES (1, 2);
+
+--sleep 5
+
+--error ER_SCHEMA_READ_ONLY
+CREATE EVENT S.ev
+  ON SCHEDULE EVERY 1 SECOND DO INSERT INTO test.t1 VALUES (1, 2);
+
+ALTER SCHEMA S READ ONLY=0;
+CREATE EVENT S.ev
+  ON SCHEDULE EVERY 1 SECOND DO INSERT INTO test.t1 VALUES (1, 2);
+ALTER SCHEMA S READ ONLY=1;
+
+--error ER_SCHEMA_READ_ONLY
+ALTER EVENT S.ev DISABLE;
+
+--error ER_SCHEMA_READ_ONLY
+DROP EVENT S.ev;
+
+--sleep 5
+
+--echo # Reject executing events located in a read only schema because
+--echo # last_executed timestamp must be updated.
+--let $grep_file= $MYSQLD_LOG
+let $grep_pattern= Event Scheduler: Unable to schedule event: Schema '.' is in
+ read only mode.;
+--let $grep_output= boolean
+--source include/grep_pattern.inc
+
+--let $grep_file= $MYSQLD_LOG
+let $grep_pattern= Event Scheduler: Serious error during getting next event
+ to execute. Stopping;
+--let $grep_output= boolean
+--source include/grep_pattern.inc
+
+--echo #--------------------------------------------------------------------
+--echo # Reject executing events accessing read only entities.
+--echo #--------------------------------------------------------------------
+--let $grep_file= $MYSQLD_LOG
+let $grep_pattern= Event Scheduler: \[root@localhost\]\[test.ev\] Schema '.'
+ is in read only mode.;
+--let $grep_output= boolean
+--source include/grep_pattern.inc
+
+--let $grep_file= $MYSQLD_LOG
+let $grep_pattern= Event Scheduler: \[root@localhost\].\[test.ev\] event
+ execution failed.;
+--let $grep_output= boolean
+--source include/grep_pattern.inc
+
+ALTER SCHEMA S READ ONLY=0;
+ALTER EVENT S.ev DISABLE;
+DROP EVENT S.ev;
+DROP EVENT test.ev;
+DROP TABLE test.t1;
+ALTER SCHEMA S READ ONLY=1;
+
+--echo #--------------------------------------------------------------------
+--echo # Non-cascading foreign keys.
+--echo #--------------------------------------------------------------------
+--connection node_1
+CREATE TABLE test.p (
+    id INT NOT NULL,
+    PRIMARY KEY (id)
+);
+INSERT INTO test.p VALUES (1), (2), (3), (4);
+
+ALTER SCHEMA S READ ONLY=0;
+CREATE TABLE S.c (
+    p_id INT,
+    FOREIGN KEY (p_id)
+        REFERENCES test.p(id)
+);
+INSERT INTO S.c VALUES (1), (2);
+ALTER SCHEMA S READ ONLY=1;
+
+--error ER_ROW_IS_REFERENCED_2
+DELETE FROM test.p WHERE id=1;
+DELETE FROM test.p WHERE id=4;
+
+SELECT * FROM test.p;
+SELECT * FROM S.c;
+
+--echo # Parent of non-cascading FK may be locked.
+LOCK TABLE test.p WRITE;
+UNLOCK TABLES;
+
+ALTER SCHEMA S READ ONLY=0;
+DROP TABLE S.c;
+
+--echo #--------------------------------------------------------------------
+--echo # Cascading foreign keys.
+--echo #--------------------------------------------------------------------
+INSERT INTO test.p VALUES (4);
+CREATE TABLE S.c (
+    p_id INT,
+    FOREIGN KEY (p_id)
+        REFERENCES test.p(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+);
+INSERT INTO S.c VALUES (1), (2);
+ALTER SCHEMA S READ ONLY=1;
+
+--echo # Prelocking will reject any parent update/delete + LOCK TABLE.
+--error ER_SCHEMA_READ_ONLY
+DELETE FROM test.p WHERE id=1;
+--error ER_SCHEMA_READ_ONLY
+DELETE FROM test.p WHERE id=4;
+--error ER_SCHEMA_READ_ONLY
+UPDATE test.p SET id=5 WHERE id=2;
+--error ER_SCHEMA_READ_ONLY
+UPDATE test.p SET id=5 WHERE id=4;
+--error ER_SCHEMA_READ_ONLY
+LOCK TABLE test.p WRITE;
+
+--echo #--------------------------------------------------------------------
+--echo # Turning off FKC will allow changes and skip updating child, but still
+--echo # reject LOCK TABLE.
+--echo #--------------------------------------------------------------------
+SET @@session.foreign_key_checks=0;
+
+DELETE FROM test.p WHERE id=1;
+DELETE FROM test.p WHERE id=4;
+UPDATE test.p SET id=5 WHERE id=2;
+UPDATE test.p SET id=2 WHERE id=3;
+
+SELECT * FROM test.p;
+SELECT * FROM S.c;
+
+--error ER_SCHEMA_READ_ONLY
+LOCK TABLE test.p WRITE;
+
+SET @@session.foreign_key_checks=1;
+
+--echo #--------------------------------------------------------------------
+--echo # Turning off read only will allow changes and update child + allow
+--echo # LOCK TABLE.
+--echo #--------------------------------------------------------------------
+ALTER SCHEMA S READ ONLY=0;
+UPDATE test.p SET id=6 WHERE id=2;
+
+SELECT * FROM test.p;
+SELECT * FROM S.c;
+
+DELETE FROM test.p WHERE id=6;
+
+SELECT * FROM test.p;
+SELECT * FROM S.c;
+
+LOCK TABLE test.p WRITE;
+--echo #--------------------------------------------------------------------
+--echo # LOCK will block altering schema from same connection.
+--echo #--------------------------------------------------------------------
+--error ER_LOCK_OR_ACTIVE_TRANSACTION
+ALTER SCHEMA S READ ONLY=1;
+UNLOCK TABLES;
+
+ALTER SCHEMA S READ ONLY=1;
+
+--echo #--------------------------------------------------------------------
+--echo # Trigger deleting/updating parent with a cascading FK child in
+--echo # read only schema.
+--echo #--------------------------------------------------------------------
+CREATE TABLE test.t(i INT);
+
+CREATE TRIGGER test.ins_upd
+  BEFORE INSERT ON test.t FOR EACH ROW
+    UPDATE test.p SET id = id + 1 WHERE id = NEW.i;
+CREATE TRIGGER test.ins_del
+  AFTER INSERT ON test.t FOR EACH ROW DELETE FROM test.p WHERE id = NEW.i-1;
+
+SELECT * FROM test.p;
+SELECT * FROM S.c;
+
+--error ER_SCHEMA_READ_ONLY
+INSERT INTO test.t VALUES (4);
+--error ER_SCHEMA_READ_ONLY
+LOCK TABLE test.t WRITE;
+
+ALTER SCHEMA S READ ONLY=0;
+INSERT INTO test.t VALUES (4);
+
+SELECT * FROM test.p;
+SELECT * FROM S.c;
+
+--connection node_2
+--echo # LOCK TABLES of table in read only schema.
+ALTER SCHEMA S READ ONLY=1;
+--error ER_SCHEMA_READ_ONLY
+LOCK TABLE S.c WRITE;
+
+--echo # Restart with default log file.
+--let $wait_counter= 10000
+--let $restart_parameters= "restart:"
+--source include/restart_mysqld.inc
+
+--echo # Intermediate cleanup.
+ALTER SCHEMA S READ ONLY=0;
+DROP SCHEMA S;
+DROP TABLE test.t;
+DROP TABLE test.p;
+
+--echo #--------------------------------------------------------------------
+--echo # The option shall not have any affect on temporary tables.
+--echo #--------------------------------------------------------------------
+--connection node_1
+eval CREATE SCHEMA S;
+ALTER SCHEMA S READ ONLY=1;
+CREATE TEMPORARY TABLE S.t(i INT);
+INSERT INTO S.t VALUES(1);
+SELECT * FROM S.t;
+DROP TABLE S.t;
+ALTER SCHEMA S READ ONLY=0;
+DROP SCHEMA S;
+
+--echo #--------------------------------------------------------------------
+--echo # Conflicting options.
+--echo #--------------------------------------------------------------------
+eval CREATE SCHEMA S;
+ALTER SCHEMA S READ ONLY = 0 READ ONLY = 0;
+--error ER_CONFLICTING_DECLARATIONS
+ALTER SCHEMA S READ ONLY = 0 READ ONLY = 1;
+ALTER SCHEMA S READ ONLY = 0 READ ONLY = DEFAULT;
+
+--error ER_CONFLICTING_DECLARATIONS
+ALTER SCHEMA S READ ONLY = 1 READ ONLY = 0;
+ALTER SCHEMA S READ ONLY = 1 READ ONLY = 1;
+--error ER_CONFLICTING_DECLARATIONS
+ALTER SCHEMA S READ ONLY = 1 READ ONLY = DEFAULT;
+
+ALTER SCHEMA S READ ONLY = DEFAULT READ ONLY = 0;
+--error ER_CONFLICTING_DECLARATIONS
+ALTER SCHEMA S READ ONLY = DEFAULT READ ONLY = 1;
+ALTER SCHEMA S READ ONLY = DEFAULT READ ONLY = DEFAULT;
+DROP SCHEMA S;
+
+--echo #--------------------------------------------------------------------
+--echo # ALTER READ ONLY allowed for read only schema.
+--echo #--------------------------------------------------------------------
+eval CREATE SCHEMA S;
+ALTER SCHEMA S READ ONLY=1;
+SHOW CREATE SCHEMA S;
+ALTER SCHEMA S READ ONLY=DEFAULT;
+SHOW CREATE SCHEMA S;
+ALTER SCHEMA S READ ONLY=1;
+--echo Repeated READ ONLY = 1 is allowed
+ALTER SCHEMA S READ ONLY=1;
+SHOW CREATE SCHEMA S;
+ALTER SCHEMA S READ ONLY=0;
+DROP SCHEMA S;
+
+--echo #--------------------------------------------------------------------
+--echo # ALTER SCHEMA rejected for read only schema.
+--echo #--------------------------------------------------------------------
+eval CREATE SCHEMA S;
+ALTER SCHEMA S READ ONLY=1;
+SHOW CREATE SCHEMA S;
+--error ER_SCHEMA_READ_ONLY
+ALTER SCHEMA S COLLATE utf8mb4_bin;
+SHOW CREATE SCHEMA S;
+ALTER SCHEMA S READ ONLY=0;
+DROP SCHEMA S;
+
+--echo #--------------------------------------------------------------------
+--echo # ALTER SCHEMA for a mix of options.
+--echo #--------------------------------------------------------------------
+eval CREATE SCHEMA S;
+ALTER SCHEMA S READ ONLY=1;
+--error ER_SCHEMA_READ_ONLY
+ALTER SCHEMA S READ ONLY = 1 COLLATE utf8mb4_bin;
+ALTER SCHEMA S READ ONLY = 0 COLLATE utf8mb4_bin;
+SHOW CREATE SCHEMA S;
+ALTER SCHEMA S READ ONLY = 1 COLLATE utf8mb4_general_ci;
+ALTER SCHEMA S READ ONLY=0;
+DROP SCHEMA S;
+
+# Despite all the above queries, the cluster should still be operational.
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+--connection node_2
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+# Test suppressions
+CALL mtr.add_suppression("Can't create database 'S'; database exists");
+CALL mtr.add_suppression("Query apply failed");
+CALL mtr.add_suppression("Access to system schema 'mysql' is rejected.");

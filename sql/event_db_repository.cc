@@ -183,7 +183,8 @@ bool Event_db_repository::update_event(THD *thd, Event_parse_data *parse_data,
 #ifdef WITH_WSREP
   /* Check is enforced before update event post SUPER_USER privilege
   check passes. */
-  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL)) {
+  if (WSREP(thd) &&
+      wsrep_to_isolation_begin(thd, parse_data->dbname.str, NULL, NULL)) {
     return true;
   }
 #endif /* WITH_WSREP */
@@ -258,7 +259,7 @@ bool Event_db_repository::drop_event(THD *thd, LEX_CSTRING db, LEX_CSTRING name,
 #ifdef WITH_WSREP
   /* Check is enforced before update event post SUPER_USER privilege check
   check passes. */
-  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL)) {
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, db.str, NULL, NULL)) {
     return true;
   }
 #endif /* WITH_WSREP */

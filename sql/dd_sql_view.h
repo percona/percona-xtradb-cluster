@@ -225,4 +225,11 @@ bool mark_referencing_views_invalid(THD *thd, const sp_name *spname,
 std::string push_view_warning_or_error(THD *thd, const char *db,
                                        const char *view_name);
 
+#ifdef WITH_WSREP
+template <typename T>
+bool prepare_view_tables_list(THD *thd, const char *db,
+                              const char *tbl_or_sf_name, bool skip_same_db,
+                              MEM_ROOT *mem_root,
+                              std::vector<TABLE_LIST *> *views);
+#endif  /* WITH_WSREP */
 #endif  // DD_SQL_VIEW_INCLUDED

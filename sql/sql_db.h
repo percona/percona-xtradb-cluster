@@ -49,4 +49,7 @@ bool get_default_db_collation(THD *thd, const char *db_name,
                               const CHARSET_INFO **collation);
 bool check_schema_readonly(THD *thd, const char *schema_name,
                            TABLE_SHARE *share = nullptr);
+#ifdef WITH_WSREP
+bool check_schema_readonly_no_error(THD *thd, const char *schema_name);
+#endif /* WITH_WSREP */
 #endif /* SQL_DB_INCLUDED */

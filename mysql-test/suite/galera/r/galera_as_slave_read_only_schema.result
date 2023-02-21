@@ -1,0 +1,34 @@
+# connection node_2
+# connection node_2
+START REPLICA USER='root';
+Warnings:
+Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
+# connection node_1
+CREATE DATABASE testdb;
+# connection node_2
+# connection node_3
+# connection node_2
+ALTER SCHEMA testdb READ ONLY = 1;
+CREATE TABLE testdb.tt1 (i INT PRIMARY KEY);
+ERROR HY000: Schema 'testdb' is in read only mode.
+# connection node_3
+CREATE TABLE testdb.tt1 (i INT PRIMARY KEY);
+ERROR HY000: Schema 'testdb' is in read only mode.
+# connection node_1
+use testdb;
+CREATE TABLE t1(i int PRIMARY KEY);
+INSERT INTO t1 VALUES(1),(2),(3),(4);
+UPDATE t1 SET i=i+10;
+DELETE FROM t1 WHERE i>11;
+# connection node_2
+CREATE TABLE testdb.tt1 (i INT PRIMARY KEY);
+ERROR HY000: Schema 'testdb' is in read only mode.
+# connection node_3
+CREATE TABLE testdb.tt1 (i INT PRIMARY KEY);
+ERROR HY000: Schema 'testdb' is in read only mode.
+ALTER SCHEMA testdb READ ONLY = 0;
+DROP DATABASE testdb;
+# connection node_2
+STOP REPLICA;
+RESET REPLICA ALL;
+RESET MASTER;

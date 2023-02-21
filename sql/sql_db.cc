@@ -179,8 +179,46 @@ static bool thread_can_ignore_schema_read_only(THD *thd) {
   */
   return (thd->is_bootstrap_system_thread() ||
           thd->is_server_upgrade_thread() || thd->slave_thread ||
+#ifdef WITH_WSREP
+          thd->wsrep_applier ||
+#endif /* WITH_WSREP */
           thd->is_cmd_skip_readonly());
 }
+
+/**
+  Check if the schema is read_only. Unlike check_schema_readonly(), no error is
+  reported when the schema is read only.
+
+  @param thd          Thread context.
+  @param schema_name  Name of schema to check.
+
+  @return false if the schema is writable, true if not.
+*/
+#ifdef WITH_WSREP
+bool check_schema_readonly_no_error(THD *thd, const char *schema_name) {
+  // We ignore read_only for certain thread types.
+  if (thread_can_ignore_schema_read_only(thd)) return false;
+
+  dd::Schema_MDL_locker mdl_handler(thd);
+  dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+  const dd::Schema *sch_obj = nullptr;
+
+  if (mdl_handler.ensure_locked(schema_name) ||
+      thd->dd_client()->acquire(schema_name, &sch_obj)) {
+    assert(thd->is_error() || thd->killed);
+    return true;
+  }
+
+  // A non existing schema is considered not being in a read_only state.
+  if (sch_obj == nullptr) return false;
+
+  if (sch_obj->read_only()) {
+    return true;
+  }
+
+  return false;
+}
+#endif /* WITH_WSREP */
 
 /**
   Check the read_only option for the given schema, and report error if

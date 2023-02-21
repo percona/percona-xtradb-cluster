@@ -475,7 +475,8 @@ bool mysql_create_view(THD *thd, TABLE_LIST *views,
   view->open_type = OT_BASE_ONLY;
 
 #ifdef WITH_WSREP
-  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL)) {
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, view->db, NULL, NULL)) {
+    view = lex->unlink_first_table(&link_to_local);
     res = true;
     goto err;
   }
@@ -1815,7 +1816,7 @@ bool mysql_drop_view(THD *thd, TABLE_LIST *views) {
   }
 
 #ifdef WITH_WSREP
-  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL)) {
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, views->db, NULL, NULL)) {
     return true;
   }
 #endif /* WITH_WSREP */
