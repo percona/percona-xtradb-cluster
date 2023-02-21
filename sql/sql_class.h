@@ -4836,7 +4836,7 @@ class THD : public MDL_context_owner,
 #ifdef WITH_WSREP
     /* With update protocol, starting g-4, trx_id is always updated
        with update of query_id. */
-    if (WSREP(this) && update_wsrep_id) {
+    if (WSREP_NNULL(this) && update_wsrep_id) {
       set_wsrep_next_trx_id(query_id);
 #if 0
       TODO: readd this once the dependency with logevent is resolved.
