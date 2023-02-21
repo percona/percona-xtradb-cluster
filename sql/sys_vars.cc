@@ -4431,26 +4431,6 @@ static bool check_not_null_not_empty(sys_var *self, THD *thd, set_var *var) {
   res = var->value ? var->value->val_str(&str) : nullptr;
   if (res && res->is_empty()) return true;
 
-#ifdef WITH_WSREP
-  /* If PXC node is acting as async slave and this slave is trying to enforce
-  order based on master replication then it could interfere with galera
-  commit monitor semantics. Disabling it for now.
-  This can be re-enabled but we just need enough testing for it */
-  if (WSREP(thd) && var->save_result.ulonglong_value == 1) {
-    WSREP_ERROR(
-        "Percona-XtraDB-Cluster prohibits enabling"
-        " slave_preserve_commit_order as it conflicts with galera"
-        " multi-master commit order semantics");
-    char message[1024];
-    sprintf(message,
-            "Percona-XtraDB-Cluster prohibits enabling"
-            " slave_preserve_commit_order as it conflicts with galera"
-            " multi-master commit order semantics");
-    my_message(ER_UNKNOWN_ERROR, message, MYF(0));
-    return true;
-  }
-#endif /* WITH_WSREP */
-
   return false;
 }
 
