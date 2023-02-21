@@ -6,6 +6,7 @@ log-bin=mysqld-bin
 log-slave-updates
 enforce-gtid-consistency
 binlog-format=ROW
+wsrep_mode = IGNORE_NATIVE_REPLICATION_FILTER_RULES
 
 [mysqld.2]
 replicate-do-db=test1

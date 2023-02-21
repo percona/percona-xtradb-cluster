@@ -11059,8 +11059,15 @@ static enum_tbl_map_status check_table_map(Relay_log_info const *rli,
   enum_tbl_map_status res = OK_TO_PROCESS;
 
 #ifdef WITH_WSREP
+  /* Check if we should ignore replication filter rules for cluster events. */
+  const bool thd_is_wsrep_applier =
+      WSREP(rli->info_thd) && rli->info_thd->wsrep_applier;
+  if (thd_is_wsrep_applier &&
+      wsrep_check_mode(WSREP_MODE_IGNORE_NATIVE_REPLICATION_FILTER_RULES))
+    return res;
+
   if ((rli->info_thd->slave_thread /* filtering is for slave only */ ||
-       (WSREP(rli->info_thd) && rli->info_thd->wsrep_applier)) &&
+       thd_is_wsrep_applier) &&
 #else
   if (rli->info_thd->slave_thread /* filtering is for slave only */ &&
 #endif /* WITH_WSREP */

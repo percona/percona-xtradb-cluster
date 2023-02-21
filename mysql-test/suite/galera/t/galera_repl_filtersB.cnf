@@ -3,6 +3,7 @@
 [mysqld]
 replicate-wild-do-table=db.%
 default-authentication-plugin=mysql_native_password
+wsrep_mode = IGNORE_NATIVE_REPLICATION_FILTER_RULES
 
 [mysqld.2]
 replicate-wild-do-table=db1.%

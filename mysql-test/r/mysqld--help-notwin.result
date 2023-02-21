@@ -1837,6 +1837,8 @@ The following options may be given as the first argument:
  --wsrep-min-log-verbosity=# 
  Set the minimum logging verbosity level of wsrep plugin
  and Galera
+ --wsrep-mode=name   Set of WSREP features that are enabled. Legal values:
+ IGNORE_NATIVE_REPLICATION_FILTER_RULES 
  --wsrep-node-address=name 
  Node address
  --wsrep-node-incoming-address=name 
@@ -2396,6 +2398,7 @@ wsrep-log-conflicts FALSE
 wsrep-max-ws-rows 0
 wsrep-max-ws-size 2147483647
 wsrep-min-log-verbosity 3
+wsrep-mode 
 wsrep-node-address 
 wsrep-node-incoming-address AUTO
 wsrep-notify-cmd 

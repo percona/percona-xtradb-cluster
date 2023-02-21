@@ -1,0 +1,23 @@
+--source include/have_wsrep.inc
+
+--echo #
+--echo # wsrep_mode
+--echo #
+
+--echo # default
+SELECT @@global.wsrep_mode;
+
+--echo
+--echo # scope
+--error ER_INCORRECT_GLOBAL_LOCAL_VAR
+SELECT @@session.wsrep_mode;
+SELECT @@global.wsrep_mode;
+
+--error ER_WRONG_VALUE_FOR_VAR
+SET @@global.wsrep_mode=13;
+
+SET @@global.wsrep_mode=IGNORE_NATIVE_REPLICATION_FILTER_RULES;
+
+SET @@global.wsrep_mode=0;
+
+--echo # End of test

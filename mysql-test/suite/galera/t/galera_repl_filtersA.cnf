@@ -3,6 +3,9 @@
 [mysqld]
 replicate-do-db=db
 default-authentication-plugin=mysql_native_password
+# Ignore native replications filters for galera cluster events
+wsrep_mode = IGNORE_NATIVE_REPLICATION_FILTER_RULES
+
 
 [mysqld.2]
 replicate-do-db=db1

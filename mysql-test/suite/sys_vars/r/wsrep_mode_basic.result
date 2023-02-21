@@ -1,0 +1,19 @@
+#
+# wsrep_mode
+#
+# default
+SELECT @@global.wsrep_mode;
+@@global.wsrep_mode
+
+
+# scope
+SELECT @@session.wsrep_mode;
+ERROR HY000: Variable 'wsrep_mode' is a GLOBAL variable
+SELECT @@global.wsrep_mode;
+@@global.wsrep_mode
+
+SET @@global.wsrep_mode=13;
+ERROR 42000: Variable 'wsrep_mode' can't be set to the value of '13'
+SET @@global.wsrep_mode=IGNORE_NATIVE_REPLICATION_FILTER_RULES;
+SET @@global.wsrep_mode=0;
+# End of test
