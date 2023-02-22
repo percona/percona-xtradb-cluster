@@ -1115,7 +1115,7 @@ static void setup_galera_encryption_params(char* provider_options, size_t buf_si
   }
 
   snprintf(provider_options, buf_size, "%s", options.c_str());
-  provider_options[buf_size] = 0;
+  provider_options[buf_size - 1] = 0;
 }
 
 int wsrep_init() {
@@ -1175,7 +1175,7 @@ int wsrep_init() {
   } else {
     snprintf(buffer, buf_size, "%s", provider_options ? provider_options : "");
   }
-  buffer[buf_size] = 0;
+  buffer[buf_size - 1] = 0;
 
   /* Setup GCache and WSCache encryption according to
       wsrep_gcache_encrypt and wsrep_disk_pages_encrypt.

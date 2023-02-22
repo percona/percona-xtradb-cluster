@@ -588,7 +588,7 @@ int Wsrep_high_priority_service::log_dummy_write_set(
   return ret;
 }
 
-void Wsrep_high_priority_service::debug_crash(const char *crash_point) {
+void Wsrep_high_priority_service::debug_crash(const char *crash_point __attribute__((unused))) {
   assert(m_thd == current_thd);
   DBUG_EXECUTE_IF(crash_point, DBUG_SUICIDE(););
 }
