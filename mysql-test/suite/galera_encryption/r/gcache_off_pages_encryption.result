@@ -1,4 +1,3 @@
-call mtr.add_suppression("Bogus offset in GCache ring buffer preamble");
 # restart:<hidden args>
 CREATE DATABASE test2;
 USE test2;
@@ -8,5 +7,5 @@ DROP DATABASE test2;
 CREATE DATABASE test2;
 USE test2;
 include/assert_grep.inc [Assert that GCache off page is encrypted]
-DROP DATABASE test2;
 # restart:<hidden args>
+DROP DATABASE test2;
