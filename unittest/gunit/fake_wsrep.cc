@@ -8,7 +8,7 @@
 class THD;
 class MDL_context;
 class MDL_ticket;
-class MDL_key;
+struct MDL_key;
 
 ulong wsrep_debug = 0;
 uint wsrep_min_log_verbosity = 3;

@@ -723,6 +723,8 @@ int log_builtins_filter_run(log_filter_ruleset *ruleset, log_line *ll) {
     if (!skip_filter_matching) {
       cond_result =
           log_filter_try_match((ln >= 0) ? &ll->item[ln] : nullptr, r);
+    } else {
+      cond_result = LOG_FILTER_MATCH_UNSATISFIED;
     }
 #else
     /*

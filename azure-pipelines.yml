@@ -77,18 +77,6 @@ jobs:
 
   strategy:
     matrix:
-      macOS 12 RelWithDebInfo:
-        imageName: 'macOS-12'
-        Compiler: clang
-        BuildType: RelWithDebInfo
-
-      # skip for a pull request if branch name doesn't contain "fullci"
-      ${{ if or(ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
-        macOS 12 Debug:
-          imageName: 'macOS-12'
-          Compiler: clang
-          BuildType: Debug
-
       # clang-6 and newer compilers
       clang-15 RelWithDebInfo [Ubuntu 22.04 Jammy]:
         imageName: 'ubuntu-22.04'
@@ -358,6 +346,7 @@ jobs:
         sudo -E apt-add-repository -y "ppa:ubuntu-toolchain-r/test"
         sudo -E apt-get -yq update >> ~/apt-get-update.log 2>&1
 
+        sudo -E apt-get -yq --no-install-suggests --no-install-recommends --allow-unauthenticated install scons socat check libasio-dev libatomic1 libboost-all-dev || exit 1
         sudo -E apt-get -yq --no-install-suggests --no-install-recommends --allow-unauthenticated install $PACKAGES cmake cmake-curses-gui ccache bison libudev-dev libaio-dev libmecab-dev libnuma-dev liblzma-dev libssl-dev libreadline-dev libpam-dev libcurl4-openssl-dev libldap2-dev libkrb5-dev libsasl2-dev libsasl2-modules-gssapi-mit || exit 1;
         if [[ "$(INVERTED)" != "ON" ]]; then
           sudo -E apt-get -yq --no-install-suggests --no-install-recommends --allow-unauthenticated install rapidjson-dev zlib1g-dev libzstd-dev liblz4-dev libfido2-dev libevent-dev libreadline-dev protobuf-compiler libprotobuf-dev libprotoc-dev libicu-dev || exit 1;
@@ -405,7 +394,7 @@ jobs:
   - script: |
       df -Th
       git submodule sync
-      git submodule update --init --force --depth=256
+      git submodule update --init --recursive --force --depth=256
       git submodule
     displayName: '*** Update git submodules'
 
@@ -431,6 +420,7 @@ jobs:
       )
 
       CMAKE_OPT="
+        -DWITH_WSREP=ON
         -DCMAKE_BUILD_TYPE=$(BuildType)
         -DBUILD_CONFIG=mysql_release
         -DDOWNLOAD_BOOST=1
@@ -439,7 +429,6 @@ jobs:
         -DCMAKE_CXX_COMPILER=$SELECTED_CXX
         -DCMAKE_C_COMPILER_LAUNCHER=ccache
         -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-        -DWITH_ROCKSDB=ON
         -DWITH_COREDUMPER=ON
         -DWITH_KEYRING_VAULT=ON
         -DWITH_KEYRING_VAULT_TEST=ON
@@ -455,7 +444,6 @@ jobs:
       if [[ "$OS_NAME" == "Darwin" ]]; then
         CMAKE_OPT+="
           -DMYSQL_MAINTAINER_MODE=OFF
-          -DWITH_TOKUDB=OFF
           -DWITH_PROTOBUF=system
           -DWITH_SYSTEM_LIBS=ON
           -DWITH_ICU=/usr/local/opt/icu4c
@@ -467,7 +455,6 @@ jobs:
       else
         CMAKE_OPT+="
           -DMYSQL_MAINTAINER_MODE=ON
-          -DWITH_TOKUDB=ON
         "
         if [[ "$(INVERTED)" != "ON" ]]; then
           CMAKE_OPT+="
@@ -537,4 +524,3 @@ jobs:
       df -Th
 
     displayName: '*** Compile'
-

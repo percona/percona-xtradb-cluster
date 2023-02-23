@@ -1998,8 +1998,7 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
     w/o re-writting then applier will not be able to establish user context).
   */
   if (WSREP(thd) && !thd->wsrep_applier) {
-    constexpr size_t query_length_max =
-        strlen("SET PASSWORD FOR ''@''=''") + 3 * 120 + 1;
+    size_t query_length_max = strlen("SET PASSWORD FOR ''@''=''") + 3 * 120 + 1;
     char *buff = (char *)thd->alloc(query_length_max);
     if (!buff) {
       my_error(ER_OUTOFMEMORY, MYF(ME_FATALERROR), 0);
