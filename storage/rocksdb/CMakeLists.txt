@@ -1,3 +1,5 @@
+RETURN()  # Disable RocksDB
+
 # TODO: Copyrights
 
 # by default MyRocks is not built
