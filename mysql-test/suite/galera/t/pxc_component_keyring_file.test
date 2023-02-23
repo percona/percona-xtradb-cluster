@@ -8,6 +8,9 @@
 #
 # PXC-3989: Support for Keyring Components in PXC
 
+--source include/have_component_keyring_file.inc
+--source include/big_test.inc
+--source include/not_parallel.inc
 --source include/galera_cluster.inc
 
 # Create a helper inc file for test validation
