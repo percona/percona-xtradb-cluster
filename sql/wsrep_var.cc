@@ -251,27 +251,29 @@ err:
   return true;
 }
 
-static void wsrep_set_local_position(THD *thd, const char *const value,
+static bool wsrep_set_local_position(THD *thd, const char *const value,
                                      size_t length, bool const sst) {
   wsrep_uuid_t uuid;
   size_t const uuid_len = wsrep_uuid_scan(value, length, &uuid);
   wsrep_seqno_t const seqno = strtoll(value + uuid_len + 1, NULL, 10);
 
   if (sst) {
-    wsrep_sst_received(thd, uuid, seqno, NULL, 0);
+    if (wsrep_sst_received(thd, uuid, seqno, NULL, 0)) {
+      return true;
+    }
   } else {
     local_uuid = uuid;
     local_seqno = seqno;
   }
+  return false;
 }
 
 bool wsrep_start_position_update(sys_var *, THD *thd, enum_var_type) {
   WSREP_INFO("Updating wsrep_start_position to: '%s'", wsrep_start_position);
   // since this value passed wsrep_start_position_check, don't check anything
   // here
-  wsrep_set_local_position(thd, wsrep_start_position,
-                           strlen(wsrep_start_position), true);
-  return 0;
+  return wsrep_set_local_position(thd, wsrep_start_position,
+                                  strlen(wsrep_start_position), true);
 }
 
 void wsrep_start_position_init(const char *val) {
@@ -281,7 +283,9 @@ void wsrep_start_position_init(const char *val) {
     return;
   }
 
-  wsrep_set_local_position(NULL, val, strlen(val), false);
+  if (wsrep_set_local_position(NULL, val, strlen(val), false)) {
+    WSREP_ERROR("Server failed to set local position");
+  }
 }
 
 int get_provider_option_value(const char *opts, const char *opt_name,
