@@ -76,7 +76,7 @@ XA COMMIT '1';
 --eval SET GTID_NEXT='AUTOMATIC'
 FLUSH LOGS;
 --replace_result $master_uuid MASTER_UUID
-SELECT * FROM mysql.gtid_executed;
+SELECT * FROM mysql.gtid_executed ORDER BY interval_start;
 
 
 --source include/sync_slave_sql_with_master.inc
@@ -143,7 +143,7 @@ FLUSH LOGS;
 SET DEBUG_SYNC='now WAIT_FOR complete_compression';
 SET GLOBAL DEBUG= @debug_save;
 --replace_result $master_uuid MASTER_UUID
-SELECT * FROM mysql.gtid_executed;
+SELECT * FROM mysql.gtid_executed ORDER BY interval_start;
 
 --echo #
 --echo # Verify that gtid_executed and gtid_purged are always same
@@ -165,7 +165,7 @@ DROP TABLE t3;
 --echo # Stored gtids MASTER_UUID:$gno_root:$gno_1-$gno_2 in gtid_executed table
 --echo # on slave.
 --replace_result $master_uuid MASTER_UUID
---eval SELECT * FROM mysql.gtid_executed
+--eval SELECT * FROM mysql.gtid_executed ORDER BY interval_start
 
 #
 # Check out XA COMMIT,ROLLBACK with Gtid_next having either automatic
@@ -258,7 +258,7 @@ FLUSH LOGS;
 SET DEBUG_SYNC='now WAIT_FOR complete_compression';
 SET GLOBAL DEBUG= @debug_save;
 --replace_result $master_uuid MASTER_UUID
-SELECT * FROM mysql.gtid_executed;
+SELECT * FROM mysql.gtid_executed ORDER BY interval_start;
 
 --connection master
 DROP TABLE t3;

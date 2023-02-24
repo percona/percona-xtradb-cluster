@@ -36,7 +36,7 @@ include/assert.inc [committed gtids MASTER_UUID:1-6:17-18]
 #
 SET GTID_NEXT='AUTOMATIC';
 FLUSH LOGS;
-SELECT * FROM mysql.gtid_executed;
+SELECT * FROM mysql.gtid_executed ORDER BY interval_start;
 source_uuid	interval_start	interval_end
 MASTER_UUID	1	6
 MASTER_UUID	17	18
@@ -78,7 +78,7 @@ SET GTID_NEXT='AUTOMATIC';
 FLUSH LOGS;
 SET DEBUG_SYNC='now WAIT_FOR complete_compression';
 SET GLOBAL DEBUG= @debug_save;
-SELECT * FROM mysql.gtid_executed;
+SELECT * FROM mysql.gtid_executed ORDER BY interval_start;
 source_uuid	interval_start	interval_end
 MASTER_UUID	1	6
 MASTER_UUID	17	20
@@ -97,7 +97,7 @@ DROP TABLE t3;
 #
 # Stored gtids MASTER_UUID:1-6:17-20 in gtid_executed table
 # on slave.
-SELECT * FROM mysql.gtid_executed;
+SELECT * FROM mysql.gtid_executed ORDER BY interval_start;
 source_uuid	interval_start	interval_end
 MASTER_UUID	1	6
 MASTER_UUID	17	20
@@ -168,7 +168,7 @@ SET GTID_NEXT='AUTOMATIC';
 FLUSH LOGS;
 SET DEBUG_SYNC='now WAIT_FOR complete_compression';
 SET GLOBAL DEBUG= @debug_save;
-SELECT * FROM mysql.gtid_executed;
+SELECT * FROM mysql.gtid_executed ORDER BY interval_start;
 source_uuid	interval_start	interval_end
 MASTER_UUID	1	15
 MASTER_UUID	17	23
