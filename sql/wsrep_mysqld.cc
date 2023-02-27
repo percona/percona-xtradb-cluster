@@ -2307,28 +2307,31 @@ static bool is_operating_on_read_only_schema(THD *thd, const char *db_,
                                              const TABLE_LIST *table_list) {
   LEX *lex = thd->lex;
   HA_CREATE_INFO *create_info = lex->create_info;
-  bool some_tables_in_read_only_schema = false;
+  bool uses_read_only_schema = false;
   bool skip_table_list_traversal = false;
   std::string first_read_only_schema;
 
   /* Check if the db is read only */
   if (db_) {
     if (check_schema_readonly_no_error(thd, db_)) {
-      some_tables_in_read_only_schema = true;
+      uses_read_only_schema = true;
       first_read_only_schema.assign(db_);
     }
   }
 
-  /* Check if the first table is in read only schema */
+  /*
+    Check if the first table is in read only schema if the flag
+    uses_read_only_schema is not set.
+  */
   const TABLE_LIST *first_table = table_list;
-  if (first_table && first_table->db) {
+  if (first_table && first_table->db && !uses_read_only_schema) {
     if (check_schema_readonly_no_error(thd, first_table->db)) {
-      some_tables_in_read_only_schema = true;
+      uses_read_only_schema = true;
       first_read_only_schema.assign(first_table->db);
     }
   }
 
-  if (!some_tables_in_read_only_schema) {
+  if (!uses_read_only_schema) {
     /*
        Prepare a list of referencing views for the given table and check if any
        table is referenced by a view in read only schema.
@@ -2344,7 +2347,7 @@ static bool is_operating_on_read_only_schema(THD *thd, const char *db_,
       if (!views.empty()) {
         for (const auto view : views) {
           if (check_schema_readonly_no_error(thd, view->db)) {
-            some_tables_in_read_only_schema = true;
+            uses_read_only_schema = true;
             first_read_only_schema.assign(view->db);
             return;
           }
@@ -2377,7 +2380,7 @@ static bool is_operating_on_read_only_schema(THD *thd, const char *db_,
         }
         /* Check if any table is referenced by a view in a read only schema. */
         for (const TABLE_LIST *table = db_tables;
-             table && !some_tables_in_read_only_schema;
+             table && !uses_read_only_schema;
              table = table->next_global) {
           prepare_ref_view_list(db_, table->table_name);
         }
@@ -2404,10 +2407,10 @@ static bool is_operating_on_read_only_schema(THD *thd, const char *db_,
      only schema. This can happen in case of multi table drop and rename.
    */
   for (const TABLE_LIST *table = table_list;
-       table && !some_tables_in_read_only_schema && !skip_table_list_traversal;
+       table && !uses_read_only_schema && !skip_table_list_traversal;
        table = table->next_global) {
     if (check_schema_readonly_no_error(thd, table->db)) {
-      some_tables_in_read_only_schema = true;
+      uses_read_only_schema = true;
       first_read_only_schema.assign(table->db);
       break;
     }
@@ -2430,7 +2433,7 @@ static bool is_operating_on_read_only_schema(THD *thd, const char *db_,
           - Or if we have set other fields as well and set READ ONLY to true.
 
   */
-  if (some_tables_in_read_only_schema) {
+  if (uses_read_only_schema) {
     /*
       We ignore read_only for CREATE SCHEMA to make sure we keep the existing
       error handling in case the schema exists already.
