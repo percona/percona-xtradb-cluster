@@ -22,6 +22,7 @@
 #include "sql/dd/types/table.h"
 #include "sql/key_spec.h"
 #include "sql/raii/sentry.h"
+#include "sql/server_component/mysql_server_keyring_lockable_imp.h"
 #include "sql/sql_alter.h"
 #include "sql/sql_lex.h"
 #include "sql/ssl_init_callback.h"
@@ -30,7 +31,6 @@
 #include "sql_class.h"
 #include "sql_parse.h"
 #include "sql_plugin.h"  // SHOW_MY_BOOL
-#include "sql/server_component/mysql_server_keyring_lockable_imp.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -1164,14 +1164,11 @@ int wsrep_init() {
       return 1;
     }
 
-    char ssl_opts[buf_size];
+    char ssl_opts[buf_size - 1];
     server_main_callback.populate_wsrep_ssl_options(ssl_opts, sizeof(ssl_opts));
-    MY_COMPILER_GCC_DIAGNOSTIC_PUSH();
-    MY_COMPILER_GCC_DIAGNOSTIC_IGNORE("-Wformat-truncation");
     snprintf(buffer, buf_size, "%s%s%s",
              provider_options ? provider_options : "",
              ((provider_options && *provider_options) ? ";" : ""), ssl_opts);
-    MY_COMPILER_GCC_DIAGNOSTIC_POP();
   } else {
     snprintf(buffer, buf_size, "%s", provider_options ? provider_options : "");
   }
