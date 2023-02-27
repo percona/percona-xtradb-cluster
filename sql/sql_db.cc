@@ -112,8 +112,10 @@ static TYPELIB deletable_extentions = {array_elements(del_exts) - 1, "del_exts",
 static bool find_unknown_and_remove_deletable_files(THD *thd, MY_DIR *dirp,
                                                     const char *path);
 
+#ifndef WITH_WSREP
 static bool find_db_tables(THD *thd, const dd::Schema &schema, const char *db,
                            TABLE_LIST **tables);
+#endif /* WITH_WSREP */
 
 static long mysql_rm_arc_files(THD *thd, MY_DIR *dirp, const char *org_path);
 static bool rm_dir_w_symlink(const char *org_path, bool send_error);
@@ -1076,8 +1078,11 @@ found_other_files:
   from the data-dictionary.
 */
 
-static bool find_db_tables(THD *thd, const dd::Schema &schema, const char *db,
-                           TABLE_LIST **tables) {
+#ifndef WITH_WSREP
+static
+#endif /* WITH_WSREP */
+bool find_db_tables(THD *thd, const dd::Schema &schema, const char *db,
+                    TABLE_LIST **tables) {
   TABLE_LIST *tot_list = nullptr, **tot_list_next_local, **tot_list_next_global;
   DBUG_TRACE;
 

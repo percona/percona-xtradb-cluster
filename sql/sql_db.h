@@ -26,6 +26,9 @@
 #include "lex_string.h"
 
 struct TABLE_SHARE;
+#ifdef WITH_WSREP
+struct TABLE_LIST;
+#endif /* WITH_WSREP */
 class THD;
 namespace dd {
 class Schema;
@@ -51,5 +54,7 @@ bool check_schema_readonly(THD *thd, const char *schema_name,
                            TABLE_SHARE *share = nullptr);
 #ifdef WITH_WSREP
 bool check_schema_readonly_no_error(THD *thd, const char *schema_name);
+bool find_db_tables(THD *thd, const dd::Schema &schema, const char *db,
+                    TABLE_LIST **tables);
 #endif /* WITH_WSREP */
 #endif /* SQL_DB_INCLUDED */

@@ -173,6 +173,8 @@ ALTER SCHEMA S READ ONLY=1;
 # rejected.
 DROP TABLE test.t1;
 ERROR HY000: Schema 'S' is in read only mode.
+DROP DATABASE test;
+ERROR HY000: Schema 'S' is in read only mode.
 ALTER SCHEMA S READ ONLY=0;
 DROP TABLE test.t1;
 ALTER SCHEMA S READ ONLY=1;

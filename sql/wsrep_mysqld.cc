@@ -19,6 +19,7 @@
 #include "mysqld.h"
 #include "rpl_replica.h"
 #include "sql/dd/cache/dictionary_client.h"  // dd::cache::Dictionary_client
+#include "sql/dd/dd_schema.h"                // Schema_MDL_locker
 #include "sql/dd/dd_view.h"
 #include "sql/dd/dictionary.h"
 #include "sql/dd/types/table.h"
@@ -45,7 +46,7 @@
 #include "rpl_msr.h"  // channel_map
 #include "sp_head.h"
 #include "sql_base.h"  // TEMP_PREFIX
-#include "sql_db.h"    // check_schema_readonly
+#include "sql_db.h"    // check_schema_readonly_no_error
 #include "wsrep_applier.h"
 #include "wsrep_binlog.h"
 #include "wsrep_priv.h"
@@ -2307,6 +2308,7 @@ static bool is_operating_on_read_only_schema(THD *thd, const char *db_,
   LEX *lex = thd->lex;
   HA_CREATE_INFO *create_info = lex->create_info;
   bool some_tables_in_read_only_schema = false;
+  bool skip_table_list_traversal = false;
   std::string first_read_only_schema;
 
   /* Check if the db is read only */
@@ -2326,47 +2328,88 @@ static bool is_operating_on_read_only_schema(THD *thd, const char *db_,
     }
   }
 
-  if (!some_tables_in_read_only_schema && table_list) {
+  if (!some_tables_in_read_only_schema) {
     /*
-      Validate referencing views if it is a DROP TABLE on a table in a different
-      readonly schema. CREATE TABLE LIKE is possible when the table referenced
-      by a view is deleted and recreated.
+       Prepare a list of referencing views for the given table and check if any
+       table is referenced by a view in read only schema.
     */
-    if (thd->lex->sql_command == SQLCOM_DROP_TABLE ||
-        thd->lex->sql_command == SQLCOM_CREATE_TABLE) {
-      // Prepare the list of referencing views
+    auto prepare_ref_view_list = [&](const char *db,
+                                     const char *table_name) -> void {
       std::vector<TABLE_LIST *> views;
       MEM_ROOT mem_root(key_memory_wsrep, MEM_ROOT_BLOCK_SIZE);
-      if (prepare_view_tables_list<dd::View_table>(
-              thd, db_, table_list->table_name, false, &mem_root, &views))
-        return true;
+      if (prepare_view_tables_list<dd::View_table>(thd, db, table_name, false,
+                                                   &mem_root, &views))
+        return;
 
       if (!views.empty()) {
         for (const auto view : views) {
           if (check_schema_readonly_no_error(thd, view->db)) {
             some_tables_in_read_only_schema = true;
             first_read_only_schema.assign(view->db);
-            break;
+            return;
           }
         }
       }
-    }
+      return;
+    };
 
-    /* Skip table list traversal for CREATE TABLE LIKE command */
-    bool skip_traversal =
-        (create_info && create_info->options & HA_LEX_CREATE_TABLE_LIKE);
+    switch (thd->lex->sql_command) {
+      case SQLCOM_DROP_DB: {
+        dd::Schema_MDL_locker mdl_handler(thd);
+        dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+        const dd::Schema *sch_obj = nullptr;
 
-    /* Go through the table_list to check if any of the tables are in read
-       only schema. This can happen in case of multi table drop and rename.
-     */
-    for (const TABLE_LIST *table = table_list;
-         table && !some_tables_in_read_only_schema && !skip_traversal;
-         table = table->next_global) {
-      if (check_schema_readonly_no_error(thd, table->db)) {
-        some_tables_in_read_only_schema = true;
-        first_read_only_schema.assign(table->db);
+        if (mdl_handler.ensure_locked(db_) ||
+            thd->dd_client()->acquire(db_, &sch_obj)) {
+          assert(thd->is_error() || thd->killed);
+          return true;
+        }
+
+        if (sch_obj == nullptr) {
+          my_error(ER_NO_SUCH_DB, MYF(0), db_);
+          return true;
+        }
+
+        /* Fetch the list of tables */
+        TABLE_LIST *db_tables = nullptr;
+        if (find_db_tables(thd, *sch_obj, db_, &db_tables)) {
+          return true;
+        }
+        /* Check if any table is referenced by a view in a read only schema. */
+        for (const TABLE_LIST *table = db_tables;
+             table && !some_tables_in_read_only_schema;
+             table = table->next_global) {
+          prepare_ref_view_list(db_, table->table_name);
+        }
+      } break;
+      case SQLCOM_DROP_TABLE:
+      case SQLCOM_CREATE_TABLE:
+        /* Skip table list traversal for CREATE TABLE LIKE command */
+        skip_table_list_traversal =
+            (create_info && create_info->options & HA_LEX_CREATE_TABLE_LIKE);
+        /*
+          Validate referencing views if it is a DROP TABLE on a table in a
+          different readonly schema. CREATE TABLE LIKE is possible when the
+          table referenced by a view is deleted and recreated.
+        */
+        if (table_list) prepare_ref_view_list(db_, table_list->table_name);
         break;
-      }
+      default:
+        break;
+
+    } /* end of switch */
+  }
+
+  /* Go through the table_list to check if any of the tables are in read
+     only schema. This can happen in case of multi table drop and rename.
+   */
+  for (const TABLE_LIST *table = table_list;
+       table && !some_tables_in_read_only_schema && !skip_table_list_traversal;
+       table = table->next_global) {
+    if (check_schema_readonly_no_error(thd, table->db)) {
+      some_tables_in_read_only_schema = true;
+      first_read_only_schema.assign(table->db);
+      break;
     }
   }
 
@@ -2381,7 +2424,7 @@ static bool is_operating_on_read_only_schema(THD *thd, const char *db_,
 
      - query is not ALTER DB
      - query is CREATE DB with same DB name, this must result in
-    ER_DB_CREATE_EXISTS
+       ER_DB_CREATE_EXISTS
      - query is ALTER DB but
           - HA_CREATE_USED_READ_ONLY is not set.
           - Or if we have set other fields as well and set READ ONLY to true.
