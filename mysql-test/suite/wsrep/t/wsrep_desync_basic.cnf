@@ -1,0 +1,2 @@
+# Include the config file with no predecided values for wsrep variables
+!include suite/wsrep/wsrep_basic.cnf
