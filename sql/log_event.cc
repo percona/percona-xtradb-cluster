@@ -3674,10 +3674,26 @@ bool Query_log_event::write(Basic_ostream *ostream) {
     *start++ = thd->variables.default_table_encryption;
   }
 
+#ifdef WITH_WSREP
+  /*
+    Replicate Q_DDL_SKIP_REWRITE only if the session has
+    binlog_ddl_skip_rewrite set.
+  */
   if (thd && thd->variables.binlog_ddl_skip_rewrite) {
     *start++ = Q_DDL_SKIP_REWRITE;
     *start++ = thd->variables.binlog_ddl_skip_rewrite;
   }
+
+  /*
+    Replicate Q_WSREP_SKIP_READONLY_CHECKS only if it is a
+    replication applier thread.
+  */
+  if (WSREP(thd) && ((thd->system_thread == SYSTEM_THREAD_SLAVE_SQL) ||
+                     (thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER))) {
+    *start++ = Q_WSREP_SKIP_READONLY_CHECKS;
+    *start++ = 1;
+  }
+#endif /* WITH_WSREP */
 
   /*
     NOTE: When adding new status vars, please don't forget to update
@@ -4864,7 +4880,10 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
         thd->variables.default_table_encryption = default_table_encryption;
       }
 
-      thd->variables.binlog_ddl_skip_rewrite = (ddl_skip_rewrite != 0)? true : false;
+      thd->variables.binlog_ddl_skip_rewrite =
+          (ddl_skip_rewrite != 0) ? true : false;
+      thd->wsrep_applier_skip_readonly_checks =
+          (wsrep_applier_skip_readonly_checks != 0) ? true : false;
 
       thd->table_map_for_update = (table_map)table_map_for_update;
 
