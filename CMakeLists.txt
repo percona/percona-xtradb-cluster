@@ -2698,4 +2698,7 @@ IF(HAVE_WITH_NDBCLUSTER)
     "Deprecated legacy option for MySQL Cluster")
 ENDIF()
 
-ADD_SUBDIRECTORY(percona-xtradb-cluster-galera)
+# Uncomment once packaging changes for switching from scons to cmake
+# for galera are ready - PXC-4166.
+# Should be done for 8.0.32
+# ADD_SUBDIRECTORY(percona-xtradb-cluster-galera)
