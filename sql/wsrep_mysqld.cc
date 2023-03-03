@@ -3192,8 +3192,10 @@ static bool wsrep_init_master_key() {
 }
 
 static void wsrep_deinit_master_key() {
-  masterKeyManager->DeInit();
-  masterKeyManager.reset();
+  if (masterKeyManager) {
+    masterKeyManager->DeInit();
+    masterKeyManager.reset();
+  }
 }
 
 std::string wsrep_get_master_key(const std::string &keyId) {
