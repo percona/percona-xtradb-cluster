@@ -1,12 +1,5 @@
-<<<<<<< HEAD
 Percona XtraDB Cluster 5.7
 --------------------------
-||||||| c1b94a6cfd7
-Percona Server 5.7
-------------------
-=======
-Percona Server 5.7
->>>>>>> b9848e44dcea1a18190cba1d2e5eda84dda29753
 
 Percona XtraDB Cluster is based on Percona Server and Codership wsrep API
 using galera replication library that provides Multimaster Cluster based

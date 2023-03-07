@@ -16,18 +16,8 @@
 # cmake include to wrap if compiler supports std cxx11 and alters compiler flags
 # On return, HAVE_STDCXX11 will be set
 
-<<<<<<< HEAD
 RETURN() # Disable Tokudb
 
-||||||| c1b94a6cfd7
-=======
-# CMake version 3.20 and above
-# Policy CMP0115 is not set: Source file extensions must be explicit.
-IF(POLICY CMP0115)
-  CMAKE_POLICY(SET CMP0115 OLD)
-ENDIF()
-
->>>>>>> b9848e44dcea1a18190cba1d2e5eda84dda29753
 # by default TokuDB is attempted to build, if environment is unsupported,
 # TokuDB is gently skipped
 IF (NOT DEFINED WITH_TOKUDB)

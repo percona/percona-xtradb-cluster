@@ -77,33 +77,6 @@ jobs:
 
   strategy:
     matrix:
-<<<<<<< HEAD
-||||||| c1b94a6cfd7
-      macOS 10.15 Release:
-        imageName: 'macOS-10.15'
-        Compiler: clang
-        BuildType: RelWithDebInfo
-
-      ${{ if ne(variables['Build.Reason'], 'IndividualCI') }}:
-        macOS 10.15 Debug:
-          imageName: 'macOS-10.15'
-          Compiler: clang
-          BuildType: Debug
-
-=======
-      macOS 12 RelWithDebInfo:
-        imageName: 'macOS-12'
-        Compiler: clang
-        BuildType: RelWithDebInfo
-
-      # skip for a pull request if branch name doesn't contain "fullci"
-      ${{ if or(ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
-        macOS 12 Debug:
-          imageName: 'macOS-12'
-          Compiler: clang
-          BuildType: Debug
-
->>>>>>> b9848e44dcea1a18190cba1d2e5eda84dda29753
       # clang-5 and newer compilers
       clang-15 RelWithDebInfo [Ubuntu 22.04 Jammy]:
         imageName: 'ubuntu-22.04'
@@ -497,13 +470,9 @@ jobs:
         CMAKE_OPT+="
           -DMYSQL_MAINTAINER_MODE=OFF
           -DWITH_PROTOBUF=bundled
-<<<<<<< HEAD
           -DWITH_WSREP=ON
-||||||| c1b94a6cfd7
-=======
           -DWITH_SSL=/usr/local/opt/openssl@1.1
           -DWITH_ZLIB=bundled
->>>>>>> b9848e44dcea1a18190cba1d2e5eda84dda29753
         "
       else
         CMAKE_OPT+="
