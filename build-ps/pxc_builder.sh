@@ -998,6 +998,9 @@ build_tarball(){
     if [ -n "${GALERA_REVNO}" ]; then
         sed -i "s:GALERA_REVISION=\"0000000\":GALERA_REVISION=\"$GALERA_REVNO\":g" ./build-ps/build-binary.sh
     fi
+    if [ -n "${REVISION}" ]; then
+        sed -i "s:REVISION=\"\":REVISION=\"$REVISION\":g" ./build-ps/build-binary.sh
+    fi
     if [[ ${DEBUG} == 1 ]]; then
         bash -x ./build-ps/build-binary.sh --debug --with-jemalloc=jemalloc/ -t $BIN_RELEASE $BUILD_ROOT
     else
