@@ -430,7 +430,7 @@ TEST_F(MySQLNetworkProviderTest, NewServerConnectionTest) {
 #ifdef WITH_WSREP
   wsrep::gtid gtid;
   Wsrep_server_state::init_once(std::string(), std::string(), std::string(),
-                                std::string(), gtid, 0);
+                                std::string(), gtid, WsrepVersion::UNSPECIFIED);
 #endif
 
   THD fake_thd(false);
