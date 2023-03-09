@@ -3685,8 +3685,8 @@ bool Query_log_event::write(Basic_ostream *ostream) {
   }
 
   /*
-    Replicate Q_WSREP_SKIP_READONLY_CHECKS only if it is a
-    replication applier thread.
+    Replicate Q_WSREP_SKIP_READONLY_CHECKS only if it is an async/semisync
+    applier thread, but not a wsrep applier thread.
   */
   if (WSREP(thd) && ((thd->system_thread == SYSTEM_THREAD_SLAVE_SQL) ||
                      (thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER))) {

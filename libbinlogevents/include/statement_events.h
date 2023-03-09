@@ -670,8 +670,10 @@ class Query_event : public Binary_log_event {
   uint8_t sql_require_primary_key;
 
   uint8_t default_table_encryption;
+#ifdef WITH_WSREP
   uint8_t ddl_skip_rewrite;
   uint8_t wsrep_applier_skip_readonly_checks;
+#endif /* WITH_WSREP */
 
   /**
     The constructor will be used while creating a Query_event, to be
