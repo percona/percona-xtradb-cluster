@@ -1755,7 +1755,11 @@ bool binlog_expire_logs_seconds_supplied = false;
 /* Static variables */
 
 static bool opt_myisam_log;
+#ifdef WITH_WSREP
+static std::atomic_int cleanup_done;
+#else
 static int cleanup_done;
+#endif /* WITH_WSREP */
 static ulong opt_specialflag;
 char *opt_binlog_index_name;
 char *mysql_home_ptr, *pidfile_name_ptr;

@@ -286,7 +286,8 @@ void Wsrep_server_service::log_view(
       if (checkpoint_was_reset || last_committed != view.state_id().seqno()) {
         wsrep_set_SE_checkpoint(view.state_id());
       }
-      assert(wsrep_get_SE_checkpoint().id() == view.state_id().id());
+      assert(wsrep_get_SE_checkpoint().id() == view.state_id().id() ||
+             wsrep_unireg_abort);
     } else {
       WSREP_DEBUG(
           "No applier in Wsrep_server_service::log_view(), "
