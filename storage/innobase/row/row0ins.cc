@@ -1651,7 +1651,7 @@ dberr_t row_ins_check_foreign_constraint(
 #ifdef WITH_WSREP
           err = wsrep_append_foreign_key(
               thr_get_trx(thr), foreign, rec, check_index, check_ref,
-              (upd_node != NULL && wsrep_protocol_version < 4)
+              (upd_node != NULL && wsrep_protocol_version < WsrepVersion::V4)
                   ? WSREP_SERVICE_KEY_SHARED
                   : WSREP_SERVICE_KEY_REFERENCE);
 #endif /* WITH_WSREP */

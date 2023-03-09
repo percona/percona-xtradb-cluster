@@ -25,6 +25,7 @@
 #include "wsrep/provider.hpp"
 #include "wsrep/streaming_context.hpp"
 #include "wsrep_api.h"
+#include "service_wsrep.h"
 #include "wsrep_server_state.h"
 #include "mysql/components/services/log_builtins.h"  // LogEvent
 #include "sql/system_variables.h"  // struct System_variables. Needed by WSREP_ON
@@ -76,7 +77,7 @@ extern ulong wsrep_max_ws_size;
 extern ulong wsrep_max_ws_rows;
 extern const char *wsrep_notify_cmd;
 extern bool wsrep_certify_nonPK;
-extern long wsrep_protocol_version;
+extern WsrepVersion wsrep_protocol_version;
 extern ulong wsrep_forced_binlog_format;
 extern bool wsrep_desync;
 extern ulong wsrep_reject_queries;

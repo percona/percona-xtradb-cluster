@@ -1732,7 +1732,8 @@ static bool block_write_while_in_rolling_upgrade(THD *thd) {
   bool block = false;
   LEX *lex = thd->lex;
   if (sql_command_flags[lex->sql_command] & CF_CHANGES_DATA) {
-    bool multi_version_cluster = wsrep_protocol_version < 4;
+    bool multi_version_cluster =
+        wsrep_protocol_version < WsrepVersion::V4;
     if (multi_version_cluster ||
         DBUG_EVALUATE_IF("simulate_wsrep_multiple_major_versions", true,
                          false)) {
