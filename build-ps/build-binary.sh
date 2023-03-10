@@ -469,6 +469,7 @@ fi
             -DMYSQL_SERVER_SUFFIX=".$TAG" \
             -DWITH_WSREP=ON \
             -DWITH_UNIT_TESTS=0 \
+            -DMINIMAL_RELWITHDEBINFO=OFF \
             $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
         (make $MAKE_JFLAG $QUIET) || exit 1
