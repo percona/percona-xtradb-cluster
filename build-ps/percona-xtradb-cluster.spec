@@ -763,6 +763,7 @@ mkdir release
   ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
            -DDOWNLOAD_BOOST=1 -DWITH_BOOST=build-ps/boost \
            -DCMAKE_BUILD_TYPE=RelWithDebInfo  -DCMAKE_INSTALL_PREFIX=%{_prefix} \
+           -DMINIMAL_RELWITHDEBINFO=OFF \
            -DWITH_EMBEDDED_SERVER=OFF \
            -DWITH_INNODB_MEMCACHED=ON \
            -DUSE_LD_LLD=0 \

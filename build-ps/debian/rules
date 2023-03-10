@@ -122,6 +122,7 @@ endif
 		-DSYSCONFDIR=/etc/mysql \
 		-DMYSQL_UNIX_ADDR=/var/run/mysqld/mysqld.sock \
 		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+		-DMINIMAL_RELWITHDEBINFO=OFF \
 		-DCOMPILATION_COMMENT=$(compilation_comment_release) \
 		-DSYSTEM_TYPE="debian-linux-gnu" \
 		-DWITHOUT_TOKUDB=ON \
