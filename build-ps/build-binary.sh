@@ -277,7 +277,8 @@ PRODUCT_FULL_NAME="${PRODUCT_NAME}.${TAG}_$(uname -s)${DIST_NAME:-}.$MACHINE_SPE
 # This corresponds to GIT revision when the build/package is created.
 if test -e "$SOURCEDIR/Docs/INFO_SRC"
 then
-    REVISION="$(cd "$SOURCEDIR"; grep '^short: ' Docs/INFO_SRC |sed -e 's/short: //')"
+    REVISION="$(cd "$SOURCEDIR"; grep '^commit: ' Docs/INFO_SRC |sed -e 's/commit: //')"
+    REVISION=${REVISION::7}
 elif [ -n "$(which git)" -a -d "$SOURCEDIR/.git" ];
 then
     REVISION="$(git rev-parse --short HEAD)"
