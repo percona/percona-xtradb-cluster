@@ -552,7 +552,7 @@ class Query_event : public Binary_log_event {
     /*
       Replicate Q_WSREP_SKIP_READONLY_CHECKS.
     */
-    Q_WSREP_SKIP_READONLY_CHECKS
+    Q_WSREP_SKIP_READONLY_CHECKS = 128
 #endif /* WITH_WSREP */
   };
   const char *query;
