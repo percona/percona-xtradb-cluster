@@ -724,7 +724,7 @@ TEST(log0log, log_random_disturb) {
 #ifdef WITH_WSREP
   wsrep::gtid gtid;
   Wsrep_server_state::init_once(std::string(), std::string(), std::string(),
-                                std::string(), gtid, 0);
+                                std::string(), gtid, WsrepVersion::UNSPECIFIED);
 #endif
 
   disturber.reset(new Log_buf_resizer{256 * 1024, 1024 * 1024});

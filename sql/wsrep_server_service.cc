@@ -192,16 +192,17 @@ void Wsrep_server_service::log_view(
     global_system_variables.auto_increment_offset = view.own_index() + 1;
     global_system_variables.auto_increment_increment = view.members().size();
   }
-  wsrep_protocol_version = view.protocol_version();
+  wsrep_protocol_version = static_cast<WsrepVersion>(view.protocol_version());
   bool not_shutdown = (pxc_maint_mode != PXC_MAINT_MODE_SHUTDOWN);
-  bool multi_version_cluster = wsrep_protocol_version < 4;
+  bool multi_version_cluster = wsrep_protocol_version < WsrepVersion::V4;
   if (not_shutdown &&
       ((multi_version_cluster &&
         (pxc_strict_mode > PXC_STRICT_MODE_PERMISSIVE)) ||
        DBUG_EVALUATE_IF("simulate_wsrep_multiple_major_versions", true,
                         false))) {
     std::ostringstream os;
-    os << "Detected Protocol version: " << wsrep_protocol_version
+    os << "Detected Protocol version: "
+       << wsrep_protocol_version
        << " Changing pxc_maint_mode to "
           "MAINTENANCE.";
     WSREP_INFO("%s", os.str().c_str());
@@ -212,7 +213,8 @@ void Wsrep_server_service::log_view(
     if (wsrep_pxc_maint_mode_forced &&
         pxc_maint_mode != PXC_MAINT_MODE_SHUTDOWN) {
       std::ostringstream os;
-      os << "Detected Protocol version: " << wsrep_protocol_version
+      os << "Detected Protocol version: "
+         << wsrep_protocol_version
          << " Changing pxc_maint_mode to "
             "DISABLED.";
       WSREP_INFO("%s", os.str().c_str());

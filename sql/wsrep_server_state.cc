@@ -50,14 +50,13 @@ void Wsrep_server_state::init_once(const std::string &name,
                                    const std::string &address,
                                    const std::string &working_dir,
                                    const wsrep::gtid &initial_position,
-                                   int max_protocol_version) {
+                                   WsrepVersion max_protocol_version) {
   if (m_instance == 0) {
     mysql_mutex_init(key_LOCK_wsrep_server_state, &LOCK_wsrep_server_state,
                      MY_MUTEX_INIT_FAST);
     mysql_cond_init(key_COND_wsrep_server_state, &COND_wsrep_server_state);
-    m_instance =
-        new Wsrep_server_state(name, incoming_address, address, working_dir,
-                               initial_position, max_protocol_version);
+    m_instance = new Wsrep_server_state(
+        name, incoming_address, address, working_dir, initial_position, max_protocol_version);
   }
 }
 

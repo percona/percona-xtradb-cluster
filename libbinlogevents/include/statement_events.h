@@ -426,12 +426,20 @@ const uint64_t INVALID_XID = 0xffffffffffffffffULL;
     <td>2 byte integer</td>
     <td>Value of the config variable default_table_encryption</td>
   </tr>
+#ifdef WITH_WSREP
   <tr>
     <td>ddl_skip_rewrite</td>
     <td>Q_DDL_SKIP_REWRITE</td>
     <td>2 byte integer</td>
     <td>Value of the config variable ddl_skip_rewrite</td>
   </tr>
+  <tr>
+    <td>wsrep_applier_skip_readonly_checks</td>
+    <td>Q_WSREP_SKIP_READONLY_CHECKS</td>
+    <td>2 byte integer</td>
+    <td> This will be set only for replication applier threads </td>
+  </tr>
+#endif
   </table>
 
   @subsection Query_event_notes_on_previous_versions Notes on Previous Versions
@@ -534,12 +542,18 @@ class Query_event : public Binary_log_event {
     /*
       Replicate default_table_encryption.
     */
-    Q_DEFAULT_TABLE_ENCRYPTION,
-
+    Q_DEFAULT_TABLE_ENCRYPTION
+#ifdef WITH_WSREP
+    ,
     /*
       Replicate ddl_skip_rewrite.
     */
-    Q_DDL_SKIP_REWRITE
+    Q_DDL_SKIP_REWRITE,
+    /*
+      Replicate Q_WSREP_SKIP_READONLY_CHECKS.
+    */
+    Q_WSREP_SKIP_READONLY_CHECKS = 128
+#endif /* WITH_WSREP */
   };
   const char *query;
   const char *db;
@@ -656,7 +670,10 @@ class Query_event : public Binary_log_event {
   uint8_t sql_require_primary_key;
 
   uint8_t default_table_encryption;
+#ifdef WITH_WSREP
   uint8_t ddl_skip_rewrite;
+  uint8_t wsrep_applier_skip_readonly_checks;
+#endif /* WITH_WSREP */
 
   /**
     The constructor will be used while creating a Query_event, to be

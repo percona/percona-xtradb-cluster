@@ -179,6 +179,9 @@ static bool thread_can_ignore_schema_read_only(THD *thd) {
   */
   return (thd->is_bootstrap_system_thread() ||
           thd->is_server_upgrade_thread() || thd->slave_thread ||
+#ifdef WITH_WSREP
+          thd->wsrep_applier_skip_readonly_checks ||
+#endif /* WITH_WSREP */
           thd->is_cmd_skip_readonly());
 }
 

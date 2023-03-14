@@ -8475,7 +8475,7 @@ int wsrep_innobase_mysql_sort(int mysql_type, uint charset_number,
       ut_a(str_length <= tmp_length);
       memcpy(tmp_str, str, str_length);
 
-      if (wsrep_protocol_version < 3) {
+      if (wsrep_protocol_version < WsrepVersion::V3) {
         tmp_length = charset->coll->strnxfrm(
             charset, str, str_length, str_length, tmp_str, tmp_length, 0);
         assert(tmp_length <= str_length);
@@ -8613,7 +8613,7 @@ uint wsrep_store_key_val_for_row(THD *thd, TABLE *table, uint keynr, char *buff,
           wsrep_innobase_mysql_sort(mysql_type, cs->number, sorted, true_len,
                                     REC_VERSION_56_MAX_INDEX_COL_LEN);
 
-      if (wsrep_protocol_version > 1) {
+      if (wsrep_protocol_version > WsrepVersion::V1) {
         /* Note that we always reserve the maximum possible
         length of the true VARCHAR in the key value, though
         only len first bytes after the 2 length bytes contain
@@ -8693,7 +8693,7 @@ uint wsrep_store_key_val_for_row(THD *thd, TABLE *table, uint keynr, char *buff,
 
       /* Note that we always reserve the maximum possible
       length of the BLOB prefix in the key value. */
-      ut_a(wsrep_protocol_version > 1);
+      ut_a(wsrep_protocol_version > WsrepVersion::V1);
       if (true_len > buff_space) {
         ib::warn() << "WSREP: key truncated: %s " << wsrep_thd_query(thd);
         true_len = buff_space;
@@ -11221,7 +11221,7 @@ func_exit:
   if (!err && wsrep_do_replication(m_user_thd)) {
     DBUG_PRINT("wsrep", ("update row key"));
     if (wsrep_append_keys(m_user_thd,
-                          wsrep_protocol_version >= 4
+                          wsrep_protocol_version >= WsrepVersion::V4
                               ? WSREP_SERVICE_KEY_UPDATE
                               : WSREP_SERVICE_KEY_EXCLUSIVE,
                           old_row, new_row)) {
@@ -12745,7 +12745,7 @@ extern dberr_t wsrep_append_foreign_key(
   key[0] = (char)i;
 
   rcode = wsrep_rec_get_foreign_key(&key[1], &len, rec, index, idx,
-                                    wsrep_protocol_version > 1);
+                                    wsrep_protocol_version > WsrepVersion::V1);
   if (rcode != DB_SUCCESS) {
     WSREP_ERROR(
         "FK key set failed: %d (%d %s), index: %s %s, %s", rcode, referenced,
@@ -12756,7 +12756,7 @@ extern dberr_t wsrep_append_foreign_key(
     return DB_ERROR;
   }
   strncpy(cache_key,
-          (wsrep_protocol_version > 1)
+          (wsrep_protocol_version > WsrepVersion::V1)
               ? ((referenced) ? foreign->referenced_table->name.m_name
                               : foreign->foreign_table->name.m_name)
               : foreign->foreign_table->name.m_name,
@@ -12891,7 +12891,7 @@ int ha_innobase::wsrep_append_keys(
     DBUG_RETURN(0);
   }
 
-  if (wsrep_protocol_version == 0) {
+  if (wsrep_protocol_version == WsrepVersion::UNSPECIFIED) {
     uint len;
     char keyval[WSREP_MAX_SUPPORTED_KEY_LENGTH + 1] = {'\0'};
     char *key = &keyval[0];

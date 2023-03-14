@@ -27,12 +27,16 @@ enum Wsrep_service_key_type {
   WSREP_SERVICE_KEY_EXCLUSIVE
 };
 
+namespace wsrep_version {
+enum wsrep_version : long { UNSPECIFIED = 0, V1 = 1, V2 = 2, V3 = 3, V4 = 4 };
+}
+typedef wsrep_version::wsrep_version WsrepVersion;
+
 extern ulong wsrep_debug;
 extern bool wsrep_log_conflicts;
 extern bool wsrep_certify_nonPK;
 extern bool wsrep_load_data_splitting;
 extern bool wsrep_recovery;
-extern long wsrep_protocol_version;
 
 /* Must match to definition in sql/mysqld.h */
 typedef int64 query_id_t;
