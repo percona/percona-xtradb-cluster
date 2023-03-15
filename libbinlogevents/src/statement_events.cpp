@@ -84,8 +84,14 @@ Query_event::Query_event(
       ddl_xid(INVALID_XID),
       default_collation_for_utf8mb4_number(0),
       sql_require_primary_key(0xff),
-      default_table_encryption(0xff),
-      ddl_skip_rewrite(0) {}
+      default_table_encryption(0xff)
+#ifdef WITH_WSREP
+      ,
+      ddl_skip_rewrite(0),
+      wsrep_applier_skip_readonly_checks(0)
+#endif /* WITH_WSREP */
+{
+}
 
 /**
   Utility function for the Query_event constructor.
@@ -136,8 +142,13 @@ Query_event::Query_event(const char *buf, const Format_description_event *fde,
       ddl_xid(INVALID_XID),
       default_collation_for_utf8mb4_number(0),
       sql_require_primary_key(0xff),
-      default_table_encryption(0xff),
-      ddl_skip_rewrite(0) {
+      default_table_encryption(0xff)
+#ifdef WITH_WSREP
+      ,
+      ddl_skip_rewrite(0),
+      wsrep_applier_skip_readonly_checks(0)
+#endif /* WITH_WSREP */
+{
   BAPI_ENTER("Query_event::Query_event(const char*, ...)");
   READER_TRY_INITIALIZATION;
   READER_ASSERT_POSITION(fde->common_header_len);
@@ -331,9 +342,14 @@ Query_event::Query_event(const char *buf, const Format_description_event *fde,
       case Q_DEFAULT_TABLE_ENCRYPTION:
         READER_TRY_SET(default_table_encryption, read<uint8_t>);
         break;
+#ifdef WITH_WSREP
       case Q_DDL_SKIP_REWRITE:
         READER_TRY_SET(ddl_skip_rewrite, read<uint8_t>);
         break;
+      case Q_WSREP_SKIP_READONLY_CHECKS:
+        READER_TRY_SET(wsrep_applier_skip_readonly_checks, read<uint8_t>);
+        break;
+#endif /* WITH_WSREP */
       default:
         /* That's why you must write status vars in growing order of code */
         READER_CALL(go_to, end_variable_part);  // Break loop

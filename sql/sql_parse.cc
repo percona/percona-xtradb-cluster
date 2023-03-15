@@ -1817,7 +1817,8 @@ static bool block_write_while_in_rolling_upgrade(THD *thd) {
   bool block = false;
   LEX *lex = thd->lex;
   if (sql_command_flags[lex->sql_command] & CF_CHANGES_DATA) {
-    bool multi_version_cluster = wsrep_protocol_version < 4;
+    bool multi_version_cluster =
+        wsrep_protocol_version < WsrepVersion::V4;
     if (multi_version_cluster ||
         DBUG_EVALUATE_IF("simulate_wsrep_multiple_major_versions", true,
                          false)) {
@@ -4658,6 +4659,10 @@ int mysql_execute_command(THD *thd, bool first_level) {
         break;
 
 #ifdef WITH_WSREP
+      if (thd->locked_tables_mode) {
+        my_error(ER_LOCK_OR_ACTIVE_TRANSACTION, MYF(0));
+        break;
+      }
       WSREP_TO_ISOLATION_BEGIN(lex->name.str, NULL, NULL)
 #endif /* WITH_WSREP */
       /*
@@ -4678,6 +4683,10 @@ int mysql_execute_command(THD *thd, bool first_level) {
                        false))
         break;
 #ifdef WITH_WSREP
+      if (thd->locked_tables_mode) {
+        my_error(ER_LOCK_OR_ACTIVE_TRANSACTION, MYF(0));
+        break;
+      }
       WSREP_TO_ISOLATION_BEGIN(lex->name.str, NULL, NULL)
 #endif /* WITH_WSREP */
       res = mysql_rm_db(thd, to_lex_cstring(lex->name), lex->drop_if_exists);
@@ -4690,6 +4699,10 @@ int mysql_execute_command(THD *thd, bool first_level) {
                        false))
         break;
 #ifdef WITH_WSREP
+      if (thd->locked_tables_mode) {
+        my_error(ER_LOCK_OR_ACTIVE_TRANSACTION, MYF(0));
+        break;
+      }
       WSREP_TO_ISOLATION_BEGIN(lex->name.str, NULL, NULL)
 #endif /* WITH_WSREP */
       /*
