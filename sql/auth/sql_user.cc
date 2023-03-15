@@ -698,7 +698,7 @@ static bool auth_verify_password_history(
     table->field[MYSQL_PASSWORD_HISTORY_FIELD_PASSWORD_TIMESTAMP]->store_time(
         &tm_now);
     table->field[MYSQL_PASSWORD_HISTORY_FIELD_PASSWORD]->store(
-        cred_hash, cred_hash_length, &my_charset_utf8_bin);
+        cred_hash, cred_hash_length, &my_charset_utf8mb3_bin);
     table->field[MYSQL_PASSWORD_HISTORY_FIELD_PASSWORD]->set_notnull();
 
     if (0 != (error = table->file->ha_write_row(table->record[0]))) {
@@ -1998,8 +1998,7 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
     w/o re-writting then applier will not be able to establish user context).
   */
   if (WSREP(thd) && !thd->wsrep_applier) {
-    constexpr size_t query_length_max =
-        strlen("SET PASSWORD FOR ''@''=''") + 3 * 120 + 1;
+    size_t query_length_max = strlen("SET PASSWORD FOR ''@''=''") + 3 * 120 + 1;
     char *buff = (char *)thd->alloc(query_length_max);
     if (!buff) {
       my_error(ER_OUTOFMEMORY, MYF(ME_FATALERROR), 0);

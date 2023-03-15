@@ -504,6 +504,13 @@ bool has_commit_order_manager(THD *thd) {
          thd->rli_slave->get_commit_order_manager() != nullptr;
 }
 
+#ifdef WITH_WSREP
+Commit_order_manager* get_commit_order_manager(THD *thd) {
+  return !is_mts_worker(thd) ? nullptr :
+    thd->rli_slave->get_commit_order_manager();
+}
+#endif /* WITH_WSREP */
+
 bool Commit_order_manager::wait_for_its_turn_before_flush_stage(THD *thd) {
   switch (thd->lex->sql_command) {
     case SQLCOM_ALTER_TABLE:

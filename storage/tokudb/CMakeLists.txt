@@ -1,3 +1,5 @@
+RETURN()  # Disable TokuDB
+
 # Copyright (c) 2017, Percona and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify

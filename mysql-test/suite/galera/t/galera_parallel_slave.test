@@ -1,0 +1,85 @@
+--source include/have_debug.inc
+--source include/have_log_bin.inc
+--source include/force_restart.inc
+
+# As node #1 is not a Galera node, we connect to node #2 in order to run include/galera_cluster.inc
+--connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--source include/galera_cluster_master_slave.inc
+
+--connection node_2
+--source include/only_mts_replica_parallel_workers.inc
+
+--disable_query_log
+--eval CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1', SOURCE_PORT=$NODE_MYPORT_1;
+--enable_query_log
+START REPLICA USER='root';
+
+--connection node_1
+# Initialize
+CREATE TABLE t1(c1 INT PRIMARY KEY, c2 INT, INDEX(c2)) ENGINE = InnoDB;
+INSERT INTO t1 VALUES(1, NULL),(2, 2), (3, NULL), (4, 4), (5, NULL), (6, 6);
+
+CREATE TABLE t2(c1 INT PRIMARY KEY, c2 INT, INDEX(c2)) ENGINE = InnoDB;
+INSERT INTO t2 VALUES(1, NULL),(2, 2), (3, NULL), (4, 4), (5, NULL), (6, 6);
+
+--connection node_2
+--sleep 1
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't2';
+--source include/wait_condition.inc
+
+STOP REPLICA;
+
+SET GLOBAL replica_transaction_retries = 3;
+SET GLOBAL replica_parallel_workers = 5;
+
+--connection node_1
+
+INSERT INTO t1 VALUES(10, NULL);
+
+--let $debug_point= d,set_commit_parent_100
+--source include/add_debug_point.inc
+INSERT INTO t2 VALUES(11, NULL);
+INSERT INTO t1 VALUES(11, NULL);
+INSERT INTO t2 VALUES(12, NULL);
+INSERT INTO t1 VALUES(12, NULL);
+INSERT INTO t2 VALUES(13, NULL);
+INSERT INTO t1 VALUES(13, NULL);
+
+--connection node_2
+# It blocks above INSERT statement
+FLUSH TABLES t2 WITH READ LOCK;
+
+--connection node_2a
+START REPLICA USER='root';
+
+# This sleep is not ideal, but information_schema.processlist selects fail at this point with lock wait timeout
+--sleep 10
+#--let $wait_condition= SELECT count(*) > 0 FROM information_schema.processlist WHERE INFO LIKE "%dependent transaction to commit%"
+#--source include/wait_condition.inc
+
+--connection node_2
+UNLOCK TABLES;
+
+--let $wait_condition = SELECT COUNT(*) = 10 FROM t1;
+--source include/wait_condition.inc
+
+SELECT * FROM t1;
+SELECT * FROM t2;
+
+--echo #
+--echo # Deinitialize
+--echo #
+--connection node_1
+--let $debug_point= d,set_commit_parent_100
+--source include/remove_debug_point.inc
+DROP TABLE t1;
+DROP TABLE t2;
+
+--sleep 1
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+--source include/wait_condition.inc
+
+STOP REPLICA;
+RESET REPLICA ALL;

@@ -43,7 +43,7 @@ call mtr.add_suppression("\\[Warning\\] .*MY-\\d+.* Changing innodb_extend_and_i
 call mtr.add_suppression("Failed to initialize TLS for channel: mysql_main");
 
 let $total_global_vars=`SELECT COUNT(*) FROM performance_schema.global_variables where variable_name NOT LIKE 'ndb_%' AND variable_name NOT LIKE 'debug_%'`;
-let $total_persistent_vars=540;
+let $total_persistent_vars=539;
 
 --echo ***************************************************************
 --echo * 0. Verify that variables present in performance_schema.global
@@ -62,8 +62,6 @@ CREATE TABLE global_vars (id INT PRIMARY KEY AUTO_INCREMENT, var_name VARCHAR(64
 # ERROR 1231 (42000): Variable 'innodb_monitor_reset' can't be set to the value of 'NULL'
 # -> SET GLOBAL innodb_monitor_reset_all = @@global.innodb_monitor_reset_all;
 # ERROR 1231 (42000): Variable 'innodb_monitor_reset_all' can't be set to the value of 'NULL'
-# -> SET GLOBAL innodb_default_encryption_key_id = @@global.innodb_default_encryption_key_id;
-# ERROR 1231 (42000): Variable 'innodb_default_encryption_key_id' can't be set to the value of '0'
 
 # pxc_maint_mode pxc_strict_mode can be changed only if node is cluster-node
 # 'Variable 'wsrep_trx_fragment_size' can't be set to the value of '0''
@@ -76,7 +74,6 @@ performance_schema.global_variables WHERE variable_name NOT IN
 'innodb_monitor_disable',
 'innodb_monitor_reset',
 'innodb_monitor_reset_all',
-'innodb_default_encryption_key_id',
 'rbr_exec_mode',
 'jemalloc_profiling',
 'pxc_maint_mode',
@@ -119,7 +116,6 @@ CREATE TABLE all_vars (id INT PRIMARY KEY AUTO_INCREMENT, var_name VARCHAR(64), 
 
 # Currently we are not able to test below global variables
 # 1. rbr_exec_mode
-# 2. innodb_default_encryption_key_id
 #
 # because of open bugs (listed below).
 #
@@ -128,14 +124,13 @@ CREATE TABLE all_vars (id INT PRIMARY KEY AUTO_INCREMENT, var_name VARCHAR(64), 
 # Once the bugs is fixed, below $bug_var_count must be modified along with the query.
 
 # pxc_maint_mode, pxc_strict_mode can be changed only if node is cluster-node
---let $bug_var_count=4
+--let $bug_var_count=3
 --expr $expected_var_count=$total_global_vars - $bug_var_count
 
 INSERT INTO all_vars (var_name, var_value)
 SELECT * FROM performance_schema.global_variables
 WHERE variable_name NOT IN
-('innodb_default_encryption_key_id',
-'rbr_exec_mode',
+('rbr_exec_mode',
 'pxc_maint_mode',
 'pxc_strict_mode')
 AND variable_name NOT LIKE 'ndb_%'

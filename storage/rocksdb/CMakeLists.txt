@@ -1,3 +1,5 @@
+RETURN()  # Disable RocksDB
+
 # TODO: Copyrights
 
 # by default MyRocks is not built
@@ -251,6 +253,12 @@ IF(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   ADD_CXX_COMPILE_FLAGS_TO_FILES(-Wno-conditional-uninitialized FILES ha_rocksdb.cc rdb_datadic.cc rocksdb/db/db_impl/db_impl.cc rocksdb/db/write_thread.cc rocksdb/env/env_posix.cc rocksdb/env/fs_posix.cc)
 ENDIF()
 
+# Suppress warnings for clang-15 or newer
+IF(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 15)
+  ADD_CXX_COMPILE_FLAGS_TO_FILES(-Wno-unused-but-set-variable FILES rocksdb/db/version_set.cc rocksdb/db/version_edit_handler.cc rocksdb/cache/lru_cache.cc)
+  ADD_CXX_COMPILE_FLAGS_TO_FILES(-Wno-array-parameter FILES ha_rocksdb.cc)
+ENDIF()
+
 # Suppress warnings for clang-13 or newer
 IF(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 13.0)
   ADD_CXX_COMPILE_FLAGS_TO_FILES(-Wno-unused-but-set-variable FILES rocksdb/utilities/env_mirror.cc)
@@ -278,6 +286,15 @@ ENDIF()
 IF(CMAKE_COMPILER_IS_GNUCXX AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9)
   ADD_CXX_COMPILE_FLAGS_TO_FILES(-Wno-deprecated-copy FILES rocksdb/db/db_impl/db_impl.cc)
   ADD_CXX_COMPILE_FLAGS_TO_FILES(-Wno-maybe-uninitialized FILES rocksdb/env/env.cc rocksdb/table/block_based/block_based_table_builder.cc)
+ENDIF()
+
+# Suppress warnings for gcc-12 or newer
+IF(CMAKE_COMPILER_IS_GNUCXX AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 12)
+  CHECK_AVX512_SUPPORT(HAVE_AVX512)
+  IF(HAVE_AVX512)
+    MESSAGE(STATUS "AVX-512: add -Wno-uninitialized for xxhash.cc (check https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105593)")
+    ADD_CXX_COMPILE_FLAGS_TO_FILES(-Wno-uninitialized -Wno-maybe-uninitialized FILES rocksdb/util/xxhash.cc ${BUNDLED_LZ4_PATH}/xxhash.c)
+  ENDIF()
 ENDIF()
 
 # Suppress warnings for gcc ASan build

@@ -1,0 +1,54 @@
+START REPLICA USER='root';
+Warnings:
+Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
+CREATE TABLE t1(c1 INT PRIMARY KEY, c2 INT, INDEX(c2)) ENGINE = InnoDB;
+INSERT INTO t1 VALUES(1, NULL),(2, 2), (3, NULL), (4, 4), (5, NULL), (6, 6);
+CREATE TABLE t2(c1 INT PRIMARY KEY, c2 INT, INDEX(c2)) ENGINE = InnoDB;
+INSERT INTO t2 VALUES(1, NULL),(2, 2), (3, NULL), (4, 4), (5, NULL), (6, 6);
+STOP REPLICA;
+SET GLOBAL replica_transaction_retries = 3;
+SET GLOBAL replica_parallel_workers = 5;
+INSERT INTO t1 VALUES(10, NULL);
+# Adding debug point 'd,set_commit_parent_100' to @@GLOBAL.debug
+INSERT INTO t2 VALUES(11, NULL);
+INSERT INTO t1 VALUES(11, NULL);
+INSERT INTO t2 VALUES(12, NULL);
+INSERT INTO t1 VALUES(12, NULL);
+INSERT INTO t2 VALUES(13, NULL);
+INSERT INTO t1 VALUES(13, NULL);
+FLUSH TABLES t2 WITH READ LOCK;
+START REPLICA USER='root';
+Warnings:
+Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
+UNLOCK TABLES;
+SELECT * FROM t1;
+c1	c2
+1	NULL
+3	NULL
+5	NULL
+10	NULL
+11	NULL
+12	NULL
+13	NULL
+2	2
+4	4
+6	6
+SELECT * FROM t2;
+c1	c2
+1	NULL
+3	NULL
+5	NULL
+11	NULL
+12	NULL
+13	NULL
+2	2
+4	4
+6	6
+#
+# Deinitialize
+#
+# Removing debug point 'd,set_commit_parent_100' from @@GLOBAL.debug
+DROP TABLE t1;
+DROP TABLE t2;
+STOP REPLICA;
+RESET REPLICA ALL;

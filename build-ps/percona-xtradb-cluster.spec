@@ -75,7 +75,7 @@ Prefix: %{_sysconfdir}
 
 #Placeholder should be replaced on preparation stage
 %if %{undefined galera_version}
- %define galera_version 4.12
+ %define galera_version 4.13
 %endif
 
 %if %{undefined galera_revision}
@@ -676,7 +676,7 @@ popd
 
 mkdir pxb-8.0
 pushd pxb-8.0
-yumdownloader percona-xtrabackup-80-8.0.30
+yumdownloader percona-xtrabackup-80-8.0.31
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib64 ./
@@ -763,6 +763,7 @@ mkdir release
   ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
            -DDOWNLOAD_BOOST=1 -DWITH_BOOST=build-ps/boost \
            -DCMAKE_BUILD_TYPE=RelWithDebInfo  -DCMAKE_INSTALL_PREFIX=%{_prefix} \
+           -DMINIMAL_RELWITHDEBINFO=OFF \
            -DWITH_EMBEDDED_SERVER=OFF \
            -DWITH_INNODB_MEMCACHED=ON \
            -DUSE_LD_LLD=0 \

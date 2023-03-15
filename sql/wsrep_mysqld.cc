@@ -22,6 +22,7 @@
 #include "sql/dd/types/table.h"
 #include "sql/key_spec.h"
 #include "sql/raii/sentry.h"
+#include "sql/server_component/mysql_server_keyring_lockable_imp.h"
 #include "sql/sql_alter.h"
 #include "sql/sql_lex.h"
 #include "sql/ssl_init_callback.h"
@@ -30,7 +31,6 @@
 #include "sql_class.h"
 #include "sql_parse.h"
 #include "sql_plugin.h"  // SHOW_MY_BOOL
-#include "sql/server_component/mysql_server_keyring_lockable_imp.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -120,6 +120,7 @@ bool wsrep_restart_slave_activated = 0;  // node has dropped, and slave
                                          // restart will be needed
 bool wsrep_slave_UK_checks = 0;          // slave thread does UK checks
 bool wsrep_slave_FK_checks = 0;          // slave thread does FK checks
+ulonglong wsrep_mode = 0;
 
 /* wait for x micro-secs to allow active connection to commit before
 starting RSU */
@@ -1115,7 +1116,7 @@ static void setup_galera_encryption_params(char* provider_options, size_t buf_si
   }
 
   snprintf(provider_options, buf_size, "%s", options.c_str());
-  provider_options[buf_size] = 0;
+  provider_options[buf_size - 1] = 0;
 }
 
 int wsrep_init() {
@@ -1164,18 +1165,15 @@ int wsrep_init() {
       return 1;
     }
 
-    char ssl_opts[buf_size];
+    char ssl_opts[buf_size - 1];
     server_main_callback.populate_wsrep_ssl_options(ssl_opts, sizeof(ssl_opts));
-    MY_COMPILER_GCC_DIAGNOSTIC_PUSH();
-    MY_COMPILER_GCC_DIAGNOSTIC_IGNORE("-Wformat-truncation");
     snprintf(buffer, buf_size, "%s%s%s",
              provider_options ? provider_options : "",
              ((provider_options && *provider_options) ? ";" : ""), ssl_opts);
-    MY_COMPILER_GCC_DIAGNOSTIC_POP();
   } else {
     snprintf(buffer, buf_size, "%s", provider_options ? provider_options : "");
   }
-  buffer[buf_size] = 0;
+  buffer[buf_size - 1] = 0;
 
   /* Setup GCache and WSCache encryption according to
       wsrep_gcache_encrypt and wsrep_disk_pages_encrypt.
@@ -1441,6 +1439,8 @@ bool wsrep_start_replication() {
 
   return true;
 }
+
+bool wsrep_check_mode(uint mask) { return wsrep_mode & (1ULL << mask); }
 
 bool wsrep_must_sync_wait(THD *thd, uint mask) {
   bool ret;
@@ -3193,8 +3193,10 @@ static bool wsrep_init_master_key() {
 }
 
 static void wsrep_deinit_master_key() {
-  masterKeyManager->DeInit();
-  masterKeyManager.reset();
+  if (masterKeyManager) {
+    masterKeyManager->DeInit();
+    masterKeyManager.reset();
+  }
 }
 
 std::string wsrep_get_master_key(const std::string &keyId) {

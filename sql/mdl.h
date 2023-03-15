@@ -44,6 +44,7 @@
 #include "mysql/components/services/bits/psi_stage_bits.h"
 #include "mysql/psi/mysql_rwlock.h"
 #include "mysql_com.h"
+#include "prealloced_array.h"
 #include "sql/sql_plist.h"
 #include "template_utils.h"
 
@@ -393,6 +394,7 @@ struct MDL_key {
      - RESOURCE_GROUPS is for resource groups.
      - FOREIGN_KEY is for foreign key names.
      - CHECK_CONSTRAINT is for check constraint names.
+     - RESOURCE_GROUPS_GLOBAL is global lock for resource groups.
     Note that requests waiting for user-level locks get special
     treatment - waiting is aborted if connection to client is lost.
   */
@@ -415,6 +417,7 @@ struct MDL_key {
     RESOURCE_GROUPS,
     FOREIGN_KEY,
     CHECK_CONSTRAINT,
+    RESOURCE_GROUPS_GLOBAL,
     BACKUP_TABLES, /* Percona LOCK TABLES FOR BACKUP */
     /* This should be the last ! */
     NAMESPACE_END
@@ -1550,6 +1553,10 @@ class MDL_context {
                      Timeout_type lock_wait_timeout);
   bool upgrade_shared_lock(MDL_ticket *mdl_ticket, enum_mdl_type new_type,
                            Timeout_type lock_wait_timeout);
+  bool upgrade_shared_locks(MDL_request_list *mdl_requests,
+                            enum_mdl_type new_type,
+                            Timeout_type lock_wait_timeout,
+                            bool (*filter_func)(MDL_request *) = nullptr);
 
   bool clone_ticket(MDL_request *mdl_request);
 
@@ -1808,6 +1815,10 @@ class MDL_context {
 
   friend bool mdl_unittest::test_drive_fix_pins(MDL_context *);
   bool fix_pins();
+
+  bool filter_and_sort_requests_by_mdl_key(
+      Prealloced_array<MDL_request *, 16> *sort_buf,
+      MDL_request_list *mdl_requests, bool (*filter_func)(MDL_request *));
 
  public:
 #ifdef WITH_WSREP

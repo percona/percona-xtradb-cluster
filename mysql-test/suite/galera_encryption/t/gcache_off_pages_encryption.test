@@ -3,21 +3,33 @@
 #
 
 --source include/galera_cluster.inc
+--source include/force_restart.inc
+
+# Stop nodes and delete their gcaches. This is to make the test deterministic
+
+--connection node_1
+--let $MYSQL1_DATA_DIR = `select @@datadir`
+--source include/shutdown_mysqld.inc
+--remove_files_wildcard $MYSQL1_DATA_DIR gcache.page.*
+--remove_file $MYSQL1_DATA_DIR/galera.cache
+--remove_file $MYSQL1_DATA_DIR/grastate.dat
 
 --connection node_2
+--let $MYSQL2_DATA_DIR = `select @@datadir`
+--source include/shutdown_mysqld.inc
+--remove_files_wildcard $MYSQL2_DATA_DIR gcache.page.*
+--remove_file $MYSQL2_DATA_DIR/galera.cache
+--remove_file $MYSQL2_DATA_DIR/grastate.dat
 
---let $MYSQL_DATA_DIR = `select @@datadir`
 
-# Restart the server without GCache ring buffer and encryption disabled.
-# This warning may happen, if there is someting already in GCache (e.g. from previous tests).
-# We are shrinking ring buffer to zero, so offset in the preamble will not be valid.
-call mtr.add_suppression("Bogus offset in GCache ring buffer preamble");
+# # Restart node_1 without GCache ring buffer and encryption disabled
+--connection node_1
 --let $do_not_echo_parameters = 1
---let $restart_parameters = "restart: --wsrep_provider_options='base_port=$NODE_GALERAPORT_2;gcache.encryption=no;gcache.encryption_cache_page_size=4k;gcache.encryption_cache_size=4k;gcache.size=0;gcache.page_size=16k'"
---source include/restart_mysqld.inc
+--let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
+--let $restart_parameters = "restart: --wsrep_provider_options='base_port=$NODE_GALERAPORT_1;gcache.encryption=no;gcache.encryption_cache_page_size=4k;gcache.encryption_cache_size=4k;gcache.size=0;gcache.page_size=16k'"
+--source include/start_mysqld.inc
 --source include/wait_until_connected_again.inc
 --source include/galera_wait_ready.inc
-
 CREATE DATABASE test2;
 USE test2;
 
@@ -32,17 +44,21 @@ while ($cnt)
 
 # Check that GCache off page contains CREATE TABLE clear text
 --let $assert_text = Assert that GCache off page is not encrypted
---let $assert_file = $MYSQL_DATA_DIR/gcache.page.000000
+--let $assert_file = $MYSQL1_DATA_DIR/gcache.page.000000
 --let $assert_select = CREATE TABLE t_100
 --let $assert_count = 1
 --source include/assert_grep.inc
 
 DROP DATABASE test2;
 
-# Restart the server without GCache ring buffer and encryption enabled
+# Restart node_1 without GCache ring buffer and encryption enabled
+--source include/shutdown_mysqld.inc
+--remove_files_wildcard $MYSQL1_DATA_DIR gcache.page.*
+--remove_file $MYSQL1_DATA_DIR/galera.cache
+--remove_file $MYSQL1_DATA_DIR/grastate.dat
 --let $do_not_echo_parameters = 1
---let $restart_parameters = "restart: --wsrep_provider_options='base_port=$NODE_GALERAPORT_2;gcache.encryption=yes;gcache.encryption_cache_page_size=4k;gcache.encryption_cache_size=4k;gcache.size=0;gcache.page_size=16k'"
---source include/restart_mysqld.inc
+--let $restart_parameters = "restart: --wsrep_provider_options='base_port=$NODE_GALERAPORT_1;gcache.encryption=yes;gcache.encryption_cache_page_size=4k;gcache.encryption_cache_size=4k;gcache.size=0;gcache.page_size=16k'"
+--source include/start_mysqld.inc
 --source include/wait_until_connected_again.inc
 --source include/galera_wait_ready.inc
 
@@ -58,17 +74,20 @@ while ($cnt)
 }
 --enable_query_log
 
-# Check that GCache off page contains CREATE TABLE clear text
+# Check that GCache off page doesn't contain CREATE TABLE clear text
 --let $assert_text = Assert that GCache off page is encrypted
---let $assert_file = $MYSQL_DATA_DIR/gcache.page.000002
+--let $assert_file = $MYSQL1_DATA_DIR/gcache.page.000000
 --let $assert_select = CREATE TABLE t_
 --let $assert_count = 0
 --source include/assert_grep.inc
 
 
 # cleanup
+--connection node_2
+--let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
+--let $do_not_echo_parameters = 1
+--let $restart_parameters = "restart: --wsrep_provider_options='base_port=$NODE_GALERAPORT_2'"
+--source include/start_mysqld.inc
+--source include/wait_until_connected_again.inc
 DROP DATABASE test2;
 
---let $do_not_echo_parameters = 1
---let $restart_parameters = restart:
---source include/restart_mysqld.inc

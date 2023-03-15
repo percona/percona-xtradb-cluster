@@ -825,7 +825,7 @@ EXPLAIN FORMAT=tree
 SELECT a, b FROM t1, t2 GROUP BY a, b WITH ROLLUP;
 EXPLAIN
 -> Table scan on <temporary>  (cost=2.50..2.50 rows=0)
-    -> Temporary table  (cost=2.50..2.50 rows=0)
+    -> Temporary table  (cost=0.00..0.00 rows=0)
         -> Group (no aggregates)
             -> Sort: t1.a, t2.b
                 -> Stream results  (cost=0.80 rows=2)
@@ -1561,13 +1561,13 @@ NULL	NULL	510
 EXPLAIN FORMAT=tree SELECT i, j, i+j, AVG(j) over () from t1 GROUP BY i,j
 WITH ROLLUP HAVING i+j is NULL ORDER BY i;
 EXPLAIN
--> Sort: i
+-> Sort: t1.i
     -> Table scan on <temporary>  (cost=2.50..2.50 rows=0)
-        -> Temporary table  (cost=2.50..2.50 rows=0)
+        -> Temporary table  (cost=0.00..0.00 rows=0)
             -> Window aggregate with buffering: avg(j) OVER () 
                 -> Filter: ((rollup_group_item(t1.i,0) + rollup_group_item(t1.j,1)) is null)
                     -> Table scan on <temporary>  (cost=2.50..2.50 rows=0)
-                        -> Temporary table  (cost=2.50..2.50 rows=0)
+                        -> Temporary table  (cost=0.00..0.00 rows=0)
                             -> Group (no aggregates)
                                 -> Sort: t1.i, t1.j
                                     -> Stream results  (cost=1.75 rows=15)
@@ -2283,3 +2283,35 @@ a	b
 3	NULL
 NULL	NULL
 DROP TABLE t;
+#
+# PS-8328: MySQL 8 Crash when using group_concat with group by with
+#          rollup.
+#
+CREATE TABLE t1 (id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, string TEXT, i INT);
+INSERT INTO t1 (string, i) VALUES ('something', 10), ('something_else', 10), ('something_completely_else', 20);
+SELECT GROUP_CONCAT(string) FROM t1 GROUP BY string WITH ROLLUP;
+GROUP_CONCAT(string)
+something
+something_completely_else
+something_else
+something,something_completely_else,something_else
+SELECT string, GROUP_CONCAT(string) FROM t1 GROUP BY string WITH ROLLUP;
+string	GROUP_CONCAT(string)
+something	something
+something_completely_else	something_completely_else
+something_else	something_else
+NULL	something,something_completely_else,something_else
+SELECT i, GROUP_CONCAT(string) FROM t1 GROUP BY i WITH ROLLUP;
+i	GROUP_CONCAT(string)
+10	something,something_else
+20	something_completely_else
+NULL	something,something_else,something_completely_else
+SELECT i, string, GROUP_CONCAT(string) FROM t1 GROUP BY i, string WITH ROLLUP;
+i	string	GROUP_CONCAT(string)
+10	something	something
+10	something_else	something_else
+10	NULL	something,something_else
+20	something_completely_else	something_completely_else
+20	NULL	something_completely_else
+NULL	NULL	something,something_else,something_completely_else
+DROP TABLE t1;

@@ -141,13 +141,13 @@ int table_pxc_cluster_view ::read_row_values(TABLE *table, unsigned char *buf,
     if (read_all || bitmap_is_set(table->read_set, f->field_index())) {
       switch (f->field_index()) {
         case 0: /** host name */
-          set_field_char_utf8(f, m_row.host_name, strlen(m_row.host_name));
+          set_field_char_utf8mb4(f, m_row.host_name, strlen(m_row.host_name));
           break;
         case 1: /** uuid */
-          set_field_char_utf8(f, m_row.uuid, WSREP_UUID_STR_LEN);
+          set_field_char_utf8mb4(f, m_row.uuid, WSREP_UUID_STR_LEN);
           break;
         case 2: /** status */
-          set_field_char_utf8(f, m_row.status, strlen(m_row.status));
+          set_field_char_utf8mb4(f, m_row.status, strlen(m_row.status));
           break;
         case 3: /** local_index */
           set_field_ulong(f, m_row.local_index);

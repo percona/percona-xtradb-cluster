@@ -277,7 +277,8 @@ PRODUCT_FULL_NAME="${PRODUCT_NAME}.${TAG}_$(uname -s)${DIST_NAME:-}.$MACHINE_SPE
 # This corresponds to GIT revision when the build/package is created.
 if test -e "$SOURCEDIR/Docs/INFO_SRC"
 then
-    REVISION="$(cd "$SOURCEDIR"; grep '^short: ' Docs/INFO_SRC |sed -e 's/short: //')"
+    REVISION="$(cd "$SOURCEDIR"; grep '^commit: ' Docs/INFO_SRC |sed -e 's/commit: //')"
+    REVISION=${REVISION::7}
 elif [ -n "$(which git)" -a -d "$SOURCEDIR/.git" ];
 then
     REVISION="$(git rev-parse --short HEAD)"
@@ -442,6 +443,7 @@ fi
     else
         cmake $SOURCEDIR/ ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
             -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
+            -DMINIMAL_RELWITHDEBINFO=OFF \
             -DCMAKE_INSTALL_PREFIX="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" \
             -DMYSQL_DATADIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/data" \
             -DROUTER_INSTALL_LIBDIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib/mysqlrouter/private" \
@@ -720,13 +722,15 @@ fi
 (
     cd "$TARGETDIR/usr/local/"
     # PS-4854 Percona Server for MySQL tarball without AGPLv3 dependency/license
-    find $PRODUCT_FULL -type f -name 'COPYING.AGPLv3' -delete
+    find $PRODUCT_FULL_NAME -type f -name 'COPYING.AGPLv3' -delete
+    find $PRODUCT_FULL_NAME -type f -name 'core.*' -delete
     $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME.tar.gz" $PRODUCT_FULL_NAME
 
     if [[ $CMAKE_BUILD_TYPE != "Debug" ]]; then
         cd "$TARGETDIR/usr/local/minimal/"
         # PS-4854 Percona Server for MySQL tarball without AGPLv3 dependency/license
-        find $PRODUCT_FULL -type f -name 'COPYING.AGPLv3' -delete
+        find $PRODUCT_FULL_NAME-minimal -type f -name 'COPYING.AGPLv3' -delete
+        find $PRODUCT_FULL_NAME-minimal -type f -name 'core.*' -delete
         $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME-minimal.tar.gz" $PRODUCT_FULL_NAME-minimal
     fi
 ) || exit 1

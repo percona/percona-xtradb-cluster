@@ -202,17 +202,17 @@ bool wsrep_setup_allowed_sst_methods() {
 static bool sst_awaiting_callback = false;
 
 // Signal end of SST
-static void wsrep_sst_complete(THD *thd, int const rcode) {
+static int wsrep_sst_complete(THD *thd, int const rcode) {
   Wsrep_client_service client_service(thd, thd->wsrep_cs());
-  Wsrep_server_state::instance().sst_received(client_service, rcode,
-                                              &sst_awaiting_callback);
+  return Wsrep_server_state::instance().sst_received(client_service, rcode,
+                                                     &sst_awaiting_callback);
 }
 
 /*
 If wsrep provider is loaded, inform that the new state snapshot
 has been received. Also update the local checkpoint.
 */
-void wsrep_sst_received(THD *thd, const wsrep_uuid_t &uuid,
+bool wsrep_sst_received(THD *thd, const wsrep_uuid_t &uuid,
                         wsrep_seqno_t const seqno,
                         const void *const state __attribute__((unused)),
                         size_t const state_len __attribute__((unused))) {
@@ -250,8 +250,10 @@ void wsrep_sst_received(THD *thd, const wsrep_uuid_t &uuid,
 
   if (WSREP_ON) {
     int const rcode(seqno < 0 ? seqno : 0);
-    wsrep_sst_complete(thd, rcode);
+    return (0 != wsrep_sst_complete(thd, rcode));
   }
+
+  return false;
 }
 
 // get rid of trailing \n
@@ -661,7 +663,11 @@ static void *sst_joiner_thread(void *a) {
     /* Read committed isolation to avoid gap locking */
     thd->variables.transaction_isolation = ISO_READ_COMMITTED;
 
-    wsrep_sst_complete(thd, -err);
+    if (wsrep_sst_complete(thd, -err)) {
+      WSREP_ERROR("Failure while signalling the completion of SST. Aborting.");
+      unireg_abort(1);
+    }
+
     WSREP_SYSTEM("SST completed");
     delete thd;
     my_thread_end();
@@ -1104,7 +1110,7 @@ static uint server_session_execute(MYSQL_SESSION session, std::string query,
 
   /* execute sql command */
   command_service_run_command(
-      session, COM_QUERY, &cmd, &my_charset_utf8_general_ci,
+      session, COM_QUERY, &cmd, &my_charset_utf8mb4_general_ci,
       &wsp::Sql_service_context_base::sql_service_callbacks,
       CS_TEXT_REPRESENTATION, ctx);
   delete ctx;

@@ -52,6 +52,7 @@ mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
+mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	CLONE_ADMIN	N
 mysql.session	localhost	CONNECTION_ADMIN	N
@@ -146,6 +147,7 @@ mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
+mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	CLONE_ADMIN	N
 mysql.session	localhost	CONNECTION_ADMIN	N
@@ -239,6 +241,7 @@ mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
+mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	CLONE_ADMIN	N
 mysql.session	localhost	CONNECTION_ADMIN	N
@@ -345,6 +348,7 @@ mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
+mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	CLONE_ADMIN	N
 mysql.session	localhost	CONNECTION_ADMIN	N
@@ -443,6 +447,7 @@ mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
+mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	CLONE_ADMIN	N
 mysql.session	localhost	CONNECTION_ADMIN	N
@@ -536,6 +541,7 @@ mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
+mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	CLONE_ADMIN	N
 mysql.session	localhost	CONNECTION_ADMIN	N
@@ -652,6 +658,7 @@ mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
+mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	CLONE_ADMIN	N
 mysql.session	localhost	CONNECTION_ADMIN	N
@@ -759,6 +766,7 @@ mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
+mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	CLONE_ADMIN	N
 mysql.session	localhost	CONNECTION_ADMIN	N
@@ -874,6 +882,7 @@ mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
+mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	CLONE_ADMIN	N
 mysql.session	localhost	CONNECTION_ADMIN	N
@@ -1179,12 +1188,16 @@ SELECT * FROM test.t1;
 a
 1
 555
+GRANT CONNECTION_ADMIN ON *.* TO u1@localhost;
 SET GLOBAL init_connect = '';
 SET GLOBAL offline_mode = 'ON';
+REVOKE CONNECTION_ADMIN ON *.* from u1@localhost;
 # Connection will fail
 ERROR HY000: The server is currently in offline mode
+GRANT CONNECTION_ADMIN ON *.* TO u1@localhost;
 SET GLOBAL offline_mode = 'OFF';
 SET GLOBAL read_only = 'ON';
+REVOKE CONNECTION_ADMIN ON *.* from u1@localhost;
 # User can't do write operation in database
 INSERT INTO test.t1 VALUES(1);
 ERROR HY000: The MySQL server is running with the --read-only option so it cannot execute this statement
@@ -1400,6 +1413,7 @@ Warning	3719	'utf8' is currently an alias for the character set UTF8MB3, but wil
 Warning	3778	'utf8mb3_bin' is a collation of the deprecated character set UTF8MB3. Please consider using UTF8MB4 with an appropriate collation instead.
 # restore mysql.session privileges
 GRANT SYSTEM_VARIABLES_ADMIN ON *.* TO 'mysql.session'@localhost;
+GRANT AUTHENTICATION_POLICY_ADMIN ON *.* TO 'mysql.session'@localhost;
 GRANT SESSION_VARIABLES_ADMIN ON *.* TO 'mysql.session'@localhost;
 GRANT PERSIST_RO_VARIABLES_ADMIN ON *.* TO 'mysql.session'@localhost;
 GRANT CLONE_ADMIN ON *.* TO 'mysql.session'@localhost;

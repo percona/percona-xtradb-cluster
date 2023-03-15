@@ -44,7 +44,7 @@ SHOW STATUS LIKE 'wsrep_flow_control_interval';
 
 # Set the evs.inactive_timeout to ensure that the node will shutdown 6 seconds after it is
 # killed.  This is set to 6 seconds because evs.inactive_timeout > evs.suspect_timeout (PT5S)
---let $command = "`dirname $WSREP_PROVIDER`/../bin/garbd"
+--let $command = "$GALERA_GARBD"
 --let $command_opt = --sst="xtrabackup-v2:127.0.0.1:9999/xtrabackup_sst//1" --donor invalid_donor --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'evs.inactive_timeout=PT6S;base_port=$NODE_GALERAPORT_2' > $GARBD_LOG_FILE 2>&1
 --source include/start_proc_in_background.inc
 
