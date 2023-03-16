@@ -1,0 +1,10 @@
+# Use default setting for mysqld processes
+!include include/default_mysqld.cnf
+
+[mysqld.1]
+binlog-format=row
+innodb_autoinc_lock_mode=2
+innodb_flush_log_at_trx_commit=2
+
+[ENV]
+GALERA_BASE_PORT=@mysqld.1.#galera_port
