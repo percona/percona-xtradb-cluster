@@ -135,13 +135,13 @@ public:
                                     const ulonglong max_reserved);
 
   /** lock mutex protecting auto increment value next_auto_inc_val. */
-  inline void lock_auto_inc()
+  void lock_auto_inc()
   {
     assert(auto_inc_mutex);
     mysql_mutex_lock(auto_inc_mutex);
   }
   /** unlock mutex protecting auto increment value next_auto_inc_val. */
-  inline void unlock_auto_inc()
+  void unlock_auto_inc()
   {
     assert(auto_inc_mutex);
     mysql_mutex_unlock(auto_inc_mutex);
@@ -458,7 +458,7 @@ public:
       @retval false success.
       @retval true  failure.
   */
-  inline bool init_partitioning(MEM_ROOT *mem_root)
+  bool init_partitioning(MEM_ROOT *mem_root)
   {
 #ifndef NDEBUG
     m_key_not_found_partitions.bitmap= NULL;
@@ -719,7 +719,7 @@ protected:
   /**
     Lock auto increment value if needed.
   */
-  inline void lock_auto_increment()
+  void lock_auto_increment()
   {
     /* lock already taken */
     if (m_auto_increment_safe_stmt_log_lock)
@@ -734,7 +734,7 @@ protected:
   /**
     unlock auto increment.
   */
-  inline void unlock_auto_increment()
+  void unlock_auto_increment()
   {
     /*
       If m_auto_increment_safe_stmt_log_lock is true, we have to keep the lock.
@@ -1051,7 +1051,7 @@ private:
   /**
     Update auto increment value if current row contains a higher value.
   */
-  inline void set_auto_increment_if_higher();
+  void set_auto_increment_if_higher();
   /**
     Common routine to set up index scans.
 
