@@ -81,7 +81,7 @@ FLUSH TABLE WITH READ LOCK;
 --connection node_2
 SET SESSION wsrep_sync_wait = 0;
 --echo #node-2 (check ddl are waiting)
---let $wait_condition = SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'wsrep: initiating TOI for write set (-1)';
+--let $wait_condition = SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'Waiting for global read lock';
 --source include/wait_condition.inc
 
 --connection node_1

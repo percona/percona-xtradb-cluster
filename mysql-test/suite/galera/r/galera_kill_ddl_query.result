@@ -1,25 +1,5 @@
 CALL mtr.add_suppression("WSREP: TO isolation failed");
-################ Test 1 ################
-[connection node_1]
-FLUSH TABLES WITH READ LOCK;
-[connection node_1a]
-SET DEBUG_SYNC = 'wsrep_TOI_begin_after_wsrep_skip_wsrep_hton SIGNAL reached';
-CREATE TABLE t1 (ID INT PRIMARY KEY);;
-[connection node_1b]
-SET DEBUG_SYNC = "now WAIT_FOR reached";
-# Killing query on node1a
-ERROR HY000: The query is in TOI/NBO and cannot be killed
-[connection node_1]
-UNLOCK TABLES;
-[connection node_1a]
-[connection node_1]
-include/assert.inc [Table t1 should exist on node1]
-[connection node_2]
-include/assert.inc [Table t1 should exist on node2]
-[connection node_1]
-DROP TABLE t1;
-SET DEBUG_SYNC='RESET';
-################ Test 2a ################
+################ Test 1a ################
 [connection node_1a]
 SET DEBUG_SYNC = 'wsrep_TOI_begin_before_wsrep_skip_wsrep_hton SIGNAL reached WAIT_FOR continue';
 CREATE TABLE t1 (ID INT PRIMARY KEY);;
@@ -35,7 +15,7 @@ include/assert.inc [Table t1 should not exist on node1]
 include/assert.inc [Table t1 should not exist on node2]
 [connection node_1]
 SET DEBUG_SYNC='RESET';
-################ Test 2b ################
+################ Test 1b ################
 [connection node_1a]
 SET DEBUG_SYNC = 'wsrep_TOI_begin_after_wsrep_skip_wsrep_hton SIGNAL reached WAIT_FOR continue';
 CREATE TABLE t1 (ID INT PRIMARY KEY);;
@@ -52,7 +32,7 @@ include/assert.inc [Table t1 should exist on node2]
 [connection node_1]
 DROP TABLE t1;
 SET DEBUG_SYNC='RESET';
-################ Test 2c ################
+################ Test 1c ################
 [connection node_1a]
 SET DEBUG_SYNC = 'wsrep_to_isolation_end_before_wsrep_skip_wsrep_hton SIGNAL reached WAIT_FOR continue';
 CREATE TABLE t1 (ID INT PRIMARY KEY);;
@@ -69,7 +49,7 @@ include/assert.inc [Table t1 should exist on node2]
 [connection node_1]
 DROP TABLE t1;
 SET DEBUG_SYNC='RESET';
-################ Test 2d ################
+################ Test 1d ################
 [connection node_1a]
 SET DEBUG_SYNC = 'wsrep_to_isolation_end_after_wsrep_skip_wsrep_hton SIGNAL reached WAIT_FOR continue';
 CREATE TABLE t1 (ID INT PRIMARY KEY);;
@@ -85,7 +65,7 @@ include/assert.inc [Table t1 should exist on node2]
 [connection node_1]
 DROP TABLE t1;
 SET DEBUG_SYNC='RESET';
-################ Test 3 ################
+################ Test 2 ################
 [connection node_1]
 CREATE TABLE t2(id INT PRIMARY KEY);
 SET DEBUG_SYNC = 'ha_innobase_write_row SIGNAL write_reached WAIT_FOR write_continue';
@@ -112,7 +92,7 @@ include/assert.inc [Table t2 should be empty on node2]
 DROP TABLE t1;
 DROP TABLE t2;
 SET DEBUG_SYNC='RESET';
-################ Test 4a ################
+################ Test 3a ################
 [connection node_1a]
 SET DEBUG_SYNC = 'wsrep_TOI_begin_before_wsrep_skip_wsrep_hton SIGNAL reached WAIT_FOR continue';
 CREATE TABLE t1 (ID INT PRIMARY KEY);;
@@ -128,7 +108,7 @@ include/assert.inc [Table t1 should not exist on node1]
 include/assert.inc [Table t1 should not exist on node2]
 [connection node_1]
 SET DEBUG_SYNC='RESET';
-################ Test 4b ################
+################ Test 3b ################
 [connection node_1a]
 SET DEBUG_SYNC = 'wsrep_TOI_begin_after_wsrep_skip_wsrep_hton SIGNAL reached WAIT_FOR continue';
 CREATE TABLE t1 (ID INT PRIMARY KEY);;
@@ -145,7 +125,7 @@ include/assert.inc [Table t1 should exist on node2]
 [connection node_1]
 DROP TABLE t1;
 SET DEBUG_SYNC='RESET';
-################ Test 4c ################
+################ Test 3c ################
 [connection node_1a]
 SET DEBUG_SYNC = 'wsrep_to_isolation_end_before_wsrep_skip_wsrep_hton SIGNAL reached WAIT_FOR continue';
 CREATE TABLE t1 (ID INT PRIMARY KEY);;
@@ -162,7 +142,7 @@ include/assert.inc [Table t1 should exist on node2]
 [connection node_1]
 DROP TABLE t1;
 SET DEBUG_SYNC='RESET';
-################ Test 4d ################
+################ Test 3d ################
 [connection node_1a]
 SET DEBUG_SYNC = 'wsrep_to_isolation_end_after_wsrep_skip_wsrep_hton SIGNAL reached WAIT_FOR continue';
 CREATE TABLE t1 (ID INT PRIMARY KEY);;

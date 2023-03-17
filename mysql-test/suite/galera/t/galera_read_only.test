@@ -44,3 +44,33 @@ SET GLOBAL super_read_only=FALSE;
 SET GLOBAL read_only=FALSE;
 
 DROP TABLE t1;
+#
+# PXC-4041: Rotating InnoDB MK from a read_only node breaks the cluster
+#
+
+--connection node_1
+--let super_read_only_saved = `SELECT @@super_read_only`
+--let read_only_saved = `SELECT @@read_only`
+
+# super_read_only
+SET GLOBAL super_read_only=1;
+--error ER_OPTION_PREVENTS_STATEMENT
+ALTER INSTANCE ROTATE INNODB MASTER KEY;
+
+# read_only
+SET GLOBAL super_read_only=0;
+SET GLOBAL read_only=1;
+
+CREATE USER 'testuser'@'%' IDENTIFIED WITH 'mysql_native_password' BY 'testuser';
+GRANT ENCRYPTION_KEY_ADMIN ON *.* to 'testuser'@'%';
+--connect node_1a, 127.0.0.1, testuser, testuser, test, $NODE_MYPORT_1
+--connection node_1a
+--error ER_OPTION_PREVENTS_STATEMENT
+ALTER INSTANCE ROTATE INNODB MASTER KEY;
+
+--connection node_1
+--eval SET global read_only = $read_only_saved
+--eval SET global super_read_only = $super_read_only_saved
+DROP USER 'testuser'@'%';
+
+CALL mtr.add_suppression("Failed to replicate .* in cluster mode");
