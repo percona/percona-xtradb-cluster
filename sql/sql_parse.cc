@@ -1809,9 +1809,15 @@ static bool pxc_strict_mode_lock_check(THD *thd) {
  * Writing on a new node can crash nodes with lower version 8.0->5.7
  */
 static bool block_write_while_in_rolling_upgrade(THD *thd) {
-  /* Ignore check while server is not ready or for background wsrep applier too
-   * (like slave thread) */
-  if (!wsrep_node_is_synced() || (WSREP(thd) && thd->wsrep_applier))
+  /* Ignore check for:
+     1. The time when server starts and is initializing. We can get here from
+        the main thread when init_server_components() is called. Galera view
+        was not received so far, wsrep_protocol_version == 4, so we don't see
+        the cluster as multi-version cluster, so even without this check we
+        would not block writes, but for clear flow, let's check if server state
+        is initialized, and if it is not yet, do not block writes.
+     2. Background wsrep applier (like slave thread) */
+  if (!thd->wsrep_cs().server_state().is_initialized() || (WSREP(thd) && thd->wsrep_applier))
     return false;
 
   bool block = false;
