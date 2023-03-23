@@ -48,12 +48,18 @@
 #include "sql/system_variables.h"
 #include "sql/thr_malloc.h"
 
+<<<<<<< HEAD
 #ifdef WITH_WSREP
 #include "mysql/components/services/log_builtins.h"
 #include "wsrep_trans_observer.h"
 #endif /* WITH_WSREP */
 
 struct TABLE_LIST;
+||||||| 714493799d7
+struct TABLE_LIST;
+=======
+class Table_ref;
+>>>>>>> Percona-Server-8.0.32-24
 
 #include <vector>
 
@@ -787,7 +793,7 @@ int Gtid_state::compress(THD *thd) {
   return gtid_table_persistor->compress(thd);
 }
 
-int Gtid_state::warn_or_err_on_modify_gtid_table(THD *thd, TABLE_LIST *table) {
+int Gtid_state::warn_or_err_on_modify_gtid_table(THD *thd, Table_ref *table) {
   DBUG_TRACE;
   int ret =
       gtid_table_persistor->warn_or_err_on_explicit_modification(thd, table);

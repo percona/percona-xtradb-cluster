@@ -112,7 +112,7 @@ bool Column_name_comparator::operator()(const String *lhs,
   return sortcmp(lhs, rhs, lhs->charset()) < 0;
 }
 
-static int send_check_errmsg(THD *thd, TABLE_LIST *table,
+static int send_check_errmsg(THD *thd, Table_ref *table,
                              const char *operator_name, const char *errmsg)
 
 {
@@ -127,7 +127,7 @@ static int send_check_errmsg(THD *thd, TABLE_LIST *table,
   return 1;
 }
 
-static int prepare_for_repair(THD *thd, TABLE_LIST *table_list,
+static int prepare_for_repair(THD *thd, Table_ref *table_list,
                               HA_CHECK_OPT *check_opt) {
   int error = 0;
   TABLE tmp_table, *table;
@@ -305,7 +305,7 @@ Sql_cmd_analyze_table::Sql_cmd_analyze_table(
       m_histogram_buckets(histogram_buckets),
       m_data{data} {}
 
-bool Sql_cmd_analyze_table::drop_histogram(THD *thd, TABLE_LIST *table,
+bool Sql_cmd_analyze_table::drop_histogram(THD *thd, Table_ref *table,
                                            histograms::results_map &results) {
   histograms::columns_set fields;
 
@@ -352,7 +352,7 @@ static bool send_analyze_table_errors(THD *thd, const char *operator_name,
 }
 
 bool Sql_cmd_analyze_table::send_histogram_results(
-    THD *thd, const histograms::results_map &results, const TABLE_LIST *table) {
+    THD *thd, const histograms::results_map &results, const Table_ref *table) {
   Item *item;
   mem_root_deque<Item *> field_list(thd->mem_root);
 
@@ -623,7 +623,7 @@ bool Sql_cmd_analyze_table::send_histogram_results(
   return false;
 }
 
-bool Sql_cmd_analyze_table::update_histogram(THD *thd, TABLE_LIST *table,
+bool Sql_cmd_analyze_table::update_histogram(THD *thd, Table_ref *table,
                                              histograms::results_map &results) {
   histograms::columns_set fields;
 
@@ -748,10 +748,10 @@ wsrep_error_label:
           (admin operation or network communication failed)
 */
 static bool mysql_admin_table(
-    THD *thd, TABLE_LIST *tables, HA_CHECK_OPT *check_opt,
+    THD *thd, Table_ref *tables, HA_CHECK_OPT *check_opt,
     const char *operator_name, thr_lock_type lock_type, bool open_for_modify,
     bool repair_table_use_frm, uint extra_open_options,
-    int (*prepare_func)(THD *, TABLE_LIST *, HA_CHECK_OPT *),
+    int (*prepare_func)(THD *, Table_ref *, HA_CHECK_OPT *),
     int (handler::*operator_func)(THD *, HA_CHECK_OPT *), int check_view,
     Alter_info *alter_info, bool need_to_acquire_shared_backup_lock) {
   /*
@@ -763,7 +763,7 @@ static bool mysql_admin_table(
 
   dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
 
-  TABLE_LIST *table;
+  Table_ref *table;
   Query_block *select = thd->lex->query_block;
   Item *item;
   Protocol *protocol = thd->get_protocol();
@@ -838,12 +838,12 @@ static bool mysql_admin_table(
                                     : MDL_SHARED_READ);
     /* open only one table from local list of command */
     {
-      TABLE_LIST *save_next_global, *save_next_local;
+      Table_ref *save_next_global, *save_next_local;
       save_next_global = table->next_global;
       table->next_global = nullptr;
       save_next_local = table->next_local;
       table->next_local = nullptr;
-      select->table_list.first = table;
+      select->m_table_list.first = table;
       /*
         Time zone tables and SP tables can be add to lex->query_tables list,
         so it have to be prepared.
@@ -1338,8 +1338,8 @@ static bool mysql_admin_table(
         }
         if (protocol->end_row()) goto err;
         DBUG_PRINT("info", ("HA_ADMIN_TRY_ALTER, trying analyze..."));
-        TABLE_LIST *save_next_local = table->next_local,
-                   *save_next_global = table->next_global;
+        Table_ref *save_next_local = table->next_local,
+                  *save_next_global = table->next_global;
         table->next_local = table->next_global = nullptr;
         {
           // binlogging is done by caller if wanted
@@ -1618,7 +1618,7 @@ err:
    true  error
 */
 
-bool Sql_cmd_cache_index::assign_to_keycache(THD *thd, TABLE_LIST *tables) {
+bool Sql_cmd_cache_index::assign_to_keycache(THD *thd, Table_ref *tables) {
   HA_CHECK_OPT check_opt;
   KEY_CACHE *key_cache;
   DBUG_TRACE;
@@ -1655,7 +1655,7 @@ bool Sql_cmd_cache_index::assign_to_keycache(THD *thd, TABLE_LIST *tables) {
     true  error
 */
 
-bool Sql_cmd_load_index::preload_keys(THD *thd, TABLE_LIST *tables) {
+bool Sql_cmd_load_index::preload_keys(THD *thd, Table_ref *tables) {
   DBUG_TRACE;
   /*
     We cannot allow concurrent inserts. The storage engine reads
@@ -1685,7 +1685,7 @@ bool Sql_cmd_analyze_table::set_histogram_fields(List<String> *fields) {
 }
 
 bool Sql_cmd_analyze_table::handle_histogram_command(THD *thd,
-                                                     TABLE_LIST *table) {
+                                                     Table_ref *table) {
   // This should not be empty here.
   assert(!get_histogram_fields().empty());
 
@@ -1896,7 +1896,7 @@ static bool pxc_strict_mode_admin_check(THD *thd, TABLE_LIST *tables) {
 #endif /* WITH_WSREP */
 
 bool Sql_cmd_analyze_table::execute(THD *thd) {
-  TABLE_LIST *first_table = thd->lex->query_block->get_table_list();
+  Table_ref *first_table = thd->lex->query_block->get_table_list();
   bool res = true;
   thr_lock_type lock_type = TL_READ_NO_INSERT;
   DBUG_TRACE;
@@ -1943,7 +1943,7 @@ bool Sql_cmd_analyze_table::execute(THD *thd) {
     */
     res = write_bin_log(thd, true, thd->query().str, thd->query().length);
   }
-  thd->lex->query_block->table_list.first = first_table;
+  thd->lex->query_block->m_table_list.first = first_table;
   thd->lex->query_tables = first_table;
 
 error:
@@ -1951,7 +1951,7 @@ error:
 }
 
 bool Sql_cmd_check_table::execute(THD *thd) {
-  TABLE_LIST *first_table = thd->lex->query_block->get_table_list();
+  Table_ref *first_table = thd->lex->query_block->get_table_list();
   thr_lock_type lock_type = TL_READ_NO_INSERT;
   bool res = true;
   DBUG_TRACE;
@@ -1976,7 +1976,7 @@ bool Sql_cmd_check_table::execute(THD *thd) {
                           lock_type, false, false, HA_OPEN_FOR_REPAIR, nullptr,
                           &handler::ha_check, 1, m_alter_info, true);
 
-  thd->lex->query_block->table_list.first = first_table;
+  thd->lex->query_block->m_table_list.first = first_table;
   thd->lex->query_tables = first_table;
 
 error:
@@ -1984,7 +1984,7 @@ error:
 }
 
 bool Sql_cmd_optimize_table::execute(THD *thd) {
-  TABLE_LIST *first_table = thd->lex->query_block->get_table_list();
+  Table_ref *first_table = thd->lex->query_block->get_table_list();
   bool res = true;
   DBUG_TRACE;
 
@@ -2013,7 +2013,7 @@ bool Sql_cmd_optimize_table::execute(THD *thd) {
     */
     res = write_bin_log(thd, true, thd->query().str, thd->query().length);
   }
-  thd->lex->query_block->table_list.first = first_table;
+  thd->lex->query_block->m_table_list.first = first_table;
   thd->lex->query_tables = first_table;
 
 error:
@@ -2021,7 +2021,7 @@ error:
 }
 
 bool Sql_cmd_repair_table::execute(THD *thd) {
-  TABLE_LIST *first_table = thd->lex->query_block->get_table_list();
+  Table_ref *first_table = thd->lex->query_block->get_table_list();
   bool res = true;
   DBUG_TRACE;
 
@@ -2050,7 +2050,7 @@ bool Sql_cmd_repair_table::execute(THD *thd) {
     */
     res = write_bin_log(thd, true, thd->query().str, thd->query().length);
   }
-  thd->lex->query_block->table_list.first = first_table;
+  thd->lex->query_block->m_table_list.first = first_table;
   thd->lex->query_tables = first_table;
 
 error:
