@@ -586,7 +586,6 @@ int ReplicaInitializer::init_replica() {
 
   group_replication_cleanup_after_clone();
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   /*
      for only wsrep, create active_mi, for async slave restart purpose
@@ -594,44 +593,7 @@ int ReplicaInitializer::init_replica() {
   active_mi = channel_map.get_default_channel_mi();
 #endif /* WITH_WSREP */
 
-#ifndef NDEBUG
-  /* @todo: Print it for all the channels */
-  {
-    Master_info *default_mi;
-    default_mi = channel_map.get_default_channel_mi();
-    if (default_mi && default_mi->rli) {
-      DBUG_PRINT("info",
-                 ("init group master %s %lu  group relay %s %lu event %s %lu\n",
-                  default_mi->rli->get_group_master_log_name(),
-                  (ulong)default_mi->rli->get_group_master_log_pos(),
-                  default_mi->rli->get_group_relay_log_name(),
-                  (ulong)default_mi->rli->get_group_relay_log_pos(),
-                  default_mi->rli->get_event_relay_log_name(),
-                  (ulong)default_mi->rli->get_event_relay_log_pos()));
-    }
-  }
-#endif
-||||||| 714493799d7
-#ifndef NDEBUG
-  /* @todo: Print it for all the channels */
-  {
-    Master_info *default_mi;
-    default_mi = channel_map.get_default_channel_mi();
-    if (default_mi && default_mi->rli) {
-      DBUG_PRINT("info",
-                 ("init group master %s %lu  group relay %s %lu event %s %lu\n",
-                  default_mi->rli->get_group_master_log_name(),
-                  (ulong)default_mi->rli->get_group_master_log_pos(),
-                  default_mi->rli->get_group_relay_log_name(),
-                  (ulong)default_mi->rli->get_group_relay_log_pos(),
-                  default_mi->rli->get_event_relay_log_name(),
-                  (ulong)default_mi->rli->get_event_relay_log_pos()));
-    }
-  }
-#endif
-=======
   print_channel_info();
->>>>>>> Percona-Server-8.0.32-24
 
   check_replica_configuration_restrictions();
 
@@ -7205,26 +7167,12 @@ wsrep_restart_point :
 
   mysql_mutex_unlock(&rli->info_thd_lock);
 
-<<<<<<< HEAD
   /* Inform waiting threads that slave has started */
   rli->slave_run_id++;
   rli->slave_running = 1;
   rli->reported_unsafe_warning = false;
   rli->sql_thread_kill_accepted = false;
-||||||| 714493799d7
-    /* Inform waiting threads that slave has started */
-    rli->slave_run_id++;
-    rli->slave_running = 1;
-    rli->reported_unsafe_warning = false;
-    rli->sql_thread_kill_accepted = false;
-=======
-    /* Inform waiting threads that slave has started */
-    rli->slave_run_id++;
-    rli->slave_running = 1;
-    rli->reported_unsafe_warning = false;
-    rli->sql_thread_kill_accepted = false;
-    rli->last_event_start_time = 0;
->>>>>>> Percona-Server-8.0.32-24
+  rli->last_event_start_time = 0;
 
   if (init_replica_thread(thd, SLAVE_THD_SQL)) {
     /*
@@ -7263,21 +7211,14 @@ wsrep_restart_point :
         (rli->get_require_table_primary_key_check() ==
          Relay_log_info::PK_CHECK_ON);
 
-<<<<<<< HEAD
   // Replicas shall not create GIPKs if source tables have no PKs
   thd->variables.sql_generate_invisible_primary_key = false;
-||||||| 714493799d7
-    // Replicas shall not create GIPKs if source tables have no PKs
-    thd->variables.sql_generate_invisible_primary_key = false;
-=======
-    thd->variables.sql_generate_invisible_primary_key = false;
-    if (thd->rpl_thd_ctx.get_rpl_channel_type() != GR_APPLIER_CHANNEL &&
-        thd->rpl_thd_ctx.get_rpl_channel_type() != GR_RECOVERY_CHANNEL &&
-        Relay_log_info::PK_CHECK_GENERATE ==
-            rli->get_require_table_primary_key_check()) {
-      thd->variables.sql_generate_invisible_primary_key = true;
-    }
->>>>>>> Percona-Server-8.0.32-24
+  if (thd->rpl_thd_ctx.get_rpl_channel_type() != GR_APPLIER_CHANNEL &&
+      thd->rpl_thd_ctx.get_rpl_channel_type() != GR_RECOVERY_CHANNEL &&
+      Relay_log_info::PK_CHECK_GENERATE ==
+          rli->get_require_table_primary_key_check()) {
+    thd->variables.sql_generate_invisible_primary_key = true;
+  }
 
   rli->transaction_parser.reset();
 

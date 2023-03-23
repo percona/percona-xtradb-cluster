@@ -7500,16 +7500,6 @@ static int init_server_components() {
       true; /* Don't separate from init function */
   delete_optimizer_cost_module();
 
-<<<<<<< HEAD
-  LEX_CSTRING plugin_name = {STRING_WITH_LEN("thread_pool")};
-  if (Connection_handler_manager::thread_handling !=
-          Connection_handler_manager::SCHEDULER_ONE_THREAD_PER_CONNECTION ||
-      plugin_is_ready(plugin_name, MYSQL_DAEMON_PLUGIN)) {
-    auto res_grp_mgr = resourcegroups::Resource_group_mgr::instance();
-    res_grp_mgr->disable_resource_group();
-    res_grp_mgr->set_unsupport_reason("Thread pool plugin enabled");
-  }
-
 #ifdef WITH_WSREP
   static const LEX_CSTRING keyring_vault_name = {
       STRING_WITH_LEN("keyring_vault")};
@@ -7526,18 +7516,6 @@ static int init_server_components() {
   }
 #endif
 
-||||||| 714493799d7
-  LEX_CSTRING plugin_name = {STRING_WITH_LEN("thread_pool")};
-  if (Connection_handler_manager::thread_handling !=
-          Connection_handler_manager::SCHEDULER_ONE_THREAD_PER_CONNECTION ||
-      plugin_is_ready(plugin_name, MYSQL_DAEMON_PLUGIN)) {
-    auto res_grp_mgr = resourcegroups::Resource_group_mgr::instance();
-    res_grp_mgr->disable_resource_group();
-    res_grp_mgr->set_unsupport_reason("Thread pool plugin enabled");
-  }
-
-=======
->>>>>>> Percona-Server-8.0.32-24
 #ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
   if (!is_help_or_validate_option()) {
     /*

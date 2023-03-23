@@ -232,7 +232,11 @@ class Commit_stage_manager {
 
     @return True if the session is a group leader, false otherwise.
    */
+#ifdef WITH_WSREP
+  bool append_to(StageID stage, THD *thd, bool interim_commit);
+#else
   bool append_to(StageID stage, THD *thd);
+#endif /* WITH_WSREP */
 
   /**
     Enroll a set of sessions for a stage.

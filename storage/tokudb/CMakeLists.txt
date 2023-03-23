@@ -1,4 +1,4 @@
-RETURN()  # Disable TokuDB
+RETURN()  # Disable TokuDB for PXC builds
 
 # Copyright (c) 2017, Percona and/or its affiliates. All rights reserved.
 #
@@ -26,16 +26,8 @@ IF (NOT DEFINED WITH_TOKUDB)
 ENDIF ()
 
 IF (NOT WITH_TOKUDB)
-<<<<<<< HEAD
-#  MESSAGE (STATUS "Not building with TokuDB storage engine, you must specify -DWITH_TOKUDB=1|ON|FORCE to cmake in order to build with TokuDB.")
-  RETURN ()
-||||||| 714493799d7
-#  MESSAGE (STATUS "Not building with TokuDB storage engine, you must specify -DWITH_TOKUDB=1|ON|FORCE to cmake in order to build with TokuDB.")
-#  RETURN ()
-=======
   MESSAGE (STATUS "Not building with TokuDB storage engine, you must specify -DWITH_TOKUDB=1|ON|FORCE to cmake in order to build with TokuDB.")
   RETURN ()
->>>>>>> Percona-Server-8.0.32-24
 ELSE ()
   MESSAGE (STATUS "Building with TokuDB storage engine = " ${WITH_TOKUDB})
   IF (WITH_TOKUDB STREQUAL "FORCE")

@@ -505,16 +505,14 @@ struct PRINT_EVENT_INFO {
     It omits the SET @@session.pseudo_thread_id printed on Query events
   */
   bool require_row_format;
-<<<<<<< HEAD
-  bool ddl_skip_rewrite;
-||||||| 714493799d7
-=======
 
   /**
     The version of the last server that sent the transaction
   */
   uint32_t immediate_server_version;
->>>>>>> Percona-Server-8.0.32-24
+#ifdef WITH_WSREP
+  bool ddl_skip_rewrite;
+#endif /* WITH_WSREP */
 };
 #endif
 

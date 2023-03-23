@@ -48,18 +48,12 @@
 #include "sql/system_variables.h"
 #include "sql/thr_malloc.h"
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 #include "mysql/components/services/log_builtins.h"
 #include "wsrep_trans_observer.h"
 #endif /* WITH_WSREP */
 
-struct TABLE_LIST;
-||||||| 714493799d7
-struct TABLE_LIST;
-=======
 class Table_ref;
->>>>>>> Percona-Server-8.0.32-24
 
 #include <vector>
 

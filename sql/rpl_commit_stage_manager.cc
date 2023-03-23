@@ -29,15 +29,11 @@
 #include "sql/raii/sentry.h"                             // raii::Sentry<>
 #include "sql/rpl_commit_stage_manager.h"
 #include "sql/rpl_replica_commit_order_manager.h"  // Commit_order_manager
-<<<<<<< HEAD
-#include "sql/rpl_rli_pdb.h"  // Slave_worker                    // Slave_worker
+#include "sql/rpl_rli_pdb.h"                       // Slave_worker
+#ifdef WITH_WSREP
 #include "sql/wsrep_applier.h"
 #include "sql/wsrep_trans_observer.h"
-||||||| 714493799d7
-#include "sql/rpl_rli_pdb.h"  // Slave_worker                    // Slave_worker
-=======
-#include "sql/rpl_rli_pdb.h"                       // Slave_worker
->>>>>>> Percona-Server-8.0.32-24
+#endif /* WITH_WSREP */
 
 class Slave_worker;
 class Commit_order_manager;
@@ -252,13 +248,21 @@ void Commit_stage_manager::wait_for_ticket_turn(THD *thd,
   }
 }
 
+#ifdef WITH_WSREP
+bool Commit_stage_manager::append_to(StageID stage, THD *thd, bool interim_commit) {
+#else
 bool Commit_stage_manager::append_to(StageID stage, THD *thd) {
+#endif /* WITH_WSREP */
   this->wait_for_ticket_turn(thd, false);
   raii::Sentry<> _ticket_guard{
       [thd, this]() -> void { this->update_session_ticket_state(thd); }};
 
   lock_queue(stage);
+#ifdef WITH_WSREP
+  return m_queue[stage].append(thd, interim_commit);
+#else
   return m_queue[stage].append(thd);
+#endif /* WITH_WSREP */
 }
 
 bool Commit_stage_manager::enroll_for(StageID stage, THD *thd,
@@ -270,20 +274,12 @@ bool Commit_stage_manager::enroll_for(StageID stage, THD *thd,
   DBUG_PRINT("debug",
              ("Enqueue 0x%llx to queue for stage %d", (ulonglong)thd, stage));
 
-<<<<<<< HEAD
-  lock_queue(stage);
-#ifdef WITH_WSREP
-  bool leader = m_queue[stage].append(thd, (stage == BINLOG_FLUSH_STAGE));
-#else
-  bool leader = m_queue[stage].append(thd);
-#endif /* WITH_WSREP */
-||||||| 714493799d7
-  lock_queue(stage);
-  bool leader = m_queue[stage].append(thd);
-=======
   thd->rpl_thd_ctx.binlog_group_commit_ctx().assign_ticket();
+#ifdef WITH_WSREP
+  bool leader = this->append_to(stage, thd, (stage == BINLOG_FLUSH_STAGE));
+#else
   bool leader = this->append_to(stage, thd);
->>>>>>> Percona-Server-8.0.32-24
+#endif /* WITH_WSREP */
 
   /*
    if its FLUSH stage queue (BINLOG_FLUSH_STAGE or COMMIT_ORDER_FLUSH_STAGE)

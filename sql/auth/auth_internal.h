@@ -239,18 +239,9 @@ int replace_routine_table(THD *thd, GRANT_NAME *grant_name, TABLE *table,
                           const LEX_USER &combo, const char *db,
                           const char *routine_name, bool is_proc, ulong rights,
                           bool revoke_grant);
-<<<<<<< HEAD
-int open_grant_tables(THD *thd, TABLE_LIST *tables, bool *transactional_tables);
-void acl_tables_setup_for_read(TABLE_LIST *tables);
-||||||| 714493799d7
-int open_grant_tables(THD *thd, TABLE_LIST *tables, bool *transactional_tables);
-void acl_tables_setup_for_read(TABLE_LIST *tables);
-
-=======
 int open_grant_tables(THD *thd, Table_ref *tables, bool *transactional_tables);
 void acl_tables_setup_for_read(Table_ref *tables);
 
->>>>>>> Percona-Server-8.0.32-24
 void acl_print_ha_error(int handler_error);
 bool check_engine_type_for_acl_table(Table_ref *tables, bool report_error);
 bool log_and_commit_acl_ddl(THD *thd, bool transactional_tables,

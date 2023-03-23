@@ -1970,17 +1970,8 @@ static bool acl_tables_setup_for_write_and_acquire_mdl(THD *thd,
   @note  IX Backup Lock is implicitly acquired as side effect of calling
          this function.
 */
-<<<<<<< HEAD
-int open_grant_tables(THD *thd, TABLE_LIST *tables,
-                      bool *transactional_tables) {
-||||||| 714493799d7
-
-int open_grant_tables(THD *thd, TABLE_LIST *tables,
-                      bool *transactional_tables) {
-=======
 
 int open_grant_tables(THD *thd, Table_ref *tables, bool *transactional_tables) {
->>>>>>> Percona-Server-8.0.32-24
   DBUG_TRACE;
 
   if (!initialized) {

@@ -830,34 +830,18 @@ const ACL_internal_schema_access *get_cached_schema_access(
 bool acl_is_utility_user(const char *user, const char *host, const char *ip);
 bool acl_utility_user_has_global_grant(const std::string &privilege);
 
-<<<<<<< HEAD
-bool lock_tables_precheck(THD *thd, TABLE_LIST *tables);
-bool create_table_precheck(THD *thd, TABLE_LIST *tables,
-                           TABLE_LIST *create_table);
+bool lock_tables_precheck(THD *thd, Table_ref *tables);
+bool create_table_precheck(THD *thd, Table_ref *tables,
+                           Table_ref *create_table);
 #ifdef WITH_WSREP
 bool check_fk_parent_table_access(THD *thd, HA_CREATE_INFO *create_info,
                                   Alter_info *alter_info,
                                   bool check_fk_support = true);
 #else
-||||||| 714493799d7
-bool lock_tables_precheck(THD *thd, TABLE_LIST *tables);
-bool create_table_precheck(THD *thd, TABLE_LIST *tables,
-                           TABLE_LIST *create_table);
-=======
-bool lock_tables_precheck(THD *thd, Table_ref *tables);
-bool create_table_precheck(THD *thd, Table_ref *tables,
-                           Table_ref *create_table);
->>>>>>> Percona-Server-8.0.32-24
 bool check_fk_parent_table_access(THD *thd, HA_CREATE_INFO *create_info,
                                   Alter_info *alter_info);
-<<<<<<< HEAD
 #endif
-bool check_lock_view_underlying_table_access(THD *thd, TABLE_LIST *tbl,
-||||||| 714493799d7
-bool check_lock_view_underlying_table_access(THD *thd, TABLE_LIST *tbl,
-=======
 bool check_lock_view_underlying_table_access(THD *thd, Table_ref *tbl,
->>>>>>> Percona-Server-8.0.32-24
                                              bool *fake_lock_tables_acl);
 bool check_readonly(THD *thd, bool err_if_readonly);
 void err_readonly(THD *thd);
