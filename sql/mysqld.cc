@@ -2782,7 +2782,16 @@ static void unireg_abort(int exit_code) {
     }
     wsrep_deinit();
     THD *thd = current_thd;
-    if (thd) {
+
+    /*
+      Skip removing background threads from Global_THD_manager, as SST Joiner
+      thread (marked as SYSTEM_THREAD_BACKGROUND, which is not added to
+      Global_THD_manager can end up here if there is a problem during startup.
+
+      Calling remove_thd() without registering in the Global_THD_manager may
+      cause the assertion "Assertion `1 == num_erased'"
+    */
+    if (thd && thd->system_thread != SYSTEM_THREAD_BACKGROUND) {
       Global_THD_manager *thd_manager = Global_THD_manager::get_instance();
       WSREP_DEBUG("Closing aborting applier THD: %u", thd->thread_id());
       thd->release_resources();
