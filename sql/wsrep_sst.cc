@@ -684,6 +684,15 @@ static void *sst_joiner_thread(void *a) {
   return NULL;
 }
 
+#if defined(HAVE_ASAN)
+/*
+ * When MySQL is built with ASAN, libasan will be propagated to child processes
+ * via LD_PRELOAD. This can be annoying because unix utils including bash can
+ * have memory errors itself. Let's unset LD_PRELOAD on ASAN builds.
+ */
+static void reset_ld_preload(wsp::env &env) { env.append("LD_PRELOAD="); }
+#endif
+
 static ssize_t sst_prepare_other(const char *method, const char *addr_in,
                                  const char **addr_out) {
   int const cmd_len = 4096;
@@ -733,6 +742,10 @@ static ssize_t sst_prepare_other(const char *method, const char *addr_in,
     WSREP_ERROR("sst_prepare_other(): env. var ctor failed: %d", -env.error());
     return -env.error();
   }
+
+#if defined(HAVE_ASAN)
+  reset_ld_preload(env);
+#endif
 
   pthread_t tmp;
   sst_thread_arg arg(cmd_str(), env());
@@ -1545,6 +1558,10 @@ int wsrep_sst_donate(const std::string &msg, const wsrep::gtid &current_gtid,
     WSREP_ERROR("wsrep_sst_donate_cb(): env var ctor failed: %d", -env.error());
     return WSREP_CB_FAILURE;
   }
+
+#if defined(HAVE_ASAN)
+  reset_ld_preload(env);
+#endif
 
 #if 0
   /* Wait for wsrep-SE to initialize that also signals
