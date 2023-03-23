@@ -706,7 +706,7 @@ static Check_result check_for_upgrade(THD *thd, dd::String_type &sname,
    also appended in the write set.
    ALTER TABLE case is handled in alter table execution path.
 */
-static bool wsrep_toi_replication(THD *thd, TABLE_LIST *tables) {
+static bool wsrep_toi_replication(THD *thd, Table_ref *tables) {
   if (!WSREP(thd) || !WSREP_CLIENT(thd)) return false;
 
   LEX *lex = thd->lex;
@@ -1776,10 +1776,10 @@ bool Sql_cmd_analyze_table::handle_histogram_command(THD *thd,
 }
 
 #ifdef WITH_WSREP
-static bool pxc_strict_mode_admin_check(THD *thd, TABLE_LIST *tables) {
+static bool pxc_strict_mode_admin_check(THD *thd, Table_ref *tables) {
   enum legacy_db_type db_type;
 
-  for (TABLE_LIST *table = tables; table; table = table->next_local) {
+  for (Table_ref *table = tables; table; table = table->next_local) {
     /* Skip check for temporary table */
     if (is_temporary_table(table)) continue;
 

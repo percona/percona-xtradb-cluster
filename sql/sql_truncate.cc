@@ -772,7 +772,7 @@ bool Sql_cmd_truncate_table::execute(THD *thd) {
 
   if (WSREP_ON && !is_temporary_table(first_table)) {
     enum legacy_db_type db_type;
-    TABLE_LIST *table = first_table;
+    Table_ref *table = first_table;
 
     // mdl_lock scope begin
     {

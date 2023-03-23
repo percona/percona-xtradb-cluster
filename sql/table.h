@@ -3398,7 +3398,7 @@ class Table_ref {
   const char *get_table_name() const { return table_name; }
 #ifdef WITH_WSREP
   /**
-     @brief Returns the table alias that this TABLE_LIST represents.
+     @brief Returns the table alias that this Table_ref represents.
      This is needed to get the real name of the temporary table as the normal
      table name is temporary generated string.
 

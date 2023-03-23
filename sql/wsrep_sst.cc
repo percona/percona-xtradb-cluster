@@ -951,7 +951,7 @@ static int sst_flush_tables(THD *thd) {
   } else {
     /* make sure logs are flushed after global read lock acquired */
     err = handle_reload_request(thd, REFRESH_ENGINE_LOG | REFRESH_BINARY_LOG,
-                                (TABLE_LIST *)0, &not_used);
+                                (Table_ref *)0, &not_used);
   }
 
   if (err) {

@@ -213,7 +213,7 @@ static int open_table(THD *thd, const LEX_CSTRING *schema_name,
       (MYSQL_OPEN_IGNORE_GLOBAL_READ_LOCK | MYSQL_LOCK_IGNORE_GLOBAL_READ_ONLY |
        MYSQL_OPEN_IGNORE_FLUSH | MYSQL_LOCK_IGNORE_TIMEOUT);
 
-  TABLE_LIST tables(schema_name->str, schema_name->length, table_name->str,
+  Table_ref tables(schema_name->str, schema_name->length, table_name->str,
                     table_name->length, table_name->str, lock_type);
 
   if (!open_n_lock_single_table(thd, &tables, lock_type, flags)) {
@@ -962,7 +962,7 @@ int Wsrep_schema::remove_fragments(THD *thd, const wsrep::id &server_id,
   thd->lex->reset_n_backup_query_tables_list(&query_tables_list_backup);
   thd->reset_n_backup_open_tables_state(&open_tables_backup,
                                         Open_tables_state::SYSTEM_TABLES);
-  TABLE_LIST tables(wsrep_schema_str.c_str(), wsrep_schema_str.length(),
+  Table_ref tables(wsrep_schema_str.c_str(), wsrep_schema_str.length(),
                     sr_table_str.c_str(), sr_table_str.length(),
                     sr_table_str.c_str(), TL_WRITE);
 

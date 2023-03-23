@@ -11036,7 +11036,7 @@ bool mysql_create_like_table(THD *thd, Table_ref *table, Table_ref *src_table,
          the temporary table definition will be needed in slaves to
          enable the create to succeed
        */
-      TABLE_LIST tbl;
+      Table_ref tbl;
       memset(static_cast<void *>(&tbl), 0, sizeof(tbl));
       tbl.db = src_table->db;
       tbl.table_name = tbl.alias = src_table->table_name;

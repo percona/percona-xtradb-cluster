@@ -36,6 +36,7 @@
 
 class set_var;
 class THD;
+class Table_ref;
 
 /* this while concept of consistency check was added so that pt-checksum
 can run the command to consistency of the all the nodes of the cluster.
@@ -251,9 +252,9 @@ extern enum wsrep::provider::status wsrep_sync_wait_upto_gtid(
 extern void wsrep_last_committed_id(wsrep_gtid_t *gtid);
 extern int wsrep_check_opts(int argc, char *const *argv);
 extern void wsrep_prepend_PATH(const char *path);
-bool wsrep_append_fk_parent_table(THD *thd, TABLE_LIST *table,
+bool wsrep_append_fk_parent_table(THD *thd, Table_ref *table,
                                   wsrep::key_array *keys);
-bool wsrep_append_child_tables(THD *thd, TABLE_LIST *tables,
+bool wsrep_append_child_tables(THD *thd, Table_ref *tables,
                                wsrep::key_array *keys);
 
 /* some inline functions are defined in wsrep_mysqld_inl.h */
@@ -442,10 +443,9 @@ extern PSI_thread_key key_THREAD_wsrep_post_rollbacker;
 extern PSI_file_key key_file_wsrep_gra_log;
 #endif /* HAVE_PSI_INTERFACE */
 
-struct TABLE_LIST;
 class Alter_info;
 int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
-                             const TABLE_LIST *table_list,
+                             const Table_ref *table_list,
                              dd::Tablespace_table_ref_vec *trefs = NULL,
                              Alter_info *alter_info = NULL,
                              wsrep::key_array *fk_tables = NULL);
@@ -485,7 +485,7 @@ typedef struct wsrep_key_arr {
 
 bool wsrep_prepare_keys_for_isolation(THD *thd, const char *db,
                                       const char *table,
-                                      const TABLE_LIST *table_list,
+                                      const Table_ref *table_list,
                                       wsrep_key_arr_t *ka);
 void wsrep_keys_free(wsrep_key_arr_t *key_arr);
 

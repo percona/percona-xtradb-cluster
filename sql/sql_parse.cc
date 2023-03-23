@@ -1372,9 +1372,9 @@ void cleanup_items(Item *item) {
 }
 
 #ifdef WITH_WSREP
-static bool wsrep_tables_accessible_when_detached(const TABLE_LIST *tables) {
+static bool wsrep_tables_accessible_when_detached(const Table_ref *tables) {
   bool has_tables = false;
-  for (const TABLE_LIST *table = tables; table; table = table->next_global) {
+  for (const Table_ref *table = tables; table; table = table->next_global) {
     TABLE_CATEGORY c;
     LEX_CSTRING db, tn;
 
@@ -1738,7 +1738,7 @@ static bool deny_updates_if_read_only_option(THD *thd, Table_ref *all_tables) {
 }
 
 #ifdef WITH_WSREP
-static bool wsrep_read_only_option(THD *thd, TABLE_LIST *all_tables) {
+static bool wsrep_read_only_option(THD *thd, Table_ref *all_tables) {
   int opt_readonly_saved = opt_readonly;
 
   ulong master_access = thd->security_context()->master_access();
@@ -4366,7 +4366,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
       }
 
 #ifdef WITH_WSREP
-      for (TABLE_LIST *table = all_tables; table; table = table->next_global) {
+      for (Table_ref *table = all_tables; table; table = table->next_global) {
         if (!lex->drop_temporary &&
             (!thd->is_current_stmt_binlog_format_row() ||
              !find_temporary_table(thd, table))) {

@@ -378,7 +378,7 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
     }
   }
 
-  TABLE *find_temporary_table(THD * thd, const TABLE_LIST *tl);
+  TABLE *find_temporary_table(THD * thd, const Table_ref *tl);
   if (WSREP(thd) && WSREP_CLIENT(thd) &&
       (!thd->is_current_stmt_binlog_format_row() ||
        !find_temporary_table(thd, first_table))) {
@@ -425,7 +425,7 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
   if (WSREP_ON && !is_temporary_table(first_table)) {
     enum legacy_db_type existing_db_type, new_db_type;
 
-    TABLE_LIST *table = first_table;
+    Table_ref *table = first_table;
 
     // mdl_lock scope begin
     {
@@ -604,7 +604,7 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
   }
 
   {
-    extern TABLE *find_temporary_table(THD * thd, const TABLE_LIST *tl);
+    extern TABLE *find_temporary_table(THD * thd, const Table_ref *tl);
 
     if ((!thd->is_current_stmt_binlog_format_row() ||
          !find_temporary_table(thd, first_table))) {
