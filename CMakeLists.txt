@@ -303,6 +303,13 @@ MESSAGE(STATUS "SIZEOF_VOIDP ${SIZEOF_VOIDP}")
 # even if we have configured for 64bit build....
 SET(CMAKE_SIZEOF_VOID_P ${SIZEOF_VOIDP})
 
+IF(WITH_DEFAULT_COMPILER_OPTIONS)
+  INCLUDE(${CMAKE_SOURCE_DIR}/cmake/build_configurations/compiler_options.cmake)
+ENDIF()
+IF(WITH_DEFAULT_FEATURE_SET)
+  INCLUDE(${CMAKE_SOURCE_DIR}/cmake/build_configurations/feature_set.cmake)
+ENDIF()
+
 INCLUDE(compile_flags)
 INCLUDE(install_layout)
 
@@ -334,13 +341,6 @@ IF(WITH_PACKAGE_FLAGS AND NOT CMAKE_C_FLAGS AND NOT CMAKE_CXX_FLAGS)
       MESSAGE(WARNING "Please do 'apt install dpkg-dev'")
     ENDIF()
   ENDIF()
-ENDIF()
-
-IF(WITH_DEFAULT_COMPILER_OPTIONS)
-  INCLUDE(${CMAKE_SOURCE_DIR}/cmake/build_configurations/compiler_options.cmake)
-ENDIF()
-IF(WITH_DEFAULT_FEATURE_SET)
-  INCLUDE(${CMAKE_SOURCE_DIR}/cmake/build_configurations/feature_set.cmake)
 ENDIF()
 
 INCLUDE(CMakePushCheckState)
