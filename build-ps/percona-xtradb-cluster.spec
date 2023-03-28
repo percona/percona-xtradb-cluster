@@ -619,6 +619,11 @@ sed -i 's:#!/usr/bin/env python:#!/usr/bin/env python2:g' scripts/pyclustercheck
 sed -i 's:#!/usr/bin/env python:#!/usr/bin/env python2:g' mysql-test/suite/tokudb/t/*
 %endif
 
+%if 0%{?rhel} == 9
+sed -i 's:#!/usr/bin/env python:#!/usr/bin/env python3:g' scripts/pyclustercheck
+sed -i 's:#!/usr/bin/env python:#!/usr/bin/env python3:g' mysql-test/suite/tokudb/t/*
+%endif
+
 #
 # Set environment in order of preference, MYSQL_BUILD_* first, then variable
 # name, finally a default.  RPM_OPT_FLAGS is assumed to be a part of the
@@ -685,13 +690,14 @@ mkdir debug
                 -e 's/ -ip / /' \
                 -e 's/^ //' \
                 -e 's/ $//'`
-  CXXFLAGS=`echo " ${CXXFLAGS} " | \
-              sed -e 's/ -O[0-9]* / /' \
-                  -e 's/-Wp,-D_FORTIFY_SOURCE=2/ -Wno-missing-field-initializers -Wno-error /' \
-                  -e 's/ -unroll2 / /' \
-                  -e 's/ -ip / /' \
-                  -e 's/^ //' \
-                  -e 's/ $//'`
+  CXXFLAGS="${CFLAGS}"
+  %if 0%{?rhel} == 9
+    CFLAGS=`echo " ${CFLAGS} " | \
+                sed -e 's/ -Wno-error / -Wno-error -Wno-error=odr -Wno-error=free-nonheap-object /' \
+                    -e 's:-specs=/usr/lib/rpm/redhat/redhat-annobin-cc1::'`
+    CXXFLAGS="${CFLAGS}"
+    echo "${CXXFLAGS}"
+  %endif
   # XXX: MYSQL_UNIX_ADDR should be in cmake/* but mysql_version is included before
   # XXX: install_layout so we can't just set it based on INSTALL_LAYOUT=RPM
   ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
