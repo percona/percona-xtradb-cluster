@@ -710,7 +710,7 @@ mkdir debug
                 -e 's/ -O[0-9]* / /' \
                 -e 's/-Wp,-D_FORTIFY_SOURCE=2/ -Wno-missing-field-initializers -Wno-error /' \
 %else
-                -e 's/-D_FORTIFY_SOURCE=2/-D_FORTIFY_SOURCE=2 -Wno-error=stringop-truncation -Wno-error=maybe-uninitialized/' \
+                -e 's/-D_FORTIFY_SOURCE=2/-D_FORTIFY_SOURCE=2 -Wno-error=stringop-truncation -Wno-error=maybe-uninitialized -Wno-error=odr/' \
 %endif
                 -e 's/ -ip / /' \
                 -e 's/^ //' \
