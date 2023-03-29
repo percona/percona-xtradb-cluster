@@ -113,7 +113,13 @@ class LogEventStatusSizeTest : public ::testing::Test {
     qe.need_sql_require_primary_key = 1;
     qe.needs_default_table_encryption = 1;
     qe.default_collation_for_utf8mb4_number = 1;
+#ifdef WITH_WSREP
     qe.thd->variables.binlog_ddl_skip_rewrite = 1;
+
+    // Needed for Q_WSREP_SKIP_READONLY_CHECKS
+    qe.thd->system_thread = SYSTEM_THREAD_SLAVE_SQL;
+    wsrep_provider_set = 1;
+#endif /* WITH_WSREP */
 
     for (size_t did = 0; did < MAX_DBS_IN_EVENT_MTS; ++did) {
       std::string db = fill_str(NAME_LEN, 'a' + did);
@@ -128,6 +134,10 @@ class LogEventStatusSizeTest : public ::testing::Test {
     // make sure that the length of status variables is equal to
     // MAX_SIZE_LOG_EVENT_STATUS
     ASSERT_EQ(MAX_SIZE_LOG_EVENT_STATUS, qe.status_vars_len);
+
+#ifdef WITH_WSREP
+    wsrep_provider_set = 0;
+#endif /* WITH_WSREP */
 
     srv.TearDown();
   }

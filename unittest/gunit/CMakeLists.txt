@@ -134,7 +134,6 @@ SET(TESTS
   filesort_buffer
   filesort_compare
   filesort_mergechunk
-  float_compare
   inplace_vector
   integer_digits
   intrusive_list_iterator
@@ -208,6 +207,7 @@ ENDIF()
 
 # Add tests (link them with gunit/gmock libraries and the server libraries)
 SET(SERVER_TESTS
+  bgc_ticket_manager
   character_set_deprecation
   compare_access_paths
   connect_joins
