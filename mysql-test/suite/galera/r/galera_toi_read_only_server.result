@@ -1,0 +1,56 @@
+[connection node_1]
+CREATE TABLE t1 (ID INT PRIMARY KEY) ENCRYPTION='Y';
+SET GLOBAL super_read_only=1;
+ALTER INSTANCE ROTATE INNODB MASTER KEY;
+ERROR HY000: The MySQL server is running with the --super-read-only option so it cannot execute this statement
+[connection node_2]
+[connection node_1a]
+SET GLOBAL super_read_only=0;
+SET DEBUG_SYNC = 'wsrep_to_isolation_begin_before_replication SIGNAL reached WAIT_FOR continue';
+ALTER INSTANCE ROTATE INNODB MASTER KEY;
+[connection node_1b]
+SET SESSION wsrep_sync_wait=0;
+SET DEBUG_SYNC = "now WAIT_FOR reached";
+# Setting super_read_only=1
+SET GLOBAL super_read_only=1;
+[connection node_1]
+SET SESSION wsrep_sync_wait=0;
+include/assert.inc [Verify that SET GLOBAL super_read_only=1 is waiting for Global Read Lock.]
+SET DEBUG_SYNC= 'now SIGNAL continue';
+[connection node_1]
+[connection node_2]
+[connection node_1]
+SET DEBUG_SYNC='RESET';
+FLUSH HOSTS;
+Warnings:
+Warning	1287	'FLUSH HOSTS' is deprecated and will be removed in a future release. Please use TRUNCATE TABLE performance_schema.host_cache instead
+SET GLOBAL super_read_only=0;
+CREATE USER 'user1'@'localhost' IDENTIFIED BY 'pass1';
+SET GLOBAL super_read_only=1;
+FLUSH PRIVILEGES;
+SET GLOBAL super_read_only=0;
+DELETE FROM mysql.user WHERE user = 'user1';
+SET GLOBAL super_read_only=1;
+FLUSH PRIVILEGES;
+FLUSH STATUS;
+FLUSH USER_RESOURCES;
+FLUSH TABLES;
+SET GLOBAL super_read_only=0;
+CREATE TABLE t2 (f1 INTEGER);
+SET GLOBAL super_read_only=1;
+FLUSH TABLES t2;
+FLUSH ERROR LOGS;
+FLUSH SLOW LOGS;
+FLUSH GENERAL LOGS;
+FLUSH ENGINE LOGS;
+FLUSH RELAY LOGS;
+FLUSH CLIENT_STATISTICS;
+FLUSH INDEX_STATISTICS;
+FLUSH TABLE_STATISTICS;
+FLUSH USER_STATISTICS;
+FLUSH THREAD_STATISTICS;
+SET global read_only = 0;
+SET global super_read_only = 0;
+DROP TABLE t1;
+DROP TABLE t2;
+CALL mtr.add_suppression("Failed to replicate .* in cluster mode");

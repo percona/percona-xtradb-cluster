@@ -18,73 +18,12 @@ CALL mtr.add_suppression("WSREP: TO isolation failed");
 --connect node_1b, 127.0.0.1, root, , test, $NODE_MYPORT_1
 
 #
-# Test 1: Block with FTWRL, then KILL
-# (The command will succeed)
+# Test 1: Test killing of the DDL query using KILL QUERY
 #
---echo ################ Test 1 ################
---connection node_1
---echo [connection node_1]
-FLUSH TABLES WITH READ LOCK;
-
-# Do the CREATE TABLE, this will block due to the FTWRL
---connection node_1a
---echo [connection node_1a]
-SET DEBUG_SYNC = 'wsrep_TOI_begin_after_wsrep_skip_wsrep_hton SIGNAL reached';
---send CREATE TABLE t1 (ID INT PRIMARY KEY);
-
-# Kill the CREATE TABLE query
---connection node_1b
---echo [connection node_1b]
-
-# Ensure that we have entered TOI (at least)
-SET DEBUG_SYNC = "now WAIT_FOR reached";
-
-# The KILL will fail because we are already in TOI
---disable_query_log
---echo # Killing query on node1a
---error ER_KILL_DENIED_ERROR
---eval KILL QUERY $node1a_connection_id
---enable_query_log
-
-# Unblock the CREATE TABLE
---connection node_1
---echo [connection node_1]
-UNLOCK TABLES;
-
-# The CREATE TABLE should succeed
---connection node_1a
---echo [connection node_1a]
---reap
-
-# Verify the cluster contents
---connection node_1
---echo [connection node_1]
---let $assert_text= Table t1 should exist on node1
---let $assert_cond= COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
---let $assert_debug= SELECT * FROM INFORMATION_SCHEMA.TABLES
---source include/assert.inc
-
---connection node_2
---echo [connection node_2]
---let $assert_text= Table t1 should exist on node2
---let $assert_cond= COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
---let $assert_debug= SELECT * FROM INFORMATION_SCHEMA.TABLES
---source include/assert.inc
-
-# Cleanup
---connection node_1
---echo [connection node_1]
-DROP TABLE t1;
-SET DEBUG_SYNC='RESET';
-
-
-#
-# Test 2: Test killing of the DDL query using KILL QUERY
-#
-# Test 2a: Block in wsrep_TOI_begin_before_wsrep_skip_wsrep_hton, then KILL
+# Test 1a: Block in wsrep_TOI_begin_before_wsrep_skip_wsrep_hton, then KILL
 # (The command will be aborted)
 #
---echo ################ Test 2a ################
+--echo ################ Test 1a ################
 
 # Do the CREATE TABLE, this will block due to the DEBUG_SYNC
 --connection node_1a
@@ -135,10 +74,10 @@ SET DEBUG_SYNC='RESET';
 
 
 #
-# Test 2b: Block in wsrep_TOI_begin_after_wsrep_skip_wsrep_hton, then KILL
+# Test 1b: Block in wsrep_TOI_begin_after_wsrep_skip_wsrep_hton, then KILL
 # (The command will succeed)
 #
---echo ################ Test 2b ################
+--echo ################ Test 1b ################
 
 # Do the CREATE TABLE, this will block due to the DEBUG_SYNC
 --connection node_1a
@@ -189,10 +128,10 @@ DROP TABLE t1;
 SET DEBUG_SYNC='RESET';
 
 #
-# Test 2c: Block in wsrep_to_isolation_end_before_wsrep_skip_wsrep_hton, then KILL
+# Test 1c: Block in wsrep_to_isolation_end_before_wsrep_skip_wsrep_hton, then KILL
 # (The command will succeed)
 #
---echo ################ Test 2c ################
+--echo ################ Test 1c ################
 
 # Do the CREATE TABLE, this will block due to the DEBUG_SYNC
 --connection node_1a
@@ -244,9 +183,9 @@ SET DEBUG_SYNC='RESET';
 
 
 #
-# Test 2d: Block in wsrep_to_isolation_end_after_wsrep_skip_wsrep_hton, then KILL
+# Test 1d: Block in wsrep_to_isolation_end_after_wsrep_skip_wsrep_hton, then KILL
 # (The command will succeed)
---echo ################ Test 2d ################
+--echo ################ Test 1d ################
 
 # Do the CREATE TABLE, this will block due to the DEBUG_SYNC
 --connection node_1a
@@ -298,9 +237,9 @@ SET DEBUG_SYNC='RESET';
 
 
 #
-# Test 3: Check that other (DML) queries (while running a DDL) can still
+# Test 2: Check that other (DML) queries (while running a DDL) can still
 # be killed.
---echo ################ Test 3 ################
+--echo ################ Test 2 ################
 
 # Setup the test
 --connection node_1
@@ -379,12 +318,12 @@ DROP TABLE t2;
 SET DEBUG_SYNC='RESET';
 
 #
-# Test 4: Test killing of the DDL using KILL CONNECTION
+# Test 3: Test killing of the DDL using KILL CONNECTION
 #
-# Test 4a: Block in wsrep_TOI_begin_before_wsrep_skip_wsrep_hton, then KILL the connection
+# Test 3a: Block in wsrep_TOI_begin_before_wsrep_skip_wsrep_hton, then KILL the connection
 # (The command will be aborted)
 #
---echo ################ Test 4a ################
+--echo ################ Test 3a ################
 
 # Do the CREATE TABLE, this will block due to the DEBUG_SYNC
 --connection node_1a
@@ -439,10 +378,10 @@ SET DEBUG_SYNC='RESET';
 --let $node1a_connection_id=`SELECT CONNECTION_ID()`
 
 #
-# Test 4b: Block in wsrep_TOI_begin_after_wsrep_skip_wsrep_hton, then KILL the connection
+# Test 3b: Block in wsrep_TOI_begin_after_wsrep_skip_wsrep_hton, then KILL the connection
 # (The command will succeed)
 #
---echo ################ Test 4b ################
+--echo ################ Test 3b ################
 
 # Do the CREATE TABLE, this will block due to the DEBUG_SYNC
 --connection node_1a
@@ -494,10 +433,10 @@ SET DEBUG_SYNC='RESET';
 
 
 #
-# Test 4c: Block in wsrep_to_isolation_end_before_wsrep_skip_wsrep_hton, then KILL the connection
+# Test 3c: Block in wsrep_to_isolation_end_before_wsrep_skip_wsrep_hton, then KILL the connection
 # (The command will succeed)
 #
---echo ################ Test 4c ################
+--echo ################ Test 3c ################
 
 # Do the CREATE TABLE, this will block due to the DEBUG_SYNC
 --connection node_1a
@@ -549,9 +488,9 @@ SET DEBUG_SYNC='RESET';
 
 
 #
-# Test 4d: Block in wsrep_to_isolation_end_after_wsrep_skip_wsrep_hton, then KILL the connection
+# Test 3d: Block in wsrep_to_isolation_end_after_wsrep_skip_wsrep_hton, then KILL the connection
 # (The command will succeed)
---echo ################ Test 4d ################
+--echo ################ Test 3d ################
 
 # Do the CREATE TABLE, this will block due to the DEBUG_SYNC
 --connection node_1a

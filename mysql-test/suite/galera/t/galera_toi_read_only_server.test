@@ -1,0 +1,346 @@
+# === Purpose ===
+#
+# This test verifies that DDLs replicating as TOI fail before replication when
+# server is set to super_read_only.
+#
+# === References ===
+# PXC-4041: Rotating InnoDB MK from a read_only node breaks the cluster
+
+--source include/have_debug.inc
+--source include/have_debug_sync.inc
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connect node_1b, 127.0.0.1, root, , test, $NODE_MYPORT_1
+
+###############################################################################
+# Test-1: Setting super_read_only=1 before running DDL. DDL must fail with
+# ER_OPTION_PREVENTS_STATEMENT.
+###############################################################################
+--connection node_1
+--echo [connection node_1]
+--let super_read_only_saved = `SELECT @@super_read_only`
+--let read_only_saved = `SELECT @@read_only`
+
+CREATE TABLE t1 (ID INT PRIMARY KEY) ENCRYPTION='Y';
+
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
+SET GLOBAL super_read_only=1;
+
+--error ER_OPTION_PREVENTS_STATEMENT
+ALTER INSTANCE ROTATE INNODB MASTER KEY;
+
+# Verify that there was no replication
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
+--source include/wait_condition_with_debug.inc
+
+--connection node_2
+--echo [connection node_2]
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
+--source include/wait_condition_with_debug.inc
+
+###############################################################################
+# Test-2: Setting super_read_only before query is replicated to other nodes.
+# i.e, Make the query block in wsrep_to_isolation_begin_before_replication, then
+# set super_read_only from the other session.
+###############################################################################
+
+# Execute ALTER INSTANCE, this will block due to the DEBUG_SYNC
+--connection node_1a
+--echo [connection node_1a]
+SET GLOBAL super_read_only=0;
+SET DEBUG_SYNC = 'wsrep_to_isolation_begin_before_replication SIGNAL reached WAIT_FOR continue';
+
+--send ALTER INSTANCE ROTATE INNODB MASTER KEY
+
+--connection node_1b
+--echo [connection node_1b]
+SET SESSION wsrep_sync_wait=0;
+--let $conn_id=`SELECT CONNECTION_ID()`
+SET DEBUG_SYNC = "now WAIT_FOR reached";
+
+--echo # Setting super_read_only=1
+--send SET GLOBAL super_read_only=1
+
+# Verify that SET GLBOAL super_read_only=1 waits for Global Read Lock.
+--connection node_1
+--echo [connection node_1]
+SET SESSION wsrep_sync_wait=0;
+--let $wait_condition= SELECT COUNT(*)=1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE State='Waiting for global read lock';
+--source include/wait_condition.inc
+
+--let $assert_text= Verify that SET GLOBAL super_read_only=1 is waiting for Global Read Lock.
+--let $assert_cond= [ SELECT State="Waiting for global read lock" FROM INFORMATION_SCHEMA.PROCESSLIST WHERE Id = $conn_id ] = 1
+--source include/assert.inc
+
+# Unblock ALTER INSTANCE
+SET DEBUG_SYNC= 'now SIGNAL continue';
+
+--connection node_1a
+--reap
+
+--connection node_1b
+--reap
+
+# Assert that super_read_only has been set.
+--assert(`SELECT @@GLOBAL.super_read_only = 1`)
+
+# Verify that the query was replicated
+--connection node_1
+--echo [connection node_1]
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
+--source include/wait_condition_with_debug.inc
+
+--connection node_2
+--echo [connection node_2]
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
+--source include/wait_condition_with_debug.inc
+
+# Cleanup
+--connection node_1
+--echo [connection node_1]
+SET DEBUG_SYNC='RESET';
+
+###############################################################################
+# Test-3: Verify that FLUSH commands are not affected when server has
+# super_read_only=1
+###############################################################################
+
+#-------------------------------------------------------------------------------
+# Test: FLUSH HOSTS
+#-------------------------------------------------------------------------------
+--connection node_2
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
+--connection node_1
+FLUSH HOSTS;
+
+--connection node_2
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
+--source include/wait_condition_with_debug.inc
+
+
+#-------------------------------------------------------------------------------
+# Test: FLUSH PRIVILEGES
+#-------------------------------------------------------------------------------
+--connection node_1
+SET GLOBAL super_read_only=0;
+CREATE USER 'user1'@'localhost' IDENTIFIED BY 'pass1';
+SET GLOBAL super_read_only=1;
+FLUSH PRIVILEGES;
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM mysql.user WHERE User = "user1"
+--source include/wait_condition.inc
+
+--connect node_2a, 127.0.0.1, user1, pass1, test, $NODE_MYPORT_2
+
+--connection node_1
+SET GLOBAL super_read_only=0;
+DELETE FROM mysql.user WHERE user = 'user1';
+SET GLOBAL super_read_only=1;
+FLUSH PRIVILEGES;
+
+
+#-------------------------------------------------------------------------------
+# Test: FLUSH STATUS
+#-------------------------------------------------------------------------------
+--connection node_2
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
+--connection node_1
+FLUSH STATUS;
+
+--connection node_2
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
+--source include/wait_condition_with_debug.inc
+
+
+#-------------------------------------------------------------------------------
+# Test: FLUSH USER_RESOURCES
+#-------------------------------------------------------------------------------
+--connection node_2
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
+--connection node_1
+FLUSH USER_RESOURCES;
+
+--connection node_2
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
+--source include/wait_condition_with_debug.inc
+
+
+#-------------------------------------------------------------------------------
+# Test: FLUSH TABLES
+#-------------------------------------------------------------------------------
+--connection node_2
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
+--connection node_1
+FLUSH TABLES;
+
+--connection node_2
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
+--source include/wait_condition_with_debug.inc
+
+
+#-------------------------------------------------------------------------------
+# Test: FLUSH TABLES
+#-------------------------------------------------------------------------------
+--connection node_1
+SET GLOBAL super_read_only=0;
+CREATE TABLE t2 (f1 INTEGER);
+SET GLOBAL super_read_only=1;
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't2';
+--source include/wait_condition.inc
+
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
+--connection node_1
+FLUSH TABLES t2;
+
+--connection node_2
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
+--source include/wait_condition_with_debug.inc
+
+
+#-------------------------------------------------------------------------------
+# Test: FLUSH ERROR_LOGS
+#-------------------------------------------------------------------------------
+--connection node_2
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
+--connection node_1
+FLUSH ERROR LOGS;
+
+--connection node_2
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
+--source include/wait_condition_with_debug.inc
+
+
+#-------------------------------------------------------------------------------
+# Test: FLUSH SLOW_LOGS
+#-------------------------------------------------------------------------------
+--connection node_2
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
+--connection node_1
+FLUSH SLOW LOGS;
+
+--connection node_2
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
+--source include/wait_condition_with_debug.inc
+
+
+#-------------------------------------------------------------------------------
+# Test: FLUSH GENERAL_LOGS
+#-------------------------------------------------------------------------------
+--connection node_2
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
+--connection node_1
+FLUSH GENERAL LOGS;
+
+--connection node_2
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
+--source include/wait_condition_with_debug.inc
+
+
+#-------------------------------------------------------------------------------
+# Test: FLUSH ENGINE_LOGS
+#-------------------------------------------------------------------------------
+--connection node_2
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
+--connection node_1
+FLUSH ENGINE LOGS;
+
+--connection node_2
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
+--source include/wait_condition_with_debug.inc
+
+
+#-------------------------------------------------------------------------------
+# Test: FLUSH RELAY_LOGS
+#-------------------------------------------------------------------------------
+--connection node_2
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
+--connection node_1
+FLUSH RELAY LOGS;
+
+--connection node_2
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
+--source include/wait_condition_with_debug.inc
+
+
+#-------------------------------------------------------------------------------
+# Test: FLUSH CLIENT_STATISTICS
+#       FLUSH INDEX_STATISTICS
+#       FLUSH TABLE_STATISTICS
+#       FLUSH USER_STATISTICS
+#-------------------------------------------------------------------------------
+--connection node_2
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
+--connection node_1
+FLUSH CLIENT_STATISTICS;
+FLUSH INDEX_STATISTICS;
+FLUSH TABLE_STATISTICS;
+FLUSH USER_STATISTICS;
+
+--connection node_2
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 4 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 4 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
+--source include/wait_condition_with_debug.inc
+--source include/wait_condition.inc
+
+
+#-------------------------------------------------------------------------------
+# Test: FLUSH THREAD_STATISTICS
+#-------------------------------------------------------------------------------
+--connection node_2
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
+--connection node_1
+FLUSH THREAD_STATISTICS;
+
+--connection node_2
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
+--source include/wait_condition_with_debug.inc
+
+
+
+# Test cleanup
+
+--disconnect node_1b
+--disconnect node_1a
+
+--connection node_1
+--eval SET global read_only = $read_only_saved
+--eval SET global super_read_only = $super_read_only_saved
+
+DROP TABLE t1;
+DROP TABLE t2;
+
+CALL mtr.add_suppression("Failed to replicate .* in cluster mode");
+--source include/wait_until_count_sessions.inc

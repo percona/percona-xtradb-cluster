@@ -1734,22 +1734,6 @@ static bool deny_updates_if_read_only_option(THD *thd, TABLE_LIST *all_tables) {
 }
 
 #ifdef WITH_WSREP
-static bool wsrep_read_only_option(THD *thd, TABLE_LIST *all_tables) {
-  int opt_readonly_saved = opt_readonly;
-
-  ulong master_access = thd->security_context()->master_access();
-  ulong flag_saved = (ulong)(master_access & SUPER_ACL);
-
-  opt_readonly = 0;
-  thd->security_context()->set_master_access(master_access & ~SUPER_ACL);
-
-  bool ret = !deny_updates_if_read_only_option(thd, all_tables);
-
-  opt_readonly = opt_readonly_saved;
-  thd->security_context()->set_master_access(master_access | flag_saved);
-
-  return ret;
-}
 
 static void wsrep_copy_query(THD *thd) {
   thd->wsrep_retry_command = thd->get_command();
@@ -7740,8 +7724,7 @@ static bool wsrep_dispatch_sql_command(THD *thd, const char *rawbuf,
                                        uint length, Parser_state *parser_state,
                                        bool update_userstat) {
   DBUG_TRACE;
-  bool is_autocommit = !thd->in_multi_stmt_transaction_mode() &&
-                       wsrep_read_only_option(thd, thd->lex->query_tables);
+  bool is_autocommit = !thd->in_multi_stmt_transaction_mode();
   bool retry_autocommit;
 
   do {
