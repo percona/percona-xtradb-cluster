@@ -1,0 +1,57 @@
+# This test kills cluster nodes after primary component is formed.
+# This causes gvwstate.dat file of node_2 having view consisting of two nodes.
+# When we start node_2 it waits for being the part of primary component before it's state is moved to joined.
+# Check that node_2 waits for pc.wait_restored_prim_timeout seconds and then time outs if no primary component reached.
+
+--source include/galera_cluster.inc
+
+--let $ofile= $MYSQLTEST_VARDIR/tmp/node.2.err
+
+# kill both servers
+--connection node_2
+--source include/kill_galera.inc
+--connection node_1
+--source include/kill_galera.inc
+
+# node_2 has the full PC view in gvwstate.dat file.
+# Start it with 10 secs wait timeout for finding other nodes.
+
+--connection node_2
+--let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
+--let $expect_crash_on_start = 1
+--let $do_not_echo_parameters = 1
+--let $restart_parameters = "restart: --wsrep_provider_options='base_port=$NODE_GALERAPORT_2;pc.wait_restored_prim_timeout=PT10S' --log-error=$ofile"
+--source include/start_mysqld.inc
+--let expect_crash_on_start = 0
+# Sleep to ensure that server exited...
+--sleep 30
+
+# Grep logs to ensure that server exited with timeout
+--let $grep_file = $ofile
+--let $grep_pattern =failed to reach primary view
+--let $grep_output = none
+--source include/grep_pattern.inc
+
+--assert($GREP_RESULT == "1")
+
+
+--remove_file $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
+--remove_file $MYSQLTEST_VARDIR/mysqld.2/data/gvwstate.dat
+--remove_file $MYSQLTEST_VARDIR/mysqld.1/data/grastate.dat
+--remove_file $MYSQLTEST_VARDIR/mysqld.1/data/gvwstate.dat
+
+--connection node_1
+--let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
+--let $do_not_echo_parameters = 1
+--let $restart_parameters = "restart: --wsrep_provider_options='base_port=$NODE_GALERAPORT_1'"
+--source include/start_mysqld.inc
+--source include/galera_wait_ready.inc
+
+--connection node_2
+--let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
+--let $do_not_echo_parameters = 1
+--let $restart_parameters = "restart: --wsrep_provider_options='base_port=$NODE_GALERAPORT_2'"
+--source include/start_mysqld.inc
+--source include/galera_wait_ready.inc
+
+--remove_file $ofile
