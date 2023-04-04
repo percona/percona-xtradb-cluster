@@ -5889,17 +5889,19 @@ static bool pre_autocommit(sys_var *self, THD *thd, set_var *var) {
       (thd->variables.option_bits & OPTION_NOT_AUTOCOMMIT) &&
       var->save_result.ulonglong_value) {
     // Autocommit mode is about to be activated.
-    if (trans_commit_stmt(thd) || trans_commit(thd)) {
 #ifdef WITH_WSREP
+    if (trans_commit_stmt(thd) || trans_commit(thd)) {
       // TODO: check if this release is needed ?
       thd->mdl_context.release_transactional_locks();
       WSREP_DEBUG(
           "Transaction commit failed while toggling autocommit."
           " Release MDL trx lock for thread: %u",
           thd->thread_id());
-#endif /* WITH_WSREP */
       return true;
     }
+#else
+    if (trans_commit_stmt(thd) || trans_commit(thd)) return true;
+#endif /* WITH_WSREP */
   }
   return false;
 }

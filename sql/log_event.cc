@@ -4900,10 +4900,12 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
         }
       }
 
+#ifdef WITH_WSREP
       thd->variables.binlog_ddl_skip_rewrite =
           (ddl_skip_rewrite != 0) ? true : false;
       thd->wsrep_applier_skip_readonly_checks =
           (wsrep_applier_skip_readonly_checks != 0) ? true : false;
+#endif /* WITH_WSREP */
 
       thd->table_map_for_update = (table_map)table_map_for_update;
 

@@ -3132,7 +3132,7 @@ func_exit:
                          record under the cursor */
     que_thr_t *thr,      /*!< in: query thread */
     bool referenced,
-    /*!< in: TRUE if index may be referenced in
+    /*!< in: true if index may be referenced in
     a foreign key constraint */
 #ifdef WITH_WSREP
     bool foreign, /*!< in: TRUE if index is foreign key index */

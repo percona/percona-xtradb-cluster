@@ -338,7 +338,9 @@ static void *handle_connection(void *arg) {
 #endif /* WITH_WSREP */
 
     delete thd;
+#ifdef WITH_WSREP
     thd = NULL;
+#endif /* WITH_WSREP */
 
 #ifdef HAVE_PSI_THREAD_INTERFACE
     /* Delete the instrumentation for the job that just completed. */

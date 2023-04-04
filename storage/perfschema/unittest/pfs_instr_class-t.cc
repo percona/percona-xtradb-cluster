@@ -27,8 +27,11 @@
 #include "storage/perfschema/pfs_instr.h"
 #include "storage/perfschema/pfs_instr_class.h"
 #include "storage/perfschema/unittest/stub_pfs_plugin_table.h"
-#include "storage/perfschema/unittest/stub_pfs_defaults.h"
 #include "unittest/mytap/tap.h"
+
+#ifdef WITH_WSREP
+#include "storage/perfschema/unittest/stub_pfs_defaults.h"
+#endif /* WITH_WSREP */
 
 static void test_no_registration() {
   int rc;

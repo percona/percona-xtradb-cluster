@@ -93,7 +93,6 @@
 #include "violite.h"
 /* key_restore */
 
-#include <openssl/rand.h>  // RAND_bytes
 #include "prealloced_array.h"
 #include "sql/auth/auth_internal.h"
 #include "sql/auth/sql_auth_cache.h"
@@ -106,6 +105,7 @@
 #include "sql/mysqld.h"
 #include "sql/sql_rewrite.h"
 
+#include <openssl/rand.h>  // RAND_bytes
 #ifdef WITH_WSREP
 #include "sql/wsrep_trans_observer.h"
 #endif /* WITH_WSREP */
@@ -2044,8 +2044,7 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
     }
 
     /* trying to change the password of the utility user? */
-    if (acl_is_utility_user(acl_user->user, acl_user->host.get_host(),
-                            nullptr)) {
+    if (acl_is_utility_user(acl_user->user, acl_user->host.get_host(), nullptr)) {
       my_error(ER_PASSWORD_NO_MATCH, MYF(0));
       return true;
     }

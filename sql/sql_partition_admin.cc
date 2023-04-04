@@ -640,7 +640,9 @@ bool Sql_cmd_alter_table_truncate_partition::execute(THD *thd) {
       !first_table->table->file->ht->partition_flags ||
       !(part_handler = first_table->table->file->get_partition_handler())) {
     my_error(ER_PARTITION_MGMT_ON_NONPARTITIONED, MYF(0));
+#ifdef WITH_WSREP
     WSREP_NBO_1ST_PHASE_END;
+#endif /* WITH_WSREP */
     return true;
   }
 
@@ -652,10 +654,15 @@ bool Sql_cmd_alter_table_truncate_partition::execute(THD *thd) {
     allows to avoid excessive calls to external_lock().
   */
   first_table->partition_names = &m_alter_info->partition_names;
+#ifdef WITH_WSREP
   if (first_table->table->part_info->set_partition_bitmaps(first_table)) {
     WSREP_NBO_1ST_PHASE_END;
     return true;
   }
+#else
+  if (first_table->table->part_info->set_partition_bitmaps(first_table))
+    return true;
+#endif /* WITH_WSREP */
 
   /*
     Under locked table modes we still don't have an exclusive lock.
@@ -671,16 +678,22 @@ bool Sql_cmd_alter_table_truncate_partition::execute(THD *thd) {
 
   if (thd->locked_tables_mode) {
     MDL_ticket *ticket = first_table->table->mdl_ticket;
+#ifdef WITH_WSREP
     if (thd->mdl_context.upgrade_shared_lock(ticket, MDL_EXCLUSIVE, timeout)) {
       WSREP_NBO_1ST_PHASE_END;
       return true;
     }
+#else
+    if (thd->mdl_context.upgrade_shared_lock(ticket, MDL_EXCLUSIVE, timeout))
+      return true;
+#endif
     downgrade_mdl_guard.reset(ticket);
   }
 
   dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
   dd::Table *table_def = nullptr;
 
+#ifdef WITH_WSREP
   if (thd->dd_client()->acquire_for_modification<dd::Table>(
           first_table->db, first_table->table_name, &table_def)) {
     WSREP_NBO_1ST_PHASE_END;
@@ -688,6 +701,11 @@ bool Sql_cmd_alter_table_truncate_partition::execute(THD *thd) {
   }
 
   WSREP_NBO_1ST_PHASE_END;
+#else
+  if (thd->dd_client()->acquire_for_modification<dd::Table>(
+          first_table->db, first_table->table_name, &table_def))
+    return true;
+#endif /* WITH_WSREP */
 
   /* Table was successfully opened above. */
   assert(table_def != nullptr);
