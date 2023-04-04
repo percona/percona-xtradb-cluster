@@ -29,9 +29,10 @@
 #include <atomic>
 #include <utility>
 
+#ifdef WITH_WSREP
 #include "sql/log.h"
-
 #include "include/mysql/components/services/log_builtins.h"
+#endif /* WITH_WSREP */
 
 #include "libbinlogevents/include/binlog_event.h"  // enum_binlog_checksum_alg
 #include "m_string.h"                              // llstr

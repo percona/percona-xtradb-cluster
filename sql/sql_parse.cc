@@ -3347,13 +3347,13 @@ static bool wsrep_is_show_query(enum enum_sql_command command) {
 */
 
 static bool lock_tables_for_backup(THD *thd) {
-  DBUG_TRACE;
+  DBUG_ENTER("lock_tables_for_backup");
 
-  if (check_backup_admin_privilege(thd)) return true;
+  if (check_backup_admin_privilege(thd)) DBUG_RETURN(true);
 
   if (delay_key_write_options == DELAY_KEY_WRITE_ALL) {
     my_error(ER_OPTION_PREVENTS_STATEMENT, MYF(0), "delay_key_write=ALL");
-    return true;
+    DBUG_RETURN(true);
   }
   /*
     Do nothing if the current connection already owns the LOCK TABLES FOR
@@ -3361,7 +3361,7 @@ static bool lock_tables_for_backup(THD *thd) {
   */
   if (thd->backup_tables_lock.is_acquired() ||
       thd->global_read_lock.is_acquired())
-    return false;
+    DBUG_RETURN(false);
 
   /*
     Do not allow backup locks under regular LOCK TABLES, FLUSH TABLES ... FOR
@@ -3369,7 +3369,7 @@ static bool lock_tables_for_backup(THD *thd) {
   */
   if (thd->variables.option_bits & OPTION_TABLE_LOCK) {
     my_error(ER_LOCK_OR_ACTIVE_TRANSACTION, MYF(0));
-    return true;
+    DBUG_RETURN(true);
   }
 
   bool res = thd->backup_tables_lock.acquire(thd);
@@ -3379,7 +3379,7 @@ static bool lock_tables_for_backup(THD *thd) {
     res = true;
   }
 
-  return res;
+   DBUG_RETURN(res);
 }
 
 /**
@@ -6002,7 +6002,9 @@ finish:
     DEBUG_SYNC(thd, "execute_command_after_close_tables");
 #endif
 
+#ifdef WITH_WSREP
   WSREP_NBO_2ND_PHASE_BEGIN;
+#endif /* WITH_WSREP */
 
   if (!thd->in_sub_stmt && thd->transaction_rollback_request) {
     /*

@@ -73,8 +73,10 @@ class IO_CACHE_binlog_cache_storage : public Truncatable_ostream {
   IO_CACHE_binlog_cache_storage(const IO_CACHE_binlog_cache_storage &) = delete;
   ~IO_CACHE_binlog_cache_storage() override;
 
+#ifdef WITH_WSREP
   bool open(File file, 
             my_off_t max_cache_size);
+#endif /* WITH_WSREP */
   /**
      Opens the binlog cache. It creates a memory buffer as long as cache_size.
      The buffer will be extended up to max_cache_size when writing data. The
@@ -184,8 +186,9 @@ class IO_CACHE_binlog_cache_storage : public Truncatable_ostream {
 class Binlog_cache_storage : public Basic_ostream {
  public:
   ~Binlog_cache_storage() override;
-
+#ifdef WITH_WSREP
   bool open(File file, my_off_t max_cache_size);
+#endif /* WITH_WSREP */
   bool open(my_off_t cache_size, my_off_t max_cache_size);
   void close();
 
@@ -243,9 +246,9 @@ class Binlog_cache_storage : public Basic_ostream {
   */
   bool is_empty() const { return length() == 0; }
 
+#ifdef WITH_WSREP
   bool flush() { return m_file.flush(); }
 
-#ifdef WITH_WSREP
   /* Not a good pratice to expose private member but PXC/wsrep
   function would need re-write for this so temporary fix to
   allow PXC/wsrep orginal function to work for now. */

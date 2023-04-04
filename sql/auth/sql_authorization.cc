@@ -6105,8 +6105,8 @@ bool check_fk_parent_table_access(THD *thd, HA_CREATE_INFO *create_info,
 #ifdef WITH_WSREP
   if (check_fk_support) {
 #endif
-    handlerton *db_type = create_info->db_type ? create_info->db_type
-                                               : ha_default_handlerton(thd);
+    handlerton *db_type = 
+        create_info->db_type ? create_info->db_type : ha_default_handlerton(thd);
 
     // Return if engine does not support Foreign key Constraint.
     if (!ha_check_storage_engine_flag(db_type, HTON_SUPPORTS_FOREIGN_KEYS))

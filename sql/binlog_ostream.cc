@@ -40,6 +40,7 @@ bool binlog_cache_is_reset = false;
 IO_CACHE_binlog_cache_storage::IO_CACHE_binlog_cache_storage() = default;
 IO_CACHE_binlog_cache_storage::~IO_CACHE_binlog_cache_storage() { close(); }
 
+#ifdef WITH_WSREP
 bool IO_CACHE_binlog_cache_storage::open(File file,
                                          my_off_t max_cache_size) {
   DBUG_TRACE;
@@ -55,6 +56,7 @@ bool IO_CACHE_binlog_cache_storage::open(File file,
   m_max_cache_size = max_cache_size;
   return false;
 }
+#endif /* WITH_WSREP */
 
 bool IO_CACHE_binlog_cache_storage::open(const char *dir, const char *prefix,
                                          my_off_t cache_size,
@@ -281,12 +283,14 @@ bool IO_CACHE_binlog_cache_storage::setup_ciphers_password() {
   return false;
 }
 
+#ifdef WITH_WSREP
 bool Binlog_cache_storage::open(File file, my_off_t max_cache_size) {
   if (m_file.open(file, max_cache_size))
     return true;
   m_pipeline_head = &m_file;
   return false;
 }
+#endif /* WITH_WSREP */
 
 bool Binlog_cache_storage::open(my_off_t cache_size, my_off_t max_cache_size) {
   const char *LOG_PREFIX = "ML";

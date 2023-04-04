@@ -27,8 +27,11 @@
 #include "sql/rpl_commit_stage_manager.h"
 #include "sql/rpl_replica_commit_order_manager.h"  // Commit_order_manager
 #include "sql/rpl_rli_pdb.h"  // Slave_worker                    // Slave_worker
+
+#ifdef WITH_WSREP
 #include "sql/wsrep_applier.h"
 #include "sql/wsrep_trans_observer.h"
+#endif /* WITH_WSREP */
 
 class Slave_worker;
 class Commit_order_manager;

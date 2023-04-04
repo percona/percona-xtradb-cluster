@@ -446,8 +446,7 @@ size_t get_table_def_key(const TABLE_LIST *table_list, const char **key) {
     strcase is converted to strcasecmp because information_schema tables
     can be accessed with lower case and upper case table names.
   */
-  assert(
-      !my_strcasecmp(system_charset_info, table_list->get_db_name(),
+  assert( !my_strcasecmp(system_charset_info, table_list->get_db_name(),
                      table_list->mdl_request.key.db_name()) &&
 #ifdef WITH_WSREP
       (!my_strcasecmp(system_charset_info, table_list->get_table_name(),
@@ -10485,8 +10484,9 @@ void tdc_remove_table(THD *thd, enum_tdc_remove_table_type remove_type,
     /* if thd was BF aborted, exclusive locks are cancelled */
 #else
   assert(remove_type == TDC_RT_REMOVE_UNUSED ||
-              thd->mdl_context.owns_equal_or_stronger_lock(
-                  MDL_key::TABLE, db, table_name, MDL_EXCLUSIVE));
+         remove_type == TDC_RT_MARK_FOR_REOPEN ||
+         thd->mdl_context.owns_equal_or_stronger_lock(
+             MDL_key::TABLE, db, table_name, MDL_EXCLUSIVE));
 #endif /* WITH_WSREP */
 
   key_length = create_table_def_key(db, table_name, key);

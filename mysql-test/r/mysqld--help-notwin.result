@@ -537,8 +537,8 @@ The following options may be given as the first argument:
  --key-cache-division-limit=# 
  The minimum percentage of warm blocks in key cache
  --keyring-migration-destination=name 
- Keyring plugin to which the keys are migrated to. This
- option must be specified along with
+ Keyring plugin or component to which the keys are
+ migrated to. This option must be specified along with
  --keyring-migration-source.
  --keyring-migration-host=name 
  Connect to host.

@@ -180,8 +180,8 @@ extern PSI_memory_key key_memory_userstat_thread_stats;
 extern PSI_memory_key key_memory_userstat_client_stats;
 extern PSI_memory_key key_memory_thread_pool_connection;
 
-// Percona XtradB Cluster (PXC) PSI memory keys
 #ifdef WITH_WSREP
+// Percona XtradB Cluster (PXC) PSI memory keys
 extern PSI_memory_key key_memory_wsrep;
 #endif /* WITH_WSREP */
 
