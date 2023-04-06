@@ -75,7 +75,7 @@ Prefix: %{_sysconfdir}
 
 #Placeholder should be replaced on preparation stage
 %if %{undefined galera_version}
- %define galera_version 4.13
+ %define galera_version 4.14
 %endif
 
 %if %{undefined galera_revision}
@@ -662,7 +662,7 @@ mkdir pxc_extra
 pushd pxc_extra
 mkdir pxb-2.4
 pushd pxb-2.4
-yumdownloader percona-xtrabackup-24-2.4.27
+yumdownloader percona-xtrabackup-24-2.4.28
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib* ./
@@ -676,7 +676,7 @@ popd
 
 mkdir pxb-8.0
 pushd pxb-8.0
-yumdownloader percona-xtrabackup-80-8.0.31
+yumdownloader percona-xtrabackup-80-8.0.32
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib64 ./
@@ -710,7 +710,7 @@ mkdir debug
                 -e 's/ -O[0-9]* / /' \
                 -e 's/-Wp,-D_FORTIFY_SOURCE=2/ -Wno-missing-field-initializers -Wno-error /' \
 %else
-                -e 's/-D_FORTIFY_SOURCE=2/-D_FORTIFY_SOURCE=2 -Wno-error=stringop-truncation -Wno-error=maybe-uninitialized/' \
+                -e 's/-D_FORTIFY_SOURCE=2/-D_FORTIFY_SOURCE=2 -Wno-error=stringop-truncation -Wno-error=maybe-uninitialized -Wno-error=odr/' \
 %endif
                 -e 's/ -ip / /' \
                 -e 's/^ //' \
@@ -1817,6 +1817,7 @@ fi
 %{_libdir}/mysqlrouter/private/libmysqlrouter_metadata_cache.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_mysqlxmessages.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_routing.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_destination_status.so.*
 %dir %{_libdir}/mysqlrouter
 %dir %{_libdir}/mysqlrouter/private
 %{_libdir}/mysqlrouter/*.so*
