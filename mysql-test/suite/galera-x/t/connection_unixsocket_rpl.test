@@ -41,28 +41,7 @@ CREATE TABLE table1 ( _id INT PRIMARY KEY, doc JSON ) ;
 
 #-- "Create table table2 in xplugintest "
 
-Mysqlx.Sql.StmtExecute {
-  stmt: "create_collection"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "table2"
-      }
-    }
-  }
-  namespace: "xplugin"
-}
+-->stmtadmin create_collection  {"schema":"xplugintest","name":"table2"}
 -->recvresult
 
 -->echo Insert multiple rows into a Document column

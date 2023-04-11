@@ -1,9 +1,6 @@
 SELECT password_last_changed into @passwordchanged from mysql.user where host='localhost' and user='x_root';
 create user foo@localhost;
 alter user foo@localhost password expire;
-create user xplugin@localhost identified by 'xplugin';
-grant all on *.* to xplugin@localhost;
-alter user xplugin@localhost password expire;
 
 Test: Expired password with no support for sandbox mode (should fail)
 Got expected error: Your password has expired. To log in you must change it using a client that supports expired passwords. (code 1862)
@@ -101,7 +98,10 @@ Mysqlx.Ok {
 Got expected error: Access denied for user 'x_root'@'localhost' (using password: YES) (code 1045)
 ok
 set password for x_root@localhost = '';
+drop user foo@localhost;
 # restart: --disconnect_on_expired_password=off
+create user foo@localhost;
+alter user foo@localhost password expire;
 Test: expect expired Notice for connection
 NOTICE: Account password expired
 RUN select user(),current_user()
@@ -111,8 +111,11 @@ Mysqlx.Ok {
   msg: "bye!"
 }
 ok
+drop user foo@localhost;
 set password for x_root@localhost = '';
 # restart: --skip-disconnect_on_expired_password
+create user foo@localhost;
+alter user foo@localhost password expire;
 Test: expect expired Notice for connection
 NOTICE: Account password expired
 RUN select user(),current_user()
@@ -122,6 +125,9 @@ Mysqlx.Ok {
   msg: "bye!"
 }
 ok
+create user xplugin@localhost identified by 'xplugin';
+grant all on *.* to xplugin@localhost;
+alter user xplugin@localhost password expire;
 NOTICE: Account password expired
 RUN select user(),current_user();
 Got expected error: You must reset your password using ALTER USER statement before executing this statement. (code 1820)
@@ -147,7 +153,12 @@ Mysqlx.Ok {
   msg: "bye!"
 }
 ok
+drop user foo@localhost;
+drop user xplugin@localhost;
 # restart: --disconnect_on_expired_password
+create user xplugin@localhost identified by 'xplugin';
+grant all on *.* to xplugin@localhost;
+alter user xplugin@localhost password expire;
 NOTICE: Account password expired
 RUN select user(),current_user();
 Got expected error: You must reset your password using ALTER USER statement before executing this statement. (code 1820)
@@ -188,35 +199,11 @@ Mysqlx.Error {
   sql_state: "HY000"
 }
 
-send Mysqlx.Sql.StmtExecute {
-  stmt: "create_collection"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugin"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "table2"
-      }
-    }
-  }
-  namespace: "xplugin"
-}
-
 Got expected error: You must reset your password using ALTER USER statement before executing this statement. (code 1820)
 Mysqlx.Ok {
   msg: "bye!"
 }
 ok
-drop user foo@localhost;
 drop user xplugin@localhost;
 update mysql.user set password_last_changed = @passwordchanged where host = 'localhost' and user='x_root';
 flush privileges;

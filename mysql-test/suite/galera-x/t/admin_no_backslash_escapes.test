@@ -14,7 +14,7 @@
 -->stmtadmin create_collection	{"schema":"xtest", "name":"bar"}
 -->recvresult
 
--->stmtadmin create_collection_index	{"schema":"xtest", "collection":"bar", "name": "foo", "unique": true, "constraint":{"member": "$.foo", "type": "int","required": false}}
+-->stmtadmin create_collection_index	{"schema":"xtest", "collection":"bar", "name": "foo", "unique": true, "fields":{"field": "$.foo", "type": "int","required": false}}
 -->recvresult
 
 callmacro Assert_select

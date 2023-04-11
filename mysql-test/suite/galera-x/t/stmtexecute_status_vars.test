@@ -2,7 +2,7 @@
 ###
 ###     Monitor CRUD Status variables :
 #       1) Mysqlx_stmt_execute_sql
-#       2) Mysqlx_stmt_execute_xplugin
+#       2) Mysqlx_stmt_execute_mysqlx
 #       3) Mysqlx_stmt_create_collection
 #       4) Mysqlx_stmt_create_collection_index
 #       5) Mysqlx_rows_sent
@@ -22,13 +22,19 @@
 
 #
 #       1) Mysqlx_stmt_execute_sql
-#       2) Mysqlx_stmt_execute_xplugin
+#       2) Mysqlx_stmt_execute_mysqlx
 #       13) Mysqlx_stmt_list_objects
 #
 ## Preamble
 --source include/galera_cluster.inc
 --source include/xplugin_preamble.inc
 --source include/xplugin_create_user.inc
+
+--connection node_2
+call mtr.add_suppression("Can't DROP 'non_existing_index");
+call mtr.add_suppression("Unknown table 'xplugintest.table_non_existing'");
+call mtr.add_suppression("Query apply failed");
+--connection node_1
 
 --disable_query_log
 --disable_warnings
@@ -47,32 +53,11 @@ CREATE TABLE `scalar_types`(`number_uint` INTEGER UNSIGNED DEFAULT 10, `number_s
 
 -->sql
 SHOW STATUS like 'Mysqlx_stmt_execute_sql%';
-SHOW STATUS like 'Mysqlx_stmt_execute_xplugin%';
+SHOW STATUS like 'Mysqlx_stmt_execute_mysqlx%';
 -->endsql
 
 #-- "Create table table2 in xplugintest "
-Mysqlx.Sql.StmtExecute {
-  stmt: "create_collection"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "table2"
-      }
-    }
-  }
-  namespace: "xplugin"
-}
+-->stmtadmin create_collection	{"schema":"xplugintest","name":"table2"}
 -->recvresult
 
 
@@ -140,7 +125,7 @@ Mysqlx.Sql.StmtExecute {
 -->recvresult
 -->sql
 SHOW STATUS like 'Mysqlx_stmt_execute_sql%';
-SHOW STATUS like 'Mysqlx_stmt_execute_xplugin%';
+SHOW STATUS like 'Mysqlx_stmt_execute_mysqlx%';
 -->endsql
 EOF
 
@@ -149,7 +134,7 @@ EOF
 --write_file $MYSQL_TMP_DIR/stmtexecute_select.tmp
 -->sql
 SHOW STATUS like 'Mysqlx_stmt_execute_sql%';
-SHOW STATUS like 'Mysqlx_stmt_execute_xplugin%';
+SHOW STATUS like 'Mysqlx_stmt_execute_mysqlx%';
 -->endsql
 -->echo Filter data by unsigned int
 Mysqlx.Sql.StmtExecute {
@@ -179,7 +164,7 @@ Mysqlx.Sql.StmtExecute {
 
 -->sql
 SHOW STATUS like 'Mysqlx_stmt_execute_sql%';
-SHOW STATUS like 'Mysqlx_stmt_execute_xplugin%';
+SHOW STATUS like 'Mysqlx_stmt_execute_mysqlx%';
 -->endsql
 
 EOF
@@ -191,7 +176,7 @@ EOF
 --write_file $MYSQL_TMP_DIR/stmtexecute_second_client.tmp
 -->sql
 SHOW STATUS like 'Mysqlx_stmt_execute_sql%';
-SHOW STATUS like 'Mysqlx_stmt_execute_xplugin%';
+SHOW STATUS like 'Mysqlx_stmt_execute_mysqlx%';
 -->endsql
 EOF
 --exec $MYSQLXTEST -ux_root --password='' --mysql41-auth --file=$MYSQL_TMP_DIR/stmtexecute_second_client.tmp 2>&1
@@ -209,7 +194,7 @@ SELECT * FROM `xplugintest`.`scalar_types`;
 --write_file $MYSQL_TMP_DIR/stmtexecute_insert.tmp
 -->sql
 SHOW STATUS like 'Mysqlx_stmt_execute_sql%';
-SHOW STATUS like 'Mysqlx_stmt_execute_xplugin%';
+SHOW STATUS like 'Mysqlx_stmt_execute_mysqlx%';
 -->endsql
 -->echo Insert multiple rows into a Document column
 Mysqlx.Crud.Insert {
@@ -259,34 +244,10 @@ Mysqlx.Crud.Insert {
 }
 -->recvresult
 
-Mysqlx.Sql.StmtExecute {
-  stmt: "list_objects"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  namespace: "xplugin"
-}
+-->stmtadmin list_objects	{"schema":"xplugintest"}
 -->recvresult
 #-- statement retunin error counted as well
-Mysqlx.Sql.StmtExecute {
-  stmt: "list_objects"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "nodatabase"
-      }
-    }
-  }
-  namespace: "xplugin"
-}
+-->stmtadmin list_objects	{"schema":"nodatabase"}
 
 #-- Invalid Mysqlx.Sql.StmtExecute operation conted
 Mysqlx.Sql.StmtExecute {
@@ -300,7 +261,7 @@ Mysqlx.Sql.StmtExecute {
       }
     }
   }
-  namespace: "xplugin"
+  namespace: "mysqlx"
 }
 -->expecterror 1049
 -->recvresult
@@ -312,8 +273,8 @@ Mysqlx.Sql.StmtExecute {
 
 -->sql
 SHOW STATUS like 'Mysqlx_stmt_execute_sql%';
-#-- "Insert not counted in Mysqlx_stmt_execute_xplugin"
-SHOW STATUS like 'Mysqlx_stmt_execute_xplugin%';
+#-- "Insert not counted in Mysqlx_stmt_execute_mysqlx"
+SHOW STATUS like 'Mysqlx_stmt_execute_mysqlx%';
 #-- "Insert counted in Mysqlx_crud_insert"
 SHOW STATUS like 'Mysqlx_crud_insert%';
 SHOW STATUS like 'Mysqlx_stmt_list_objects%';
@@ -364,53 +325,11 @@ SHOW STATUS like 'Mysqlx_rows_sent%';
 SHOW STATUS like 'Mysqlx_bytes_sent';
 
 #-- "Create table table2 in xplugintest "
-Mysqlx.Sql.StmtExecute {
-  stmt: "create_collection"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "table2"
-      }
-    }
-  }
-  namespace: "xplugin"
-}
+-->stmtadmin create_collection	{"schema":"xplugintest","name":"table2"}
 -->recvresult
 
 -->echo Command is valid but returns error so its counted in status variable
-Mysqlx.Sql.StmtExecute {
-  stmt: "create_collection"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: ""
-      }
-    }
-  }
-  namespace: "xplugin"
-}
+-->stmtadmin create_collection	{"schema":"xplugintest","name":""}
 -->expecterror 5113
 -->recvresult
 
@@ -421,137 +340,12 @@ Mysqlx.Sql.StmtExecute {
 -->recv
 
 -->echo "Index with  unique(true), index column NOT NULL (true)" counted in index status variable
-Mysqlx.Sql.StmtExecute {
-  stmt: "create_collection_index"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "table2"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "col1_index"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_BOOL
-      v_bool: true
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: ".col1"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "TEXT(13)"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_BOOL
-      v_bool: true
-    }
-  }
-  namespace: "xplugin"
-}
+-->stmtadmin create_collection_index	{"schema":"xplugintest", "collection":"table2", "name":"col1_index", "unique":true, "fields":{"field":"$.col1", "type":"TEXT(13)","required":true}}
 -->recv
 
 -->echo Command is parsed , returns error. Counted in status variable
-Mysqlx.Sql.StmtExecute {
-  stmt: "create_collection_index"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "table_non_existing"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "col1_index"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_BOOL
-      v_bool: true
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: ".col1"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "TEXT(13)"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_BOOL
-      v_bool: true
-    }
-  }
-  namespace: "xplugin"
-}
+-->stmtadmin create_collection_index	{"schema":"xplugintest", "collection":"table_non_existing", "name":"col1_index", "unique":true, "fields":{"field":"$.col1", "type":"TEXT(13)","required":true}}
 -->recv
-
 
 
 -->echo Invalid index command. Not able to parse so not counted in status variable
@@ -561,28 +355,7 @@ Mysqlx.Sql.StmtExecute {
 -->recv
 
 -->echo "Create table table3 in xplugintest "
-Mysqlx.Sql.StmtExecute {
-  stmt: "create_collection"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "table3"
-      }
-    }
-  }
-  namespace: "xplugin"
-}
+-->stmtadmin create_collection	{"schema":"xplugintest","name":"table3"}
 -->recvresult
 
 
@@ -698,72 +471,12 @@ SHOW STATUS like 'Mysqlx_stmt_drop_collection_index%';
 SHOW STATUS like 'Mysqlx_stmt_ping%';
 
 -->echo # drop index counted in status variable
-Mysqlx.Sql.StmtExecute {
-  stmt: "drop_collection_index"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "table2"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "col1_index"
-      }
-    }
-  }
-  namespace: "xplugin"
-}
+-->stmtadmin drop_collection_index	{"schema":"xplugintest", "collection":"table2", "name":"col1_index"}
 -->recv
 
 
 -->echo "drop index with error counted in status variable" 
-Mysqlx.Sql.StmtExecute {
-  stmt: "drop_collection_index"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "table2"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "non_existing_index"
-      }
-    }
-  }
-  namespace: "xplugin"
-}
+-->stmtadmin drop_collection_index	{"schema":"xplugintest", "collection":"table2", "name":"non_existing_index"}
 -->recv
 
 
@@ -780,53 +493,11 @@ ALTER TABLE xplugintest.table4 DROP INDEX `fulltext_idx_1`;
 -->endsql
 
 -->echo "Drop table created using create_collection message"
-Mysqlx.Sql.StmtExecute {
-  stmt: "drop_collection"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "table2"
-      }
-    }
-  }
-  namespace: "xplugin"
-}
+-->stmtadmin drop_collection	{"schema":"xplugintest","name":"table2"}
 -->recvresult
 
 -->echo "Non existing Drop table counted in status variable"
-Mysqlx.Sql.StmtExecute {
-  stmt: "drop_collection"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "table_non_existing"
-      }
-    }
-  }
-  namespace: "xplugin"
-}
+-->stmtadmin drop_collection	{"schema":"xplugintest","name":"table_non_existing"}
 -->expecterror 1051
 -->recvresult
 
@@ -838,28 +509,7 @@ Mysqlx.Sql.StmtExecute {
 -->recv
 
 -->echo "Drop table created using create_collection message"
-Mysqlx.Sql.StmtExecute {
-  stmt: "drop_collection"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "scalar_types"
-      }
-    }
-  }
-  namespace: "xplugin"
-}
+-->stmtadmin drop_collection	{"schema":"xplugintest","name":"scalar_types"}
 -->recvresult
 
 
@@ -869,10 +519,7 @@ SHOW STATUS like 'Mysqlx_stmt_drop_collection';
 SHOW STATUS like 'Mysqlx_stmt_drop_collection_index%';
 -->endsql
 
-Mysqlx.Sql.StmtExecute {
-    namespace : "xplugin"
-    stmt : "ping"
-}
+-->stmtadmin ping
 -->recv
 
 Mysqlx.Sql.StmtExecute {
@@ -882,10 +529,7 @@ Mysqlx.Sql.StmtExecute {
 # error
 -->recv
 
-Mysqlx.Sql.StmtExecute {
-    namespace : "xplugin"
-    stmt : "ping"
-}
+-->stmtadmin ping
 -->recv
 
 -->sql

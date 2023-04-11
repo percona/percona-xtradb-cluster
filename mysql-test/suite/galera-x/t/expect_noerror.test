@@ -29,7 +29,7 @@ Mysqlx.Expect.Open {
 -->recv
 
 Mysqlx.Sql.StmtExecute {
-    namespace : "xplugin"
+    namespace : "mysqlx"
     stmt : "ping"
 }
 -->recvresult
@@ -42,7 +42,7 @@ Mysqlx.Sql.StmtExecute {
 -->recv
 
 Mysqlx.Sql.StmtExecute {
-    namespace : "xplugin"
+    namespace : "mysqlx"
     stmt : "ping"
 }
 # should fail with expect error now
@@ -54,7 +54,7 @@ Mysqlx.Expect.Close {
 -->recv
 
 Mysqlx.Sql.StmtExecute {
-    namespace : "xplugin"
+    namespace : "mysqlx"
     stmt : "ping"
 }
 # should pass now
@@ -68,7 +68,7 @@ Mysqlx.Expect.Open {
 -->recv
 
 Mysqlx.Sql.StmtExecute {
-    namespace : "xplugin"
+    namespace : "mysqlx"
     stmt : "ping"
 }
 # ok
@@ -82,7 +82,7 @@ Mysqlx.Sql.StmtExecute {
 -->recv
 
 Mysqlx.Sql.StmtExecute {
-    namespace : "xplugin"
+    namespace : "mysqlx"
     stmt : "ping"
 }
 # ok
@@ -123,7 +123,7 @@ Mysqlx.Expect.Close {
 -->recv
 
 Mysqlx.Sql.StmtExecute {
-    namespace : "xplugin"
+    namespace : "mysqlx"
     stmt : "ping"
 }
 # error
@@ -155,7 +155,7 @@ Mysqlx.Sql.StmtExecute {
 -->recv
 
 Mysqlx.Sql.StmtExecute {
-    namespace : "xplugin"
+    namespace : "mysqlx"
     stmt : "ping"
 }
 # error
@@ -174,7 +174,7 @@ Mysqlx.Sql.StmtExecute {
 -->recv
 
 Mysqlx.Sql.StmtExecute {
-    namespace : "xplugin"
+    namespace : "mysqlx"
     stmt : "ping"
 }
 # no error
@@ -207,7 +207,7 @@ Mysqlx.Sql.StmtExecute {
 # error
 -->recv
 Mysqlx.Sql.StmtExecute {
-    namespace : "xplugin"
+    namespace : "mysqlx"
     stmt : "ping"
 }
 # no error
@@ -219,7 +219,7 @@ Mysqlx.Expect.Close {
 -->recv
 
 Mysqlx.Sql.StmtExecute {
-    namespace : "xplugin"
+    namespace : "mysqlx"
     stmt : "ping"
 }
 # no error
@@ -231,7 +231,7 @@ Mysqlx.Sql.StmtExecute {
 # error
 -->recv
 Mysqlx.Sql.StmtExecute {
-    namespace : "xplugin"
+    namespace : "mysqlx"
     stmt : "ping"
 }
 # error
@@ -265,7 +265,7 @@ Mysqlx.Sql.StmtExecute {
 # error
 -->recv
 Mysqlx.Sql.StmtExecute {
-    namespace : "xplugin"
+    namespace : "mysqlx"
     stmt : "ping"
 }
 # no error
@@ -277,7 +277,7 @@ Mysqlx.Expect.Close {
 -->recv
 
 Mysqlx.Sql.StmtExecute {
-    namespace : "xplugin"
+    namespace : "mysqlx"
     stmt : "ping"
 }
 # no error
@@ -289,7 +289,7 @@ Mysqlx.Sql.StmtExecute {
 #error
 -->recv
 Mysqlx.Sql.StmtExecute {
-    namespace : "xplugin"
+    namespace : "mysqlx"
     stmt : "ping"
 }
 #error
@@ -323,7 +323,7 @@ Mysqlx.Expect.Open {
 -->recv
 
 Mysqlx.Sql.StmtExecute {
-    namespace : "xplugin"
+    namespace : "mysqlx"
     stmt : "ping"
 }
 # no error
@@ -335,7 +335,7 @@ Mysqlx.Sql.StmtExecute {
 #error
 -->recv
 Mysqlx.Sql.StmtExecute {
-    namespace : "xplugin"
+    namespace : "mysqlx"
     stmt : "ping"
 }
 #error

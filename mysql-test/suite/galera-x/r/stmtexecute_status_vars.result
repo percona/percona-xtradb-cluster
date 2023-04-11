@@ -1,38 +1,17 @@
+call mtr.add_suppression("Can't DROP 'non_existing_index");
+call mtr.add_suppression("Unknown table 'xplugintest.table_non_existing'");
+call mtr.add_suppression("Query apply failed");
 CREATE TABLE `scalar_types`(`number_uint` INTEGER UNSIGNED DEFAULT 10, `number_sint` INTEGER DEFAULT -10, `value_bool` BOOLEAN DEFAULT 0, `value_string` VARCHAR(255) default NULL, `number_float` FLOAT DEFAULT 1.1, `number_double` DOUBLE DEFAULT 2.2, `value_blob` TINYBLOB DEFAULT NULL);
 RUN SHOW STATUS like 'Mysqlx_stmt_execute_sql%'
 Variable_name	Value
 Mysqlx_stmt_execute_sql	1
 0 rows affected
-RUN SHOW STATUS like 'Mysqlx_stmt_execute_xplugin%'
+RUN SHOW STATUS like 'Mysqlx_stmt_execute_mysqlx%'
 Variable_name	Value
-Mysqlx_stmt_execute_xplugin	0
+Mysqlx_stmt_execute_mysqlx	0
 0 rows affected
-send Mysqlx.Sql.StmtExecute {
-  stmt: "create_collection"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "table2"
-      }
-    }
-  }
-  namespace: "xplugin"
-}
-
 
 command ok
-Namespace 'xplugin' is deprecated, please use 'mysqlx' instead
 send Mysqlx.Sql.StmtExecute {
   stmt: "INSERT INTO `xplugintest`.`scalar_types`(`number_sint`, `number_uint`, `value_string`) VALUES(0, ?, \'First inserted row\'),(?, 1,\'Second inserted row\'), (-1, 0,?)"
   args {
@@ -103,9 +82,9 @@ RUN SHOW STATUS like 'Mysqlx_stmt_execute_sql%'
 Variable_name	Value
 Mysqlx_stmt_execute_sql	5
 0 rows affected
-RUN SHOW STATUS like 'Mysqlx_stmt_execute_xplugin%'
+RUN SHOW STATUS like 'Mysqlx_stmt_execute_mysqlx%'
 Variable_name	Value
-Mysqlx_stmt_execute_xplugin	1
+Mysqlx_stmt_execute_mysqlx	1
 0 rows affected
 Mysqlx.Ok {
   msg: "bye!"
@@ -115,9 +94,9 @@ RUN SHOW STATUS like 'Mysqlx_stmt_execute_sql%'
 Variable_name	Value
 Mysqlx_stmt_execute_sql	1
 0 rows affected
-RUN SHOW STATUS like 'Mysqlx_stmt_execute_xplugin%'
+RUN SHOW STATUS like 'Mysqlx_stmt_execute_mysqlx%'
 Variable_name	Value
-Mysqlx_stmt_execute_xplugin	0
+Mysqlx_stmt_execute_mysqlx	0
 0 rows affected
 Mysqlx.Ok {
   msg: "bye!"
@@ -136,9 +115,9 @@ RUN SHOW STATUS like 'Mysqlx_stmt_execute_sql%'
 Variable_name	Value
 Mysqlx_stmt_execute_sql	1
 0 rows affected
-RUN SHOW STATUS like 'Mysqlx_stmt_execute_xplugin%'
+RUN SHOW STATUS like 'Mysqlx_stmt_execute_mysqlx%'
 Variable_name	Value
-Mysqlx_stmt_execute_xplugin	0
+Mysqlx_stmt_execute_mysqlx	0
 0 rows affected
 Filter data by unsigned int
 send Mysqlx.Sql.StmtExecute {
@@ -176,9 +155,9 @@ RUN SHOW STATUS like 'Mysqlx_stmt_execute_sql%'
 Variable_name	Value
 Mysqlx_stmt_execute_sql	5
 0 rows affected
-RUN SHOW STATUS like 'Mysqlx_stmt_execute_xplugin%'
+RUN SHOW STATUS like 'Mysqlx_stmt_execute_mysqlx%'
 Variable_name	Value
-Mysqlx_stmt_execute_xplugin	0
+Mysqlx_stmt_execute_mysqlx	0
 0 rows affected
 Mysqlx.Ok {
   msg: "bye!"
@@ -188,9 +167,9 @@ RUN SHOW STATUS like 'Mysqlx_stmt_execute_sql%'
 Variable_name	Value
 Mysqlx_stmt_execute_sql	1
 0 rows affected
-RUN SHOW STATUS like 'Mysqlx_stmt_execute_xplugin%'
+RUN SHOW STATUS like 'Mysqlx_stmt_execute_mysqlx%'
 Variable_name	Value
-Mysqlx_stmt_execute_xplugin	0
+Mysqlx_stmt_execute_mysqlx	0
 0 rows affected
 Insert multiple rows into a Document column
 send Mysqlx.Crud.Insert {
@@ -247,39 +226,10 @@ send Mysqlx.Crud.Insert {
 
 
 1 rows affected
-send Mysqlx.Sql.StmtExecute {
-  stmt: "list_objects"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  namespace: "xplugin"
-}
-
 name	type
 scalar_types	TABLE
 table2	COLLECTION
 command ok
-Namespace 'xplugin' is deprecated, please use 'mysqlx' instead
-send Mysqlx.Sql.StmtExecute {
-  stmt: "list_objects"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "nodatabase"
-      }
-    }
-  }
-  namespace: "xplugin"
-}
-
 send Mysqlx.Sql.StmtExecute {
   stmt: "errorstatement"
   args {
@@ -291,18 +241,18 @@ send Mysqlx.Sql.StmtExecute {
       }
     }
   }
-  namespace: "xplugin"
+  namespace: "mysqlx"
 }
 
 Got expected error: Unknown database 'nodatabase' (code 1049)
-Got expected error: Invalid xplugin command errorstatement (code 5157)
+Got expected error: Invalid mysqlx command errorstatement (code 5157)
 RUN SHOW STATUS like 'Mysqlx_stmt_execute_sql%'
 Variable_name	Value
 Mysqlx_stmt_execute_sql	3
 0 rows affected
-RUN SHOW STATUS like 'Mysqlx_stmt_execute_xplugin%'
+RUN SHOW STATUS like 'Mysqlx_stmt_execute_mysqlx%'
 Variable_name	Value
-Mysqlx_stmt_execute_xplugin	3
+Mysqlx_stmt_execute_mysqlx	3
 0 rows affected
 RUN SHOW STATUS like 'Mysqlx_crud_insert%'
 Variable_name	Value
@@ -333,58 +283,11 @@ Mysqlx_rows_sent	2
 0 rows affected
 RUN SHOW STATUS like 'Mysqlx_bytes_sent'
 Variable_name	Value
-Mysqlx_bytes_sent	720
+Mysqlx_bytes_sent	828
 0 rows affected
-send Mysqlx.Sql.StmtExecute {
-  stmt: "create_collection"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "table2"
-      }
-    }
-  }
-  namespace: "xplugin"
-}
-
 
 command ok
-Namespace 'xplugin' is deprecated, please use 'mysqlx' instead
 Command is valid but returns error so its counted in status variable
-send Mysqlx.Sql.StmtExecute {
-  stmt: "create_collection"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: ""
-      }
-    }
-  }
-  namespace: "xplugin"
-}
-
 Got expected error: Invalid collection name (code 5113)
 Parse error , so its not counted in status variable
 send Mysqlx.Sql.StmtExecute {
@@ -399,138 +302,10 @@ Mysqlx.Error {
 }
 
 "Index with  unique(true), index column NOT NULL (true)" counted in index status variable
-send Mysqlx.Sql.StmtExecute {
-  stmt: "create_collection_index"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "table2"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "col1_index"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_BOOL
-      v_bool: true
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: ".col1"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "TEXT(13)"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_BOOL
-      v_bool: true
-    }
-  }
-  namespace: "xplugin"
-}
-
 Mysqlx.Sql.StmtExecuteOk {
 }
 
 Command is parsed , returns error. Counted in status variable
-send Mysqlx.Sql.StmtExecute {
-  stmt: "create_collection_index"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "table_non_existing"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "col1_index"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_BOOL
-      v_bool: true
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: ".col1"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "TEXT(13)"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_BOOL
-      v_bool: true
-    }
-  }
-  namespace: "xplugin"
-}
-
 Mysqlx.Error {
   severity: ERROR
   code: 5113
@@ -551,29 +326,6 @@ Mysqlx.Error {
 }
 
 "Create table table3 in xplugintest "
-send Mysqlx.Sql.StmtExecute {
-  stmt: "create_collection"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "table3"
-      }
-    }
-  }
-  namespace: "xplugin"
-}
-
 
 command ok
 send Mysqlx.Sql.StmtExecute {
@@ -670,7 +422,7 @@ Mysqlx_rows_sent	7
 0 rows affected
 RUN SHOW STATUS like 'Mysqlx_bytes_sent'
 Variable_name	Value
-Mysqlx_bytes_sent	2787
+Mysqlx_bytes_sent	2983
 0 rows affected
 Filter data by unsigned int
 send Mysqlx.Sql.StmtExecute {
@@ -718,7 +470,7 @@ Mysqlx_rows_sent	15
 0 rows affected
 RUN SHOW STATUS like 'Mysqlx_bytes_sent'
 Variable_name	Value
-Mysqlx_bytes_sent	5092
+Mysqlx_bytes_sent	5432
 0 rows affected
 RUN SHOW STATUS like 'Mysqlx_stmt_drop_collection'
 Variable_name	Value
@@ -733,74 +485,10 @@ Variable_name	Value
 Mysqlx_stmt_ping	0
 0 rows affected
 # drop index counted in status variable
-send Mysqlx.Sql.StmtExecute {
-  stmt: "drop_collection_index"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "table2"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "col1_index"
-      }
-    }
-  }
-  namespace: "xplugin"
-}
-
 Mysqlx.Sql.StmtExecuteOk {
 }
 
 "drop index with error counted in status variable" 
-send Mysqlx.Sql.StmtExecute {
-  stmt: "drop_collection_index"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "table2"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "non_existing_index"
-      }
-    }
-  }
-  namespace: "xplugin"
-}
-
 Mysqlx.Error {
   severity: ERROR
   code: 1091
@@ -829,55 +517,9 @@ RUN ALTER TABLE xplugintest.table4 DROP INDEX `fulltext_idx_1`
 0 rows affected
 Records: 0  Duplicates: 0  Warnings: 0
 "Drop table created using create_collection message"
-send Mysqlx.Sql.StmtExecute {
-  stmt: "drop_collection"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "table2"
-      }
-    }
-  }
-  namespace: "xplugin"
-}
-
 
 command ok
 "Non existing Drop table counted in status variable"
-send Mysqlx.Sql.StmtExecute {
-  stmt: "drop_collection"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "table_non_existing"
-      }
-    }
-  }
-  namespace: "xplugin"
-}
-
 Got expected error: Unknown table 'xplugintest.table_non_existing' (code 1051)
 "Drop table parse error NOT counted in status variable"
 send Mysqlx.Sql.StmtExecute {
@@ -892,29 +534,6 @@ Mysqlx.Error {
 }
 
 "Drop table created using create_collection message"
-send Mysqlx.Sql.StmtExecute {
-  stmt: "drop_collection"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "scalar_types"
-      }
-    }
-  }
-  namespace: "xplugin"
-}
-
 
 command ok
 RUN SHOW STATUS like 'Mysqlx_stmt_drop_collection'
@@ -925,11 +544,6 @@ RUN SHOW STATUS like 'Mysqlx_stmt_drop_collection_index%'
 Variable_name	Value
 Mysqlx_stmt_drop_collection_index	2
 0 rows affected
-send Mysqlx.Sql.StmtExecute {
-  stmt: "ping"
-  namespace: "xplugin"
-}
-
 Mysqlx.Sql.StmtExecuteOk {
 }
 
@@ -943,11 +557,6 @@ Mysqlx.Error {
   code: 5162
   msg: "Unknown namespace bla"
   sql_state: "HY000"
-}
-
-send Mysqlx.Sql.StmtExecute {
-  stmt: "ping"
-  namespace: "xplugin"
 }
 
 Mysqlx.Sql.StmtExecuteOk {

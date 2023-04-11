@@ -6,8 +6,13 @@
 --let $wait_for_unixsocket_status = no_wait
 --source include/xplugin_preamble.inc
 --source include/xplugin_create_user.inc
+
 call mtr.add_suppression("Plugin mysqlx reported: .Error parsing message of type 17:");
 call mtr.add_suppression("Plugin mysqlx reported: .Setup of socket: '' failed, the socket file path is empty");
+--connection node_2
+call mtr.add_suppression("Plugin mysqlx reported: .Setup of socket: '' failed, the socket file path is empty");
+--connection node_1
+
 --let $wait_for_unixsocket_status = no_wait
 --source ../include/restart_mysqld.inc
 
@@ -88,10 +93,7 @@ create user expired@localhost;
 alter user expired@localhost password expire;
 --echo Check whether password expired sandbox applies to admin cmds
 --write_file $MYSQL_TMP_DIR/mysqlx-regression.tmp
-Mysqlx.Sql.StmtExecute {
-    stmt: "list_clients"
-    namespace: "xplugin"
-}
+-->stmtadmin list_clients
 -->expecterror 1820
 -->recvresult
 
@@ -100,10 +102,7 @@ Mysqlx.Sql.StmtExecute {
 }
 -->recvresult
 
-Mysqlx.Sql.StmtExecute {
-    stmt: "list_clients"
-    namespace: "xplugin"
-}
+-->stmtadmin list_clients
 -->recvresult
 EOF
 

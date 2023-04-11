@@ -1,6 +1,7 @@
 ## Password expired handling
 
 ## Preamble
+--source include/have_util_sed.inc
 --source include/galera_cluster.inc
 --source include/xplugin_preamble.inc
 --source include/xplugin_create_user.inc
@@ -8,9 +9,6 @@
 SELECT password_last_changed into @passwordchanged from mysql.user where host='localhost' and user='x_root';
 create user foo@localhost;
 alter user foo@localhost password expire;
-create user xplugin@localhost identified by 'xplugin';
-grant all on *.* to xplugin@localhost;
-alter user xplugin@localhost password expire;
 
 ##
 --echo
@@ -138,29 +136,7 @@ Mysqlx.Sql.StmtExecute {
 }
 -->recvtype Mysqlx.Error
 
-Mysqlx.Sql.StmtExecute {
-  stmt: "create_collection"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugin"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "table2"
-      }
-    }
-  }
-  namespace: "xplugin"
-}
-
+-->stmtadmin create_collection  {"schema":"xplugin" ,"name":"table2"}
 -->expecterror %EXPECT_ERROR%
 -->recvresult
 EOF
@@ -186,23 +162,41 @@ alter user x_root@localhost password expire;
 ##try login with password expired user when server started with disconnect_on_expired_password=off option
 set password for x_root@localhost = '';
 let $restart_parameters = restart: --disconnect_on_expired_password=off;
---source include/restart_mysqld.inc
+
+drop user foo@localhost;
+--source ../include/restart_mysqld.inc
+create user foo@localhost;
+alter user foo@localhost password expire;
+
 --echo Test: expect expired Notice for connection
 --exec $MYSQLXTEST -ufoo -v%EXPECT_ERROR%=ER_MUST_CHANGE_PASSWORD --file=$MYSQL_TMP_DIR/connection_expire_user.tmp 2>&1
 
 ##try login with password expired user when server started with skip-disconnect_on_expired_password option
+drop user foo@localhost;
 set password for x_root@localhost = '';
 let $restart_parameters = restart: --skip-disconnect_on_expired_password;
---source include/restart_mysqld.inc
+--source ../include/restart_mysqld.inc
+create user foo@localhost;
+alter user foo@localhost password expire;
+
 --echo Test: expect expired Notice for connection
 --exec $MYSQLXTEST -ufoo -v%EXPECT_ERROR%=ER_MUST_CHANGE_PASSWORD --file=$MYSQL_TMP_DIR/connection_expire_user.tmp 2>&1
 
+create user xplugin@localhost identified by 'xplugin';
+grant all on *.* to xplugin@localhost;
+alter user xplugin@localhost password expire;
 ###try execute statements with password exipired user once connected,connect should be successful with --skip-disconnect_on_expired_password
 --exec $MYSQLXTEST -uxplugin -pxplugin -v%EXPECT_ERROR%=ER_MUST_CHANGE_PASSWORD --file=$MYSQL_TMP_DIR/connection_expire_user_xplugin.tmp 2>&1
 
+drop user foo@localhost;
+drop user xplugin@localhost;
 ###try execute statements with password exipired user once connected,connect should be successful with --disconnect_on_expired_password and statement execution should be failed until password reset
 let $restart_parameters = restart: --disconnect_on_expired_password;
---source include/restart_mysqld.inc
+--source ../include/restart_mysqld.inc
+create user xplugin@localhost identified by 'xplugin';
+grant all on *.* to xplugin@localhost;
+alter user xplugin@localhost password expire;
+
 --exec $MYSQLXTEST --connect-expired-password -uxplugin -pxplugin -v%EXPECT_ERROR%=ER_MUST_CHANGE_PASSWORD --file=$MYSQL_TMP_DIR/connection_expire_user_xplugin.tmp 2>&1
 
 ## Connect with expired password without advertising connect on expired (should get kicked out)
@@ -213,7 +207,6 @@ let $restart_parameters = restart: --disconnect_on_expired_password;
 
 
 ## Cleanup
-drop user foo@localhost;
 drop user xplugin@localhost;
 update mysql.user set password_last_changed = @passwordchanged where host = 'localhost' and user='x_root';
 flush privileges;

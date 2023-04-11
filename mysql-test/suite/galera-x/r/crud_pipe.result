@@ -16,29 +16,6 @@ send Mysqlx.Sql.StmtExecute {
   }
 }
 
-send Mysqlx.Sql.StmtExecute {
-  stmt: "create_collection"
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "xplugintest"
-      }
-    }
-  }
-  args {
-    type: SCALAR
-    scalar {
-      type: V_STRING
-      v_string {
-        value: "table2"
-      }
-    }
-  }
-  namespace: "xplugin"
-}
-
 send SELECT (100+?)
 send Mysqlx.Sql.StmtExecute {
   stmt: "SELECT (100+?) "
@@ -57,7 +34,6 @@ SLEEP (5)
 0 rows affected
 
 command ok
-Namespace 'xplugin' is deprecated, please use 'mysqlx' instead
 (100+10)
 110
 0 rows affected
@@ -121,9 +97,9 @@ Records: 2  Duplicates: 0  Warnings: 0
 SLEEP (2)
 0
 0 rows affected
-doc	_id
-{"id": "1", "_id": "1", "name": "Omar Bras"}	1
-{"id": "2", "_id": "2", "name": "Omar Mex"}	2
+doc	_id	_json_schema
+{"id": "1", "_id": "1", "name": "Omar Bras"}	1	{"type": "object"}
+{"id": "2", "_id": "2", "name": "Omar Mex"}	2	{"type": "object"}
 0 rows affected
 
 1 rows affected
