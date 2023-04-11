@@ -27,12 +27,14 @@ call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of ADMIN 
 call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of ALTER command");
 call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend changing storage engine of a table ");
 call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of INSERT");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of HANDLER");
 call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of DML command");
 call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of TRUNCATE command");
 call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of ADMIN command");
 call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of ALTER command");
 call mtr.add_suppression("Percona-XtraDB-Cluster prohibits changing storage engine of a table");
 call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of INSERT");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of HANDLER");
 call mtr.add_suppression("WSREP doesn't support XA transaction");
 call mtr.add_suppression("Event 1 Query apply failed");
 set global pxc_strict_mode='ENFORCING';
@@ -1341,6 +1343,52 @@ DROP VIEW view_w_pk;
 DROP TABLE tbl_wo_pk;
 DROP TABLE tbl_w_pk;
 #node-1
-set global pxc_strict_mode = DISABLED;;
+CREATE TABLE t1(id INT PRIMARY KEY);
+#node-1
+SET GLOBAL pxc_strict_mode = 'DISABLED';
+SELECT @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
 #node-2
-set global pxc_strict_mode = DISABLED;;
+SET GLOBAL pxc_strict_mode = 'DISABLED';
+SELECT @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
+#node-1
+HANDLER t1 OPEN AS h1;
+HANDLER h1 CLOSE;
+#node-1
+SET GLOBAL pxc_strict_mode = 'PERMISSIVE';
+SELECT @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-2
+SET GLOBAL pxc_strict_mode = 'PERMISSIVE';
+SELECT @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-1
+HANDLER t1 OPEN AS h1;
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of HANDLER <table> OPEN AS <alias> with pxc_strict_mode = PERMISSIVE
+HANDLER h1 CLOSE;
+include/assert_grep.inc [pxc_strict_mode issued warning about HANDLER OPEN]
+#node-1
+SET GLOBAL pxc_strict_mode = 'ENFORCING';
+SELECT @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
+#node-2
+SET GLOBAL pxc_strict_mode = 'ENFORCING';
+SELECT @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
+#node-1
+HANDLER t1 OPEN AS h1;
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of HANDLER <table> OPEN AS <alias> with pxc_strict_mode = ENFORCING
+include/assert_grep.inc [pxc_strict_mode issued error about HANDLER OPEN]
+DROP TABLE t1;
+#node-1
+set global pxc_strict_mode = DISABLED;
+#node-2
+set global pxc_strict_mode = DISABLED;
