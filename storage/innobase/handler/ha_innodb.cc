@@ -7878,6 +7878,10 @@ int ha_innobase::open(const char *name, int, uint open_flags,
   DBUG_TRACE;
   assert(table_share == table->s);
 
+#ifdef WITH_WSREP
+  DEBUG_SYNC(ha_thd(), "innodb_delay_open_table");
+#endif
+
   thd = ha_thd();
 
   if (!normalize_table_name(norm_name, name)) {

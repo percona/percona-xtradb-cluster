@@ -348,6 +348,8 @@ void Wsrep_client_service::debug_crash(const char *crash_point
   DBUG_EXECUTE_IF(crash_point, DBUG_SUICIDE(););
 }
 
+extern void mysql_ha_flush(THD *thd);
+
 int Wsrep_client_service::bf_rollback() {
   assert(m_thd == current_thd);
   DBUG_ENTER("Wsrep_client_service::rollback");
@@ -382,6 +384,12 @@ int Wsrep_client_service::bf_rollback() {
 
   /* Release all user-locks. */
   mysql_ull_cleanup(m_thd);
+
+  /* If there are any tables opened by HANDLER OPEN statement
+     we need to close them before releasing explicit MDL locks.
+     If we don't do it, DDL which caused BF-abort, like DELETE TABLE
+     will detect that there are still open table instances and abort. */
+  if (!m_thd->handler_tables_hash.empty()) mysql_ha_flush(m_thd);
 
   /* release explicit MDL locks */
   m_thd->mdl_context.release_explicit_locks();

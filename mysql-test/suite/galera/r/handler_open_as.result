@@ -1,0 +1,13 @@
+SET GLOBAL pxc_strict_mode = 'DISABLED';
+SET GLOBAL pxc_strict_mode = 'DISABLED';
+CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB;
+SET DEBUG_SYNC = 'innodb_delay_open_table SIGNAL reached WAIT_FOR continue';
+HANDLER t1 OPEN AS t1;
+SET DEBUG_SYNC = 'now WAIT_FOR reached';
+DROP TABLE t1;
+SET DEBUG_SYNC = 'now SIGNAL continue';
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+HANDLER t1 CLOSE;
+SET GLOBAL pxc_strict_mode = DISABLED;
+SET GLOBAL pxc_strict_mode = DISABLED;
+SET DEBUG_SYNC = reset;
