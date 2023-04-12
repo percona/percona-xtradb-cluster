@@ -33,6 +33,8 @@ int wsrep_show_bf_aborts (THD *thd, SHOW_VAR *var, char *buff)
     return 0;
 }
 
+extern void mysql_ha_flush(THD *thd);
+
 /* must have (&thd->LOCK_wsrep_thd) */
 void wsrep_client_rollback(THD *thd)
 {
@@ -69,6 +71,12 @@ void wsrep_client_rollback(THD *thd)
 
   /* Release all user-locks. */
   mysql_ull_cleanup(thd);
+
+  /* If there are any tables opened by HANDLER OPEN statement
+     we need to close them before releasing explicit MDL locks.
+     If we don't do it, DDL which caused BF-abort, like DROP TABLE
+     will detect that there are still open table instances and abort. */
+  if (thd->handler_tables_hash.records) mysql_ha_flush(thd);
 
   /* release explicit MDL locks */
   thd->mdl_context.release_explicit_locks();

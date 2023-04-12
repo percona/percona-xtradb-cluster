@@ -7983,8 +7983,15 @@ static bool wsrep_should_retry_in_autocommit(THD *thd, const LEX *lex)
     So, we avoid retries for such queries that return result set to client,
     but cannot be run in TOI and can be killed by a TOI.
 
-    As of now, we only do this check for CHECK TABLE and SELECT, and if the
-    same symptom is found for other commands, then please add it to the
+    As of now, we only do this check for CHECK TABLE and SELECT.
+
+    We also do not retry for HANDLER OPEN AS statement. This is because
+    Sql_cmd_handler_open::execute() stores table alias in its internal hash
+    even if opening of the table is BF-aborted with the hope of auto-recovering
+    during the next handler access (READ). If we retry, we will end up with
+    the error of duplicate alias.
+
+    If the same symptom is found for other commands, then please add it to the
     below list.
   */
 
@@ -7994,6 +8001,7 @@ static bool wsrep_should_retry_in_autocommit(THD *thd, const LEX *lex)
   {
     case SQLCOM_CHECK:
     case SQLCOM_SELECT:
+    case SQLCOM_HA_OPEN:
       return false;
     case SQLCOM_CALL:
       sp= sp_find_routine(thd, SP_TYPE_PROCEDURE, lex->spname,

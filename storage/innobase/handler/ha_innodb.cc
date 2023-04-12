@@ -7208,6 +7208,10 @@ ha_innobase::open(
 
 	DBUG_ENTER("ha_innobase::open");
 
+#ifdef WITH_WSREP
+	DEBUG_SYNC(ha_thd(), "innodb_delay_open_table");
+#endif
+
 	UT_NOT_USED(mode);
 	UT_NOT_USED(test_if_locked);
 

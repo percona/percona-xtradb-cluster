@@ -163,6 +163,43 @@ static void mysql_ha_close_table(THD *thd, TABLE_LIST *tables)
   tables->mdl_request.ticket= NULL;
 }
 
+#ifdef WITH_WSREP
+static bool pxc_strict_mode_check(THD *thd)
+{
+  /* HANDLER OPEN is not supported by galera due as it not compatible
+  with multi-master semantics. It acquires explicit table lock. */
+  bool block= false;
+
+  switch (pxc_strict_mode)
+  {
+    case PXC_STRICT_MODE_DISABLED:
+    case PXC_STRICT_MODE_MASTER:
+      /* Do nothing */
+      break;
+    case PXC_STRICT_MODE_PERMISSIVE:
+    {
+      const char *msg= "Percona-XtraDB-Cluster doesn't recommend use of"
+                       " HANDLER <table> OPEN AS <alias>"
+                       " with pxc_strict_mode = PERMISSIVE";
+      WSREP_WARN("%s", msg);
+      push_warning_printf(thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+                          "%s", msg);
+    }
+      break;
+    case PXC_STRICT_MODE_ENFORCING:
+    default:
+      const char *msg= "Percona-XtraDB-Cluster prohibits use of"
+                       " HANDLER <table> OPEN AS <alias>"
+                       " with pxc_strict_mode = ENFORCING";
+      block= true;
+      WSREP_ERROR("%s", msg);
+      my_message(ER_UNKNOWN_ERROR, msg, MYF(0));
+      break;
+  }
+
+  return block;
+}
+#endif
 
 /**
   Execute a HANDLER OPEN statement.
@@ -175,13 +212,20 @@ static void mysql_ha_close_table(THD *thd, TABLE_LIST *tables)
 
 bool Sql_cmd_handler_open::execute(THD *thd)
 {
-  TABLE_LIST    *hash_tables = NULL;
+  TABLE_LIST    *hash_tables= NULL;
   char          *db, *name, *alias;
   size_t        dblen, namelen, aliaslen;
   TABLE_LIST    *tables= thd->lex->select_lex->get_table_list();
   DBUG_ENTER("Sql_cmd_handler_open::execute");
   DBUG_PRINT("enter",("'%s'.'%s' as '%s'",
                       tables->db, tables->table_name, tables->alias));
+
+#ifdef WITH_WSREP
+  if (pxc_strict_mode_check(thd))
+  {
+    DBUG_RETURN(TRUE);
+  }
+#endif
 
   if (thd->locked_tables_mode)
   {
