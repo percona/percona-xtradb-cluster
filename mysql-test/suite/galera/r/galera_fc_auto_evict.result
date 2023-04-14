@@ -1,0 +1,9 @@
+SET GLOBAL wsrep_provider_options="gcs.fc_limit=1;gcs.fc_auto_evict_window=0.01";
+FLUSH TABLES WITH READ LOCK;
+CREATE TABLE t1(a INT PRIMARY KEY AUTO_INCREMENT, b INT);
+Filling the table with data
+UNLOCK TABLES;
+include/assert_grep.inc [FС auto eviction triggered]
+Starting node 2 after shutdown...
+# restart
+DROP TABLE t1;
