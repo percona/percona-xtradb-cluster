@@ -71,10 +71,13 @@ extern const char *wsrep_defaults_group_suffix;
 #define WSREP_SST_RSYNC "rsync"
 #define WSREP_SST_MYSQLDUMP "mysqldump"
 #define WSREP_SST_SKIP "skip"
+#define WSREP_SST_ONLY_IST "ist_only"
 #define WSREP_SST_XTRABACKUP "xtrabackup"
 #define WSREP_SST_XTRABACKUP_V2 "xtrabackup-v2"
 #define WSREP_SST_DEFAULT WSREP_SST_XTRABACKUP_V2
 #define WSREP_SST_ADDRESS_AUTO "AUTO"
+
+#define WSREP_STATE_TRANSFER_NO_SST ""
 
 const char *wsrep_sst_method = WSREP_SST_DEFAULT;
 const char *wsrep_sst_receive_address = WSREP_SST_ADDRESS_AUTO;
@@ -770,6 +773,20 @@ std::string wsrep_sst_prepare() {
 
   if (!strcmp(wsrep_sst_method, WSREP_SST_SKIP)) {
     return WSREP_STATE_TRANSFER_TRIVIAL;
+  }
+
+  if (!strcmp(wsrep_sst_method, WSREP_SST_ONLY_IST)) {
+    /* Inform Galera that we are done with SST and it can proceed with IST.
+    In fact the following call will wait until the server is fully initialized
+    and then inform Galera about two things:
+    1. call sst_received() - so from Galera's point of view it looks like we are done with
+                             sst
+    2. return empty string from this function - informs Galera that only IST should
+       be processed.*/
+    WSREP_WARN("State Transfer via SST was prohibited by setting wsrep_sst_method=ist_only. "
+               "The node will try to join the cluster using only IST.");
+    wsrep_sst_complete(current_thd, 0);
+    return WSREP_STATE_TRANSFER_NO_SST;
   }
 
   // Figure out SST address. Common for all SST methods
