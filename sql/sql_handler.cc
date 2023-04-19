@@ -111,17 +111,11 @@ static bool mysql_ha_open_table(THD *thd, Table_ref *table);
   @note Broadcasts refresh if it closed a table with old version.
 */
 
-<<<<<<< HEAD
-static void mysql_ha_close_table(THD *thd, Table_ref *tables) {
-||||||| 7cb5cd7837d
-static void mysql_ha_close_table(THD *thd, TABLE_LIST *tables) {
-=======
 #ifdef WITH_WSREP
-void mysql_ha_close_table(THD *thd, TABLE_LIST *tables) {
+void mysql_ha_close_table(THD *thd, Table_ref *tables) {
 #else
-static void mysql_ha_close_table(THD *thd, TABLE_LIST *tables) {
+static void mysql_ha_close_table(THD *thd, Table_ref *tables) {
 #endif
->>>>>>> percona/8.0
   if (tables->table && !tables->table->s->tmp_table) {
     /* Non temporary table. */
     tables->table->file->ha_index_or_rnd_end();

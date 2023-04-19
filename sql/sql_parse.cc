@@ -1738,43 +1738,6 @@ static bool deny_updates_if_read_only_option(THD *thd, Table_ref *all_tables) {
 }
 
 #ifdef WITH_WSREP
-<<<<<<< HEAD
-static bool wsrep_read_only_option(THD *thd, Table_ref *all_tables) {
-  int opt_readonly_saved = opt_readonly;
-
-  ulong master_access = thd->security_context()->master_access();
-  ulong flag_saved = (ulong)(master_access & SUPER_ACL);
-
-  opt_readonly = 0;
-  thd->security_context()->set_master_access(master_access & ~SUPER_ACL);
-
-  bool ret = !deny_updates_if_read_only_option(thd, all_tables);
-
-  opt_readonly = opt_readonly_saved;
-  thd->security_context()->set_master_access(master_access | flag_saved);
-
-  return ret;
-}
-||||||| 7cb5cd7837d
-static bool wsrep_read_only_option(THD *thd, TABLE_LIST *all_tables) {
-  int opt_readonly_saved = opt_readonly;
-
-  ulong master_access = thd->security_context()->master_access();
-  ulong flag_saved = (ulong)(master_access & SUPER_ACL);
-
-  opt_readonly = 0;
-  thd->security_context()->set_master_access(master_access & ~SUPER_ACL);
-
-  bool ret = !deny_updates_if_read_only_option(thd, all_tables);
-
-  opt_readonly = opt_readonly_saved;
-  thd->security_context()->set_master_access(master_access | flag_saved);
-
-  return ret;
-}
-=======
->>>>>>> percona/8.0
-
 static void wsrep_copy_query(THD *thd) {
   thd->wsrep_retry_command = thd->get_command();
   thd->wsrep_retry_query_len = thd->query().length;
