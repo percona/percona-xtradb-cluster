@@ -179,7 +179,10 @@ When one supplies long data for a placeholder:
 #include "sql/window.h"
 #include "sql_string.h"
 #include "violite.h"
+
+#ifdef WITH_WSREP
 #include "wsrep_trans_observer.h"
+#endif /* WITH_WSREP */
 
 namespace resourcegroups {
 class Resource_group;
@@ -3172,16 +3175,17 @@ reexecute:
       }
     }
 
-    if (!error) { /* Success */
 #ifdef WITH_WSREP
+    if (!error) { /* Success */
       // We are going to retry the statement, so clean up first.
       wsrep_after_statement(thd);
-#endif
       goto reexecute;
     }
-#ifdef WITH_WSREP
-  }
+#else
+    if (!error) /* Success */
+      goto reexecute;
 #endif
+  }
   reset_stmt_parameters(this);
 
   // Re-enable the general log if it was temporarily disabled while repreparing

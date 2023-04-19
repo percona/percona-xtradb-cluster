@@ -921,8 +921,7 @@ class Global_read_lock {
         provider_paused(false),
 #endif /* WITH_WSREP */
         m_mdl_global_shared_lock(nullptr),
-        m_mdl_blocks_commits_lock(nullptr) {
-  }
+        m_mdl_blocks_commits_lock(nullptr) {}
 
 #ifdef WITH_WSREP
   bool lock_global_read_lock(THD *thd, bool *own_lock);

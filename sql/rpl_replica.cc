@@ -887,7 +887,8 @@ bool stop_slave_cmd(THD *thd) {
     }
   }
 
-  if (!lex->mi.for_channel) res = stop_slave(thd);
+  if (!lex->mi.for_channel)
+    res = stop_slave(thd);
 #ifdef WITH_WSREP
   // Similar to GR, do not allow operations on the wsrep channel
   else if (lex->mi.channel && wsrep_is_wsrep_channel_name(lex->mi.channel)) {
@@ -4000,7 +4001,8 @@ bool show_slave_status_cmd(THD *thd) {
 
   channel_map.rdlock();
 
-  if (!lex->mi.for_channel) res = show_slave_status(thd);
+  if (!lex->mi.for_channel)
+    res = show_slave_status(thd);
 #ifdef WITH_WSREP
   // Disable the SHOW SLAVE STATUS command with the wsrep channel
   else if (lex->mi.channel && wsrep_is_wsrep_channel_name(lex->mi.channel)) {
@@ -5126,11 +5128,11 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
 #ifdef WITH_WSREP
       {
         wsrep_after_statement(thd);
-#endif /* WITH_WSREP */
         /*
-          In the case of an error, coord_handle_partial_binlogged_transaction
+          In case of an error, coord_handle_partial_binlogged_transaction
           will not try to get the rli->data_lock again.
         */
+#endif /* WITH_WSREP */
         return 1;
 #ifdef WITH_WSREP
       }
@@ -6479,9 +6481,10 @@ bool mts_recovery_groups(Relay_log_info *rli) {
           continue;
         }
 
-        DBUG_PRINT("mts", ("Event Recoverying relay log info "
-                           "group_mster_log_name %s, event_master_log_pos "
-                           "%llu type code %u.",
+        DBUG_PRINT(
+            "mts",
+            ("Event Recoverying relay log info "
+             "group_mster_log_name %s, event_master_log_pos %llu type code %u.",
                            linfo.log_file_name, ev->common_header->log_pos,
                            ev->get_type_code()));
 
@@ -7300,15 +7303,6 @@ wsrep_restart_point :
       goto err;
     }
 
-  if (rli->update_is_transactional()) {
-    mysql_cond_broadcast(&rli->start_cond);
-    mysql_mutex_unlock(&rli->run_lock);
-    rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
-                ER_THD(thd, ER_SLAVE_FATAL_ERROR),
-                "Error checking if the relay log repository is transactional.");
-    goto err;
-  }
-
   if (!rli->is_transactional())
     rli->report(WARNING_LEVEL, 0,
                 "If a crash happens this configuration does not guarantee that "
@@ -7517,7 +7511,7 @@ err:
 #endif /* WITH_WSREP */
 
   delete rli->current_mts_submode;
-  rli->current_mts_submode = 0;
+  rli->current_mts_submode = nullptr;
   rli->clear_mts_recovery_groups();
 
   /*
@@ -8859,8 +8853,7 @@ int flush_relay_logs(Master_info *mi, THD *thd) {
            !mi->transaction_parser
                 .is_inside_transaction() ||  // not inside a transaction
            !channel_map.is_group_replication_channel_name(
-               mi->get_channel(),
-               true) ||            // channel isn't GR applier channel
+               mi->get_channel(), true) ||  // channel isn't GR applier channel
            !mi->slave_running) &&  // the I/O thread isn't running
           DBUG_EVALUATE_IF("deferred_flush_relay_log",
                            !channel_map.is_group_replication_channel_name(
@@ -9648,7 +9641,8 @@ bool reset_slave_cmd(THD *thd) {
     return res = true;
   }
 
-  if (!lex->mi.for_channel) res = reset_slave(thd);
+  if (!lex->mi.for_channel)
+    res = reset_slave(thd);
 #ifdef WITH_WSREP
   // Similar to GR, do not allow operations on the wsrep channel
   else if (lex->mi.channel && wsrep_is_wsrep_channel_name(lex->mi.channel)) {

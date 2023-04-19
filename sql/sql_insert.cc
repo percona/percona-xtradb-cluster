@@ -2687,7 +2687,7 @@ void Query_result_insert::abort_result_set(THD *thd) {
     changed = (info.stats.copied || info.stats.deleted || info.stats.updated);
     transactional_table = table->file->has_transactions();
     if (thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT)) {
-#ifdef WIT_WSREP
+#ifdef WITH_WSREP
       if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open()) {
 #else
       if (mysql_bin_log.is_open()) {

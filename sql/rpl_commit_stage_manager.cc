@@ -29,8 +29,16 @@
 #include "sql/raii/sentry.h"                             // raii::Sentry<>
 #include "sql/rpl_commit_stage_manager.h"
 #include "sql/rpl_replica_commit_order_manager.h"  // Commit_order_manager
+<<<<<<< HEAD
 #include "sql/rpl_rli_pdb.h"                       // Slave_worker
 #ifdef WITH_WSREP
+||||||| 7cb5cd7837d
+#include "sql/rpl_rli_pdb.h"  // Slave_worker                    // Slave_worker
+=======
+#include "sql/rpl_rli_pdb.h"  // Slave_worker                    // Slave_worker
+
+#ifdef WITH_WSREP
+>>>>>>> percona/8.0
 #include "sql/wsrep_applier.h"
 #include "sql/wsrep_trans_observer.h"
 #endif /* WITH_WSREP */

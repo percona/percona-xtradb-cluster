@@ -2080,12 +2080,11 @@ loop:
 
   if (sync_array_print_long_waits(&waiter, &sema) && sema == old_sema &&
       waiter == old_waiter) {
-    fatal_cnt++;
-#if defined(WITH_WSREP)
+#ifdef WITH_WSREP
     if (os_event_is_set(srv_allow_writes_event)) {
 #endif /* WITH_WSREP */
       fatal_cnt++;
-#if defined(WITH_WSREP)
+#ifdef WITH_WSREP
     } else {
       ib::warn() << "WSREP: avoiding InnoDB self crash due to long "
                     "semaphore wait of > "

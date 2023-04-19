@@ -2833,9 +2833,8 @@ static void unireg_abort(int exit_code) {
 void clean_up_mysqld_mutexes() { clean_up_mutexes(); }
 
 static void mysqld_exit(int exit_code) {
-  assert(
-      (exit_code >= MYSQLD_SUCCESS_EXIT && exit_code <= MYSQLD_ABORT_EXIT) ||
-      exit_code == MYSQLD_RESTART_EXIT);
+  assert((exit_code >= MYSQLD_SUCCESS_EXIT && exit_code <= MYSQLD_ABORT_EXIT) ||
+          exit_code == MYSQLD_RESTART_EXIT);
 #ifdef WITH_WSREP
   wsrep_deinit_server();
 #endif /* WITH_WSREP */
@@ -10006,7 +10005,7 @@ struct my_option my_long_early_options[] = {
    &opt_keyring_migration_source, &opt_keyring_migration_source, nullptr,
    GET_STR, REQUIRED_ARG, 0, 0, 0, nullptr, 0, nullptr},
   {"keyring-migration-destination", OPT_KEYRING_MIGRATION_DESTINATION,
-   "Keyring plugin to which the keys are "
+   "Keyring plugin or component to which the keys are "
    "migrated to. This option must be specified along with "
    "--keyring-migration-source.",
    &opt_keyring_migration_destination, &opt_keyring_migration_destination,
@@ -14210,8 +14209,8 @@ PSI_stage_info *all_server_stages[] = {
     &stage_communication_delegation,
     &stage_restoring_secondary_keys};
 
-/* clang-format off */
 #ifdef WITH_WSREP
+/* clang-format off */
 PSI_stage_info *wsrep_server_stages[] = {
     // log_event
     &stage_wsrep_writing_rows,
@@ -14251,8 +14250,8 @@ PSI_stage_info *wsrep_server_stages[] = {
     &stage_wsrep_aborter_idle,
     &stage_wsrep_aborter_active};
 
-#endif /* WITH_WSREP */
 /* clang-format on */
+#endif /* WITH_WSREP */
 
 PSI_socket_key key_socket_tcpip;
 PSI_socket_key key_socket_unix;

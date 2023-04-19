@@ -564,8 +564,6 @@ bool set_default_collation(HA_CREATE_INFO *create_info,
   Do not check that wsrep snapshot is ready before allowing this command
 */
 #define CF_SKIP_WSREP_CHECK (1U << 2)
-#else
-#define CF_SKIP_WSREP_CHECK 0
 #endif /* WITH_WSREP */
 
 /**

@@ -5854,8 +5854,7 @@ void TABLE::mark_columns_per_binlog_row_image(THD *thd) {
        thd->is_current_stmt_binlog_format_row() &&
        !ha_check_storage_engine_flag(s->db_type(), HTON_NO_BINLOG_ROW_OPT))) {
 #else
-  if ((mysql_bin_log.is_open() &&
-       thd->is_current_stmt_binlog_format_row() &&
+  if ((mysql_bin_log.is_open() && thd->is_current_stmt_binlog_format_row() &&
        !ha_check_storage_engine_flag(s->db_type(), HTON_NO_BINLOG_ROW_OPT))) {
 #endif /* WITH_WSREP */
     /* if there is no PK, then mark all columns for the BI. */
@@ -7718,12 +7717,12 @@ bool TABLE::setup_partial_update() {
       log_bin_use_v1_row_events == 0 &&
       thd->is_current_stmt_binlog_format_row();
 #else
-  bool logical_diffs = (thd->variables.binlog_row_value_options &
-                        PARTIAL_JSON_UPDATES) != 0 &&
-                       mysql_bin_log.is_open() &&
-                       (thd->variables.option_bits & OPTION_BIN_LOG) != 0 &&
-                       log_bin_use_v1_row_events == 0 &&
-                       thd->is_current_stmt_binlog_format_row();
+  bool logical_diffs = 
+      (thd->variables.binlog_row_value_options & PARTIAL_JSON_UPDATES) != 0 &&
+      mysql_bin_log.is_open() &&
+      (thd->variables.option_bits & OPTION_BIN_LOG) != 0 &&
+      log_bin_use_v1_row_events == 0 &&
+      thd->is_current_stmt_binlog_format_row();
 #endif /* WITH_WSREP */
 
   DBUG_PRINT(

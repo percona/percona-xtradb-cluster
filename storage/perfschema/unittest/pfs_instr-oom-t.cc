@@ -36,9 +36,12 @@
 #include "storage/perfschema/pfs_stat.h"
 #include "storage/perfschema/pfs_user.h"
 #include "storage/perfschema/unittest/stub_pfs_global.h"
-#include "storage/perfschema/unittest/stub_pfs_defaults.h"
 #include "storage/perfschema/unittest/stub_pfs_plugin_table.h"
 #include "unittest/mytap/tap.h"
+
+#ifdef WITH_WSREP
+#include "storage/perfschema/unittest/stub_pfs_defaults.h"
+#endif /* WITH_WSREP */
 
 PSI_thread_key thread_key_1;
 PSI_thread_info all_thread[] = {{&thread_key_1, "T-1", "T-1", 0, 0, ""}};

@@ -2528,6 +2528,7 @@ int ha_prepare_low(THD *thd, bool all) {
   SAVEPOINT is *not* transaction-initiating SQL-statement
 */
 int ha_savepoint(THD *thd, SAVEPOINT *sv) {
+#ifdef WITH_WSREP
 #if 0
 /* commenting it out for now.
    it was not present in 5.7. there is no reason explained why
@@ -2536,7 +2537,6 @@ int ha_savepoint(THD *thd, SAVEPOINT *sv) {
    executing rollback to savepoint when it is killed by high priority
    trx.
 */
-#ifdef WITH_WSREP
   /*
     Register binlog hton for savepoint processing if wsrep binlog
     emulation is on.
@@ -2544,8 +2544,8 @@ int ha_savepoint(THD *thd, SAVEPOINT *sv) {
   if (WSREP_EMULATE_BINLOG(thd) && wsrep_thd_is_local(thd)) {
     wsrep_register_binlog_handler(thd, thd->in_multi_stmt_transaction_mode());
   }
-#endif /* WITH_WSREP */
 #endif
+#endif /* WITH_WSREP */
 
   int error = 0;
   Transaction_ctx::enum_trx_scope trx_scope =
@@ -3758,9 +3758,9 @@ bool handler::is_using_full_key(key_part_map keypart_map,
          (keypart_map == ((key_part_map(1) << actual_key_parts) - 1));
 }
 
-bool handler::is_using_full_unique_key(
-    uint index, key_part_map keypart_map,
-    enum ha_rkey_function find_flag) const noexcept {
+bool handler::is_using_full_unique_key(uint index, key_part_map keypart_map,
+                                       enum ha_rkey_function find_flag) const
+    noexcept {
   return (
       is_using_full_key(keypart_map, table->key_info[index].actual_key_parts) &&
       find_flag == HA_READ_KEY_EXACT &&
@@ -8517,7 +8517,8 @@ int handler::ha_write_row(uchar *buf) {
 
   DBUG_TRACE;
   DEBUG_SYNC(ha_thd(), "start_ha_write_row");
-  DBUG_EXECUTE_IF("inject_error_ha_write_row", return HA_ERR_INTERNAL_ERROR;);
+  DBUG_EXECUTE_IF("inject_error_ha_write_row",
+                  return HA_ERR_INTERNAL_ERROR;);
   DBUG_EXECUTE_IF("simulate_storage_engine_out_of_memory",
                   return HA_ERR_SE_OUT_OF_MEMORY;);
   mark_trx_read_write();
@@ -8874,8 +8875,9 @@ static void copy_blob_data(const TABLE *table, const MY_BITMAP *const fields,
   }
 }
 
-bool handler::is_using_prohibited_gap_locks(
-    TABLE *table, bool using_full_primary_key) const noexcept {
+bool handler::is_using_prohibited_gap_locks(TABLE *table,
+                                            bool using_full_primary_key) const
+    noexcept {
   const THD *thd = table->in_use;
   const thr_lock_type lock_type = table->reginfo.lock_type;
 

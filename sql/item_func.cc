@@ -147,10 +147,10 @@
 
 #ifdef WITH_WSREP
 #include "wsrep_trans_observer.h"
-#endif /* WITH_WSREP */
 
 class Protocol;
 class sp_rcontext;
+#endif /* WITH_WSREP */
 
 using std::max;
 using std::min;

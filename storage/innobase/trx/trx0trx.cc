@@ -67,14 +67,13 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "ut0pool.h"
 #include "ut0vec.h"
 
-#include "debug_sync.h"
 #include "my_dbug.h"
 #include "mysql/plugin.h"
 #include "sql/clone_handler.h"
-#include "sql/wsrep_mysqld.h"
 
 #ifdef WITH_WSREP
-#include <wsrep_mysqld.h>
+#include "debug_sync.h"
+#include "sql/wsrep_mysqld.h"
 #endif /* WITH_WSREP */
 
 static const ulint MAX_DETAILED_ERROR_LEN = 256;
@@ -1356,18 +1355,6 @@ static void trx_start_low(
                           std::memory_order_relaxed);
   }
 
-#if 0
-#ifdef WITH_WSREP
-  /* Avoid resetting the trx xid if the ddl is metadata only changing.
-  In this case transaction is started as part of prepare phase and not
-  before prepare it would normally happen since there is nothing
-  to change during execution phase. */
-  if (!trx->ddl_md_only) {
-    trx->xid->reset();
-  }
-#endif /* WITH_WSREP */
-#endif
-
   /* The initial value for trx->no: TRX_ID_MAX is used in
   read_view_open_now: */
 
@@ -2324,19 +2311,6 @@ void trx_commit(trx_t *trx) /*!< in/out: transaction */
 
   trx_commit_low(trx, mtr);
 
-#if 0
-  -- G4_CHANGE
-  /* PXC original flow does this as part of trx_commit_complete_for_mysql */
-#ifdef WITH_WSREP
-  /* Serialization history has been written and the
-     transaction is committed in memory, which makes
-     this commit ordered. Release commit order critical
-     section. */
-  if (wsrep_on(trx->mysql_thd)) {
-    wsrep_commit_ordered(trx->mysql_thd);
-  }
-#endif /* WITH_WSREP */
-#endif
 }
 
 /** Cleans up a transaction at database startup. The cleanup is needed if
@@ -3762,6 +3736,7 @@ void trx_set_rw_mode(trx_t *trx) /*!< in/out: transaction that is RW */
   trx_sys_rw_trx_add(trx);
 }
 
+#ifdef WITH_WSREP
 /*
   This function is needed only for canceling thread, which are inside replicator
   processing commit, when high priority transaction aborts the victim
@@ -3818,16 +3793,19 @@ int wsrep_signal_replicator(trx_t *victim_trx, trx_t *bf_trx) {
 
   DBUG_RETURN(0);
 }
+#endif /* WITH_WSREP */
 
 void trx_kill_blocking(trx_t *trx) {
-  DBUG_ENTER("trx_kill_blocking");
+#ifdef WITH_WSREP
+  DBUG_TRACE;
+#endif /* WITH_WSREP */
   if (!trx_is_high_priority(trx)) {
-    DBUG_VOID_RETURN;
+    return;
   }
   hit_list_t hit_list;
   lock_make_trx_hit_list(trx, hit_list);
   if (hit_list.empty()) {
-    DBUG_VOID_RETURN;
+    return;
   }
 #ifdef WITH_WSREP
   if (wsrep_debug) ib::info() << "trx_kill_blocking";
@@ -3995,8 +3973,6 @@ void trx_kill_blocking(trx_t *trx) {
   if (had_dict_lock) {
     row_mysql_freeze_data_dictionary(trx, UT_LOCATION_HERE);
   }
-
-  DBUG_VOID_RETURN;
 }
 
 /* To get current session thread default THD */

@@ -2224,6 +2224,7 @@ ADD_SUBDIRECTORY(libmysql)
 ADD_SUBDIRECTORY(libbinlogevents)
 ADD_SUBDIRECTORY(libbinlogstandalone)
 IF(WITH_WSREP)
+   ADD_SUBDIRECTORY(percona-xtradb-cluster-galera)
    ADD_SUBDIRECTORY(wsrep-lib)
 ENDIF()
 ADD_SUBDIRECTORY(libchangestreams)
@@ -2704,8 +2705,17 @@ IF(HAVE_WITH_NDBCLUSTER)
   SET(WITH_NDBCLUSTER ${WITH_NDB} CACHE BOOL
     "Deprecated legacy option for MySQL Cluster")
 ENDIF()
+<<<<<<< HEAD
 
 # Uncomment once packaging changes for switching from scons to cmake
 # for galera are ready - PXC-4166.
 # Should be done for 8.0.33
 # ADD_SUBDIRECTORY(percona-xtradb-cluster-galera)
+||||||| 7cb5cd7837d
+
+# Uncomment once packaging changes for switching from scons to cmake
+# for galera are ready - PXC-4166.
+# Should be done for 8.0.32
+# ADD_SUBDIRECTORY(percona-xtradb-cluster-galera)
+=======
+>>>>>>> percona/8.0
