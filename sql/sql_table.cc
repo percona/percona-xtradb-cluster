@@ -87,7 +87,6 @@
 #include "pfs_table_provider.h"
 #include "prealloced_array.h"
 #include "scope_guard.h"
-#include "service_wsrep.h"
 #include "sql/auth/auth_acls.h"
 #include "sql/auth/auth_common.h"  // check_fk_parent_table_access
 #include "sql/binlog.h"            // mysql_bin_log
@@ -192,6 +191,10 @@
 #include "template_utils.h"
 #include "thr_lock.h"
 #include "typelib.h"
+
+#ifdef WITH_WSREP
+#include "service_wsrep.h"
+#endif /* WITH_WSREP */
 
 namespace dd {
 class View;
@@ -13692,13 +13695,13 @@ static bool mysql_inplace_alter_table(
       }
     }
 
+#ifdef WITH_WSREP
     DBUG_EXECUTE_IF("halt_alter_table_after_lock_downgrade", {
       const char act[] =
           "now SIGNAL alter_table_inplace_after_downgrade "
           "WAIT_FOR continue_inplace_alter";
       assert(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
     };);
-#ifdef WITH_WSREP
 
     WSREP_NBO_1ST_PHASE_END;
 
@@ -17637,7 +17640,9 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
     trans_rollback_stmt(thd);
     trans_rollback(thd);
 
+#ifdef WITH_WSREP
     WSREP_NBO_1ST_PHASE_END;
+#endif /* WITH_WSREP */
 
     return true;
   }

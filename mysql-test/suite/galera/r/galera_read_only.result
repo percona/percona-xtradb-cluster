@@ -20,3 +20,16 @@ t1
 SET GLOBAL super_read_only=FALSE;
 SET GLOBAL read_only=FALSE;
 DROP TABLE t1;
+SET GLOBAL super_read_only=1;
+ALTER INSTANCE ROTATE INNODB MASTER KEY;
+ERROR HY000: The MySQL server is running with the --super-read-only option so it cannot execute this statement
+SET GLOBAL super_read_only=0;
+SET GLOBAL read_only=1;
+CREATE USER 'testuser'@'%' IDENTIFIED WITH 'mysql_native_password' BY 'testuser';
+GRANT ENCRYPTION_KEY_ADMIN ON *.* to 'testuser'@'%';
+ALTER INSTANCE ROTATE INNODB MASTER KEY;
+ERROR HY000: The MySQL server is running with the --read-only option so it cannot execute this statement
+SET global read_only = 0;
+SET global super_read_only = 0;
+DROP USER 'testuser'@'%';
+CALL mtr.add_suppression("Failed to replicate .* in cluster mode");

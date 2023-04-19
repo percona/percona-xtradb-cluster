@@ -1,0 +1,44 @@
+--source include/galera_cluster.inc
+--source include/have_debug_sync.inc
+--source include/count_sessions.inc
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+
+--connection node_1
+--let $pxc_strict_mode_saved1 = `SELECT @@pxc_strict_mode`
+SET GLOBAL pxc_strict_mode = 'DISABLED';
+--connection node_2
+--let $pxc_strict_mode_saved2 = `SELECT @@pxc_strict_mode`
+SET GLOBAL pxc_strict_mode = 'DISABLED';
+
+CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB;
+
+--connection node_1
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+--source include/wait_condition.inc
+
+SET DEBUG_SYNC = 'innodb_delay_open_table SIGNAL reached WAIT_FOR continue';
+--send HANDLER t1 OPEN AS t1
+
+--connection node_1a
+SET DEBUG_SYNC = 'now WAIT_FOR reached';
+
+--connection node_2
+DROP TABLE t1;
+
+--connection node_1a
+SET DEBUG_SYNC = 'now SIGNAL continue';
+
+--connection node_1
+--error ER_LOCK_DEADLOCK
+--reap
+
+HANDLER t1 CLOSE;
+
+--connection node_1
+--eval SET GLOBAL pxc_strict_mode = $pxc_strict_mode_saved1
+--connection node_2
+--eval SET GLOBAL pxc_strict_mode = $pxc_strict_mode_saved2
+SET DEBUG_SYNC = reset;
+--disconnect node_1a
+--source include/wait_until_count_sessions.inc

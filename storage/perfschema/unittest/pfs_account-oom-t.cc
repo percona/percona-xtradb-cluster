@@ -34,9 +34,12 @@
 #include "storage/perfschema/pfs_stat.h"
 #include "storage/perfschema/pfs_user.h"
 #include "storage/perfschema/unittest/stub_pfs_global.h"
-#include "storage/perfschema/unittest/stub_pfs_defaults.h"
 #include "storage/perfschema/unittest/stub_pfs_plugin_table.h"
 #include "unittest/mytap/tap.h"
+
+#ifdef WITH_WSREP
+#include "storage/perfschema/unittest/stub_pfs_defaults.h"
+#endif /* WITH_WSREP */
 
 PFS_thread pfs_thread;
 

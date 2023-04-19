@@ -2825,12 +2825,12 @@ void srv_start_threads(bool bootstrap) {
 void srv_start_threads_after_ddl_recovery() {
   /* Start the buffer pool dump/load thread, which will access spaces thus
         must wait for DDL recovery */
-#ifdef WTIH_WSREP
+#ifdef WITH_WSREP
   if (!get_wsrep_recovery()) {
     /* Skip creating buffer pool dump thread during wsrep
     co-ordinate recovery (triggered using --wsrep-recover option). */
     srv_threads.m_buf_dump =
-        os_thread_create(buf_dump_thread_key, buf_dump_thread);
+        os_thread_create(buf_dump_thread_key, 0, buf_dump_thread);
 
     srv_threads.m_buf_dump.start();
   } else {

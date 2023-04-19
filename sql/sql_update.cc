@@ -1189,12 +1189,14 @@ bool Sql_cmd_update::update_single_table(THD *thd) {
 
   assert(CountHiddenFields(*update_value_list) == 0);
 
+#ifdef WITH_WSREP
   DBUG_EXECUTE_IF("pause_commit_after_update_single_table", {
     const char act[] =
         "innobase_commit_low_begin "
         "SIGNAL update_commit_waiting WAIT_FOR continue";
     assert(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
   };);
+#endif /* WITH_WSREP */
 
   // Following test is disabled, as we get RQG errors that are hard to debug
   // assert((error >= 0) == thd->is_error());

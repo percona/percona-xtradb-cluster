@@ -2814,6 +2814,19 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
   }
 
   /*
+    Acquire an intention exclusive lock to protect against others setting the
+    global read_only and error out if the server is already read only.
+
+    However, FLUSH commands must be exempted from read only checks as server
+    allows all FLUSH commands to run when in read_only mode.
+  */
+  bool skip_read_only_checks = thd->lex->sql_command == SQLCOM_FLUSH;
+  if (!skip_read_only_checks &&
+      acquire_shared_global_read_lock(thd, thd->variables.lock_wait_timeout)) {
+    return -1;
+  }
+
+  /*
     It makes sense to set auto_increment_* to defaults in TOI operations.
     Must be done before wsrep_TOI_begin() since Query_log_event encapsulating
     TOI statement and auto inc variables for wsrep replication is constructed
@@ -2824,6 +2837,8 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
     thd->variables.auto_increment_offset = 1;
     thd->variables.auto_increment_increment = 1;
   }
+
+  DEBUG_SYNC(thd, "wsrep_to_isolation_begin_before_replication");
 
   if (thd->variables.wsrep_on && wsrep_thd_is_local(thd)) {
     switch (thd->variables.wsrep_OSU_method) {
@@ -2856,6 +2871,9 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
         break;
     }
   }
+
+  DEBUG_SYNC(thd, "wsrep_to_isolation_begin_after_replication");
+
   return ret;
 }
 

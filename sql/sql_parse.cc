@@ -1738,23 +1738,6 @@ static bool deny_updates_if_read_only_option(THD *thd, Table_ref *all_tables) {
 }
 
 #ifdef WITH_WSREP
-static bool wsrep_read_only_option(THD *thd, Table_ref *all_tables) {
-  int opt_readonly_saved = opt_readonly;
-
-  ulong master_access = thd->security_context()->master_access();
-  ulong flag_saved = (ulong)(master_access & SUPER_ACL);
-
-  opt_readonly = 0;
-  thd->security_context()->set_master_access(master_access & ~SUPER_ACL);
-
-  bool ret = !deny_updates_if_read_only_option(thd, all_tables);
-
-  opt_readonly = opt_readonly_saved;
-  thd->security_context()->set_master_access(master_access | flag_saved);
-
-  return ret;
-}
-
 static void wsrep_copy_query(THD *thd) {
   thd->wsrep_retry_command = thd->get_command();
   thd->wsrep_retry_query_len = thd->query().length;
@@ -3366,13 +3349,13 @@ static bool wsrep_is_show_query(enum enum_sql_command command) {
 */
 
 static bool lock_tables_for_backup(THD *thd) {
-  DBUG_TRACE;
+  DBUG_ENTER("lock_tables_for_backup");
 
-  if (check_backup_admin_privilege(thd)) return true;
+  if (check_backup_admin_privilege(thd)) DBUG_RETURN(true);
 
   if (delay_key_write_options == DELAY_KEY_WRITE_ALL) {
     my_error(ER_OPTION_PREVENTS_STATEMENT, MYF(0), "delay_key_write=ALL");
-    return true;
+    DBUG_RETURN(true);
   }
   /*
     Do nothing if the current connection already owns the LOCK TABLES FOR
@@ -3380,7 +3363,7 @@ static bool lock_tables_for_backup(THD *thd) {
   */
   if (thd->backup_tables_lock.is_acquired() ||
       thd->global_read_lock.is_acquired())
-    return false;
+    DBUG_RETURN(false);
 
   /*
     Do not allow backup locks under regular LOCK TABLES, FLUSH TABLES ... FOR
@@ -3388,7 +3371,7 @@ static bool lock_tables_for_backup(THD *thd) {
   */
   if (thd->variables.option_bits & OPTION_TABLE_LOCK) {
     my_error(ER_LOCK_OR_ACTIVE_TRANSACTION, MYF(0));
-    return true;
+    DBUG_RETURN(true);
   }
 
   bool res = thd->backup_tables_lock.acquire(thd);
@@ -3398,7 +3381,7 @@ static bool lock_tables_for_backup(THD *thd) {
     res = true;
   }
 
-  return res;
+   DBUG_RETURN(res);
 }
 
 /**
@@ -6029,7 +6012,9 @@ finish:
     DEBUG_SYNC(thd, "execute_command_after_close_tables");
 #endif
 
+#ifdef WITH_WSREP
   WSREP_NBO_2ND_PHASE_BEGIN;
+#endif /* WITH_WSREP */
 
   if (!thd->in_sub_stmt && thd->transaction_rollback_request) {
     /*
@@ -7729,13 +7714,21 @@ static bool wsrep_should_retry_in_autocommit(const THD *thd) {
     So, we avoid retries for such queries that return result set to client,
     but cannot be run in TOI and can be killed by a TOI.
 
-    As of now, we only do this check for CHECK TABLE and SELECT, and if the
-    same symptom is found for other commands, then please add it to the
+    As of now, we only do this check for CHECK TABLE and SELECT.
+
+    We also do not retry for HANDLER OPEN AS statement. This is because
+    Sql_cmd_handler_open::execute() stores table alias in its internal hash
+    even if opening of the table is BF-aborted with the hope of auto-recovering
+    during the next handler access (READ). If we retry, we will end up with
+    the error of duplicate alias.
+
+    If the same symptom is found for other commands, then please add it to the
     below list.
   */
   switch (thd->lex->sql_command) {
     case SQLCOM_CHECK:
     case SQLCOM_SELECT:
+    case SQLCOM_HA_OPEN:
       return false;
     case SQLCOM_ALTER_TABLE: {
       return (thd->lex->alter_info->flags & Alter_info::ALTER_ADMIN_PARTITION
@@ -7751,8 +7744,7 @@ static bool wsrep_dispatch_sql_command(THD *thd, const char *rawbuf,
                                        uint length, Parser_state *parser_state,
                                        bool update_userstat) {
   DBUG_TRACE;
-  bool is_autocommit = !thd->in_multi_stmt_transaction_mode() &&
-                       wsrep_read_only_option(thd, thd->lex->query_tables);
+  bool is_autocommit = !thd->in_multi_stmt_transaction_mode();
   bool retry_autocommit;
 
   do {

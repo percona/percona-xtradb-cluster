@@ -232,11 +232,11 @@ extern "C" void handle_fatal_signal(int sig) {
 
   s_handler_being_processed = true;
 
+#ifdef WITH_WSREP
 /*
   The wsrep subsystem has their its own actions
   which need be performed before exiting:
 */
-#ifdef WITH_WSREP
   wsrep_handle_fatal_signal(sig);
 #endif /* WITH_WSREP */
 
