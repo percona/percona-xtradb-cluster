@@ -1620,14 +1620,14 @@ static bool wsrep_prepare_keys_for_alter_add_fk(const char *child_table_db,
 
 static bool wsrep_prepare_keys_for_isolation(THD *, const char *db,
                                              const char *table,
-                                             const TABLE_LIST *table_list,
+                                             const Table_ref *table_list,
                                              Alter_info *alter_info,
                                              wsrep_key_arr_t *ka) {
   ka->keys = 0;
   ka->keys_len = 0;
 
   if (db || table) {
-    TABLE_LIST tmp_table;
+    Table_ref tmp_table;
 
     memset(static_cast<void *>(&tmp_table), 0, sizeof(tmp_table));
     tmp_table.table_name = const_cast<char *>(table);
@@ -1639,7 +1639,7 @@ static bool wsrep_prepare_keys_for_isolation(THD *, const char *db,
     if (!wsrep_prepare_key_for_isolation(db, table, ka)) goto err;
   }
 
-  for (const TABLE_LIST *table_it = table_list; table_it;
+  for (const Table_ref *table_it = table_list; table_it;
        table_it = table_it->next_global) {
     if (!wsrep_prepare_key_for_isolation(table_it->db, table_it->table_name,
                                          ka))
@@ -1665,7 +1665,7 @@ err:
  */
 bool wsrep_prepare_keys_for_isolation(THD *thd, const char *db,
                                       const char *table,
-                                      const TABLE_LIST *table_list,
+                                      const Table_ref *table_list,
                                       wsrep_key_arr_t *ka) {
   return wsrep_prepare_keys_for_isolation(thd, db, table, table_list, NULL, ka);
 }
@@ -1743,7 +1743,7 @@ wsrep::key_array wsrep_prepare_keys_for_alter_add_fk(const char *child_table_db,
 }
 
 wsrep::key_array wsrep_prepare_keys_for_toi(const char *db, const char *table,
-                                            const TABLE_LIST *table_list,
+                                            const Table_ref *table_list,
                                             dd::Tablespace_table_ref_vec *trefs,
                                             Alter_info *alter_info,
                                             wsrep::key_array *fk_tables) {
@@ -1751,7 +1751,7 @@ wsrep::key_array wsrep_prepare_keys_for_toi(const char *db, const char *table,
   if (db || table) {
     ret.push_back(wsrep_prepare_key_for_toi(db, table, wsrep::key::shared));
   }
-  for (const TABLE_LIST *table_it = table_list; table_it;
+  for (const Table_ref *table_it = table_list; table_it;
        table_it = table_it->next_global) {
     ret.push_back(wsrep_prepare_key_for_toi(table_it->get_db_name(),
                                             table_it->get_table_name(),
@@ -1782,7 +1782,7 @@ wsrep::key_array wsrep_prepare_keys_for_toi(const char *db, const char *table,
  * action function.
  */
 using action_fn = std::function<void(const dd::Table *)>;
-static bool wsrep_do_action_for_tables(THD *thd, TABLE_LIST *tables,
+static bool wsrep_do_action_for_tables(THD *thd, Table_ref *tables,
                                        action_fn action) {
   if (!WSREP(thd) || !WSREP_CLIENT(thd)) return false;
 
@@ -1857,7 +1857,7 @@ static bool wsrep_do_action_for_tables(THD *thd, TABLE_LIST *tables,
 /*
  * Collect wsrep keys corresponding to child tables
  */
-bool wsrep_append_child_tables(THD *thd, TABLE_LIST *tables,
+bool wsrep_append_child_tables(THD *thd, Table_ref *tables,
                                wsrep::key_array *keys) {
   return wsrep_do_action_for_tables(
       thd, tables, [keys](const dd::Table *table_def) {
@@ -1872,7 +1872,7 @@ bool wsrep_append_child_tables(THD *thd, TABLE_LIST *tables,
 /*
  * Collect wsrep keys corresponding to parent tables
  */
-bool wsrep_append_fk_parent_table(THD *thd, TABLE_LIST *tables,
+bool wsrep_append_fk_parent_table(THD *thd, Table_ref *tables,
                                   wsrep::key_array *keys) {
   return wsrep_do_action_for_tables(
       thd, tables, [keys](const dd::Table *table_def) {
@@ -1969,8 +1969,8 @@ int wsrep_to_buf_helper(THD *thd, const char *query, uint query_len,
 static int create_view_query(THD *thd, uchar **buf, size_t *buf_len) {
   LEX *lex = thd->lex;
   auto *select_lex = lex->query_block;
-  TABLE_LIST *first_table = select_lex->table_list.first;
-  TABLE_LIST *views = first_table;
+  Table_ref *first_table = select_lex->m_table_list.first;
+  Table_ref *views = first_table;
 
   String buff;
   const LEX_STRING command[3] = {{C_STRING_WITH_LEN("CREATE ")},
@@ -2037,13 +2037,13 @@ static int create_view_query(THD *thd, uchar **buf, size_t *buf_len) {
 static int wsrep_drop_table_query(THD *thd, uchar **buf, size_t *buf_len) {
   LEX *lex = thd->lex;
   auto *select_lex = lex->query_block;
-  TABLE_LIST *first_table = select_lex->table_list.first;
+  Table_ref *first_table = select_lex->m_table_list.first;
   String buff;
 
   assert(!lex->drop_temporary);
 
   bool found_temp_table = false;
-  for (TABLE_LIST *table = first_table; table; table = table->next_global) {
+  for (Table_ref *table = first_table; table; table = table->next_global) {
     if (find_temporary_table(thd, table->db, table->table_name)) {
       found_temp_table = true;
       break;
@@ -2054,7 +2054,7 @@ static int wsrep_drop_table_query(THD *thd, uchar **buf, size_t *buf_len) {
     buff.append("DROP TABLE ");
     if (lex->drop_if_exists) buff.append("IF EXISTS ");
 
-    for (TABLE_LIST *table = first_table; table; table = table->next_global) {
+    for (Table_ref *table = first_table; table; table = table->next_global) {
       if (!find_temporary_table(thd, table->db, table->table_name)) {
         append_identifier(thd, &buff, table->db, strlen(table->db),
                           system_charset_info, thd->charset());
@@ -2080,7 +2080,7 @@ static int wsrep_drop_table_query(THD *thd, uchar **buf, size_t *buf_len) {
 }
 
 static bool wsrep_can_run_in_nbo(THD *thd, const char *db, const char *table,
-                                 const TABLE_LIST *table_list) {
+                                 const Table_ref *table_list) {
   if (thd->lex->sql_command != SQLCOM_ALTER_TABLE &&
       thd->lex->sql_command != SQLCOM_CREATE_INDEX &&
       thd->lex->sql_command != SQLCOM_DROP_INDEX)
@@ -2092,9 +2092,9 @@ static bool wsrep_can_run_in_nbo(THD *thd, const char *db, const char *table,
 
   LEX *lex = thd->lex;
   auto *select_lex = lex->query_block;
-  TABLE_LIST *first_table = (select_lex ? select_lex->table_list.first : NULL);
+  Table_ref *first_table = (select_lex ? select_lex->m_table_list.first : NULL);
   if (table_list && first_table) {
-    for (TABLE_LIST *table_it = first_table; table_it;
+    for (Table_ref *table_it = first_table; table_it;
          table_it = table_it->next_global) {
       if (!find_temporary_table(thd, table_it->db, table_it->table_name)) {
         return true;
@@ -2114,7 +2114,7 @@ static bool wsrep_can_run_in_nbo(THD *thd, const char *db, const char *table,
   non-temporary tables.
  */
 static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
-                                 const TABLE_LIST *table_list) {
+                                 const Table_ref *table_list) {
   /* compression dictionary is not table object that has temporary qualifier
   attached to it. Neither it is dependent on other object that needs
   validation. */
@@ -2127,7 +2127,7 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
 
   LEX *lex = thd->lex;
   auto *select_lex = lex->query_block;
-  TABLE_LIST *first_table = (select_lex ? select_lex->table_list.first : NULL);
+  Table_ref *first_table = (select_lex ? select_lex->m_table_list.first : NULL);
 
   switch (lex->sql_command) {
     case SQLCOM_CREATE_TABLE:
@@ -2145,7 +2145,7 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
         If any of the remaining tables refer to temporary table error
         is returned to client, so TOI can be skipped
       */
-      for (TABLE_LIST *it = first_table->next_global; it;
+      for (Table_ref *it = first_table->next_global; it;
            it = it->next_global) {
         if (find_temporary_table(thd, it)) {
           return false;
@@ -2172,7 +2172,7 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
       }
 
       if (table_list && first_table) {
-        for (TABLE_LIST *table_it = first_table; table_it;
+        for (Table_ref *table_it = first_table; table_it;
              table_it = table_it->next_global) {
           if (!find_temporary_table(thd, table_it->db, table_it->table_name)) {
             return true;
@@ -2294,7 +2294,7 @@ fail:
  */
 
 static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
-                           const TABLE_LIST *table_list,
+                           const Table_ref *table_list,
                            dd::Tablespace_table_ref_vec *trefs,
                            Alter_info *alter_info,
                            wsrep::key_array *fk_tables) {
@@ -2481,7 +2481,7 @@ static void wsrep_TOI_end(THD *thd) {
 
 static int wsrep_NBO_begin_phase_one(THD *thd, const char *db_,
                                      const char *table_,
-                                     const TABLE_LIST *table_list,
+                                     const Table_ref *table_list,
                                      dd::Tablespace_table_ref_vec *trefs,
                                      Alter_info *alter_info,
                                      wsrep::key_array *fk_tables) {
@@ -2743,7 +2743,7 @@ static void wsrep_RSU_end(THD *thd) {
 }
 
 int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
-                             const TABLE_LIST *table_list,
+                             const Table_ref *table_list,
                              dd::Tablespace_table_ref_vec *trefs,
                              Alter_info *alter_info,
                              wsrep::key_array *fk_tables) {

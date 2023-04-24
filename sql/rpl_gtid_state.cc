@@ -53,7 +53,7 @@
 #include "wsrep_trans_observer.h"
 #endif /* WITH_WSREP */
 
-struct TABLE_LIST;
+class Table_ref;
 
 #include <vector>
 
@@ -787,7 +787,7 @@ int Gtid_state::compress(THD *thd) {
   return gtid_table_persistor->compress(thd);
 }
 
-int Gtid_state::warn_or_err_on_modify_gtid_table(THD *thd, TABLE_LIST *table) {
+int Gtid_state::warn_or_err_on_modify_gtid_table(THD *thd, Table_ref *table) {
   DBUG_TRACE;
   int ret =
       gtid_table_persistor->warn_or_err_on_explicit_modification(thd, table);

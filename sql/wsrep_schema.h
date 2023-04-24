@@ -28,7 +28,7 @@
 class THD;
 class Relay_log_info;
 struct TABLE;
-struct TABLE_LIST;
+class Table_ref;
 
 /** Name of the table in `wsrep_schema_str` used for storing streaming
 replication data. In an InnoDB full format, e.g. "database/tablename". */

@@ -75,7 +75,7 @@ Prefix: %{_sysconfdir}
 
 #Placeholder should be replaced on preparation stage
 %if %{undefined galera_version}
- %define galera_version 4.13
+ %define galera_version 4.14
 %endif
 
 %if %{undefined galera_revision}
@@ -1817,6 +1817,7 @@ fi
 %{_libdir}/mysqlrouter/private/libmysqlrouter_metadata_cache.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_mysqlxmessages.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_routing.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_destination_status.so.*
 %dir %{_libdir}/mysqlrouter
 %dir %{_libdir}/mysqlrouter/private
 %{_libdir}/mysqlrouter/*.so*
