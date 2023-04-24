@@ -70,7 +70,6 @@ extern const char *wsrep_defaults_group_suffix;
 
 #define WSREP_SST_RSYNC "rsync"
 #define WSREP_SST_MYSQLDUMP "mysqldump"
-#define WSREP_SST_SKIP "skip"
 #define WSREP_SST_ONLY_IST "ist_only"
 #define WSREP_SST_XTRABACKUP "xtrabackup"
 #define WSREP_SST_XTRABACKUP_V2 "xtrabackup-v2"
@@ -147,8 +146,7 @@ bool wsrep_sst_donor_check(sys_var *, THD *, set_var *) { return 0; }
 bool wsrep_sst_donor_update(sys_var *, THD *, enum_var_type) { return 0; }
 
 bool wsrep_before_SE() {
-  return (wsrep_provider != NULL && strcmp(wsrep_provider, WSREP_NONE) &&
-          strcmp(wsrep_sst_method, WSREP_SST_SKIP));
+  return (wsrep_provider != NULL && strcmp(wsrep_provider, WSREP_NONE));
 }
 
 bool wsrep_setup_allowed_sst_methods() {
@@ -783,10 +781,6 @@ std::string wsrep_sst_prepare() {
   const char *addr_in = NULL;
   const char *addr_out = NULL;
   const char *method;
-
-  if (!strcmp(wsrep_sst_method, WSREP_SST_SKIP)) {
-    return WSREP_STATE_TRANSFER_TRIVIAL;
-  }
 
   if (!strcmp(wsrep_sst_method, WSREP_SST_ONLY_IST)) {
     /* Inform Galera that we are done with SST and it can proceed with IST.
