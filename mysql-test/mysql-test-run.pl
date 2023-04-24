@@ -207,7 +207,7 @@ my $DEFAULT_SUITES= "main,sys_vars,binlog,binlog_encryption,rpl_encryption,encry
   ."tokudb.rpl,tokudb.perfschema,"
   ."rocksdb,rocksdb_rpl,rocksdb_sys_vars,rocksdb_stress,"
   ."audit_null,percona-pam-for-mysql,data_masking,"
-  ."galera,galera_3nodes";
+  ."galera,galera_3nodes,wsrep";
 
 my $opt_suites;
 

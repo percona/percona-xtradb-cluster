@@ -104,6 +104,8 @@ void wsrep_set_SE_checkpoint(XID& xid)
 
 void wsrep_set_SE_checkpoint(const wsrep_uuid_t& uuid, wsrep_seqno_t seqno)
 {
+  if (!WSREP_ON) return;
+
   XID xid;
   wsrep_xid_init(&xid, uuid, seqno);
   wsrep_set_SE_checkpoint(xid);

@@ -40,6 +40,8 @@ void wsrep_abort_cb (void);
 extern wsrep_uuid_t  local_uuid;
 extern wsrep_seqno_t local_seqno;
 
+bool wsrep_sst_in_progress();
+
 // a helper function
 void wsrep_sst_received(wsrep_t*, const wsrep_uuid_t&, wsrep_seqno_t,
                         const void*, size_t);

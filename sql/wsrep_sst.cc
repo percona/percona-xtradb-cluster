@@ -450,6 +450,14 @@ void wsrep_sst_complete (const wsrep_uuid_t* sst_uuid,
 
 static bool sst_awaiting_callback= false;
 
+bool wsrep_sst_in_progress()
+{
+    if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
+    bool in_progress = sst_awaiting_callback;
+    mysql_mutex_unlock (&LOCK_wsrep_sst);
+    return in_progress;
+}
+
 void wsrep_sst_received (wsrep_t*            const wsrep,
                          const wsrep_uuid_t& uuid,
                          wsrep_seqno_t       const seqno,
