@@ -1,0 +1,9 @@
+!include ../my.cnf
+
+[mysqld.1]
+wsrep-on=ON
+wsrep-cluster-address=gcomm://
+wsrep-provider=@env.WSREP_PROVIDER
+binlog-format=ROW
+log-bin=mysqld-bin
+sync-binlog=1
