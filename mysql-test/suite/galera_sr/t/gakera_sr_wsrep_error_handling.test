@@ -1,0 +1,18 @@
+# Test to verify the error paths of wsrep_schema.cc 
+# (More scenarios can be added in the future)
+#
+
+# Failing to update fragment results in a deadlock
+--source include/galera_cluster.inc
+
+--connection node_1
+--echo #node-1
+SET SESSION DEBUG='+d,fail_at_update_fragment';
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY);
+
+SET SESSION wsrep_trx_fragment_size=1;
+--error ER_LOCK_DEADLOCK
+INSERT INTO t1 VALUES (1);
+
+# cleanup
+DROP TABLE t1;
