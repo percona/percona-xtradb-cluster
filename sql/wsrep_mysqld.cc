@@ -734,7 +734,7 @@ wsrep_view_handler_cb (void*                    app_ctx,
   default:
       WSREP_ERROR("Unsupported application protocol version: %d",
                   view->proto_ver);
-      unireg_abort(1);
+      return WSREP_CB_FAILURE;
   }
 
   if (view->state_gap)
@@ -808,7 +808,7 @@ wsrep_view_handler_cb (void*                    app_ctx,
       WSREP_ERROR("Undetected state gap. Can't continue.");
       wsrep_log_states(WSREP_LOG_FATAL, &cluster_uuid, view->state_id.seqno,
                        &local_uuid, -1);
-      unireg_abort(1);
+      return WSREP_CB_FAILURE;
     }
   }
 
