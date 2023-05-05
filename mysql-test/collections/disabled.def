@@ -235,7 +235,6 @@ sys_vars.sql_mode_func                       : BUG#0 Differences in result likel
 #sys_vars.innodb_support_xa_func              : BUG#0 XA is not supported by PXC
 
 # wsrep
-wsrep.wsrep_start_position_basic          : BUG#0 This needs server to start in cluster mode with wsrep initialized.
 wsrep.wsrep_preordered_basic              : BUG#0 TC pending.
 wsrep.wsrep_reject_queries_basic          : BUG#0 TC pending.
 wsrep.wsrep_max_ws_size_basic             : BUG#0 Setting this now also set repl.max_ws_size which is galera internal setting.

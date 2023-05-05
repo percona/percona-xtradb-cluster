@@ -14,8 +14,16 @@ SELECT @@global.wsrep_start_position;
 --echo # scope
 --error ER_INCORRECT_GLOBAL_LOCAL_VAR
 SELECT @@session.wsrep_start_position;
+
+# Setting wsrep_start_position when wsrep provider is loaded is prohibited 
+--error ER_UNKNOWN_ERROR
 SET @@global.wsrep_start_position='00000000-0000-0000-0000-000000000000:-1';
 SELECT @@global.wsrep_start_position;
+
+# Restart the server without wsrep provider loaded
+--let $do_not_echo_parameters = 1
+--let $restart_parameters = "restart: --wsrep_provider=none --log-bin"
+--source include/restart_mysqld.inc
 
 --echo
 --echo # valid values
@@ -49,8 +57,8 @@ SET @@global.wsrep_start_position=NULL;
 --error ER_WRONG_VALUE_FOR_VAR
 SET @@global.wsrep_start_position='junk';
 
---echo
---echo # restore the initial value
-SET @@global.wsrep_start_position = @wsrep_start_position_global_saved;
+--let $do_not_echo_parameters = 1
+--let $restart_parameters = "restart:"
+--source include/restart_mysqld.inc
 
 --echo # End of test

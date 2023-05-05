@@ -220,15 +220,16 @@ static int wsrep_start_position_verify(const char *start_str) {
 
 /* Function checks if the new value for start_position is valid.
 @return false if no error encountered with check else return true. */
-bool wsrep_start_position_check(sys_var *self, THD *, set_var *var) {
-  if ((Wsrep_server_state::instance().state() !=
-       wsrep::server_state::s_disconnected) ||
-      (strcmp(wsrep_provider, WSREP_NONE))) {
-    char message[1024];
-    sprintf(message,
-            "wsrep_start_position can be set during server boot"
-            " or before loading wsrep_provider");
-    my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+bool wsrep_start_position_check (sys_var *self, THD*, set_var* var) {
+    /* Allow setting wsrep_start_position:
+    1. During SST - always (this is used by mysqldump sst)
+    2. After boot - only when wsrep_provider=none
+    In other words, prohibit wsrep_start_position setting
+    if we are after SST and wsrep provider is loaded. */
+  if (!wsrep_sst_in_progress() && (strcmp(wsrep_provider, WSREP_NONE))) {
+    my_message(ER_UNKNOWN_ERROR,
+              "wsrep_start_position can be set during server boot"
+              " or before loading wsrep_provider", MYF(0));
     return true;
   }
 

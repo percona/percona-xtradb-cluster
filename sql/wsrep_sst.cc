@@ -202,6 +202,13 @@ bool wsrep_setup_allowed_sst_methods() {
 // True if wsrep awaiting sst_received callback:
 static bool sst_awaiting_callback = false;
 
+bool wsrep_sst_in_progress() {
+    if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
+    bool in_progress = sst_awaiting_callback;
+    mysql_mutex_unlock (&LOCK_wsrep_sst);
+    return in_progress;
+}
+
 // Signal end of SST
 static int wsrep_sst_complete(THD *thd, int const rcode) {
   Wsrep_client_service client_service(thd, thd->wsrep_cs());
