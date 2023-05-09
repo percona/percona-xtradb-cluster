@@ -181,8 +181,7 @@ class System_variable {
   size_t m_name_length;
 
 #ifdef WITH_WSREP
-  char m_value_str[((SHOW_VAR_FUNC_BUFF_SIZE > 2048)
-                    ? SHOW_VAR_FUNC_BUFF_SIZE : 2048) + 1];
+  char m_value_str[std::max(SHOW_VAR_FUNC_BUFF_SIZE, WSREP_PS_VAR_VALUE_BUFF_SIZE) + 1];
 #else
   char m_value_str[SHOW_VAR_FUNC_BUFF_SIZE + 1];
 #endif /* WITH_WSREP */

@@ -716,7 +716,7 @@ void System_variable::init(THD *target_thd, const SHOW_VAR *show_var,
 #ifdef WITH_WSREP
   m_value_length = std::min(
       m_value_length,
-      ((size_t{SHOW_VAR_FUNC_BUFF_SIZE} > 2048) ? size_t{SHOW_VAR_FUNC_BUFF_SIZE} : 2048));
+      size_t(std::max(SHOW_VAR_FUNC_BUFF_SIZE, WSREP_PS_VAR_VALUE_BUFF_SIZE)));
 #else
   m_value_length = std::min(m_value_length, size_t{SHOW_VAR_FUNC_BUFF_SIZE});
 #endif /* WITH_WSREP */

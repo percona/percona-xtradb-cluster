@@ -1115,7 +1115,7 @@ struct PFS_variable_value_row {
 
 #ifdef WITH_WSREP
   /* Increase in lenght to accomodate wsrep_provider_options */
-  char m_str[2048];
+  char m_str[WSREP_PS_VAR_VALUE_BUFF_SIZE];
 #else
   char m_str[1024];
 #endif /* WITH_WSREP */
