@@ -254,7 +254,6 @@ rpl.rpl_seconds_behind_master : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-330
 
 # galera
 galera.galera_toi_ddl_online : BUG#0 fails randomly with "deadlock error" as sequence of action is causing an issue.
-galera.galera_kill_nochanges : BUG#0 mysql-wsrep#24
 galera.pxc_encrypt_rest_gt_vault : BUG#0 Vault server availability is unreliable
 galera.pxc_encrypt_rest_fpt_vault : BUG#0 Vault server availability is unreliable
 galera.galera_var_notify_cmd : BUG#0 Failing to invoke the external script
@@ -279,11 +278,9 @@ binlog.binlog_index : BUG#0 codership/mysql-wsrep##71
 binlog.binlog_xa_prepared_disconnect : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-330
 
 # Galera 4.5 / 8.0.21 related
-galera.galera_mysqlpump : BUG#0 Wasn't working properly even before inconsistency voting 
 galera.galera-index-online-fk : BUG#0 fk_40 triggers inconsistency voting, as it uses a debug_sync on node1
 galera.MW-284 : BUG#0000 test is incompatible with native mysql8.0 server slave behavior (upstream)
 galera.galera_fk_lock_parent_update_child : BUG#0 Few cases have timing issues(PXC-3431) and few are invalid after PXC-3501
-galera.galera_toi_ddl_fk_insert : BUG#0 CODERSHIP qa#39 test fails sporadically (PXC-3431)
 
 # auth_sec
 auth_sec.wrong_keyring_file_data                                        : BUG#0 PXC needs keyring_file/keyring_vault to load without errors
