@@ -12,9 +12,11 @@ SELECT @@global.wsrep_start_position;
 SELECT @@session.wsrep_start_position;
 ERROR HY000: Variable 'wsrep_start_position' is a GLOBAL variable
 SET @@global.wsrep_start_position='00000000-0000-0000-0000-000000000000:-1';
+ERROR HY000: wsrep_start_position can be set during server boot or before loading wsrep_provider
 SELECT @@global.wsrep_start_position;
 @@global.wsrep_start_position
 00000000-0000-0000-0000-000000000000:-1
+# restart:<hidden args>
 
 # valid values
 SET @@global.wsrep_start_position='00000000-0000-0000-0000-000000000000:-2';
@@ -51,7 +53,5 @@ SET @@global.wsrep_start_position=NULL;
 ERROR 42000: Variable 'wsrep_start_position' can't be set to the value of 'NULL'
 SET @@global.wsrep_start_position='junk';
 ERROR 42000: Variable 'wsrep_start_position' can't be set to the value of 'junk'
-
-# restore the initial value
-SET @@global.wsrep_start_position = @wsrep_start_position_global_saved;
+# restart:<hidden args>
 # End of test

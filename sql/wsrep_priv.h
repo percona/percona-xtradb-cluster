@@ -42,6 +42,8 @@ extern Wsrep_schema *wsrep_schema;
 
 void wsrep_abort_cb(void);
 
+bool wsrep_sst_in_progress();
+
 bool wsrep_sst_received(THD *, const wsrep_uuid_t &, wsrep_seqno_t,
                         const void *, size_t);
 
