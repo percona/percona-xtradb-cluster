@@ -1,0 +1,23 @@
+# The purpose of this test is to check of binlog rotation works
+# when WSREP is enabled.
+
+--source include/have_wsrep_provider.inc
+
+--let $statement = SHOW BINARY LOGS
+--let $column = Log_name
+--source include/get_row_count.inc
+--let $binlogs_count_start = $row_count
+
+CREATE TABLE t1(a INT PRIMARY KEY, c1 varchar(8192));
+INSERT INTO t1 VALUES (0, repeat('a', 8192));
+DROP TABLE t1;
+
+# Check that binlog rotation occured
+--let $statement = SHOW BINARY LOGS
+--let $column = Log_name
+--source include/get_row_count.inc
+--let $binlogs_count_end = $row_count
+
+--let $assert_text = Binlog rotation should have occured
+--let $assert_cond = "[SELECT $binlogs_count_start = $binlogs_count_end]" = 0
+--source include/assert.inc
