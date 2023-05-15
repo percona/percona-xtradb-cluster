@@ -170,8 +170,10 @@ static inline bool wsrep_run_commit_hook(THD *thd, bool all) {
                        wsrep_is_ordered(thd),
                        thd->is_operating_substatement_implicitly));
   /* Avoid running commit hooks if a sub-statement is being operated implicitly
+     or gtid table is being accessed implicitly
    * within current transaction (if it is an internal transaction) */
-  if (thd->is_operating_substatement_implicitly) {
+  if (thd->is_operating_substatement_implicitly ||
+      thd->is_operating_gtid_table_implicitly) {
     return false;
   }
   /* Is MST commit or autocommit? */
