@@ -1867,9 +1867,12 @@ end:
   /*
     New galera flow now start transaction even for read-only transaction.
     This read-only transaction will not change any row so will get committed
-    as an empty transaction
+    as an empty transaction.
+    But we need to skip this for implicit, internal transactions.
   */
-  if (wsrep_is_active(thd) && is_real_trans && !error && (rw_ha_count == 0) &&
+  if (!thd->is_operating_substatement_implicitly &&
+      !thd->is_operating_gtid_table_implicitly && wsrep_is_active(thd) &&
+      is_real_trans && !error && (rw_ha_count == 0) &&
       wsrep_not_committed(thd)) {
     wsrep_commit_empty(thd, all);
   }

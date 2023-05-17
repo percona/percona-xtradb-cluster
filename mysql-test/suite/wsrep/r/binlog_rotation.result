@@ -1,0 +1,4 @@
+CREATE TABLE t1(a INT PRIMARY KEY, c1 varchar(8192));
+INSERT INTO t1 VALUES (0, repeat('a', 8192));
+DROP TABLE t1;
+include/assert.inc [Binlog rotation should have occured]
