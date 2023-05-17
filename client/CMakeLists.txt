@@ -247,6 +247,7 @@ SET(MYSQLBINLOG_LIBRARIES
   binlogevents_static
   client_base
   perconaserverclient
+  extra::rapidjson
   )
 
 IF(WITH_JSON_BINLOG_LIBRARY)

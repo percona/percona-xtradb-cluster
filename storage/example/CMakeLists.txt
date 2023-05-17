@@ -27,12 +27,12 @@ IF(WITH_EXAMPLE_STORAGE_ENGINE AND NOT WITHOUT_EXAMPLE_STORAGE_ENGINE)
   MYSQL_ADD_PLUGIN(example ha_example.cc
     STORAGE_ENGINE
     DEFAULT
-    LINK_LIBRARIES ext::zlib
+    LINK_LIBRARIES ext::zlib extra::rapidjson
     )
 ELSEIF(NOT WITHOUT_EXAMPLE_STORAGE_ENGINE)
   MYSQL_ADD_PLUGIN(example ha_example.cc
     STORAGE_ENGINE
     MODULE_ONLY
-    LINK_LIBRARIES ext::zlib
+    LINK_LIBRARIES ext::zlib extra::rapidjson
     )
 ENDIF()

@@ -761,7 +761,7 @@ bool start_slave_cmd(THD *thd) {
        bad configuration, mysql replication would not be forwarded to wsrep
        cluster which would lead to immediate inconsistency
     */
-    my_message(ER_SLAVE_CONFIGURATION,
+    my_message(ER_REPLICA_CONFIGURATION,
                "bad configuration no log_slave_updates"
                " defined, slave would not replicate further to wsrep cluster",
                MYF(0));
@@ -789,7 +789,7 @@ bool start_slave_cmd(THD *thd) {
     else if (thd->lex->slave_thd_opt & SLAVE_SQL)
       command = "START SLAVE SQL_THREAD FOR CHANNEL";
 
-    my_error(ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0), command,
+    my_error(ER_REPLICA_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0), command,
              lex->mi.channel, command);
 
     goto err;
@@ -901,7 +901,7 @@ bool stop_slave_cmd(THD *thd) {
     else if (thd->lex->slave_thd_opt & SLAVE_SQL)
       command = "STOP SLAVE SQL_THREAD FOR CHANNEL";
 
-    my_error(ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0), command,
+    my_error(ER_REPLICA_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0), command,
              lex->mi.channel, command);
 
     channel_map.unlock();
@@ -1096,7 +1096,7 @@ static int find_first_relay_log_with_rotate_from_master(Relay_log_info *rli) {
 #ifdef WITH_WSREP
   // Similar to GR, do not allow operations on the wsrep channel
   else if (wsrep_is_wsrep_channel_name(rli->get_channel())) {
-    my_error(ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0),
+    my_error(ER_REPLICA_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0),
              "Relay log recovery skipped for '%s' channel", rli->get_channel());
     goto err;
   }
@@ -4045,7 +4045,7 @@ bool show_slave_status_cmd(THD *thd) {
 #ifdef WITH_WSREP
   // Disable the SHOW SLAVE STATUS command with the wsrep channel
   else if (lex->mi.channel && wsrep_is_wsrep_channel_name(lex->mi.channel)) {
-    my_error(ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0),
+    my_error(ER_REPLICA_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0),
              "SHOW SLAVE STATUS", lex->mi.channel);
     channel_map.unlock();
     return true;
@@ -5326,29 +5326,18 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
                 };);
 
 #endif
-<<<<<<< HEAD
-              DBUG_PRINT("info", ("Slave retries transaction "
+              DBUG_PRINT("info", ("Replica retries transaction "
                                   "rli->trans_retries: %lu",
                                   rli->trans_retries));
             }
           } else {
             thd->fatal_error();
             rli->report(ERROR_LEVEL, thd->get_stmt_da()->mysql_errno(),
-                        "Slave SQL thread retried transaction %lu time(s) "
+                        "Replica SQL thread retried transaction %lu time(s) "
                         "in vain, giving up. Consider raising the value of "
                         "the replica_transaction_retries variable.",
                         rli->trans_retries);
-||||||| merged common ancestors
-            DBUG_PRINT("info", ("Slave retries transaction "
-                                "rli->trans_retries: %lu",
-                                rli->trans_retries));
-=======
-            DBUG_PRINT("info", ("Replica retries transaction "
-                                "rli->trans_retries: %lu",
-                                rli->trans_retries));
->>>>>>> Percona-Server-8.0.33-25
           }
-<<<<<<< HEAD
         } else if ((exec_res && !temp_err) ||
                    (opt_using_transactions &&
                     rli->get_group_relay_log_pos() ==
@@ -5363,23 +5352,6 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
           DBUG_PRINT("info",
                      ("Resetting retry counter, rli->trans_retries: %lu",
                       rli->trans_retries));
-||||||| merged common ancestors
-        } else {
-          thd->fatal_error();
-          rli->report(ERROR_LEVEL, thd->get_stmt_da()->mysql_errno(),
-                      "Slave SQL thread retried transaction %lu time(s) "
-                      "in vain, giving up. Consider raising the value of "
-                      "the replica_transaction_retries variable.",
-                      rli->trans_retries);
-=======
-        } else {
-          thd->fatal_error();
-          rli->report(ERROR_LEVEL, thd->get_stmt_da()->mysql_errno(),
-                      "Replica SQL thread retried transaction %lu time(s) "
-                      "in vain, giving up. Consider raising the value of "
-                      "the replica_transaction_retries variable.",
-                      rli->trans_retries);
->>>>>>> Percona-Server-8.0.33-25
         }
       }
 #ifdef WITH_WSREP
@@ -6613,19 +6585,9 @@ bool mts_recovery_groups(Relay_log_info *rli) {
         DBUG_PRINT(
             "mta",
             ("Event Recoverying relay log info "
-<<<<<<< HEAD
-             "group_mster_log_name %s, event_master_log_pos %llu type code %u.",
-                           linfo.log_file_name, ev->common_header->log_pos,
-                           ev->get_type_code()));
-||||||| merged common ancestors
-             "group_mster_log_name %s, event_master_log_pos %llu type code %u.",
-             linfo.log_file_name, ev->common_header->log_pos,
-             ev->get_type_code()));
-=======
              "group_mster_log_name %s, event_source_log_pos %llu type code %u.",
              linfo.log_file_name, ev->common_header->log_pos,
              ev->get_type_code()));
->>>>>>> Percona-Server-8.0.33-25
 
         if (ev->starts_group()) {
           flag_group_seen_begin = true;
@@ -7316,7 +7278,6 @@ wsrep_restart_point :
   rli->sql_thread_kill_accepted = false;
   rli->last_event_start_time = 0;
 
-<<<<<<< HEAD
   if (init_replica_thread(thd, SLAVE_THD_SQL)) {
     /*
       TODO: this is currently broken - slave start and change master
@@ -7324,41 +7285,12 @@ wsrep_restart_point :
     */
     mysql_cond_broadcast(&rli->start_cond);
     mysql_mutex_unlock(&rli->run_lock);
-    rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
-                ER_THD(thd, ER_SLAVE_FATAL_ERROR),
-                "Failed during slave thread initialization");
+    rli->report(ERROR_LEVEL, ER_REPLICA_FATAL_ERROR,
+                ER_THD(thd, ER_REPLICA_FATAL_ERROR),
+                "Failed during replica thread initialization");
     goto err;
   }
   thd->init_query_mem_roots();
-||||||| merged common ancestors
-    if (init_replica_thread(thd, SLAVE_THD_SQL)) {
-      /*
-        TODO: this is currently broken - slave start and change master
-        will be stuck if we fail here
-      */
-      mysql_cond_broadcast(&rli->start_cond);
-      mysql_mutex_unlock(&rli->run_lock);
-      rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
-                  ER_THD(thd, ER_SLAVE_FATAL_ERROR),
-                  "Failed during slave thread initialization");
-      goto err;
-    }
-    thd->init_query_mem_roots();
-=======
-    if (init_replica_thread(thd, SLAVE_THD_SQL)) {
-      /*
-        TODO: this is currently broken - slave start and change master
-        will be stuck if we fail here
-      */
-      mysql_cond_broadcast(&rli->start_cond);
-      mysql_mutex_unlock(&rli->run_lock);
-      rli->report(ERROR_LEVEL, ER_REPLICA_FATAL_ERROR,
-                  ER_THD(thd, ER_REPLICA_FATAL_ERROR),
-                  "Failed during replica thread initialization");
-      goto err;
-    }
-    thd->init_query_mem_roots();
->>>>>>> Percona-Server-8.0.33-25
 
   if ((rli->deferred_events_collecting = rli->rpl_filter->is_on()))
     rli->deferred_events = new Deferred_log_events();
@@ -7402,36 +7334,15 @@ wsrep_restart_point :
   set_timespec_nsec(&rli->ts_exec[1], 0);
   set_timespec_nsec(&rli->stats_begin, 0);
 
-<<<<<<< HEAD
   if (RUN_HOOK(binlog_relay_io, applier_start, (thd, rli->mi))) {
     mysql_cond_broadcast(&rli->start_cond);
     mysql_mutex_unlock(&rli->run_lock);
-    rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
-                ER_THD(thd, ER_SLAVE_FATAL_ERROR),
+    rli->report(ERROR_LEVEL, ER_REPLICA_FATAL_ERROR,
+                ER_THD(thd, ER_REPLICA_FATAL_ERROR),
                 "Failed to run 'applier_start' hook");
     goto err;
   }
-||||||| merged common ancestors
-    if (RUN_HOOK(binlog_relay_io, applier_start, (thd, rli->mi))) {
-      mysql_cond_broadcast(&rli->start_cond);
-      mysql_mutex_unlock(&rli->run_lock);
-      rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
-                  ER_THD(thd, ER_SLAVE_FATAL_ERROR),
-                  "Failed to run 'applier_start' hook");
-      goto err;
-    }
-=======
-    if (RUN_HOOK(binlog_relay_io, applier_start, (thd, rli->mi))) {
-      mysql_cond_broadcast(&rli->start_cond);
-      mysql_mutex_unlock(&rli->run_lock);
-      rli->report(ERROR_LEVEL, ER_REPLICA_FATAL_ERROR,
-                  ER_THD(thd, ER_REPLICA_FATAL_ERROR),
-                  "Failed to run 'applier_start' hook");
-      goto err;
-    }
->>>>>>> Percona-Server-8.0.33-25
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   /* Initialization of Galera/WSREP and async replication happens in parallel.
      Allow async replication infrastructure to init up to this point, but
@@ -7445,55 +7356,14 @@ wsrep_restart_point :
         Wsrep_server_state::s_synced);
   }
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-    /* MTS: starting the worker pool */
-    if (slave_start_workers(rli, rli->opt_replica_parallel_workers,
-                            &mts_inited) != 0) {
-      mysql_cond_broadcast(&rli->start_cond);
-      mysql_mutex_unlock(&rli->run_lock);
-      rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
-                  ER_THD(thd, ER_SLAVE_FATAL_ERROR),
-                  "Failed during slave workers initialization");
-      goto err;
-    }
-    /*
-      We are going to set slave_running to 1. Assuming slave I/O thread is
-      alive and connected, this is going to make Seconds_Behind_Master be 0
-      i.e. "caught up". Even if we're just at start of thread. Well it's ok, at
-      the moment we start we can think we are caught up, and the next second we
-      start receiving data so we realize we are not caught up and
-      Seconds_Behind_Master grows. No big deal.
-    */
-    rli->abort_slave = false;
-=======
-    /* MTS: starting the worker pool */
-    if (slave_start_workers(rli, rli->opt_replica_parallel_workers,
-                            &mts_inited) != 0) {
-      mysql_cond_broadcast(&rli->start_cond);
-      mysql_mutex_unlock(&rli->run_lock);
-      rli->report(ERROR_LEVEL, ER_REPLICA_FATAL_ERROR,
-                  ER_THD(thd, ER_REPLICA_FATAL_ERROR),
-                  "Failed during replica workers initialization");
-      goto err;
-    }
-    /*
-      We are going to set slave_running to 1. Assuming slave I/O thread is
-      alive and connected, this is going to make Seconds_Behind_Master be 0
-      i.e. "caught up". Even if we're just at start of thread. Well it's ok, at
-      the moment we start we can think we are caught up, and the next second we
-      start receiving data so we realize we are not caught up and
-      Seconds_Behind_Master grows. No big deal.
-    */
-    rli->abort_slave = false;
->>>>>>> Percona-Server-8.0.33-25
 
   /* MTS: starting the worker pool */
   if (slave_start_workers(rli, rli->opt_replica_parallel_workers,
                           &mts_inited) != 0) {
     mysql_cond_broadcast(&rli->start_cond);
     mysql_mutex_unlock(&rli->run_lock);
-    rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
-                ER_THD(thd, ER_SLAVE_FATAL_ERROR),
+    rli->report(ERROR_LEVEL, ER_REPLICA_FATAL_ERROR,
+                ER_THD(thd, ER_REPLICA_FATAL_ERROR),
                 "Failed during slave workers initialization");
     goto err;
   }
@@ -7554,62 +7424,24 @@ wsrep_restart_point :
   rli->trans_retries = 0;  // start from "no error"
   DBUG_PRINT("info", ("rli->trans_retries: %lu", rli->trans_retries));
 
-<<<<<<< HEAD
   if (applier_reader.open(&errmsg)) {
-    rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR, "%s", errmsg);
+    rli->report(ERROR_LEVEL, ER_REPLICA_FATAL_ERROR, "%s", errmsg);
     goto err;
   }
-||||||| merged common ancestors
-    if (applier_reader.open(&errmsg)) {
-      rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR, "%s", errmsg);
-      goto err;
-    }
-=======
-    if (applier_reader.open(&errmsg)) {
-      rli->report(ERROR_LEVEL, ER_REPLICA_FATAL_ERROR, "%s", errmsg);
-      goto err;
-    }
->>>>>>> Percona-Server-8.0.33-25
 
   THD_CHECK_SENTRY(thd);
   assert(rli->info_thd == thd);
 
-<<<<<<< HEAD
-  DBUG_PRINT("master_info", ("log_file_name: %s  position: %s",
+  DBUG_PRINT("source_info", ("log_file_name: %s  position: %s",
                              rli->get_group_master_log_name(),
                              llstr(rli->get_group_master_log_pos(), llbuff)));
-||||||| merged common ancestors
-    DBUG_PRINT("master_info", ("log_file_name: %s  position: %s",
-                               rli->get_group_master_log_name(),
-                               llstr(rli->get_group_master_log_pos(), llbuff)));
-=======
-    DBUG_PRINT("source_info", ("log_file_name: %s  position: %s",
-                               rli->get_group_master_log_name(),
-                               llstr(rli->get_group_master_log_pos(), llbuff)));
->>>>>>> Percona-Server-8.0.33-25
 
-<<<<<<< HEAD
   if (check_temp_dir(rli->slave_patternload_file, rli->get_channel())) {
     rli->report(ERROR_LEVEL, thd->get_stmt_da()->mysql_errno(),
-                "Unable to use slave's temporary directory %s - %s",
+                "Unable to use replica's temporary directory %s - %s",
                 replica_load_tmpdir, thd->get_stmt_da()->message_text());
     goto err;
   }
-||||||| merged common ancestors
-    if (check_temp_dir(rli->slave_patternload_file, rli->get_channel())) {
-      rli->report(ERROR_LEVEL, thd->get_stmt_da()->mysql_errno(),
-                  "Unable to use slave's temporary directory %s - %s",
-                  replica_load_tmpdir, thd->get_stmt_da()->message_text());
-      goto err;
-    }
-=======
-    if (check_temp_dir(rli->slave_patternload_file, rli->get_channel())) {
-      rli->report(ERROR_LEVEL, thd->get_stmt_da()->mysql_errno(),
-                  "Unable to use replica's temporary directory %s - %s",
-                  replica_load_tmpdir, thd->get_stmt_da()->message_text());
-      goto err;
-    }
->>>>>>> Percona-Server-8.0.33-25
 
   priv_check_status = rli->check_privilege_checks_user();
   if (!!priv_check_status) {
@@ -7629,14 +7461,14 @@ wsrep_restart_point :
   }
 
   if (rli->is_privilege_checks_user_null())
-    LogErr(INFORMATION_LEVEL, ER_RPL_SLAVE_SQL_THREAD_STARTING,
+    LogErr(INFORMATION_LEVEL, ER_RPL_REPLICA_SQL_THREAD_STARTING,
            rli->get_for_channel_str(), rli->get_rpl_log_name(),
            llstr(rli->get_group_master_log_pos(), llbuff),
            rli->get_group_relay_log_name(),
            llstr(rli->get_group_relay_log_pos(), llbuff1));
   else
     LogErr(INFORMATION_LEVEL,
-           ER_RPL_SLAVE_SQL_THREAD_STARTING_WITH_PRIVILEGE_CHECKS,
+           ER_RPL_REPLICA_SQL_THREAD_STARTING_WITH_PRIVILEGE_CHECKS,
            rli->get_for_channel_str(), rli->get_rpl_log_name(),
            llstr(rli->get_group_master_log_pos(), llbuff),
            rli->get_group_relay_log_name(),
@@ -7649,15 +7481,14 @@ wsrep_restart_point :
   if (opt_init_replica.length) {
     execute_init_command(thd, &opt_init_replica, &LOCK_sys_init_replica);
     if (thd->is_slave_error) {
-      rli->report(ERROR_LEVEL, ER_SERVER_SLAVE_INIT_QUERY_FAILED,
-                  ER_THD(current_thd, ER_SERVER_SLAVE_INIT_QUERY_FAILED),
+      rli->report(ERROR_LEVEL, ER_SERVER_REPLICA_INIT_QUERY_FAILED,
+                  ER_THD(current_thd, ER_SERVER_REPLICA_INIT_QUERY_FAILED),
                   thd->get_stmt_da()->mysql_errno(),
                   thd->get_stmt_da()->message_text());
       goto err;
     }
   }
 
-<<<<<<< HEAD
   /*
     First check until condition - probably there is nothing to execute. We
     do not want to wait for next event in this case.
@@ -7693,73 +7524,14 @@ wsrep_restart_point :
     assert(rli->info_thd == thd);
     THD_CHECK_SENTRY(thd);
     if (saved_skip && rli->slave_skip_counter == 0) {
-      LogErr(INFORMATION_LEVEL, ER_RPL_SLAVE_SKIP_COUNTER_EXECUTED,
+      LogErr(INFORMATION_LEVEL, ER_RPL_REPLICA_SKIP_COUNTER_EXECUTED,
              (ulong)saved_skip, saved_log_name, (ulong)saved_log_pos,
              saved_master_log_name, (ulong)saved_master_log_pos,
-||||||| merged common ancestors
-    if (rli->is_privilege_checks_user_null())
-      LogErr(INFORMATION_LEVEL, ER_RPL_SLAVE_SQL_THREAD_STARTING,
-             rli->get_for_channel_str(), rli->get_rpl_log_name(),
-             llstr(rli->get_group_master_log_pos_info(), llbuff),
              rli->get_group_relay_log_name(),
-             llstr(rli->get_group_relay_log_pos(), llbuff1));
-    else
-      LogErr(INFORMATION_LEVEL,
-             ER_RPL_SLAVE_SQL_THREAD_STARTING_WITH_PRIVILEGE_CHECKS,
-             rli->get_for_channel_str(), rli->get_rpl_log_name(),
-             llstr(rli->get_group_master_log_pos_info(), llbuff),
-=======
-    if (rli->is_privilege_checks_user_null())
-      LogErr(INFORMATION_LEVEL, ER_RPL_REPLICA_SQL_THREAD_STARTING,
-             rli->get_for_channel_str(), rli->get_rpl_log_name(),
-             llstr(rli->get_group_master_log_pos_info(), llbuff),
-             rli->get_group_relay_log_name(),
-             llstr(rli->get_group_relay_log_pos(), llbuff1));
-    else
-      LogErr(INFORMATION_LEVEL,
-             ER_RPL_REPLICA_SQL_THREAD_STARTING_WITH_PRIVILEGE_CHECKS,
-             rli->get_for_channel_str(), rli->get_rpl_log_name(),
-             llstr(rli->get_group_master_log_pos_info(), llbuff),
->>>>>>> Percona-Server-8.0.33-25
-             rli->get_group_relay_log_name(),
-<<<<<<< HEAD
              (ulong)rli->get_group_relay_log_pos(),
              rli->get_group_master_log_name_info(),
              (ulong)rli->get_group_master_log_pos_info());
       saved_skip = 0;
-||||||| merged common ancestors
-             llstr(rli->get_group_relay_log_pos(), llbuff1),
-             rli->get_privilege_checks_username().c_str(),
-             rli->get_privilege_checks_hostname().c_str(),
-             opt_always_activate_granted_roles == 0 ? "DEFAULT" : "ALL");
-
-    /* execute init_replica variable */
-    if (opt_init_replica.length) {
-      execute_init_command(thd, &opt_init_replica, &LOCK_sys_init_replica);
-      if (thd->is_slave_error) {
-        rli->report(ERROR_LEVEL, ER_SERVER_SLAVE_INIT_QUERY_FAILED,
-                    ER_THD(current_thd, ER_SERVER_SLAVE_INIT_QUERY_FAILED),
-                    thd->get_stmt_da()->mysql_errno(),
-                    thd->get_stmt_da()->message_text());
-        goto err;
-      }
-=======
-             llstr(rli->get_group_relay_log_pos(), llbuff1),
-             rli->get_privilege_checks_username().c_str(),
-             rli->get_privilege_checks_hostname().c_str(),
-             opt_always_activate_granted_roles == 0 ? "DEFAULT" : "ALL");
-
-    /* execute init_replica variable */
-    if (opt_init_replica.length) {
-      execute_init_command(thd, &opt_init_replica, &LOCK_sys_init_replica);
-      if (thd->is_slave_error) {
-        rli->report(ERROR_LEVEL, ER_SERVER_REPLICA_INIT_QUERY_FAILED,
-                    ER_THD(current_thd, ER_SERVER_REPLICA_INIT_QUERY_FAILED),
-                    thd->get_stmt_da()->mysql_errno(),
-                    thd->get_stmt_da()->message_text());
-        goto err;
-      }
->>>>>>> Percona-Server-8.0.33-25
     }
 
     // read next event
@@ -7786,7 +7558,6 @@ wsrep_restart_point :
             Next iteration reads the same event. */
         break;
 
-<<<<<<< HEAD
       case SLAVE_APPLY_EVENT_AND_UPDATE_POS_APPLY_ERROR:
         /** fall through */
       case SLAVE_APPLY_EVENT_AND_UPDATE_POS_UPDATE_POS_ERROR:
@@ -7794,39 +7565,6 @@ wsrep_restart_point :
       case SLAVE_APPLY_EVENT_AND_UPDATE_POS_APPEND_JOB_ERROR:
         main_loop_error = true;
         break;
-||||||| merged common ancestors
-    while (!main_loop_error && !sql_slave_killed(thd, rli)) {
-      Log_event *ev = nullptr;
-      THD_STAGE_INFO(thd, stage_reading_event_from_the_relay_log);
-      assert(rli->info_thd == thd);
-      THD_CHECK_SENTRY(thd);
-      if (saved_skip && rli->slave_skip_counter == 0) {
-        LogErr(INFORMATION_LEVEL, ER_RPL_SLAVE_SKIP_COUNTER_EXECUTED,
-               (ulong)saved_skip, saved_log_name, (ulong)saved_log_pos,
-               saved_master_log_name, (ulong)saved_master_log_pos,
-               rli->get_group_relay_log_name(),
-               (ulong)rli->get_group_relay_log_pos(),
-               rli->get_group_master_log_name_info(),
-               (ulong)rli->get_group_master_log_pos_info());
-        saved_skip = 0;
-      }
-=======
-    while (!main_loop_error && !sql_slave_killed(thd, rli)) {
-      Log_event *ev = nullptr;
-      THD_STAGE_INFO(thd, stage_reading_event_from_the_relay_log);
-      assert(rli->info_thd == thd);
-      THD_CHECK_SENTRY(thd);
-      if (saved_skip && rli->slave_skip_counter == 0) {
-        LogErr(INFORMATION_LEVEL, ER_RPL_REPLICA_SKIP_COUNTER_EXECUTED,
-               (ulong)saved_skip, saved_log_name, (ulong)saved_log_pos,
-               saved_master_log_name, (ulong)saved_master_log_pos,
-               rli->get_group_relay_log_name(),
-               (ulong)rli->get_group_relay_log_pos(),
-               rli->get_group_master_log_name_info(),
-               (ulong)rli->get_group_master_log_pos_info());
-        saved_skip = 0;
-      }
->>>>>>> Percona-Server-8.0.33-25
 
       default:
         /* This shall never happen. */
@@ -7849,50 +7587,8 @@ err:
   }
 #endif /* WITH_WSREP */
 
-<<<<<<< HEAD
   if (main_loop_error == true && !sql_slave_killed(thd, rli))
     slave_errno = report_apply_event_error(thd, rli);
-||||||| merged common ancestors
-    // report error
-    if (main_loop_error == true && !sql_slave_killed(thd, rli))
-      slave_errno = report_apply_event_error(thd, rli);
-
-    /* At this point the SQL thread will not try to work anymore. */
-    rli->atomic_is_stopping = true;
-    (void)RUN_HOOK(
-        binlog_relay_io, applier_stop,
-        (thd, rli->mi, rli->is_error() || !rli->sql_thread_kill_accepted));
-
-    slave_stop_workers(rli, &mts_inited);  // stopping worker pool
-    /* Thread stopped. Print the current replication position to the log */
-    if (slave_errno)
-      LogErr(ERROR_LEVEL, slave_errno, rli->get_rpl_log_name(),
-             llstr(rli->get_group_master_log_pos_info(), llbuff));
-    else
-      LogErr(INFORMATION_LEVEL, ER_RPL_SLAVE_SQL_THREAD_EXITING,
-             rli->get_for_channel_str(), rli->get_rpl_log_name(),
-             llstr(rli->get_group_master_log_pos_info(), llbuff));
-=======
-    // report error
-    if (main_loop_error == true && !sql_slave_killed(thd, rli))
-      slave_errno = report_apply_event_error(thd, rli);
-
-    /* At this point the SQL thread will not try to work anymore. */
-    rli->atomic_is_stopping = true;
-    (void)RUN_HOOK(
-        binlog_relay_io, applier_stop,
-        (thd, rli->mi, rli->is_error() || !rli->sql_thread_kill_accepted));
-
-    slave_stop_workers(rli, &mts_inited);  // stopping worker pool
-    /* Thread stopped. Print the current replication position to the log */
-    if (slave_errno)
-      LogErr(ERROR_LEVEL, slave_errno, rli->get_rpl_log_name(),
-             llstr(rli->get_group_master_log_pos_info(), llbuff));
-    else
-      LogErr(INFORMATION_LEVEL, ER_RPL_REPLICA_SQL_THREAD_EXITING,
-             rli->get_for_channel_str(), rli->get_rpl_log_name(),
-             llstr(rli->get_group_master_log_pos_info(), llbuff));
->>>>>>> Percona-Server-8.0.33-25
 
   /* At this point the SQL thread will not try to work anymore. */
   rli->atomic_is_stopping = true;
@@ -7906,7 +7602,7 @@ err:
     LogErr(ERROR_LEVEL, slave_errno, rli->get_rpl_log_name(),
            llstr(rli->get_group_master_log_pos(), llbuff));
   else
-    LogErr(INFORMATION_LEVEL, ER_RPL_SLAVE_SQL_THREAD_EXITING,
+    LogErr(INFORMATION_LEVEL, ER_RPL_REPLICA_SQL_THREAD_EXITING,
            rli->get_for_channel_str(), rli->get_rpl_log_name(),
            llstr(rli->get_group_master_log_pos(), llbuff));
 
@@ -9347,13 +9043,13 @@ bool flush_relay_logs_cmd(THD *thd) {
         Log warning on SQL or worker threads.
       */
       WSREP_ERROR("FLUSH RELAY LOGS cannot be performed on channel 'wsrep'");
-      LogErr(WARNING_LEVEL, ER_RPL_SLAVE_INCORRECT_CHANNEL, lex->mi.channel);
+      LogErr(WARNING_LEVEL, ER_RPL_REPLICA_INCORRECT_CHANNEL, lex->mi.channel);
     } else {
       /*
         Return error on client sessions.
       */
       error = true;
-      my_error(ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0),
+      my_error(ER_REPLICA_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0),
                "FLUSH RELAY LOGS", lex->mi.channel);
     }
 #endif /* WITH_WSREP */
@@ -9958,7 +9654,7 @@ bool reset_slave_cmd(THD *thd) {
 #ifdef WITH_WSREP
   // Similar to GR, do not allow operations on the wsrep channel
   else if (lex->mi.channel && wsrep_is_wsrep_channel_name(lex->mi.channel)) {
-    my_error(ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0),
+    my_error(ER_REPLICA_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0),
              "RESET SLAVE [ALL] FOR CHANNEL", lex->mi.channel);
     channel_map.unlock();
     return true;
@@ -11678,7 +11374,7 @@ bool change_master_cmd(THD *thd) {
 #ifdef WITH_WSREP
   // Similar to GR, do not allow operations on the wsrep channel
   if (lex->mi.channel && wsrep_is_wsrep_channel_name(lex->mi.channel)) {
-    my_error(ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0),
+    my_error(ER_REPLICA_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0),
              "CHANGE MASTER with the given parameters", lex->mi.channel);
     res = true;
     goto err;
@@ -11941,7 +11637,7 @@ static bool check_replica_configuration_errors(Master_info *mi,
        cluster which would lead to immediate inconsistency
     */
     WSREP_WARN("Cannot start MySQL slave, when log_slave_updates is not set");
-    my_error(ER_SLAVE_CONFIGURATION, MYF(0),
+    my_error(ER_REPLICA_CONFIGURATION, MYF(0),
              "bad configuration no log_slave_updates defined, slave would not"
              " replicate further to wsrep cluster");
     return true;

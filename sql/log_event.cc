@@ -4993,23 +4993,15 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
         clear_all_errors(
             thd, const_cast<Relay_log_info *>(rli)); /* Can ignore query */
       else {
-<<<<<<< HEAD
 #ifdef WITH_WSREP
-        rli->report(ERROR_LEVEL, ER_ERROR_ON_MASTER,
-                    ER_THD(thd, ER_ERROR_ON_MASTER), expected_error,
+        rli->report(ERROR_LEVEL, ER_ERROR_ON_SOURCE,
+                    ER_THD(thd, ER_ERROR_ON_SOURCE), expected_error,
                     (!opt_general_log_raw) && thd->rewritten_query().length()
                         ? wsrep_thd_rewritten_query(thd).c_ptr_safe()
                         : thd->query().str);
 #else
-        rli->report(ERROR_LEVEL, ER_ERROR_ON_MASTER,
-                    ER_THD(thd, ER_ERROR_ON_MASTER), expected_error,
-||||||| merged common ancestors
-        rli->report(ERROR_LEVEL, ER_ERROR_ON_MASTER,
-                    ER_THD(thd, ER_ERROR_ON_MASTER), expected_error,
-=======
         rli->report(ERROR_LEVEL, ER_ERROR_ON_SOURCE,
                     ER_THD(thd, ER_ERROR_ON_SOURCE), expected_error,
->>>>>>> Percona-Server-8.0.33-25
                     thd->query().str);
 #endif /* WITH_WSREP */
         thd->is_slave_error = true;

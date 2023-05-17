@@ -301,7 +301,7 @@ Relay_log_info *Rpl_info_factory::create_rli(uint rli_option,
   } else {
     rpl_filter = rpl_channel_filters.get_channel_filter(channel);
     if (rpl_filter == NULL) {
-      LogErr(ERROR_LEVEL, ER_RPL_SLAVE_FILTER_CREATE_FAILED, channel);
+      LogErr(ERROR_LEVEL, ER_RPL_REPLICA_FILTER_CREATE_FAILED, channel);
       msg = msg_alloc;
       goto err;
     }

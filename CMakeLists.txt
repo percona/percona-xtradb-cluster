@@ -2518,20 +2518,6 @@ IF(PACK_SEPARATE_COMPONENTS)
   SET(CPACK_COMPONENTS_GROUPING IGNORE)
 ENDIF()
 
-<<<<<<< HEAD
-IF(UNIX AND NOT WITH_WSREP)
-  INSTALL(FILES
-    Docs/mysql.info
-    DESTINATION ${INSTALL_INFODIR} OPTIONAL COMPONENT Info)
-ENDIF()
-||||||| merged common ancestors
-IF(UNIX)
-  INSTALL(FILES
-    Docs/mysql.info
-    DESTINATION ${INSTALL_INFODIR} OPTIONAL COMPONENT Info)
-ENDIF()
-=======
->>>>>>> Percona-Server-8.0.33-25
 #
 # RPM installs documentation directly from the source tree
 #

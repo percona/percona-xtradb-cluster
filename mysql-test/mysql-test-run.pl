@@ -6248,82 +6248,37 @@ sub check_expected_crash_and_restart($$) {
         # Ignore any partial or unknown command
         next unless $last_line =~ /^(restart|try)/;
 
-<<<<<<< HEAD
-        # If last line begins "restart:", the rest of the line is read as
-        # extra command line options to add to the restarted mysqld.
-        # Anything other than 'wait' or 'restart:' (with a colon) will
-        # result in a restart with original mysqld options.
-        my $try = 0;
-||||||| merged common ancestors
-        # If last line begins "restart:", the rest of the line is read as
-        # extra command line options to add to the restarted mysqld.
-        # Anything other than 'wait' or 'restart:' (with a colon) will
-        # result in a restart with original mysqld options.
-=======
         # If the last line begins with 'restart:' or 'restart_abort:' (with
         # a colon), rest of the line is read as additional command line options
         # to be provided to the mysql server during restart.
         # Anything other than 'wait', 'restart:' or'restart_abort:' will result
         # in a restart with the original mysqld options.
+        my $try = 0;
         my $follow_up_wait = 0;
->>>>>>> Percona-Server-8.0.33-25
         if ($last_line =~ /restart:(.+)/) {
           my @rest_opt = split(' ', $1);
           $mysqld->{'restart_opts'} = \@rest_opt;
-<<<<<<< HEAD
        } elsif ($last_line =~ /try:(.+)/) {
          my @rest_opt= split(' ', $1);
          $mysqld->{'restart_opts'}= \@rest_opt;
          $try=1;
-||||||| merged common ancestors
-=======
         } elsif ($last_line =~ /restart_abort:(.+)/) {
           my @rest_opt = split(' ', $1);
           $mysqld->{'restart_opts'} = \@rest_opt;
           $follow_up_wait = 1;
->>>>>>> Percona-Server-8.0.33-25
         } else {
           delete $mysqld->{'restart_opts'};
         }
 
-<<<<<<< HEAD
-       if ($try == 1) {
-          my $handle;
-          open ($handle,'>',$expect_file) or die("Cant open expect file for write");
-          print $handle "wait";
-          close ($handle);
-       } else {
-          unlink($expect_file);
-       }
-
-#        # Attempt to remove the .expect file. If it fails in
-#        # windows, retry removal after a sleep.
-#        my $retry = 1;
-#        while (
-#          unlink($expect_file) == 0 &&
-#          $! == 13 &&    # Error = 13, Permission denied
-#          IS_WINDOWS && $retry-- >= 0
-#        ) {
-#          # Permission denied to unlink.
-#          # Race condition seen on windows. Wait and retry.
-#          mtr_milli_sleep(1000);
-#        }
-#
-||||||| merged common ancestors
-        # Attempt to remove the .expect file. If it fails in
-        # windows, retry removal after a sleep.
-        my $retry = 1;
-        while (
-          unlink($expect_file) == 0 &&
-          $! == 13 &&    # Error = 13, Permission denied
-          IS_WINDOWS && $retry-- >= 0
-          ) {
-          # Permission denied to unlink.
-          # Race condition seen on windows. Wait and retry.
-          mtr_milli_sleep(1000);
+        if ($try == 1) {
+           my $handle;
+           open ($handle,'>',$expect_file) or die("Cant open expect file for write");
+           print $handle "wait";
+           close ($handle);
+        } else {
+           unlink($expect_file);
         }
 
-=======
         # Attempt to remove the .expect file. If it fails in
         # windows, retry removal after a sleep.
         my $retry = 1;
@@ -6346,7 +6301,6 @@ sub check_expected_crash_and_restart($$) {
           mtr_verbose("Test says wait after unsuccessful restart");
         }
 
->>>>>>> Percona-Server-8.0.33-25
         # Start server with same settings as last time
         mysqld_start($mysqld, $mysqld->{'started_opts'},
                      $tinfo, $bootstrap_opts);

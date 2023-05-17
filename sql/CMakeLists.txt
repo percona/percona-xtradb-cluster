@@ -975,15 +975,9 @@ ADD_DEPENDENCIES(sql_main GenBootstrapPriv)
 ADD_DEPENDENCIES(sql_main GenSysSchema)
 TARGET_LINK_LIBRARIES(sql_main ${MYSQLD_STATIC_PLUGIN_LIBS}
   mysql_server_component_services mysys strings vio
-<<<<<<< HEAD
   ${WSREP_LIB}
-  binlogevents_static ${LIBWRAP} ${LIBDL} ${SSL_LIBRARIES})
-||||||| merged common ancestors
-  binlogevents_static ${LIBWRAP} ${LIBDL} ${SSL_LIBRARIES})
-=======
   binlogevents_static ${LIBWRAP} ${LIBDL} ${SSL_LIBRARIES}
   extra::rapidjson)
->>>>>>> Percona-Server-8.0.33-25
 
 # sql/immutable_string.h uses
 # google::protobuf::io::CodedOutputStream::WriteVarint64ToArray

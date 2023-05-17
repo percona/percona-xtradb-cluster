@@ -24,6 +24,7 @@ MYSQL_ADD_PLUGIN(keyring_udf
   keyring_udf.cc
   MODULE_ONLY
   MODULE_OUTPUT_NAME "keyring_udf"
+  LINK_LIBRARIES extra::rapidjson
   )
 
 ADD_DEFINITIONS(-DMYSQL_SERVER)

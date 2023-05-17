@@ -32,5 +32,6 @@ MYSQL_ADD_PLUGIN(auth_fido ${AUTH_FIDO_SOURCES}
   LINK_LIBRARIES
   ${OPENSSL_LIBRARIES}
   ext::fido
+  extra::rapidjson
   MODULE_ONLY MODULE_OUTPUT_NAME "authentication_fido"
   )

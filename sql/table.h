@@ -3399,7 +3399,6 @@ class Table_ref {
      respectively.
    */
   const char *get_table_name() const { return table_name; }
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   /**
      @brief Returns the table alias that this Table_ref represents.
@@ -3412,13 +3411,8 @@ class Table_ref {
   const char *get_table_alias() const { return alias; }
 #endif /* WITH_WSREP */
 
-  int fetch_number_of_rows();
-||||||| merged common ancestors
-  int fetch_number_of_rows();
-=======
   int fetch_number_of_rows(
       ha_rows fallback_estimate = PLACEHOLDER_TABLE_ROW_ESTIMATE);
->>>>>>> Percona-Server-8.0.33-25
   bool update_derived_keys(THD *, Field *, Item **, uint, bool *);
   bool generate_keys();
 

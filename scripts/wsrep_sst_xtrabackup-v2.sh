@@ -1675,6 +1675,7 @@ function initialize_pxb_commands()
                 --defaults-group=mysqld${WSREP_SST_OPT_CONF_SUFFIX} $disver $iopts \
                 \$INNOEXTRA \$keyringbackupopt --lock-ddl --backup --galera-info \
                 \$encrypt_backup_options --stream=\$sfmt \
+                --no-version-check \
                 --xtrabackup-plugin-dir="$pxb_plugin_dir" \
                 --target-dir=\$itmpdir 2> >(logger -p daemon.err -t ${ssystag}innobackupex-backup)"
         fi
