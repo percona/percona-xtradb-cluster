@@ -448,6 +448,7 @@ int Wsrep_high_priority_service::apply_toi(const wsrep::ws_meta &ws_meta,
            (long long)wsrep_thd_trx_seqno(m_thd));
   WSREP_DEBUG("%s", m_thd->wsrep_info);
   thd_proc_info(thd, m_thd->wsrep_info);
+  thd->set_command(COM_QUERY);
 
   WSREP_DEBUG("Wsrep_high_priority_service::apply_toi: %lld",
               client_state.toi_meta().seqno().get());
@@ -483,6 +484,7 @@ int Wsrep_high_priority_service::apply_toi(const wsrep::ws_meta &ws_meta,
            (long long)wsrep_thd_trx_seqno(m_thd));
   WSREP_DEBUG("%s", m_thd->wsrep_info);
   thd_proc_info(thd, m_thd->wsrep_info);
+  thd->set_command(COM_SLEEP);
 
   wsrep_wait_rollback_complete_and_acquire_ownership(m_thd);
   wsrep_set_SE_checkpoint(client_state.toi_meta().gtid());
@@ -630,6 +632,10 @@ int Wsrep_applier_service::apply_write_set(const wsrep::ws_meta &ws_meta,
            "wsrep: applying write-set (%lld)", ws_meta.seqno().get());
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
+  /* Note that COM_QUERY is set in Rows_log_event::do_apply_event() anyway,
+     but let's set it here for sanity.
+   */
+  thd->set_command(COM_QUERY);
 
   /* moved dbug sync point here, after possible THD switch for SR transactions
      has ben done
@@ -666,6 +672,7 @@ int Wsrep_applier_service::apply_write_set(const wsrep::ws_meta &ws_meta,
            ws_meta.seqno().get());
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
+  thd->set_command(COM_SLEEP);
 
   return ret;
 }

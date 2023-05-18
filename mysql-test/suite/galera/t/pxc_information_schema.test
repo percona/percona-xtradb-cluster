@@ -1,0 +1,84 @@
+#
+# Test that INFORMATION_SCHEMA.PROCESSLIST shows proper information about wsrep threads
+#
+
+--source include/galera_cluster.inc
+
+#
+# Restart node_2 and check that all wsrep threads related command is 'Sleep'
+#
+--connection node_2
+--source include/kill_galera.inc
+--source include/wait_until_disconnected.inc
+--source include/start_mysqld.inc
+
+--let $sleep_wsrep_thd_cnt_start = `SELECT COUNT(*) FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep%' AND COMMAND LIKE 'Sleep'`
+--let $not_sleep_wsrep_thd_cnt = `SELECT COUNT(*) FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep%' AND COMMAND NOT LIKE 'Sleep'`
+
+--let $assert_text = All wsrep threads COMMAND should be Sleep after node startup
+--let $assert_cond = [ SELECT $not_sleep_wsrep_thd_cnt = 0 ]
+--source include/assert.inc
+--let $assert_text = All wsrep threads COMMAND should be Sleep after node startup
+--let $assert_cond = [ SELECT $sleep_wsrep_thd_cnt_start != 0 ]
+--source include/assert.inc
+
+#
+# execute DDL on node_1 and check that after applying on node_2 wsrep applier goes to 'Sleep'
+#
+--connection node_1
+CREATE TABLE t1 (a INT PRIMARY KEY);
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'test' AND TABLE_NAME = 't1'
+--source include/wait_condition.inc
+
+--let $sleep_wsrep_thd_cnt = `SELECT COUNT(*) FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep%' AND COMMAND LIKE 'Sleep'`
+--let $not_sleep_wsrep_thd_cnt = `SELECT COUNT(*) FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep%' AND COMMAND NOT LIKE 'Sleep'`
+
+--let $assert_text = All wsrep threads COMMAND should be Sleep after DDL
+--let $assert_cond = [ SELECT $not_sleep_wsrep_thd_cnt = 0 ]
+--source include/assert.inc
+--let $assert_text = All wsrep threads COMMAND should be Sleep after DDL
+--let $assert_cond = [ SELECT $sleep_wsrep_thd_cnt = $sleep_wsrep_thd_cnt_start ]
+--source include/assert.inc
+
+#
+# execute DML on node_1 and check that after applying on node_2 wsrep applier goes to 'Sleep'
+#
+--connection node_1
+INSERT INTO t1 VALUES (0);
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM t1;
+--source include/wait_condition.inc
+
+--let $sleep_wsrep_thd_cnt = `SELECT COUNT(*) FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep%' AND COMMAND LIKE 'Sleep'`
+--let $not_sleep_wsrep_thd_cnt = `SELECT COUNT(*) FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep%' AND COMMAND NOT LIKE 'Sleep'`
+
+--let $assert_text = All wsrep threads COMMAND should be Sleep after DML
+--let $assert_cond = [ SELECT $not_sleep_wsrep_thd_cnt = 0 ]
+--source include/assert.inc
+--let $assert_text = All wsrep threads COMMAND should be Sleep after DML
+--let $assert_cond = [ SELECT $sleep_wsrep_thd_cnt = $sleep_wsrep_thd_cnt_start ]
+--source include/assert.inc
+
+#
+# execute DDL once again on node_1 and check that after applying on node_2 wsrep applier goes to 'Sleep'
+#
+--connection node_1
+DROP TABLE t1;
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'test' AND TABLE_NAME = 't1'
+--source include/wait_condition.inc
+
+--let $sleep_wsrep_thd_cnt = `SELECT COUNT(*) FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep%' AND COMMAND LIKE 'Sleep'`
+--let $not_sleep_wsrep_thd_cnt = `SELECT COUNT(*) FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep%' AND COMMAND NOT LIKE 'Sleep'`
+
+--let $assert_text = All wsrep threads COMMAND should be Sleep after DDL
+--let $assert_cond = [ SELECT $not_sleep_wsrep_thd_cnt = 0 ]
+--source include/assert.inc
+--let $assert_text = All wsrep threads COMMAND should be Sleep after DDL
+--let $assert_cond = [ SELECT $sleep_wsrep_thd_cnt = $sleep_wsrep_thd_cnt_start ]
+--source include/assert.inc
+

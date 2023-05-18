@@ -1,0 +1,13 @@
+Killing server ...
+# restart
+include/assert.inc [All wsrep threads COMMAND should be Sleep after node startup]
+include/assert.inc [All wsrep threads COMMAND should be Sleep after node startup]
+CREATE TABLE t1 (a INT PRIMARY KEY);
+include/assert.inc [All wsrep threads COMMAND should be Sleep after DDL]
+include/assert.inc [All wsrep threads COMMAND should be Sleep after DDL]
+INSERT INTO t1 VALUES (0);
+include/assert.inc [All wsrep threads COMMAND should be Sleep after DML]
+include/assert.inc [All wsrep threads COMMAND should be Sleep after DML]
+DROP TABLE t1;
+include/assert.inc [All wsrep threads COMMAND should be Sleep after DDL]
+include/assert.inc [All wsrep threads COMMAND should be Sleep after DDL]
