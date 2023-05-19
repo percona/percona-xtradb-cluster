@@ -56,6 +56,23 @@ jobs:
           python $(Build.SourcesDirectory)/scripts/find_unicode_control.py -p bidi -v ${CHANGED_FILES}
       fi
 
+- job: PS Diff Check
+  pool:
+    vmImage: 'ubuntu-20.04'
+
+  steps:
+  - checkout: self
+    fetchDepth: 32
+
+  - script: |
+      CHANGED_FILES=$(git diff -U0 --name-only --no-color HEAD^1 *.c *.cc *.cpp *.h *.hpp *.i *.ic *.ih | tr '\n' ' ')
+
+      if [ -z "${CHANGED_FILES}" ]; then
+          echo --- No changed files
+      else
+          bash $(Build.SourcesDirectory)/ps-diff-check.sh
+      fi
+
 - job:
   timeoutInMinutes: 240
   pool:

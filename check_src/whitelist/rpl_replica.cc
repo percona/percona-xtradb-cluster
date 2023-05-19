@@ -7,6 +7,7 @@
 <           DBUG_PRINT("info",
 <                      ("Resetting retry counter, rli->trans_retries: %lu",
 >         DBUG_PRINT("info", ("Resetting retry counter, rli->trans_retries: %lu",
+<   // Replicas shall not create GIPKs if source tables have no PKs
 <     rli->report(WARNING_LEVEL, 0,
 >       rli->report(
 >           WARNING_LEVEL, 0,
