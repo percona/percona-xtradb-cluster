@@ -103,7 +103,7 @@ SET SESSION wsrep_sync_wait = 0;
 --source include/shutdown_mysqld.inc
 
 # ensure that we can startup with grastate.dat
---exec $SED -i "s/safe_to_bootstrap:[ \t]*0/safe_to_bootstrap: 1/" $MYSQLTEST_VARDIR/mysqld.1/data/grastate.dat
+--source include/safe_to_bootstrap.inc
 
 # restart node1 with super-read-only=ON (SST)
 --echo "# restarting node1 (bootstrapped with super-read-only)"
@@ -216,7 +216,7 @@ SET SESSION wsrep_sync_wait = 0;
 --source include/shutdown_mysqld.inc
 
 # ensure that we can bootstrap with grastate.dat
---exec $SED -i "s/safe_to_bootstrap:[ \t]*0/safe_to_bootstrap: 1/" $MYSQLTEST_VARDIR/mysqld.1/data/grastate.dat
+--source include/safe_to_bootstrap.inc
 
 # restart node1
 --let $do_not_echo_parameters=1

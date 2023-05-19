@@ -1,0 +1,32 @@
+--source include/have_util_sed.inc
+--source include/galera_cluster.inc
+--source include/have_fips.inc
+--let $MYSQLXTEST_HISTORY_PROTOCOL=false
+--source include/xplugin_preamble.inc
+
+--disable_query_log
+call mtr.add_suppression("Error during SSL handshake");
+--enable_query_log
+
+--write_file $MYSQL_TMP_DIR/mysqlx_fips_test.tmp
+-->sql
+SHOW STATUS LIKE 'ssl_cipher';
+-->endsql
+EOF
+
+--echo ##Test: Restart server and provide weak ssl-cipher at server startup
+let $restart_parameters=restart:--ssl-cipher=CAMELLIA256-SHA;
+--source ../include/restart_mysqld.inc
+
+let $wait_condition=SELECT 1 FROM performance_schema.global_status WHERE variable_name='mysqlx_port' AND variable_value!='';
+--source include/wait_condition_or_abort.inc
+
+--error 1
+--exec $MYSQLXTEST -u root --file=$MYSQL_TMP_DIR/mysqlx_fips_test.tmp --ssl-mode=required --ssl-fips-mode=on --ssl-cipher=CAMELLIA256-SHA 2>&1
+--exec $MYSQLXTEST -u root --file=$MYSQL_TMP_DIR/mysqlx_fips_test.tmp --ssl-mode=required --ssl-fips-mode=off --ssl-cipher=CAMELLIA256-SHA 2>&1
+
+--echo ##Cleanup: Restore ssl-cipher to default
+
+let $restart_parameters=;
+--source ../include/restart_mysqld.inc
+--remove_file $MYSQL_TMP_DIR/mysqlx_fips_test.tmp

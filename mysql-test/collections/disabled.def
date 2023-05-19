@@ -315,3 +315,22 @@ group_replication.gr_xa_commit_one_phase_failure_before_gtid_externalization @wi
 group_replication.gr_xa_prepare_failure_before_gtid_externalization @windows : BUG#34155238 Disabled until bug is fixed
 group_replication.gr_xa_rollback_failure_before_gtid_externalization @windows : BUG#34155238 Disabled until bug is fixed
 
+# galera-x underfinished tests
+galera-x.connection_unixsocket_rpl : BUG#0 PXC-4154 underfinished test
+galera-x.crud_rpl : BUG#0 PXC-4154 underfinished test
+galera-x.connection_unixsocket_invalid : BUG#0 PXC-4154 underfinished test
+galera-x.create_alter_sql : BUG#0 PXC-4154 WSREP not ready
+galera-x.crud_debug : BUG#0 PXC-4154 WSREP not ready
+galera-x.connection_skip_networking : BUG#0 PXC-4154 Server failed to restart
+galera-x.connection_skip_grant_table : BUG#0 PXC-4154 Server failed to restart
+galera-x.connection_skip_grant_table_ssl : BUG#0 PXC-4154 Server failed to restart
+galera-x.admin_xkill : BUG#0 PXC-4154 underfinished test
+galera-x.connection : BUG#0 PXC-4154 underfinished test
+galera-x.udf_mysqlx_generate_document_id : BUG#0 PXC-4154 blinking auto-generated ids
+galera-x.prep_stmt_crud_insert_doc : BUG#0 PXC-4154 blinking auto-generated ids
+galera-x.create_drop_collection_crud : BUG#0 PXC-4154 blinking auto-generated ids
+galera-x.connection_openssl : BUG#0 PXC-4154 TLS version is invalid (code 2026)
+galera-x.connection_openssl_unixsocket : BUG#0 PXC-4154 TLS version is invalid (code 2026)
+galera-x.connection_tls_version : BUG#0 PXC-4154 TLS version is invalid (code 2026)
+galera-x.admin_list_objects_case_insensitive_names : BUG#0 PXC-4154 unexpected case value
+galera-x.admin_list_objects_case_insensitive_names_forced : BUG#0 PXC-4154 unexpected case value
