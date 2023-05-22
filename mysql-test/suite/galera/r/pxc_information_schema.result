@@ -11,3 +11,23 @@ include/assert.inc [All wsrep threads COMMAND should be Sleep after DML]
 DROP TABLE t1;
 include/assert.inc [All wsrep threads COMMAND should be Sleep after DDL]
 include/assert.inc [All wsrep threads COMMAND should be Sleep after DDL]
+CREATE TABLE t1 (a INT PRIMARY KEY AUTO_INCREMENT, b INT);
+INSERT INTO t1(b) (SELECT * FROM SEQUENCE_TABLE(4) AS tt);
+SET SESSION wsrep_OSU_method='NBO';
+SET @debug_saved = @@global.debug;
+SET SESSION wsrep_sync_wait = 0;
+SET GLOBAL debug = "+d,wsrep_signal_applier_thread";
+SET GLOBAL debug = "+d,wsrep_signal_nbo_applier_thread";
+CREATE INDEX b_idx ON t1 (b);
+SET DEBUG_SYNC="now WAIT_FOR apply_nbo_begin_entered_nbo_mode.reached";
+SET DEBUG_SYNC="now WAIT_FOR nbo_applier_started";
+include/assert.inc [Wsrep applier and nbo applier should be in Query state]
+SET DEBUG_SYNC="now SIGNAL apply_nbo_begin_entered_nbo_mode.continue";
+SET DEBUG_SYNC="now WAIT_FOR apply_nbo_begin_nbo_applier_created.reached";
+include/assert.inc [Only nbo applier should be in Query state]
+SET DEBUG_SYNC="now SIGNAL nbo_applier_continue";
+SET DEBUG_SYNC="now WAIT_FOR nbo_applier_finished";
+include/assert.inc [There should be no thread in Query state after NBO execution]
+SET @@global.debug = @debug_saved;
+SET SESSION wsrep_OSU_method='TOI';
+DROP TABLE t1;

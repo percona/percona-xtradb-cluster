@@ -82,3 +82,59 @@ DROP TABLE t1;
 --let $assert_cond = [ SELECT $sleep_wsrep_thd_cnt = $sleep_wsrep_thd_cnt_start ]
 --source include/assert.inc
 
+
+#
+# Test the status reported during the NBO
+#
+
+--connection node_1
+CREATE TABLE t1 (a INT PRIMARY KEY AUTO_INCREMENT, b INT);
+INSERT INTO t1(b) (SELECT * FROM SEQUENCE_TABLE(4) AS tt);
+SET SESSION wsrep_OSU_method='NBO';
+
+--connection node_2
+SET @debug_saved = @@global.debug;
+SET SESSION wsrep_sync_wait = 0;
+
+# stop wsrep applier thread after NBO applier creation
+SET GLOBAL debug = "+d,wsrep_signal_applier_thread";
+
+# stop nbo applier after entering into NBO mode
+SET GLOBAL debug = "+d,wsrep_signal_nbo_applier_thread";
+
+--connection node_1
+--send CREATE INDEX b_idx ON t1 (b)
+
+--connection node_2
+SET DEBUG_SYNC="now WAIT_FOR apply_nbo_begin_entered_nbo_mode.reached";
+SET DEBUG_SYNC="now WAIT_FOR nbo_applier_started";
+
+# wsrep applier and nbo thread both should report their states as 'Query'
+--let $nbo_thds = `SELECT COUNT(*) FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND COMMAND LIKE 'Query'`
+--let $assert_text = Wsrep applier and nbo applier should be in Query state
+--let $assert_cond = [ SELECT $nbo_thds = 2 ]
+--source include/assert.inc
+
+# unblock wsrep applier thread and wait until it is done with creation of NBO applier
+SET DEBUG_SYNC="now SIGNAL apply_nbo_begin_entered_nbo_mode.continue";
+SET DEBUG_SYNC="now WAIT_FOR apply_nbo_begin_nbo_applier_created.reached";
+--let $nbo_thds = `SELECT COUNT(*) FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND COMMAND LIKE 'Query'`
+--let $assert_text = Only nbo applier should be in Query state
+--let $assert_cond = [ SELECT $nbo_thds = 1 ]
+--source include/assert.inc
+
+# unblock NBO applier thread and wait until it is done
+SET DEBUG_SYNC="now SIGNAL nbo_applier_continue";
+SET DEBUG_SYNC="now WAIT_FOR nbo_applier_finished";
+
+--let $nbo_thds = `SELECT COUNT(*) FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND COMMAND LIKE 'Query'`
+--let $assert_text = There should be no thread in Query state after NBO execution
+--let $assert_cond = [ SELECT $nbo_thds = 0 ]
+--source include/assert.inc
+
+SET @@global.debug = @debug_saved;
+
+--connection node_1
+--reap
+SET SESSION wsrep_OSU_method='TOI';
+DROP TABLE t1;

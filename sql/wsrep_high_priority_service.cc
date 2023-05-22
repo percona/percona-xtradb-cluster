@@ -702,9 +702,13 @@ int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
   const char *category = "sql";
   mysql_thread_register(category, nbo_threads, 1);
 
+  /* The job of wsrep applier thread is only to create a background thread
+      which job is to apply NBO.
+  */
   snprintf(m_thd->wsrep_info, sizeof(m_thd->wsrep_info),
-           "wsrep: applying NBO write-set (%lld)",
+           "wsrep: creating NBO applier for write-set (%lld)",
            (long long)wsrep_thd_trx_seqno(m_thd));
+  m_thd->set_command(COM_QUERY);
 
   std::thread th([&] {
     wsp::thd wthd(true);
@@ -783,12 +787,21 @@ int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
 
     assert(ret == 0);
 
+    /* The background thread which executes NBO will be visible in
+       I_S.PROCESSLIST table for the time of its job. */
     snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
              "wsrep: applying NBO write-set (%lld)",
              (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
-
+    thd->set_command(COM_QUERY);
+    DBUG_EXECUTE_IF("wsrep_signal_nbo_applier_thread", {
+      const char act[] =
+          "now "
+          "SIGNAL nbo_applier_started "
+          "WAIT_FOR nbo_applier_continue";
+      assert(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
+    };);
     WSREP_DEBUG("Wsrep_high_priority_service::apply_nbo_begin: %lld",
                 client_state.nbo_meta().seqno().get());
 
@@ -817,6 +830,8 @@ int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
 
     ret = trans_commit(thd);
 
+    /* This thread is going to be removed soon and will be not visible in
+       I_S.PROCESSLIST anymore, but set proper info for sanity. */
     THD_STAGE_INFO(thd, stage_wsrep_committed);
     snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
              "wsrep: %s NBO write set (%lld)",
@@ -824,6 +839,14 @@ int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
              (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
+    thd->set_command(COM_SLEEP);
+
+    DBUG_EXECUTE_IF("wsrep_signal_nbo_applier_thread", {
+      const char act[] =
+          "now "
+          "SIGNAL nbo_applier_finished";
+      assert(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
+    };);
 
     if (ret == 0) {
       thd->wsrep_rli->cleanup_context(thd, 0);
@@ -866,6 +889,28 @@ int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
   cv.wait(lk, [&] { return entered_nbo_mode; });
 
   th.detach();
+
+  DBUG_EXECUTE_IF("wsrep_signal_applier_thread", {
+    const char act[] =
+        "now "
+        "SIGNAL apply_nbo_begin_entered_nbo_mode.reached "
+        "WAIT_FOR apply_nbo_begin_entered_nbo_mode.continue";
+    assert(!debug_sync_set_action(m_thd, STRING_WITH_LEN(act)));
+  };);
+
+  /* WSREP applier thread created NBO background worker
+     and is ready for processing next writesets. */
+  snprintf(m_thd->wsrep_info, sizeof(m_thd->wsrep_info),
+           "wsrep: created NBO applier for write-set (%lld)",
+           (long long)wsrep_thd_trx_seqno(m_thd));
+  m_thd->set_command(COM_SLEEP);
+
+  DBUG_EXECUTE_IF("wsrep_signal_applier_thread", {
+    const char act[] =
+        "now "
+        "SIGNAL apply_nbo_begin_nbo_applier_created.reached";
+    assert(!debug_sync_set_action(m_thd, STRING_WITH_LEN(act)));
+  };);
 
   return 0;
 }
