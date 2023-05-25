@@ -470,7 +470,36 @@ void trx_sys_update_wsrep_checkpoint(
         the same xid_seqno.
         Allow current and new values be the same, without introducing new flags
         and logic to prevent double storing of the same value */
-        ut_ad(xid_seqno >= trx_sys_cur_xid_seqno);
+
+        /* Case 3:
+
+           NBO allows interleaving of non-conflicting transactions. This allows
+           other transactions to be committed in InnoDB while there is an
+           ongoing NBO update. This is possible when the NBO thread has
+           finished phase one but is yet to start its phase two. Before adding
+           the below NBO condition, the other transactions updated its XID
+           there by resulting in the NBO thread to hit the below assertion as
+           it finds that the current thread no more has the latest xid in
+           InnoDB since NBO phase_two() calls this funcation with seqno X, the
+           one we got during phase one of the NBO. Please note that we do not
+           persist X+1+N+1 in SE upon completion on NBO even though it is only
+           incremented in galera.
+
+           i.e,
+           Seqno X       - Assigned during NBO begin
+           Seqno X+1     - Reserved for NBO end, but never used. Yes, this is a
+                           bug. TODO: Check why this happens.
+           Seqno X+1+N   - N Other transactions while NBO is in progress and
+                           the latest xid persisted in InnoDB
+           Seqno X+1+N+1 - Assigned during NBO end. It is incremented in
+                           galera, but never persisted in SE.
+                           TODO: Check why this happens.
+
+           As a result, the assertion evaluated to
+              "X" >= "X+1+N"
+        */
+        ut_ad((current_thd && wsrep_thd_is_in_nbo(current_thd)) ||
+              xid_seqno >= trx_sys_cur_xid_seqno);
         trx_sys_cur_xid_seqno = xid_seqno;
 
         /* Mark as done */

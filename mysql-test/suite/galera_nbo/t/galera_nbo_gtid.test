@@ -1,0 +1,128 @@
+# === Purpose ===
+# This test verifies that both local and remote DDLs running in NBO mode are
+# binlogged 
+#
+# 1. Like any other DDL, with a proper XID
+# 2. With a valid GTID using the cluster uuid when GTID mode is enabled
+#
+# === Reference ===
+#
+# PXC-4228: NBO generates corrupted binary logs
+
+--source include/galera_cluster.inc
+CREATE TABLE t1(i INT PRIMARY KEY);
+
+# Save binlog positions
+--let $node1_file= query_get_value(SHOW MASTER STATUS,File,1)
+--let $node1_pos= query_get_value(SHOW MASTER STATUS,Position,1)
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+--source include/wait_condition.inc
+--let $node2_file= query_get_value(SHOW MASTER STATUS,File,1)
+--let $node2_pos= query_get_value(SHOW MASTER STATUS,Position,1)
+
+--echo #
+--echo # Run ALTER TABLE in NBO mode and verify that it is logged with a proper GTID.
+--echo #
+--connection node_1
+SET SESSION wsrep_OSU_method="NBO";
+ALTER TABLE t1 ENGINE=InnoDB;
+SET SESSION wsrep_OSU_method=default;
+
+--let $binlog_file=$node1_file
+--let $binlog_start=$node1_pos
+--let $keep_gtid_events=1
+--let $show_binlog_events_mask_columns=1,2,4,5
+--source include/show_binlog_events.inc
+
+--let $cluster_uuid=`SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='wsrep_cluster_state_uuid'`
+
+# Assert that NBO query is logged as normal DDLs with cluster_uuid gtid on the local node
+--let $event_sequence= Gtid/.*$cluster_uuid.* # Query/.*ALTER TABLE.*
+--let $binlog_position=$node1_pos
+--let $include_silent=1
+--source include/assert_binlog_events.inc
+--echo include/assert_binlog_events.inc [Gtid/.*CLUSTER_UUID.* # Query/.*ALTER TABLE.*]
+--let $include_silent=0
+
+--connection node_2
+--let $binlog_file=$node2_file
+--let $binlog_start=$node2_pos
+--let $keep_gtid_events=1
+--source include/show_binlog_events.inc
+
+# Assert that NBO query is logged as normal DDLs with cluster_uuid gtid on the remote node
+--let $event_sequence= Gtid/.*$cluster_uuid.* # Query/.*ALTER TABLE.*
+--let $binlog_position=$node2_pos
+--let $include_silent=1
+--source include/assert_binlog_events.inc
+--echo include/assert_binlog_events.inc [Gtid/.*CLUSTER_UUID.* # Query/.*ALTER TABLE.*]
+--let $include_silent=0
+
+--echo #
+--echo # Assert that Incremental State Transfer succeeds when the binary log has a DDL logged in NBO.
+--echo #
+
+--source include/shutdown_mysqld.inc
+
+--connection node_1
+INSERT INTO t1 VALUES(1),(2),(3),(4);
+CREATE TABLE t2 (j INT PRIMARY KEY);
+INSERT INTO t2 VALUES(1),(2),(3),(4);
+
+--connection node_2
+--let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
+--source include/start_mysqld.inc
+--source include/wait_until_connected_again.inc
+
+# Assert that IST was successful
+--assert(`SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.TABLES WHERE table_schema="test"`)
+--assert(`SELECT COUNT(*) = 1 FROM information_schema.tables WHERE table_name = "t1" AND table_schema="test"`)
+--assert(`SELECT COUNT(*) = 1 FROM information_schema.tables WHERE table_name = "t2" AND table_schema="test"`)
+--assert(`SELECT COUNT(*) = 4 FROM test.t1`)
+--assert(`SELECT COUNT(*) = 4 FROM test.t1`)
+
+--echo #
+--echo # Assert that binlog rotation will be successful on both nodes.
+--echo #
+
+# Run a DDL in NBO mode on both nodes
+--connection node_1
+SET SESSION wsrep_OSU_method="NBO";
+ALTER TABLE t1 ENGINE=InnoDB;
+SET SESSION wsrep_OSU_method=default;
+
+--connection node_2
+SET SESSION wsrep_OSU_method="NBO";
+ALTER TABLE t1 ENGINE=InnoDB;
+SET SESSION wsrep_OSU_method=default;
+
+# Assert that binlog rotation was successful
+--connection node_1
+--let $node1_file_before= query_get_value(SHOW MASTER STATUS,File,1)
+FLUSH BINARY LOGS;
+--let $node1_file_after= query_get_value(SHOW MASTER STATUS,File,1)
+--assert(`SELECT '$node1_file_before' <> '$node1_file_after'`)
+
+--connection node_2
+--let $node2_file_before= query_get_value(SHOW MASTER STATUS,File,1)
+FLUSH BINARY LOGS;
+--let $node2_file_after= query_get_value(SHOW MASTER STATUS,File,1)
+--assert(`SELECT '$node2_file_before' <> '$node2_file_after'`)
+
+# Add test suppressions
+--connection node_1
+CALL mtr.add_suppression("no corresponding NBO begin found for NBO end");
+
+--connection node_2
+CALL mtr.add_suppression("no corresponding NBO begin found for NBO end");
+
+# Cleanup
+--let $binlog_file=
+--let $binlog_start=
+--let $binlog_position=
+--let $keep_gtid_events=
+--let $show_binlog_events_mask_columns=
+DROP TABLE t1;
+DROP TABLE t2;

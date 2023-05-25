@@ -180,9 +180,12 @@ int wsrep_apply_events(THD *thd, Relay_log_info *rli __attribute__((unused)),
     thd->unmasked_server_id = ev->common_header->unmasked_server_id;
     thd->set_time();  // time the query
 
-    if (wsrep_thd_is_toi(thd) || wsrep_thd_is_in_nbo(thd)) {
+    if (wsrep_thd_is_toi(thd)) {
       wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
                      thd->wsrep_cs().toi_meta().gtid());
+    } else if (wsrep_thd_is_in_nbo(thd)) {
+      wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
+                     thd->wsrep_cs().nbo_meta().gtid());
     } else {
       wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
                      thd->wsrep_trx().ws_meta().gtid());
