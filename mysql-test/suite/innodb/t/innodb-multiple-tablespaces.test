@@ -33,7 +33,7 @@ call mtr.add_suppression("\\[ERROR\\] InnoDB: Dictionary location:");
 call mtr.add_suppression("\\[ERROR\\] InnoDB: Error number 11 means 'Resource temporarily unavailable'");
 call mtr.add_suppression("\\[ERROR\\] InnoDB: Error number 22 means 'Invalid argument'");
 call mtr.add_suppression("\\[ERROR\\] InnoDB: Error number 35 means 'Resource temporarily unavailable'");
-call mtr.add_suppression("\\[ERROR\\] InnoDB: Error number 38 means 'Function not implemented'.");
+call mtr.add_suppression("\\[ERROR\\] InnoDB: Error number 38 means 'Function not implemented'");
 call mtr.add_suppression("\\[ERROR\\] InnoDB: Failed to find tablespace for table `test`.`.*` in the cache. Attempting to load");
 call mtr.add_suppression("\\[ERROR\\] InnoDB: If you are installing InnoDB, remember that you must create directories yourself, InnoDB does not create them.");
 call mtr.add_suppression("\\[ERROR\\] InnoDB: In file '.*', tablespace id and flags are .* but in the InnoDB data dictionary they are");
