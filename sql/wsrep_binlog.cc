@@ -429,6 +429,11 @@ void wsrep_register_for_group_commit(THD *thd) {
   return;
 }
 
+bool wsrep_implicit_transaction(THD *thd) {
+  return thd->is_operating_substatement_implicitly ||
+         thd->is_operating_gtid_table_implicitly;
+}
+
 void wsrep_wait_for_turn_in_group_commit(THD *thd) {
   DBUG_TRACE;
   if (wsrep_emulate_bin_log || thd == NULL) {
