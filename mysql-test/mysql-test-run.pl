@@ -203,9 +203,6 @@ my $DEFAULT_SUITES= "main,sys_vars,binlog,binlog_encryption,rpl_encryption,encry
   ."test_service_sql_api,jp,stress,engines/iuds,engines/funcs,"
   ."group_replication,x,"
   ."query_response_time,audit_log,json,connection_control,"
-  ."tokudb.add_index,tokudb.alter_table,tokudb,tokudb.bugs,tokudb.parts,"
-  ."tokudb.rpl,tokudb.perfschema,"
-  ."rocksdb,rocksdb_rpl,rocksdb_sys_vars,rocksdb_stress,"
   ."audit_null,percona-pam-for-mysql,data_masking,"
   ."galera,galera_3nodes,wsrep";
 

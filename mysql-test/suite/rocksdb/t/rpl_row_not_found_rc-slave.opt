@@ -1,2 +1,0 @@
---binlog_format=row --slave_parallel_workers=4 --transaction_isolation=read-committed
---loose-rocksdb_lock_wait_timeout=5
