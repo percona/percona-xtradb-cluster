@@ -1653,7 +1653,7 @@ fi
 # 2.4.20  Transition-key fixes
 #
 
-XB_REQUIRED_VERSION="2.4.27"
+XB_REQUIRED_VERSION="2.4.28"
 
 XB_VERSION=`$INNOBACKUPEX_BIN --version 2>&1 | grep -oe '[0-9]\.[0-9][\.0-9]*' | head -n1`
 if [[ -z $XB_VERSION ]]; then

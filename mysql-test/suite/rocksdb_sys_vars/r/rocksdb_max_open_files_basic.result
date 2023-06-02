@@ -1,3 +1,0 @@
-show variables like 'rocksdb_max_open_files';
-Variable_name	Value
-rocksdb_max_open_files	#

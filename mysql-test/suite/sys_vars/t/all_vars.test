@@ -52,10 +52,12 @@ eval load data infile "$MYSQLTEST_VARDIR/tmp/sys_vars.all_vars.txt" into table t
 --disable_warnings
 insert into t2 select variable_name from information_schema.global_variables
   where variable_name not like 'innodb_disallow_writes'
-  and   variable_name not like '%pxc_%';
+  and   variable_name not like '%pxc_%'
+  and   variable_name not like 'wsrep_start_position';
 insert into t2 select variable_name from information_schema.session_variables
   where variable_name not like 'innodb_disallow_writes'
-  and   variable_name not like '%pxc_%';
+  and   variable_name not like '%pxc_%'
+  and   variable_name not like 'wsrep_start_position';
 --enable_warnings
 
 # Performance schema variables are too long for files named

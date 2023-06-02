@@ -1,2 +1,0 @@
-let $trx_isolation = READ COMMITTED;
---source ../include/blind_delete_without_tx_api.inc
