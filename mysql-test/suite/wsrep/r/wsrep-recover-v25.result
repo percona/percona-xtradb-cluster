@@ -1,0 +1,18 @@
+# Kill the server
+Expect seqno 1
+1
+# restart: --wsrep-start-position=<WSREP_START_POSITION>
+CREATE TABLE t1 (f1 INT PRIMARY KEY) ENGINE=InnoDB;
+# Kill the server
+Expect seqno 3
+3
+# restart: --wsrep-start-position=<WSREP_START_POSITION>
+INSERT INTO t1 VALUES (5);
+# Kill the server
+Expect seqno 5
+5
+# restart: --wsrep-start-position=<WSREP_START_POSITION>
+SELECT VARIABLE_VALUE `expect 6` FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_last_committed';
+expect 6
+6
+DROP TABLE t1;

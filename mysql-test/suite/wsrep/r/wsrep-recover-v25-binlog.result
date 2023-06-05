@@ -1,0 +1,29 @@
+# Kill the server
+Expect seqno 1
+1
+# restart: --wsrep-start-position=<WSREP_START_POSITION>
+CREATE TABLE t1 (f1 INT PRIMARY KEY) ENGINE=InnoDB;
+# Kill the server
+Expect seqno 3
+3
+# restart: --wsrep-start-position=<WSREP_START_POSITION>
+INSERT INTO t1 VALUES (5);
+# Kill the server
+Expect seqno 5
+5
+# restart: --wsrep-start-position=<WSREP_START_POSITION>
+SELECT VARIABLE_VALUE `expect 6` FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_last_committed';
+expect 6
+6
+SET DEBUG_SYNC = "ha_commit_trans_after_prepare SIGNAL after_prepare_reached WAIT_FOR continue";
+INSERT INTO t1 VALUES (7);
+SET DEBUG_SYNC = "now WAIT_FOR after_prepare_reached";
+# Kill the server
+Expect seqno 6
+6
+# restart: --wsrep-start-position=<WSREP_START_POSITION>
+Expect 5
+SELECT * FROM t1;
+f1
+5
+DROP TABLE t1;

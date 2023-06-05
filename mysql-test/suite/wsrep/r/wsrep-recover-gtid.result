@@ -1,0 +1,6 @@
+CREATE TABLE t1 (f1 INT PRIMARY KEY) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1);
+Performing --wsrep-recover ...
+Using --wsrep-start-position when starting mysqld ...
+# restart: --wsrep-start-position=<WSREP_START_POSITION>
+DROP TABLE t1;

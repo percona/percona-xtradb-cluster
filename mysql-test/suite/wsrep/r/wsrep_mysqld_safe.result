@@ -1,0 +1,16 @@
+Shutdown mysqld from MTR
+Start mysqld using mysqld_safe
+Read seqno from --wsrep_recover step
+Expect 0
+seqno_diff
+0
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY);
+Killing server ...
+Read seqno from --wsrep_recover step
+Expect 2
+seqno_diff
+2
+Shutdown mysqld using mysqladmin
+Restart mysqld from MTR
+DROP TABLE t1;
+CALL mtr.add_suppression("One can only use the --user switch if running as root");

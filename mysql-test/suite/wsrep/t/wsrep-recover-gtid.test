@@ -1,0 +1,14 @@
+# Verify that mysqld --wsrep-recover succeeeds with gtid_mode=ON. See
+# wsrep-recover-gtid.cnf for configuration.
+#
+--source include/have_wsrep.inc
+--source include/have_wsrep_provider.inc
+--source include/have_log_bin.inc
+
+CREATE TABLE t1 (f1 INT PRIMARY KEY) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1);
+--source include/shutdown_mysqld.inc
+--let $galera_wsrep_recover_server_id = 1
+--source suite/galera/include/galera_wsrep_recover.inc
+--source include/start_mysqld.inc
+DROP TABLE t1;

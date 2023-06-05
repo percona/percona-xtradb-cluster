@@ -238,6 +238,7 @@ sys_vars.sql_mode_func                       : BUG#0 Differences in result likel
 wsrep.wsrep_preordered_basic              : BUG#0 TC pending.
 wsrep.wsrep_reject_queries_basic          : BUG#0 TC pending.
 wsrep.wsrep_max_ws_size_basic             : BUG#0 Setting this now also set repl.max_ws_size which is galera internal setting.
+wsrep.wsrep_mysqld_safe                   : BUG#0 Imported from Codeship Galera Cluster, it fails there too in the same way.
 
 # innodb_fts
 innodb_fts.fulltext_table_evict : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-330
