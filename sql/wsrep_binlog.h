@@ -89,4 +89,6 @@ void wsrep_register_for_group_commit(THD *thd);
 void wsrep_wait_for_turn_in_group_commit(THD *thd);
 void wsrep_unregister_from_group_commit(THD *thd);
 
+bool wsrep_implicit_transaction(THD *thd);
+
 #endif /* WSREP_BINLOG_H */

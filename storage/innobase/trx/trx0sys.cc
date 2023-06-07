@@ -419,6 +419,8 @@ void trx_sys_update_wsrep_checkpoint(
 #endif /* !UNIV_DEBUG */
 #endif
   {
+    if (wsrep_implicit_transaction(current_thd)) return;
+
     /* Check that seqno is monotonically increasing */
     unsigned char xid_uuid[16];
     long long xid_seqno = read_wsrep_xid_seqno(xid);
