@@ -616,12 +616,10 @@ This package contains the garb binary and init scripts.
 
 %if 0%{?rhel} == 8
 sed -i 's:#!/usr/bin/env python:#!/usr/bin/env python2:g' scripts/pyclustercheck
-sed -i 's:#!/usr/bin/env python:#!/usr/bin/env python2:g' mysql-test/suite/tokudb/t/*
 %endif
 
 %if 0%{?rhel} == 9
 sed -i 's:#!/usr/bin/env python:#!/usr/bin/env python3:g' scripts/pyclustercheck
-sed -i 's:#!/usr/bin/env python:#!/usr/bin/env python3:g' mysql-test/suite/tokudb/t/*
 %endif
 
 #
