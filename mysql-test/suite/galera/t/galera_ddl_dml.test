@@ -303,11 +303,11 @@ drop table t;
 # 5. Explicit lock in form of HANDLER locks.
 #
 --connection node_1
-call mtr.add_suppression("Slave SQL: Error \'Table \'t\' already exists\' on query.*");
+call mtr.add_suppression("Replica SQL: Error \'Table \'t\' already exists\' on query.*");
 call mtr.add_suppression("Ignoring error \'Table \'t\' already exists' on query");
 
 --connection node_2
-call mtr.add_suppression("Slave SQL: Error \'Table \'t\' already exists\' on query.*");
+call mtr.add_suppression("Replica SQL: Error \'Table \'t\' already exists\' on query.*");
 call mtr.add_suppression("Ignoring error \'Table \'t\' already exists' on query");
 
 --connection node_1

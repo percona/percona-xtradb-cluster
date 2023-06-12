@@ -13,7 +13,7 @@ DROP TABLE test.t1;
 Killing server ...
 # restart
 CALL mtr.add_suppression("Inconsistent by consensus.");
-CALL mtr.add_suppression("Slave SQL: Could not execute Write_rows event on table test.t1; Duplicate entry '1' for key 't1.PRIMARY'");
+CALL mtr.add_suppression("Replica SQL: Could not execute Write_rows event on table test.t1; Duplicate entry '1' for key 't1.PRIMARY'");
 CALL mtr.add_suppression("Event 3 Write_rows apply failed: 121, seqno");
 CALL mtr.add_suppression("Node consistency compromized, leaving cluster...");
 CALL mtr.add_suppression("Failed to apply write set: ");

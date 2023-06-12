@@ -3,6 +3,7 @@
 #
 
 # Failing to update fragment results in a deadlock
+--source include/have_debug.inc
 --source include/galera_cluster.inc
 
 --connection node_1

@@ -85,17 +85,17 @@ DROP TABLE t1;
 STOP SLAVE;
 RESET SLAVE ALL;
 
-CALL mtr.add_suppression("Slave SQL: Error 'Unknown command' on query");
+CALL mtr.add_suppression("Replica SQL: Error 'Unknown command' on query");
 CALL mtr.add_suppression("Slave: Unknown command Error_code: 1047");
 CALL mtr.add_suppression("Send action \\{\\(nil\\), 323, TORDERED\\} returned -107 \\(Transport endpoint is not connected\\)");
 CALL mtr.add_suppression("Send action \\{\\(nil\\), 328, TORDERED\\} returned -107 \\(Transport endpoint is not connected\\)");
 CALL mtr.add_suppression("Send action \\{\\(nil\\), 384, TORDERED\\} returned -107 \\(Transport endpoint is not connected\\)");
-CALL mtr.add_suppression("Slave SQL for channel '': Error 'WSREP has not yet prepared node for application use' on query");
+CALL mtr.add_suppression("Replica SQL for channel '': Error 'WSREP has not yet prepared node for application use' on query");
 CALL mtr.add_suppression("Slave: WSREP has not yet prepared node for application use Error_code: MY-001047");
 CALL mtr.add_suppression("(Transport endpoint is not connected|Socket is not connected)");
 CALL mtr.add_suppression("Operation not permitted");
-CALL mtr.add_suppression("Slave SQL for channel '': Error in Xid_log_event: Commit could not be completed, 'Deadlock found when trying to get lock; try restarting transaction'");
-CALL mtr.add_suppression("Slave SQL for channel '': Node has dropped from cluster");
+CALL mtr.add_suppression("Replica SQL for channel '': Error in Xid_log_event: Commit could not be completed, 'Deadlock found when trying to get lock; try restarting transaction'");
+CALL mtr.add_suppression("Replica SQL for channel '': Node has dropped from cluster");
 CALL mtr.add_suppression("Worker 1 failed executing transaction");
 CALL mtr.add_suppression("The slave coordinator and worker threads are stopped, possibly leaving data in inconsistent state");
 

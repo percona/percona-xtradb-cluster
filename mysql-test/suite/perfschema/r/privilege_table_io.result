@@ -115,7 +115,6 @@ wait/io/table/sql/handler	handler.cc:	TABLE	mysql	global_grants	fetch	1
 wait/io/table/sql/handler	handler.cc:	TABLE	mysql	global_grants	fetch	1
 wait/io/table/sql/handler	handler.cc:	TABLE	mysql	global_grants	fetch	1
 wait/io/table/sql/handler	handler.cc:	TABLE	mysql	global_grants	fetch	1
-<<<<<<< HEAD
 wait/io/table/sql/handler	handler.cc:	TABLE	mysql	global_grants	fetch	1
 wait/io/table/sql/handler	handler.cc:	TABLE	mysql	global_grants	fetch	1
 wait/io/table/sql/handler	handler.cc:	TABLE	mysql	global_grants	fetch	1
@@ -150,10 +149,8 @@ wait/io/table/sql/handler	handler.cc:	TABLE	mysql	global_grants	fetch	1
 wait/io/table/sql/handler	handler.cc:	TABLE	mysql	global_grants	fetch	1
 wait/io/table/sql/handler	handler.cc:	TABLE	mysql	global_grants	fetch	1
 wait/io/table/sql/handler	handler.cc:	TABLE	mysql	global_grants	fetch	1
-||||||| merged common ancestors
-=======
 wait/io/table/sql/handler	handler.cc:	TABLE	mysql	global_grants	fetch	1
->>>>>>> Percona-Server-8.0.33-25
+wait/io/table/sql/handler	handler.cc:	TABLE	mysql	global_grants	fetch	1
 wait/io/table/sql/handler	handler.cc:	TABLE	mysql	role_edges	fetch	1
 wait/io/table/sql/handler	handler.cc:	TABLE	mysql	default_roles	fetch	1
 wait/io/table/sql/handler	handler.cc:	TABLE	mysql	tables_priv	fetch	1

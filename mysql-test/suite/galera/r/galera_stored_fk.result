@@ -69,5 +69,5 @@ CALL mtr.add_suppression("Cannot add foreign key constraint");
 CALL mtr.add_suppression("Duplicate foreign key constraint name");
 CALL mtr.add_suppression("Failed to add the foreign key constraint.");
 CALL mtr.add_suppression("ALGORITHM=INPLACE is not supported for this operation.");
-CALL mtr.add_suppression("Slave SQL: Error 'Error on rename");
+CALL mtr.add_suppression("Replica SQL: Error 'Error on rename");
 CALL mtr.add_suppression("Cannot add foreign key on the base column of stored column.");

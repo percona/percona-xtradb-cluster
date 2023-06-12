@@ -30,7 +30,6 @@ call mtr.add_suppression("Query apply failed");
 # - temporary tablespace
 # - binlog encryption
 
-call mtr.add_suppression("Slave SQL: Error 'Request to create 'unencrypted' table while using an 'encrypted' tablespace.'");
 call mtr.add_suppression("Ignoring error 'Request to create 'unencrypted' table while using an 'encrypted' tablespace.'");
 call mtr.add_suppression("Query apply failed.");
 
