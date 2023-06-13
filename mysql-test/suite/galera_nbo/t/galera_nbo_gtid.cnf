@@ -1,0 +1,11 @@
+!include ../galera_2nodes.cnf
+
+[mysqld.1]
+gtid-mode=on
+enforce-gtid-consistency=on
+log-slave-updates
+
+[mysqld.2]
+gtid-mode=on
+enforce-gtid-consistency=on
+log-slave-updates

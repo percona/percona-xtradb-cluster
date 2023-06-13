@@ -2556,19 +2556,19 @@ static int wsrep_NBO_begin_phase_one(THD *thd, const char *db_,
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
 
-  wsrep::client_state &cs(thd->wsrep_cs());
+  wsrep::client_state &client_state(thd->wsrep_cs());
 
-  int ret = cs.begin_nbo_phase_one(key_array,
-                                   wsrep::const_buffer(buff.ptr, buff.len));
+  int ret = client_state.begin_nbo_phase_one(
+      key_array, wsrep::const_buffer(buff.ptr, buff.len));
 
   if (ret) {
-    assert(cs.current_error());
+    assert(client_state.current_error());
     WSREP_DEBUG("begin_nbo_phase_one() failed for %u: %s, seqno: %lld",
                 thd->thread_id(), WSREP_QUERY(thd),
                 (long long)wsrep_thd_trx_seqno(thd));
 
     /* jump to error handler in mysql_execute_command() */
-    switch (cs.current_error()) {
+    switch (client_state.current_error()) {
       default:
         WSREP_WARN(
             "NBO failed for: %d, schema: %s, sql: %s. "
@@ -2615,14 +2615,15 @@ void wsrep_NBO_end_phase_one(THD *thd) {
   DBUG_TRACE;
 
   wsrep::mutable_buffer err;
+  wsrep::client_state &client_state(thd->wsrep_cs());
+  long long nbo_seqno = client_state.nbo_meta().seqno().get();
   WSREP_DEBUG("Ending NBO phase one");
-  int ret = thd->wsrep_cs().end_nbo_phase_one(err);
+  int ret = client_state.end_nbo_phase_one(err);
   WSREP_DEBUG("NBO phase one ended");
   if (ret) {
-    assert(thd->wsrep_cs().current_error());
+    assert(client_state.current_error());
     WSREP_DEBUG("end_nbo_phase_one() failed for %u: %s, seqno: %lld",
-                thd->thread_id(), WSREP_QUERY(thd),
-                (long long)wsrep_thd_trx_seqno(thd));
+                thd->thread_id(), WSREP_QUERY(thd), nbo_seqno);
     mysql_mutex_lock(&thd->LOCK_thd_data);
     thd->wsrep_skip_wsrep_hton = false;
     mysql_mutex_unlock(&thd->LOCK_thd_data);
@@ -2630,10 +2631,10 @@ void wsrep_NBO_end_phase_one(THD *thd) {
     bool atomic_ddl = is_atomic_ddl(thd, true);
     if (atomic_ddl) {
       wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
-                     thd->wsrep_cs().toi_meta().gtid());
+                     client_state.nbo_meta().gtid());
     }
     if (wsrep_thd_is_local_nbo(thd)) {
-      wsrep_set_SE_checkpoint(thd->wsrep_cs().nbo_meta().gtid());
+      wsrep_set_SE_checkpoint(client_state.nbo_meta().gtid());
     }
   }
 
@@ -2649,8 +2650,9 @@ int wsrep_NBO_begin_phase_two(THD *thd) {
   if (wsrep_thd_is_in_nbo(thd)) {
     DBUG_TRACE;
     wsrep::client_state &client_state(thd->wsrep_cs());
-    WSREP_DEBUG("NBO phase two END start: %lld: %s",
-                client_state.toi_meta().seqno().get(), WSREP_QUERY(thd));
+    long long nbo_seqno = client_state.nbo_meta().seqno().get();
+    WSREP_DEBUG("Starting NBO phase two: %lld: %s",
+                client_state.nbo_meta().seqno().get(), WSREP_QUERY(thd));
     int ret = client_state.begin_nbo_phase_two(
         thd->wsrep_nbo.keys,
         std::chrono::steady_clock::now() +
@@ -2659,8 +2661,7 @@ int wsrep_NBO_begin_phase_two(THD *thd) {
     if (ret) {
       assert(client_state.current_error());
       WSREP_DEBUG("begin_nbo_phase_two() failed for %u: %s, seqno: %lld",
-                  thd->thread_id(), WSREP_QUERY(thd),
-                  (long long)wsrep_thd_trx_seqno(thd));
+                  thd->thread_id(), WSREP_QUERY(thd), nbo_seqno);
 
       /* jump to error handler in mysql_execute_command() */
       switch (client_state.current_error()) {
@@ -2684,17 +2685,33 @@ int wsrep_NBO_begin_phase_two(THD *thd) {
 
 static void wsrep_NBO_end_phase_two(THD *thd) {
   DBUG_TRACE;
-  --wsrep_to_isolation;
 
   wsrep::client_state &client_state(thd->wsrep_cs());
-  WSREP_DEBUG("NBO phase two END: %lld: %s",
+  long long nbo_seqno = client_state.nbo_meta().seqno().get();
+  WSREP_DEBUG("Ending NBO phase two: %lld: %s",
               client_state.nbo_meta().seqno().get(), WSREP_QUERY(thd));
 
   if (wsrep_thd_is_in_nbo(thd)) {
+    /*
+       Dont decrement the number of currently active TOI threads
+       (wsrep_to_isolation) if it is not a local NBO execution (i.e, wsrep
+       applier / remote NBO).
+
+       In normal cases, we increment wsrep_to_isolation in wsrep_TOI_begin()
+       and wsrep_NBO_begin_phase_one() and we decrement the count in
+       wsrep_TOI_end() and wsrep_NBO_end_phase_two().
+
+       Since wsrep_NBO_end_phase_two() is called in case of both local or
+       remote NBO, decrement the count only for the local NBO.
+
+       Please note that failing to do so can result in failure during FLUSH
+       BINARY LOGS as it disallows binlog rotation when there is an active TOI.
+    */
+    if (!thd->wsrep_applier) --wsrep_to_isolation;
+
     THD_STAGE_INFO(thd, stage_wsrep_completed_TO_isolation);
     snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
-             "wsrep: completed NBO write set (%lld)",
-             (long long)wsrep_thd_trx_seqno(thd));
+             "wsrep: completed NBO write set (%lld)", nbo_seqno);
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
 
@@ -2705,8 +2722,6 @@ static void wsrep_NBO_end_phase_two(THD *thd) {
     int ret = client_state.end_nbo_phase_two(err);
 
     if (!ret) {
-      WSREP_DEBUG("NBO phase two END: %lld",
-                  client_state.nbo_meta().seqno().get());
       /* Reset XID on completion of DDL transactions */
       bool atomic_ddl = is_atomic_ddl(thd, true);
       if (atomic_ddl) {
