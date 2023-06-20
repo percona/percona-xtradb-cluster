@@ -79,13 +79,12 @@ class Rdb_writebatch_impl;
 class Rdb_field_encoder;
 class Regex_list_handler;
 
-extern char *rocksdb_read_free_rpl_tables;
 extern ulong rocksdb_max_row_locks;
 #if defined(HAVE_PSI_INTERFACE)
 extern PSI_rwlock_key key_rwlock_read_free_rpl_tables;
 #endif
 extern Regex_list_handler rdb_read_free_regex_handler;
-
+extern bool rocksdb_column_default_value_as_expression;
 /**
   @brief
   Rdb_table_handler is a reference-counted structure storing information for
@@ -318,7 +317,7 @@ class ha_rocksdb : public my_core::handler, public blob_buffer {
 
   int create_key_defs(const TABLE *const table_arg,
                       Rdb_tbl_def *const tbl_def_arg,
-                      const std::string &actual_user_table_name,
+                      const std::string &actual_user_table_name, bool is_dd_tbl,
                       const TABLE *const old_table_arg = nullptr,
                       const Rdb_tbl_def *const old_tbl_def_arg = nullptr) const
       MY_ATTRIBUTE((__warn_unused_result__));
@@ -443,12 +442,15 @@ class ha_rocksdb : public my_core::handler, public blob_buffer {
         an engine that can only handle statement-based logging. This is
         used in testing.
     */
-    DBUG_RETURN(
-        HA_BINLOG_ROW_CAPABLE | HA_BINLOG_STMT_CAPABLE | HA_CAN_INDEX_BLOBS |
-        (m_pk_can_be_decoded ? HA_PRIMARY_KEY_IN_READ_INDEX : 0) |
-        HA_PRIMARY_KEY_REQUIRED_FOR_POSITION | HA_NULL_IN_KEY |
-        HA_PARTIAL_COLUMN_READ | HA_ONLINE_ANALYZE | HA_GENERATED_COLUMNS |
-        HA_CAN_INDEX_VIRTUAL_GENERATED_COLUMN | HA_SUPPORTS_DEFAULT_EXPRESSION);
+    DBUG_RETURN(HA_BINLOG_ROW_CAPABLE | HA_BINLOG_STMT_CAPABLE |
+                HA_CAN_INDEX_BLOBS |
+                (m_pk_can_be_decoded ? HA_PRIMARY_KEY_IN_READ_INDEX : 0) |
+                HA_PRIMARY_KEY_REQUIRED_FOR_POSITION | HA_NULL_IN_KEY |
+                HA_PARTIAL_COLUMN_READ | HA_ONLINE_ANALYZE |
+                HA_GENERATED_COLUMNS | HA_CAN_INDEX_VIRTUAL_GENERATED_COLUMN |
+                (rocksdb_column_default_value_as_expression
+                     ? HA_SUPPORTS_DEFAULT_EXPRESSION
+                     : 0));
   }
 
   bool init_with_fields() override;
@@ -486,7 +488,7 @@ class ha_rocksdb : public my_core::handler, public blob_buffer {
   int rename_table(const char *const from, const char *const to,
                    const dd::Table *from_table_def MY_ATTRIBUTE((__unused__)),
                    dd::Table *to_table_def MY_ATTRIBUTE((__unused__))) override
-      MY_ATTRIBUTE((__nonnull__, __warn_unused_result__));
+      MY_ATTRIBUTE((__warn_unused_result__, __nonnull__(2, 3)));
 
   int convert_record_from_storage_format(const rocksdb::Slice *const key,
                                          const rocksdb::Slice *const value,
@@ -685,14 +687,16 @@ class ha_rocksdb : public my_core::handler, public blob_buffer {
 
   int create_cfs(const TABLE *const table_arg, Rdb_tbl_def *const tbl_def_arg,
                  const std::string &actual_user_table_name,
-                 std::array<struct key_def_cf_info, MAX_INDEXES + 1> *const cfs)
-      const MY_ATTRIBUTE((__warn_unused_result__));
+                 std::array<struct key_def_cf_info, MAX_INDEXES + 1> *const cfs,
+                 bool is_dd_tbl) const
+      MY_ATTRIBUTE((__nonnull__, __warn_unused_result__));
 
   int create_key_def(const TABLE *const table_arg, const uint i,
                      const Rdb_tbl_def *const tbl_def_arg,
                      std::shared_ptr<Rdb_key_def> *const new_key_def,
                      const struct key_def_cf_info &cf_info, uint64 ttl_duration,
-                     const std::string &ttl_column) const
+                     const std::string &ttl_column,
+                     bool is_dd_tbl = false) const
       MY_ATTRIBUTE((__warn_unused_result__));
 
   int create_inplace_key_defs(
@@ -758,6 +762,10 @@ class ha_rocksdb : public my_core::handler, public blob_buffer {
   int update_write_pk(const Rdb_key_def &kd,
                       const struct update_row_info &row_info,
                       const bool pk_changed)
+      MY_ATTRIBUTE((__warn_unused_result__));
+
+  int check_partial_index_prefix(const TABLE *table_arg, const Rdb_key_def &kd,
+                                 Rdb_transaction *tx, const uchar *data)
       MY_ATTRIBUTE((__warn_unused_result__));
   int update_write_sk(const TABLE *const table_arg, const Rdb_key_def &kd,
                       const struct update_row_info &row_info,
@@ -896,6 +904,9 @@ class ha_rocksdb : public my_core::handler, public blob_buffer {
       TABLE *const altered_table,
       my_core::Alter_inplace_info *const ha_alter_info, bool commit,
       const dd::Table *old_table_def, dd::Table *new_table_def) override;
+
+  /* Determine if this is an instant ALTER TABLE. */
+  static bool is_instant(const Alter_inplace_info *ha_alter_info);
 
   bool is_read_free_rpl_table() const;
   static int adjust_handler_stats_sst_and_memtable(ha_statistics *ha_stats,
@@ -1171,5 +1182,8 @@ extern std::atomic<uint64_t> rocksdb_partial_index_groups_materialized;
 extern std::atomic<uint64_t> rocksdb_partial_index_rows_sorted;
 extern std::atomic<uint64_t> rocksdb_partial_index_rows_materialized;
 extern bool rocksdb_enable_tmp_table;
+extern bool rocksdb_enable_delete_range_for_drop_index;
+extern bool rocksdb_disable_instant_ddl;
 
+extern unsigned long long rocksdb_converter_record_cached_length;
 }  // namespace myrocks

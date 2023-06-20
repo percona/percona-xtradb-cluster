@@ -23,6 +23,10 @@
 #include <string>
 #include <vector>
 
+#ifdef __APPLE__
+#include <sys/resource.h>
+#endif
+
 /* MySQL header files */
 #include "sql/handler.h" /* handler */
 #include "sql_string.h"
@@ -196,7 +200,12 @@ const char *const RDB_PARTIAL_INDEX_THRESHOLD_QUALIFIER =
 #define RDB_MIN_RECALC_INTERVAL 10 /* seconds */
 
 #define THREAD_PRIO_MIN -20
+#ifndef __APPLE__
 #define THREAD_PRIO_MAX 19
+#else
+#define THREAD_PRIO_MAX PRIO_DARWIN_BG
+#endif
+
 /*
   Default and maximum values for rocksdb-compaction-sequential-deletes and
   rocksdb-compaction-sequential-deletes-window to add basic boundary checking.
@@ -319,9 +328,11 @@ static_assert(HA_ERR_ROCKSDB_FIRST > HA_ERR_LAST,
 
 const constexpr char rocksdb_hton_name[] = "ROCKSDB";
 
+using Index_id = uint32_t;
+
 typedef struct _gl_index_id_s {
   uint32_t cf_id;
-  uint32_t index_id;
+  Index_id index_id;
   bool operator==(const struct _gl_index_id_s &other) const {
     return cf_id == other.cf_id && index_id == other.index_id;
   }
