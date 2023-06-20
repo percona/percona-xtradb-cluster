@@ -1675,7 +1675,6 @@ function initialize_pxb_commands()
                 --defaults-group=mysqld${WSREP_SST_OPT_CONF_SUFFIX} $disver $iopts \
                 \$INNOEXTRA \$keyringbackupopt --lock-ddl --backup --galera-info \
                 \$encrypt_backup_options --stream=\$sfmt \
-                --no-version-check \
                 --xtrabackup-plugin-dir="$pxb_plugin_dir" \
                 --target-dir=\$itmpdir 2> >(logger -p daemon.err -t ${ssystag}innobackupex-backup)"
         fi
@@ -1736,7 +1735,7 @@ fi
 # 2.4.20  Transition-key fixes
 #
 
-XB_2x_REQUIRED_VERSION="2.4.27"
+XB_2x_REQUIRED_VERSION="2.4.28"
 
 if [[ ! -x $XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN ]]; then
     wsrep_log_error "******************* FATAL ERROR ********************** "
@@ -1762,7 +1761,7 @@ fi
 # 8.0.11  Transition-key fixes
 #
 
-XB_8x_REQUIRED_VERSION="8.0.32"
+XB_8x_REQUIRED_VERSION="8.0.33"
 
 if [[ ! -x $XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN ]]; then
     wsrep_log_error "******************* FATAL ERROR ********************** "
