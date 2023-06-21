@@ -75,8 +75,8 @@ USE test;
 --let $wait_condition = SELECT VARIABLE_VALUE = 'ON' FROM performance_schema.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready'
 --source include/wait_condition.inc
 --echo Node 2 synced
-CALL mtr.add_suppression("Slave SQL: Error 'Unknown database 'test'' on query");
-CALL mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t1'' on query");
+CALL mtr.add_suppression("Replica SQL: Error 'Unknown database 'test'' on query");
+CALL mtr.add_suppression("Replica SQL: Error 'Unknown table 'test.t1'' on query");
 CALL mtr.add_suppression("Query apply failed");
 CALL mtr.add_suppression("Inconsistency detected: Inconsistent by consensus on .*");
 CALL mtr.add_suppression("Plugin 'InnoDB' will be forced to shutdown");
@@ -85,7 +85,7 @@ CALL mtr.add_suppression("Plugin 'InnoDB' will be forced to shutdown");
 --let $wait_condition = SELECT VARIABLE_VALUE = 'ON' FROM performance_schema.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready'
 --source include/wait_condition.inc
 --echo Node 3 synced
-CALL mtr.add_suppression("Slave SQL: Error 'Table 't1' already exists' on query");
+CALL mtr.add_suppression("Replica SQL: Error 'Table 't1' already exists' on query");
 CALL mtr.add_suppression("Query apply failed");
 CALL mtr.add_suppression("Inconsistency detected: Inconsistent by consensus on .*");
 CALL mtr.add_suppression("Plugin 'InnoDB' will be forced to shutdown");

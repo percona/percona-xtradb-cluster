@@ -94,23 +94,116 @@ jobs:
 
   strategy:
     matrix:
-      # clang-6 and newer compilers
+<<<<<<< HEAD
+||||||| merged common ancestors
+      macOS 12 RelWithDebInfo:
+        imageName: 'macOS-12'
+        Compiler: clang
+        BuildType: RelWithDebInfo
+
+      # skip for a pull request if branch name doesn't contain "fullci"
+      ${{ if or(ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
+        macOS 12 Debug:
+          imageName: 'macOS-12'
+          Compiler: clang
+          BuildType: Debug
+
+<<<<<<<<< Temporary merge branch 1
+      # clang-5 and newer compilers
       clang-15 RelWithDebInfo [Ubuntu 22.04 Jammy]:
+||||||||| merged common ancestors
+      # clang-5 and newer compilers
+      clang-15 Release [Ubuntu 22.04 Jammy]:
+=========
+=======
+      macOS 12 RelWithDebInfo:
+        imageName: 'macOS-12'
+        Compiler: clang
+        BuildType: RelWithDebInfo
+
+      # skip for a pull request if branch name doesn't contain "fullci"
+      ${{ if or(ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
+        macOS 12 Debug:
+          imageName: 'macOS-12'
+          Compiler: clang
+          BuildType: Debug
+
+      clang-16 RelWithDebInfo [Ubuntu 22.04 Jammy]:
         imageName: 'ubuntu-22.04'
         UBUNTU_CODE_NAME: jammy
         Compiler: clang
-        CompilerVer: 15
+        CompilerVer: 16
         BuildType: RelWithDebInfo
 
       ${{ if or(ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
-        clang-15 RelWithDebInfo INVERTED=ON [Ubuntu 22.04 Jammy]:
+        clang-16 RelWithDebInfo INVERTED=ON [Ubuntu 22.04 Jammy]:
+          imageName: 'ubuntu-22.04'
+          UBUNTU_CODE_NAME: jammy
+          Compiler: clang
+          CompilerVer: 16
+          BuildType: RelWithDebInfo
+          INVERTED: ON
+
+      ${{ if or(ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
+        clang-16 Debug [Ubuntu 22.04 Jammy]:
+          imageName: 'ubuntu-22.04'
+          UBUNTU_CODE_NAME: jammy
+          Compiler: clang
+          CompilerVer: 16
+          BuildType: Debug
+
+      clang-16 Debug INVERTED=ON [Ubuntu 22.04 Jammy]:
+        imageName: 'ubuntu-22.04'
+        UBUNTU_CODE_NAME: jammy
+        Compiler: clang
+        CompilerVer: 16
+        BuildType: Debug
+        INVERTED: ON
+
+      ${{ if or(ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
+        clang-15 RelWithDebInfo [Ubuntu 22.04 Jammy]:
           imageName: 'ubuntu-22.04'
           UBUNTU_CODE_NAME: jammy
           Compiler: clang
           CompilerVer: 15
           BuildType: RelWithDebInfo
-          INVERTED: ON
 
+<<<<<<< HEAD
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+      ${{ if or(ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
+        clang-14 Debug [Ubuntu 20.04 Focal]:
+          imageName: 'ubuntu-20.04'
+          Compiler: clang
+          CompilerVer: 14
+          BuildType: Debug
+
+      ${{ if or(ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
+        clang-13 RelWithDebInfo [Ubuntu 20.04 Focal]:
+          imageName: 'ubuntu-20.04'
+          Compiler: clang
+          CompilerVer: 13
+          BuildType: RelWithDebInfo
+
+      clang-13 Debug [Ubuntu 20.04 Focal]:
+||||||||| merged common ancestors
+      ${{ if or(ne(variables['Build.Reason'], 'IndividualCI'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
+        clang-14 Debug [Ubuntu 20.04 Focal]:
+          imageName: 'ubuntu-20.04'
+          Compiler: clang
+          CompilerVer: 14
+          BuildType: Debug
+
+      ${{ if or(ne(variables['Build.Reason'], 'IndividualCI'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
+        clang-13 Release [Ubuntu 20.04 Focal]:
+          imageName: 'ubuntu-20.04'
+          Compiler: clang
+          CompilerVer: 13
+          BuildType: RelWithDebInfo
+
+      clang-13 Debug [Ubuntu 20.04 Focal]:
+=========
+=======
       ${{ if or(ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
         clang-15 Debug [Ubuntu 22.04 Jammy]:
           imageName: 'ubuntu-22.04'
@@ -119,14 +212,6 @@ jobs:
           CompilerVer: 15
           BuildType: Debug
 
-      clang-15 Debug INVERTED=ON [Ubuntu 22.04 Jammy]:
-        imageName: 'ubuntu-22.04'
-        UBUNTU_CODE_NAME: jammy
-        Compiler: clang
-        CompilerVer: 15
-        BuildType: Debug
-        INVERTED: ON
-
       ${{ if or(ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
         clang-14 RelWithDebInfo [Ubuntu 20.04 Focal]:
           imageName: 'ubuntu-20.04'
@@ -134,6 +219,7 @@ jobs:
           CompilerVer: 14
           BuildType: RelWithDebInfo
 
+>>>>>>> Percona-Server-8.0.33-25
       clang-14 Debug [Ubuntu 20.04 Focal]:
         imageName: 'ubuntu-20.04'
         Compiler: clang
@@ -363,10 +449,17 @@ jobs:
         sudo -E apt-add-repository -y "ppa:ubuntu-toolchain-r/test"
         sudo -E apt-get -yq update >> ~/apt-get-update.log 2>&1
 
+<<<<<<< HEAD
         sudo -E apt-get -yq --no-install-suggests --no-install-recommends --allow-unauthenticated install scons socat check libasio-dev libatomic1 libboost-all-dev || exit 1
         sudo -E apt-get -yq --no-install-suggests --no-install-recommends --allow-unauthenticated install $PACKAGES cmake cmake-curses-gui ccache bison libudev-dev libaio-dev libmecab-dev libnuma-dev liblzma-dev libssl-dev libreadline-dev libpam-dev libcurl4-openssl-dev libldap2-dev libkrb5-dev libsasl2-dev libsasl2-modules-gssapi-mit || exit 1;
+||||||| merged common ancestors
+        sudo -E apt-get -yq --no-install-suggests --no-install-recommends --allow-unauthenticated install $PACKAGES cmake cmake-curses-gui ccache bison libudev-dev libaio-dev libmecab-dev libnuma-dev liblzma-dev libssl-dev libreadline-dev libpam-dev libcurl4-openssl-dev libldap2-dev libkrb5-dev libsasl2-dev libsasl2-modules-gssapi-mit || exit 1;
+=======
+        sudo -E apt-get -yq --no-install-suggests --no-install-recommends --allow-unauthenticated install $PACKAGES cmake cmake-curses-gui ccache bison libudev-dev libaio-dev libmecab-dev libnuma-dev libssl-dev libreadline-dev libedit-dev libpam-dev libcurl4-openssl-dev libldap2-dev libkrb5-dev libsasl2-dev libsasl2-modules-gssapi-mit || exit 1;
+        `# SYSTEM_LIBRARIES = CURL EDITLINE ICU LIBEVENT LZ4 PROTOBUF SSL ZSTD FIDO (Ubuntu 21.04+)`
+>>>>>>> Percona-Server-8.0.33-25
         if [[ "$(INVERTED)" != "ON" ]]; then
-          sudo -E apt-get -yq --no-install-suggests --no-install-recommends --allow-unauthenticated install rapidjson-dev zlib1g-dev libzstd-dev liblz4-dev libfido2-dev libevent-dev libreadline-dev protobuf-compiler libprotobuf-dev libprotoc-dev libicu-dev || exit 1;
+          sudo -E apt-get -yq --no-install-suggests --no-install-recommends --allow-unauthenticated install libicu-dev libevent-dev liblz4-dev zlib1g-dev protobuf-compiler libprotobuf-dev libprotoc-dev libzstd-dev libfido2-dev || exit 1;
         fi
 
         if [[ "$(Compiler)" == "clang" ]]; then
@@ -376,7 +469,7 @@ jobs:
         fi
       else
          brew update
-         brew install ccache protobuf lz4 rapidjson openssl@1.1
+         brew install ccache protobuf lz4 openssl@1.1
       fi
 
       UPDATE_TIME=$SECONDS

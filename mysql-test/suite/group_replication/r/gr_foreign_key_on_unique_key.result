@@ -1,7 +1,7 @@
 include/group_replication.inc
 Warnings:
 Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
-Note	####	Storing MySQL user name or password information in the master info repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START SLAVE; see the 'START SLAVE Syntax' in the MySQL Manual for more information.
+Note	####	Storing MySQL user name or password information in the connection metadata repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START REPLICA; see the 'START REPLICA Syntax' in the MySQL Manual for more information.
 [connection server1]
 
 ############################################################
@@ -48,6 +48,7 @@ COMMIT;
 # 3. Wait until local transaction reaches the
 # group_replication_before_message_broadcast debug sync point.
 [connection server_1]
+SET DEBUG_SYNC="now WAIT_FOR signal.group_replication_before_message_broadcast_reached";
 
 ############################################################
 # 4. Execute a transaction on remote server, that will reach first
@@ -63,8 +64,6 @@ COMMIT;
 #    transaction.
 [connection server_1]
 SET DEBUG_SYNC='now SIGNAL waiting';
-SET DEBUG_SYNC='RESET';
-SET @@GLOBAL.DEBUG= @debug_save;
 
 ############################################################
 # 6. Wait for remote transaction to be executed succesfully
@@ -81,6 +80,8 @@ include/sync_slave_sql_with_master.inc
 ERROR 40000: Plugin instructed the server to rollback the current transaction.
 [connection server1]
 SET @@GLOBAL.DEBUG=@debug_save;
+[connection server_1]
+SET DEBUG_SYNC='RESET';
 ############################################################
 # 8. Sync everything
 include/rpl_sync.inc
@@ -136,6 +137,7 @@ COMMIT;
 # 3. Wait until local transaction reaches the
 # group_replication_before_message_broadcast debug sync point.
 [connection server_1]
+SET DEBUG_SYNC="now WAIT_FOR signal.group_replication_before_message_broadcast_reached";
 
 ############################################################
 # 4. Execute a transaction on remote server, that will reach first
@@ -151,8 +153,6 @@ COMMIT;
 #    transaction.
 [connection server_1]
 SET DEBUG_SYNC='now SIGNAL waiting';
-SET DEBUG_SYNC='RESET';
-SET @@GLOBAL.DEBUG= @debug_save;
 
 ############################################################
 # 6. Wait for remote transaction to be executed succesfully
@@ -168,6 +168,8 @@ include/sync_slave_sql_with_master.inc
 [connection server1]
 [connection server1]
 SET @@GLOBAL.DEBUG=@debug_save;
+[connection server_1]
+SET DEBUG_SYNC='RESET';
 ############################################################
 # 8. Sync everything
 include/rpl_sync.inc
@@ -256,10 +258,4 @@ Occurrences of 'last_committed' in the input file: 13
 # Validate indexes on member 2.
 #
 include/include/assert_logical_timestamps.inc [0 0;1 2;2 3;3 4;3 5;4 6;5 7;6 8;7 9;9 10;8 11;11 12;12 13]
-Asserting all GTID transaction length information in 'server-relay-log-group_replication_applier.000002'
-Inspected 9 transactions, all with correct transaction length.
-Asserting all GTID transaction length information in 'server-relay-log-group_replication_applier.000003'
-Inspected 12 transactions, all with correct transaction length.
-Asserting all GTID transaction length information in 'server-binary-log.000001'
-Inspected 24 transactions, all with correct transaction length.
 include/group_replication_end.inc

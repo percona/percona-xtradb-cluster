@@ -1,4 +1,4 @@
-/* Copyright (c) 2016, 2022, Oracle and/or its affiliates.
+/* Copyright (c) 2016, 2023, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -256,11 +256,17 @@ struct Prefer_RAM_over_MMAP_policy_obeying_per_table_limit {
                              TableResourceMonitor *table_resource_monitor) {
     assert(table_resource_monitor);
     assert(table_resource_monitor->consumption() <=
-           table_resource_monitor->threshold());
+           std::max(table_resource_monitor->threshold(), 1024ul * 1024ul));
 
     if (table_resource_monitor->consumption() + block_size >
-        table_resource_monitor->threshold())
+        table_resource_monitor->threshold()) {
+      if (table_resource_monitor->consumption() == 0) {
+        // Always allow to allocate at least one block, otherwise the temptable
+        // engine is unusable
+        return Prefer_RAM_over_MMAP_policy::block_source(block_size);
+      }
       throw Result::RECORD_FILE_FULL;
+    }
 
     return Prefer_RAM_over_MMAP_policy::block_source(block_size);
   }
