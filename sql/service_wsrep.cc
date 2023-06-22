@@ -112,7 +112,7 @@ extern "C" bool wsrep_thd_is_BF(const THD *thd, bool sync) {
     if (sync)
       mysql_mutex_lock(const_cast<mysql_mutex_t *>(&thd->LOCK_wsrep_thd));
     status = (wsrep_thd_is_applying(thd) || wsrep_thd_is_toi(thd) ||
-              wsrep_thd_is_in_rsu(thd));
+              wsrep_thd_is_in_rsu(thd)) || wsrep_thd_is_in_nbo(thd);
     if (sync)
       mysql_mutex_unlock(const_cast<mysql_mutex_t *>(&thd->LOCK_wsrep_thd));
   }
