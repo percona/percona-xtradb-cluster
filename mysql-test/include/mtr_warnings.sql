@@ -387,7 +387,7 @@ INSERT INTO global_suppressions VALUES
  ("Refusing exit for the last slave thread"),
  ("Quorum: No node with complete state"),
  ("Failed to report last committed"),
- ("Slave SQL: Error 'Duplicate entry"),
+ ("Replica SQL: Error 'Duplicate entry"),
  ("Query apply warning:"),
  ("Ignoring error for TO isolated action:"),
  ("Initial position was provided by configuration or SST.*"),
@@ -428,7 +428,7 @@ INSERT INTO global_suppressions VALUES
  ("InnoDB High Priority being used"),
 
  /* MySQL supression needed by Galera */
- ("Slave I/O.*: Get master clock failed with error:.*"),
+ ("Replica I/O.*: Get master clock failed with error:.*"),
  ("Trying to access missing tablespace.*"),
  ("Allocated tablespace ID .*, old maximum was.*"),
 

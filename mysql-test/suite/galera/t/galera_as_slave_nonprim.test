@@ -97,7 +97,7 @@ CALL mtr.add_suppression("Operation not permitted");
 CALL mtr.add_suppression("Replica SQL for channel '': Error in Xid_log_event: Commit could not be completed, 'Deadlock found when trying to get lock; try restarting transaction'");
 CALL mtr.add_suppression("Replica SQL for channel '': Node has dropped from cluster");
 CALL mtr.add_suppression("Worker 1 failed executing transaction");
-CALL mtr.add_suppression("The slave coordinator and worker threads are stopped, possibly leaving data in inconsistent state");
+CALL mtr.add_suppression("The replica coordinator and worker threads are stopped, possibly leaving data in inconsistent state");
 
 --connection node_1
 RESET MASTER;
