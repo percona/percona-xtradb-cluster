@@ -79,15 +79,6 @@ BuildRequires:  cmake3 >= 3.6.1
 BuildRequires:  devtoolset-8-gcc
 BuildRequires:  devtoolset-8-gcc-c++
 %endif
-<<<<<<< HEAD
-||||||| merged common ancestors
-%{?el6:BuildRequires:  devtoolset-8-gcc}
-%{?el6:BuildRequires:  devtoolset-8-gcc-c++}
-%{?el7:BuildRequires:  devtoolset-10-gcc}
-%{?el7:BuildRequires:  devtoolset-10-gcc-c++}
-%{?el8:BuildRequires:  gcc-toolset-10-gcc}
-%{?el8:BuildRequires:  gcc-toolset-10-gcc-c++}
-=======
 %{?el6:BuildRequires:  devtoolset-8-gcc}
 %{?el6:BuildRequires:  devtoolset-8-gcc-c++}
 %ifarch aarch64
@@ -109,7 +100,6 @@ BuildRequires:  devtoolset-8-gcc-c++
 %{?el9:BuildRequires:  gcc-toolset-12-binutils}
 %{?el9:BuildRequires:  gcc-toolset-12-gcc-c++}
 %{?el9:BuildRequires:  gcc-toolset-12-gcc}
->>>>>>> Percona-Server-8.0.33-25
 BuildRequires:  bison >= 2.1
 BuildRequires:  time
 BuildRequires:  cyrus-sasl-devel
