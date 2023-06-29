@@ -860,8 +860,6 @@ int Wsrep_schema::update_fragment_meta(THD *thd,
   Wsrep_schema_impl::init_stmt(thd);
   if (Wsrep_schema_impl::open_for_write(thd, sr_table_str.c_str(),
                                         &frag_table)) {
-    trans_rollback_stmt(thd);
-    close_thread_tables(thd);
     DBUG_RETURN(1);
   }
 
@@ -872,15 +870,12 @@ int Wsrep_schema::update_fragment_meta(THD *thd,
   Wsrep_schema_impl::make_key(frag_table, key, &key_map, 3);
 
   if ((error =
-           Wsrep_schema_impl::init_for_index_scan(frag_table, key, key_map)) ||
-           DBUG_EVALUATE_IF("fail_at_update_fragment", true, false)) {
+           Wsrep_schema_impl::init_for_index_scan(frag_table, key, key_map))) {
     if (error == HA_ERR_END_OF_FILE || error == HA_ERR_KEY_NOT_FOUND) {
       WSREP_WARN("Record not found in %s.%s: %d", frag_table->s->db.str,
                  frag_table->s->table_name.str, error);
     }
-    Wsrep_schema_impl::end_index_scan(frag_table);
-    trans_rollback_stmt(thd);
-    close_thread_tables(thd);
+    Wsrep_schema_impl::finish_stmt(thd);
     DBUG_RETURN(1);
   }
 
@@ -894,8 +889,7 @@ int Wsrep_schema::update_fragment_meta(THD *thd,
     WSREP_ERROR("Error updating record in %s.%s: %d", frag_table->s->db.str,
                 frag_table->s->table_name.str, error);
     Wsrep_schema_impl::end_index_scan(frag_table);
-    trans_rollback_stmt(thd);
-    close_thread_tables(thd);
+    Wsrep_schema_impl::finish_stmt(thd);
     DBUG_RETURN(1);
   }
 
@@ -1049,9 +1043,8 @@ int Wsrep_schema::replay_transaction(
     if ((error = Wsrep_schema_impl::open_for_read(&thd, sr_table_str.c_str(),
                                                   &frag_table))) {
       WSREP_WARN("Could not open SR table for read: %d", error);
-      trans_rollback_stmt(&thd);
-      ret = 1;
-      break;
+      Wsrep_schema_impl::finish_stmt(&thd);
+      DBUG_RETURN(1);
     }
 
     Wsrep_schema_impl::store(frag_table, 0, ws_meta.server_id());
@@ -1064,8 +1057,7 @@ int Wsrep_schema::replay_transaction(
     if (error2) {
       WSREP_WARN("Failed to init streaming log table for index scan: %d",
                  error);
-      Wsrep_schema_impl::end_index_scan(frag_table);
-      trans_rollback_stmt(&thd);
+      Wsrep_schema_impl::finish_stmt(&thd);
       ret = 1;
       break;
     }
@@ -1085,7 +1077,7 @@ int Wsrep_schema::replay_transaction(
         WSREP_WARN(
             "Wsrep_schema::replay_transaction: failed to apply fragments");
         Wsrep_schema_impl::end_index_scan(frag_table);
-        trans_rollback_stmt(&thd);
+        Wsrep_schema_impl::finish_stmt(&thd);
         break;
       }
     }
@@ -1098,16 +1090,14 @@ int Wsrep_schema::replay_transaction(
     if ((error = Wsrep_schema_impl::open_for_write(&thd, sr_table_str.c_str(),
                                                    &frag_table))) {
       WSREP_WARN("Could not open SR table for write: %d", error);
-      trans_rollback_stmt(&thd);
-      ret = 1;
-      break;
+      Wsrep_schema_impl::finish_stmt(&thd);
+      DBUG_RETURN(1);
     }
     error = Wsrep_schema_impl::init_for_index_scan(frag_table, key, key_map);
     if (error) {
       WSREP_WARN("Failed to init streaming log table for index scan: %d",
                  error);
-      Wsrep_schema_impl::end_index_scan(frag_table);
-      trans_rollback_stmt(&thd);
+      Wsrep_schema_impl::finish_stmt(&thd);
       ret = 1;
       break;
     }
@@ -1116,16 +1106,14 @@ int Wsrep_schema::replay_transaction(
     if (error) {
       WSREP_WARN("Could not delete row from streaming log table: %d", error);
       Wsrep_schema_impl::end_index_scan(frag_table);
-      trans_rollback_stmt(&thd);
+      Wsrep_schema_impl::finish_stmt(&thd);
       ret = 1;
       break;
     }
     Wsrep_schema_impl::end_index_scan(frag_table);
     Wsrep_schema_impl::finish_stmt(&thd);
-    DBUG_RETURN(ret);
   }
 
-  close_thread_tables(&thd);
   DBUG_RETURN(ret);
 }
 
