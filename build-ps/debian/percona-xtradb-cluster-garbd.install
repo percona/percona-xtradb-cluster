@@ -1,4 +1,4 @@
-garb/garbd usr/bin
+usr/bin/garbd
 lib/systemd/system/garb.service
 usr/bin/garb-systemd
 etc/default/garb
