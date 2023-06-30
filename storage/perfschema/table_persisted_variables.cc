@@ -61,7 +61,11 @@ Plugin_table table_persisted_variables::m_table_def(
     "persisted_variables",
     /* Definition */
     "  VARIABLE_NAME VARCHAR(64) not null,\n"
+#ifdef WITH_WSREP
+    "  VARIABLE_VALUE VARCHAR(" WSREP_PS_VAR_VALUE_BUFF_SIZE_STR "),\n"
+#else
     "  VARIABLE_VALUE VARCHAR(1024),\n"
+#endif /* WITH_WSREP */
     "  PRIMARY KEY (VARIABLE_NAME) USING HASH\n",
     /* Options */
     " ENGINE=PERFORMANCE_SCHEMA",
