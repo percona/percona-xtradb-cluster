@@ -657,7 +657,8 @@ private:
   void make_row(const CHARSET_INFO *cs, const char* str, size_t length);
 
 #ifdef WITH_WSREP
-  char m_str[2048];
+  /* Increase in lenght to accomodate wsrep_provider_options */
+  char m_str[WSREP_PS_VAR_VALUE_BUFF_SIZE];
 #else
   char m_str[1024];
 #endif /* WITH_WSREP */

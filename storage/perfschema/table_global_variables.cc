@@ -45,7 +45,7 @@ static const TABLE_FIELD_TYPE field_types[]=
   {
     { C_STRING_WITH_LEN("VARIABLE_VALUE") },
 #ifdef WITH_WSREP
-    { C_STRING_WITH_LEN("varchar(2048)") },
+    { C_STRING_WITH_LEN("varchar(" WSREP_PS_VAR_VALUE_BUFF_SIZE_STR ")") },
 #else
     { C_STRING_WITH_LEN("varchar(1024)") },
 #endif /* WITH_WSREP */
