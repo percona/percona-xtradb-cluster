@@ -2223,10 +2223,6 @@ ADD_SUBDIRECTORY(mysys)
 ADD_SUBDIRECTORY(libmysql)
 ADD_SUBDIRECTORY(libbinlogevents)
 ADD_SUBDIRECTORY(libbinlogstandalone)
-IF(WITH_WSREP)
-   ADD_SUBDIRECTORY(percona-xtradb-cluster-galera)
-   ADD_SUBDIRECTORY(wsrep-lib)
-ENDIF()
 ADD_SUBDIRECTORY(libchangestreams)
 ADD_SUBDIRECTORY(sql-common/oci)
 
@@ -2276,6 +2272,10 @@ IF(NOT WITHOUT_SERVER)
   ADD_SUBDIRECTORY(sql)
 ENDIF()
 
+IF(WITH_WSREP)
+   ADD_SUBDIRECTORY(percona-xtradb-cluster-galera)
+   ADD_SUBDIRECTORY(wsrep-lib)
+ENDIF()
 # Some unit tests need to link with the entire server, use this library:
 IF(NOT WITHOUT_SERVER AND WITH_UNIT_TESTS)
 

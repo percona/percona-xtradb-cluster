@@ -72,7 +72,7 @@ call mtr.add_suppression("Aborting");
 
 --echo "Restart with wsrep_desync=1"
 --let $start_mysqld_params="--wsrep_desync=1"
---exec echo "try:$start_mysqld_params" > $_expect_file_name
+--exec echo "restart_abort:$start_mysqld_params" > $_expect_file_name
 # Sleep to ensure that server exited...
 --sleep 30
 #

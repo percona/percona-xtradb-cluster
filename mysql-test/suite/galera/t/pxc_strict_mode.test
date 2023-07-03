@@ -1333,7 +1333,7 @@ drop table t;
 #
 --let $start_mysqld_params="--innodb_autoinc_lock_mode=1 --pxc_strict_mode=ENFORCING --log-error=$restartdir/restart.log"
 --echo "Try restarting node-2 with --innodb_autoinc_lock_mode=1"
---exec echo "try:$start_mysqld_params" > $_expect_file_name
+--exec echo "restart_abort:$start_mysqld_params" > $_expect_file_name
 --sleep 30
 #
 --echo "grep --count \"Percona-XtraDB-Cluster prohibits setting innodb_autoinc_lock_mode to"

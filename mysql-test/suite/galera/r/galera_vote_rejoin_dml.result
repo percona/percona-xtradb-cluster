@@ -23,7 +23,7 @@ COUNT(*) = 1
 SELECT COUNT(*) = 0 FROM t1 WHERE f2 = 'B';
 COUNT(*) = 0
 1
-CALL mtr.add_suppression("Slave SQL: Could not execute Delete_rows");
+CALL mtr.add_suppression("Replica SQL: Could not execute Delete_rows");
 CALL mtr.add_suppression("Event 3 Delete_rows apply failed: 120, seqno [0-9]*");
 SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'A';
 COUNT(*) = 1
@@ -32,7 +32,7 @@ SELECT COUNT(*) = 0 FROM t1 WHERE f2 = 'B';
 COUNT(*) = 0
 1
 CALL mtr.add_suppression("mysqld: Can't find record in 't1'");
-CALL mtr.add_suppression("Slave SQL: Could not execute Delete_rows");
+CALL mtr.add_suppression("Replica SQL: Could not execute Delete_rows");
 CALL mtr.add_suppression("Event 3 Delete_rows apply failed: 120, seqno [0-9]*");
 SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'A';
 COUNT(*) = 1
