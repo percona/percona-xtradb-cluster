@@ -19,7 +19,7 @@
 
 --connection node_3
 --echo #node-3 (async slave)
-call mtr.add_suppression("Recovery from master pos");
+call mtr.add_suppression("Recovery from source pos");
 call mtr.add_suppression("when attempting to connect");
 --disable_query_log
 --eval CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1',SOURCE_USER='root',SOURCE_PORT=$NODE_MYPORT_1;
