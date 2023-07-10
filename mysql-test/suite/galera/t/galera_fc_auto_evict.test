@@ -11,6 +11,7 @@
 # It's just a smoke test of the feature, because it's problematic to achieve required
 # time characteristics. For more granular testing a unit test is used.
 
+--source include/force_restart.inc
 --source include/galera_cluster.inc
 
 --connection node_2
