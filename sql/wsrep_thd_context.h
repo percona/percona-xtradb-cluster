@@ -42,8 +42,8 @@ class Wsrep_thd_context {
   Wsrep_thd_context() {}
   void clear();
 
-  std::vector<wsrep_table_t>& get_fk_parent_tables();
-  std::vector<wsrep_table_t>& get_fk_child_tables();
+  std::vector<wsrep_table_t> &get_fk_parent_tables();
+  std::vector<wsrep_table_t> &get_fk_child_tables();
 };
 
 #endif /* WSREP_THD_CONTEXT_H */

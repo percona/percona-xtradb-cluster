@@ -1889,13 +1889,13 @@ bool wsrep_append_fk_parent_table(THD *thd, Table_ref *tables,
       std::pair<std::string, std::string> table =
           std::make_pair(fk->referenced_table_schema_name().c_str(),
                          fk->referenced_table_name().c_str());
+
       thd->wsrep_thd_context.get_fk_parent_tables().push_back(table);
     }
   };
 
   if (wsrep_do_action_for_tables(thd, tables, populate_parent_tables))
     return true;
-
 
   for (const auto &table_obj : thd->wsrep_thd_context.get_fk_parent_tables()) {
     keys->push_back(wsrep_prepare_key_for_toi(

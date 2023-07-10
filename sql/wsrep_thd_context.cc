@@ -17,11 +17,11 @@
 
 #include "sql/wsrep_thd_context.h"  // Wsrep_thd_context
 
-std::vector<wsrep_table_t>& Wsrep_thd_context::get_fk_parent_tables() {
+std::vector<wsrep_table_t> &Wsrep_thd_context::get_fk_parent_tables() {
   return fk_parent_tables;
 }
 
-std::vector<wsrep_table_t>& Wsrep_thd_context::get_fk_child_tables() {
+std::vector<wsrep_table_t> &Wsrep_thd_context::get_fk_child_tables() {
   return fk_child_tables;
 }
 
