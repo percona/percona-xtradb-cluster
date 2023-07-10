@@ -785,6 +785,7 @@ IF(WITH_WSREP)
    wsrep_sst.cc
    wsrep_storage_service.cc
    wsrep_thd.cc
+   wsrep_thd_context.cc
    wsrep_utils.cc
    wsrep_var.cc
    wsrep_xid.cc

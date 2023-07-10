@@ -164,6 +164,7 @@ struct LOG_INFO;
 #include "wsrep_condition_variable.h"
 #include "wsrep_mutex.h"
 #include "wsrep_mysqld.h"
+#include "wsrep_thd_context.h"
 
 class Wsrep_applier_service;
 #endif /* WITH_WSREP */
@@ -3188,6 +3189,7 @@ class THD : public MDL_context_owner,
   };
 
   nbo_context wsrep_nbo;
+  Wsrep_thd_context wsrep_thd_context;
 
   mysql_mutex_t LOCK_wsrep_thd;
   mysql_cond_t COND_wsrep_thd;
