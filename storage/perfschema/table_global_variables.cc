@@ -56,6 +56,11 @@ bool PFS_index_global_variables::match(const System_variable *pfs) {
 
 THR_LOCK table_global_variables::m_table_lock;
 
+#ifdef WITH_WSREP
+#define xstr(a) str(a)
+#define str(a) #a
+#endif
+
 Plugin_table table_global_variables::m_table_def(
     /* Schema name */
     "performance_schema",
@@ -64,7 +69,7 @@ Plugin_table table_global_variables::m_table_def(
     /* Definition */
     "  VARIABLE_NAME VARCHAR(64) not null,\n"
 #ifdef WITH_WSREP
-    "  VARIABLE_VALUE VARCHAR(" WSREP_PS_VAR_VALUE_BUFF_SIZE_STR "),\n"
+    "  VARIABLE_VALUE VARCHAR(" xstr(WSREP_PS_VAR_VALUE_BUFF_SIZE) "),\n"
 #else
     "  VARIABLE_VALUE VARCHAR(1024),\n"
 #endif /* WITH_WSREP */
