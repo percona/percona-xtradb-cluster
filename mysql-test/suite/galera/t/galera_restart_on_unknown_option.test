@@ -8,6 +8,7 @@ call mtr.add_suppression("The privilege system failed to initialize correctly");
 call mtr.add_suppression("SST failed/interrupted");
 call mtr.add_suppression("IST was interrupted");
 call mtr.add_suppression("IST didn't contain all write sets");
+call mtr.add_suppression("Failure while signalling the completion of SST");
 
 #
 # We should count the number of "Assertion failed" warnings
