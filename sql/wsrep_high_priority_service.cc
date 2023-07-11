@@ -879,6 +879,7 @@ int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
     thd->wsrep_cs().close();
     thd->wsrep_cs().cleanup();
 
+    thd->get_protocol_classic()->end_net();
     thd->release_resources();
     thd_manager->remove_thd(thd);
 #ifdef HAVE_PSI_THREAD_INTERFACE

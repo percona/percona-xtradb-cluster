@@ -1859,14 +1859,24 @@ static bool wsrep_do_action_for_tables(THD *thd, Table_ref *tables,
  */
 bool wsrep_append_child_tables(THD *thd, Table_ref *tables,
                                wsrep::key_array *keys) {
-  return wsrep_do_action_for_tables(
-      thd, tables, [keys](const dd::Table *table_def) {
-        for (const auto fk : table_def->foreign_key_parents()) {
-          keys->push_back(wsrep_prepare_key_for_toi(
-              fk->child_schema_name().c_str(), fk->child_table_name().c_str(),
-              wsrep::key::shared));
-        }
-      });
+  auto populate_child_tables = [thd](const dd::Table *table_def) {
+    for (const auto fk : table_def->foreign_key_parents()) {
+      std::pair<std::string, std::string> table = std::make_pair(
+          fk->child_schema_name().c_str(), fk->child_table_name().c_str());
+
+      thd->wsrep_thd_context.get_fk_child_tables().push_back(table);
+    }
+  };
+
+  if (wsrep_do_action_for_tables(thd, tables, populate_child_tables))
+    return true;
+
+  for (const auto &table_obj : thd->wsrep_thd_context.get_fk_child_tables()) {
+    keys->push_back(wsrep_prepare_key_for_toi(
+        table_obj.first.c_str(), table_obj.second.c_str(), wsrep::key::shared));
+  }
+
+  return false;
 }
 
 /*
@@ -1874,14 +1884,25 @@ bool wsrep_append_child_tables(THD *thd, Table_ref *tables,
  */
 bool wsrep_append_fk_parent_table(THD *thd, Table_ref *tables,
                                   wsrep::key_array *keys) {
-  return wsrep_do_action_for_tables(
-      thd, tables, [keys](const dd::Table *table_def) {
-        for (const auto fk : table_def->foreign_keys()) {
-          keys->push_back(wsrep_prepare_key_for_toi(
-              fk->referenced_table_schema_name().c_str(),
-              fk->referenced_table_name().c_str(), wsrep::key::shared));
-        }
-      });
+  auto populate_parent_tables = [thd](const dd::Table *table_def) {
+    for (const auto fk : table_def->foreign_keys()) {
+      std::pair<std::string, std::string> table =
+          std::make_pair(fk->referenced_table_schema_name().c_str(),
+                         fk->referenced_table_name().c_str());
+
+      thd->wsrep_thd_context.get_fk_parent_tables().push_back(table);
+    }
+  };
+
+  if (wsrep_do_action_for_tables(thd, tables, populate_parent_tables))
+    return true;
+
+  for (const auto &table_obj : thd->wsrep_thd_context.get_fk_parent_tables()) {
+    keys->push_back(wsrep_prepare_key_for_toi(
+        table_obj.first.c_str(), table_obj.second.c_str(), wsrep::key::shared));
+  }
+
+  return false;
 }
 
 /*

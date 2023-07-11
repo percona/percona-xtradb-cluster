@@ -717,6 +717,7 @@ THD::THD(bool enable_plugins)
       wsrep_last_query_id(0),
       wsrep_xid(),
       wsrep_skip_locking(false),
+      wsrep_thd_context(),
       wsrep_rand(0),
       wsrep_rli(NULL),
       wsrep_retry_counter(0),
@@ -2205,6 +2206,7 @@ void THD::cleanup_after_query() {
 
 #ifdef WITH_WSREP
   if (!in_active_multi_stmt_transaction()) wsrep_affected_rows = 0;
+  wsrep_thd_context.clear();
 #endif /* WITH_WSREP */
 }
 
