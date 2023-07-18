@@ -30,6 +30,7 @@
 #include "transaction.h"
 
 #include <condition_variable>
+#include "my_dbug.h"
 #include "sql_base.h"  // close_temporary_table()
 
 extern handlerton *binlog_hton;
@@ -808,6 +809,13 @@ int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
     /* DDL are atomic so flow (in wsrep_apply_events) will assign XID.
     Avoid over-writting of this XID by MySQL XID */
     thd->get_transaction()->xid_state()->get_xid()->set_keep_wsrep_xid(true);
+
+    DBUG_EXECUTE_IF("nbo_stop_before_apply_events", {
+      const char act[] =
+          "now signal nbo_before_apply_events_reached wait_for "
+          "nbo_before_apply_events_continue";
+      assert(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
+    });
 
     wsrep::mutable_buffer err2;
     ret = apply_events(thd, m_rli, our_buffer, err2);

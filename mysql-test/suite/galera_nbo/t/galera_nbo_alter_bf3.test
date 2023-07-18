@@ -1,0 +1,56 @@
+--source include/have_debug_sync.inc
+--source include/have_debug.inc
+--source include/galera_cluster.inc
+
+--connection node_1
+CREATE TABLE t1 (a INT PRIMARY KEY, b INT);
+INSERT INTO t1 VALUES (0, 0), (1, 0);
+CREATE TABLE aux (a INT PRIMARY KEY);
+
+# Setup node_2 to stop NBO applier thread just before apply_events()
+--connection node_2
+SET GLOBAL DEBUG="+d,nbo_stop_before_apply_events";
+
+--connection node_1
+SET SESSION wsrep_osu_method = NBO;
+--send CREATE INDEX b_idx ON t1(b)
+
+--connection node_2
+SET DEBUG_SYNC = 'now WAIT_FOR nbo_before_apply_events_reached';
+
+# make sure NBO phase 1 finished
+INSERT INTO aux VALUES (0);
+
+# There is nothing which blocks the following transaction:
+# 1. Apply and Commit Monitors are released (NBO phase 1 finished)
+# 2. No MDL locks acquired by NBO applier thread yet
+# It should be be rejected at the certification stage. If not, it would replicate and cause BF-BF conflict on node 1
+--error ER_LOCK_DEADLOCK
+INSERT INTO t1 VALUES (2, 2);
+
+# Try with TOI
+CALL mtr.add_suppression(".*TO isolation failed.*");
+--error ER_LOCK_DEADLOCK
+ALTER TABLE t1 ADD COLUMN (c INT);
+
+# Try with SR
+SET SESSION wsrep_trx_fragment_size=1;
+SET SESSION wsrep_trx_fragment_unit="STATEMENTS";
+BEGIN;
+--error ER_LOCK_DEADLOCK
+INSERT INTO t1 VALUES (2, 2);
+ROLLBACK;
+SET SESSION wsrep_trx_fragment_size=default;
+SET SESSION wsrep_trx_fragment_unit=default;
+
+# Let NBO applier thread to continue
+SET DEBUG_SYNC = 'now SIGNAL nbo_before_apply_events_continue';
+
+--connection node_1
+--reap
+SET SESSION wsrep_osu_method=TOI;
+DROP TABLE t1;
+DROP TABLE aux;
+
+--connection node_2
+SET GLOBAL DEBUG="-d,nbo_stop_before_apply_events";

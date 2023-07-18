@@ -3013,8 +3013,29 @@ bool wsrep_handle_mdl_conflict(const MDL_context *requestor_ctx,
     ticket->wsrep_report(wsrep_debug);
 
     mysql_mutex_lock(&granted_thd->LOCK_wsrep_thd);
-    if (wsrep_thd_is_toi(granted_thd) || wsrep_thd_is_in_nbo(granted_thd) ||
-        wsrep_thd_is_applying(granted_thd)) {
+    if (wsrep_thd_is_in_nbo(granted_thd) &&
+        wsrep_thd_is_applying(request_thd)) {
+      /* Here we've got the situation when NBO is in progress and applier tries
+         to apply conflicting writeset. In the ideal world it should not happen,
+         because all DMLs should be ordered after NBO or fail certification.
+         However, NBO certification index is cleaned up in Galera during
+         WSREP_NBO_2ND_PHASE_BEGIN. If NBO certification index gets cleared, it
+         does not block certification of DMLs. But we still keep MDL locks, so
+         it may happen that MDL is allowed, but conflicts NBO which finished,
+         but not yet released MDL locks. Ideally, Galera should clean NBO
+         certification index during finishing TOI related to 2nd phase of NBO,
+         which happens after releasing all MDL locks, but it is as it is.
+         Instead of rewriting that part in Galera, we will block applier here
+         for the time of unblocking MDL locks by NBO thread. */
+      WSREP_MDL_LOG(
+          INFO,
+          "MDL conflict, NBO vs applier. Waiting for NBO to release MDL locks",
+          schema, schema_len, request_thd, granted_thd);
+      mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
+      ret = false;
+    } else if (wsrep_thd_is_toi(granted_thd) ||
+               wsrep_thd_is_in_nbo(granted_thd) ||
+               wsrep_thd_is_applying(granted_thd)) {
       if (wsrep_thd_is_SR(granted_thd) && !wsrep_thd_is_SR(request_thd)) {
         WSREP_MDL_LOG(INFO, "MDL conflict, DDL vs SR", schema, schema_len,
                       request_thd, granted_thd);

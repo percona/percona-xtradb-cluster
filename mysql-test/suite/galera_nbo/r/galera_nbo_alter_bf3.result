@@ -1,0 +1,26 @@
+CREATE TABLE t1 (a INT PRIMARY KEY, b INT);
+INSERT INTO t1 VALUES (0, 0), (1, 0);
+CREATE TABLE aux (a INT PRIMARY KEY);
+SET GLOBAL DEBUG="+d,nbo_stop_before_apply_events";
+SET SESSION wsrep_osu_method = NBO;
+CREATE INDEX b_idx ON t1(b);
+SET DEBUG_SYNC = 'now WAIT_FOR nbo_before_apply_events_reached';
+INSERT INTO aux VALUES (0);
+INSERT INTO t1 VALUES (2, 2);
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+CALL mtr.add_suppression(".*TO isolation failed.*");
+ALTER TABLE t1 ADD COLUMN (c INT);
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+SET SESSION wsrep_trx_fragment_size=1;
+SET SESSION wsrep_trx_fragment_unit="STATEMENTS";
+BEGIN;
+INSERT INTO t1 VALUES (2, 2);
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+ROLLBACK;
+SET SESSION wsrep_trx_fragment_size=default;
+SET SESSION wsrep_trx_fragment_unit=default;
+SET DEBUG_SYNC = 'now SIGNAL nbo_before_apply_events_continue';
+SET SESSION wsrep_osu_method=TOI;
+DROP TABLE t1;
+DROP TABLE aux;
+SET GLOBAL DEBUG="-d,nbo_stop_before_apply_events";

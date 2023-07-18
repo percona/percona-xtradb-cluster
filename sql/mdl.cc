@@ -2540,7 +2540,7 @@ bool MDL_lock::can_grant_lock(enum_mdl_type type_arg,
           other context.
 
           If we are trying to acquire "unobtrusive" type of lock then the
-          confliciting lock must be from "obtrusive" set, therefore it should
+          conflicting lock must be from "obtrusive" set, therefore it should
           have been acquired using "slow path" and should be present in
           m_granted list.
 
@@ -3073,7 +3073,7 @@ bool MDL_context::try_acquire_lock_impl(MDL_request *mdl_request,
   */
 #ifdef WITH_WSREP
   /* WSREP preempt lock if thread is applier or TOTAL_ORDER and so
-  we avoid using fast path as fast path locks needs to be materalize
+  we avoid using fast path as fast path locks needs to be materialized
   before conflict checks can be done which causes issue with preempt
   approach WSREP uses.
   TODO: Check if this preempt approach can be relaxed. */
