@@ -1,0 +1,54 @@
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+
+CREATE USER u1@localhost IDENTIFIED BY '';
+GRANT ALL PRIVILEGES ON test.* TO u1@localhost;
+GRANT SYSTEM_USER ON *.* TO u1@localhost;
+
+CREATE USER u2@localhost IDENTIFIED BY '';
+GRANT SELECT, CREATE VIEW, SHOW VIEW, DROP ON test.* to u2@localhost;
+
+--connect (u1_connection,localhost,u1,,test, $NODE_MYPORT_1)
+CREATE TABLE t1(i INT PRIMARY KEY, n VARCHAR(9));
+CREATE OR REPLACE VIEW v AS SELECT * FROM t1;
+
+--connect (u2_connection,localhost,u2,,test, $NODE_MYPORT_1)
+--error ER_SPECIFIC_ACCESS_DENIED_ERROR
+ALTER DEFINER=u1@`localhost` VIEW v AS SELECT * FROM t1;
+
+--connection u1_connection
+DROP VIEW v;
+DROP TABLE t1;
+
+--disconnect u1_connection
+--disconnect u2_connection
+
+--connection node_1
+DROP USER u1@localhost;
+DROP USER u2@localhost;
+
+
+CREATE DATABASE db1;
+CREATE DATABASE db2;
+CREATE TABLE db1.t1(c1 INT PRIMARY KEY);
+CREATE TABLE db1.t2(c2 INT PRIMARY KEY);
+
+CREATE USER u1@localhost IDENTIFIED BY '';
+GRANT SELECT ON db1.t1 TO u1@localhost;
+GRANT INSERT ON db1.t2 TO u1@localhost;
+GRANT ALL PRIVILEGES ON db2.* TO u1@localhost;
+FLUSH PRIVILEGES;
+
+--connect (u1_connection,127.0.0.1,u1,,db2, $NODE_MYPORT_1)
+--error ER_COLUMNACCESS_DENIED_ERROR
+CREATE VIEW v AS SELECT c1, c2 FROM db1.t1, db1.t2;
+--disconnect u1_connection
+
+--connection node_1
+DROP DATABASE db1;
+DROP DATABASE db2;
+DROP USER u1@localhost;
+
+
+--source include/wait_until_count_sessions.inc
