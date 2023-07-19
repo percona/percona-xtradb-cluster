@@ -75,7 +75,7 @@ Prefix: %{_sysconfdir}
 
 #Placeholder should be replaced on preparation stage
 %if %{undefined galera_version}
- %define galera_version 4.14
+ %define galera_version 4.15
 %endif
 
 %if %{undefined galera_revision}
