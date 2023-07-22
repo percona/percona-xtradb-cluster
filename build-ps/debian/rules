@@ -9,6 +9,7 @@ export CXXFLAGS=
 
 PACKAGE=percona-xtradb-cluster
 PS_VERSION_EXTRA = $(shell echo "Percona XtraDB Cluster (GPL), $(DEBVERSION)")
+OS_VERSION = $(shell lsb_release -rs)
 
 wsrep_version="@@WSREP_VERSION@@"
 percona_server_version="@@PERCONA_VERSION@@"
@@ -259,9 +260,14 @@ override_dh_install:
 	patchelf --debug --set-rpath $(rpath) debian/percona-xtradb-cluster-server/usr/lib/mysql/plugin/authentication_fido.so
 	@echo "RULES.$@"
 
+ifeq ($(OS_VERSION), 18.04)
 override_dh_strip:
-	dh_strip --dbg-package=percona-xtradb-cluster-dbg 
+	dh_strip --dbg-package=percona-xtradb-cluster-dbg --exclude=authentication_fido.so --exclude=libprotobuf-lite.so*
+else
+override_dh_strip:
+	dh_strip --dbg-package=percona-xtradb-cluster-dbg
 	dh_strip -Xlibprotobuf-lite
+endif
 
 override_dh_installinit:
 	@echo "RULES.$@"

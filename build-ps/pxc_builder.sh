@@ -251,6 +251,10 @@ get_sources(){
 
     cd ${WORKDIR} || exit
     #
+    pushd ${PXCDIR}
+        sed -i 's:boostorg\.jfrog\.io/artifactory/main/release/.*/source:jenkins.percona.com/downloads/boost:g' cmake/boost.cmake
+    popd
+    #
     tar --owner=0 --group=0 --exclude=.bzr --exclude=.git -czf ${PXCDIR}.tar.gz ${PXCDIR}
     rm -fr ${PXCDIR}
     cat pxc-80.properties
