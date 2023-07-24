@@ -681,7 +681,26 @@ static void row_ins_set_detailed(
   rewind(srv_misc_tmpfile);
 
   if (os_file_set_eof(srv_misc_tmpfile)) {
+#ifdef WITH_WSREP
+    /*
+      Here, we avoid printing the temporary table name and instead print
+      "temp_table" to the error message for TOI and NBO operations as it
+      can trigger inconsistency voting due to temporary table names
+      when DDL fails.
+    */
+    {
+      std::string foreign_table_name = foreign->foreign_table_name;
+      bool use_temp_name = false;
+      use_temp_name = ((wsrep_on(trx->mysql_thd) &&
+                        (wsrep_thd_is_toi(trx->mysql_thd) ||
+                         wsrep_thd_is_in_nbo(trx->mysql_thd))) &&
+                       foreign_table_name.find("#sql-") != std::string::npos);
+      ut_print_name(srv_misc_tmpfile, trx,
+                    use_temp_name ? "temp_table" : foreign->foreign_table_name);
+    }
+#else
     ut_print_name(srv_misc_tmpfile, trx, foreign->foreign_table_name);
+#endif /* WITH_WSREP */
     dict_print_info_on_foreign_key_in_create_format(srv_misc_tmpfile, trx,
                                                     foreign, false);
     trx_set_detailed_error_from_file(trx, srv_misc_tmpfile);
