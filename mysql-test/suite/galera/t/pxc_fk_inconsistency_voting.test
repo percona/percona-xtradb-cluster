@@ -1,0 +1,40 @@
+#
+# This test ensures that server rewrites the name of the intermediate temporary
+# table in the error messages.
+#
+--source include/galera_cluster.inc
+
+CREATE TABLE parent (i INT PRIMARY KEY) ENGINE = InnoDB;
+CREATE TABLE child (j INT PRIMARY KEY) ENGINE = InnoDB;
+INSERT INTO child VALUES (10);
+
+--error ER_NO_REFERENCED_ROW_2
+ALTER TABLE child ADD CONSTRAINT idx17 FOREIGN KEY (j) REFERENCES parent(i);
+
+# Assert that the message has 'temp_table'. Note that count is 2 because it
+# prints messages from both the nodes.
+--let $assert_text= Verify that the intermediate temporary table name has been replaced with temp_table
+--let $assert_select= a foreign key constraint fails \(`temp_table`, CONSTRAINT `idx17`
+--let $assert_file= $MYSQLTEST_VARDIR/log/mysqld.1.err
+--let $assert_count=2
+--source include/assert_grep.inc
+
+# Test with wsrep_on=OFF
+SET SESSION wsrep_on=OFF;
+--replace_regex /#sql.*$/#sql-XXXXX/
+--error ER_NO_REFERENCED_ROW_2
+ALTER TABLE child ADD CONSTRAINT idx17 FOREIGN KEY (j) REFERENCES parent(i), ALGORITHM=COPY;
+SET SESSION wsrep_on=ON;
+
+# Assert that the cluster is still up and running
+--assert(`SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'`)
+
+# Test suppressions
+CALL mtr.add_suppression("Cannot add or update a child row: a foreign key constraint fails");
+
+--connection node_2
+CALL mtr.add_suppression("Cannot add or update a child row: a foreign key constraint fails");
+
+--connection node_1
+DROP TABLE child;
+DROP TABLE parent;
