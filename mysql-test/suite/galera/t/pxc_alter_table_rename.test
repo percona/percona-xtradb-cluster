@@ -1,0 +1,78 @@
+--source include/galera_cluster.inc
+
+# Test the basic table rename
+CREATE TABLE t1(i INT PRIMARY KEY);
+
+SET SESSION WSREP_OSU_METHOD=NBO;
+ALTER TABLE t1 RENAME TO t2;
+ALTER TABLE t2 RENAME TO t1;
+ALTER TABLE t1 DISABLE KEYS;
+ALTER TABLE t1 ENABLE KEYS;
+
+ALTER TABLE t1 RENAME TO t2, DISABLE KEYS;
+ALTER TABLE t2 RENAME TO t1, ENABLE KEYS;
+ALTER TABLE t1 RENAME TO t2, ENGINE=INNODB;
+--replace_regex /#sql.*$/#sql-XXXXX/
+ALTER TABLE t2 RENAME TO t1, ENABLE KEYS, ENGINE=INNODB;
+
+SET SESSION WSREP_OSU_METHOD=default;
+ALTER TABLE t1 RENAME TO t2;
+ALTER TABLE t2 RENAME TO t1;
+ALTER TABLE t1 DISABLE KEYS;
+ALTER TABLE t1 ENABLE KEYS;
+
+ALTER TABLE t1 RENAME TO t2, DISABLE KEYS;
+ALTER TABLE t2 RENAME TO t1, ENABLE KEYS;
+ALTER TABLE t1 RENAME TO t2, ENGINE=INNODB;
+--replace_regex /#sql.*$/#sql-XXXXX/
+ALTER TABLE t2 RENAME TO t1, ENABLE KEYS, ENGINE=INNODB;
+DROP TABLE t1;
+
+--write_file $MYSQLTEST_VARDIR/tmp/set_osu_method_for_alter.inc
+  if ($ddl_method == 'TOI') 
+  {
+    SET SESSION wsrep_OSU_method=TOI;
+  }
+  if ($ddl_method == 'NBO') 
+  {
+    SET SESSION wsrep_OSU_method=NBO;
+  }
+EOF
+
+--write_file $MYSQLTEST_VARDIR/tmp/set_osu_method_for_other_ddls.inc
+  SET SESSION wsrep_OSU_method=TOI;
+EOF
+
+# Let's source some innodb tests for better coverage
+--let $ddl_method=NBO
+--source pxc_instant_rename_column.inc
+--source pxc_rename_index.inc
+
+# Let's source some innodb tests for better coverage
+--let $ddl_method=TOI
+--source pxc_instant_rename_column.inc
+--source pxc_rename_index.inc
+
+# Test suppressions
+# Suppressions from pxc_instant_rename_column.inc
+CALL mtr.add_suppression("While running PXC node in cluster mode it will skip binlogging of non-replicating DDL statement");
+
+--connection node_2
+# Suppressions from pxc_instant_rename_column.inc
+CALL mtr.add_suppression("Column 'c1' has a generated column dependency.");
+CALL mtr.add_suppression("Incorrect column name");
+CALL mtr.add_suppression("ALGORITHM=INSTANT is not supported");
+CALL mtr.add_suppression("ALGORITHM=INPLACE is not supported");
+CALL mtr.add_suppression("Query apply failed");
+
+# Suppressions from pxc_rename_index.inc
+CALL mtr.add_suppression("Incorrect index name");
+CALL mtr.add_suppression("Key .* doesn't exist in table");
+CALL mtr.add_suppression("Can't DROP '.*'; check that column/key exists");
+CALL mtr.add_suppression("Duplicate key name");
+
+# Cleanup
+--connection node_1
+SET SESSION WSREP_OSU_METHOD=default;
+--remove_file $MYSQLTEST_VARDIR/tmp/set_osu_method_for_alter.inc
+--remove_file $MYSQLTEST_VARDIR/tmp/set_osu_method_for_other_ddls.inc
