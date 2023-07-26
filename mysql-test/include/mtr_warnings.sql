@@ -426,6 +426,7 @@ INSERT INTO global_suppressions VALUES
  ("Toggling wsrep_on to OFF will affect sql_log_bin"),
  ("Toggling wsrep_on to ON will affect sql_log_bin"),
  ("InnoDB High Priority being used"),
+ ("Query apply failed"),
 
  /* MySQL supression needed by Galera */
  ("Replica I/O.*: Get master clock failed with error:.*"),
