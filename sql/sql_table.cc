@@ -16101,6 +16101,14 @@ static bool simple_rename_or_index_change(
     // It's now safe to take the table level lock.
     if (lock_tables(thd, table_list, alter_ctx->tables_opened, 0)) return true;
 
+#ifdef WITH_WSREP
+    /*
+      Locks are acquired for ALTER TABLE .. ENABLE | DISABLE KEYS
+      It is time to call nbo_phase_one_end().
+    */
+    WSREP_NBO_1ST_PHASE_END;
+#endif /* WITH_WSREP */
+
     if (keys_onoff == Alter_info::ENABLE) {
       DEBUG_SYNC(thd, "alter_table_enable_indexes");
       DBUG_EXECUTE_IF("sleep_alter_enable_indexes", my_sleep(6000000););
@@ -16221,6 +16229,14 @@ static bool simple_rename_or_index_change(
             thd, table_list->db, table_list->table_name, alter_ctx->new_db,
             alter_ctx->new_alias, old_db_type))
       error = -1;
+
+#ifdef WITH_WSREP
+    /*
+      Locks are acquired for ALTER TABLE .. RENAME TO
+      It is time to call nbo_phase_one_end().
+    */
+    WSREP_NBO_1ST_PHASE_END;
+#endif /* WITH_WSREP */
 
     if (!error) {
       if (mysql_rename_table(thd, old_db_type, alter_ctx->db,
