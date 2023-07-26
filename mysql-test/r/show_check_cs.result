@@ -115,19 +115,19 @@ drop table t1;
 show variables like "wait_timeout%";
 Catalog	Database	Table	Table_alias	Column	Column_alias	Type	Length	Max length	Is_null	Flags	Decimals	Charsetnr
 def	performance_schema	session_variables	session_variables	Variable_name	Variable_name	253	256	12	N	4097	0	255
-def	performance_schema	session_variables	session_variables	Value	Value	253	4096	5	Y	0	0	255
+def	performance_schema	session_variables	session_variables	Value	Value	253	16384	5	Y	0	0	255
 Variable_name	Value
 wait_timeout	28800
 show variables like "WAIT_timeout%";
 Catalog	Database	Table	Table_alias	Column	Column_alias	Type	Length	Max length	Is_null	Flags	Decimals	Charsetnr
 def	performance_schema	session_variables	session_variables	Variable_name	Variable_name	253	256	12	N	4097	0	255
-def	performance_schema	session_variables	session_variables	Value	Value	253	4096	5	Y	0	0	255
+def	performance_schema	session_variables	session_variables	Value	Value	253	16384	5	Y	0	0	255
 Variable_name	Value
 wait_timeout	28800
 show variables like "this_doesn't_exists%";
 Catalog	Database	Table	Table_alias	Column	Column_alias	Type	Length	Max length	Is_null	Flags	Decimals	Charsetnr
 def	performance_schema	session_variables	session_variables	Variable_name	Variable_name	253	256	0	N	4097	0	255
-def	performance_schema	session_variables	session_variables	Value	Value	253	4096	0	Y	0	0	255
+def	performance_schema	session_variables	session_variables	Value	Value	253	16384	0	Y	0	0	255
 Variable_name	Value
 show table status from test like "this_doesn't_exists%";
 Catalog	Database	Table	Table_alias	Column	Column_alias	Type	Length	Max length	Is_null	Flags	Decimals	Charsetnr

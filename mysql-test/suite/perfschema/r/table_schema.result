@@ -853,7 +853,7 @@ def	performance_schema	file_summary_by_instance	MAX_TIMER_MISC	25	NULL	NO	bigint
 def	performance_schema	global_status	VARIABLE_NAME	1	NULL	NO	varchar	64	256	NULL	NULL	NULL	utf8mb4	utf8mb4_0900_ai_ci	varchar(64)	PRI		select,insert,update,references			NULL
 def	performance_schema	global_status	VARIABLE_VALUE	2	NULL	YES	varchar	1024	4096	NULL	NULL	NULL	utf8mb4	utf8mb4_0900_ai_ci	varchar(1024)			select,insert,update,references			NULL
 def	performance_schema	global_variables	VARIABLE_NAME	1	NULL	NO	varchar	64	256	NULL	NULL	NULL	utf8mb4	utf8mb4_0900_ai_ci	varchar(64)	PRI		select,insert,update,references			NULL
-def	performance_schema	global_variables	VARIABLE_VALUE	2	NULL	YES	varchar	2048	8192	NULL	NULL	NULL	utf8mb4	utf8mb4_0900_ai_ci	varchar(2048)			select,insert,update,references			NULL
+def	performance_schema	global_variables	VARIABLE_VALUE	2	NULL	YES	varchar	4096	16384	NULL	NULL	NULL	utf8mb4	utf8mb4_0900_ai_ci	varchar(4096)			select,insert,update,references			NULL
 def	performance_schema	hosts	HOST	1	NULL	YES	char	255	255	NULL	NULL	NULL	ascii	ascii_general_ci	char(255)	UNI		select,insert,update,references			NULL
 def	performance_schema	hosts	CURRENT_CONNECTIONS	2	NULL	NO	bigint	NULL	NULL	19	0	NULL	NULL	NULL	bigint			select,insert,update,references			NULL
 def	performance_schema	hosts	TOTAL_CONNECTIONS	3	NULL	NO	bigint	NULL	NULL	19	0	NULL	NULL	NULL	bigint			select,insert,update,references			NULL
@@ -1002,7 +1002,7 @@ def	performance_schema	performance_timers	TIMER_FREQUENCY	2	NULL	YES	bigint	NULL
 def	performance_schema	performance_timers	TIMER_RESOLUTION	3	NULL	YES	bigint	NULL	NULL	19	0	NULL	NULL	NULL	bigint			select,insert,update,references			NULL
 def	performance_schema	performance_timers	TIMER_OVERHEAD	4	NULL	YES	bigint	NULL	NULL	19	0	NULL	NULL	NULL	bigint			select,insert,update,references			NULL
 def	performance_schema	persisted_variables	VARIABLE_NAME	1	NULL	NO	varchar	64	256	NULL	NULL	NULL	utf8mb4	utf8mb4_0900_ai_ci	varchar(64)	PRI		select,insert,update,references			NULL
-def	performance_schema	persisted_variables	VARIABLE_VALUE	2	NULL	YES	varchar	1024	4096	NULL	NULL	NULL	utf8mb4	utf8mb4_0900_ai_ci	varchar(1024)			select,insert,update,references			NULL
+def	performance_schema	persisted_variables	VARIABLE_VALUE	2	NULL	YES	varchar	4096	16384	NULL	NULL	NULL	utf8mb4	utf8mb4_0900_ai_ci	varchar(4096)			select,insert,update,references			NULL
 def	performance_schema	prepared_statements_instances	OBJECT_INSTANCE_BEGIN	1	NULL	NO	bigint	NULL	NULL	20	0	NULL	NULL	NULL	bigint unsigned	PRI		select,insert,update,references			NULL
 def	performance_schema	prepared_statements_instances	STATEMENT_ID	2	NULL	NO	bigint	NULL	NULL	20	0	NULL	NULL	NULL	bigint unsigned	MUL		select,insert,update,references			NULL
 def	performance_schema	prepared_statements_instances	STATEMENT_NAME	3	NULL	YES	varchar	64	256	NULL	NULL	NULL	utf8mb4	utf8mb4_0900_ai_ci	varchar(64)	MUL		select,insert,update,references			NULL
@@ -1213,7 +1213,7 @@ def	performance_schema	session_connect_attrs	ORDINAL_POSITION	4	NULL	YES	int	NUL
 def	performance_schema	session_status	VARIABLE_NAME	1	NULL	NO	varchar	64	256	NULL	NULL	NULL	utf8mb4	utf8mb4_0900_ai_ci	varchar(64)	PRI		select,insert,update,references			NULL
 def	performance_schema	session_status	VARIABLE_VALUE	2	NULL	YES	varchar	1024	4096	NULL	NULL	NULL	utf8mb4	utf8mb4_0900_ai_ci	varchar(1024)			select,insert,update,references			NULL
 def	performance_schema	session_variables	VARIABLE_NAME	1	NULL	NO	varchar	64	256	NULL	NULL	NULL	utf8mb4	utf8mb4_0900_ai_ci	varchar(64)	PRI		select,insert,update,references			NULL
-def	performance_schema	session_variables	VARIABLE_VALUE	2	NULL	YES	varchar	1024	4096	NULL	NULL	NULL	utf8mb4	utf8mb4_0900_ai_ci	varchar(1024)			select,insert,update,references			NULL
+def	performance_schema	session_variables	VARIABLE_VALUE	2	NULL	YES	varchar	4096	16384	NULL	NULL	NULL	utf8mb4	utf8mb4_0900_ai_ci	varchar(4096)			select,insert,update,references			NULL
 def	performance_schema	setup_actors	HOST	1	%	NO	char	255	255	NULL	NULL	NULL	ascii	ascii_general_ci	char(255)	PRI		select,insert,update,references			NULL
 def	performance_schema	setup_actors	USER	2	%	NO	char	32	128	NULL	NULL	NULL	utf8mb4	utf8mb4_bin	char(32)	PRI		select,insert,update,references			NULL
 def	performance_schema	setup_actors	ROLE	3	%	NO	char	32	128	NULL	NULL	NULL	utf8mb4	utf8mb4_bin	char(32)	PRI		select,insert,update,references			NULL
