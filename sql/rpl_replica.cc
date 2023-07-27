@@ -7364,7 +7364,7 @@ wsrep_restart_point :
     mysql_mutex_unlock(&rli->run_lock);
     rli->report(ERROR_LEVEL, ER_REPLICA_FATAL_ERROR,
                 ER_THD(thd, ER_REPLICA_FATAL_ERROR),
-                "Failed during slave workers initialization");
+                "Failed during replica workers initialization");
     goto err;
   }
   /*
