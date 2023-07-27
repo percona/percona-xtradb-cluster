@@ -205,7 +205,7 @@ timeout_delegate(){
     local cmd="$@"
     local x1 x2 took piperc
 
-    if [[ $ttime -eq 1 ]]; then 
+    if [[ $ttime -eq 1 ]]; then
         x1=$(date +%s)
         wsrep_log_debug "Evaluating $cmd"
         eval "$cmd; piperc=( "\${PIPESTATUS[@]}" )"
@@ -213,7 +213,7 @@ timeout_delegate(){
         took=$(( x2-x1 ))
         wsrep_log_debug "NOTE: $stage took $took seconds"
         totime=$(( totime+took ))
-    else 
+    else
         wsrep_log_debug "Evaluating $cmd"
         eval "$cmd; piperc=( "\${PIPESTATUS[@]}" )"
     fi
@@ -223,7 +223,7 @@ timeout_delegate(){
 
 # Execute provided command within provided time window.
 # Return:
-# Array consisting of error code of timeout followed by 
+# Array consisting of error code of timeout followed by
 # command PIPESTATUS array.
 # 0 - success
 # 124 - timeout
@@ -250,26 +250,26 @@ interruptable_timeout() {
           wsrep_log_info "Trying to terminate ($pid) $cmd with SIGTERM"
           pkill -SIGTERM -P $pid
           result=124
-        fi 
+        fi
 
         if [[ $tmt -eq 10 ]]; then
           # Still alive after SIGTERM? Send SIGKILL.
           wsrep_log_info "Trying to terminate ($pid) $cmd with SIGKILL"
           pkill -SIGKILL -P $pid
           result=124
-        fi 
-        
+        fi
+
         if [[ $tmt -eq 0 ]]; then
           # Still alive after SIGKILL? Give up.
           wsrep_log_error "Unable to stop command: $cmd"
           result=124
           break
-        fi 
+        fi
 
         sleep 1
         tmt=$((tmt-1))
     done
-    
+
     if [[ $result -eq 0 ]]; then
       piperesult=(`cat ${tmpdirbase}/$PIPESTATUS_FILE`)
     fi
@@ -314,7 +314,15 @@ monitor_sst_progress() {
     fi
 
     if [[ ${current_timeout} -eq  ${timeout} ]]; then
-      wsrep_log_error "Killing SST ($pid) with SIGKILL after stalling for ${current_timeout} seconds"
+      wsrep_log_error "******************* FATAL ERROR ********************** "
+      wsrep_log_error "Killing SST ($pid) with SIGKILL after stalling for ${current_timeout} seconds."
+      wsrep_log_error "Within the last ${current_timeout} seconds (defined by the sst-idle-timeout variable),"
+      wsrep_log_error "the SST process on the joiner (this node) has not received any data from the donor."
+      wsrep_log_error "This error could be caused by broken network connectivity between"
+      wsrep_log_error "the donor and the joiner (this node)."
+      wsrep_log_error "Check the network connection and restart the joiner node."
+      wsrep_log_error "Line $LINENO"
+      wsrep_log_error "****************************************************** "
       pkill -SIGKILL -P ${pid} 2> /dev/null
       break;
     fi
@@ -339,7 +347,7 @@ check_for_dhparams()
                 wsrep_log_error "Could not locate 'openssl'"
                 wsrep_log_error "Please ensure that openssl is installed and is in the path"
                 wsrep_log_error "Line $LINENO"
-                wsrep_log_error "******************* FATAL ERROR ********************** "
+                wsrep_log_error "****************************************************** "
                 exit 2
             fi
             wsrep_log_info "Could not find dhparams file, creating $DATA/dhparams.pem"
@@ -376,7 +384,7 @@ verify_cert_matches_key()
         wsrep_log_error "Could not locate 'openssl' or 'diff'"
         wsrep_log_error "Please ensure that openssl and diff are installed and in the path"
         wsrep_log_error "Line $LINENO"
-        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "****************************************************** "
         exit 2
     fi
 
@@ -411,7 +419,7 @@ verify_ca_matches_cert()
         wsrep_log_error "Could not locate 'openssl'"
         wsrep_log_error "Please ensure that openssl is installed and is in the path"
         wsrep_log_error "Line $LINENO"
-        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "****************************************************** "
         exit 2
     fi
 
@@ -490,7 +498,7 @@ get_transfer()
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
             if nc -h 2>&1 | grep -q ncat; then
                 tcmd="nc $ncsockopt -l ${TSST_PORT}"
-            else 
+            else
                 tcmd="nc $ncsockopt -dl ${TSST_PORT}"
             fi
         else
@@ -1352,7 +1360,7 @@ recv_data_from_donor_to_joiner()
     pushd ${dir} 1>/dev/null
     set +e
 
-    if [[ $tmt -gt 0 ]]; then 
+    if [[ $tmt -gt 0 ]]; then
          RC=(`interruptable_timeout $tmt "$msg" "$tcmd | $strmcmd"`)
     else
         timeit "$msg" "$tcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
@@ -1371,19 +1379,39 @@ recv_data_from_donor_to_joiner()
     if [[ ${#RC[@]} -lt 1 ]]; then
         wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "SST script interrupted"
-        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "****************************************************** "
         exit 32
     fi
 
     if [[ ${RC[0]} -eq 124 ]]; then
         wsrep_log_error "******************* FATAL ERROR ********************** "
-        wsrep_log_error "Possible timeout in receving first data from donor in gtid/keyring stage"
+        wsrep_log_error "Possible timeout in receving first data from donor in gtid/keyring stage."
+        wsrep_log_error "After waiting for the $WSREP_SST_JOINER_TIMEOUT seconds"
+        wsrep_log_error "(defined by sst-initial-timeout/joiner-timeout variable),"
+        wsrep_log_error "the SST process has not started."
+        wsrep_log_error "This error could be caused by broken network connectivity between"
+        wsrep_log_error "the donor and the joiner (this node)."
+        wsrep_log_error "Check the network connection and restart the joiner node."
         wsrep_log_error "Line $LINENO"
         wsrep_log_error "****************************************************** "
         exit 32
     fi
 
-    for ecode in "${RC[@]}";do
+    # Here we know that transfer pipeline received SIGKILL
+    # But if this is the case that SIGKILL was done by monitor_sst_progress() function
+    # we can learn only by checking message printed by monitor_sst_progress().
+    if [[ ${RC[0]} -eq 137 ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "SST transfer has been interrupted."
+        wsrep_log_error "Check if the log above indicates the interruption"
+        wsrep_log_error "was related to sst-idle-timeout configuration variable."
+        wsrep_log_error "exit codes: ${RC[@]}"
+        wsrep_log_error "Line $LINENO"
+        wsrep_log_error "****************************************************** "
+        exit 32
+    fi
+
+    for ecode in "${RC[@]}"; do
         if [[ $ecode -ne 0 ]]; then
             wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "Error while getting data from donor node: " \
@@ -2054,19 +2082,37 @@ then
 
         set -e
 
+        # Postpone script exit until all errors are reported
+        do_exit=0
         if [ ${RC[0]} -ne 0 ]; then
             wsrep_log_error "******************* FATAL ERROR ********************** "
+            # This is the only way, we can guess if it was the network connectivity problem.
+            # If socat gives up after -T seconds of stall, it exits with no error
+            # and pxb prints "OS errno 32 - Broken pipe" messages to its error log
+            # and then exits with code 1.
+            if grep -q "OS errno 32 - Broken pipe" "${DATA}/innobackup.backup.log"; then
+                wsrep_log_error "${XTRABACKUP_BIN} was not able to send data to the Joiner node."
+                wsrep_log_error "Within the last $WSREP_SST_IDLE_TIMEOUT seconds (defined by the sst-idle-timeout variable),"
+                wsrep_log_error "the SST process on the donor (this node) has not sent any data to the joiner."
+                wsrep_log_error "This error could be caused by broken network connectivity between"
+                wsrep_log_error "the donor (this node) and the joiner."
+                wsrep_log_error "Check the network connection and restart the joiner node."
+            fi
             wsrep_log_error "${XTRABACKUP_BIN} finished with error: ${RC[0]}. " \
                             "Check ${DATA}/innobackup.backup.log"
-            wsrep_log_error "Line $LINENO"
             cat_file_to_stderr "${DATA}/innobackup.backup.log" "ERR" "innobackup.backup.log"
+            wsrep_log_error "Line $LINENO"
             wsrep_log_error "****************************************************** "
-            exit 22
-        elif [[ ${RC[$(( ${#RC[@]}-1 ))]} -eq 1 ]]; then
+            do_exit=1
+        fi
+        if [[ ${RC[$(( ${#RC[@]}-1 ))]} -eq 1 ]]; then
             wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "$tcmd finished with error: ${RC[1]}"
             wsrep_log_error "Line $LINENO"
             wsrep_log_error "****************************************************** "
+            do_exit=1
+        fi
+        if [[ $do_exit -eq 1 ]]; then
             exit 22
         fi
 
@@ -2523,7 +2569,7 @@ then
                 popd &> /dev/null
             fi
 
-            # To avoid comparing data directory and BINLOG_DIRNAME 
+            # To avoid comparing data directory and BINLOG_DIRNAME
             #mv $DATA/${binlog_file}.* "$binlog_dir"/ 2>/dev/null || true
 
             pushd "$DATA" &>/dev/null
