@@ -17,6 +17,9 @@
 # $galera_debug
 #   Print debug information.
 #
+# $galera_use_socket_client_connection
+#   Use socket connection instead of TCP/IP
+#
 
 if (!$galera_connection_name)
 {
@@ -28,18 +31,37 @@ if (!$galera_server_number)
   --die ERROR IN TEST: $galera_server_number must be set before sourcing include/galera_connect.inc
 }
 
---let $_galera_port= \$NODE_MYPORT_$galera_server_number
-if (!$_galera_port)
+
+--let $_galera_port=
+--let $_host=
+if (!$galera_use_socket_client_connection)
 {
-  --echo Bug in test case: '\$NODE_MYPORT_$galera_server_number' not initialized. Check the test's .cfg file.
-  --die Not all NODE_MYPORT_* environment variables are setup correctly.
+  --let $_galera_port= \$NODE_MYPORT_$galera_server_number
+  --let $_host= 127.0.0.1
+  if (!$_galera_port)
+  {
+    --echo Bug in test case: '\$NODE_MYPORT_$galera_server_number' not initialized. Check the test's .cfg file.
+    --die Not all NODE_MYPORT_* environment variables are setup correctly.
+  }
+}
+
+--let $_galera_sock=
+if ($galera_use_socket_client_connection)
+{
+  --let $_galera_sock= \$NODE_MYSOCK_$galera_server_number
+  --let $_host= localhost
+  if (!$_galera_sock)
+  {
+    --echo Bug in test case: '\$NODE_MYSOCK_$galera_server_number' not initialized. Check the test's .cfg file.
+    --die Not all NODE_MYSOCK_* environment variables are setup correctly.
+  }
 }
 
 if ($galera_debug)
 {
-  --echo connect($galera_connection_name,127.0.0.1,root,,test,$_galera_port,)
+  --echo connect($galera_connection_name,$_host,root,,test,$_galera_port,$_galera_sock)
 }
 
 # Open a connection
---connect($galera_connection_name,127.0.0.1,root,,test,$_galera_port,)
+--connect($galera_connection_name,$_host,root,,test,$_galera_port,$_galera_sock)
 

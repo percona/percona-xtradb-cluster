@@ -4886,7 +4886,14 @@ int mysql_execute_command(THD *thd, bool first_level) {
       /* Replicate current user as grantor */
       thd->binlog_invoker();
 
+#ifdef WITH_WSREP
+      /* If not replication or wsrep applier thread.
+         We need the below warning for consistency voting protocol
+         to work properly as it may have been issued on source node. */
+      if (thd->security_context()->user().str || thd->wsrep_applier)
+#else
       if (thd->security_context()->user().str)  // If not replication
+#endif
       {
         LEX_USER *user, *tmp_user;
         bool first_user = true;

@@ -5721,7 +5721,11 @@ bool acl_check_proxy_grant_access(THD *thd, const char *host, const char *user,
              ("user=%s host=%s with_grant=%d", user, host, (int)with_grant));
   assert(initialized);
   /* replication slave thread can do anything */
+#if WITH_WSREP
+  if (thd->slave_thread || thd->wsrep_applier) {
+#else
   if (thd->slave_thread) {
+#endif
     DBUG_PRINT("info", ("replication slave"));
     return false;
   }
