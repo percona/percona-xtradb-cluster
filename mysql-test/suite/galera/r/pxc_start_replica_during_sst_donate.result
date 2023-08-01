@@ -1,0 +1,39 @@
+#
+# 1. Create a two node cluster.
+#
+# 2. Shutdown node2 and remove the grastate.dat file.
+[connection node_2]
+[connection node_1]
+#
+# 3. Execute some transactions on node1 so that node2 forces an SST when it
+#    joins next time.
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+INSERT INTO t1 VALUES(1);
+INSERT INTO t1 VALUES(2);
+#
+# 4. Add a debug point on node1 to halt just before donating state transfer.
+# Adding debug point 'halt_before_sst_donate' to @@GLOBAL.debug
+#
+# 5. Start node2 in background and wait till node1 stops before donating SST
+#
+[connection node_1]
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC='now wait_for stopped_before_sst_donate';
+# Removing debug point 'halt_before_sst_donate' from @@GLOBAL.debug
+#
+# 6. Configure replication parameters and execute START REPLICA.
+START REPLICA USER='root';
+[connection node_1]
+SET DEBUG_SYNC = "now SIGNAL continue";
+#
+# 7. Shutdown node2 started as a background process and restart
+[connection node_2]
+# restart
+SET SESSION wsrep_sync_wait = 0;
+[connection node_1]
+SET SESSION wsrep_sync_wait = 0;
+#
+# 8. Cleanup
+DROP TABLE t1;
+RESET MASTER;
+RESET REPLICA ALL;

@@ -1591,6 +1591,11 @@ int wsrep_sst_donate(const std::string &msg, const wsrep::gtid &current_gtid,
     if (applier_thd->killed == THD::KILL_CONNECTION) return WSREP_CB_FAILURE;
   }
 #endif
+  DBUG_EXECUTE_IF("halt_before_sst_donate", {
+    const char action[] =
+        "now SIGNAL stopped_before_sst_donate WAIT_FOR continue";
+    assert(!debug_sync_set_action(current_thd, STRING_WITH_LEN(action)));
+  };);
 
   int ret;
   ret = sst_donate_other(method, data, current_gtid, bypass, env());
