@@ -1890,6 +1890,9 @@ bool Slave_worker::retry_transaction(uint start_relay_number,
       reset_commit_order_deadlock();
       cleaned_up = true;
     }
+#ifdef WITH_WSREP
+    wsrep_after_statement(thd);
+#endif
   };
 
   /* Object of sentry class to perform cleanup */

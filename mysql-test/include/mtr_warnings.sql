@@ -369,6 +369,8 @@ INSERT INTO global_suppressions VALUES
  (" *down context*"),
  (" Failed to send state UUID:*"),
  ("wsrep_sst_receive_address is set to '127.0.0.1"),
+ ("Failed to guess base node address"),
+ ("Guessing address for incoming client connections failed"),
  ("option --wsrep-causal-reads is deprecated"),
  ("--wsrep-sync-wait=.* takes precedence over --wsrep-causal-reads=OFF"),
  ("--wsrep-causal-reads=ON takes precedence over --wsrep-sync-wait=.*"),
