@@ -430,6 +430,9 @@ void wsrep_register_for_group_commit(THD *thd) {
 }
 
 bool wsrep_implicit_transaction(THD *thd) {
+  if (!thd) {
+    return false;
+  }
   return thd->is_operating_substatement_implicitly ||
          thd->is_operating_gtid_table_implicitly;
 }

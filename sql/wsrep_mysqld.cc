@@ -1859,14 +1859,24 @@ static bool wsrep_do_action_for_tables(THD *thd, Table_ref *tables,
  */
 bool wsrep_append_child_tables(THD *thd, Table_ref *tables,
                                wsrep::key_array *keys) {
-  return wsrep_do_action_for_tables(
-      thd, tables, [keys](const dd::Table *table_def) {
-        for (const auto fk : table_def->foreign_key_parents()) {
-          keys->push_back(wsrep_prepare_key_for_toi(
-              fk->child_schema_name().c_str(), fk->child_table_name().c_str(),
-              wsrep::key::shared));
-        }
-      });
+  auto populate_child_tables = [thd](const dd::Table *table_def) {
+    for (const auto fk : table_def->foreign_key_parents()) {
+      std::pair<std::string, std::string> table = std::make_pair(
+          fk->child_schema_name().c_str(), fk->child_table_name().c_str());
+
+      thd->wsrep_thd_context.get_fk_child_tables().push_back(table);
+    }
+  };
+
+  if (wsrep_do_action_for_tables(thd, tables, populate_child_tables))
+    return true;
+
+  for (const auto &table_obj : thd->wsrep_thd_context.get_fk_child_tables()) {
+    keys->push_back(wsrep_prepare_key_for_toi(
+        table_obj.first.c_str(), table_obj.second.c_str(), wsrep::key::shared));
+  }
+
+  return false;
 }
 
 /*
@@ -1874,14 +1884,25 @@ bool wsrep_append_child_tables(THD *thd, Table_ref *tables,
  */
 bool wsrep_append_fk_parent_table(THD *thd, Table_ref *tables,
                                   wsrep::key_array *keys) {
-  return wsrep_do_action_for_tables(
-      thd, tables, [keys](const dd::Table *table_def) {
-        for (const auto fk : table_def->foreign_keys()) {
-          keys->push_back(wsrep_prepare_key_for_toi(
-              fk->referenced_table_schema_name().c_str(),
-              fk->referenced_table_name().c_str(), wsrep::key::shared));
-        }
-      });
+  auto populate_parent_tables = [thd](const dd::Table *table_def) {
+    for (const auto fk : table_def->foreign_keys()) {
+      std::pair<std::string, std::string> table =
+          std::make_pair(fk->referenced_table_schema_name().c_str(),
+                         fk->referenced_table_name().c_str());
+
+      thd->wsrep_thd_context.get_fk_parent_tables().push_back(table);
+    }
+  };
+
+  if (wsrep_do_action_for_tables(thd, tables, populate_parent_tables))
+    return true;
+
+  for (const auto &table_obj : thd->wsrep_thd_context.get_fk_parent_tables()) {
+    keys->push_back(wsrep_prepare_key_for_toi(
+        table_obj.first.c_str(), table_obj.second.c_str(), wsrep::key::shared));
+  }
+
+  return false;
 }
 
 /*
@@ -2992,8 +3013,29 @@ bool wsrep_handle_mdl_conflict(const MDL_context *requestor_ctx,
     ticket->wsrep_report(wsrep_debug);
 
     mysql_mutex_lock(&granted_thd->LOCK_wsrep_thd);
-    if (wsrep_thd_is_toi(granted_thd) || wsrep_thd_is_in_nbo(granted_thd) ||
-        wsrep_thd_is_applying(granted_thd)) {
+    if (wsrep_thd_is_in_nbo(granted_thd) &&
+        wsrep_thd_is_applying(request_thd)) {
+      /* Here we've got the situation when NBO is in progress and applier tries
+         to apply conflicting writeset. In the ideal world it should not happen,
+         because all DMLs should be ordered after NBO or fail certification.
+         However, NBO certification index is cleaned up in Galera during
+         WSREP_NBO_2ND_PHASE_BEGIN. If NBO certification index gets cleared, it
+         does not block certification of DMLs. But we still keep MDL locks, so
+         it may happen that MDL is allowed, but conflicts NBO which finished,
+         but not yet released MDL locks. Ideally, Galera should clean NBO
+         certification index during finishing TOI related to 2nd phase of NBO,
+         which happens after releasing all MDL locks, but it is as it is.
+         Instead of rewriting that part in Galera, we will block applier here
+         for the time of unblocking MDL locks by NBO thread. */
+      WSREP_MDL_LOG(
+          INFO,
+          "MDL conflict, NBO vs applier. Waiting for NBO to release MDL locks",
+          schema, schema_len, request_thd, granted_thd);
+      mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
+      ret = false;
+    } else if (wsrep_thd_is_toi(granted_thd) ||
+               wsrep_thd_is_in_nbo(granted_thd) ||
+               wsrep_thd_is_applying(granted_thd)) {
       if (wsrep_thd_is_SR(granted_thd) && !wsrep_thd_is_SR(request_thd)) {
         WSREP_MDL_LOG(INFO, "MDL conflict, DDL vs SR", schema, schema_len,
                       request_thd, granted_thd);

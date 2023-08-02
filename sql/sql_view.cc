@@ -1,4 +1,4 @@
-/* Copyright (c) 2004, 2022, Oracle and/or its affiliates.
+/* Copyright (c) 2004, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -473,13 +473,6 @@ bool mysql_create_view(THD *thd, Table_ref *views, enum_view_create_mode mode) {
   lex->link_first_table_back(view, link_to_local);
   view->open_type = OT_BASE_ONLY;
 
-#ifdef WITH_WSREP
-  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL)) {
-    res = true;
-    goto err;
-  }
-#endif /* WITH_WSREP */
-
   /*
     No pre-opening of temporary tables is possible since must
     wait until Table_ref::open_type is set. So we have to open
@@ -692,6 +685,21 @@ bool mysql_create_view(THD *thd, Table_ref *views, enum_view_create_mode mode) {
       goto err;
     }
   }
+
+#ifdef WITH_WSREP
+  if (WSREP(thd)) {
+    // We need the view to be the 1st table because of
+    // how create_view_query() is implemented.
+    lex->link_first_table_back(view, link_to_local);
+    int toi_begin_res =
+        wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL);
+    view = lex->unlink_first_table(&link_to_local);
+    if (toi_begin_res) {
+      res = true;
+      goto err;
+    }
+  }
+#endif /* WITH_WSREP */
 
   if ((res = mysql_register_view(thd, view, mode))) goto err_with_rollback;
 

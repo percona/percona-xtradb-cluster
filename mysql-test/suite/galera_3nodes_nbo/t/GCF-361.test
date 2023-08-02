@@ -41,7 +41,7 @@ SET SESSION wsrep_on = OFF;
 --source include/wait_until_connected_again.inc
 --source include/galera_wait_ready.inc
 
-CALL mtr.add_suppression("Slave SQL: Error 'Table 't1' already exists' on query. Default database: 'test'");
+CALL mtr.add_suppression("Replica SQL: Error 'Table 't1' already exists' on query. Default database: 'test'");
 CALL mtr.add_suppression("Inconsistency detected: Inconsistent by consensus on ");
 CALL mtr.add_suppression("Plugin 'InnoDB' will be forced to shutdown");
 CALL mtr.add_suppression("Query apply failed");

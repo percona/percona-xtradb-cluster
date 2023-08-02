@@ -2,7 +2,7 @@ show create table performance_schema.persisted_variables;
 Table	Create Table
 persisted_variables	CREATE TABLE `persisted_variables` (
   `VARIABLE_NAME` varchar(64) NOT NULL,
-  `VARIABLE_VALUE` varchar(1024) DEFAULT NULL,
+  `VARIABLE_VALUE` varchar(4096) DEFAULT NULL,
   PRIMARY KEY (`VARIABLE_NAME`)
 ) ENGINE=PERFORMANCE_SCHEMA DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 select * from INFORMATION_SCHEMA.STATISTICS

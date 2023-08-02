@@ -19,5 +19,5 @@ COUNT(*) = 4
 1
 SET SESSION wsrep_osu_method=TOI;
 DROP TABLE t1;
-CALL mtr.add_suppression("Slave SQL: Error 'Duplicate column name");
+CALL mtr.add_suppression("Replica SQL: Error 'Duplicate column name");
 CALL mtr.add_suppression("Query apply failed");

@@ -21,7 +21,7 @@ expect_0
 SELECT COUNT(*) AS expect_1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't2';
 expect_1
 1
-CALL mtr.add_suppression("Slave SQL: Error 'Unknown table");
+CALL mtr.add_suppression("Replica SQL: Error 'Unknown table");
 CALL mtr.add_suppression("Query apply failed");
 SELECT COUNT(*) AS expect_0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 expect_0
@@ -29,7 +29,7 @@ expect_0
 SELECT COUNT(*) AS expect_1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't2';
 expect_1
 1
-CALL mtr.add_suppression("Slave SQL: Error 'Unknown table");
+CALL mtr.add_suppression("Replica SQL: Error 'Unknown table");
 CALL mtr.add_suppression("Query apply failed");
 SELECT COUNT(*) AS expect_0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 expect_0
@@ -37,7 +37,7 @@ expect_0
 SELECT COUNT(*) AS expect_1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't2';
 expect_1
 1
-CALL mtr.add_suppression("Slave SQL: Error 'Unknown table");
+CALL mtr.add_suppression("Replica SQL: Error 'Unknown table");
 CALL mtr.add_suppression("Query apply failed");
 SELECT COUNT(*) AS expect_0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 expect_0

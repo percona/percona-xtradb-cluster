@@ -1,4 +1,4 @@
-/* Copyright (c) 2007, 2022, Oracle and/or its affiliates.
+/* Copyright (c) 2007, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -2540,7 +2540,7 @@ bool MDL_lock::can_grant_lock(enum_mdl_type type_arg,
           other context.
 
           If we are trying to acquire "unobtrusive" type of lock then the
-          confliciting lock must be from "obtrusive" set, therefore it should
+          conflicting lock must be from "obtrusive" set, therefore it should
           have been acquired using "slow path" and should be present in
           m_granted list.
 
@@ -3073,7 +3073,7 @@ bool MDL_context::try_acquire_lock_impl(MDL_request *mdl_request,
   */
 #ifdef WITH_WSREP
   /* WSREP preempt lock if thread is applier or TOTAL_ORDER and so
-  we avoid using fast path as fast path locks needs to be materalize
+  we avoid using fast path as fast path locks needs to be materialized
   before conflict checks can be done which causes issue with preempt
   approach WSREP uses.
   TODO: Check if this preempt approach can be relaxed. */
@@ -3557,6 +3557,14 @@ void MDL_lock::object_lock_notify_conflicting_locks(MDL_context *ctx,
 
 bool MDL_context::acquire_lock(MDL_request *mdl_request,
                                Timeout_type lock_wait_timeout) {
+  // in order to test bug#34594035 call functions that before the fix
+  // caused crash and return failure
+  DBUG_EXECUTE_IF("bug34594035_fail_acl_cache_lock",
+                  debug_sync(get_thd(), "123", 3);
+                  mysql_prlock_wrlock(&m_LOCK_waiting_for);
+                  mysql_prlock_unlock(&m_LOCK_waiting_for);
+                  DBUG_SET("-d,bug34594035_fail_acl_cache_lock"); return true;);
+
   if (lock_wait_timeout == 0) {
     /*
       Resort to try_acquire_lock() in case of zero timeout.

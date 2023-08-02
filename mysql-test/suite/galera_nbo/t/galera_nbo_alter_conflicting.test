@@ -52,7 +52,7 @@ SET SESSION wsrep_OSU_method=TOI;
 DROP TABLE t1;
 
 --connection node_2
-CALL mtr.add_suppression("Slave SQL: Error 'Multiple primary key defined' on query");
+CALL mtr.add_suppression("Replica SQL: Error 'Multiple primary key defined' on query");
 CALL mtr.add_suppression("Query apply failed");
 
 SET GLOBAL wsrep_applier_threads = 1;

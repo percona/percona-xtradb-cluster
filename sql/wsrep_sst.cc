@@ -672,8 +672,7 @@ static void *sst_joiner_thread(void *a) {
     thd->variables.transaction_isolation = ISO_READ_COMMITTED;
 
     if (wsrep_sst_complete(thd, -err)) {
-      WSREP_ERROR("Failure while signalling the completion of SST. Aborting.");
-      unireg_abort(1);
+      WSREP_WARN("Failure while signalling the completion of SST.");
     }
 
     WSREP_SYSTEM("SST completed");

@@ -75,7 +75,7 @@ Prefix: %{_sysconfdir}
 
 #Placeholder should be replaced on preparation stage
 %if %{undefined galera_version}
- %define galera_version 4.14
+ %define galera_version 4.15
 %endif
 
 %if %{undefined galera_revision}
@@ -676,7 +676,7 @@ popd
 
 mkdir pxb-8.0
 pushd pxb-8.0
-yumdownloader percona-xtrabackup-80-8.0.32
+yumdownloader percona-xtrabackup-80-8.0.33
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib64 ./
@@ -830,10 +830,10 @@ fi
 mkdir -p "$(dirname $RPM_BUILD_DIR/%{_libdir})"
 mv $RBR%{_libdir} $RPM_BUILD_DIR/%{_libdir}
 
-pushd percona-xtradb-cluster-galera
-  scons %{?_smp_mflags}  revno=%{galera_revision} version=%{galera_version} psi=1 boost_pool=0 libgalera_smm.so %{scons_arch} %{scons_args}
-  scons %{?_smp_mflags}  revno=%{galera_revision} version=%{galera_version} boost_pool=0 garb/garbd %{scons_arch} %{scons_args}
-popd
+#pushd percona-xtradb-cluster-galera
+#  scons %{?_smp_mflags}  revno=%{galera_revision} version=%{galera_version} psi=1 boost_pool=0 libgalera_smm.so %{scons_arch} %{scons_args}
+#  scons %{?_smp_mflags}  revno=%{galera_revision} version=%{galera_version} boost_pool=0 garb/garbd %{scons_arch} %{scons_args}
+#popd
 
 
 ##############################################################################
@@ -927,6 +927,12 @@ install -D -p -m 0644 packaging/rpm-common/mysqlrouter.conf.in %{buildroot}%{_sy
 %{__rm} -f $RBR/usr/include/kmippp.h
 %{__rm} -f $RBR/usr/lib/libkmip.a
 %{__rm} -f $RBR/usr/lib/libkmippp.a
+%{__rm} -f $RBR/usr/lib/libgalera_smm.so
+%{__rm} -f $RBR/usr/share/garb-systemd
+%{__rm} -f $RBR/usr/share/garb.cnf
+%{__rm} -f $RBR/usr/share/garb.service
+%{__rm} -rf $RBR/usr/man
+%{__rm} -rf $RBR/usr/doc
 #
 
 install -d $RBR%{_sysconfdir}/ld.so.conf.d
@@ -970,10 +976,10 @@ install -d "$RBR/%{_sharedstatedir}/galera"
     $RBR%{_sysconfdir}/init.d/garb
 %endif
 
-install -m 755 "$MBD/%{galera_src_dir}/garb/garbd" \
-  "$RBR/%{_bindir}/"
+#install -m 755 "$MBD/%{galera_src_dir}/garb/garbd" \
+#  "$RBR/%{_bindir}/"
 install -d "$RBR/%{_libdir}/galera4"
-install -m 755 "$MBD/%{galera_src_dir}/libgalera_smm.so" \
+install -m 755 "$MBD/release/%{galera_src_dir}/libgalera_smm.so" \
   "$RBR/%{_libdir}/galera4/"
 ln -s "galera4/libgalera_smm.so" "$RBR/%{_libdir}/"
 
@@ -996,6 +1002,7 @@ install -m 644 $MBD/%{galera_src_dir}/packages/rpm/README     \
 install -d $RBR%{_mandir}/man8
 install -m 644 $MBD/%{galera_src_dir}/man/garbd.8  \
     $RBR%{_mandir}/man8/garbd.8
+%{__rm} -rf $RBR/usr/man
 install -d $RBR%{_libdir}/mysql
 #%if 0%{?mecab}
 #    mv $RBR%{_libdir}/mecab $RBR%{_libdir}/mysql

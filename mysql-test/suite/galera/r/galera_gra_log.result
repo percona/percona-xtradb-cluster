@@ -38,6 +38,6 @@ Killing server ...
 # restart
 SET GLOBAL wsrep_ignore_apply_errors = 0;
 DROP TABLE t1;
-CALL mtr.add_suppression("Slave SQL: Error 'Table 't1' already exists' on query. Default database: 'test'.");
+CALL mtr.add_suppression("Replica SQL: Error 'Table 't1' already exists' on query. Default database: 'test'.");
 CALL mtr.add_suppression("Inconsistency detected: Inconsistent by consensus on");
 CALL mtr.add_suppression("Event 1 Query apply failed");

@@ -298,12 +298,12 @@ RESET SLAVE ALL;
 Warnings:
 Warning	1287	'RESET SLAVE' is deprecated and will be removed in a future release. Please use RESET REPLICA instead
 CALL mtr.add_suppression("GTID replication failed");
-CALL mtr.add_suppression("Slave SQL for channel '': Error in Xid_log_event: Commit could not be completed");
-CALL mtr.add_suppression("Slave SQL for channel '': Node has dropped from cluster");
+CALL mtr.add_suppression("Replica SQL for channel '': Error in Xid_log_event: Commit could not be completed");
+CALL mtr.add_suppression("Replica SQL for channel '': Node has dropped from cluster");
 CALL mtr.add_suppression("MySQL GTID event pending");
 CALL mtr.add_suppression("Pending to replicate MySQL GTID event.*");
 CALL mtr.add_suppression("TO isolation failed for");
-CALL mtr.add_suppression("Slave SQL: Error 'Deadlock found when trying to get lock; try restarting transaction' on query");
-CALL mtr.add_suppression("Slave SQL: Error 'WSREP has not yet prepared node for application use' on query");
+CALL mtr.add_suppression("Replica SQL: Error 'Deadlock found when trying to get lock; try restarting transaction' on query");
+CALL mtr.add_suppression("Replica SQL: Error 'WSREP has not yet prepared node for application use' on query");
 CALL mtr.add_suppression("Slave: WSREP has not yet prepared node for application use Error_code: 1047");
 CALL mtr.add_suppression("Worker 1 failed executing transaction");

@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, 2022, Oracle and/or its affiliates.
+/* Copyright (c) 2017, 2023, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -54,6 +54,11 @@ bool PFS_index_persisted_variables::match(const System_variable *pfs) {
 
 THR_LOCK table_persisted_variables::m_table_lock;
 
+#ifdef WITH_WSREP
+#define xstr(a) str(a)
+#define str(a) #a
+#endif
+
 Plugin_table table_persisted_variables::m_table_def(
     /* Schema name */
     "performance_schema",
@@ -61,7 +66,11 @@ Plugin_table table_persisted_variables::m_table_def(
     "persisted_variables",
     /* Definition */
     "  VARIABLE_NAME VARCHAR(64) not null,\n"
+#ifdef WITH_WSREP
+    "  VARIABLE_VALUE VARCHAR(" xstr(WSREP_PS_VAR_VALUE_BUFF_SIZE) "),\n"
+#else
     "  VARIABLE_VALUE VARCHAR(1024),\n"
+#endif /* WITH_WSREP */
     "  PRIMARY KEY (VARIABLE_NAME) USING HASH\n",
     /* Options */
     " ENGINE=PERFORMANCE_SCHEMA",
@@ -87,13 +96,12 @@ PFS_engine_table *table_persisted_variables::create(PFS_engine_table_share *) {
   return new table_persisted_variables();
 }
 
-ha_rows table_persisted_variables::get_row_count(void) {
+ha_rows table_persisted_variables::get_row_count() {
   Persisted_variables_cache *pv = Persisted_variables_cache::get_instance();
   if (pv) {
     return pv->get_persisted_dynamic_variables()->size();
-  } else {
-    return 0;
   }
+  return 0;
 }
 
 table_persisted_variables::table_persisted_variables()
@@ -102,7 +110,7 @@ table_persisted_variables::table_persisted_variables()
       m_pos(0),
       m_next_pos(0) {}
 
-void table_persisted_variables::reset_position(void) {
+void table_persisted_variables::reset_position() {
   m_pos.m_index = 0;
   m_next_pos.m_index = 0;
 }
@@ -114,7 +122,7 @@ int table_persisted_variables::rnd_init(bool /* scan */) {
   return 0;
 }
 
-int table_persisted_variables::rnd_next(void) {
+int table_persisted_variables::rnd_next() {
   for (m_pos.set_at(&m_next_pos); m_pos.m_index < m_sysvar_cache.size();
        m_pos.next()) {
     if (m_sysvar_cache.is_materialized()) {
@@ -158,7 +166,7 @@ int table_persisted_variables::index_init(uint idx [[maybe_unused]], bool) {
   return 0;
 }
 
-int table_persisted_variables::index_next(void) {
+int table_persisted_variables::index_next() {
   for (m_pos.set_at(&m_next_pos); m_pos.m_index < m_sysvar_cache.size();
        m_pos.next()) {
     if (m_sysvar_cache.is_materialized()) {

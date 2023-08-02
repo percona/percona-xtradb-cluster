@@ -603,6 +603,7 @@ set timestamp=1, timestamp=default;
 set tmp_table_size=100;
 Warnings:
 Warning	1292	Truncated incorrect tmp_table_size value: '100'
+Warning	48040	Tmp_table_size is set below 1MiB. The TEMPTABLE engine requires at least 1MiB table size, and will use that value instead. Please increase the limit to silence this warning.
 set transaction_isolation="READ-COMMITTED";
 set wait_timeout=100;
 set global log_error_verbosity=2;
@@ -2082,6 +2083,7 @@ SET SESSION require_row_format = @@session.require_row_format;
 SET SESSION resultset_metadata = @@session.resultset_metadata;
 SET SESSION show_create_table_skip_secondary_engine = @@session.show_create_table_skip_secondary_engine;
 SET SESSION sql_log_bin = @@session.sql_log_bin;
+SET SESSION statement_id = @@session.statement_id;
 SET SESSION timestamp = @@session.timestamp;
 SET SESSION transaction_allow_batching = @@session.transaction_allow_batching;
 SET SESSION use_secondary_engine = @@session.use_secondary_engine;

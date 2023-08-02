@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2022, Oracle and/or its affiliates.
+Copyright (c) 1996, 2023, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -681,7 +681,26 @@ static void row_ins_set_detailed(
   rewind(srv_misc_tmpfile);
 
   if (os_file_set_eof(srv_misc_tmpfile)) {
+#ifdef WITH_WSREP
+    /*
+      Here, we avoid printing the temporary table name and instead print
+      "temp_table" to the error message for TOI and NBO operations as it
+      can trigger inconsistency voting due to temporary table names
+      when DDL fails.
+    */
+    {
+      std::string foreign_table_name = foreign->foreign_table_name;
+      bool use_temp_name = false;
+      use_temp_name = ((wsrep_on(trx->mysql_thd) &&
+                        (wsrep_thd_is_toi(trx->mysql_thd) ||
+                         wsrep_thd_is_in_nbo(trx->mysql_thd))) &&
+                       foreign_table_name.find("#sql-") != std::string::npos);
+      ut_print_name(srv_misc_tmpfile, trx,
+                    use_temp_name ? "temp_table" : foreign->foreign_table_name);
+    }
+#else
     ut_print_name(srv_misc_tmpfile, trx, foreign->foreign_table_name);
+#endif /* WITH_WSREP */
     dict_print_info_on_foreign_key_in_create_format(srv_misc_tmpfile, trx,
                                                     foreign, false);
     trx_set_detailed_error_from_file(trx, srv_misc_tmpfile);
@@ -2491,9 +2510,10 @@ dberr_t row_ins_clust_index_entry_low(uint32_t flags, ulint mode,
 
   /* Write logs for AUTOINC right after index lock has been got and
   before any further resource acquisitions to prevent deadlock.
-  No need to log for temporary tables and intermediate tables */
-  if (!index->table->is_temporary() && !index->table->skip_alter_undo &&
+  No need to log for temporary tables */
+  if (!index->table->is_temporary() &&
       dict_table_has_autoinc_col(index->table)) {
+    ut_ad(!index->table->is_intrinsic());
     uint64_t counter =
         row_get_autoinc_counter(entry, index->table->autoinc_field_no);
 
@@ -2503,6 +2523,9 @@ dberr_t row_ins_clust_index_entry_low(uint32_t flags, ulint mode,
       persist_autoinc = dict_table_autoinc_log(index->table, counter, &mtr);
     }
   }
+
+  DBUG_EXECUTE_IF("crash_create_after_autoinc_persisted_update",
+                  DBUG_SUICIDE(););
 
   /* Allowing duplicates in clustered index is currently enabled
   only for intrinsic table and caller understand the limited

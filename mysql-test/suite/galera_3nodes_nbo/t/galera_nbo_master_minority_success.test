@@ -1,6 +1,6 @@
 #
-# This test has the master (node #2) in the minority when an
-# NBO DDL succeeds on master
+# This test has the source (node #2) in the minority when an
+# NBO DDL succeeds on source
 #
 
 --source include/galera_cluster.inc
@@ -31,7 +31,7 @@ SET SESSION wsrep_osu_method=TOI;
 DROP TABLE t1;
 
 --connection node_1
-CALL mtr.add_suppression("Slave SQL: Error");
+CALL mtr.add_suppression("Replica SQL: Error");
 CALL mtr.add_suppression("Query apply failed");
 
 --connection node_2
@@ -39,5 +39,5 @@ CALL mtr.add_suppression("inconsistent with group");
 
 --connection node_3
 --source include/galera_wait_ready.inc
-CALL mtr.add_suppression("Slave SQL: Error");
+CALL mtr.add_suppression("Replica SQL: Error");
 CALL mtr.add_suppression("Query apply failed");

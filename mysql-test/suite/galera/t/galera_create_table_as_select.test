@@ -23,8 +23,8 @@ CREATE TABLE t1 AS SELECT * FROM t2;
 CREATE TABLE t1 AS SELECT 1 FROM DUAL;
 
 --connection node_2
-call mtr.add_suppression("Slave SQL: Error \'Table \'t1\' already exists\' on query");
-call mtr.add_suppression("Slave SQL: Error \'Table \'test.t2\' doesn\'t exist\' on query");
+call mtr.add_suppression("Replica SQL: Error \'Table \'t1\' already exists\' on query");
+call mtr.add_suppression("Replica SQL: Error \'Table \'test.t2\' doesn\'t exist\' on query");
 call mtr.add_suppression("Ignoring error 'Table 't1' already exists'");
 call mtr.add_suppression("Ignoring error 'Table 'test.t2' doesn't exist'");
 call mtr.add_suppression("Query apply failed.*");
@@ -157,7 +157,7 @@ CREATE TEMPORARY TABLE t1 AS SELECT * FROM t2;
 --error ER_NO_SUCH_TABLE
 SELECT * FROM t1;
 
-CALL mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t1'' on query");
+CALL mtr.add_suppression("Replica SQL: Error 'Unknown table 'test.t1'' on query");
 
 --connection node_1
 DROP TABLE t1, t2;

@@ -8,6 +8,7 @@ call mtr.add_suppression("The privilege system failed to initialize correctly");
 call mtr.add_suppression("SST failed/interrupted");
 call mtr.add_suppression("IST was interrupted");
 call mtr.add_suppression("IST didn't contain all write sets");
+call mtr.add_suppression("Failure while signalling the completion of SST");
 
 #
 # We should count the number of "Assertion failed" warnings
@@ -60,7 +61,7 @@ SELECT * FROM t1;
 --let $start_mysqld_params=--galera-unknown-option
 
 --echo Starting server ...
---exec echo "try:$start_mysqld_params" > $_expect_file_name
+--exec echo "restart_abort:$start_mysqld_params" > $_expect_file_name
 
 # Sleep to ensure that server exited...
 
@@ -105,7 +106,7 @@ SELECT * FROM t1;
 --let $start_mysqld_params=--galera-unknown-option
 
 --echo Starting server ...
---exec echo "try:$start_mysqld_params" > $_expect_file_name
+--exec echo "restart_abort:$start_mysqld_params" > $_expect_file_name
 
 # Sleep to ensure that server exited...
 
