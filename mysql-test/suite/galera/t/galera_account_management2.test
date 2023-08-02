@@ -1,0 +1,88 @@
+#
+# Test the account management statements - GRANT, REVOKE, etc.
+# when cluster servers are started with --skip-name-resolve option
+# and nonexistent user is used within the query
+#
+
+--let $galera_use_socket_client_connection = 1
+--source include/galera_cluster.inc
+
+--connection node_1
+CALL mtr.add_suppression("Operation .* failed");
+CALL mtr.add_suppression("You are not allowed to create a user with GRANT");
+CALL mtr.add_suppression("Can't revoke all privileges for one or more of the requested users");
+CALL mtr.add_suppression("There is no such grant defined for user");
+
+--connection node_2
+CALL mtr.add_suppression("Operation .* failed");
+CALL mtr.add_suppression("You are not allowed to create a user with GRANT");
+CALL mtr.add_suppression("Can't revoke all privileges for one or more of the requested users");
+CALL mtr.add_suppression("There is no such grant defined for user");
+
+--connection node_1
+
+#
+# ALTER USER
+#
+
+--connection node_1
+--error ER_CANNOT_USER
+ALTER USER user1@localhost PASSWORD EXPIRE;
+
+#
+# ALTER USER IDENTIFIED BY 
+#
+
+--error ER_CANNOT_USER
+ALTER USER 'user10@localhost' IDENTIFIED BY 'new_password';
+
+#
+# RENAME USER
+#
+
+--error ER_CANNOT_USER
+RENAME USER user2@localhost TO user3@localhost;
+
+
+#
+# SET PASSWORD
+#
+
+--error ER_PASSWORD_NO_MATCH
+SET PASSWORD FOR user3@localhost = 'foo';
+
+#
+# DROP USER
+#
+--error ER_CANNOT_USER
+DROP USER user1@localhost, user3@localhost;
+
+#
+# GRANT
+#
+
+--error ER_CANT_CREATE_USER_WITH_GRANT
+GRANT ALL ON *.* TO user4@localhost;
+
+#
+# GRANT PROXY ON
+#
+--error ER_CANT_CREATE_USER_WITH_GRANT
+GRANT PROXY ON user4@localhost TO user5@localhost;
+
+#
+# REVOKE
+#
+
+--error ER_REVOKE_GRANTS
+REVOKE ALL PRIVILEGES ON *.* FROM user4@localhost;
+
+#
+# REVOKE PROXY
+#
+
+--error ER_NONEXISTING_GRANT
+REVOKE PROXY ON user4@localhost FROM user5@localhost;
+
+# Assert that the cluster is still up and running
+--assert(`SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'`)

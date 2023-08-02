@@ -1,0 +1,26 @@
+CALL mtr.add_suppression("Operation .* failed");
+CALL mtr.add_suppression("You are not allowed to create a user with GRANT");
+CALL mtr.add_suppression("Can't revoke all privileges for one or more of the requested users");
+CALL mtr.add_suppression("There is no such grant defined for user");
+CALL mtr.add_suppression("Operation .* failed");
+CALL mtr.add_suppression("You are not allowed to create a user with GRANT");
+CALL mtr.add_suppression("Can't revoke all privileges for one or more of the requested users");
+CALL mtr.add_suppression("There is no such grant defined for user");
+ALTER USER user1@localhost PASSWORD EXPIRE;
+ERROR HY000: Operation ALTER USER failed for 'user1'@'localhost'
+ALTER USER 'user10@localhost' IDENTIFIED BY 'new_password';
+ERROR HY000: Operation ALTER USER failed for 'user10@localhost'@'%'
+RENAME USER user2@localhost TO user3@localhost;
+ERROR HY000: Operation RENAME USER failed for 'user2'@'localhost'
+SET PASSWORD FOR user3@localhost = 'foo';
+ERROR 42000: Can't find any matching row in the user table
+DROP USER user1@localhost, user3@localhost;
+ERROR HY000: Operation DROP USER failed for 'user1'@'localhost','user3'@'localhost'
+GRANT ALL ON *.* TO user4@localhost;
+ERROR 42000: You are not allowed to create a user with GRANT
+GRANT PROXY ON user4@localhost TO user5@localhost;
+ERROR 42000: You are not allowed to create a user with GRANT
+REVOKE ALL PRIVILEGES ON *.* FROM user4@localhost;
+ERROR HY000: Can't revoke all privileges for one or more of the requested users
+REVOKE PROXY ON user4@localhost FROM user5@localhost;
+ERROR 42000: There is no such grant defined for user 'user5' on host 'localhost'
