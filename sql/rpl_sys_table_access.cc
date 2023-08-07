@@ -116,6 +116,20 @@ bool Rpl_sys_table_access::open(enum thr_lock_type lock_type) {
   thd->variables.option_bits &= ~OPTION_AUTOCOMMIT;
   thd->variables.option_bits |= OPTION_NOT_AUTOCOMMIT;
   thd->set_skip_readonly_check();
+#ifdef WITH_WSREP
+  /*
+   Set wsrep-on=0 as it would write rows to mysql system tables that we don't
+   want to replicate.
+
+   Example: Async failover UDFs
+       1. asynchronous_connection_failover_add_managed()
+       2. asynchronous_connection_failover_delete_managed()
+       3. asynchronous_connection_failover_add_source()
+       4. asynchronous_connection_failover_delete_source()
+       5. asynchronous_connection_failover_reset()
+  */
+  thd->variables.wsrep_on = false;
+#endif /* WITH_WSREP */
   m_thd = thd;
 
   // m_table_list[0] is m_schema_name.m_table_name
