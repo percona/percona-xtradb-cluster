@@ -5191,7 +5191,7 @@ public:
     query_id= new_query_id;
     mysql_mutex_unlock(&LOCK_thd_data);
 #ifdef WITH_WSREP
-    if (WSREP(this)
+    if (WSREP_NNULL(this)
         && wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID
         && update_wsrep_id)
     {
