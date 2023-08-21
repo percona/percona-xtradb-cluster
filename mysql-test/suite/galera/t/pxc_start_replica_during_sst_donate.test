@@ -1,0 +1,112 @@
+# ==== Purpose ====
+#
+# This test verifies that starting async replication while proccessing SST
+# request are handled properly by the server.
+#
+# ==== Implementation ====
+#
+# 1. Create a two node cluster.
+# 2. Shutdown node2 and remove the grastate.dat file.
+# 3. Execute some transactions on node1 so that node2 forces an SST when it
+#    joins next time.
+# 4. Add a debug point on node1 to halt just before donating state transfer.
+# 5. Start node2 in background and wait till node1 stops before donating SST
+# 6. Configure replication parameters and execute START REPLICA.
+# 7. Shutdown node2 started as a background process and restart
+# 8. Cleanup
+#
+# ==== References ====
+#
+# PXC-4219: Deadlock with concurrent START SLAVE and backup using PXB
+#
+
+
+--source include/have_debug.inc
+--source include/have_debug_sync.inc
+
+--echo #
+--echo # 1. Create a two node cluster.
+--source include/galera_cluster.inc
+
+--echo #
+--echo # 2. Shutdown node2 and remove the grastate.dat file.
+--connection node_2
+--echo [connection node_2]
+--source include/shutdown_mysqld.inc
+--remove_file $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
+
+# Wait until the cluster size is updated on node1.
+--connection node_1
+--echo [connection node_1]
+--let $wait_condition= SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+--echo #
+--echo # 3. Execute some transactions on node1 so that node2 forces an SST when it
+--echo #    joins next time.
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+INSERT INTO t1 VALUES(1);
+INSERT INTO t1 VALUES(2);
+
+--echo #
+--echo # 4. Add a debug point on node1 to halt just before donating state transfer.
+--let $debug_point= halt_before_sst_donate
+--source include/add_debug_point.inc
+
+--echo #
+--echo # 5. Start node2 in background and wait till node1 stops before donating SST
+--echo #
+
+--let $PID_FILE= $MYSQLTEST_VARDIR/tmp/node2.pid
+--let $ERROR_LOG_FILE= $MYSQLTEST_VARDIR/tmp/node2.err
+
+--let $command= $MYSQLD
+--let $command_opt=  --defaults-group-suffix=.2 --defaults-file=$MYSQLTEST_VARDIR/my.cnf --log-error=$ERROR_LOG_FILE
+--let $pid_file= $PID_FILE
+--source include/start_proc_in_background.inc
+
+--connection node_1
+--echo [connection node_1]
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC='now wait_for stopped_before_sst_donate';
+--source include/remove_debug_point.inc
+
+--echo #
+--echo # 6. Configure replication parameters and execute START REPLICA.
+--disable_query_log
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+CHANGE REPLICATION SOURCE TO SOURCE_PORT = 1;
+--enable_query_log
+--send START REPLICA USER='root'
+
+--connection node_1
+--echo [connection node_1]
+SET DEBUG_SYNC = "now SIGNAL continue";
+
+--echo #
+--echo # 7. Shutdown node2 started as a background process and restart
+--connection node_2
+--echo [connection node_2]
+--enable_reconnect
+--source include/wait_until_connected_again.inc
+--disable_reconnect
+--source include/restart_mysqld.inc
+--source include/wait_proc_to_finish.inc
+
+SET SESSION wsrep_sync_wait = 0;
+--let $wait_condition= SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+--connection node_1
+--echo [connection node_1]
+SET SESSION wsrep_sync_wait = 0;
+--let $wait_condition= SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+--echo #
+--echo # 8. Cleanup
+--remove_file $PID_FILE
+--remove_file $ERROR_LOG_FILE
+DROP TABLE t1;
+RESET MASTER;
+RESET REPLICA ALL;

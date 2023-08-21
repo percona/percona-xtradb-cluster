@@ -7343,20 +7343,6 @@ wsrep_restart_point :
     goto err;
   }
 
-#ifdef WITH_WSREP
-  /* Initialization of Galera/WSREP and async replication happens in parallel.
-     Allow async replication infrastructure to init up to this point, but
-     wait with applying async-replicated events until WSREP infrastructure
-     is fully initialized (wsrep_ready == true). wsrep_ready is set when
-     server state shifts to s_synced.
-     Before this state, events are rejected with error
-     'WSREP has not yet prepared node for application use' */
-  if (WSREP(thd)) {
-    Wsrep_server_state::instance().wait_until_state(
-        Wsrep_server_state::s_synced);
-  }
-#endif /* WITH_WSREP */
-
   /* MTS: starting the worker pool */
   if (slave_start_workers(rli, rli->opt_replica_parallel_workers,
                           &mts_inited) != 0) {
@@ -7413,6 +7399,20 @@ wsrep_restart_point :
 
   mysql_cond_broadcast(&rli->start_cond);
   mysql_mutex_unlock(&rli->run_lock);
+
+#ifdef WITH_WSREP
+  /* Initialization of Galera/WSREP and async replication happens in parallel.
+     Allow async replication infrastructure to init up to this point, but
+     wait with applying async-replicated events until WSREP infrastructure
+     is fully initialized (wsrep_ready == true). wsrep_ready is set when
+     server state shifts to s_synced.
+     Before this state, events are rejected with error
+     'WSREP has not yet prepared node for application use' */
+  if (WSREP(thd)) {
+    Wsrep_server_state::instance().wait_until_state(
+        Wsrep_server_state::s_synced);
+  }
+#endif /* WITH_WSREP */
 
   DEBUG_SYNC(thd, "after_start_replica");
 
