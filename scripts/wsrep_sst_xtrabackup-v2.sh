@@ -1652,6 +1652,11 @@ function initialize_pxb_commands()
     xb_version=${xb_version# }
     wsrep_log_debug "pxb-version:$xb_version"
 
+    local decompress_threads=$(grep -c ^processor /proc/cpuinfo)
+    if [[ $decompress_threads -gt 1 ]]; then
+        decompress_threads=$((decompress_threads/2))
+    fi
+
     #
     # Use syslogger (for logging) if configured else continue
     # to use file-based logging.
@@ -1705,6 +1710,9 @@ function initialize_pxb_commands()
                 \$encrypt_backup_options --stream=\$sfmt \
                 --xtrabackup-plugin-dir="$pxb_plugin_dir" \
                 --target-dir=\$itmpdir 2> >(logger -p daemon.err -t ${ssystag}innobackupex-backup)"
+            INNODECOMPRESS="${pxb_bin_path} $disver --parallel=${decompress_threads} --decompress --remove-original \
+                --target-dir=\${DATA} 2>&1 | logger -p daemon.err -t ${ssystag}innobackupex-decompress "
+
         fi
     else
         # prepare doesn't look at my.cnf instead it has its own generated backup-my.cnf
@@ -1725,6 +1733,8 @@ function initialize_pxb_commands()
             \$encrypt_backup_options --stream=\$sfmt \
             --xtrabackup-plugin-dir="$pxb_plugin_dir" \
             --target-dir=\$itmpdir 2>\${DATA}/innobackup.backup.log"
+        INNODECOMPRESS="${pxb_bin_path} $disver --parallel=${decompress_threads} --decompress --remove-original \
+            --target-dir=\${DATA} &>\${DATA}/innobackup.decompress.log"
     fi
 }
 
@@ -2529,6 +2539,31 @@ then
             fi
         fi
 
+        # If the backup was compressed by xtrabackup with qpress, we are done.
+        # But there might have been another compression method, and PXB 8.0.34 uses ZSTD
+        # by default if 'compress' option is specified in [xtrabackup] secion of
+        # the config file.
+        # xtrabackup is able to detect the compression method automatically when started
+        # with --decompress option. Moreover, if the backup is not compressed, this invocation
+        # will do nothing and return immediately, which simplifies the below logic.
+        wsrep_log_info "Decompressing the backup at ${DATA}"
+        timeit "Xtrabackup decompress stage " "$INNODECOMPRESS"
+
+        if [ $? -ne 0 ];
+        then
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "${XTRABACKUP_BIN} decompress finished with errors."
+            if [[ -n "$WSREP_LOG_DEBUG" ]]; then
+              wsrep_log_error "Keeping ${DATA} for further diagnosis. " \
+                        "Check ${DATA}/XXX.log for details. " \
+                        "${DATA} may be removed if not needed for further diagnosis."
+            fi
+            wsrep_log_error "Line $LINENO"
+            cat_file_to_stderr "${DATA}/innobackup.decompress.log" "ERR" "innobackup.decompress.log"
+            wsrep_log_error "****************************************************** "
+            exit 22
+        fi
+
         wsrep_log_info "Preparing the backup at ${DATA}"
         timeit "Xtrabackup prepare stage" "$INNOPREPARE"
 
@@ -2548,7 +2583,7 @@ then
         fi
 
         XB_GTID_INFO_FILE_PATH="${TDATA}/${XB_GTID_INFO_FILE}"
-        rm -f $TDATA/innobackup.prepare.log $TDATA/innobackup.move.log
+        rm -f $TDATA/innobackup.decompress.log $TDATA/innobackup.prepare.log $TDATA/innobackup.move.log
 
         # Just rename the file till PXB-8.0.6 fix this issue of rename.
         # moving file to property directory will be take care by PXB-8.0.5.
@@ -2593,7 +2628,6 @@ then
         timeit "Xtrabackup move stage" "$INNOMOVE"
         errcode=$?
         set -e
-
         if [[ $errcode -ne 0 ]]; then
             wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "Move failed."
