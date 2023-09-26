@@ -25,6 +25,7 @@
 #include "sql/server_component/mysql_server_keyring_lockable_imp.h"
 #include "sql/sql_alter.h"
 #include "sql/sql_lex.h"
+#include "sql/sql_rewrite.h"
 #include "sql/ssl_init_callback.h"
 #include "sql/thd_raii.h"
 #include "sql_base.h"
@@ -2048,6 +2049,82 @@ static int create_view_query(THD *thd, uchar **buf, size_t *buf_len) {
   return wsrep_to_buf_helper(thd, buff.ptr(), buff.length(), buf, buf_len);
 }
 
+/* Rewrite GRANT query if partial_revokes is enabled.
+   Q: Why and when do we need to rewrite GRANT query if partial_revokes=1?
+   A: When partial_revokes=1 and GRANT statement does not contain explicit AS
+   clause and the GRANT is at global level (*.*), CURRENT_USER is used
+   implicitly for AS clause. Explicit usage of CURRENT_USER() is restricted in
+   PXC, however in this case user would be confused. The above query rewrite is
+   done just before writing the event into the binlog in
+   sql_authorization.cc::mysql_grant(). It is done for async replication
+   purposes for replica to see the real user and not to use CURRENT_USER. Here
+   we send TOI, so we need the same - a query containing explicit AS clause with
+   the current user.
+
+   Q: Why can't we use thd->binlog_invoker() / thd->get_invoker_user() mechanism
+   for async and galera replication? A: By design, thd caches grants related to
+   the current user. In other words, as long as the connection is active,
+   granting/revoking privileges related to this connection's user takes no
+   effect. On the other side, replication thread when uses binlog_invoker
+      mechanism, switches its security context to the required one every time,
+   which causes that it uses non-cached version of privileges. Having said
+   above, using binglog_invoker mechanism would lead to the situation when
+      privileges have been revoked for user, but user's connection is still
+   active on node_1. Then the user invokes GRANT query, which succeeds on
+   node_1, but fails on node_2. If, instead of this, the query is rewritten on
+   node_1 it succeeds on node_1 because of above-mentioned cache and succeeds on
+   node_2 because being executed from root user context. */
+static int wsrep_grant_query(THD *thd, uchar **buf, size_t *buf_len) {
+  LEX *lex = thd->lex;
+
+  /* If GRANT ... AS ... was not provided explicitly, we would use current user
+     implicitly. Let's keep the same logic as in
+     sql_authorization.cc::mysql_grant() Rewrite the query if:
+     lex->grant_as.grant_as_used == false
+     and mysqld_partial_revokes() == true
+     and lex->type != TYPE_ENUM_PROXY
+     and lex->query_block->db == nullptr
+     and lex->sql_command != SQLCOM_REVOKE */
+
+  bool rewrite = !lex->grant_as.grant_as_used && mysqld_partial_revokes() &&
+                 lex->type != TYPE_ENUM_PROXY &&
+                 lex->query_block->db == nullptr &&
+                 lex->sql_command != SQLCOM_REVOKE;
+
+  if (!rewrite) {
+    return wsrep_to_buf_helper(thd, thd->query().str, thd->query().length, buf,
+                               buf_len);
+  }
+
+  LEX_GRANT_AS grant_as_for_rewrite;
+  grant_as_for_rewrite.grant_as_used = true;
+
+  grant_as_for_rewrite.role_type =
+      thd->security_context()->get_num_active_roles() ? role_enum::ROLE_NAME
+                                                      : role_enum::ROLE_NONE;
+
+  LEX_CSTRING priv_user = thd->security_context()->priv_user();
+  LEX_CSTRING priv_host = thd->security_context()->priv_host();
+  grant_as_for_rewrite.user =
+      LEX_USER::alloc(thd, (LEX_STRING *)&priv_user, (LEX_STRING *)&priv_host);
+
+  if (grant_as_for_rewrite.role_type == role_enum::ROLE_NAME) {
+    grant_as_for_rewrite.role_list = new (thd->mem_root) List<LEX_USER>;
+    thd->security_context()->get_active_roles(thd,
+                                              *grant_as_for_rewrite.role_list);
+  }
+
+  Grant_params grant_rewrite_params(false, &grant_as_for_rewrite);
+
+  Rewriter_grant rewriter(thd, Consumer_type::BINLOG, &grant_rewrite_params);
+
+  String rewritten_query;
+  rewriter.rewrite(rewritten_query);
+
+  return wsrep_to_buf_helper(thd, rewritten_query.ptr(),
+                             rewritten_query.length(), buf, buf_len);
+}
+
 /*
   Rewrite DROP TABLE for TOI. Temporary tables are eliminated from
   the query as they are visible only to client connection.
@@ -2227,6 +2304,9 @@ static int wsrep_TOI_event_buf(THD *thd, uchar **buf, size_t *buf_len) {
       break;
     case SQLCOM_DROP_TABLE:
       err = wsrep_drop_table_query(thd, buf, buf_len);
+      break;
+    case SQLCOM_GRANT:
+      err = wsrep_grant_query(thd, buf, buf_len);
       break;
 #if 0
     case SQLCOM_CREATE_ROLE:
