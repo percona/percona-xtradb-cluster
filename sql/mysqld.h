@@ -704,7 +704,7 @@ extern PSI_stage_info stage_rpl_failover_updating_source_member_details;
 extern PSI_stage_info stage_rpl_failover_wait_before_next_fetch;
 extern PSI_stage_info stage_communication_delegation;
 extern PSI_stage_info stage_restoring_secondary_keys;
-<<<<<<< HEAD
+extern PSI_stage_info stage_wait_on_commit_ticket;
 
 #ifdef WITH_WSREP
 extern PSI_stage_info stage_wsrep_writing_rows;
@@ -742,10 +742,6 @@ extern PSI_stage_info stage_wsrep_aborter_idle;
 extern PSI_stage_info stage_wsrep_aborter_active;
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-=======
-extern PSI_stage_info stage_wait_on_commit_ticket;
->>>>>>> Percona-Server-8.0.34-26
 #ifdef HAVE_PSI_STATEMENT_INTERFACE
 /**
   Statement instrumentation keys (sql).

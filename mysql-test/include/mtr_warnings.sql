@@ -458,7 +458,6 @@ INSERT INTO global_suppressions VALUES
  */
  ("Manifest file '.*' is not read-only. For better security, please make sure that the file is read-only."),
 
-<<<<<<< HEAD
  /*
    Warnings/errors seen while using group replication with Percona XtraDB Cluster
  */
@@ -484,8 +483,6 @@ INSERT INTO global_suppressions VALUES
  ("No suitable '.*' service implementation found"),
 
 
-||||||| merged common ancestors
-=======
  /*
    --ssl-fips-mode
  */
@@ -493,7 +490,6 @@ INSERT INTO global_suppressions VALUES
 
  ("'mysql_native_password' is deprecated and will be removed in a future release."),
 
->>>>>>> Percona-Server-8.0.34-26
  ("THE_LAST_SUPPRESSION");
 
 

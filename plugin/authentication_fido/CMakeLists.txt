@@ -19,43 +19,8 @@ IF(WITH_PERCONA_AUTHENTICATION_FIDO)
     RETURN()
   ENDIF()
 
-<<<<<<< HEAD
-SET(AUTH_FIDO_SOURCES
-  src/plugin_fido.cc
-)
-### Configuration ###
-ADD_DEFINITIONS(-DLOG_COMPONENT_TAG="authentication_fido")
-
-INCLUDE_DIRECTORIES(SYSTEM ${BOOST_PATCHES_DIR} ${BOOST_INCLUDE_DIR})
-
-DISABLE_MISSING_PROFILE_WARNING()
-
-MYSQL_ADD_PLUGIN(auth_fido ${AUTH_FIDO_SOURCES}
-  LINK_LIBRARIES
-  ${OPENSSL_LIBRARIES}
-  ext::fido
-  extra::rapidjson
-  MODULE_ONLY MODULE_OUTPUT_NAME "authentication_fido"
-||||||| merged common ancestors
-SET(AUTH_FIDO_SOURCES
-  src/plugin_fido.cc
-)
-### Configuration ###
-ADD_DEFINITIONS(-DLOG_COMPONENT_TAG="authentication_fido")
-
-INCLUDE_DIRECTORIES(SYSTEM ${BOOST_PATCHES_DIR} ${BOOST_INCLUDE_DIR})
-
-DISABLE_MISSING_PROFILE_WARNING()
-
-MYSQL_ADD_PLUGIN(auth_fido ${AUTH_FIDO_SOURCES}
-  LINK_LIBRARIES
-  ${OPENSSL_LIBRARIES}
-  ext::fido
-  MODULE_ONLY MODULE_OUTPUT_NAME "authentication_fido"
-=======
   SET(AUTH_FIDO_SOURCES
     src/plugin_fido.cc
->>>>>>> Percona-Server-8.0.34-26
   )
   ### Configuration ###
   ADD_DEFINITIONS(-DLOG_COMPONENT_TAG="authentication_fido")
@@ -68,6 +33,7 @@ MYSQL_ADD_PLUGIN(auth_fido ${AUTH_FIDO_SOURCES}
     LINK_LIBRARIES
     ${OPENSSL_LIBRARIES}
     ext::fido
+    extra::rapidjson
     MODULE_ONLY MODULE_OUTPUT_NAME "authentication_fido"
     )
 ENDIF(WITH_PERCONA_AUTHENTICATION_FIDO)

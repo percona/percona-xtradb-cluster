@@ -64,7 +64,6 @@ binlog::Binlog_recovery &binlog::Binlog_recovery::recover() {
   std::shared_ptr<Log_event> ev;
   this->m_valid_pos = this->m_reader.position();
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   /*
     If binlog is enabled then SE will persist redo at following stages:
@@ -132,12 +131,7 @@ binlog::Binlog_recovery &binlog::Binlog_recovery::recover() {
   binlogged */
 #endif /* WITH_WSREP */
 
-  for (Log_event *ev = it.begin(); ev != it.end(); ev = it.next()) {
-||||||| merged common ancestors
-  for (Log_event *ev = it.begin(); ev != it.end(); ev = it.next()) {
-=======
   while (istream >> ev) {
->>>>>>> Percona-Server-8.0.34-26
     switch (ev->get_type_code()) {
       case binary_log::QUERY_EVENT: {
         this->process_query_event(dynamic_cast<Query_log_event &>(*ev));

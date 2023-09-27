@@ -31,14 +31,9 @@
    of the log; if it is the 3rd then there is this combination:
    Format_desc_of_slave, Rotate_of_master, Format_desc_of_master.
 */
-<<<<<<< HEAD
 
 #undef WITH_WSREP
 
-||||||| merged common ancestors
-
-=======
->>>>>>> Percona-Server-8.0.34-26
 #include "client/mysqlbinlog.h"
 
 #include <fcntl.h>
