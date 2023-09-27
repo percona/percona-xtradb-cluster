@@ -3,6 +3,8 @@ Warnings:
 Warning	1287	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
 SET SESSION binlog_format='STATEMENT';
+Warnings:
+Warning	1287	'@@binlog_format' is deprecated and will be removed in a future release.
 CREATE TABLE t1 (
 i int NOT NULL AUTO_INCREMENT,
 c char(32) DEFAULT 'dummy_text',
@@ -93,4 +95,6 @@ RESET SLAVE ALL;
 Warnings:
 Warning	1287	'RESET SLAVE' is deprecated and will be removed in a future release. Please use RESET REPLICA instead
 SET GLOBAL binlog_format='ROW';
+Warnings:
+Warning	1287	'@@binlog_format' is deprecated and will be removed in a future release.
 RESET MASTER;
