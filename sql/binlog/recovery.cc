@@ -22,9 +22,9 @@
 
 #include "sql/binlog/recovery.h"
 
-#include "sql/binlog/tools/iterators.h"  // binlog::tools::Iterator
-#include "sql/raii/sentry.h"             // raii::Sentry<>
-#include "sql/xa/xid_extract.h"          // xa::XID_extractor
+#include "sql/binlog/decompressing_event_object_istream.h"  // binlog::Decompressing_event_object_istream
+#include "sql/raii/sentry.h"                                // raii::Sentry<>
+#include "sql/xa/xid_extract.h"                             // xa::XID_extractor
 
 #ifdef WITH_WSREP
 #include "sql/wsrep_mysqld.h"  // WSREP_DEBUG
@@ -60,10 +60,11 @@ std::string const &binlog::Binlog_recovery::get_failure_message() const {
 }
 
 binlog::Binlog_recovery &binlog::Binlog_recovery::recover() {
-  binlog::tools::Iterator it{&this->m_reader};
-  it.set_copy_event_buffer();
+  binlog::Decompressing_event_object_istream istream{this->m_reader};
+  std::shared_ptr<Log_event> ev;
   this->m_valid_pos = this->m_reader.position();
 
+<<<<<<< HEAD
 #ifdef WITH_WSREP
   /*
     If binlog is enabled then SE will persist redo at following stages:
@@ -132,6 +133,11 @@ binlog::Binlog_recovery &binlog::Binlog_recovery::recover() {
 #endif /* WITH_WSREP */
 
   for (Log_event *ev = it.begin(); ev != it.end(); ev = it.next()) {
+||||||| merged common ancestors
+  for (Log_event *ev = it.begin(); ev != it.end(); ev = it.next()) {
+=======
+  while (istream >> ev) {
+>>>>>>> Percona-Server-8.0.34-26
     switch (ev->get_type_code()) {
       case binary_log::QUERY_EVENT: {
         this->process_query_event(dynamic_cast<Query_log_event &>(*ev));
@@ -154,13 +160,27 @@ binlog::Binlog_recovery &binlog::Binlog_recovery::recover() {
     // Whenever the current position is at a transaction boundary, save it
     // to m_valid_pos
     if (!this->m_is_malformed && !this->m_in_transaction &&
-        !is_gtid_event(ev) && !is_session_control_event(ev))
+        !is_gtid_event(ev.get()) && !is_session_control_event(ev.get()))
       this->m_valid_pos = this->m_reader.position();
 
-    delete ev;
-    ev = nullptr;
-    this->m_is_malformed = it.has_error() || this->m_is_malformed;
     if (this->m_is_malformed) break;
+  }
+  if (istream.has_error()) {
+    using Status_t = binlog::Decompressing_event_object_istream::Status_t;
+    switch (istream.get_status()) {
+      case Status_t::corrupted:
+      case Status_t::out_of_memory:
+      case Status_t::exceeds_max_size:
+        // @todo Uncomment this to fix BUG#34828252
+        // this->m_is_malformed = true;
+        // this->m_failure_message.assign(istream.get_error_str());
+        // break;
+      case Status_t::success:
+      case Status_t::end:
+      case Status_t::truncated:
+        // not malformed, just truncated
+        break;
+    }
   }
 
 #ifdef WITH_WSREP

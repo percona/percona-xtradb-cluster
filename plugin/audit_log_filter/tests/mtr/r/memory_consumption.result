@@ -1,0 +1,10 @@
+SELECT audit_log_filter_set_filter('log_all', '{"filter": {"log": true}}');
+audit_log_filter_set_filter('log_all', '{"filter": {"log": true}}')
+OK
+SELECT audit_log_filter_set_user('%', 'log_all');
+audit_log_filter_set_user('%', 'log_all')
+OK
+memory/sql/THD::variables current_alloc Ok
+#
+# Cleanup
+DROP TABLE test;

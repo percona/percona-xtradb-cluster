@@ -133,6 +133,7 @@ enum options_mysqld {
   OPT_REPLICA_PARALLEL_TYPE,
   OPT_SSL_SESSION_CACHE_TIMEOUT,
   OPT_REPLICA_PARALLEL_WORKERS,
+<<<<<<< HEAD
   OPT_OLD_STYLE_USER_LIMITS
 #ifdef WITH_WSREP
   ,
@@ -142,6 +143,12 @@ enum options_mysqld {
   OPT_WSREP_START_POSITION,
   OPT_WSREP_RECOVER
 #endif /* WITH_WSREP */
+||||||| merged common ancestors
+  OPT_OLD_STYLE_USER_LIMITS
+=======
+  OPT_OLD_STYLE_USER_LIMITS,
+  OPT_SYNC_RELAY_LOG_INFO
+>>>>>>> Percona-Server-8.0.34-26
 };
 
 #endif  // OPTIONS_MYSQLD_INCLUDED

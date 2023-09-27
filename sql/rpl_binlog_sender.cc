@@ -31,6 +31,7 @@
 #include <utility>
 
 #include "lex_string.h"
+#include "libbinlogevents/include/binlog_event.h"  // binary_log::max_log_event_size
 #include "m_string.h"
 #include "map_helpers.h"
 #include "my_byteorder.h"
@@ -51,7 +52,6 @@
 #include "sql/derror.h"      // ER_THD
 #include "sql/item_func.h"   // user_var_entry
 #include "sql/log.h"
-#include "sql/log_event.h"  // MAX_MAX_ALLOWED_PACKET
 #include "sql/mdl.h"
 #include "sql/mysqld.h"  // global_system_variables ...
 #include "sql/protocol.h"
@@ -94,8 +94,8 @@ class Observe_transmission_guard {
 
     - The event is an `XID_EVENT`
     - The event is an `XA_PREPARE_LOG_EVENT`.
-    - The event is a `QUERY_EVENT` with query equal to "XA COMMIT" or "XA ABORT"
-      or "COMMIT".
+    - The event is a `QUERY_EVENT` with query equal to "XA COMMIT" or
+      "XA ROLLBACK" or "COMMIT".
     - The event is the first `QUERY_EVENT` after a `GTID_EVENT` and the query is
       not "BEGIN" --the statement is a DDL, for instance.
 
@@ -131,7 +131,7 @@ class Observe_transmission_guard {
             m_to_set = (strcmp("BEGIN", ev.query) != 0);
           else
             m_to_set = (strncmp("XA COMMIT", ev.query, 9) == 0) ||
-                       (strncmp("XA ABORT", ev.query, 8) == 0) ||
+                       (strncmp("XA ROLLBACK", ev.query, 11) == 0) ||
                        (strncmp("COMMIT", ev.query, 6) == 0);
           break;
         }
@@ -344,7 +344,7 @@ void Binlog_sender::init() {
   m_wait_new_events =
       !((thd->server_id == 0) || ((m_flag & BINLOG_DUMP_NON_BLOCK) != 0));
   /* Binary event can be vary large. So set it to max allowed packet. */
-  thd->variables.max_allowed_packet = MAX_MAX_ALLOWED_PACKET;
+  thd->variables.max_allowed_packet = binary_log::max_log_event_size;
 
 #ifndef NDEBUG
   if (opt_sporadic_binlog_dump_fail && (binlog_dump_count++ % 2))
@@ -625,6 +625,8 @@ int Binlog_sender::send_events(File_reader &reader, my_off_t end_pos) {
       auto now = now_in_nanosecs();
       assert(now >= m_last_event_sent_ts);
 
+      if (before_send_hook(log_file, log_pos)) return 1;
+
       // if enough time has elapsed so that we should send another heartbeat
       if (m_heartbeat_period > std::chrono::nanoseconds(0) &&
           (now - m_last_event_sent_ts) >= m_heartbeat_period) {
@@ -633,6 +635,10 @@ int Binlog_sender::send_events(File_reader &reader, my_off_t end_pos) {
       } else {
         exclude_group_end_pos = log_pos;
       }
+
+      if (unlikely(after_send_hook(log_file, in_exclude_group ? log_pos : 0)))
+        return 1;
+
       DBUG_PRINT("info", ("Event of type %s is skipped",
                           Log_event::get_type_str(event_type)));
     } else {
@@ -1120,7 +1126,7 @@ int Binlog_sender::send_format_description_event(File_reader &reader,
 
   Log_event *ev = nullptr;
   Binlog_read_error binlog_read_error = binlog_event_deserialize(
-      event_ptr, event_len, reader.format_description_event(), false, &ev);
+      event_ptr, event_len, &reader.format_description_event(), false, &ev);
   if (binlog_read_error.has_error()) {
     set_fatal_error(binlog_read_error.get_str());
     return 1;
@@ -1194,7 +1200,7 @@ int Binlog_sender::send_format_description_event(File_reader &reader,
   }
 
   binlog_read_error = binlog_event_deserialize(
-      event_ptr, event_len, reader.format_description_event(), false, &ev);
+      event_ptr, event_len, &reader.format_description_event(), false, &ev);
 
   if (binlog_read_error.has_error()) {
     set_fatal_error(binlog_read_error.get_str());

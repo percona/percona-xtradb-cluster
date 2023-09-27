@@ -1,5 +1,6 @@
 
 #include "buffered_error_log.h"
+#include <string>
 
 Buffered_error_logger buffered_error_log;
 char *buffered_error_log_filename = nullptr;
@@ -66,4 +67,9 @@ void Buffered_error_logger::write_to_disk_() {
   const auto curr_size = data->capacity();
   data->clear();
   data->reserve(curr_size);
+}
+
+void Buffered_error_logger::close() {
+  std::lock_guard<std::mutex> lk{data_mtx};
+  buffered_error_log_filename = nullptr;
 }

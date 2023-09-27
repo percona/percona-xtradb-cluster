@@ -65,7 +65,6 @@
 namespace resourcegroups {
 const char *SYS_DEFAULT_RESOURCE_GROUP_NAME = "SYS_default";
 const char *USR_DEFAULT_RESOURCE_GROUP_NAME = "USR_default";
-const char *SYS_INTERNAL_RESOURCE_GROUP_NAME = "SYS_internal";
 
 Resource_group_mgr *Resource_group_mgr::m_instance = nullptr;
 
@@ -158,7 +157,6 @@ static bool deserialize_resource_groups(THD *thd) {
 
   bool usr_default_in_dd = false;
   bool sys_default_in_dd = false;
-  bool sys_internal_in_dd = false;
 
   auto res_grp_mgr = Resource_group_mgr::instance();
   for (const auto &resource_group : resource_group_vec) {
@@ -170,10 +168,6 @@ static bool deserialize_resource_groups(THD *thd) {
                            resource_group->name().c_str(),
                            SYS_DEFAULT_RESOURCE_GROUP_NAME) == 0)
       sys_default_in_dd = true;
-    else if (my_strcasecmp(&my_charset_utf8mb3_general_ci,
-                           resource_group->name().c_str(),
-                           SYS_INTERNAL_RESOURCE_GROUP_NAME) == 0)
-      sys_internal_in_dd = true;
     else {
       auto resource_group_ptr =
           res_grp_mgr->deserialize_resource_group(resource_group);
@@ -212,10 +206,6 @@ static bool deserialize_resource_groups(THD *thd) {
 
   if (persist_resource_group(thd, *res_grp_mgr->sys_default_resource_group(),
                              sys_default_in_dd))
-    return true;
-
-  if (persist_resource_group(thd, *res_grp_mgr->sys_internal_resource_group(),
-                             sys_internal_in_dd))
     return true;
 
   return false;
@@ -417,28 +407,10 @@ bool Resource_group_mgr::init() {
     return true;
   }
 
-  m_sys_internal_resource_group = new (std::nothrow)
-      Resource_group(SYS_INTERNAL_RESOURCE_GROUP_NAME,
-                     resourcegroups::Type::SYSTEM_RESOURCE_GROUP, true);
-
-  if (m_sys_internal_resource_group == nullptr) {
-    LogErr(ERROR_LEVEL, ER_FAILED_TO_ALLOCATE_MEMORY_FOR_RESOURCE_GROUP,
-           "SYS_internal");
-    delete m_resource_group_hash;
-    m_resource_group_hash = nullptr;
-    delete m_usr_default_resource_group;
-    m_usr_default_resource_group = nullptr;
-    delete m_sys_default_resource_group;
-    m_sys_default_resource_group = nullptr;
-    return true;
-  }
-
   add_resource_group(
       std::unique_ptr<Resource_group>(m_usr_default_resource_group));
   add_resource_group(
       std::unique_ptr<Resource_group>(m_sys_default_resource_group));
-  add_resource_group(
-      std::unique_ptr<Resource_group>(m_sys_internal_resource_group));
 
   // Initialize number of VCPUs.
   m_num_vcpus = platform::num_vcpus();
@@ -470,12 +442,10 @@ bool Resource_group_mgr::move_resource_group(Resource_group *from_res_grp,
       nullptr, pfs_thread_id, to_res_grp->name().c_str(),
       to_res_grp->name().length(), nullptr);
 
-  if (from_res_grp != nullptr && !is_resource_group_default(from_res_grp) &&
-      !is_sys_internal_resource_group(from_res_grp))
+  if (from_res_grp != nullptr && !is_resource_group_default(from_res_grp))
     from_res_grp->remove_pfs_thread_id(pfs_thread_id);
 
-  if (!is_resource_group_default(to_res_grp) &&
-      !is_sys_internal_resource_group(to_res_grp))
+  if (!is_resource_group_default(to_res_grp))
     to_res_grp->add_pfs_thread_id(pfs_thread_id);
   return true;
 }
@@ -526,19 +496,6 @@ void Resource_group_mgr::remove_resource_group(const std::string &name) {
   mysql_rwlock_unlock(&m_map_rwlock);
 }
 
-void Resource_group_mgr::extract_resource_group(const std::string &name) {
-  DBUG_TRACE;
-  assert(m_resource_group_support);
-
-  mysql_rwlock_wrlock(&m_map_rwlock);
-  auto nh = m_resource_group_hash->extract(name);
-  if ((bool)nh) {
-    // Release resource group ownership.
-    nh.mapped().release();
-  }
-  mysql_rwlock_unlock(&m_map_rwlock);
-}
-
 Resource_group *Resource_group_mgr::create_and_add_in_resource_group_hash(
     const LEX_CSTRING &name, Type type, bool enabled,
     std::unique_ptr<std::vector<Range>> vcpu_range_vector, int priority) {
@@ -579,9 +536,9 @@ bool Resource_group_mgr::switch_resource_group_if_needed(
     resourcegroups::Resource_group **dest_res_grp, MDL_ticket **ticket,
     MDL_ticket **cur_ticket) {
   bool switched = false;
-  auto res_grp_name = thd->resource_group_ctx()->m_switch_resource_group_str;
 
-  if (!opt_initialize && res_grp_name[0] != '\0') {
+  if (!opt_initialize && thd->lex->switch_resource_group != nullptr) {
+    auto res_grp_name = thd->lex->switch_resource_group;
     resourcegroups::Resource_group_mgr *mgr_instance =
         resourcegroups::Resource_group_mgr::instance();
 
@@ -589,7 +546,6 @@ bool Resource_group_mgr::switch_resource_group_if_needed(
             thd, res_grp_name, MDL_EXPLICIT, ticket, false)) {
       LogErr(WARNING_LEVEL, ER_FAILED_TO_ACQUIRE_LOCK_ON_RESOURCE_GROUP,
              res_grp_name);
-      res_grp_name[0] = '\0';
       return false;
     }
 
@@ -632,7 +588,6 @@ bool Resource_group_mgr::switch_resource_group_if_needed(
       LogErr(WARNING_LEVEL, ER_FAILED_TO_ACQUIRE_LOCK_ON_RESOURCE_GROUP,
              src_res_grp_str);
       mysql_mutex_unlock(&thd->LOCK_thd_data);
-      res_grp_name[0] = '\0';
       return false;
     }
     assert(*dest_res_grp != nullptr);
@@ -648,4 +603,5 @@ bool Resource_group_mgr::switch_resource_group_if_needed(
 
   return switched;
 }
+
 }  // namespace resourcegroups

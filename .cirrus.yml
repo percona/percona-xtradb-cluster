@@ -28,7 +28,7 @@ script_template: &SCRIPT_TEMPLATE
   install_dependencies_script: |
     export DEBIAN_FRONTEND=noninteractive
     PACKAGES_TO_INSTALL="lz4 unzip ca-certificates git pkg-config dpkg-dev make cmake cmake-curses-gui ccache bison npm"
-    PACKAGES_LIBS="libxml-simple-perl libeatmydata1 libfido2-dev libicu-dev libevent-dev libudev-dev libaio-dev libmecab-dev libnuma-dev liblz4-dev libzstd-dev liblzma-dev libreadline-dev libpam-dev libssl-dev libcurl4-openssl-dev libldap2-dev libkrb5-dev libsasl2-dev libsasl2-modules-gssapi-mit"
+    PACKAGES_LIBS="libgflags-dev libxml-simple-perl libeatmydata1 libfido2-dev libicu-dev libevent-dev libudev-dev libaio-dev libmecab-dev libnuma-dev liblz4-dev libzstd-dev liblzma-dev libreadline-dev libpam-dev libssl-dev libcurl4-openssl-dev libldap2-dev libkrb5-dev libsasl2-dev libsasl2-modules-gssapi-mit"
     PACKAGES_PROTOBUF="protobuf-compiler libprotobuf-dev libprotoc-dev"
     apt update
     apt -yq --no-install-suggests --no-install-recommends --allow-unauthenticated install $PACKAGES_TO_INSTALL $PACKAGES_LIBS $PACKAGES_PROTOBUF $SELECTED_CXX
@@ -77,11 +77,11 @@ script_template: &SCRIPT_TEMPLATE
     echo "SELECTED_CC=$SELECTED_CC (`which $SELECTED_CC`) SELECTED_CXX=$SELECTED_CXX (`which $SELECTED_CXX`) BUILD_TYPE=$BUILD_TYPE BUILD_PARAMS_TYPE=$BUILD_PARAMS_TYPE"
     cd $WORKING_DIR; mkdir bin; cd bin
     OPTIONS_DEBUG="-DCMAKE_C_FLAGS_DEBUG=-g1 -DCMAKE_CXX_FLAGS_DEBUG=-g1"
-    OPTIONS_BUILD="-DMYSQL_MAINTAINER_MODE=ON -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DBUILD_CONFIG=mysql_release -DDOWNLOAD_BOOST=1 -DWITH_BOOST=$BOOST_DIR"
+    OPTIONS_BUILD="-DMYSQL_MAINTAINER_MODE=ON -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DBUILD_CONFIG=mysql_release -DWITH_PACKAGE_FLAGS=OFF -DDOWNLOAD_BOOST=1 -DWITH_BOOST=$BOOST_DIR"
     OPTIONS_COMPILER="-DCMAKE_C_COMPILER=$SELECTED_CC -DCMAKE_CXX_COMPILER=$SELECTED_CXX -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache"
     OPTIONS_COMPONENTS="-DWITH_ROCKSDB=ON -DWITH_COREDUMPER=ON -DWITH_KEYRING_VAULT=ON -DWITH_KEYRING_VAULT_TEST=ON -DWITH_PAM=ON"
     OPTIONS_LIBS="-DWITH_MECAB=system -DWITH_NUMA=ON -DWITH_READLINE=system -DWITH_SYSTEM_LIBS=ON -DWITH_ZLIB=bundled"
-    OPTIONS_INVERTED="-DWITH_NDB=ON -DWITH_NDBCLUSTER=ON -DWITH_NDB_JAVA=OFF -DWITH_ROUTER=OFF -DWITH_UNIT_TESTS=OFF -DWITH_NUMA=OFF"
+    OPTIONS_INVERTED="-DWITH_NDB=ON -DWITH_NDBCLUSTER=ON -DWITH_NDB_JAVA=OFF -DWITH_ROUTER=OFF -DWITH_UNIT_TESTS=OFF -DWITH_NUMA=OFF -DROCKSDB_PLUGINS=zenfs -DWITH_ZENFS_UTILITY=ON"
     OPTIONS_LIBS_BUNDLED="-DWITH_EDITLINE=bundled -DWITH_FIDO=bundled -DWITH_ICU=bundled -DWITH_LIBEVENT=bundled -DWITH_LZ4=bundled -DWITH_PROTOBUF=bundled -DWITH_RAPIDJSON=bundled -DWITH_ZLIB=bundled -DWITH_ZSTD=bundled"
     OPTIONS_SE_INVERTED="-DWITH_ARCHIVE_STORAGE_ENGINE=OFF -DWITH_BLACKHOLE_STORAGE_ENGINE=OFF -DWITH_EXAMPLE_STORAGE_ENGINE=ON -DWITH_FEDERATED_STORAGE_ENGINE=OFF -DWITHOUT_PERFSCHEMA_STORAGE_ENGINE=ON -DWITH_INNODB_MEMCACHED=ON"
     if [[ "$BUILD_PARAMS_TYPE" == "normal" ]]; then
@@ -117,6 +117,8 @@ script_template: &SCRIPT_TEMPLATE
     mysql-test/mysql-test-run.pl $MTR_TESTS --parallel=$NTHREADS --junit-output=$CIRRUS_WORKING_DIR/${RESULTS_FILE}.xml --mysqld-env=LD_PRELOAD=${LIBEATMYDATA##* } --force --max-test-fail=0 --retry-failure=0 --debug-server || echo Ignore mysql_test_run.pl errorcode
     echo "Finished testing with $NTHREADS/$NPROC threads"
     df -Th
+    rm -rf mysql-test/var
+    df -Th
     npm install -g xunit-viewer
     xunit-viewer --results $CIRRUS_WORKING_DIR/${RESULTS_FILE}.xml --output $CIRRUS_WORKING_DIR/${RESULTS_FILE}.html
   html_artifacts:
@@ -125,13 +127,17 @@ script_template: &SCRIPT_TEMPLATE
 
 task:
   << : *FILTER_TEMPLATE
-  # don't run on percona/percona-server/8.0 as we have nightly cron builds for "8.0" branch
-  only_if: "$CIRRUS_CRON != '' || ($CIRRUS_REPO_FULL_NAME != 'percona/percona-server' || $CIRRUS_BRANCH != '8.0') && !changesIncludeOnly('doc/*', 'build-ps/*', 'man/*', 'mysql-test/*', 'packaging/*', 'policy/*', 'scripts/*', 'support-files/*')"
-  arm_container:
-    image: ubuntu:jammy
-    cpu: 8
-    memory: 32G
-    greedy: true
+  # run only on "percona/percona-server" but not on "8.0" as we have nightly cron builds for "8.0" branch
+  only_if: "$CIRRUS_CRON != '' || $CIRRUS_REPO_FULL_NAME == 'percona/percona-server' && $CIRRUS_BRANCH != '8.0' && !changesIncludeOnly('doc/*', 'build-ps/*', 'man/*', 'mysql-test/*', 'packaging/*', 'policy/*', 'scripts/*', 'support-files/*')"
+  aws_credentials: ENCRYPTED[!f57794979d3ed96943cd39073b66a4fffbdc3ee6366b265e68c5aae890961d171bddca50bf169cc07db56c8c68172b84!]
+  ec2_instance:
+    # aws ec2 describe-images --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-202307*"
+    image: ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-20230728
+    # image: ami-0e2b332e63c56bcb5  # Ubuntu Server 22.04 LTS ARM 64-bit
+    type: c6gd.4xlarge  # 16 vCPUs, 32 GB, 950 GB SSD, 0.6144 USD/H
+    region: us-east-1
+    architecture: arm64 # defautls to amd64
+    spot: true
   env:
     OS_TYPE: ubuntu-22.04-arm64
   matrix:
@@ -141,6 +147,7 @@ task:
         SELECTED_CXX: g++
         BUILD_TYPE: Debug
     - name: (arm64) gcc RelWithDebInfo [Ubuntu 22.04 Jammy]
+      skip: $CIRRUS_PR != ""  # skip PRs
       env:
         SELECTED_CC: gcc
         SELECTED_CXX: g++
@@ -149,17 +156,22 @@ task:
     lsblk
     lsblk -f
     df -Th
+    sudo mkfs -t xfs /dev/nvme1n1
+    sudo mkdir $MOUNT_POINT
+    sudo mount /dev/nvme1n1 $MOUNT_POINT
+    df -Th
   << : *SCRIPT_TEMPLATE
+
 
 
 task:
   << : *FILTER_TEMPLATE
-  aws_credentials: ENCRYPTED[!f57794979d3ed96943cd39073b66a4fffbdc3ee6366b265e68c5aae890961d171bddca50bf169cc07db56c8c68172b84!]
   # run only on "percona/percona-server" but not on "8.0" as we have nightly cron builds for "8.0" branch
   only_if: "$CIRRUS_CRON != '' || $CIRRUS_REPO_FULL_NAME == 'percona/percona-server' && $CIRRUS_BRANCH != '8.0' && !changesIncludeOnly('doc/*', 'build-ps/*', 'man/*', 'mysql-test/*', 'packaging/*', 'policy/*', 'scripts/*', 'support-files/*')"
+  aws_credentials: ENCRYPTED[!f57794979d3ed96943cd39073b66a4fffbdc3ee6366b265e68c5aae890961d171bddca50bf169cc07db56c8c68172b84!]
   ec2_instance:
     # aws ec2 describe-images --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-202302*"
-    image: ami-0e5872bad32cd6a9d # Ubuntu 22.04.1 x86-64 with percona-server gcc-12 gcc-11 gcc-10 gcc-9 clang-15 clang-14 clang-13 node-12
+    image: ami-0f9f8d3ed33d7cb88 # Ubuntu 22.04.1 x86-64 with 40 GB gp2 and percona-server gcc-13 gcc-12 gcc-11 gcc-10 gcc-9 clang-15 clang-14 clang-13 node-12
     type: c6a.4xlarge  # 16 vCPUs, 32 GB, no SSD, 0.612 USD/H
     #type: c5a.4xlarge  # 16 vCPUs, 32 GB, no SSD, 0.616 USD/H
     #type: c5.4xlarge   # 16 vCPUs, 32 GB, no SSD, 0.68 USD/H
@@ -170,17 +182,17 @@ task:
   env:
     OS_TYPE: ubuntu-22.04-x86_64
   matrix:
-    - name: (x86_64) gcc-12 Debug INVERTED [Ubuntu 22.04 Jammy]
+    - name: (x86_64) gcc-13 Debug INVERTED [Ubuntu 22.04 Jammy]
       env:
-        SELECTED_CC: gcc-12
-        SELECTED_CXX: g++-12
+        SELECTED_CC: gcc-13
+        SELECTED_CXX: g++-13
         BUILD_TYPE: Debug
         BUILD_PARAMS_TYPE: inverted
-    - name: (x86_64) gcc-12 RelWithDebInfo INVERTED [Ubuntu 22.04 Jammy]
+    - name: (x86_64) gcc-13 RelWithDebInfo INVERTED [Ubuntu 22.04 Jammy]
       skip: $CIRRUS_PR != ""  # skip PRs
       env:
-        SELECTED_CC: gcc-12
-        SELECTED_CXX: g++-12
+        SELECTED_CC: gcc-13
+        SELECTED_CXX: g++-13
         BUILD_TYPE: RelWithDebInfo
         BUILD_PARAMS_TYPE: inverted
   mount_disk_script: |

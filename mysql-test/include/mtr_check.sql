@@ -213,6 +213,7 @@ BEGIN
   --
   -- For "unauthenticated user", see Bug#30035699 "UNAUTHENTICATED USER" SHOWS UP IN CHECK-TESTCASE
   --
+<<<<<<< HEAD
   -- SELECT USER, HOST, DB, COMMAND, INFO FROM INFORMATION_SCHEMA.PROCESSLIST
   --   WHERE COMMAND NOT IN ('Sleep')
   --    AND USER NOT IN ('unauthenticated user','mysql.session', 'event_scheduler')
@@ -244,6 +245,20 @@ BEGIN
   DELETE FROM mysql.global_grants WHERE user = 'mysql.pxc.sst.user';
   COMMIT;
   SET SESSION wsrep_on = ON;
+||||||| merged common ancestors
+  SELECT /*+SET_VAR(use_secondary_engine=OFF)*/ USER, HOST, DB, COMMAND, INFO FROM INFORMATION_SCHEMA.PROCESSLIST
+    WHERE COMMAND NOT IN ('Sleep')
+      AND USER NOT IN ('unauthenticated user','mysql.session', 'event_scheduler')
+        ORDER BY COMMAND;
+=======
+  -- Also (in similar fashion as above) exclude all 'Daemon' threads, they will
+  -- not give consistent result either.
+  --
+  SELECT /*+SET_VAR(use_secondary_engine=OFF)*/ USER, HOST, DB, COMMAND, INFO FROM INFORMATION_SCHEMA.PROCESSLIST
+    WHERE COMMAND NOT IN ('Sleep', 'Daemon')
+      AND USER NOT IN ('unauthenticated user','mysql.session', 'event_scheduler')
+        ORDER BY COMMAND;
+>>>>>>> Percona-Server-8.0.34-26
 
   -- Checksum system tables to make sure they have been properly
   -- restored after test.
