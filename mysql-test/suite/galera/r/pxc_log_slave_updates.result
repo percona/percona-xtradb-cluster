@@ -1,8 +1,8 @@
 CREATE TABLE t1 (a INT PRIMARY KEY);
 CREATE TABLE t2 (a INT PRIMARY KEY);
 INSERT INTO t1 VALUES (0);
-INSERT INTO t2 SELECT /*!99997*/ * FROM t1;
-INSERT INTO t2 SELECT /*!99997*/ * FROM t1;
+INSERT INTO t2 SELECT /*!99997 */ * FROM t1;
+INSERT INTO t2 SELECT /*!99997 */ * FROM t1;
 ERROR 23000: Duplicate entry '0' for key 't2.PRIMARY'
 CALL mtr.add_suppression("Query apply failed");
 include/assert.inc [node_1 should be alive and t2 should contain one row]
