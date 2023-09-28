@@ -2090,7 +2090,7 @@ then
                 wsrep_log_warning "This node's PXC version is $local_version_str. The donor's PXC version is $donor_version_str."
                 wsrep_log_warning "Run mysql_upgrade in non-cluster (standalone mode) to upgrade."
                 wsrep_log_warning "Check the upgrade process here:"
-                wsrep_log_warning "    https://www.percona.com/doc/percona-xtradb-cluster/LATEST/howtos/upgrade_guide.html"
+                wsrep_log_warning "    https://www.percona.com/doc/percona-xtradb-cluster/5.7/howtos/upgrade_guide.html"
             fi
         fi
 
