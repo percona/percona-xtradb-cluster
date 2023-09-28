@@ -7547,8 +7547,8 @@ static int init_server_components() {
     WSREP_WARN(
         "You have enabled keyring plugin. SST encryption is mandatory. "
         "Please enable pxc_encrypt_cluster_traffic. Check "
-        "https://www.percona.com/doc/percona-xtradb-cluster/%u.%u/security/"
-        "encrypt-traffic.html#encrypt-sst for more details.",
+        "https://docs.percona.com/percona-xtradb-cluster/%u.%u/"
+        "encrypt-traffic.html#encrypt-sst-traffic for more details.",
         MYSQL_VERSION_MAJOR, MYSQL_VERSION_MINOR);
   }
 #endif
