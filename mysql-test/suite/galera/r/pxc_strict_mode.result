@@ -590,6 +590,8 @@ ERROR 42000: Variable 'binlog_format' can't be set to the value of 'STATEMENT'
 select @@binlog_format;
 @@binlog_format
 ROW
+Warnings:
+Warning	1287	'@@binlog_format' is deprecated and will be removed in a future release.
 create table tinnodb (i int, primary key pk(i)) engine=innodb;
 insert into tinnodb values (1), (2);
 select * from tinnodb;
@@ -609,6 +611,8 @@ ERROR 42000: Variable 'binlog_format' can't be set to the value of 'MIXED'
 select @@binlog_format;
 @@binlog_format
 ROW
+Warnings:
+Warning	1287	'@@binlog_format' is deprecated and will be removed in a future release.
 create table tinnodb (i int, primary key pk(i)) engine=innodb;
 insert into tinnodb values (1), (2);
 select * from tinnodb;
@@ -624,9 +628,13 @@ i
 drop table tinnodb;
 #node-1
 set session binlog_format = 'ROW';
+Warnings:
+Warning	1287	'@@binlog_format' is deprecated and will be removed in a future release.
 select @@binlog_format;
 @@binlog_format
 ROW
+Warnings:
+Warning	1287	'@@binlog_format' is deprecated and will be removed in a future release.
 create table tinnodb (i int, primary key pk(i)) engine=innodb;
 insert into tinnodb values (1), (2);
 select * from tinnodb;
@@ -656,6 +664,8 @@ ERROR 42000: Variable 'binlog_format' can't be set to the value of 'STATEMENT'
 select @@binlog_format;
 @@binlog_format
 ROW
+Warnings:
+Warning	1287	'@@binlog_format' is deprecated and will be removed in a future release.
 create table tinnodb (i int, primary key pk(i)) engine=innodb;
 insert into tinnodb values (1), (2);
 select * from tinnodb;
@@ -675,6 +685,8 @@ ERROR 42000: Variable 'binlog_format' can't be set to the value of 'MIXED'
 select @@binlog_format;
 @@binlog_format
 ROW
+Warnings:
+Warning	1287	'@@binlog_format' is deprecated and will be removed in a future release.
 create table tinnodb (i int, primary key pk(i)) engine=innodb;
 insert into tinnodb values (1), (2);
 select * from tinnodb;
@@ -690,9 +702,13 @@ i
 drop table tinnodb;
 #node-1
 set session binlog_format = 'ROW';
+Warnings:
+Warning	1287	'@@binlog_format' is deprecated and will be removed in a future release.
 select @@binlog_format;
 @@binlog_format
 ROW
+Warnings:
+Warning	1287	'@@binlog_format' is deprecated and will be removed in a future release.
 create table tinnodb (i int, primary key pk(i)) engine=innodb;
 insert into tinnodb values (1), (2);
 select * from tinnodb;
@@ -708,6 +724,8 @@ i
 drop table tinnodb;
 #node-1
 set session binlog_format = 'ROW';
+Warnings:
+Warning	1287	'@@binlog_format' is deprecated and will be removed in a future release.
 set global pxc_strict_mode = 'ENFORCING';
 select @@pxc_strict_mode;
 @@pxc_strict_mode
@@ -723,16 +741,24 @@ ERROR 42000: Variable 'binlog_format' can't be set to the value of 'STATEMENT'
 select @@binlog_format;
 @@binlog_format
 ROW
+Warnings:
+Warning	1287	'@@binlog_format' is deprecated and will be removed in a future release.
 set session binlog_format = 'MIXED';
 ERROR 42000: Variable 'binlog_format' can't be set to the value of 'MIXED'
 select @@binlog_format;
 @@binlog_format
 ROW
+Warnings:
+Warning	1287	'@@binlog_format' is deprecated and will be removed in a future release.
 #node-1
 set session binlog_format = 'ROW';
+Warnings:
+Warning	1287	'@@binlog_format' is deprecated and will be removed in a future release.
 select @@binlog_format;
 @@binlog_format
 ROW
+Warnings:
+Warning	1287	'@@binlog_format' is deprecated and will be removed in a future release.
 create table tinnodb (i int, primary key pk(i)) engine=innodb;
 insert into tinnodb values (1), (2);
 select * from tinnodb;

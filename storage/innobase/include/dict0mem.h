@@ -988,14 +988,20 @@ struct rec_cache_t {
   size_t nullable_cols{0};
 };
 
+/** Maximum number of records we insert or select from intrinsic table
+before committing mtr. */
+constexpr uint32_t MAX_INTRINSIC_MTR_RECORDS = 100;
+
 /** Cache position of last inserted or selected record by caching record
 and holding reference to the block where record resides.
-Note: We don't commit mtr and hold it beyond a transaction lifetime as this is
-a special case (intrinsic table) that are not shared across connection. */
+Note: We don't commit mtr (unless mtr_records reaches MAX_INTRINSIC_MTR_RECORDS
+limit) and hold it beyond a transaction lifetime as this is a  special case
+(intrinsic table) that are not shared across connection. */
 class last_ops_cur_t {
  public:
   /** Constructor */
-  last_ops_cur_t() : rec(), block(), mtr(), disable_caching(), invalid() {
+  last_ops_cur_t()
+      : rec(), block(), mtr(), disable_caching(), invalid(), mtr_records(0) {
     /* Do Nothing. */
   }
 
@@ -1007,6 +1013,7 @@ class last_ops_cur_t {
     rec = nullptr;
     block = nullptr;
     invalid = false;
+    mtr_records = 0;
   }
 
  public:
@@ -1026,6 +1033,11 @@ class last_ops_cur_t {
   split then invalidate the cached position as it would be no more
   remain valid. Will be re-cached on post-split insert. */
   bool invalid;
+
+  /** Number of records which were inserted or selected into from
+  intrinsic table within this mtr. Needed to limit number of intrinsic
+  table records inserted/selected within single mtr. */
+  uint32_t mtr_records;
 };
 
 /** "GEN_CLUST_INDEX" is the name reserved for InnoDB default
@@ -2153,7 +2165,7 @@ struct dict_table_t {
   uint32_t total_col_count{0};
 
   /** Set if table is upgraded instant table */
-  unsigned m_upgraded_instant : 1;
+  bool m_upgraded_instant{false};
 
   /** table dynamic metadata status, protected by dict_persist->mutex */
   std::atomic<table_dirty_status> dirty_status;
@@ -2554,13 +2566,11 @@ detect this and will eventually quit sooner. */
   bool has_instant_drop_cols() const { return (get_n_instant_drop_cols() > 0); }
 
   /** Set table to be upgraded table with INSTANT ADD columns in V1. */
-  void set_upgraded_instant() { m_upgraded_instant = 1; }
+  void set_upgraded_instant() { m_upgraded_instant = true; }
 
   /** Checks if table is upgraded table with INSTANT ADD columns in V1.
   @return       true if it is, false otherwise */
-  bool is_upgraded_instant() const {
-    return (m_upgraded_instant == 1) ? true : false;
-  }
+  bool is_upgraded_instant() const { return m_upgraded_instant; }
 
   /** Check whether the table is corrupted.
   @return true if the table is corrupted, otherwise false */
@@ -2867,6 +2877,13 @@ class Persister {
   virtual ulint read(PersistentTableMetadata &metadata, const byte *buffer,
                      ulint size, bool *corrupt) const = 0;
 
+  /** Aggregate metadata entries into a single metadata instance, considering
+  version numbers
+  @param[in,out] metadata        metadata object to be modified
+  @param[in]     new_entry       metadata entry from logs */
+  virtual void aggregate(PersistentTableMetadata &metadata,
+                         const PersistentTableMetadata &new_entry) const = 0;
+
   /** Write MLOG_TABLE_DYNAMIC_META for persistent dynamic
   metadata of table
   @param[in]    id              Table id
@@ -2906,6 +2923,9 @@ class CorruptedIndexPersister : public Persister {
   is complete and we get everything, 0 if the buffer is incompleted */
   ulint read(PersistentTableMetadata &metadata, const byte *buffer, ulint size,
              bool *corrupt) const override;
+
+  void aggregate(PersistentTableMetadata &metadata,
+                 const PersistentTableMetadata &new_entry) const override;
 
  private:
   /** The length of index_id_t we will write */
@@ -2949,6 +2969,9 @@ class AutoIncPersister : public Persister {
   is complete and we get everything, 0 if the buffer is incomplete */
   ulint read(PersistentTableMetadata &metadata, const byte *buffer, ulint size,
              bool *corrupt) const override;
+
+  void aggregate(PersistentTableMetadata &metadata,
+                 const PersistentTableMetadata &new_entry) const override;
 };
 
 /** Container of persisters used in the system. Currently we don't need
