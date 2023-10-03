@@ -1835,9 +1835,9 @@ fi
 %files -n percona-xtradb-cluster-icu-data-files
 %defattr(-, root, root, -)
 %doc %{?license_files_server}
-%dir %attr(755, root, root) %{_libdir}/mysql/private/icudt69l
-%{_libdir}/mysql/private/icudt69l/unames.icu
-%{_libdir}/mysql/private/icudt69l/brkitr
+%dir %attr(755, root, root) %{_libdir}/mysql/private/icudt73l
+%{_libdir}/mysql/private/icudt73l/*.icu
+%{_libdir}/mysql/private/icudt73l/brkitr
 
 
 ##############################################################################
