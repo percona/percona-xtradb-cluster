@@ -43,7 +43,8 @@ class Wsrep_server_service : public wsrep::server_service {
 
   void release_high_priority_service(wsrep::high_priority_service *) override;
 
-  void background_rollback(wsrep::client_state &) override;
+  void background_rollback(wsrep::unique_lock<wsrep::mutex> &,
+                           wsrep::client_state &) override;
 
   void bootstrap() override;
   void log_message(enum wsrep::log::level, const char *) override;

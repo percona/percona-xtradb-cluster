@@ -52,6 +52,7 @@ LOCK INSTANCE FOR BACKUP;
 --echo #
 
 SET DEBUG_SYNC = 'now SIGNAL continue_purge_applied_logs_after_backup_lock';
+SET DEBUG_SYNC = RESET;
 
 --let $debug_point = syncpoint_purge_applied_logs_after_backup_lock
 --source include/remove_debug_point.inc
