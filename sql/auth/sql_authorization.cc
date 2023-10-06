@@ -2785,9 +2785,6 @@ int mysql_table_grant(THD *thd, Table_ref *table_list,
     values when we are out of this function scope
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
-#ifdef WITH_WSREP
-  Enable_TOI_preparation_guard toi_guard(thd);
-#endif
   /*
     The lock api is depending on the thd->lex variable which needs to be
     re-initialized.
@@ -2800,6 +2797,12 @@ int mysql_table_grant(THD *thd, Table_ref *table_list,
     this value corresponds to the statement being executed.
   */
   thd->lex->sql_command = backup.sql_command;
+
+#ifdef WITH_WSREP
+  if (wsrep_check_system_user_privilege(thd, user_list)) {
+    return true;
+  }
+#endif
 
   { /* Critical Section */
     Acl_cache_lock_guard acl_cache_lock(thd, Acl_cache_lock_mode::WRITE_MODE);
@@ -2818,13 +2821,6 @@ int mysql_table_grant(THD *thd, Table_ref *table_list,
       commit_and_close_mysql_tables(thd);
       return true;
     }
-
-#ifdef WITH_WSREP
-    if (toi_guard.start_toi()) {
-      commit_and_close_mysql_tables(thd);
-      return true;
-    }
-#endif
 
     MEM_ROOT *old_root = thd->mem_root;
     thd->mem_root = &memex;
@@ -3008,6 +3004,12 @@ bool mysql_routine_grant(THD *thd, Table_ref *table_list, bool is_proc,
     if (sp_exist_routines(thd, table_list, is_proc)) return true;
   }
 
+#ifdef WITH_WSREP
+  if (wsrep_check_system_user_privilege(thd, user_list)) {
+    return true;
+  }
+#endif
+
   /*
     This statement will be replicated as a statement, even when using
     row-based replication.  The binlog state will be cleared here to
@@ -3015,9 +3017,7 @@ bool mysql_routine_grant(THD *thd, Table_ref *table_list, bool is_proc,
     values when we are out of this function scope
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
-#ifdef WITH_WSREP
-  Enable_TOI_preparation_guard toi_guard(thd);
-#endif
+
   if ((ret = open_grant_tables(thd, tables, &transactional_tables)))
     return ret != 1;
 
@@ -3033,13 +3033,6 @@ bool mysql_routine_grant(THD *thd, Table_ref *table_list, bool is_proc,
       commit_and_close_mysql_tables(thd);
       return true;
     }
-
-#ifdef WITH_WSREP
-    if (toi_guard.start_toi()) {
-      commit_and_close_mysql_tables(thd);
-      return true;
-    }
-#endif
 
     MEM_ROOT *old_root = thd->mem_root;
     thd->mem_root = &memex;
@@ -3176,9 +3169,13 @@ bool mysql_revoke_role(THD *thd, const List<LEX_USER> *users,
   TABLE *table = nullptr;
   int ret;
   bool transactional_tables;
+
 #ifdef WITH_WSREP
-  Enable_TOI_preparation_guard toi_guard(thd);
+  if (wsrep_check_system_user_privilege(thd, *users)) {
+    return true;
+  }
 #endif
+
   if ((ret = open_grant_tables(thd, tables, &transactional_tables)))
     return ret != 1; /* purecov: deadcode */
 
@@ -3194,13 +3191,6 @@ bool mysql_revoke_role(THD *thd, const List<LEX_USER> *users,
       commit_and_close_mysql_tables(thd);
       return true;
     }
-
-#ifdef WITH_WSREP
-    if (toi_guard.start_toi()) {
-      commit_and_close_mysql_tables(thd);
-      return true;
-    }
-#endif
 
     table = tables[ACL_TABLES::TABLE_ROLE_EDGES].table;
 
@@ -3442,8 +3432,11 @@ bool mysql_grant_role(THD *thd, const List<LEX_USER> *users,
   bool transactional_tables;
 
 #ifdef WITH_WSREP
-  Enable_TOI_preparation_guard toi_guard(thd);
+  if (wsrep_check_system_user_privilege(thd, *users)) {
+    return true;
+  }
 #endif
+
   if ((ret = open_grant_tables(thd, tables, &transactional_tables)))
     return ret != 1; /* purecov: deadcode */
 
@@ -3459,13 +3452,6 @@ bool mysql_grant_role(THD *thd, const List<LEX_USER> *users,
       commit_and_close_mysql_tables(thd);
       return true;
     }
-
-#ifdef WITH_WSREP
-    if (toi_guard.start_toi()) {
-      commit_and_close_mysql_tables(thd);
-      return true;
-    }
-#endif
 
     table = tables[6].table;
 
@@ -3587,6 +3573,37 @@ bool mysql_grant(THD *thd, const char *db, List<LEX_USER> &list, ulong rights,
     proxied_user = str_list++;
   }
 
+#ifdef WITH_WSREP
+  if (WSREP(thd) && !thd->wsrep_applier) {
+  //{ /* Critical section */
+    /* We need WRITE_MODE lock, because Grant_validator may end up in
+       insert_entry_in_db_cache() which requires it. */
+    Acl_cache_lock_guard acl_cache_lock(thd, Acl_cache_lock_mode::WRITE_MODE);
+    if (!acl_cache_lock.lock()) {
+      return true;
+    }
+
+    bool with_grant_option = ((rights & GRANT_ACL) != 0);
+    if (db == nullptr && with_grant_option && (rights & ~GRANT_ACL) == 0 &&
+        dynamic_privilege.elements > 0) {
+      /*
+        If this is a grant on global privilege level and there only dynamic
+        privileges specified; don't apply the GRANT OPTION on a global privilege
+        level.
+      */
+      rights = 0;
+    }
+
+    dynpriv_table = tables[ACL_TABLES::TABLE_DYNAMIC_PRIV].table;
+    Grant_validator grant_validator(
+        thd, db, list, rights, revoke_grant, dynamic_privilege,
+        grant_all_current_privileges, grant_as, dynpriv_table);
+    if (grant_validator.validate()) {
+      return true;
+    }
+  }
+#endif
+
   /*
     This statement will be replicated as a statement, even when using
     row-based replication.  The binlog state will be cleared here to
@@ -3594,9 +3611,7 @@ bool mysql_grant(THD *thd, const char *db, List<LEX_USER> &list, ulong rights,
     values when we are out of this function scope
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
-#ifdef WITH_WSREP
-  Enable_TOI_preparation_guard toi_guard(thd);
-#endif
+
   if ((ret = open_grant_tables(thd, tables, &transactional_tables)))
     return ret != 1;
 
@@ -3627,13 +3642,6 @@ bool mysql_grant(THD *thd, const char *db, List<LEX_USER> &list, ulong rights,
       commit_and_close_mysql_tables(thd);
       return true;
     }
-
-#ifdef WITH_WSREP
-    if (toi_guard.start_toi()) {
-      commit_and_close_mysql_tables(thd);
-      return true;
-    }
-#endif
 
     /* go through users in user_list */
     grant_version++;
@@ -5285,6 +5293,12 @@ bool mysql_revoke_all(THD *thd, List<LEX_USER> &list) {
   int ret = 0;
   DBUG_TRACE;
 
+#ifdef WITH_WSREP
+  if (wsrep_check_system_user_privilege(thd, list)) {
+    return true;
+  }
+#endif
+
   /*
     This statement will be replicated as a statement, even when using
     row-based replication.  The binlog state will be cleared here to
@@ -5292,9 +5306,7 @@ bool mysql_revoke_all(THD *thd, List<LEX_USER> &list) {
     values when we are out of this function scope
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
-#ifdef WITH_WSREP
-  Enable_TOI_preparation_guard toi_guard(thd);
-#endif
+
   if ((ret = open_grant_tables(thd, tables, &transactional_tables)))
     return ret != 1;
 
@@ -5310,13 +5322,6 @@ bool mysql_revoke_all(THD *thd, List<LEX_USER> &list) {
       commit_and_close_mysql_tables(thd);
       return true;
     }
-
-#ifdef WITH_WSREP
-    if (toi_guard.start_toi()) {
-      commit_and_close_mysql_tables(thd);
-      return true;
-    }
-#endif
 
     TABLE *dynpriv_table = tables[ACL_TABLES::TABLE_DYNAMIC_PRIV].table;
     LEX_USER *lex_user, *tmp_lex_user;
@@ -5467,9 +5472,6 @@ bool sp_revoke_privileges(THD *thd, const char *sp_db, const char *sp_name,
   bool transactional_tables;
   DBUG_TRACE;
 
-#ifdef WITH_WSREP
-  Enable_TOI_preparation_guard toi_guard(thd);
-#endif
   if (0 != (int_result = open_grant_tables(thd, tables, &transactional_tables)))
     return int_result != 1;
 
@@ -5478,13 +5480,6 @@ bool sp_revoke_privileges(THD *thd, const char *sp_db, const char *sp_name,
     commit_and_close_mysql_tables(thd);
     return true;
   }
-
-#ifdef WITH_WSREP
-  if (toi_guard.start_toi()) {
-    commit_and_close_mysql_tables(thd);
-    return true;
-  }
-#endif
 
   /* Be sure to pop this before exiting this scope! */
   thd->push_internal_handler(&error_handler);
@@ -6108,8 +6103,8 @@ bool check_fk_parent_table_access(THD *thd, HA_CREATE_INFO *create_info,
 #ifdef WITH_WSREP
   if (check_fk_support) {
 #endif
-    handlerton *db_type = 
-        create_info->db_type ? create_info->db_type : ha_default_handlerton(thd);
+    handlerton *db_type = create_info->db_type ? create_info->db_type
+                                               : ha_default_handlerton(thd);
 
     // Return if engine does not support Foreign key Constraint.
     if (!ha_check_storage_engine_flag(db_type, HTON_SUPPORTS_FOREIGN_KEYS))
@@ -6600,6 +6595,12 @@ bool mysql_alter_or_clear_default_roles(THD *thd, role_enum role_type,
   int result = 0;
   bool transactional_tables = false;
 
+#ifdef WITH_WSREP
+  if (wsrep_check_system_user_privilege(thd, *users)) {
+    return true;
+  }
+#endif
+
   /*
     This statement will be replicated as a statement, even when using
     row-based replication. The binlog state will be cleared here to
@@ -6607,9 +6608,6 @@ bool mysql_alter_or_clear_default_roles(THD *thd, role_enum role_type,
     values when we are out of this function scope
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
-#ifdef WITH_WSREP
-  Enable_TOI_preparation_guard toi_guard(thd);
-#endif
 
   if ((result = open_grant_tables(thd, tables, &transactional_tables)))
     return result != 1;
@@ -6635,13 +6633,6 @@ bool mysql_alter_or_clear_default_roles(THD *thd, role_enum role_type,
       commit_and_close_mysql_tables(thd);
       return true;
     }
-
-#ifdef WITH_WSREP
-    if (toi_guard.start_toi()) {
-      commit_and_close_mysql_tables(thd);
-      return true;
-    }
-#endif
 
     while ((user = users_it++) && !ret) {
       // Check for CURRENT_USER token

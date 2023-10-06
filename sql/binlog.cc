@@ -10726,7 +10726,7 @@ int THD::decide_logging_format(Table_ref *tables) {
   */
 #ifdef WITH_WSREP
   // Note that wsrep_thd_is_local() returns false for TOI
-  if (WSREP(this) && wsrep_thd_is_local(this) && !wsrep_TOI_preparation &&
+  if (WSREP(this) && wsrep_thd_is_local(this) &&
       variables.wsrep_trx_fragment_size > 0) {
     if (!is_current_stmt_binlog_format_row()) {
       my_message(ER_NOT_SUPPORTED_YET,

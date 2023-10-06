@@ -2036,7 +2036,6 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
 #ifdef WITH_WSREP
-  Enable_TOI_preparation_guard toi_guard(thd);
   /*
     Rewrite query to ensure it is safe to replay on slave thread with proper
     user context established (this is important if original query fails to
@@ -2044,6 +2043,30 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
     w/o re-writting then applier will not be able to establish user context).
   */
   if (WSREP(thd) && !thd->wsrep_applier) {
+    { /* Critical section */
+      Acl_cache_lock_guard acl_cache_rlock(thd, Acl_cache_lock_mode::READ_MODE);
+
+      if (!acl_cache_rlock.lock()) {
+        return true;
+      }
+
+      ACL_USER *acl_user =
+          find_acl_user(lex_user->host.str, lex_user->user.str, true);
+      if (acl_user == nullptr) {
+        my_error(ER_PASSWORD_NO_MATCH, MYF(0));
+        return true;
+      }
+
+      /* trying to change the password of the utility user? */
+      if (acl_is_utility_user(acl_user->user, acl_user->host.get_host(),
+                              nullptr)) {
+        my_error(ER_PASSWORD_NO_MATCH, MYF(0));
+        return true;
+      }
+    }
+
+
+
     size_t query_length_max = strlen("SET PASSWORD FOR ''@''=''") + 3 * 120 + 1;
     char *buff = (char *)thd->alloc(query_length_max);
     if (!buff) {
@@ -2059,7 +2082,8 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
     buff[query_length_max - 1] = 0;
     thd->set_query(buff, query_length);
 
-    if ((ret = open_grant_tables(thd, tables, &transactional_tables))) {
+    if ((ret = open_grant_tables(thd, tables, &transactional_tables,
+                                 WSREP_MYSQL_DB, "user"))) {
       thd->set_query(query_save);
       return (ret != 1);
     }
@@ -2094,17 +2118,6 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
       my_error(ER_PASSWORD_NO_MATCH, MYF(0));
       return true;
     }
-
-#ifdef WITH_WSREP
-    /* We can start TOI after acl cache lock is acquired.
-       Doing it before acquiring the lock, would lead to the deadlock,
-       because all other functions using start_toi_after_open_grant_tables()
-       do it in the order: acl_cache_lock.lock() -> start TOI */
-    if (!thd->wsrep_applier && toi_guard.start_toi(WSREP_MYSQL_DB, "user")) {
-      commit_and_close_mysql_tables(thd);
-      return true;
-    }
-#endif
 
     assert(acl_user->plugin.length != 0);
     is_role = acl_user->is_role;
@@ -2815,6 +2828,13 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
 
   /* check if CREATE user is allowed on this user list or not. */
   if (check_orphaned_definers(thd, list)) return true;
+
+#if WITH_WSREP
+  if (wsrep_check_system_user_privilege(thd, list)) {
+    return true;
+  }
+#endif
+
   /*
     This statement will be replicated as a statement, even when using
     row-based replication.  The binlog state will be cleared here to
@@ -2822,9 +2842,6 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
     values when we are out of this function scope
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
-#ifdef WITH_WSREP
-  Enable_TOI_preparation_guard toi_guard(thd);
-#endif
 
   /* CREATE USER may be skipped on replication client. */
   if ((result = open_grant_tables(thd, tables, &transactional_tables)))
@@ -2842,13 +2859,6 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
       commit_and_close_mysql_tables(thd);
       return true;
     }
-
-#ifdef WITH_WSREP
-    if (toi_guard.start_toi()) {
-      commit_and_close_mysql_tables(thd);
-      return true;
-    }
-#endif
 
     while ((tmp_user_name = user_list++)) {
       if (acl_is_utility_user(tmp_user_name->user.str, tmp_user_name->host.str,
@@ -3139,6 +3149,12 @@ bool mysql_drop_user(THD *thd, List<LEX_USER> &list, bool if_exists,
   /* check if DROP user is allowed on this user list or not. */
   if (check_orphaned_definers(thd, list)) return true;
 
+#if WITH_WSREP
+  if (wsrep_check_system_user_privilege(thd, list)) {
+    return true;
+  }
+#endif
+
   /*
     Make sure that none of the authids we're about to drop is used as a
     mandatory role. Mandatory roles needs to be disabled first before the
@@ -3154,9 +3170,6 @@ bool mysql_drop_user(THD *thd, List<LEX_USER> &list, bool if_exists,
     values when we are out of this function scope
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
-#ifdef WITH_WSREP
-  Enable_TOI_preparation_guard toi_guard(thd);
-#endif
   /* DROP USER may be skipped on replication client. */
   if ((result = open_grant_tables(thd, tables, &transactional_tables)))
     return result != 1;
@@ -3172,13 +3185,6 @@ bool mysql_drop_user(THD *thd, List<LEX_USER> &list, bool if_exists,
       commit_and_close_mysql_tables(thd);
       return true;
     }
-
-#ifdef WITH_WSREP
-    if (toi_guard.start_toi()) {
-      commit_and_close_mysql_tables(thd);
-      return true;
-    }
-#endif
 
     get_mandatory_roles(&mandatory_roles);
     while ((user = user_list++) != nullptr) {
@@ -3332,9 +3338,7 @@ bool mysql_rename_user(THD *thd, List<LEX_USER> &list) {
     values when we are out of this function scope
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
-#ifdef WITH_WSREP
-  Enable_TOI_preparation_guard toi_guard(thd);
-#endif
+
   /* RENAME USER may be skipped on replication client. */
   if ((result = open_grant_tables(thd, tables, &transactional_tables)))
     return result != 1;
@@ -3375,13 +3379,6 @@ bool mysql_rename_user(THD *thd, List<LEX_USER> &list) {
 #endif /* WITH_WSREP */
       }
       assert(user_to != nullptr); /* Syntax enforces pairs of users. */
-
-#ifdef WITH_WSREP
-      if (toi_guard.start_toi()) {
-        commit_and_close_mysql_tables(thd);
-        return true;
-      }
-#endif
 
       /*
         If we are renaming to anonymous user, make sure no roles are granted.
@@ -3529,6 +3526,12 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
   std::vector<std::string> server_challenge;
   DBUG_TRACE;
 
+#if WITH_WSREP
+  if (wsrep_check_system_user_privilege(thd, list)) {
+    return true;
+  }
+#endif
+
   /*
     This statement will be replicated as a statement, even when using
     row-based replication.  The binlog state will be cleared here to
@@ -3536,9 +3539,6 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
     values when we are out of this function scope
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
-#ifdef WITH_WSREP
-  Enable_TOI_preparation_guard toi_guard(thd);
-#endif
   if ((result = open_grant_tables(thd, tables, &transactional_tables)))
     return result != 1;
 
@@ -3554,13 +3554,6 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
       commit_and_close_mysql_tables(thd);
       return true;
     }
-
-#ifdef WITH_WSREP
-    if (toi_guard.start_toi()) {
-      commit_and_close_mysql_tables(thd);
-      return true;
-    }
-#endif
 
     is_privileged_user = is_privileged_user_for_credential_change(thd);
 
