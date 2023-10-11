@@ -547,6 +547,7 @@ build_srpm(){
     #
     mv -fv ${TARFILE} ${WORKDIR}/rpmbuild/SOURCES
     cd ${WORKDIR}/rpmbuild/SOURCES || exit
+    wget https://raw.githubusercontent.com/Percona-Lab/telemetry-agent/phase-0/call-home.sh
     tar -xzf ${TARFILE}
     rm -rf ${TARFILE}
     PXCDIR=$(ls | grep 'Percona-XtraDB-Cluster*' | sort | tail -n1)
@@ -577,6 +578,18 @@ build_srpm(){
         SCONS_ARGS=""
     fi
     source ${WORKDIR}/pxc-80.properties
+    cd ${WORKDIR}/rpmbuild/SPECS
+    line_number=$(grep -n SOURCE999 percona-xtradb-cluster.spec | awk -F ':' '{print $1}')
+    cp ../SOURCES/call-home.sh ./
+    awk -v n=$line_number 'NR <= n {print > "part1.txt"} NR > n {print > "part2.txt"}' percona-xtradb-cluster.spec
+    head -n -1 part1.txt > temp && mv temp part1.txt
+    echo "cat <<'CALLHOME' > /tmp/call-home.sh" >> part1.txt
+    cat call-home.sh >> part1.txt 
+    echo "CALLHOME" >> part1.txt
+    cat part2.txt >> part1.txt
+    rm -f call-home.sh part2.txt
+    mv part1.txt percona-xtradb-cluster.spec
+    cd ${WORKDIR}
     if [ -n ${SRCRPM} ]; then
         if test "x${SCONS_ARGS}" == "x"
         then
@@ -867,6 +880,19 @@ build_deb(){
     chmod 777 debian/rules
     dch -b -m -D "$DEBIAN_VERSION" --force-distribution -v "1:$MYSQL_VERSION-$MYSQL_RELEASE-$DEB_RELEASE.${DEBIAN_VERSION}" 'Update distribution'
     #
+
+    cd debian/
+        wget https://raw.githubusercontent.com/Percona-Lab/telemetry-agent/phase-0/call-home.sh
+        sed -i 's:exit 0::' percona-xtradb-cluster-server.postinst
+        echo "cat <<'CALLHOME' > /tmp/call-home.sh" >> percona-xtradb-cluster-server.postinst
+        cat call-home.sh >> percona-xtradb-cluster-server.postinst 
+        echo "CALLHOME" >> percona-xtradb-cluster-server.postinst
+        echo 'bash -x /tmp/call-home.sh -f "PRODUCT_FAMILY_PXC" -v "8.0.34-26-1" -d "PACKAGE" &>/dev/null || :' >> percona-xtradb-cluster-server.postinst
+        echo "rm -rf /tmp/call-home.sh" >> percona-xtradb-cluster-server.postinst
+        echo "exit 0" >> percona-xtradb-cluster-server.postinst
+        rm -f call-home.sh
+    cd ../
+
     GALERA_REVNO="${GALERA_REVNO}" SCONS_ARGS=' strict_build_flags=0'  MAKE_JFLAG=-j4  dpkg-buildpackage -rfakeroot -uc -us -b
     #
     cd ${WORKSPACE} || exit

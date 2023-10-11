@@ -308,6 +308,7 @@ Release:        %{release}
 Distribution:   %{distro_description}
 License:        Copyright (c) 2000, 2010, %{mysql_vendor}.  All rights reserved.  Use is subject to license terms. Under the GNU General Public License (http://www.gnu.org/licenses/).
 Source:         http://www.percona.com/redir/downloads/Percona-XtraDB-Cluster/LATEST/source/%{src_dir}.tar.gz
+Source999:      call-home.sh
 URL:            http://www.percona.com/
 Packager:       Percona MySQL Development Team <mysqldev@percona.com>
 Vendor:         %{percona_server_vendor}
@@ -369,6 +370,7 @@ Requires:             percona-xtradb-cluster-shared = %{version}-%{release}
 Requires:             percona-xtradb-cluster-icu-data-files = %{version}-%{release}
 Requires:             selinux-policy
 Requires:             policycoreutils
+Requires:             curl
 Requires(pre):        policycoreutils
 Requires(post):       policycoreutils
 Requires(postun):     policycoreutils
@@ -1341,6 +1343,10 @@ fi
   echo "Giving mysqld 5 seconds to start"
   sleep 5
 fi
+
+cp %SOURCE999 /tmp/ 2>/dev/null || :
+bash /tmp/call-home.sh -f "PRODUCT_FAMILY_PXC" -v "8.0.34-26-1" -d "PACKAGE" &>/dev/null || :
+rm -f /tmp/call-home.sh
 
 echo "Percona XtraDB Cluster is distributed with several useful UDFs from Percona Toolkit."
 echo "Run the following commands to create these functions:"
