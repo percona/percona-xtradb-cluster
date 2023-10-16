@@ -2244,8 +2244,17 @@ bool sp_head::execute(THD *thd, bool merge_da_on_success) {
 #ifdef WITH_WSREP
     if (WSREP(thd) &&
         (m_type == enum_sp_type::PROCEDURE || m_type == enum_sp_type::EVENT)) {
-      if ((thd->is_fatal_error() || thd->is_killed()) &&
-          (thd->wsrep_trx().state() == wsrep::transaction::s_executing)) {
+      mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+      const bool is_killed_or_must_abort =
+          ((thd->wsrep_trx().state() == wsrep::transaction::s_executing) &&
+           (thd->is_fatal_error() || thd->killed)) ||
+          wsrep_must_abort(thd);
+      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+
+      if (is_killed_or_must_abort) {
+        WSREP_DEBUG("SP abort err status %d in sub %d trx state %d", err_status,
+                    thd->in_sub_stmt, thd->wsrep_trx().state());
+        err_status = 1;
         /*
           SP was killed, and it is not due to a wsrep conflict.
           We skip after_statement hook at this point because
@@ -2274,13 +2283,28 @@ bool sp_head::execute(THD *thd, bool merge_da_on_success) {
           so that the error does not get propagated via client-server protocol.
         */
         if (wsrep_current_error(thd)) {
+          /*
+            If even transaction replay failed due to certification conflict and
+            we still have the deadlock error, then we must return error from
+            here.
+          */
+          if (must_replay &&
+              wsrep_current_error(thd) == wsrep::client_error::e_deadlock_error)
+            err_status = 1;
+
           wsrep_override_error(thd, wsrep_current_error(thd),
                                wsrep_current_error_status(thd));
           thd->wsrep_cs().reset_error();
+
           /* Reset also thd->killed if it has been set during BF abort. */
           if (thd->killed == THD::KILL_QUERY) {
             thd->killed = THD::NOT_KILLED;
           }
+          /*
+            If the failed transaction was not replayed, must return with error
+            from here.
+          */
+          if (!must_replay) err_status = 1;
         }
       }
     }
