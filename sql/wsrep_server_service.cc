@@ -144,7 +144,9 @@ void Wsrep_server_service::release_high_priority_service(
 }
 
 void Wsrep_server_service::background_rollback(
+    [[maybe_unused]] wsrep::unique_lock<wsrep::mutex> &lock,
     wsrep::client_state &client_state) {
+  assert(lock.owns_lock());
   Wsrep_client_state &cs = static_cast<Wsrep_client_state &>(client_state);
   wsrep_fire_rollbacker(cs.thd());
 }
