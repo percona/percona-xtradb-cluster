@@ -468,6 +468,7 @@ void wsrep_init_sidno(const wsrep_uuid_t &);
 bool wsrep_node_is_donor();
 bool wsrep_node_is_synced();
 bool wsrep_replicate_GTID(THD *thd);
+void free_gtid_event_buf(THD *thd);
 
 void wsrep_init_SR();
 void wsrep_verify_SE_checkpoint(const wsrep_uuid_t &uuid, wsrep_seqno_t seqno);

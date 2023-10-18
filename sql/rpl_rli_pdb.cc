@@ -2632,6 +2632,10 @@ int slave_worker_exec_job_group(Slave_worker *worker, Relay_log_info *rli) {
 
   return 0;
 err:
+#ifdef WITH_WSREP
+  /* Free the GTID buffer associated with the thread. */
+  free_gtid_event_buf(thd);
+#endif /* WITH_WSREP */
   if (error) {
     Commit_stage_manager::get_instance().finish_session_ticket(thd);
 

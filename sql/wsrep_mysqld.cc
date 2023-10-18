@@ -2352,7 +2352,7 @@ fail:
   unireg_abort(1);
 }
 
-static void free_gtid_event_buf(THD *thd) {
+void free_gtid_event_buf(THD *thd) {
   if (thd->wsrep_gtid_event_buf) my_free(thd->wsrep_gtid_event_buf);
   thd->wsrep_gtid_event_buf_len = 0;
   thd->wsrep_gtid_event_buf = NULL;
