@@ -7580,6 +7580,8 @@ err:
   // report error
 
 #ifdef WITH_WSREP
+  /* Free the GTID buffer associated with the thread. */
+  free_gtid_event_buf(thd);
   if (main_loop_error == true && WSREP_ON) {
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
     if (thd->wsrep_cs().current_error()) {
