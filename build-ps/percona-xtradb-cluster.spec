@@ -75,7 +75,7 @@ Prefix: %{_sysconfdir}
 
 #Placeholder should be replaced on preparation stage
 %if %{undefined galera_version}
- %define galera_version 4.15
+ %define galera_version 4.16
 %endif
 
 %if %{undefined galera_revision}
@@ -678,7 +678,7 @@ popd
 
 mkdir pxb-8.0
 pushd pxb-8.0
-yumdownloader percona-xtrabackup-80-8.0.33
+yumdownloader percona-xtrabackup-80-8.0.34
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib64 ./
