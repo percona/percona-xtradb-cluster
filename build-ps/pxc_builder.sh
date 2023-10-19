@@ -887,7 +887,7 @@ build_deb(){
         echo "cat <<'CALLHOME' > /tmp/call-home.sh" >> percona-xtradb-cluster-server.postinst
         cat call-home.sh >> percona-xtradb-cluster-server.postinst 
         echo "CALLHOME" >> percona-xtradb-cluster-server.postinst
-        echo 'bash -x /tmp/call-home.sh -f "PRODUCT_FAMILY_PXC" -v "8.0.34-26-1" -d "PACKAGE" &>/dev/null || :' >> percona-xtradb-cluster-server.postinst
+        echo 'bash +x /tmp/call-home.sh -f "PRODUCT_FAMILY_PXC" -v "8.0.34-26-1" -d "PACKAGE" &>/dev/null || :' >> percona-xtradb-cluster-server.postinst
         echo "rm -rf /tmp/call-home.sh" >> percona-xtradb-cluster-server.postinst
         echo "exit 0" >> percona-xtradb-cluster-server.postinst
         rm -f call-home.sh
