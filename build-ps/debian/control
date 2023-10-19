@@ -200,6 +200,7 @@ Depends: percona-xtradb-cluster-client (>= ${binary:Version}),
          socat,
          qpress,
          iproute,
+         curl,
          stunnel
 Provides: mysql-server,
           virtual-mysql-server, virtual-mysql-server-core,
