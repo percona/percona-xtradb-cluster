@@ -244,6 +244,12 @@ bool Event_db_repository::drop_event(THD *thd, LEX_CSTRING db, LEX_CSTRING name,
 
     push_warning_printf(thd, Sql_condition::SL_NOTE, ER_SP_DOES_NOT_EXIST,
                         ER_THD(thd, ER_SP_DOES_NOT_EXIST), "Event", name.str);
+#ifdef WITH_WSREP
+    /* If 'IF EXISTS' clause is present, we replicate always. */
+    if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL)) {
+      return true;
+    }
+#endif
     return false;
   }
   /*
