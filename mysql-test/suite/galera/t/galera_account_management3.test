@@ -1,0 +1,66 @@
+#
+# Test the account management statements - GRANT, REVOKE with partial_revokes enabled
+#
+
+
+--source include/galera_cluster.inc
+--source include/have_log_bin.inc
+--source include/count_sessions.inc
+
+#
+# CREATE USER
+#
+--connection node_1
+CREATE ROLE 'reader', 'writer';
+GRANT SELECT ON *.* TO 'reader';
+GRANT INSERT, UPDATE, DELETE ON *.* TO 'writer';
+
+CREATE USER 'user1'@'%' IDENTIFIED WITH mysql_native_password BY 'passwd';
+CREATE USER 'user2'@'%' IDENTIFIED WITH mysql_native_password BY 'passwd';
+
+GRANT ALL PRIVILEGES ON *.* TO 'user1'@'%' WITH GRANT OPTION ;
+GRANT 'reader', 'writer' TO 'user2'@'%';
+GRANT USAGE ON *.* TO 'user2'@'%' WITH GRANT OPTION;
+
+--connect node_1a, 127.0.0.1, user1, passwd, test, $NODE_MYPORT_1
+--connection node_1a
+GRANT ALL PRIVILEGES ON *.* TO 'user2'@'%' WITH GRANT OPTION ;
+--disconnect node_1a
+
+--connect node_1b, 127.0.0.1, user2, passwd, test, $NODE_MYPORT_1
+--connection node_1b
+SET ROLE 'writer';
+GRANT ALL PRIVILEGES ON *.* TO 'user1'@'%' WITH GRANT OPTION;
+
+--let $binlog_file = mysqld-bin.000002
+--let $binlog_position = 2282
+--let $limit = 1
+--let $event_sequence = .*GRANT ALL PRIVILEGES ON.*TO 'user2'.* WITH GRANT OPTION AS 'user1'.* WITH ROLE NONE.*
+--source include/assert_binlog_events.inc
+
+--let $binlog_file = mysqld-bin.000002
+--let $binlog_position = 2547
+--let $limit = 1
+--let $event_sequence = .*GRANT ALL PRIVILEGES ON.*TO 'user1'.* WITH GRANT OPTION AS 'user2'.* WITH ROLE 'writer'.*
+--source include/assert_binlog_events.inc
+
+--disconnect node_1b
+
+--connection node_2
+--let $binlog_file = mysqld-bin.000004
+--let $binlog_position = 2298
+--let $limit = 1
+--let $event_sequence = .*GRANT ALL PRIVILEGES ON.*TO 'user2'.* WITH GRANT OPTION AS 'user1'.* WITH ROLE NONE.*
+--source include/assert_binlog_events.inc
+
+--let $binlog_file = mysqld-bin.000004
+--let $binlog_position = 2565
+--let $limit = 1
+--let $event_sequence = .*GRANT ALL PRIVILEGES ON.*TO 'user1'.* WITH GRANT OPTION AS 'user2'.* WITH ROLE 'writer'.*
+--source include/assert_binlog_events.inc
+
+--connection node_1
+DROP USER 'user1'@'%';
+DROP USER 'user2'@'%';
+DROP ROLE 'reader', 'writer';
+--source include/wait_until_count_sessions.inc

@@ -421,6 +421,7 @@ MySQL clients support the protocol:
   @page PAGE_TESTING_TOOLS Testing Tools
 
   - @subpage PAGE_MYSQL_TEST_RUN
+  - @subpage PAGE_COMPONENT_MOCK_UNIT_TEST_TOOLS
 */
 
 /**
@@ -759,8 +760,8 @@ MySQL clients support the protocol:
 #include "mysql_version.h"
 #include "mysqld_error.h"
 #include "mysys/buffered_error_log.h"
-#include "mysys_err.h"  // EXIT_OUT_OF_MEMORY
 #include "mysys/build_id.h"
+#include "mysys_err.h"  // EXIT_OUT_OF_MEMORY
 #include "pfs_thread_provider.h"
 #include "print_version.h"
 #include "scope_guard.h"                            // create_scope_guard()
@@ -804,22 +805,23 @@ MySQL clients support the protocol:
 #include "sql/mdl_context_backup.h"  // mdl_context_backup_manager
 #include "sql/my_decimal.h"
 #include "sql/mysqld_daemon.h"
-#include "sql/mysqld_thd_manager.h"     // Global_THD_manager
-#include "sql/opt_costconstantcache.h"  // delete_optimizer_cost_module
-#include "sql/range_optimizer/range_optimizer.h"  // range_optimizer_init
-#include "sql/options_mysqld.h"                   // OPT_THREAD_CACHE_SIZE
-#include "sql/partitioning/partition_handler.h"   // partitioning_init
-#include "sql/persisted_variable.h"               // Persisted_variables_cache
+#include "sql/mysqld_thd_manager.h"              // Global_THD_manager
+#include "sql/opt_costconstantcache.h"           // delete_optimizer_cost_module
+#include "sql/options_mysqld.h"                  // OPT_THREAD_CACHE_SIZE
+#include "sql/partitioning/partition_handler.h"  // partitioning_init
+#include "sql/persisted_variable.h"              // Persisted_variables_cache
 #include "sql/plugin_table.h"
 #include "sql/protocol.h"
 #include "sql/psi_memory_key.h"  // key_memory_MYSQL_RELAY_LOG_index
 #include "sql/query_options.h"
+#include "sql/range_optimizer/range_optimizer.h"    // range_optimizer_init
 #include "sql/replication.h"                        // thd_enter_cond
 #include "sql/resourcegroups/resource_group_mgr.h"  // init, post_init
 #include "sql/sql_profile.h"
 #ifdef _WIN32
 #include "sql/restart_monitor_win.h"
 #endif
+#include "my_openssl_fips.h"  // OPENSSL_ERROR_LENGTH, set_fips_mode
 #include "sql/rpl_async_conn_failover_configuration_propagation.h"
 #include "sql/rpl_event_ctx.h"  // Rpl_event_ctx
 #include "sql/rpl_filter.h"
@@ -831,11 +833,11 @@ MySQL clients support the protocol:
 #include "sql/rpl_injector.h"  // injector
 #include "sql/rpl_io_monitor.h"
 #include "sql/rpl_log_encryption.h"
-#include "sql/rpl_source.h"  // max_binlog_dump_events
 #include "sql/rpl_mi.h"
 #include "sql/rpl_msr.h"      // Multisource_info
-#include "sql/rpl_rli.h"      // Relay_log_info
 #include "sql/rpl_replica.h"  // replica_load_tmpdir
+#include "sql/rpl_rli.h"      // Relay_log_info
+#include "sql/rpl_source.h"   // max_binlog_dump_events
 #include "sql/rpl_trx_tracking.h"
 #include "sql/sd_notify.h"  // sd_notify_connect
 #include "sql/session_tracker.h"
@@ -886,7 +888,6 @@ MySQL clients support the protocol:
 #include "thr_mutex.h"
 #include "typelib.h"
 #include "violite.h"
-#include "my_openssl_fips.h"  // OPENSSL_ERROR_LENGTH, set_fips_mode
 
 #ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
 #include "storage/perfschema/pfs_server.h"
@@ -3080,6 +3081,9 @@ static void clean_up(bool print_message) {
     the component system unregister_ variable()  api's, hence we need
     to call the sys_var_end() after component_infrastructure_deinit()
   */
+  buffered_error_log.write_to_disk();
+  buffered_error_log
+      .close();  // buffered_error_log_filename will be freed by sys_var_end()
   sys_var_end();
   free_status_vars();
 
@@ -6188,7 +6192,7 @@ static void my_openssl_free(void *ptr FILE_LINE_ARGS) {
 #endif  // !_WIN32
 }
 
-static void init_ssl() {
+static int init_ssl() {
 #if defined(HAVE_PSI_MEMORY_INTERFACE)
   static PSI_memory_info all_openssl_memory[] = {
       {&key_memory_openssl, "openssl_malloc", 0, 0,
@@ -6202,14 +6206,19 @@ static void init_ssl() {
     LogErr(WARNING_LEVEL, ER_SSL_MEMORY_INSTRUMENTATION_INIT_FAILED,
            "CRYPTO_set_mem_functions");
   ssl_start();
-}
-
-static int init_ssl_communication() {
   char ssl_err_string[OPENSSL_ERROR_LENGTH] = {'\0'};
   if (set_fips_mode(opt_ssl_fips_mode, ssl_err_string)) {
     LogErr(ERROR_LEVEL, ER_SSL_FIPS_MODE_ERROR, ssl_err_string);
     return 1;
   }
+
+  if (opt_ssl_fips_mode != SSL_FIPS_MODE_OFF)
+    LogErr(WARNING_LEVEL, ER_DEPRECATE_MSG_NO_REPLACEMENT, "--ssl-fips-mode");
+
+  return 0;
+}
+
+static int init_ssl_communication() {
   if (TLS_channel::singleton_init(&mysql_main, mysql_main_channel, opt_use_ssl,
                                   &server_main_callback, opt_initialize))
     return 1;
@@ -7547,11 +7556,20 @@ static int init_server_components() {
     WSREP_WARN(
         "You have enabled keyring plugin. SST encryption is mandatory. "
         "Please enable pxc_encrypt_cluster_traffic. Check "
-        "https://www.percona.com/doc/percona-xtradb-cluster/%u.%u/security/"
-        "encrypt-traffic.html#encrypt-sst for more details.",
+        "https://docs.percona.com/percona-xtradb-cluster/%u.%u/"
+        "encrypt-traffic.html#encrypt-sst-traffic for more details.",
         MYSQL_VERSION_MAJOR, MYSQL_VERSION_MINOR);
   }
 #endif
+
+  LEX_CSTRING plugin_name = {STRING_WITH_LEN("thread_pool")};
+  if (Connection_handler_manager::thread_handling !=
+          Connection_handler_manager::SCHEDULER_ONE_THREAD_PER_CONNECTION ||
+      plugin_is_ready(plugin_name, MYSQL_DAEMON_PLUGIN)) {
+    auto res_grp_mgr = resourcegroups::Resource_group_mgr::instance();
+    res_grp_mgr->disable_resource_group();
+    res_grp_mgr->set_unsupport_reason("Thread pool plugin enabled");
+  }
 
 #ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
   if (!is_help_or_validate_option()) {
@@ -8296,6 +8314,8 @@ int win_main(int argc, char **argv)
 int mysqld_main(int argc, char **argv)
 #endif
 {
+  initialize_stack_direction();
+
   // Substitute the full path to the executable in argv[0]
   substitute_progpath(argv);
   sysd::notify_connect();
@@ -8595,7 +8615,10 @@ int mysqld_main(int argc, char **argv)
 #endif /* HAVE_PSI_INTERFACE */
 
   /* This limits ability to configure SSL library through config options */
-  init_ssl();
+  if (init_ssl()) {
+    flush_error_log_messages();
+    exit(MYSQLD_ABORT_EXIT);
+  }
 
   /* Set umask as early as possible */
   umask(((~my_umask) & 0666));
@@ -10984,6 +11007,13 @@ static int show_open_tables(THD *, SHOW_VAR *var, char *buff) {
   return 0;
 }
 
+static int show_open_tables_with_triggers(THD *, SHOW_VAR *var, char *buff) {
+  var->type = SHOW_LONG;
+  var->value = buff;
+  *((long *)buff) = (long)table_cache_manager.loaded_triggers_tables();
+  return 0;
+}
+
 static int show_prepared_stmt_count(THD *, SHOW_VAR *var, char *buff) {
   var->type = SHOW_LONG;
   var->value = buff;
@@ -11377,6 +11407,8 @@ SHOW_VAR status_vars[] = {
     {"Open_table_definitions", (char *)&show_table_definitions, SHOW_FUNC,
      SHOW_SCOPE_GLOBAL},
     {"Open_tables", (char *)&show_open_tables, SHOW_FUNC, SHOW_SCOPE_ALL},
+    {"Open_tables_with_triggers", (char *)&show_open_tables_with_triggers,
+     SHOW_FUNC, SHOW_SCOPE_ALL},
     {"Opened_files",
      const_cast<char *>(reinterpret_cast<const char *>(&my_file_total_opened)),
      SHOW_LONG_NOFLUSH, SHOW_SCOPE_GLOBAL},
@@ -12032,6 +12064,7 @@ bool mysqld_get_one_option(int optid,
       break;
     case OPT_BINLOG_FORMAT:
       binlog_format_used = true;
+      LogErr(WARNING_LEVEL, ER_DEPRECATE_MSG_NO_REPLACEMENT, "binlog_format");
       break;
     case OPT_BINLOG_MAX_FLUSH_QUEUE_TIME:
       push_deprecated_warn_no_replacement(nullptr,
@@ -12607,6 +12640,10 @@ bool mysqld_get_one_option(int optid,
       break;
     case OPT_OLD_STYLE_USER_LIMITS:
       push_deprecated_warn_no_replacement(nullptr, "--old-style-user-limits");
+      break;
+    case OPT_SYNC_RELAY_LOG_INFO:
+      LogErr(WARNING_LEVEL, ER_DEPRECATE_MSG_NO_REPLACEMENT,
+             "--sync-relay-log-info");
   }
   return false;
 }
@@ -14087,6 +14124,7 @@ PSI_stage_info stage_rpl_failover_updating_source_member_details= { 0, "Updating
 PSI_stage_info stage_rpl_failover_wait_before_next_fetch= { 0, "Wait before trying to fetch next membership changes from source", 0, PSI_DOCUMENT_ME};
 PSI_stage_info stage_communication_delegation= { 0, "Connection delegated to Group Replication", 0, PSI_DOCUMENT_ME};
 PSI_stage_info stage_restoring_secondary_keys= { 0, "restoring secondary keys", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wait_on_commit_ticket= { 0, "Waiting for Binlog Group Commit ticket", 0, PSI_DOCUMENT_ME};
 /* clang-format on */
 
 extern PSI_stage_info stage_waiting_for_disk_space;
@@ -14252,7 +14290,8 @@ PSI_stage_info *all_server_stages[] = {
     &stage_rpl_failover_updating_source_member_details,
     &stage_rpl_failover_wait_before_next_fetch,
     &stage_communication_delegation,
-    &stage_restoring_secondary_keys};
+    &stage_restoring_secondary_keys,
+    &stage_wait_on_commit_ticket};
 
 #ifdef WITH_WSREP
 /* clang-format off */

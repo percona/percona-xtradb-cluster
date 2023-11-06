@@ -704,6 +704,7 @@ extern PSI_stage_info stage_rpl_failover_updating_source_member_details;
 extern PSI_stage_info stage_rpl_failover_wait_before_next_fetch;
 extern PSI_stage_info stage_communication_delegation;
 extern PSI_stage_info stage_restoring_secondary_keys;
+extern PSI_stage_info stage_wait_on_commit_ticket;
 
 #ifdef WITH_WSREP
 extern PSI_stage_info stage_wsrep_writing_rows;

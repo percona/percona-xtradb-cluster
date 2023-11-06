@@ -213,13 +213,12 @@ BEGIN
   --
   -- For "unauthenticated user", see Bug#30035699 "UNAUTHENTICATED USER" SHOWS UP IN CHECK-TESTCASE
   --
-  -- SELECT USER, HOST, DB, COMMAND, INFO FROM INFORMATION_SCHEMA.PROCESSLIST
-  --   WHERE COMMAND NOT IN ('Sleep')
+  -- Also (in similar fashion as above) exclude all 'Daemon' threads, they will
+  -- not give consistent result either.
+  --
+  -- SELECT /*+SET_VAR(use_secondary_engine=OFF)*/ USER, HOST, DB, COMMAND, INFO FROM INFORMATION_SCHEMA.PROCESSLIST
+  --  WHERE COMMAND NOT IN ('Sleep', 'Daemon')
   --    AND USER NOT IN ('unauthenticated user','mysql.session', 'event_scheduler')
-  --      ORDER BY COMMAND;
-  -- SELECT USER, HOST, DB, COMMAND, INFO FROM INFORMATION_SCHEMA.PROCESSLIST
-  --  WHERE COMMAND NOT IN ('Sleep')
-  --    AND USER NOT IN ('mysql.session', 'event_scheduler')
   --      ORDER BY COMMAND;
 
   -- Show open connections/transactions in wsrep provider

@@ -76,35 +76,12 @@ SET PASSWORD FOR 'y'@'localhost' TO RANDOM;
 DROP USER 'utilityuser'@'localhost';
 
 
-#
-# Two nodes interaction
-#
---connection node_1
 CALL mtr.add_suppression(".*Operation DROP USER failed.*");
 CALL mtr.add_suppression(".*Fail to replicate: DROP USER.*");
 
 --connection node_2
 CALL mtr.add_suppression(".*Operation DROP USER failed.*");
 CALL mtr.add_suppression(".*Query apply failed.*");
-
---connection node_1
-CREATE USER 'z'@'localhost' IDENTIFIED BY 'z';
-GRANT ALL ON *.* TO 'z'@'localhost' WITH GRANT OPTION;
-
-# It will be BF aborted so will continue automatically after abortion, but we need to wait anyway
-SET DEBUG_SYNC = 'wl14084_after_table_locks SIGNAL after_table_locks.reached WAIT_FOR after_table_locks.continue';
---send DROP USER 'z'@'localhost';
-
---connection node_1a
-SET DEBUG_SYNC = 'now WAIT_FOR after_table_locks.reached';
-
---connection node_2
-DROP USER 'z'@'localhost';
-
---connection node_1
---error ER_CANNOT_USER
---reap
-
 
 --connection node_1
 

@@ -81,7 +81,6 @@
 #include "errmsg.h"  // CR_*
 #include "lex_string.h"
 #include "libbinlogevents/include/binlog_event.h"
-#include "libbinlogevents/include/compression/iterator.h"
 #include "libbinlogevents/include/control_events.h"
 #include "libbinlogevents/include/debug_vars.h"
 #include "m_ctype.h"
@@ -7542,8 +7541,12 @@ wsrep_restart_point :
     // set additional context as needed by the scheduler before execution
     // takes place
     if (ev != nullptr && rli->is_parallel_exec() &&
-        rli->current_mts_submode != nullptr)
-      rli->current_mts_submode->set_multi_threaded_applier_context(*rli, *ev);
+        rli->current_mts_submode != nullptr) {
+      if (rli->current_mts_submode->set_multi_threaded_applier_context(*rli, 
+                                                                       *ev)) {
+        goto err;
+      }
+    }
 
     // try to execute the event
     switch (exec_relay_log_event(thd, rli, &applier_reader, ev)) {
@@ -7577,6 +7580,8 @@ err:
   // report error
 
 #ifdef WITH_WSREP
+  /* Free the GTID buffer associated with the thread. */
+  free_gtid_event_buf(thd);
   if (main_loop_error == true && WSREP_ON) {
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
     if (thd->wsrep_cs().current_error()) {

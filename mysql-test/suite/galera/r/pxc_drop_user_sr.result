@@ -45,13 +45,6 @@ CALL mtr.add_suppression(".*Operation DROP USER failed.*");
 CALL mtr.add_suppression(".*Fail to replicate: DROP USER.*");
 CALL mtr.add_suppression(".*Operation DROP USER failed.*");
 CALL mtr.add_suppression(".*Query apply failed.*");
-CREATE USER 'z'@'localhost' IDENTIFIED BY 'z';
-GRANT ALL ON *.* TO 'z'@'localhost' WITH GRANT OPTION;
-SET DEBUG_SYNC = 'wl14084_after_table_locks SIGNAL after_table_locks.reached WAIT_FOR after_table_locks.continue';
-DROP USER 'z'@'localhost';;
-SET DEBUG_SYNC = 'now WAIT_FOR after_table_locks.reached';
-DROP USER 'z'@'localhost';
-ERROR HY000: Operation DROP USER failed for 'z'@'localhost'
 DROP TABLE t1;
 DROP USER 'x'@'localhost';
 DROP USER 'y'@'localhost';

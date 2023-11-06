@@ -37,6 +37,7 @@
 #include "mutex_lock.h"  // Mutex_lock
 #include "my_alloc.h"
 #include "my_base.h"
+#include "my_cleanse.h"
 #include "my_compiler.h"
 #include "my_dbug.h"
 #include "my_inttypes.h"
@@ -44,9 +45,11 @@
 #include "my_sqlcommand.h"
 #include "my_sys.h"
 #include "my_time.h"
+#include "mysql/components/my_service.h"
 #include "mysql/components/services/bits/psi_bits.h"
 #include "mysql/components/services/log_builtins.h"
 #include "mysql/components/services/log_shared.h"
+#include "mysql/components/services/validate_password.h"
 #include "mysql/mysql_lex_string.h"
 #include "mysql/plugin.h"
 #include "mysql/plugin_audit.h"
@@ -56,6 +59,7 @@
 #include "mysql_time.h"
 #include "mysqld_error.h"
 #include "password.h" /* my_make_scrambled_password */
+#include "scope_guard.h"
 #include "sql/auth/auth_acls.h"
 #include "sql/auth/auth_common.h"
 #include "sql/auth/dynamic_privilege_table.h"
@@ -853,23 +857,29 @@ end:
 
   The plaintext current password is erased from LEX_USER, iff its length > 0 .
 
-  @param thd      The execution context
-  @param Str      LEX user
-  @param acl_user The associated user which carries the ACL
-  @param auth     Auth plugin to use for verification
-  @param is_privileged_user     Whether caller has CREATE_USER_ACL
-                                or UPDATE_ACL over mysql.*
+  @param thd                  The execution context
+  @param Str                  LEX user
+  @param acl_user             The associated user which carries the ACL
+  @param auth                 Auth plugin to use for verification
+  @param new_password         New password buffer
+  @param new_password_length  Length of new password
+  @param is_privileged_user   Whether caller has CREATE_USER_ACL
+                              or UPDATE_ACL over mysql.*
   @param user_exists  Whether user already exists
 
   @retval true operation failed
   @retval false success
 */
-static bool validate_password_require_current(THD *thd, LEX_USER *Str,
-                                              ACL_USER *acl_user,
-                                              st_mysql_auth *auth,
-                                              bool is_privileged_user,
-                                              bool user_exists) {
+static bool validate_password_require_current(
+    THD *thd, LEX_USER *Str, ACL_USER *acl_user, st_mysql_auth *auth,
+    const char *new_password, unsigned int new_password_length,
+    bool is_privileged_user, bool user_exists) {
   if (user_exists) {
+    auto password_cleanup = create_scope_guard([&] {
+      my_cleanse(const_cast<char *>(Str->current_auth.str),
+                 Str->current_auth.length);
+      my_cleanse(const_cast<char *>(new_password), new_password_length);
+    });
     if (Str->uses_replace_clause) {
       int is_error = 0;
       Security_context *sctx = thd->security_context();
@@ -898,33 +908,45 @@ static bool validate_password_require_current(THD *thd, LEX_USER *Str,
         if (Str->current_auth.length > 0) {
           my_error(ER_INCORRECT_CURRENT_PASSWORD, MYF(0));
           return (true);
-        } else {
-          return (false);
         }
+        return (false);
       }
       /*
         Compare the specified plain text current password with the
         current auth string.
       */
-      else if ((auth->authentication_flags & AUTH_FLAG_USES_INTERNAL_STORAGE) &&
-               auth->compare_password_with_hash &&
-               auth->compare_password_with_hash(
-                   acl_user->credentials[PRIMARY_CRED].m_auth_string.str,
-                   (unsigned long)acl_user->credentials[PRIMARY_CRED]
-                       .m_auth_string.length,
-                   Str->current_auth.str,
-                   (unsigned long)Str->current_auth.length, &is_error) &&
-               !is_error) {
+      if ((auth->authentication_flags & AUTH_FLAG_USES_INTERNAL_STORAGE) &&
+          auth->compare_password_with_hash &&
+          auth->compare_password_with_hash(
+              acl_user->credentials[PRIMARY_CRED].m_auth_string.str,
+              (unsigned long)acl_user->credentials[PRIMARY_CRED]
+                  .m_auth_string.length,
+              Str->current_auth.str, (unsigned long)Str->current_auth.length,
+              &is_error) &&
+          !is_error) {
         my_error(ER_INCORRECT_CURRENT_PASSWORD, MYF(0));
         return (true);
       }
 
-      /*
-        Current password is valid plain text password with len > 0.
-        Erase that in memory. We don't need it any further
-       */
-      memset(const_cast<char *>(Str->current_auth.str), 0,
-             Str->current_auth.length);
+      {
+        /* Validate password policy requirements if any */
+        my_service<SERVICE_TYPE(validate_password_changed_characters)> service(
+            "validate_password_changed_characters", srv_registry);
+        if (service.is_valid()) {
+          unsigned int minimum_required = 0, changed = 0;
+          String current_str(Str->current_auth.str, Str->current_auth.length,
+                             &my_charset_utf8mb3_bin);
+          String new_str(new_password, new_password_length,
+                         &my_charset_utf8mb3_bin);
+          if (service->validate(reinterpret_cast<my_h_string>(&current_str),
+                                reinterpret_cast<my_h_string>(&new_str),
+                                &minimum_required, &changed)) {
+            my_error(ER_VALIDATE_PASSWORD_INSUFFICIENT_CHANGED_CHARACTERS,
+                     MYF(0), minimum_required, changed);
+            return (true);
+          }
+        }
+      }
     } else if (!is_privileged_user) {
       /*
         If the field value is set or field value is NULL and global sys
@@ -938,7 +960,7 @@ static bool validate_password_require_current(THD *thd, LEX_USER *Str,
       }
     }
   }
-  return (false);
+  return false;
 }
 
 char translate_byte_to_password_char(unsigned char c) {
@@ -1289,6 +1311,8 @@ bool set_and_validate_user_attributes(
   enum_sql_command command = thd->lex->sql_command;
   bool current_password_empty = false;
   bool new_password_empty = false;
+  char new_password[MAX_FIELD_WIDTH]{0};
+  unsigned int new_password_length = 0;
 
   assert(!acl_is_utility_user(Str->user.str, Str->host.str, nullptr));
 
@@ -1511,7 +1535,7 @@ bool set_and_validate_user_attributes(
         Str->alter_status.password_reuse_interval =
             acl_user->password_reuse_interval;
     }
-  } else {
+  } else { /* User does not exist */
     /*
       when authentication_policy = 'mysql_native_password,,' and
       --default-authentication-plugin = 'caching_sha2_password'
@@ -1713,9 +1737,17 @@ bool set_and_validate_user_attributes(
        Erase in memory copy of plain text password, unless we need it
        later to send to client as a result set.
     */
-    if (Str->first_factor_auth_info.auth.length > 0)
-      memset(const_cast<char *>(Str->first_factor_auth_info.auth.str), 0,
-             Str->first_factor_auth_info.auth.length);
+    if (Str->first_factor_auth_info.auth.length > 0) {
+      if (user_exists && Str->uses_replace_clause) {
+        assert(Str->first_factor_auth_info.auth.length < MAX_FIELD_WIDTH);
+        new_password_length = Str->first_factor_auth_info.auth.length;
+        strncpy(new_password, Str->first_factor_auth_info.auth.str,
+                std::min(static_cast<size_t>(MAX_FIELD_WIDTH),
+                         Str->first_factor_auth_info.auth.length));
+      }
+      my_cleanse(const_cast<char *>(Str->first_factor_auth_info.auth.str),
+                 Str->first_factor_auth_info.auth.length);
+    }
     /* Use the authentication_string field as password */
     Str->first_factor_auth_info.auth = {password, buflen};
     new_password_empty = buflen ? false : true;
@@ -1723,8 +1755,9 @@ bool set_and_validate_user_attributes(
 
   /* Check iff the REPLACE clause is specified correctly for the user */
   if ((what_to_set.m_what & PLUGIN_ATTR) &&
-      validate_password_require_current(thd, Str, acl_user, auth,
-                                        is_privileged_user, user_exists)) {
+      validate_password_require_current(thd, Str, acl_user, auth, new_password,
+                                        new_password_length, is_privileged_user,
+                                        user_exists)) {
     plugin_unlock(nullptr, plugin);
     what_to_set.m_what = NONE_ATTR;
     return (true);
@@ -2003,7 +2036,6 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
 #ifdef WITH_WSREP
-  Enable_TOI_preparation_guard toi_guard(thd);
   /*
     Rewrite query to ensure it is safe to replay on slave thread with proper
     user context established (this is important if original query fails to
@@ -2011,6 +2043,30 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
     w/o re-writting then applier will not be able to establish user context).
   */
   if (WSREP(thd) && !thd->wsrep_applier) {
+    { /* Critical section */
+      Acl_cache_lock_guard acl_cache_rlock(thd, Acl_cache_lock_mode::READ_MODE);
+
+      if (!acl_cache_rlock.lock()) {
+        return true;
+      }
+
+      ACL_USER *acl_user =
+          find_acl_user(lex_user->host.str, lex_user->user.str, true);
+      if (acl_user == nullptr) {
+        my_error(ER_PASSWORD_NO_MATCH, MYF(0));
+        return true;
+      }
+
+      /* trying to change the password of the utility user? */
+      if (acl_is_utility_user(acl_user->user, acl_user->host.get_host(),
+                              nullptr)) {
+        my_error(ER_PASSWORD_NO_MATCH, MYF(0));
+        return true;
+      }
+    }
+
+
+
     size_t query_length_max = strlen("SET PASSWORD FOR ''@''=''") + 3 * 120 + 1;
     char *buff = (char *)thd->alloc(query_length_max);
     if (!buff) {
@@ -2026,7 +2082,8 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
     buff[query_length_max - 1] = 0;
     thd->set_query(buff, query_length);
 
-    if ((ret = open_grant_tables(thd, tables, &transactional_tables))) {
+    if ((ret = open_grant_tables(thd, tables, &transactional_tables,
+                                 WSREP_MYSQL_DB, "user"))) {
       thd->set_query(query_save);
       return (ret != 1);
     }
@@ -2061,17 +2118,6 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
       my_error(ER_PASSWORD_NO_MATCH, MYF(0));
       return true;
     }
-
-#ifdef WITH_WSREP
-    /* We can start TOI after acl cache lock is acquired.
-       Doing it before acquiring the lock, would lead to the deadlock,
-       because all other functions using start_toi_after_open_grant_tables()
-       do it in the order: acl_cache_lock.lock() -> start TOI */
-    if (!thd->wsrep_applier && toi_guard.start_toi(WSREP_MYSQL_DB, "user")) {
-      commit_and_close_mysql_tables(thd);
-      return true;
-    }
-#endif
 
     assert(acl_user->plugin.length != 0);
     is_role = acl_user->is_role;
@@ -2782,6 +2828,13 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
 
   /* check if CREATE user is allowed on this user list or not. */
   if (check_orphaned_definers(thd, list)) return true;
+
+#if WITH_WSREP
+  if (wsrep_check_system_user_privilege(thd, list)) {
+    return true;
+  }
+#endif
+
   /*
     This statement will be replicated as a statement, even when using
     row-based replication.  The binlog state will be cleared here to
@@ -2789,9 +2842,6 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
     values when we are out of this function scope
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
-#ifdef WITH_WSREP
-  Enable_TOI_preparation_guard toi_guard(thd);
-#endif
 
   /* CREATE USER may be skipped on replication client. */
   if ((result = open_grant_tables(thd, tables, &transactional_tables)))
@@ -2809,13 +2859,6 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
       commit_and_close_mysql_tables(thd);
       return true;
     }
-
-#ifdef WITH_WSREP
-    if (toi_guard.start_toi()) {
-      commit_and_close_mysql_tables(thd);
-      return true;
-    }
-#endif
 
     while ((tmp_user_name = user_list++)) {
       if (acl_is_utility_user(tmp_user_name->user.str, tmp_user_name->host.str,
@@ -3106,6 +3149,12 @@ bool mysql_drop_user(THD *thd, List<LEX_USER> &list, bool if_exists,
   /* check if DROP user is allowed on this user list or not. */
   if (check_orphaned_definers(thd, list)) return true;
 
+#if WITH_WSREP
+  if (wsrep_check_system_user_privilege(thd, list)) {
+    return true;
+  }
+#endif
+
   /*
     Make sure that none of the authids we're about to drop is used as a
     mandatory role. Mandatory roles needs to be disabled first before the
@@ -3121,9 +3170,6 @@ bool mysql_drop_user(THD *thd, List<LEX_USER> &list, bool if_exists,
     values when we are out of this function scope
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
-#ifdef WITH_WSREP
-  Enable_TOI_preparation_guard toi_guard(thd);
-#endif
   /* DROP USER may be skipped on replication client. */
   if ((result = open_grant_tables(thd, tables, &transactional_tables)))
     return result != 1;
@@ -3139,13 +3185,6 @@ bool mysql_drop_user(THD *thd, List<LEX_USER> &list, bool if_exists,
       commit_and_close_mysql_tables(thd);
       return true;
     }
-
-#ifdef WITH_WSREP
-    if (toi_guard.start_toi()) {
-      commit_and_close_mysql_tables(thd);
-      return true;
-    }
-#endif
 
     get_mandatory_roles(&mandatory_roles);
     while ((user = user_list++) != nullptr) {
@@ -3299,9 +3338,7 @@ bool mysql_rename_user(THD *thd, List<LEX_USER> &list) {
     values when we are out of this function scope
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
-#ifdef WITH_WSREP
-  Enable_TOI_preparation_guard toi_guard(thd);
-#endif
+
   /* RENAME USER may be skipped on replication client. */
   if ((result = open_grant_tables(thd, tables, &transactional_tables)))
     return result != 1;
@@ -3342,13 +3379,6 @@ bool mysql_rename_user(THD *thd, List<LEX_USER> &list) {
 #endif /* WITH_WSREP */
       }
       assert(user_to != nullptr); /* Syntax enforces pairs of users. */
-
-#ifdef WITH_WSREP
-      if (toi_guard.start_toi()) {
-        commit_and_close_mysql_tables(thd);
-        return true;
-      }
-#endif
 
       /*
         If we are renaming to anonymous user, make sure no roles are granted.
@@ -3496,6 +3526,12 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
   std::vector<std::string> server_challenge;
   DBUG_TRACE;
 
+#if WITH_WSREP
+  if (wsrep_check_system_user_privilege(thd, list)) {
+    return true;
+  }
+#endif
+
   /*
     This statement will be replicated as a statement, even when using
     row-based replication.  The binlog state will be cleared here to
@@ -3503,9 +3539,6 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
     values when we are out of this function scope
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
-#ifdef WITH_WSREP
-  Enable_TOI_preparation_guard toi_guard(thd);
-#endif
   if ((result = open_grant_tables(thd, tables, &transactional_tables)))
     return result != 1;
 
@@ -3521,13 +3554,6 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
       commit_and_close_mysql_tables(thd);
       return true;
     }
-
-#ifdef WITH_WSREP
-    if (toi_guard.start_toi()) {
-      commit_and_close_mysql_tables(thd);
-      return true;
-    }
-#endif
 
     is_privileged_user = is_privileged_user_for_credential_change(thd);
 

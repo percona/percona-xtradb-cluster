@@ -16,6 +16,10 @@ COUNT(*) = 2
 1
 DROP TABLE t1;
 SET GLOBAL binlog_format = 'ROW';
+Warnings:
+Warning	1287	'@@binlog_format' is deprecated and will be removed in a future release.
 SET PERSIST binlog_format = 'ROW';
+Warnings:
+Warning	1287	'@@binlog_format' is deprecated and will be removed in a future release.
 RESET PERSIST binlog_format;
 call mtr.add_suppression("Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED");

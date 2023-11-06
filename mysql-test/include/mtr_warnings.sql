@@ -184,7 +184,7 @@ INSERT INTO global_suppressions VALUES
  ("unknown option '--loose-"),
  ("unknown variable 'loose-"),
  ("Setting lower_case_table_names=2"),
- ("NDB Binlog:"),
+ ("\\[NDB\\] Binlog:"),
  ("Neither --relay-log nor --relay-log-index were used"),
  ("Query partially completed"),
  ("Replica SQL thread is stopped because UNTIL condition"),
@@ -482,6 +482,13 @@ INSERT INTO global_suppressions VALUES
  ("You have enabled keyring plugin. SST encryption is mandatory."),
  ("No suitable '.*' service implementation found"),
 
+
+ /*
+   --ssl-fips-mode
+ */
+ ("'--ssl-fips-mode' is deprecated and will be removed in a future release."),
+
+ ("'mysql_native_password' is deprecated and will be removed in a future release."),
 
  ("THE_LAST_SUPPRESSION");
 

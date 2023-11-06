@@ -1226,8 +1226,7 @@ class THD : public MDL_context_owner,
 
   /**
     Resource group context indicating the current resource group
-    and the name of the resource group to switch to during execution
-    of a query.
+    and if there are any warnings related to switching resource group.
   */
   resourcegroups::Resource_group_ctx m_resource_group_ctx;
 
@@ -3340,14 +3339,6 @@ class THD : public MDL_context_owner,
     rollback. */
   bool wsrep_force_savept_rollback;
 
-  /**
-    Set to true if TOI is going to be started, but first user privileges
-    for particular actions need to be checked. In such a case, some tables
-    may be opened, and wsrep logic relies on the information if the transaction
-    is TOI or not.
-  */
-  bool wsrep_TOI_preparation;
-
   /*
     Transaction id:
     * m_next_wsrep_trx_id is assigned on the first query after
@@ -5382,7 +5373,7 @@ class THD : public MDL_context_owner,
 
  private:
   std::unordered_map<unsigned int, void *> external_store_;
-};
+};  // End of class THD
 
 /**
    Return lock_tables_mode for secondary engine.

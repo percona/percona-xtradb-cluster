@@ -1971,7 +1971,14 @@ static bool acl_tables_setup_for_write_and_acquire_mdl(THD *thd,
          this function.
 */
 
-int open_grant_tables(THD *thd, Table_ref *tables, bool *transactional_tables) {
+#ifdef WITH_WSREP
+int open_grant_tables(THD *thd, Table_ref *tables, bool *transactional_tables,
+                      const char *db [[maybe_unused]],
+                      const char *table [[maybe_unused]]) {
+#else
+int open_grant_tables(THD *thd, TABLE_LIST *tables,
+                      bool *transactional_tables) {
+#endif /* WITH_WSREP */
   DBUG_TRACE;
 
   if (!initialized) {
@@ -2006,6 +2013,30 @@ int open_grant_tables(THD *thd, Table_ref *tables, bool *transactional_tables) {
       tables[i].updating = false;
   }
 
+#ifdef WITH_WSREP
+  /* CREATE/DROP function/procedure implicitly grant priviliges.
+  Check for detail comment in respected switch handler in sql_parse.cc
+  Since the original statement is already replicated using TOI
+  sub-action of grant/revoke privilges doesn't need to get replicated. */
+  bool skip_toi = (thd->lex->sql_command == SQLCOM_CREATE_SPFUNCTION ||
+                   thd->lex->sql_command == SQLCOM_CREATE_PROCEDURE ||
+                   thd->lex->sql_command == SQLCOM_DROP_FUNCTION ||
+                   thd->lex->sql_command == SQLCOM_DROP_PROCEDURE);
+  /*
+    Perform the TOI after the replication filter check to avoid
+    replicating commands that won't be applied locally (due to a filter).
+  */
+  /* Doing TOI here is not the ideal solution, as we are holding
+  MDL locks already and the current thread can still be BF-aborted.
+  But we have to check replication filters before TOI and for this
+  we need MDL locks. */
+  if (WSREP(thd) && !skip_toi &&
+      wsrep_to_isolation_begin(thd, db, table, nullptr)) {
+    WSREP_ERROR("Fail to replicate: %s", thd->query().str);
+    return -1;
+  }
+#endif /* WITH_WSREP */
+
   uint flags = MYSQL_OPEN_HAS_MDL_LOCK | MYSQL_LOCK_IGNORE_TIMEOUT |
                MYSQL_OPEN_IGNORE_FLUSH;
   if (open_and_lock_tables(thd, tables,
@@ -2031,27 +2062,20 @@ int open_grant_tables(THD *thd, Table_ref *tables, bool *transactional_tables) {
 }
 
 #ifdef WITH_WSREP
-bool Enable_TOI_preparation_guard::start_toi(const char *db,
-                                                        const char *table) {
-  /* CREATE/DROP function/procedure implicitly grant privileges.
-  Check for detail comment in respected switch handler in sql_parse.cc
-  Since the original statement is already replicated using TOI
-  sub-action of grant/revoke privileges doesn't need to get replicated. */
-  bool skip_toi = (m_thd->lex->sql_command == SQLCOM_CREATE_SPFUNCTION ||
-                   m_thd->lex->sql_command == SQLCOM_CREATE_PROCEDURE ||
-                   m_thd->lex->sql_command == SQLCOM_DROP_FUNCTION ||
-                   m_thd->lex->sql_command == SQLCOM_DROP_PROCEDURE);
-  /*
-    Perform the TOI after the replication filter check to avoid
-    replicating commands that won't be applied locally (due to a filter).
-  */
-  if (WSREP(m_thd) && !skip_toi &&
-      wsrep_to_isolation_begin(m_thd, db, table, NULL)) {
-    WSREP_ERROR("Fail to replicate: %s", m_thd->query().str);
-    return true;
-  }
+bool wsrep_check_system_user_privilege(THD *thd,
+                                       const List<LEX_USER> &user_list) {
 
-  m_thd->wsrep_TOI_preparation = false;
+  if (WSREP(thd) && !thd->wsrep_applier) {
+    Acl_cache_lock_guard acl_cache_lock(thd, Acl_cache_lock_mode::READ_MODE);
+
+    if (!acl_cache_lock.lock()) {
+      return true;
+    }
+
+    if (check_system_user_privilege(thd, user_list)) {
+      return true;
+    }
+  }
   return false;
 }
 #endif
