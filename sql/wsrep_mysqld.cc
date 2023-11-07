@@ -3061,6 +3061,7 @@ void wsrep_to_isolation_end(THD *thd) {
            ? wsrep_thd_rewritten_query(gra).c_ptr_safe()                     \
            : gra->query().str));
 
+/* Returns true if BF-abort was done, false otherwise */
 bool wsrep_handle_mdl_conflict(const MDL_context *requestor_ctx,
                                MDL_ticket *ticket, const MDL_key *key) {
   if (!WSREP_ON) return false;
@@ -3112,7 +3113,6 @@ bool wsrep_handle_mdl_conflict(const MDL_context *requestor_ctx,
           "MDL conflict, NBO vs applier. Waiting for NBO to release MDL locks",
           schema, schema_len, request_thd, granted_thd);
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
-      ret = false;
     } else if (wsrep_thd_is_toi(granted_thd) ||
                wsrep_thd_is_in_nbo(granted_thd) ||
                wsrep_thd_is_applying(granted_thd)) {
@@ -3121,6 +3121,7 @@ bool wsrep_handle_mdl_conflict(const MDL_context *requestor_ctx,
                       request_thd, granted_thd);
         mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
         wsrep_abort_thd(request_thd, granted_thd, true);
+        ret = true;
       } else {
         WSREP_MDL_LOG(INFO, "MDL BF-BF conflict", schema, schema_len,
                       request_thd, granted_thd);
@@ -3134,7 +3135,6 @@ bool wsrep_handle_mdl_conflict(const MDL_context *requestor_ctx,
           granted_thd->thread_id());
       ticket->wsrep_report(wsrep_debug);
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
-      ret = false;
     } else if (!granted_thd->ull_hash.empty()) {
       /* If there are user-level-lock skip abort */
       WSREP_DEBUG(
@@ -3143,7 +3143,6 @@ bool wsrep_handle_mdl_conflict(const MDL_context *requestor_ctx,
           granted_thd->thread_id());
       ticket->wsrep_report(wsrep_debug);
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
-      ret = false;
     } else if (granted_thd->mdl_context.wsrep_has_explicit_locks()) {
       /* Starting MySQL-8.0, mysql flow may take MDL_EXPLICIT lock for DD
       access or change. Till 8.0, these locks use to normally correspond to
@@ -3157,21 +3156,20 @@ bool wsrep_handle_mdl_conflict(const MDL_context *requestor_ctx,
           granted_thd->thread_id());
       ticket->wsrep_report(wsrep_debug);
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
-      ret = false;
     } else if (granted_thd->wsrep_allow_mdl_conflict) {
       WSREP_DEBUG("Background thread caused BF abort, conf %s",
                   wsrep_thd_transaction_state_str(granted_thd));
       ticket->wsrep_report(wsrep_debug);
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
       wsrep_abort_thd(request_thd, granted_thd, true);
-      ret = false;
+      ret = true;
     } else if (request_thd->lex->sql_command == SQLCOM_DROP_TABLE) {
       WSREP_DEBUG("DROP caused BF abort, conf %s",
                   wsrep_thd_transaction_state_str(granted_thd));
       ticket->wsrep_report(wsrep_debug);
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
       wsrep_abort_thd(request_thd, granted_thd, true);
-      ret = false;
+      ret = true;
 #if 0
     } else if (granted_thd->wsrep_query_state == QUERY_COMMITTING) {
       WSREP_DEBUG("Aborting local thread (%u) in replication/commit state",
@@ -3179,7 +3177,7 @@ bool wsrep_handle_mdl_conflict(const MDL_context *requestor_ctx,
       ticket->wsrep_report(wsrep_debug);
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
       wsrep_abort_thd(request_thd, granted_thd, true);
-      ret = false;
+      ret = true;
 #endif /* 0 */
     } else {
       WSREP_MDL_LOG(DEBUG, "MDL conflict-> BF abort", schema, schema_len,
@@ -3188,6 +3186,7 @@ bool wsrep_handle_mdl_conflict(const MDL_context *requestor_ctx,
       if (granted_thd->wsrep_trx().active()) {
         mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
         wsrep_abort_thd(request_thd, granted_thd, true);
+        ret = true;
       } else {
         /*
           Granted_thd is likely executing with wsrep_on=0. If the requesting
@@ -3196,6 +3195,7 @@ bool wsrep_handle_mdl_conflict(const MDL_context *requestor_ctx,
         mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
         if (wsrep_thd_is_BF(request_thd, false)) {
           ha_wsrep_abort_transaction(request_thd, granted_thd, true);
+          ret = true;
         } else {
           WSREP_MDL_LOG(INFO, "MDL unknown BF-BF conflict", schema, schema_len,
                         request_thd, granted_thd);
