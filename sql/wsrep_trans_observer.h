@@ -310,7 +310,8 @@ static inline int wsrep_before_commit(THD *thd, bool all) {
       THD in wsrep group commit queue at this stage.
       If the transaction is running as 2-phase then THD is registered
       in ordered_commit to ensure thd registration order is same as
-      mysql group commit queue order. */
+      mysql group commit queue order.
+      It will be unregistered in ha_commit_low() during SE commit. */
       wsrep_register_for_group_commit(thd);
     }
 
@@ -352,7 +353,12 @@ static inline int wsrep_ordered_commit(THD *thd, bool all) {
   /* Register thread handler in wsrep group commit queue.
   Note: thread handler executing 2 phase commit transaction is registered
   as part of ordered_commit (and not part of before_commit) as wsrep group
-  commit sequence should be same as mysql group commit queue sequence. */
+  commit sequence should be same as mysql group commit queue sequence.
+  In most cases it will be unregistered as part of ha_commit_low() during
+  SE commit, however there are rare cases when it will unregistered directly
+  from ha_commit_low() if SE is not involved in the commit (for more detailed
+  explanation of this case see the comment in ha_commit_low())
+  */
   wsrep_register_for_group_commit(thd);
 
   DBUG_RETURN(thd->wsrep_cs().ordered_commit());
@@ -370,21 +376,8 @@ static inline int wsrep_after_commit(THD *thd, bool all) {
               wsrep_has_changes(thd));
   assert(wsrep_run_commit_hook(thd, all));
 
-  if (thd->wsrep_enforce_group_commit) {
-    /* Ideally, for one-phase (with binlog=off) or two-phase (with binlog=on)
-    this step would be executed when transaction commits in InnoDB.
-    If galera node is acting as async slave and replicated action from async
-    master result in empty changes on slave (slave directly applied the said
-    changes and has skipped error through skip-slave-error configuration) it
-    can result in said situation. In this case slave protocol directly commits
-    gtid through gtid_end_transaction that invokes ordered_commit causing
-    thread handler to register in wsrep group commit queue but since storage
-    engine commit is not done it would fail to unregister the said thread
-    handler as part of storage engine commit. Handle unregistration here. */
-    wsrep_wait_for_turn_in_group_commit(thd);
-    wsrep_unregister_from_group_commit(thd);
-  }
-
+  /* It has to already unregistered from wsrep_group_commit_queue either
+  during SE commit or directly in ha_commit_low if SE commit was not done. */
   assert(!thd->wsrep_enforce_group_commit);
 
   int ret = 0;
