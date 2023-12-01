@@ -149,9 +149,22 @@ static inline int decimal_string_size(const decimal_t *dec) {
   (E_DEC_OVERFLOW | E_DEC_DIV_ZERO | E_DEC_BAD_NUM | E_DEC_OOM)
 #define E_DEC_ERROR (E_DEC_FATAL_ERROR | E_DEC_TRUNCATED)
 
+<<<<<<< HEAD
 static constexpr int DECIMAL_MAX_SCALE{30};
 static constexpr int DECIMAL_NOT_SPECIFIED{DECIMAL_MAX_SCALE + 1};
 
+||||||| merged common ancestors
+static constexpr int DECIMAL_MAX_SCALE{30};
+static constexpr int DECIMAL_NOT_SPECIFIED{DECIMAL_MAX_SCALE + 1};
+
+<<<<<<<<< Temporary merge branch 1
+#endif
+||||||||| merged common ancestors
+#endif
+>>>>>>>>>>> Temporary merge branch 2
+=========
+=======
+>>>>>>> percona/ps/release-8.1.0-1
 #endif  // MYSQL_ABI_CHECK
 
 #endif  // DECIMAL_INCLUDED

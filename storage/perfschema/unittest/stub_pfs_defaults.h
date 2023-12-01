@@ -27,6 +27,7 @@
 #endif /* WITH_WSREP */
 
 void install_default_setup(PSI_thread_bootstrap *) {}
+<<<<<<< HEAD
 
 #ifdef WITH_WSREP
 void wsrep_sst_cancel(bool) { }
@@ -35,3 +36,7 @@ void wsrep_pfs_instr_cb(wsrep_pfs_instr_type_t, wsrep_pfs_instr_ops_t,
                         wsrep_pfs_instr_tag_t, void **, void **,
                         const void *) {}
 #endif /* WITH_WSREP */
+||||||| merged common ancestors
+>>>>>>>>> Temporary merge branch 2
+=======
+>>>>>>> percona/ps/release-8.1.0-1

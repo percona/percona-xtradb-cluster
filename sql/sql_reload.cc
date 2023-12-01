@@ -56,6 +56,7 @@
 #include "sql/sql_servers.h"  // servers_reload
 #include "sql/system_variables.h"
 #include "sql/table.h"
+#include "string_with_len.h"
 
 #ifdef WITH_WSREP
 #include "sql/sql_lex.h"

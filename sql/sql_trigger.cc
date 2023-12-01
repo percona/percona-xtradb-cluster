@@ -29,7 +29,6 @@
 #include <string>
 #include <utility>
 
-#include "m_ctype.h"
 #include "m_string.h"
 #include "my_base.h"
 #include "my_compiler.h"
@@ -38,6 +37,7 @@
 #include "my_psi_config.h"
 #include "my_sys.h"
 #include "mysql/psi/mysql_sp.h"
+#include "mysql/strings/m_ctype.h"
 #include "mysql_com.h"
 #include "mysqld_error.h"
 #include "sql/auth/auth_acls.h"
@@ -68,6 +68,7 @@
 #include "sql/table_trigger_dispatcher.h"  // Table_trigger_dispatcher
 #include "sql/transaction.h"               // trans_commit_stmt, trans_commit
 #include "sql_string.h"
+#include "string_with_len.h"
 #include "thr_lock.h"
 
 #ifdef WITH_WSREP
@@ -655,6 +656,7 @@ bool Sql_cmd_drop_trigger::execute(THD *thd) {
 
   return result;
 }
+<<<<<<< HEAD
 
 #ifdef WITH_WSREP
 int wsrep_create_trigger_query(THD *thd, uchar **buf, size_t *buf_len) {
@@ -701,3 +703,79 @@ int wsrep_create_trigger_query(THD *thd, uchar **buf, size_t *buf_len) {
                              buf_len);
 }
 #endif /* WITH_WSREP */
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+
+
+
+/**
+  Drop all triggers for table.
+
+  @param thd        current thread context
+  @param db_name    name of the table schema
+  @param table_name table name
+
+  @return Operation status.
+    @retval false Success
+    @retval true  Failure
+*/
+bool drop_all_triggers(THD *thd, const char *db_name, const char *table_name)
+{
+  // Check if there is at least one trigger for the given table.
+
+  if (!Trigger_loader::trg_file_exists(db_name, table_name))
+    return false;
+
+  /*
+    Here we have to 1) load trigger definitions from TRG-files and 2) parse them
+    to find out trigger names. Since trigger names are not stored in the
+    TRG-file, it is impossible to avoid parsing just to delete triggers.
+  */
+
+  Table_trigger_dispatcher d(db_name, table_name);
+
+  return
+    d.check_n_load(thd, true) ||
+    Trigger_loader::drop_all_triggers(db_name, table_name,
+                                      &d.get_trigger_list());
+}
+||||||||| merged common ancestors
+
+
+
+/**
+  Drop all triggers for table.
+
+  @param thd        current thread context
+  @param db_name    name of the table schema
+  @param table_name table name
+
+  @return Operation status.
+    @retval false Success
+    @retval true  Failure
+*/
+bool drop_all_triggers(THD *thd, const char *db_name, const char *table_name)
+{
+  // Check if there is at least one trigger for the given table.
+
+  if (!Trigger_loader::trg_file_exists(db_name, table_name))
+    return false;
+
+  /*
+    Here we have to 1) load trigger definitions from TRG-files and 2) parse them
+    to find out trigger names. Since trigger names are not stored in the
+    TRG-file, it is impossible to avoid parsing just to delete triggers.
+  */
+
+  Table_trigger_dispatcher d(db_name, table_name);
+
+  return
+    d.check_n_load(thd, true) ||
+    Trigger_loader::drop_all_triggers(db_name, table_name,
+                                      &d.get_trigger_list());
+}
+>>>>>>>>>>> Temporary merge branch 2
+=========
+>>>>>>>>> Temporary merge branch 2
+=======
+>>>>>>> percona/ps/release-8.1.0-1

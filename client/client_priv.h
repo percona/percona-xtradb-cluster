@@ -30,7 +30,6 @@
 #include <mysql.h>
 
 #include "errmsg.h"
-#include "m_string.h"
 #include "my_getopt.h"
 #include "my_sys.h"
 
@@ -192,9 +191,14 @@ enum options_client {
   OPT_SSL_SESSION_DATA_CONTINUE_ON_FAILED_REUSE,
   OPT_LONG_QUERY_TIME,
   OPT_AUTHENTICATION_KERBEROS_CLIENT_MODE,
+<<<<<<< HEAD
 #ifdef WITH_WSREP
   OPT_USE_SET_PASSWORD,
 #endif /* WITH_WSREP */
+||||||| merged common ancestors
+=======
+  OPT_TLS_SNI_SERVERNAME,
+>>>>>>> percona/ps/release-8.1.0-1
   /* Add new option above this */
   OPT_MAX_CLIENT_OPTION
 };

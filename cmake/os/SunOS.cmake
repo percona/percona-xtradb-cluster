@@ -78,4 +78,257 @@ SET(CMAKE_THREAD_LIBS_INIT -lpthread CACHE INTERNAL "" FORCE)
 # Solaris specific large page support
 CHECK_SYMBOL_EXISTS(MHA_MAPSIZE_VA sys/mman.h  HAVE_SOLARIS_LARGE_PAGES)
 
+<<<<<<< HEAD
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+# Solaris atomics
+CHECK_C_SOURCE_RUNS(
+ "
+ #include  <atomic.h>
+  int main()
+  {
+    int foo = -10; int bar = 10;
+    int64_t foo64 = -10; int64_t bar64 = 10;
+    if (atomic_add_int_nv((uint_t *)&foo, bar) || foo)
+      return -1;
+    bar = atomic_swap_uint((uint_t *)&foo, (uint_t)bar);
+    if (bar || foo != 10)
+     return -1;
+    bar = atomic_cas_uint((uint_t *)&bar, (uint_t)foo, 15);
+    if (bar)
+      return -1;
+    if (atomic_add_64_nv((volatile uint64_t *)&foo64, bar64) || foo64)
+      return -1;
+    bar64 = atomic_swap_64((volatile uint64_t *)&foo64, (uint64_t)bar64);
+    if (bar64 || foo64 != 10)
+      return -1;
+    bar64 = atomic_cas_64((volatile uint64_t *)&bar64, (uint_t)foo64, 15);
+    if (bar64)
+      return -1;
+    atomic_or_64((volatile uint64_t *)&bar64, 0);
+    return 0;
+  }
+"  HAVE_SOLARIS_ATOMIC)
+
+CHECK_CXX_SOURCE_COMPILES("
+    #undef inline
+    #if !defined(_REENTRANT)
+    #define _REENTRANT
+    #endif
+    #include <pthread.h>
+    #include <sys/types.h>
+    #include <sys/socket.h>
+    #include <netinet/in.h>
+    #include <arpa/inet.h>
+    #include <netdb.h>
+    int main()
+    {
+
+       struct hostent *foo =
+       gethostbyaddr_r((const char *) 0,
+          0, 0, (struct hostent *) 0, (char *) NULL,  0, (int *)0);
+       return 0;
+    }
+  "
+  HAVE_SOLARIS_STYLE_GETHOST)
+
+# Check is special processor flag needs to be set on older GCC
+#that defaults to v8 sparc . Code here is taken from my_rdtsc.c 
+IF(CMAKE_COMPILER_IS_GNUCC AND CMAKE_SIZEOF_VOID_P EQUAL 4
+  AND CMAKE_SYSTEM_PROCESSOR MATCHES "sparc")
+  SET(SOURCE
+  "
+  int main()
+  {
+     long high\;
+     long low\;
+    __asm __volatile__ (\"rd %%tick,%1\; srlx %1,32,%0\" : \"=r\" ( high), \"=r\" (low))\;
+    return 0\;
+  } ")
+  CHECK_C_SOURCE_COMPILES(${SOURCE}  HAVE_SPARC32_TICK)
+  IF(NOT HAVE_SPARC32_TICK)
+    SET(CMAKE_REQUIRED_FLAGS "-mcpu=v9")
+    CHECK_C_SOURCE_COMPILES(${SOURCE}  HAVE_SPARC32_TICK_WITH_V9)
+    SET(CMAKE_REQUIRED_FLAGS)
+    IF(HAVE_SPARC32_TICK_WITH_V9)
+      SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcpu=v9")
+      SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcpu=v9")
+    ENDIF()
+  ENDIF()
+ENDIF()
+
+# This is used for the version_compile_machine variable.
+IF(SIZEOF_VOIDP MATCHES 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "i386")
+  SET(MYSQL_MACHINE_TYPE "x86_64")
+ENDIF()
+
+
+MACRO(DIRNAME IN OUT)
+  GET_FILENAME_COMPONENT(${OUT} ${IN} PATH)
+ENDMACRO()
+
+# We assume that developer studio runtime libraries are installed.
+IF(CMAKE_SYSTEM_NAME MATCHES "SunOS" AND
+   CMAKE_CXX_COMPILER_ID STREQUAL "SunPro")
+  DIRNAME(${CMAKE_CXX_COMPILER} CXX_PATH)
+
+  SET(LIBRARY_SUFFIX "lib/compilers/CC-gcc/lib")
+  IF(SIZEOF_VOIDP EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "sparc")
+    SET(LIBRARY_SUFFIX "${LIBRARY_SUFFIX}/sparcv9")
+  ENDIF()
+  IF(SIZEOF_VOIDP EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "i386")
+    SET(LIBRARY_SUFFIX "${LIBRARY_SUFFIX}/amd64")
+  ENDIF()
+  FIND_LIBRARY(STL_LIBRARY_NAME
+    NAMES "stdc++"
+    PATHS ${CXX_PATH}/../${LIBRARY_SUFFIX}
+    NO_DEFAULT_PATH
+  )
+  MESSAGE(STATUS "STL_LIBRARY_NAME ${STL_LIBRARY_NAME}")
+  IF(STL_LIBRARY_NAME)
+    DIRNAME(${STL_LIBRARY_NAME} STL_LIBRARY_PATH)
+    SET(LRFLAGS " -L${STL_LIBRARY_PATH} -R${STL_LIBRARY_PATH}")
+    SET(QUOTED_CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS}")
+
+    STRING_APPEND(CMAKE_C_LINK_FLAGS          "${LRFLAGS}")
+    STRING_APPEND(CMAKE_CXX_LINK_FLAGS        "${LRFLAGS}")
+    STRING_APPEND(CMAKE_MODULE_LINKER_FLAGS   "${LRFLAGS}")
+    STRING_APPEND(CMAKE_SHARED_LINKER_FLAGS   "${LRFLAGS}")
+    STRING_APPEND(QUOTED_CMAKE_CXX_LINK_FLAGS "${LRFLAGS}")
+  ENDIF()
+
+  STRING_APPEND(CMAKE_C_LINK_FLAGS          " -lc")
+  STRING_APPEND(CMAKE_CXX_LINK_FLAGS        " -lstdc++ -lgcc_s -lCrunG3 -lc")
+  STRING_APPEND(CMAKE_MODULE_LINKER_FLAGS   " -lstdc++ -lgcc_s -lCrunG3 -lc")
+  STRING_APPEND(CMAKE_SHARED_LINKER_FLAGS   " -lstdc++ -lgcc_s -lCrunG3 -lc")
+  STRING_APPEND(QUOTED_CMAKE_CXX_LINK_FLAGS " -lstdc++ -lgcc_s -lCrunG3 -lc ")
+ENDIF()
+||||||||| merged common ancestors
+# Solaris atomics
+CHECK_C_SOURCE_RUNS(
+ "
+ #include  <atomic.h>
+  int main()
+  {
+    int foo = -10; int bar = 10;
+    int64_t foo64 = -10; int64_t bar64 = 10;
+    if (atomic_add_int_nv((uint_t *)&foo, bar) || foo)
+      return -1;
+    bar = atomic_swap_uint((uint_t *)&foo, (uint_t)bar);
+    if (bar || foo != 10)
+     return -1;
+    bar = atomic_cas_uint((uint_t *)&bar, (uint_t)foo, 15);
+    if (bar)
+      return -1;
+    if (atomic_add_64_nv((volatile uint64_t *)&foo64, bar64) || foo64)
+      return -1;
+    bar64 = atomic_swap_64((volatile uint64_t *)&foo64, (uint64_t)bar64);
+    if (bar64 || foo64 != 10)
+      return -1;
+    bar64 = atomic_cas_64((volatile uint64_t *)&bar64, (uint_t)foo64, 15);
+    if (bar64)
+      return -1;
+    atomic_or_64((volatile uint64_t *)&bar64, 0);
+    return 0;
+  }
+"  HAVE_SOLARIS_ATOMIC)
+
+CHECK_CXX_SOURCE_COMPILES("
+    #undef inline
+    #if !defined(_REENTRANT)
+    #define _REENTRANT
+    #endif
+    #include <pthread.h>
+    #include <sys/types.h>
+    #include <sys/socket.h>
+    #include <netinet/in.h>
+    #include <arpa/inet.h>
+    #include <netdb.h>
+    int main()
+    {
+
+       struct hostent *foo =
+       gethostbyaddr_r((const char *) 0,
+          0, 0, (struct hostent *) 0, (char *) NULL,  0, (int *)0);
+       return 0;
+    }
+  "
+  HAVE_SOLARIS_STYLE_GETHOST)
+
+# Check is special processor flag needs to be set on older GCC
+#that defaults to v8 sparc . Code here is taken from my_rdtsc.c 
+IF(CMAKE_COMPILER_IS_GNUCC AND CMAKE_SIZEOF_VOID_P EQUAL 4
+  AND CMAKE_SYSTEM_PROCESSOR MATCHES "sparc")
+  SET(SOURCE
+  "
+  int main()
+  {
+     long high\;
+     long low\;
+    __asm __volatile__ (\"rd %%tick,%1\; srlx %1,32,%0\" : \"=r\" ( high), \"=r\" (low))\;
+    return 0\;
+  } ")
+  CHECK_C_SOURCE_COMPILES(${SOURCE}  HAVE_SPARC32_TICK)
+  IF(NOT HAVE_SPARC32_TICK)
+    SET(CMAKE_REQUIRED_FLAGS "-mcpu=v9")
+    CHECK_C_SOURCE_COMPILES(${SOURCE}  HAVE_SPARC32_TICK_WITH_V9)
+    SET(CMAKE_REQUIRED_FLAGS)
+    IF(HAVE_SPARC32_TICK_WITH_V9)
+      SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcpu=v9")
+      SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcpu=v9")
+    ENDIF()
+  ENDIF()
+ENDIF()
+
+# This is used for the version_compile_machine variable.
+IF(SIZEOF_VOIDP MATCHES 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "i386")
+  SET(MYSQL_MACHINE_TYPE "x86_64")
+ENDIF()
+
+
+MACRO(DIRNAME IN OUT)
+  GET_FILENAME_COMPONENT(${OUT} ${IN} PATH)
+ENDMACRO()
+
+# We assume that developer studio runtime libraries are installed.
+IF(CMAKE_SYSTEM_NAME MATCHES "SunOS" AND
+   CMAKE_CXX_COMPILER_ID STREQUAL "SunPro")
+  DIRNAME(${CMAKE_CXX_COMPILER} CXX_PATH)
+
+  SET(LIBRARY_SUFFIX "lib/compilers/CC-gcc/lib")
+  IF(SIZEOF_VOIDP EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "sparc")
+    SET(LIBRARY_SUFFIX "${LIBRARY_SUFFIX}/sparcv9")
+  ENDIF()
+  IF(SIZEOF_VOIDP EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "i386")
+    SET(LIBRARY_SUFFIX "${LIBRARY_SUFFIX}/amd64")
+  ENDIF()
+  FIND_LIBRARY(STL_LIBRARY_NAME
+    NAMES "stdc++"
+    PATHS ${CXX_PATH}/../${LIBRARY_SUFFIX}
+    NO_DEFAULT_PATH
+  )
+  MESSAGE(STATUS "STL_LIBRARY_NAME ${STL_LIBRARY_NAME}")
+  IF(STL_LIBRARY_NAME)
+    DIRNAME(${STL_LIBRARY_NAME} STL_LIBRARY_PATH)
+    SET(LRFLAGS " -L${STL_LIBRARY_PATH} -R${STL_LIBRARY_PATH}")
+    SET(QUOTED_CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS}")
+
+    STRING_APPEND(CMAKE_C_LINK_FLAGS          "${LRFLAGS}")
+    STRING_APPEND(CMAKE_CXX_LINK_FLAGS        "${LRFLAGS}")
+    STRING_APPEND(CMAKE_MODULE_LINKER_FLAGS   "${LRFLAGS}")
+    STRING_APPEND(CMAKE_SHARED_LINKER_FLAGS   "${LRFLAGS}")
+    STRING_APPEND(QUOTED_CMAKE_CXX_LINK_FLAGS "${LRFLAGS}")
+  ENDIF()
+
+  STRING_APPEND(CMAKE_C_LINK_FLAGS          " -lc")
+  STRING_APPEND(CMAKE_CXX_LINK_FLAGS        " -lstdc++ -lgcc_s -lCrunG3 -lc")
+  STRING_APPEND(CMAKE_MODULE_LINKER_FLAGS   " -lstdc++ -lgcc_s -lCrunG3 -lc")
+  STRING_APPEND(CMAKE_SHARED_LINKER_FLAGS   " -lstdc++ -lgcc_s -lCrunG3 -lc")
+  STRING_APPEND(QUOTED_CMAKE_CXX_LINK_FLAGS " -lstdc++ -lgcc_s -lCrunG3 -lc ")
+ENDIF()
+>>>>>>>>>>> Temporary merge branch 2
+=========
+=======
+SET(LINK_FLAG_NO_UNDEFINED "-Wl,--no-undefined")
+>>>>>>> percona/ps/release-8.1.0-1
 SET(LINK_FLAG_Z_DEFS "-z,defs")

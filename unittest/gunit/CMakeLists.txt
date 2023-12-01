@@ -26,14 +26,6 @@ ENDIF()
 
 MSVC_CPPCHECK_DISABLE()
 
-IF(WITH_LTO OR CMAKE_COMPILER_FLAG_WITH_LTO)
-  # We get ODR violations because of multiple bison parsers.
-  MY_CHECK_CXX_COMPILER_WARNING("error=odr" HAS_WARN_FLAG)
-  IF(HAS_WARN_FLAG)
-    STRING_APPEND(CMAKE_EXE_LINKER_FLAGS " ${HAS_WARN_FLAG}")
-  ENDIF()
-ENDIF()
-
 # Some tests require Boost.
 INCLUDE_DIRECTORIES(SYSTEM ${BOOST_PATCHES_DIR} ${BOOST_INCLUDE_DIR})
 
@@ -104,7 +96,7 @@ ADD_DEPENDENCIES(gunit_large GenError)
 TARGET_LINK_LIBRARIES(gunit_small
   mysys strings ${GTEST_LIBRARIES} ${UNITTEST_JEMALLOC_LIB} extra::rapidjson)
 TARGET_LINK_LIBRARIES(gunit_large
-  mysys strings ${GTEST_LIBRARIES} ${UNITTEST_JEMALLOC_LIB} extra::rapidjson)
+  ${GTEST_LIBRARIES} ${UNITTEST_JEMALLOC_LIB} extra::rapidjson)
 
 IF(WIN32)
   ## Create an object library of nt_servc.cc, so we don't have to
@@ -182,6 +174,7 @@ SET(TESTS
   sql_string
   stl_alloc
   stream_cipher
+  strings_misc
   strings_skip_trailing
   strings_strnxfrm
   strings_utf8
@@ -298,6 +291,7 @@ SET(SERVER_TESTS
   subquery_syntax
   table_cache
   table_factor_syntax
+  table_histograms
   table_list
   tc_log_mmap
   temptable_allocator
@@ -315,10 +309,6 @@ SET(SERVER_TESTS
 
 IF(MY_COMPILER_IS_GNU AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 12)
   ADD_COMPILE_FLAGS(regexp_engine-t.cc COMPILE_FLAGS "-Wno-restrict")
-ENDIF()
-
-IF(MY_COMPILER_IS_GNU AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 8)
-  ADD_COMPILE_FLAGS(hypergraph_optimizer-t.cc connect_joins-t.cc COMPILE_FLAGS "-Wno-unused-variable")
 ENDIF()
 
 IF(WIN32)
@@ -464,10 +454,21 @@ ADD_SUBDIRECTORY(innodb)
 ADD_SUBDIRECTORY(keyring)
 ADD_SUBDIRECTORY(components/mysql_server)
 ADD_SUBDIRECTORY(components/keyring_common)
+ADD_SUBDIRECTORY(components/keyring_vault)
 ADD_SUBDIRECTORY(xplugin)
 ADD_SUBDIRECTORY(group_replication)
 ADD_SUBDIRECTORY(libmysqlgcs)
+<<<<<<< HEAD
 ADD_SUBDIRECTORY(keyring_vault)
+||||||| merged common ancestors
+>>>>>>>>> Temporary merge branch 2
+ADD_SUBDIRECTORY(keyring_vault)
+<<<<<<<<< Temporary merge branch 1
+||||||||| merged common ancestors
+>>>>>>>>>>> Temporary merge branch 2
+=========
+=======
+>>>>>>> percona/ps/release-8.1.0-1
 ADD_SUBDIRECTORY(temptable)
 ADD_SUBDIRECTORY(binlogevents)
 ADD_SUBDIRECTORY(memory)
