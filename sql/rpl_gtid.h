@@ -2487,7 +2487,11 @@ public:
     that gtid_mode!=ON before calling this function, or else the
     gtid_mode could have changed to ON by a concurrent SET GTID_MODE.)
   */
-  void acquire_anonymous_ownership()
+#ifdef WITH_WSREP
+void acquire_anonymous_ownership(THD *thd);
+void release_anonymous_ownership(THD *thd);
+#else
+void acquire_anonymous_ownership()
   {
     DBUG_ENTER("Gtid_state::acquire_anonymous_ownership");
     sid_lock->assert_some_lock();
@@ -2515,6 +2519,7 @@ public:
     assert(old_value >= 1);
     DBUG_VOID_RETURN;
   }
+#endif  /* WITH_WSREP */
 
   /// Return the number of clients that hold anonymous ownership.
   int32 get_anonymous_ownership_count()
