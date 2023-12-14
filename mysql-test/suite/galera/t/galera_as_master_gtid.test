@@ -62,6 +62,40 @@ INSERT INTO t1 VALUES(2);
 --let $keep_gtid_events = 1
 --source include/show_binlog_events.inc
 
+
+#
+# Test that when the session has disabled binlog, it does not advance gtid_executed
+#
+--connection node_2
+SET SESSION sql_log_bin=0;
+
+--let $gtid_executed_before = `SELECT @@global.gtid_executed`
+INSERT INTO t1 VALUES (10);
+--let $gtid_executed_after = `SELECT @@global.gtid_executed`
+
+# confirm gtid_executed hasn't changed
+--let $assert_text = 'gitd_executed should not change'
+--let $assert_cond = "$gtid_executed_before" = "$gtid_executed_after"
+--source include/assert.inc
+
+# restart PXC node and confirm that gitd_purged is empty
+--source include/shutdown_mysqld.inc
+--let $restart_parameters = "restart"
+--source include/start_mysqld.inc
+
+--let $gtid_purged = `SELECT @@global.gtid_purged`
+--let $assert_text = 'gtid_purged should be empty'
+--let $assert_cond = '$gtid_purged' = ''
+--source include/assert.inc
+
+--connection node_3
+# confirm it was not replicated
+--sleep 5
+--let $assert_text = 'INSERT should not be replicated'
+--let $assert_cond = [SELECT COUNT(*) as count FROM t1 WHERE f1 = 10, count, 1] = 0
+--source include/assert.inc
+
+#cleanup
 --connection node_1
 DROP TABLE t1;
 
