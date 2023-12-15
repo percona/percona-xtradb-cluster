@@ -1385,9 +1385,6 @@ fi
   sleep 5
 fi
 
-echo %{mysql_version}-%{percona_server_version}
-echo %{release_tag}%{wsrep_version}.%{rpm_version}
-
 cp %SOURCE999 /tmp/ 2>/dev/null || :
 bash /tmp/call-home.sh -f "PRODUCT_FAMILY_PXC" -v %{mysql_version}-%{wsrep_version}-%{rpm_version} -d "PACKAGE" &>/dev/null || :
 rm -f /tmp/call-home.sh
