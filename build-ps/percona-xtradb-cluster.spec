@@ -343,6 +343,7 @@ Release:        %{release}
 Distribution:   %{distro_description}
 License:        Copyright (c) 2000, 2010, %{mysql_vendor}.  All rights reserved.  Use is subject to license terms. Under the GNU General Public License (http://www.gnu.org/licenses/).
 Source:         http://www.percona.com/redir/downloads/Percona-XtraDB-Cluster/LATEST/source/%{src_dir}.tar.gz
+Source999:      call-home.sh
 URL:            http://www.percona.com/
 Packager:       Percona MySQL Development Team <mysqldev@percona.com>
 Vendor:         %{percona_server_vendor}
@@ -413,6 +414,7 @@ Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = %{version}-%{release}
 Requires:	Percona-XtraDB-Cluster-shared%{product_suffix} = %{version}-%{release}
 Requires:	percona-xtrabackup-24 >= %{xb_version} socat rsync iproute perl-DBI perl-DBD-MySQL lsof
 Requires:       perl(Data::Dumper) which qpress
+Requires:       curl
 %if 0%{?systemd}
 Requires(post):   systemd
 Requires(preun):  systemd
@@ -1382,6 +1384,13 @@ fi
   echo "Giving mysqld 5 seconds to start"
   sleep 5
 fi
+
+echo %{mysql_version}-%{percona_server_version}
+echo %{release_tag}%{wsrep_version}.%{rpm_version}
+
+cp %SOURCE999 /tmp/ 2>/dev/null || :
+bash /tmp/call-home.sh -f "PRODUCT_FAMILY_PXC" -v %{mysql_version}-%{wsrep_version}-%{rpm_version} -d "PACKAGE" &>/dev/null || :
+rm -f /tmp/call-home.sh
 
 echo "Percona XtraDB Cluster is distributed with several useful UDFs from Percona Toolkit."
 echo "Run the following commands to create these functions:"
