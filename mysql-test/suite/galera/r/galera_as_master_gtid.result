@@ -55,6 +55,12 @@ mysqld-bin.000001	#	Query	#	#	BEGIN
 mysqld-bin.000001	#	Table_map	#	#	table_id: # (test.t1)
 mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F
 mysqld-bin.000001	#	Xid	#	#	COMMIT /* XID */
+SET SESSION sql_log_bin=0;
+INSERT INTO t1 VALUES (10);
+include/assert.inc ['gitd_executed should not change']
+# restart
+include/assert.inc ['gtid_purged should be empty']
+include/assert.inc ['INSERT should not be replicated']
 DROP TABLE t1;
 STOP SLAVE;
 Warnings:
