@@ -2438,7 +2438,6 @@ class Call_close_conn : public Do_THD_Impl {
   bool is_server_shutdown;
 };
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 /**
   This class implements callback function used by
@@ -2631,8 +2630,6 @@ class Count_wsrep_applier_threads : public Do_THD_Impl {
 };
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-=======
 /**
   This class implements callback function used by
   log_alive_threads_info(Global.. ) to check which threads are alive
@@ -2661,19 +2658,14 @@ void log_alive_threads_info(Global_THD_manager *thd_manager, uint n) {
   }
 }
 
->>>>>>> percona/ps/release-8.1.0-1
 static void close_connections(void) {
   DBUG_TRACE;
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   WSREP_DEBUG("Closing connection (close_connections)");
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-=======
 
   if (!opt_initialize) LogErr(INFORMATION_LEVEL, ER_CONNECTIONS_SHUTDOWN_START);
 
->>>>>>> percona/ps/release-8.1.0-1
   (void)RUN_HOOK(server_state, before_server_shutdown, (nullptr));
 
   Per_thread_connection_handler::kill_blocked_pthreads();
@@ -2853,7 +2845,6 @@ static void unireg_abort(int exit_code) {
 
   if (!daemon_launcher_quiet && exit_code) LogErr(ERROR_LEVEL, ER_ABORTING);
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (WSREP_ON && Wsrep_server_state::has_instance() &&
       Wsrep_server_state::instance().state() !=
@@ -2903,17 +2894,10 @@ static void unireg_abort(int exit_code) {
     WSREP_INFO("Some threads may fail to exit.");
   }
 #endif /* WITH_WSREP */
-  mysql_audit_notify(MYSQL_AUDIT_SERVER_SHUTDOWN_SHUTDOWN,
-                     MYSQL_AUDIT_SERVER_SHUTDOWN_REASON_ABORT, exit_code);
-||||||| merged common ancestors
-  mysql_audit_notify(MYSQL_AUDIT_SERVER_SHUTDOWN_SHUTDOWN,
-                     MYSQL_AUDIT_SERVER_SHUTDOWN_REASON_ABORT, exit_code);
-=======
   mysql_event_tracking_shutdown_notify(
       AUDIT_EVENT(EVENT_TRACKING_SHUTDOWN_SHUTDOWN),
       EVENT_TRACKING_SHUTDOWN_REASON_ABORT, exit_code);
 
->>>>>>> percona/ps/release-8.1.0-1
 #ifndef _WIN32
   if (signal_thread_id.thread != 0) {
     // Make sure the signal thread isn't blocked when we are trying to exit.
@@ -2938,15 +2922,10 @@ void clean_up_mysqld_mutexes() { clean_up_mutexes(); }
 
 static void mysqld_exit(int exit_code) {
   assert((exit_code >= MYSQLD_SUCCESS_EXIT && exit_code <= MYSQLD_ABORT_EXIT) ||
-<<<<<<< HEAD
           exit_code == MYSQLD_RESTART_EXIT);
 #ifdef WITH_WSREP
   wsrep_deinit_server();
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-         exit_code == MYSQLD_RESTART_EXIT);
-=======
-         exit_code == MYSQLD_RESTART_EXIT);
 
   // this is to prevent mtr from accidentally printing this log when it runs
   // mysqld with --verbose --help to extract version info and variable values
@@ -2954,7 +2933,6 @@ static void mysqld_exit(int exit_code) {
   if (!is_help_or_validate_option())
     LogErr(SYSTEM_LEVEL, opt_initialize ? ER_SRV_INIT_END : ER_SRV_END);
 
->>>>>>> percona/ps/release-8.1.0-1
   mysql_audit_finalize();
   Srv_session::module_deinit();
   delete_optimizer_cost_module();
@@ -11764,7 +11742,8 @@ SHOW_VAR status_vars[] = {
      SHOW_SCOPE_GLOBAL},
     {"Telemetry_traces_supported", (char *)show_telemetry_traces_support,
      SHOW_FUNC, SHOW_SCOPE_GLOBAL},
-<<<<<<< HEAD
+    {"Tls_sni_server_name", (char *)&show_ssl_get_tls_sni_servername, SHOW_FUNC,
+     SHOW_SCOPE_SESSION},
 #ifdef WITH_WSREP
     {"wsrep_connected", (char *)&wsrep_connected, SHOW_BOOL, SHOW_SCOPE_GLOBAL},
     {"wsrep_ready", (char *)&wsrep_show_ready, SHOW_FUNC, SHOW_SCOPE_GLOBAL},
@@ -11794,11 +11773,6 @@ SHOW_VAR status_vars[] = {
      SHOW_CHAR_PTR, SHOW_SCOPE_GLOBAL},
     {"wsrep", (char *)&wsrep_show_status, SHOW_FUNC, SHOW_SCOPE_ALL},
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-=======
-    {"Tls_sni_server_name", (char *)&show_ssl_get_tls_sni_servername, SHOW_FUNC,
-     SHOW_SCOPE_SESSION},
->>>>>>> percona/ps/release-8.1.0-1
     {NullS, NullS, SHOW_LONG, SHOW_SCOPE_ALL}};
 
 void add_terminator(vector<my_option> *options) {

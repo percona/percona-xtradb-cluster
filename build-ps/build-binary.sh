@@ -41,13 +41,7 @@ WITH_MECAB_OPTION=''
 
 # build with ssl. configuration related to ssl.
 WITH_SSL='/usr'
-<<<<<<< HEAD
 WITH_SSL_TYPE='system'
-||||||| merged common ancestors
-WITH_ZENFS='OFF'
-ZENFS_EXTRA=''
-=======
->>>>>>> percona/ps/release-8.1.0-1
 OPENSSL_INCLUDE=''
 OPENSSL_LIBRARY=''
 CRYPTO_LIBRARY=''
@@ -86,16 +80,8 @@ BUILD_COMMENT=""
 # parse input option and configure build enviornment acccordingly.
 if ! getopt --test
 then
-<<<<<<< HEAD
     go_out="$(getopt --options=iqGadvjmt: \
         --longoptions=i686,verbose,copygalera,asan,debug,valgrind,with-jemalloc:,with-mecab:,with-yassl,keep-build,with-ssl:,tag: \
-||||||| merged common ancestors
-    go_out="$(getopt --options=iqdvj:m:t: \
-        --longoptions=i686,quiet,debug,valgrind,with-jemalloc:,with-zenfs,with-mecab:,with-ssl:,tag: \
-=======
-    go_out="$(getopt --options=iqdvj:m:t: \
-        --longoptions=i686,quiet,debug,valgrind,with-jemalloc:,with-mecab:,with-ssl:,tag: \
->>>>>>> percona/ps/release-8.1.0-1
         --name="$(basename "$0")" -- "$@")"
     test $? -eq 0 || exit 1
     eval set -- $go_out
@@ -349,64 +335,11 @@ fi
 (
     cd "$SOURCEDIR"
 
-<<<<<<< HEAD
     # Build/Copy galera as configured
     (
     if [[ $COPYGALERA -eq 0 ]];then
         export CC=${GALERA_CC:-gcc}
         export CXX=${GALERA_CXX:-g++}
-||||||| merged common ancestors
-    cmake $SOURCEDIR ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
-        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
-        $DEBUG_EXTRA \
-        $ZENFS_EXTRA \
-        -DFEATURE_SET=community \
-        -DCMAKE_INSTALL_PREFIX="/usr/local/$PRODUCT_FULL" \
-        -DMYSQL_DATADIR="/usr/local/$PRODUCT_FULL/data" \
-        -DROUTER_INSTALL_LIBDIR="/usr/local/$PRODUCT_FULL/lib/mysqlrouter/private" \
-        -DROUTER_INSTALL_PLUGINDIR="/usr/local/$PRODUCT_FULL/lib/mysqlrouter/plugin" \
-        -DCOMPILATION_COMMENT="$COMMENT" \
-        -DWITH_PAM=ON \
-        -DWITH_ROCKSDB=ON \
-        -DROCKSDB_DISABLE_AVX2=1 \
-        -DROCKSDB_DISABLE_MARCH_NATIVE=1 \
-        -DWITH_INNODB_MEMCACHED=ON \
-        -DWITH_ZLIB=bundled \
-        -DWITH_NUMA=ON \
-        -DWITH_LDAP=system \
-        -DDOWNLOAD_BOOST=1 \
-        -DWITH_PACKAGE_FLAGS=OFF \
-        -DFORCE_INSOURCE_BUILD=1 \
-        -DWITH_LIBEVENT=bundled \
-        -DWITH_ZSTD=bundled \
-        -DWITH_BOOST="$WORKDIR_ABS/libboost" \
-        $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
-=======
-    cmake $SOURCEDIR ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
-        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
-        $DEBUG_EXTRA \
-        -DFEATURE_SET=community \
-        -DCMAKE_INSTALL_PREFIX="/usr/local/$PRODUCT_FULL" \
-        -DMYSQL_DATADIR="/usr/local/$PRODUCT_FULL/data" \
-        -DROUTER_INSTALL_LIBDIR="/usr/local/$PRODUCT_FULL/lib/mysqlrouter/private" \
-        -DROUTER_INSTALL_PLUGINDIR="/usr/local/$PRODUCT_FULL/lib/mysqlrouter/plugin" \
-        -DCOMPILATION_COMMENT="$COMMENT" \
-        -DWITH_PAM=ON \
-        -DWITH_ROCKSDB=ON \
-        -DROCKSDB_DISABLE_AVX2=1 \
-        -DROCKSDB_DISABLE_MARCH_NATIVE=1 \
-        -DWITH_INNODB_MEMCACHED=ON \
-        -DWITH_ZLIB=bundled \
-        -DWITH_NUMA=ON \
-        -DWITH_LDAP=system \
-        -DDOWNLOAD_BOOST=1 \
-        -DWITH_PACKAGE_FLAGS=OFF \
-        -DFORCE_INSOURCE_BUILD=1 \
-        -DWITH_LIBEVENT=bundled \
-        -DWITH_ZSTD=bundled \
-        -DWITH_BOOST="$WORKDIR_ABS/libboost" \
-        $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
->>>>>>> percona/ps/release-8.1.0-1
 
         # Look for boost_program_options static library
         # (use if possible to avoid additional installation requirements)
@@ -645,16 +578,8 @@ fi
 
 # Patch needed libraries
 (
-<<<<<<< HEAD
     LIBLIST="libnuma.so libgssapi.so libldap_r-2.4.so.2 liblber-2.4.so.2 libaio.so libprocps.so libcrypto.so libssl.so libgcrypt.so libreadline.so libtinfo.so libsasl2.so libbrotlidec.so libbrotlicommon.so librtmp.so libfreebl3.so libssl3.so libsmime3.so libnss3.so libnssutil3.so libplds4.so libplc4.so libnspr4.so libtirpc.so libncurses.so.5 libboost_program_options"
     DIRLIST="bin bin/pxc_extra/pxb-8.0/bin bin/pxc_extra/pxb-2.4/bin lib bin/pxc_extra/pxb-8.0/lib/plugin bin/pxc_extra/pxb-2.4/lib/plugin lib/private lib/plugin lib/mysqlrouter/plugin lib/mysqlrouter/private"
-||||||| merged common ancestors
-    LIBLIST="libgssapi.so libldap_r-2.4.so.2 libldap.so.2 liblber-2.4.so.2 liblber.so.2 libcrypto.so libssl.so libreadline.so libtinfo.so libsasl2.so libbrotlidec.so libbrotlicommon.so librtmp.so libgssapi_krb5.so libkrb5.so libk5crypto.so libssl3.so libsmime3.so libnss3.so libnssutil3.so libplc4.so libnspr4.so libssl3.so libplds4.so libncurses.so.5 libtinfo.so.5 component_encryption_udf.so component_keyring_kms.so component_masking_functions.so"
-    DIRLIST="bin lib lib/private lib/plugin lib/mysqlrouter/plugin lib/mysqlrouter/private"
-=======
-    LIBLIST="libgssapi.so libldap_r-2.4.so.2 libldap.so.2 liblber-2.4.so.2 liblber.so.2 libcrypto.so libssl.so libtinfo.so libsasl2.so libbrotlidec.so libbrotlicommon.so librtmp.so libgssapi_krb5.so libkrb5.so libk5crypto.so libssl3.so libsmime3.so libnss3.so libnssutil3.so libplc4.so libnspr4.so libssl3.so libplds4.so libncurses.so.5 libtinfo.so.5 component_encryption_udf.so component_keyring_kms.so component_masking_functions.so"
-    DIRLIST="bin lib lib/private lib/plugin lib/mysqlrouter/plugin lib/mysqlrouter/private"
->>>>>>> percona/ps/release-8.1.0-1
 
     LIBPATH=""
     OVERRIDE=false
@@ -780,18 +705,8 @@ fi
     cp -r "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" "$TARGETDIR/usr/local/minimal/$PRODUCT_FULL_NAME-minimal"
 
     # NORMAL TARBALL
-<<<<<<< HEAD
     cd "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME"
     link
-||||||| merged common ancestors
-    if [[ ${WITH_ZENFS} != "ON" ]]; then
-        cd "$INSTALLDIR/usr/local/$PRODUCT_FULL"
-        link
-    fi
-=======
-    cd "$INSTALLDIR/usr/local/$PRODUCT_FULL"
-    link
->>>>>>> percona/ps/release-8.1.0-1
 
     # MIN TARBALL
     if [[ $CMAKE_BUILD_TYPE != "Debug" ]]; then

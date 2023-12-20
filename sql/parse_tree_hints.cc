@@ -520,17 +520,7 @@ bool PT_hint_max_execution_time::do_contextualize(Parse_context *pc) {
   return false;
 }
 
-<<<<<<< HEAD
-bool PT_hint_sys_var::contextualize(Parse_context *pc) {
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-||||||||| merged common ancestors
->>>>>>>>>>> Temporary merge branch 2
-=========
-bool PT_hint_sys_var::contextualize(Parse_context *pc) {
-=======
 bool PT_hint_sys_var::do_contextualize(Parse_context *pc) {
->>>>>>> percona/ps/release-8.1.0-1
   if (!sys_var_value) {
     // No warning here, warning is issued by parser.
     return false;

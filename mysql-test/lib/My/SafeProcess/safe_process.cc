@@ -103,7 +103,7 @@ static void die(const char *fmt, ...) {
   vfprintf(stderr, fmt, args);
   fprintf(stderr, "\n");
   va_end(args);
-  if (const int last_err = errno)
+  if (int last_err = errno)
     fprintf(stderr, "error: %d, %s\n", last_err, strerror(last_err));
   exit(1);
 }

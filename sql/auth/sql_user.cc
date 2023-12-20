@@ -126,7 +126,6 @@
   @param comma   If true, append a ',' before the the user.
  */
 void log_user(THD *thd, String *str, LEX_USER *user, bool comma = true) {
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   /*
     PXC doesn't allow user functions viz. USER/CURRENT_USER
@@ -136,24 +135,6 @@ void log_user(THD *thd, String *str, LEX_USER *user, bool comma = true) {
   if (WSREP(thd) && !user) return;
 #endif /* WITH_WSREP */
 
-  String from_user(user->user.str, user->user.length, system_charset_info);
-  String from_plugin(user->first_factor_auth_info.plugin.str,
-                     user->first_factor_auth_info.plugin.length,
-                     system_charset_info);
-  String from_auth(user->first_factor_auth_info.auth.str,
-                   user->first_factor_auth_info.auth.length,
-                   system_charset_info);
-  String from_host(user->host.str, user->host.length, system_charset_info);
-||||||| merged common ancestors
-  String from_user(user->user.str, user->user.length, system_charset_info);
-  String from_plugin(user->first_factor_auth_info.plugin.str,
-                     user->first_factor_auth_info.plugin.length,
-                     system_charset_info);
-  String from_auth(user->first_factor_auth_info.auth.str,
-                   user->first_factor_auth_info.auth.length,
-                   system_charset_info);
-  String from_host(user->host.str, user->host.length, system_charset_info);
-=======
   const String from_user(user->user.str, user->user.length,
                          system_charset_info);
   const String from_plugin(user->first_factor_auth_info.plugin.str,
@@ -164,7 +145,6 @@ void log_user(THD *thd, String *str, LEX_USER *user, bool comma = true) {
                          system_charset_info);
   const String from_host(user->host.str, user->host.length,
                          system_charset_info);
->>>>>>> percona/ps/release-8.1.0-1
 
   if (comma) str->append(',');
   append_query_string(thd, system_charset_info, &from_user, str);
@@ -2059,8 +2039,7 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
     statement based replication and will be reset to the originals
     values when we are out of this function scope
   */
-<<<<<<< HEAD
-  Save_and_Restore_binlog_format_state binlog_format_state(thd);
+  const Save_and_Restore_binlog_format_state binlog_format_state(thd);
 #ifdef WITH_WSREP
   /*
     Rewrite query to ensure it is safe to replay on slave thread with proper
@@ -2071,11 +2050,6 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
   if (WSREP(thd) && !thd->wsrep_applier) {
     { /* Critical section */
       Acl_cache_lock_guard acl_cache_rlock(thd, Acl_cache_lock_mode::READ_MODE);
-||||||| merged common ancestors
-  Save_and_Restore_binlog_format_state binlog_format_state(thd);
-=======
-  const Save_and_Restore_binlog_format_state binlog_format_state(thd);
->>>>>>> percona/ps/release-8.1.0-1
 
       if (!acl_cache_rlock.lock()) {
         return true;
@@ -3201,15 +3175,8 @@ bool mysql_drop_user(THD *thd, List<LEX_USER> &list, bool if_exists,
     statement based replication and will be reset to the originals
     values when we are out of this function scope
   */
-<<<<<<< HEAD
-  Save_and_Restore_binlog_format_state binlog_format_state(thd);
-||||||| merged common ancestors
-  Save_and_Restore_binlog_format_state binlog_format_state(thd);
-
-=======
   const Save_and_Restore_binlog_format_state binlog_format_state(thd);
 
->>>>>>> percona/ps/release-8.1.0-1
   /* DROP USER may be skipped on replication client. */
   if ((result = open_grant_tables(thd, tables, &transactional_tables)))
     return result != 1;
@@ -3578,15 +3545,8 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
     statement based replication and will be reset to the originals
     values when we are out of this function scope
   */
-<<<<<<< HEAD
-  Save_and_Restore_binlog_format_state binlog_format_state(thd);
-||||||| merged common ancestors
-  Save_and_Restore_binlog_format_state binlog_format_state(thd);
-
-=======
   const Save_and_Restore_binlog_format_state binlog_format_state(thd);
 
->>>>>>> percona/ps/release-8.1.0-1
   if ((result = open_grant_tables(thd, tables, &transactional_tables)))
     return result != 1;
 

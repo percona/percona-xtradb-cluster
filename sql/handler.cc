@@ -2490,7 +2490,6 @@ int ha_prepare_low(THD *thd, bool all) {
         continue;
 
       auto ht = ha_info.ht();
-<<<<<<< HEAD
 
 #ifdef WITH_WSREP
       const bool run_wsrep_hooks = wsrep_run_commit_hook(thd, all);
@@ -2554,12 +2553,7 @@ int ha_prepare_low(THD *thd, bool all) {
         error = 1;
       }
 #else
-      int err = ht->prepare(ht, thd, all);
-||||||| merged common ancestors
-      int err = ht->prepare(ht, thd, all);
-=======
       const int err = ht->prepare(ht, thd, all);
->>>>>>> percona/ps/release-8.1.0-1
       if (err) {
         if (!thd_holds_xa_transaction(
                 thd)) {  // If XA PREPARE, let error be handled by caller

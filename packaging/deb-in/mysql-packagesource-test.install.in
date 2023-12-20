@@ -26,13 +26,8 @@ usr/bin/mysql_client_test
 usr/bin/mysqltest
 usr/bin/mysqltest_safe_process
 usr/bin/mysqlxtest
-<<<<<<< HEAD
-||||||| merged common ancestors
-usr/bin/mysql_keyring_encryption_test
-=======
 usr/bin/mysql_keyring_encryption_test
 usr/bin/mysql_test_event_tracking
->>>>>>> percona/ps/release-8.1.0-1
 # man pages
 usr/share/man/man1/comp_err.1
 # plugins

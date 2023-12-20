@@ -95,17 +95,4 @@ typedef struct lex_state_maps_st lex_state_maps_st;
 
 bool init_state_maps(MY_CHARSET_LOADER *, CHARSET_INFO *);
 
-<<<<<<< HEAD:include/sql_chars.h
-#endif /* SQL_LEX_CHARS_INCLUDED */
-||||||| merged common ancestors:include/sql_chars.h
-#endif /* SQL_LEX_CHARS_INCLUDED */
-<<<<<<<<< Temporary merge branch 1
-
-||||||||| merged common ancestors
-
->>>>>>>>>>> Temporary merge branch 2
-=========
->>>>>>>>> Temporary merge branch 2
-=======
 #endif  // STRINGS_SQL_CHARS_H_
->>>>>>> percona/ps/release-8.1.0-1:strings/sql_chars.h

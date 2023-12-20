@@ -63,6 +63,10 @@
 #include "thr_lock.h"
 #include "typelib.h"
 
+#ifdef WITH_WSREP
+#include "m_string.h"  // native_strncasecmp
+#endif
+
 class Field;
 class Field_longlong;
 

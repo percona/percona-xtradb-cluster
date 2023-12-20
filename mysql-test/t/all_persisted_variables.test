@@ -60,7 +60,7 @@ let $total_global_vars=`SELECT COUNT(*)
    AND variable_name NOT LIKE 'debug_%'
    AND variable_name NOT LIKE '%telemetry%'`;
 let $total_persistent_vars=498;
->>>>>>> percona/ps/release-8.1.0-1
+>>>>>>> ps/Percona-Server-8.1.0-1
 
 --echo ***************************************************************
 --echo * 0. Verify that variables present in performance_schema.global

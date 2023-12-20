@@ -1033,7 +1033,6 @@ static bool login_connection(THD *thd) {
 void end_connection(THD *thd) {
   NET *net = thd->get_protocol_classic()->get_net();
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (thd->wsrep_cs().state() == wsrep::client_state::s_exec) {
     /* Error happened after the thread acquired ownership to wsrep
@@ -1045,13 +1044,8 @@ void end_connection(THD *thd) {
   thd->wsrep_client_thread = false;
 #endif /* WITH_WSREP */
 
-  mysql_audit_notify(thd, AUDIT_EVENT(MYSQL_AUDIT_CONNECTION_DISCONNECT), 0);
-||||||| merged common ancestors
-  mysql_audit_notify(thd, AUDIT_EVENT(MYSQL_AUDIT_CONNECTION_DISCONNECT), 0);
-=======
   mysql_event_tracking_connection_notify(
       thd, AUDIT_EVENT(EVENT_TRACKING_CONNECTION_DISCONNECT), 0);
->>>>>>> percona/ps/release-8.1.0-1
 
 #ifdef HAVE_PSI_THREAD_INTERFACE
   PSI_THREAD_CALL(notify_session_disconnect)(thd->get_psi());

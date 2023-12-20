@@ -1172,7 +1172,11 @@ class Item : public Parse_tree_node {
   //    'virtual', 'override', or 'final'
   MY_COMPILER_DIAGNOSTIC_PUSH()
   MY_COMPILER_MSVC_DIAGNOSTIC_IGNORE(26435)
+#ifdef WITH_WSREP
+  virtual bool itemize(Parse_context *pc, Item **res) {
+#else
   virtual bool itemize(Parse_context *pc, Item **res) final {
+#endif
     // For condition#2 below ... If position is empty, this item was not
     // created in the parser; so don't show it in the parse tree.
     if (pc->m_show_parse_tree == nullptr || this->m_pos.is_empty())

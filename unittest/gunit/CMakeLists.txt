@@ -458,17 +458,6 @@ ADD_SUBDIRECTORY(components/keyring_vault)
 ADD_SUBDIRECTORY(xplugin)
 ADD_SUBDIRECTORY(group_replication)
 ADD_SUBDIRECTORY(libmysqlgcs)
-<<<<<<< HEAD
-ADD_SUBDIRECTORY(keyring_vault)
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-ADD_SUBDIRECTORY(keyring_vault)
-<<<<<<<<< Temporary merge branch 1
-||||||||| merged common ancestors
->>>>>>>>>>> Temporary merge branch 2
-=========
-=======
->>>>>>> percona/ps/release-8.1.0-1
 ADD_SUBDIRECTORY(temptable)
 ADD_SUBDIRECTORY(binlogevents)
 ADD_SUBDIRECTORY(memory)

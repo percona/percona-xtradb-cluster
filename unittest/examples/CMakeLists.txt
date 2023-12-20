@@ -39,10 +39,6 @@ ENDFOREACH()
 #    where even unused symbols must be defined)
 MYSQL_ADD_EXECUTABLE(mytime_client-t mytime_client-t.cc SKIP_INSTALL)
 TARGET_LINK_LIBRARIES(mytime_client-t mytime ${LIBRT})
-<<<<<<< HEAD
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-=======
 
 MYSQL_ADD_EXECUTABLE(libstrings_static-t
   libstrings-t.cc
@@ -59,4 +55,3 @@ MYSQL_ADD_EXECUTABLE(libstrings_shared-t
   SKIP_INSTALL
   )
 TARGET_COMPILE_OPTIONS(libstrings_shared-t PRIVATE -DUNDEFINE_MYSQL_PROJECT)
->>>>>>> percona/ps/release-8.1.0-1

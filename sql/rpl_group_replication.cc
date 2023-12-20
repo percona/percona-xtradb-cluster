@@ -57,15 +57,11 @@
 #include "sql/sql_plugin_ref.h"
 #include "sql/ssl_init_callback.h"
 #include "sql/system_variables.h"  // System_variables
-<<<<<<< HEAD
+#include "sql/tztime.h"            // my_tz_UTC
+#include "string_with_len.h"
 #ifdef WITH_WSREP
 #include "sql/wsrep_mysqld.h"
 #endif
-||||||| merged common ancestors
-=======
-#include "sql/tztime.h"            // my_tz_UTC
-#include "string_with_len.h"
->>>>>>> percona/ps/release-8.1.0-1
 
 REQUIRES_SERVICE_PLACEHOLDER(component_sys_variable_register);
 REQUIRES_SERVICE_PLACEHOLDER(component_sys_variable_unregister);

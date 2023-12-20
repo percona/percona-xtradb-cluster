@@ -247,17 +247,7 @@ bool is_empty_geocollection(const Geometry *g) {
 bool is_empty_geocollection(const String &wkbres) {
   if (wkbres.ptr() == nullptr) return true;
 
-<<<<<<< HEAD
-  uint32 geotype = uint4korr(wkbres.ptr() + SRID_SIZE + 1);
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-||||||||| merged common ancestors
->>>>>>>>>>> Temporary merge branch 2
-=========
-  uint32 geotype = uint4korr(wkbres.ptr() + SRID_SIZE + 1);
-=======
   const uint32 geotype = uint4korr(wkbres.ptr() + SRID_SIZE + 1);
->>>>>>> percona/ps/release-8.1.0-1
 
   if (geotype != static_cast<uint32>(Geometry::wkb_geometrycollection))
     return false;

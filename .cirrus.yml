@@ -153,7 +153,7 @@ env:  # Global defaults
 =======
 env:  # Global defaults
   PARENT_BRANCH: trunk
->>>>>>> percona/ps/release-8.1.0-1
+>>>>>>> ps/Percona-Server-8.1.0-1
   MOUNT_POINT: "/data"
   CCACHE_SIZE: "500M"
   CCACHE_NOHASHDIR: "1"  # Debug info might contain a stale path if the build dir changes, but this is fine

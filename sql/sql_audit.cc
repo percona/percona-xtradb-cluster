@@ -825,10 +825,6 @@ size_t make_user_name(Security_context *sctx, char *buf) {
                sctx_ip.length ? sctx_ip.str : "", "]", NullS) -
       buf);
 }
-<<<<<<< HEAD
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-=======
 
 inline void set_cstring_with_length(mysql_cstring_with_length &cstr,
                                     const char *str) {
@@ -1431,4 +1427,3 @@ int mysql_audit_notify(THD *thd, mysql_event_authorization_subclass_t subclass,
                                     subclass_name, &event);
 }
 */
->>>>>>> percona/ps/release-8.1.0-1

@@ -565,16 +565,7 @@ TEST_F(StringsUTF8mb4Test, MyIsmbcharUtf8mb4) {
 class StringsUTF8mb4_900Test : public ::testing::Test {
  protected:
   void SetUp() override {
-<<<<<<< HEAD
-    MY_CHARSET_LOADER loader;
-    m_charset = my_collation_get_by_name(&loader, "utf8mb4_0900_ai_ci", MYF(0));
-||||||| merged common ancestors
-    MY_CHARSET_LOADER loader;
-    m_charset = my_collation_get_by_name(&loader, "utf8mb4_0900_ai_ci", MYF(0));
->>>>>>>>> Temporary merge branch 2
-=======
     m_charset = get_charset_by_name("utf8mb4_0900_ai_ci", MYF(0));
->>>>>>> percona/ps/release-8.1.0-1
   }
 
   bool equals(const char *a, const char *b) {
@@ -614,16 +605,7 @@ TEST_F(StringsUTF8mb4_900Test, MyUCA900Collate) {
 class StringsUTF8mb4_900_AS_CS_NoPad_Test : public ::testing::Test {
  protected:
   void SetUp() override {
-<<<<<<< HEAD
-    MY_CHARSET_LOADER loader;
-    m_charset = my_collation_get_by_name(&loader, "utf8mb4_0900_as_cs", MYF(0));
-||||||| merged common ancestors
-    MY_CHARSET_LOADER loader;
-    m_charset = my_collation_get_by_name(&loader, "utf8mb4_0900_as_cs", MYF(0));
->>>>>>>>> Temporary merge branch 2
-=======
     m_charset = get_charset_by_name("utf8mb4_0900_as_cs", MYF(0));
->>>>>>> percona/ps/release-8.1.0-1
   }
 
   int compare(const char *a, const char *b, bool b_is_prefix) {

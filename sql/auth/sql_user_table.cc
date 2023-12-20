@@ -2015,7 +2015,6 @@ int open_grant_tables(THD *thd, TABLE_LIST *tables,
       tables[i].updating = false;
   }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   /* CREATE/DROP function/procedure implicitly grant priviliges.
   Check for detail comment in respected switch handler in sql_parse.cc
@@ -2040,15 +2039,8 @@ int open_grant_tables(THD *thd, TABLE_LIST *tables,
   }
 #endif /* WITH_WSREP */
 
-  uint flags = MYSQL_OPEN_HAS_MDL_LOCK | MYSQL_LOCK_IGNORE_TIMEOUT |
-               MYSQL_OPEN_IGNORE_FLUSH;
-||||||| merged common ancestors
-  uint flags = MYSQL_OPEN_HAS_MDL_LOCK | MYSQL_LOCK_IGNORE_TIMEOUT |
-               MYSQL_OPEN_IGNORE_FLUSH;
-=======
   const uint flags = MYSQL_OPEN_HAS_MDL_LOCK | MYSQL_LOCK_IGNORE_TIMEOUT |
                      MYSQL_OPEN_IGNORE_FLUSH;
->>>>>>> percona/ps/release-8.1.0-1
   if (open_and_lock_tables(thd, tables,
                            flags)) {  // This should never happen
     thd->mdl_context.release_transactional_locks();

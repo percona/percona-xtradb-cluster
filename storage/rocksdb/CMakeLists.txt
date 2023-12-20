@@ -80,143 +80,13 @@ ELSE()
   # get a list of rocksdb library source files
   # run with env -i to avoid passing variables
   EXECUTE_PROCESS(
-<<<<<<< HEAD
-    COMMAND env -i ${CMAKE_CURRENT_SOURCE_DIR}/get_rocksdb_files.sh
-||||||| merged common ancestors
-    COMMAND env -i ${CMAKE_CURRENT_SOURCE_DIR}/get_rocksdb_files.sh ${ROCKSDB_FOLLY}
-=======
     COMMAND env -i CXX=${CMAKE_CXX_COMPILER} ${CMAKE_CURRENT_SOURCE_DIR}/get_rocksdb_files.sh ${ROCKSDB_FOLLY}
->>>>>>> percona/ps/release-8.1.0-1
     OUTPUT_VARIABLE SCRIPT_OUTPUT
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   )
   # split the list into lines
   STRING(REGEX MATCHALL "[^\n]+" ROCKSDB_LIB_SOURCES ${SCRIPT_OUTPUT})
 
-<<<<<<< HEAD
-  SET(ROCKSDB_PLUGINS_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/rocksdb_plugins)
-
-  LIST(APPEND PLUGINS ${ROCKSDB_PLUGINS})
-  FOREACH(PLUGIN IN LISTS PLUGINS)
-    SET(PLUGIN_ROOT "${ROCKSDB_PLUGINS_ROOT}/${PLUGIN}/")
-    MESSAGE(STATUS "MyRocks: Building RocksDB plugin: ${PLUGIN}")
-    FILE(GLOB PLUGINMKFILE "${PLUGIN_ROOT}${PLUGIN}*.mk")
-    FILE(GLOB PLUGINCMAKEFILE "${PLUGIN_ROOT}CMakeLists.txt")
-    SET(CURRENT_PLUGIN_SOURCES)
-    SET(CURRENT_PLUGIN_LD)
-    IF (EXISTS ${PLUGINCMAKEFILE})
-      IF (PLUGIN STREQUAL "zenfs")
-        SET(ZENFS_SKIP_LIBZBD_CHECK 1)
-      ENDIF()
-      ADD_SUBDIRECTORY("${PLUGIN_ROOT}")
-      FOREACH(SOURCE_FILE ${${PLUGIN}_SOURCES})
-        LIST(APPEND CURRENT_PLUGIN_SOURCES "${PLUGIN_ROOT}${SOURCE_FILE}")
-      ENDFOREACH()
-      SET(CURRENT_PLUGIN_LD ${${PLUGIN}_CMAKE_EXE_LINKER_FLAGS})
-    ELSEIF (NOT EXISTS ${PLUGINMKFILE})
-      MESSAGE(SEND_ERROR "Missing RocksDB plugin CMakeLists.txt/makefile in ${PLUGIN_ROOT}")
-    ELSE()
-      FILE(READ ${PLUGINMKFILE} PLUGINMK)
-      #Remove line continuation/breaking
-      STRING(REGEX REPLACE "[ \t\r]*\\\\\n[ \t\r]*" " "  PLUGINMK ${PLUGINMK})
-      STRING(REGEX MATCH "SOURCES[ ]*=[ ]*([^\n]*)" FOO ${PLUGINMK})
-      SET(MK_SOURCES ${CMAKE_MATCH_1})
-      SEPARATE_ARGUMENTS(MK_SOURCES)
-      FOREACH(MK_FILE IN LISTS MK_SOURCES)
-        LIST(APPEND CURRENT_PLUGIN_SOURCES "${PLUGIN_ROOT}${MK_FILE}")
-      ENDFOREACH()
-      STRING(REGEX MATCH "LDFLAGS[ ]*=[ ]*([^\n]*)" FOO ${PLUGINMK})
-      SET(CURRENT_PLUGIN_LD "${CMAKE_MATCH_1}")
-    ENDIF()
-    IF (PLUGIN STREQUAL "zenfs")
-      SET(ZENFS_PLUGIN_ENABLED 1)
-      OPTION(WITH_ZENFS_UTILITY "Build with ZenFS utility" OFF)
-      SET(ZENFS_PLUGIN_SOURCES ${CURRENT_PLUGIN_SOURCES})
-      STRING(REPLACE "-lzbd" "" CURRENT_PLUGIN_LD ${CURRENT_PLUGIN_LD})
-      STRING(STRIP ${CURRENT_PLUGIN_LD} CURRENT_PLUGIN_LD)
-      IF (NOT EXISTS ${PLUGINCMAKEFILE})
-        EXECUTE_PROCESS(COMMAND "./generate-version.sh" WORKING_DIRECTORY "${PLUGIN_ROOT}" RESULT_VARIABLE GENVER_RESULT)
-        IF (NOT GENVER_RESULT EQUAL 0)
-          MESSAGE(FATAL_ERROR "Cannot generate zenfs version file")
-        ENDIF()
-      ENDIF()
-      UNSET(ZENFS_SKIP_LIBZBD_CHECK)
-    ENDIF()
-    LIST(APPEND PLUGIN_SOURCES ${CURRENT_PLUGIN_SOURCES})
-    LIST(APPEND PLUGIN_LD ${CURRENT_PLUGIN_LD})
-  ENDFOREACH()
-
-  # Statically include all RocksDB source
-  SET(ROCKSDB_SOURCES
-    ${ROCKSDB_LIB_SOURCES}
-    ${PLUGIN_SOURCES}
-  )
-ENDIF()
-
-IF (ZENFS_PLUGIN_ENABLED)
-  INCLUDE(zbd)
-  MYSQL_CHECK_ZBD()
-  SET(rocksdb_static_libs ${rocksdb_static_libs} ${ZBD_LIBRARY})
-||||||| merged common ancestors
-  SET(ROCKSDB_PLUGINS_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/rocksdb_plugins)
-
-  LIST(APPEND PLUGINS ${ROCKSDB_PLUGINS})
-  FOREACH(PLUGIN IN LISTS PLUGINS)
-    SET(PLUGIN_ROOT "${ROCKSDB_PLUGINS_ROOT}/${PLUGIN}/")
-    MESSAGE(STATUS "MyRocks: Building RocksDB plugin: ${PLUGIN}")
-    FILE(GLOB PLUGINMKFILE "${PLUGIN_ROOT}${PLUGIN}*.mk")
-    FILE(GLOB PLUGINCMAKEFILE "${PLUGIN_ROOT}CMakeLists.txt")
-    SET(CURRENT_PLUGIN_SOURCES)
-    SET(CURRENT_PLUGIN_LD)
-    IF (EXISTS ${PLUGINCMAKEFILE})
-      IF (PLUGIN STREQUAL "zenfs")
-        SET(ZENFS_SKIP_LIBZBD_CHECK 1)
-      ENDIF()
-      ADD_SUBDIRECTORY("${PLUGIN_ROOT}")
-      FOREACH(SOURCE_FILE ${${PLUGIN}_SOURCES})
-        LIST(APPEND CURRENT_PLUGIN_SOURCES "${PLUGIN_ROOT}${SOURCE_FILE}")
-      ENDFOREACH()
-      SET(CURRENT_PLUGIN_LD ${${PLUGIN}_CMAKE_EXE_LINKER_FLAGS})
-    ELSEIF (NOT EXISTS ${PLUGINMKFILE})
-      MESSAGE(SEND_ERROR "Missing RocksDB plugin CMakeLists.txt/makefile in ${PLUGIN_ROOT}")
-    ELSE()
-      FILE(READ ${PLUGINMKFILE} PLUGINMK)
-      #Remove line continuation/breaking
-      STRING(REGEX REPLACE "[ \t\r]*\\\\\n[ \t\r]*" " "  PLUGINMK ${PLUGINMK})
-      STRING(REGEX MATCH "SOURCES[ ]*=[ ]*([^\n]*)" FOO ${PLUGINMK})
-      SET(MK_SOURCES ${CMAKE_MATCH_1})
-      SEPARATE_ARGUMENTS(MK_SOURCES)
-      FOREACH(MK_FILE IN LISTS MK_SOURCES)
-        LIST(APPEND CURRENT_PLUGIN_SOURCES "${PLUGIN_ROOT}${MK_FILE}")
-      ENDFOREACH()
-      STRING(REGEX MATCH "LDFLAGS[ ]*=[ ]*([^\n]*)" FOO ${PLUGINMK})
-      SET(CURRENT_PLUGIN_LD "${CMAKE_MATCH_1}")
-    ENDIF()
-    IF (PLUGIN STREQUAL "zenfs")
-      SET(ZENFS_PLUGIN_ENABLED 1)
-      OPTION(WITH_ZENFS_UTILITY "Build with ZenFS utility" OFF)
-      SET(ZENFS_PLUGIN_SOURCES ${CURRENT_PLUGIN_SOURCES})
-      STRING(REPLACE "-lzbd" "" CURRENT_PLUGIN_LD ${CURRENT_PLUGIN_LD})
-      STRING(STRIP ${CURRENT_PLUGIN_LD} CURRENT_PLUGIN_LD)
-      IF (NOT EXISTS ${PLUGINCMAKEFILE})
-        EXECUTE_PROCESS(COMMAND "./generate-version.sh" WORKING_DIRECTORY "${PLUGIN_ROOT}" RESULT_VARIABLE GENVER_RESULT)
-        IF (NOT GENVER_RESULT EQUAL 0)
-          MESSAGE(FATAL_ERROR "Cannot generate zenfs version file")
-        ENDIF()
-      ENDIF()
-      UNSET(ZENFS_SKIP_LIBZBD_CHECK)
-    ENDIF()
-    LIST(APPEND PLUGIN_SOURCES ${CURRENT_PLUGIN_SOURCES})
-    LIST(APPEND PLUGIN_LD ${CURRENT_PLUGIN_LD})
-  ENDFOREACH()
-ENDIF()
-
-IF (ZENFS_PLUGIN_ENABLED)
-  INCLUDE(zbd)
-  MYSQL_CHECK_ZBD()
-  SET(rocksdb_static_libs ${rocksdb_static_libs} ${ZBD_LIBRARY})
-=======
->>>>>>> percona/ps/release-8.1.0-1
 ENDIF()
 
 # This is a strong requirement coming from RocksDB. No conditional checks here.
@@ -389,35 +259,11 @@ IF(HAVE_EXTERNAL_ROCKSDB)
   SET(rocksdb_static_libs ${rocksdb_static_libs} "${ROCKSDB_LIB_PATH}/${ROCKSDB_LIB_NAME}")
 ENDIF()
 
-<<<<<<< HEAD
-SET(rocksdb_static_libs ${rocksdb_static_libs} ${ZLIB_LIBRARY} ${ZSTD_LIBRARY} ${LZ4_LIBRARY} "-ldl" ${PLUGIN_LD})
-||||||| merged common ancestors
-SET(rocksdb_static_libs ${rocksdb_static_libs} ext::zlib ext::zstd ext::lz4 extra::rapidjson "-ldl" ${PLUGIN_LD})
-=======
 SET(rocksdb_static_libs ${rocksdb_static_libs} ext::zlib ext::zstd ext::lz4 extra::rapidjson "-ldl")
->>>>>>> percona/ps/release-8.1.0-1
 IF(NOT CMAKE_SYSTEM_NAME MATCHES "Darwin")
   SET(rocksdb_static_libs ${rocksdb_static_libs} "-lrt")
 ENDIF()
 
-<<<<<<< HEAD
-MYSQL_ADD_PLUGIN(rocksdb ${ROCKSDB_SOURCES} STORAGE_ENGINE DEFAULT MODULE_ONLY
-  LINK_LIBRARIES ${rocksdb_static_libs}
-)
-||||||| merged common ancestors
-ADD_LIBRARY(rocksdb_sources ${ROCKSDB_LIB_SOURCES} ${PLUGIN_SOURCES})
-TARGET_LINK_LIBRARIES(rocksdb_sources ${rocksdb_static_libs})
-
-IF (ROCKSDB_DYNAMIC_PLUGIN)
-  MYSQL_ADD_PLUGIN(rocksdb ${ROCKSDB_SE_SOURCES} STORAGE_ENGINE DEFAULT
-    MODULE_ONLY LINK_LIBRARIES rocksdb_sources)
-ELSE()
-  MYSQL_ADD_PLUGIN(rocksdb_se ${ROCKSDB_SE_SOURCES} STORAGE_ENGINE MANDATORY
-    STATIC_ONLY LINK_LIBRARIES rocksdb_sources)
-    # to fix linkage error on partition_base
-    TARGET_LINK_LIBRARIES(rocksdb_se sql_main)
-ENDIF()
-=======
 ADD_LIBRARY(rocksdb_sources ${ROCKSDB_LIB_SOURCES})
 TARGET_LINK_LIBRARIES(rocksdb_sources ${rocksdb_static_libs})
 
@@ -430,7 +276,6 @@ ELSE()
   # to fix linkage error on partition_base
   TARGET_LINK_LIBRARIES(rocksdb_se sql_main)
 ENDIF()
->>>>>>> percona/ps/release-8.1.0-1
 
 IF (NOT HAVE_EXTERNAL_ROCKSDB)
   # TODO: read this file list from src.mk:TOOL_SOURCES
@@ -447,48 +292,6 @@ IF (NOT HAVE_EXTERNAL_ROCKSDB)
   MYSQL_ADD_EXECUTABLE(ldb ${CMAKE_CURRENT_SOURCE_DIR}/rocksdb/tools/ldb.cc ${ROCKSDB_TOOL_SOURCES})
   TARGET_LINK_LIBRARIES(ldb ${rocksdb_static_libs})
 
-<<<<<<< HEAD
-  MYSQL_ADD_EXECUTABLE(mysql_ldb ${CMAKE_CURRENT_SOURCE_DIR}/tools/mysql_ldb.cc ${ROCKSDB_TOOL_SOURCES})
-  TARGET_LINK_LIBRARIES(mysql_ldb ${rocksdb_static_libs})
-
-  IF (WITH_ZENFS_UTILITY)
-    FIND_PATH(GFLAGS_INCLUDE_DIR
-      NAMES gflags/gflags.h)
-    FIND_LIBRARY(GFLAGS_SYSTEM_LIBRARY
-      NAMES gflags)
-    IF (NOT GFLAGS_INCLUDE_DIR OR NOT GFLAGS_SYSTEM_LIBRARY)
-      MESSAGE(FATAL_ERROR "Cannot find system gflags library.")
-    ENDIF()
-
-    MYSQL_ADD_EXECUTABLE(zenfs ${CMAKE_CURRENT_SOURCE_DIR}/rocksdb_plugins/zenfs/util/zenfs.cc ${ROCKSDB_LIB_SOURCES} ${ZENFS_PLUGIN_SOURCES} ${ZSTD_SOURCES})
-    TARGET_LINK_LIBRARIES(zenfs ${rocksdb_static_libs} ${GFLAGS_SYSTEM_LIBRARY})
-
-    EXECUTE_PROCESS(COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/tmp_gen/rocksdb/plugin")
-    EXECUTE_PROCESS(COMMAND ${CMAKE_COMMAND} -E create_symlink "${CMAKE_CURRENT_SOURCE_DIR}/rocksdb_plugins/zenfs" "${CMAKE_CURRENT_BINARY_DIR}/tmp_gen/rocksdb/plugin/zenfs")
-    TARGET_INCLUDE_DIRECTORIES(zenfs SYSTEM PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/tmp_gen")
-  ENDIF()
-||||||| merged common ancestors
   MYSQL_ADD_EXECUTABLE(ldb ${CMAKE_CURRENT_SOURCE_DIR}/rocksdb/tools/ldb.cc)
   TARGET_LINK_LIBRARIES(ldb rocksdb_tool)
-
-  IF (WITH_ZENFS_UTILITY)
-    FIND_PATH(GFLAGS_INCLUDE_DIR
-      NAMES gflags/gflags.h)
-    FIND_LIBRARY(GFLAGS_SYSTEM_LIBRARY
-      NAMES gflags)
-    IF (NOT GFLAGS_INCLUDE_DIR OR NOT GFLAGS_SYSTEM_LIBRARY)
-      MESSAGE(FATAL_ERROR "Cannot find system gflags library.")
-    ENDIF()
-
-    MYSQL_ADD_EXECUTABLE(zenfs ${CMAKE_CURRENT_SOURCE_DIR}/rocksdb_plugins/zenfs/util/zenfs.cc ${ZENFS_PLUGIN_SOURCES})
-    TARGET_LINK_LIBRARIES(zenfs rocksdb_sources ${GFLAGS_SYSTEM_LIBRARY})
-
-    EXECUTE_PROCESS(COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/tmp_gen/rocksdb/plugin")
-    EXECUTE_PROCESS(COMMAND ${CMAKE_COMMAND} -E create_symlink "${CMAKE_CURRENT_SOURCE_DIR}/rocksdb_plugins/zenfs" "${CMAKE_CURRENT_BINARY_DIR}/tmp_gen/rocksdb/plugin/zenfs")
-    TARGET_INCLUDE_DIRECTORIES(zenfs SYSTEM PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/tmp_gen")
-  ENDIF()
-=======
-  MYSQL_ADD_EXECUTABLE(ldb ${CMAKE_CURRENT_SOURCE_DIR}/rocksdb/tools/ldb.cc)
-  TARGET_LINK_LIBRARIES(ldb rocksdb_tool)
->>>>>>> percona/ps/release-8.1.0-1
 ENDIF()

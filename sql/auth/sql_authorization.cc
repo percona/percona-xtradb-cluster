@@ -2788,15 +2788,8 @@ int mysql_table_grant(THD *thd, Table_ref *table_list,
     statement based replication and will be reset to the originals
     values when we are out of this function scope
   */
-<<<<<<< HEAD
-  Save_and_Restore_binlog_format_state binlog_format_state(thd);
-||||||| merged common ancestors
-  Save_and_Restore_binlog_format_state binlog_format_state(thd);
-
-=======
   const Save_and_Restore_binlog_format_state binlog_format_state(thd);
 
->>>>>>> percona/ps/release-8.1.0-1
   /*
     The lock api is depending on the thd->lex variable which needs to be
     re-initialized.
@@ -3028,14 +3021,7 @@ bool mysql_routine_grant(THD *thd, Table_ref *table_list, bool is_proc,
     statement based replication and will be reset to the originals
     values when we are out of this function scope
   */
-<<<<<<< HEAD
-  Save_and_Restore_binlog_format_state binlog_format_state(thd);
-
-||||||| merged common ancestors
-  Save_and_Restore_binlog_format_state binlog_format_state(thd);
-=======
   const Save_and_Restore_binlog_format_state binlog_format_state(thd);
->>>>>>> percona/ps/release-8.1.0-1
   if ((ret = open_grant_tables(thd, tables, &transactional_tables)))
     return ret != 1;
 
@@ -3628,14 +3614,7 @@ bool mysql_grant(THD *thd, const char *db, List<LEX_USER> &list, ulong rights,
     statement based replication and will be reset to the originals
     values when we are out of this function scope
   */
-<<<<<<< HEAD
-  Save_and_Restore_binlog_format_state binlog_format_state(thd);
-
-||||||| merged common ancestors
-  Save_and_Restore_binlog_format_state binlog_format_state(thd);
-=======
   const Save_and_Restore_binlog_format_state binlog_format_state(thd);
->>>>>>> percona/ps/release-8.1.0-1
   if ((ret = open_grant_tables(thd, tables, &transactional_tables)))
     return ret != 1;
 
@@ -5329,14 +5308,7 @@ bool mysql_revoke_all(THD *thd, List<LEX_USER> &list) {
     statement based replication and will be reset to the originals
     values when we are out of this function scope
   */
-<<<<<<< HEAD
-  Save_and_Restore_binlog_format_state binlog_format_state(thd);
-
-||||||| merged common ancestors
-  Save_and_Restore_binlog_format_state binlog_format_state(thd);
-=======
   const Save_and_Restore_binlog_format_state binlog_format_state(thd);
->>>>>>> percona/ps/release-8.1.0-1
   if ((ret = open_grant_tables(thd, tables, &transactional_tables)))
     return ret != 1;
 

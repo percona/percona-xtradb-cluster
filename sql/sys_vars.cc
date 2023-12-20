@@ -3932,16 +3932,10 @@ static void event_scheduler_restart(THD *thd) {
 
 static bool fix_read_only(sys_var *self, THD *thd, enum_var_type) {
   bool result = true;
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   bool own_lock = false;
 #endif                             /* WITH_WSREP */
-  bool new_read_only = read_only;  // make a copy before releasing a mutex
-||||||| merged common ancestors
-  bool new_read_only = read_only;  // make a copy before releasing a mutex
-=======
   const bool new_read_only = read_only;  // make a copy before releasing a mutex
->>>>>>> percona/ps/release-8.1.0-1
   DBUG_TRACE;
 
   /*
@@ -8304,9 +8298,8 @@ static bool check_set_default_table_encryption(sys_var *self [[maybe_unused]],
   // Should own one of SUPER or both (SYSTEM_VARIABLES_ADMIN and
   // TABLE_ENCRYPTION_ADMIN), unless this is the session option and
   // the value is unchanged.
-<<<<<<< HEAD
-  longlong previous_val = thd->variables.default_table_encryption;
-  longlong val = (longlong)var->save_result.ulonglong_value;
+  const longlong previous_val = thd->variables.default_table_encryption;
+  const longlong val = (longlong)var->save_result.ulonglong_value;
 
 #ifdef WITH_WSREP
   if (val > 1) {
@@ -8317,13 +8310,6 @@ static bool check_set_default_table_encryption(sys_var *self [[maybe_unused]],
   }
 #endif
 
-||||||| merged common ancestors
-  longlong previous_val = thd->variables.default_table_encryption;
-  longlong val = (longlong)var->save_result.ulonglong_value;
-=======
-  const longlong previous_val = thd->variables.default_table_encryption;
-  const longlong val = (longlong)var->save_result.ulonglong_value;
->>>>>>> percona/ps/release-8.1.0-1
   if ((!var->is_global_persist() && val == previous_val) ||
       thd->security_context()->check_access(SUPER_ACL) ||
       (thd->security_context()
@@ -9008,17 +8994,8 @@ static Sys_var_ulonglong Sys_var_buffered_error_log_size(
     "buffered_error_log_size", "Size of the buffered error log (kB)",
     GLOBAL_VAR(buffered_error_log_size), CMD_LINE(REQUIRED_ARG),
     VALID_RANGE(0, ULLONG_MAX), DEFAULT(0), BLOCK_SIZE(1), NO_MUTEX_GUARD,
-<<<<<<< HEAD
-    NOT_IN_BINLOG, ON_CHECK(nullptr),
-    ON_UPDATE(buffered_error_log_size_update));
-||||||| merged common ancestors
-    NOT_IN_BINLOG, ON_CHECK(nullptr),
-    ON_UPDATE(buffered_error_log_size_update));
->>>>>>>>> Temporary merge branch 2
-=======
     NOT_IN_BINLOG, ON_CHECK(check_buffered_error_log_size),
     ON_UPDATE(update_buffered_error_log_size));
->>>>>>> percona/ps/release-8.1.0-1
 
 #ifndef NDEBUG
 Debug_shutdown_actions Debug_shutdown_actions::instance;

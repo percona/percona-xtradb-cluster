@@ -2235,7 +2235,7 @@ performance-schema-max-statement-classes 227
 =======
 performance-schema-max-stage-classes 175
 performance-schema-max-statement-classes 228
->>>>>>> percona/ps/release-8.1.0-1
+>>>>>>> ps/Percona-Server-8.1.0-1
 performance-schema-max-statement-stack 10
 performance-schema-max-table-handles -1
 performance-schema-max-table-instances -1

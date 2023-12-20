@@ -2514,21 +2514,13 @@ const MDL_lock::MDL_lock_strategy MDL_lock::m_object_lock_strategy = {
 bool MDL_lock::can_grant_lock(enum_mdl_type type_arg,
                               const MDL_context *requestor_ctx) const {
   bool can_grant = false;
-<<<<<<< HEAD
-  bitmap_t waiting_incompat_map = incompatible_waiting_types_bitmap()[type_arg];
-  bitmap_t granted_incompat_map = incompatible_granted_types_bitmap()[type_arg];
-#ifdef WITH_WSREP
-  bool wsrep_can_grant = true;
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-  bitmap_t waiting_incompat_map = incompatible_waiting_types_bitmap()[type_arg];
-  bitmap_t granted_incompat_map = incompatible_granted_types_bitmap()[type_arg];
-=======
   const bitmap_t waiting_incompat_map =
       incompatible_waiting_types_bitmap()[type_arg];
   const bitmap_t granted_incompat_map =
       incompatible_granted_types_bitmap()[type_arg];
->>>>>>> percona/ps/release-8.1.0-1
+#ifdef WITH_WSREP
+  bool wsrep_can_grant = true;
+#endif /* WITH_WSREP */
 
   /*
     New lock request can be satisfied iff:
@@ -5230,7 +5222,6 @@ void MDL_ticket_store::set_materialized() {
 MDL_ticket *MDL_ticket_store::materialized_front(int di) {
   return m_durations[di].m_mat_front;
 }
-<<<<<<< HEAD
 
 #ifdef WITH_WSREP
 void MDL_ticket::wsrep_report(bool debug) {
@@ -5325,7 +5316,3 @@ bool MDL_ticket_store::wsrep_has_non_preemptable_tickets() {
   return (non_preemptable);
 }
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-=======
->>>>>>> percona/ps/release-8.1.0-1

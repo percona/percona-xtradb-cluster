@@ -521,15 +521,9 @@ sub post_check_client_groups {
 }
 
 sub resolve_at_variable {
-<<<<<<< HEAD
   my ($self, $config, $group, $option, $worker) = @_;
   local $_ = $option->value();
   my ($res, $after);
-||||||| merged common ancestors
-  my ($self, $config, $group, $option, $worker) = @_;
-=======
-  my ($self, $config, $group, $option) = @_;
->>>>>>> percona/ps/release-8.1.0-1
 
   while (m/(.*?)\@((?:\w+\.)+)(#?[-\w]+)/g) {
     my ($before, $group_name, $option_name)= ($1, $2, $3);
@@ -539,7 +533,6 @@ sub resolve_at_variable {
     $group_name =~ s/^\@//; # Remove at
     my $value;
 
-<<<<<<< HEAD
     if ($group_name =~ "envarray") {
       $value = $ENV{$option_name.$worker};
     } elsif ($group_name =~ "env") {
@@ -551,29 +544,6 @@ sub resolve_at_variable {
       $value= $from_group->value($option_name);
     }
     $res .= $before.$value;
-||||||| merged common ancestors
-  my $from;
-  if ($group_name =~ "envarray") {
-    $from = $ENV{$option_name.$worker};
-  } elsif ($group_name =~ "env") {
-    $from = $ENV{$option_name};
-  } else {
-    my $from_group = $config->group($group_name) or
-      croak "There is no group named '$group_name' that ",
-      "can be used to resolve '$option_name'";
-
-    $from = $from_group->value($option_name);
-=======
-  my $from;
-  if ($group_name =~ "env") {
-    $from = $ENV{$option_name};
-  } else {
-    my $from_group = $config->group($group_name) or
-      croak "There is no group named '$group_name' that ",
-      "can be used to resolve '$option_name'";
-
-    $from = $from_group->value($option_name);
->>>>>>> percona/ps/release-8.1.0-1
   }
   $res .= $after;
 
@@ -581,21 +551,13 @@ sub resolve_at_variable {
 }
 
 sub post_fix_resolve_at_variables {
-  my ($self, $config) = @_;
+  my ($self, $config, $worker) = @_;
 
   foreach my $group ($config->groups()) {
     foreach my $option ($group->options()) {
       next unless defined $option->value();
-<<<<<<< HEAD
       $self->resolve_at_variable($config, $group, $option, $worker)
 	    if ($option->value() =~ /\@/);
-||||||| merged common ancestors
-      $self->resolve_at_variable($config, $group, $option, $worker)
-        if ($option->value() =~ /^\@/);
-=======
-      $self->resolve_at_variable($config, $group, $option)
-        if ($option->value() =~ /^\@/);
->>>>>>> percona/ps/release-8.1.0-1
     }
   }
 }
@@ -784,7 +746,7 @@ sub run_generate_sections_from_cluster_config {
 sub new_config {
   my ($class, $args) = @_;
 
-  my @required_args = ('basedir', 'baseport', 'vardir', 'template_path', 'testdir', 'tmpdir');
+  my @required_args = ('basedir', 'baseport', 'vardir', 'template_path', 'testdir', 'tmpdir', 'worker');
 
   foreach my $required (@required_args) {
     croak "you must pass '$required'" unless defined $args->{$required};
@@ -862,9 +824,12 @@ sub new_config {
     push(@post_rules, \&post_check_secondary_engine_mysqld_group);
   }
 
+  # Worker ID
+  my $worker = $args->{'worker'};
+
   # Run post rules
   foreach my $rule (@post_rules) {
-    &$rule($self, $config);
+    &$rule($self, $config, $worker);
   }
 
   return $config;

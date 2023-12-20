@@ -130,16 +130,10 @@
 #include "strxnmov.h"
 #include "template_utils.h"  // down_cast
 #include "thr_mutex.h"
-<<<<<<< HEAD
-
 #ifdef WITH_WSREP
 #include "sql/log.h"
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-=======
-
->>>>>>> percona/ps/release-8.1.0-1
 /* INFORMATION_SCHEMA name */
 LEX_CSTRING INFORMATION_SCHEMA_NAME = {STRING_WITH_LEN("information_schema")};
 
@@ -7769,9 +7763,8 @@ bool TABLE::setup_partial_update(bool logical_diffs) {
 
 bool TABLE::setup_partial_update() {
   THD *thd = current_thd;
-<<<<<<< HEAD
 #ifdef WITH_WSREP
-  bool logical_diffs =
+  const bool logical_diffs =
       (thd->variables.binlog_row_value_options & PARTIAL_JSON_UPDATES) !=
           0 &&
       (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open()) &&
@@ -7779,14 +7772,7 @@ bool TABLE::setup_partial_update() {
       log_bin_use_v1_row_events == 0 &&
       thd->is_current_stmt_binlog_format_row();
 #else
-  bool logical_diffs = 
-||||||| merged common ancestors
-
-  bool logical_diffs =
-=======
-
-  const bool logical_diffs =
->>>>>>> percona/ps/release-8.1.0-1
+  const bool logical_diffs = 
       (thd->variables.binlog_row_value_options & PARTIAL_JSON_UPDATES) != 0 &&
       mysql_bin_log.is_open() &&
       (thd->variables.option_bits & OPTION_BIN_LOG) != 0 &&

@@ -2506,7 +2506,6 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       copy_bind_parameter_values(thd, com_data->com_query.parameters,
                                  com_data->com_query.parameter_count);
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
       if (WSREP_ON) {
         if (wsrep_dispatch_sql_command(thd, thd->query().str,
@@ -2523,10 +2522,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
         dispatch_sql_command(thd, &parser_state, false);
       }
 #else
-||||||| merged common ancestors
-=======
       /* This will call MYSQL_NOTIFY_STATEMENT_QUERY_ATTRIBUTES() */
->>>>>>> percona/ps/release-8.1.0-1
       dispatch_sql_command(thd, &parser_state, false);
 #endif /* WITH_WSREP */
 
@@ -5594,7 +5590,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
                                false))
         goto error;
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
         // to isolation is now done as part of sp_drop_routine as it does
         // additional ACL based check that ensures the fact that if the
@@ -5602,18 +5597,9 @@ int mysql_execute_command(THD *thd, bool first_level) {
         // WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
 #endif /* WITH_WSREP */
 
-      enum_sp_type sp_type = (lex->sql_command == SQLCOM_DROP_PROCEDURE)
-                                 ? enum_sp_type::PROCEDURE
-                                 : enum_sp_type::FUNCTION;
-||||||| merged common ancestors
-      enum_sp_type sp_type = (lex->sql_command == SQLCOM_DROP_PROCEDURE)
-                                 ? enum_sp_type::PROCEDURE
-                                 : enum_sp_type::FUNCTION;
-=======
       const enum_sp_type sp_type = (lex->sql_command == SQLCOM_DROP_PROCEDURE)
                                        ? enum_sp_type::PROCEDURE
                                        : enum_sp_type::FUNCTION;
->>>>>>> percona/ps/release-8.1.0-1
 
       /* Conditionally writes to binlog */
       const enum_sp_return_code sp_result =

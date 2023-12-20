@@ -1,22 +1,5 @@
-<<<<<<< HEAD
 # Copyright (c) 2009, 2023, Oracle and/or its affiliates.
 #
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-# Copyright (c) 2009, 2023, Oracle and/or its affiliates.
-# 
-||||||||| merged common ancestors
-<<<<<<<<<<< Temporary merge branch 1
-# Copyright (c) 2009, 2022, Oracle and/or its affiliates.
-# 
-=========
-# Copyright (c) 2009, 2023, Oracle and/or its affiliates.
-#
->>>>>>>>> Temporary merge branch 2
-=======
-# Copyright (c) 2009, 2023, Oracle and/or its affiliates.
-# 
->>>>>>> percona/ps/release-8.1.0-1
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
 # as published by the Free Software Foundation.

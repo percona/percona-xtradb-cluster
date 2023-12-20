@@ -16543,7 +16543,7 @@ alter_instance_action:
 #ifdef WITH_WSREP
             else if (is_identifier($2, "GCACHE"))
             {
-              $$= NEW_PTN PT_alter_instance(ROTATE_GCACHE_MASTER_KEY, EMPTY_CSTR);
+              $$= NEW_PTN PT_alter_instance(@$, ROTATE_GCACHE_MASTER_KEY, EMPTY_CSTR);
             }
 #endif
             else

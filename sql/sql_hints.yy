@@ -66,12 +66,7 @@ static bool parse_int(longlong *to, const char *from, size_t from_length)
 %}
 
 %define api.pure
-<<<<<<< HEAD
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-=======
 %define api.prefix {my_hint_parser_}
->>>>>>> percona/ps/release-8.1.0-1
 
 %parse-param { class THD *thd }
 %parse-param { class Hint_scanner *scanner }
