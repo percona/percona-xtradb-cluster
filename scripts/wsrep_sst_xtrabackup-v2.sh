@@ -68,8 +68,7 @@ uextra=0
 
 # keyring specific variables.
 
-# Till PXC-5.7.22, only supporting keyring plugin was keyring_file plugin.
-
+# 8.1.0 supports keyring file plugin, other keyrings are components
 keyring_plugin=0
 
 # Keyring component variables
@@ -79,7 +78,6 @@ keyring_manifest_file=""
 keyring_config_file=""
 
 keyring_file_data=""
-keyring_vault_config=""
 
 keyringbackupopt=""
 keyringapplyopt=""
@@ -198,6 +196,11 @@ XB_PREV_REQUIRED_VERSION="8.0.35"
 # To be able to service previous LTS version
 XB_PREV_LTS_REQUIRED_VERSION="8.0.35"
 
+# Joiner requires Donor to be this LTS version...
+REQUIRED_DONOR_MYSQL_LTS_VERSION="8.0"
+# ...or to be this previous version (note that it may be LTS as well if this is
+# 1st innovative)
+REQUIRED_DONOR_MYSQL_PREV_VERSION="8.0"
 
 # These files carry some important information in form of GTID of the data
 # that is being backed up.
@@ -755,22 +758,12 @@ read_cnf()
     #------- KEYRING config parsing
 
     #======================================================================
-    # Parse for keyring plugin. Only 1 plugin can be enabled at given time.
+    # Parse for keyring plugin. Only 8.1 supports only keyring file plugin.
+    # Keyring vault is the component.
     keyring_file_data=$(parse_cnf mysqld keyring-file-data "")
-    keyring_vault_config=$(parse_cnf mysqld keyring-vault-config "")
-    if [[ -n $keyring_file_data && -n $keyring_vault_config ]]; then
-        wsrep_log_error "******************* FATAL ERROR ********************** "
-        wsrep_log_error "Can't have keyring_file and keyring_vault enabled at same time"
-        wsrep_log_error "Line $LINENO"
-        wsrep_log_error "****************************************************** "
-        exit 32
-    fi
-
-    if [[ -n $keyring_file_data || -n $keyring_vault_config ]]; then
-        keyring_plugin=1
-    fi
 
     if [[ -n $keyring_file_data ]]; then
+        keyring_plugin=1
         KEYRING_FILE_DIR=$(dirname "${keyring_file_data}")
     fi
 
@@ -1833,7 +1826,7 @@ if [[ -z $MYSQL_VERSION ]]; then
     exit 2
 fi
 
-# Verify our PXB versions
+# Verify PXB versions we have
 verify_pxb_version "${XTRABACKUP_THIS_VER_PATH}" "${XB_THIS_REQUIRED_VERSION}"
 verify_pxb_version "${XTRABACKUP_PREV_VER_PATH}" "${XB_PREV_REQUIRED_VERSION}"
 verify_pxb_version "${XTRABACKUP_PREV_LTS_VER_PATH}" "${XB_PREV_LTS_REQUIRED_VERSION}"
@@ -2039,6 +2032,7 @@ then
     if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
     then
         usrst=0
+
         if [[ -z $sst_ver ]]; then
             wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "Upgrade joiner to 5.6.21 or higher for backup locks support"
@@ -2088,6 +2082,48 @@ then
             tcmd="$pcmd | $tcmd"
         fi
 
+        # Why we have sleep 10 here?
+        #
+        # The connection model is that Joiner acts as the server and Donor as
+        # a client (Joiner starts socat with listen option, then Donor connects).
+        # socat 1.7.4.3 has the following issue (full bug report here, because
+        # socat uses e-mail for bug reporting):
+        #
+        # Problem:
+        # 'connect-timeout' option makes 'retry' option to be not working for
+        # localhost connections.
+        # Moreover, 'connnect-timeout' is not respected for localhost connections.
+        # This makes problems when the client starts before the server in a microservices
+        # architecture.
+        #
+        # Steps to reproduce:
+        # echo "test" | ./socat -v -dddd -x stdio TCP:127.0.0.1:9999,retry=5,connect-timeout=10
+        #
+        # Current result:
+        # socat exits immediately with error write(7, 0x5595c8cc3030, 5): Connection refused
+        # Expected result:
+        # socat should try to connect with timeout 10s
+        # socat should try 5 times to connect
+        # More info:
+        # 1. Please note that without 'connect-timeout', 'retry' option is respected
+        # for localhost connections as it should.
+        # 2. It is well visible when ran with options -v -dddd that socat gives up
+        # just after 1st try.
+        # 3. When the destination address is not the localhost, it is visible that
+        # socat tries 5 times to connect with, respecting timeouts (the behavior is OK)
+        #
+        # The issue was fixed in v1.7.4.4:
+        # Address TCP with options connect-timeout and retry terminated
+	    # immediately when a connection attempt failed on network error or
+	    # connection refused.
+	    # Test: TCP_TIMEOUT_RETRY
+	    # Thanks to Kamil Holubicki for reporting this issue.
+        #
+        # Server needs to be actively listening when client is connecting. If it is not
+        # the client will exit immediately without any retry.
+        # The issue is visible only for localhost connections, so we could save 10 secs
+        # making the following 'sleep' executed conditionally, but I'm not sure
+        # if we are so brave to remove it from non-localhost connections.
         wsrep_log_debug "Sleeping before data transfer for SST"
         sleep 10
 
@@ -2186,10 +2222,10 @@ then
     # Get keyring component status
     get_mysqld_path
     plugin_dir=${WSREP_SST_OPT_PLUGINDIR}
+    # Get the type of the keyring given in the manifest file
     get_keyring_manifest_and_config "${DATA}" $plugin_dir
 
     if [[ -r $keyring_manifest_file && -r $keyring_config_file ]]; then
-        # Get the type of the keyring given in the manifest file
         keyring_component_enabled=1
     fi
 
@@ -2222,7 +2258,7 @@ then
     recv_data_from_donor_to_joiner $STATDIR "${stagemsg}-sst-info" $stimeout -2
 
     #
-    # Determine which file was received, the GTID or the SST_INFO
+    # We expect sst_info file to be present.
     #
     if [[ -r "${STATDIR}/${SST_INFO_FILE}" ]]; then
         #
@@ -2237,30 +2273,13 @@ then
         transition_key=$(parse_sst_info "$sst_file_info_path" sst transition-key "")
 
         if [[ -n $transition_key ]]; then
-
-            # Use the broken key if the donor version is < 5.7.29 and is not 5.7.28-31-57.2
-            # In other words, 5.7.28-31-57.2 and above will use the key that was sent
-            if compare_versions "$DONOR_MYSQL_VERSION" "<" "5.7.29" &&
-               [[ $DONOR_MYSQL_VERSION != "5.7.28-31-57.2" ]]; then
-                transition_key="\$transition_key"
-            fi
-
             encrypt_prepare_options="--transition-key=$transition_key"
             encrypt_move_options="--transition-key=$transition_key --generate-new-master-key"
         fi
 
-    elif [[ -r "${STATDIR}/${XB_GTID_INFO_FILE}" ]]; then
-        #
-        # For compatibility, we have received the gtid file
-        #
-        XB_GTID_INFO_FILE_PATH="${STATDIR}/${XB_GTID_INFO_FILE}"
-
-        DONOR_BINLOGNAME=""
-        DONOR_MYSQL_VERSION=""
-
     else
         wsrep_log_error "******************* FATAL ERROR ********************** "
-        wsrep_log_error "Did not receive expected file from donor: '${SST_INFO_FILE}' or '${XB_GTID_INFO_FILE}'"
+        wsrep_log_error "Did not receive expected file from donor: '${SST_INFO_FILE}'"
         wsrep_log_error "Line $LINENO"
         wsrep_log_error "****************************************************** "
         exit 32
@@ -2271,35 +2290,43 @@ then
         # -----------------------------------------------------
         # Reject the DONOR if it's version is too old
         # We also reject the donor if it does not send a version string.
-        # (which is true for any version of PXC < 5.7.19)
         #
         # Truncate the version numbers (we want the major.minor.revision version
-        # like "5.6.35", not "5.6.35-...")
-        local_version_str=$(expr match "$MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
-        donor_version_str=$(expr match "$DONOR_MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
-        donor_version_str=${donor_version_str:-"0.0.0"}
+        # like "8.0", not "8.0.35-...")
+        local_version_str=$(expr match "$MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\)')
+        donor_version_str=$(expr match "$DONOR_MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\)')
+        donor_version_str=${donor_version_str:-"0.0"}
+
+        local_version_full_str=$(expr match "$MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
+        donor_version_full_str=$(expr match "$DONOR_MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
+        donor_version_full_str=${donor_version_str:-"0.0.0"}
 
         # Required DONOR PXC version
         #
-        #   5.7.19  : This is the first version that sent the donor version
+        #   Allow Donor to be:
+        #   Previous LTS
+        #   Previous version (may be innovative or LTS)
+        #   The same version
         #
-        REQUIRED_DONOR_MYSQL_VERSION="5.7.19"
 
-        if [[ -z $DONOR_MYSQL_VERSION ]] || compare_versions "$donor_version_str" "<" "$REQUIRED_DONOR_MYSQL_VERSION"; then
+        if [[ -z $DONOR_MYSQL_VERSION ]] || compare_versions "$donor_version_str" "!=" "$REQUIRED_DONOR_MYSQL_LTS_VERSION" && compare_versions "$donor_version_str" "!=" "$REQUIRED_DONOR_MYSQL_PREV_VERSION" && compare_versions "$donor_version_str" "!=" "$local_version_str"; then
             wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "FATAL: The donor version is too old."
+            wsrep_log_error "FATAL: The donor version is not compatible with this node acting as a joiner."
             wsrep_log_error "This node's PXC version is $local_version_str.  The donor's PXC version is $donor_version_str."
-            wsrep_log_error "The donor node must be at least version $REQUIRED_DONOR_MYSQL_VERSION."
+            wsrep_log_error "The donor node must be one of the following versions:"
+            wsrep_log_error "${REQUIRED_DONOR_MYSQL_LTS_VERSION} (LTS)"
+            wsrep_log_error "${REQUIRED_DONOR_MYSQL_PREV_VERSION} (previous version)"
+            wsrep_log_error "${local_version_str} (the same version as this node)."
             wsrep_log_error "Line $LINENO"
             wsrep_log_error "****************************************************** "
             exit 2
         fi
 
         # Is this node's pxc version < donor's pxc version?
-        if compare_versions "$local_version_str" "<" "$donor_version_str"; then
+        if compare_versions "$local_version_full_str" "<" "$donor_version_full_str"; then
             wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "FATAL: PXC is receiving an SST from a node with a higher version."
-            wsrep_log_error "This node's PXC version is $local_version_str.  The donor's PXC version is $donor_version_str."
+            wsrep_log_error "This node's PXC version is $local_version_full_str.  The donor's PXC version is $donor_version_full_str."
             wsrep_log_error "Upgrade this node before joining the cluster."
             wsrep_log_error "Line $LINENO"
             wsrep_log_error "****************************************************** "
@@ -2345,62 +2372,15 @@ then
         # server-id is the id of the node that is acting as donor and not joiner node.
 
         # if keyring_plugin is enabled on JOINER and DONOR failed to send transition_key
-        # this means either of the 2 things:
-        # a. DONOR is at version < 5.7.22
-        # b. DONOR is not configured to use keyring_plugin
+        # this means DONOR is not configured to use keyring_plugin.
 
         if [[ $keyring_plugin -eq 1 && -z $transition_key ]]; then
-
-            # case-a: DONOR is at version < 5.7.22. We should expect keyring file
-            #         and not transition_key.
-            if compare_versions "$DONOR_MYSQL_VERSION" "<" "5.7.22"; then
-                if [[ -n $keyring_file_data ]]; then
-                     # joiner needs to wait to receive the file.
-                    sleep 3
-
-                    # Ensure that the destination directory exists and is R/W by us
-                    if [[ ! -d "$KEYRING_FILE_DIR" || ! -r "$KEYRING_FILE_DIR" || ! -w "$KEYRING_FILE_DIR" ]]; then
-                        wsrep_log_error "******************* FATAL ERROR ********************** "
-                        wsrep_log_error "FATAL: Cannot acccess the keyring directory"
-                        wsrep_log_error "  $KEYRING_FILE_DIR"
-                        wsrep_log_error "It must already exist and be readable/writeable by MySQL"
-                        wsrep_log_error "Line $LINENO"
-                        wsrep_log_error "****************************************************** "
-                        exit 22
-                    fi
-
-                    XB_DONOR_KEYRING_FILE_PATH="${KEYRING_FILE_DIR}/${XB_DONOR_KEYRING_FILE}"
-                    recv_data_from_donor_to_joiner "${KEYRING_FILE_DIR}" "${stagemsg}-keyring" 0 2 &
-                    jpid=$!
-                    monitor_sst_progress "${KEYRING_FILE_DIR}" $jpid ${WSREP_SST_IDLE_TIMEOUT} &
-                    wait $jpid
-                    keyringapplyopt=" --keyring-file-data=$XB_DONOR_KEYRING_FILE_PATH "
-                    wsrep_log_info "donor keyring received at: '${XB_DONOR_KEYRING_FILE_PATH}'"
-                else
-                    # There shouldn't be a keyring file, since we do not have a keyring here
-                    # This will error out if a keyring file IS found
-                    XB_DONOR_KEYRING_FILE_PATH="${KEYRING_FILE_DIR}/${XB_DONOR_KEYRING_FILE}"
-                    recv_data_from_donor_to_joiner "${KEYRING_FILE_DIR}" "${stagemsg}-keyring" 5 -1
-
-                    if [[ -r "${XB_DONOR_KEYRING_FILE_PATH}" ]]; then
-                        wsrep_log_error "******************* FATAL ERROR ********************** "
-                        wsrep_log_error "FATAL: xtrabackup found '${XB_DONOR_KEYRING_FILE_PATH}'"
-                        wsrep_log_error "The joiner is not using a keyring file but the donor has sent"
-                        wsrep_log_error "a keyring file.  Please check your configuration to ensure that"
-                        wsrep_log_error "both sides are using a keyring file"
-                        wsrep_log_error "****************************************************** "
-                        exit 32
-                    fi
-                fi
-            # case-b: JOINER is configured to use keyring but DONOR is not
-            else
-                wsrep_log_error "******************* FATAL ERROR ********************** "
-                wsrep_log_error "FATAL: JOINER is configured to use keyring_plugin" \
-                                "(file/vault) but DONOR is not"
-                wsrep_log_error "Line $LINENO"
-                wsrep_log_error "****************************************************** "
-                exit 32
-            fi
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "FATAL: JOINER is configured to use keyring_plugin" \
+                            "(file/vault) but DONOR is not"
+            wsrep_log_error "Line $LINENO"
+            wsrep_log_error "****************************************************** "
+            exit 32
         fi
 
         if [[ -n $transition_key && $keyring_plugin -eq 0 && $keyring_component_enabled -eq 0 ]]; then
@@ -2504,8 +2484,8 @@ then
             rebuildcmd="--rebuild-indexes --rebuild-threads=$nthreads"
         fi
 
+        # We still can receive qpress-compressed backup as the donor may be any 8.0.x
         if test -n "$(find ${DATA} -maxdepth 1 -type f -name '*.qp' -print -quit)"; then
-
             wsrep_log_info "Compressed qpress files found"
 
             if [[ ! -x `which qpress` ]]; then
@@ -2602,43 +2582,8 @@ then
         XB_GTID_INFO_FILE_PATH="${TDATA}/${XB_GTID_INFO_FILE}"
         rm -f $TDATA/innobackup.decompress.log $TDATA/innobackup.prepare.log $TDATA/innobackup.move.log
 
-        # Just rename the file till PXB-8.0.6 fix this issue of rename.
-        # moving file to property directory will be take care by PXB-8.0.5.
-        if  [[ -n "$WSREP_SST_OPT_BINLOG" && -n "$DONOR_BINLOGNAME" ]]; then
-
-            binlog_dir=$(dirname "$WSREP_SST_OPT_BINLOG")
-            binlog_file=$(basename "$WSREP_SST_OPT_BINLOG")
-            donor_binlog_file=$DONOR_BINLOGNAME
-
-            # rename the donor binlog to the name of the binlogs on the joiner
-            if [[ "$binlog_file" != "$donor_binlog_file" ]]; then
-                pushd "$DATA" &>/dev/null
-                for f in $donor_binlog_file.*; do
-                    if [[ ! -e "$f" ]]; then continue; fi
-                    f_new=$(echo $f | sed "s/$donor_binlog_file/$binlog_file/")
-                    mv "$f" "$f_new" 2>/dev/null || true
-                done
-                popd &> /dev/null
-            fi
-
-            # To avoid comparing data directory and BINLOG_DIRNAME
-            #mv $DATA/${binlog_file}.* "$binlog_dir"/ 2>/dev/null || true
-
-            pushd "$DATA" &>/dev/null
-            # starting PXB-8.0.5 it started shipping index file but since PXC
-            # may rename the file it is important that PXC re-generate the file.
-            rm -rf "${binlog_file}.index" || true
-            for bfiles in $binlog_file.*; do
-                if [[ ! -e "$bfiles" ]]; then continue; fi
-                echo "${binlog_dir}/${bfiles}" >> "${binlog_file}.index"
-            done
-            popd &> /dev/null
-
-        fi
-
         # If there is keyring file, move back needs to keep it and
         # add its keys there
-
         wsrep_log_info "Moving the backup to ${TDATA}"
 
         set +e
