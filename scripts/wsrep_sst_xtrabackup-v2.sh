@@ -134,14 +134,70 @@ declare -a RC
 XTRABACKUP_BIN=xtrabackup
 DATA="${WSREP_SST_OPT_DATA}"
 
-# default XB path (for 8.0+)  (relative to script location)
-# Use this path for 8.0+
-XTRABACKUP_80_PATH="$(dirname $0)/pxc_extra/pxb-8.0"
+# Which rolling upgrade combinations do we support?
+# MySql supports following in-place upgrades:
+# 1. 8.0.x (LTS) -> 8.i : 8.0 (LTS) to any 8 innovative
+# 2. 8.i -> 8.k : 8.i innovative to 8.k innovative
+# 3. 8.i -> 8.4 (LTS) : 8 innovative to 8.4 (LTS)
+# 4. 8.0.x (LTS) -> 8.4 (LTS) : LTS to LTS
+#
+# PXB 8.0.x supports prepare for 8.0 (LTS) only.
+# PXB 8.1 supports prepare for 8.1 innovative only.
+# PXB 8.2 supports prepare for 8.2 innovative only.
+# PXB 8.3 supports prepare for 8.3 innovative only.
+# PXB 8.4 supports prepare for 8.4 LTS only.
+#
+# If we wanted to support all possible upgrade paths in PXC we would have to
+# support:
+# 1. 8.0 (LTS) -> 8.i : LTS to any innovative
+# 2. 8.i -> 8.k : any innovative to any innovative
+# 3. 8.0 (LTS) -> 8.4 (LTS) : LTS to LTS
+#
+# To do so, PXC-8.4 SST script would have to support PXB 8.0/8.1/8.2/8.3/8.4
+# (5 pxb versions) to be able to prepare SST from any donor version.
+# It would be even worse for 9.x series, where there will be 8 versions,
+# plus possibility to upgrade from 8.4, which gives 9 PXB versions in total.
+#
+# To make things easier we will support the following paths, which require using
+# up to 3 versions of PXB:
+#
+# 1. 8.0.x (LTS) -> 8.i : 8.0 (LTS) to any 8 innovative
+# 2. 8.i -> 8.k : 8.i innovative to 8.k innovative
+# 3. 8.0.x (LTS) -> 8.4 (LTS) : LTS to LTS
+#
+# This way, every PXB version needs to understand:
+# 1. Previous LTS backup
+# 2. Previous innovative backup
+# 3. Its own backup
+#
+# E.g. PXC-8.3 needs to be bundled with PXB-8.0.x, PXB-8.2, PXB-8.3
+# The upgrade from one innovative version to another innovative version does
+# not support skipping versions. The same is for upgrading to next LTS: only
+# upgrade from previous LTS or previous innovative is supported.
+# If the cluster is on 8.1 the only way to upgrade it to 8.4 is to go throug
+# 8.2 and 8.3
 
-# XB path for previous major/minor versison (5.7)  (relative to script location)
-# Use this for previous versions (5.7)
-# Upgrading from anything less than 5.7 is not supported
-XTRABACKUP_24_PATH="$(dirname $0)/pxc_extra/pxb-2.4"
+XTRABACKUP_PATH_PREFIX="$(dirname $0)/pxc_extra/pxb-"
+
+# XB path compatible with the current version of PXC
+XTRABACKUP_THIS_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.1"
+
+# XB path compatible with prev PXC version. It may be prev Innovative release or LTS
+# if current PXC version is 1st Innovative.
+# Note that this can be the same as XTRABACKUP_PREV_LTS_VER_PATH
+XTRABACKUP_PREV_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.0"
+
+# XB path compatible previous PXC LTS version
+XTRABACKUP_PREV_LTS_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.0"
+
+# Minimum PXB required versions for this node to work
+# To be able to service this version
+XB_THIS_REQUIRED_VERSION="8.1.0"
+# To be able to service previous version
+XB_PREV_REQUIRED_VERSION="8.0.35"
+# To be able to service previous LTS version
+XB_PREV_LTS_REQUIRED_VERSION="8.0.35"
+
 
 # These files carry some important information in form of GTID of the data
 # that is being backed up.
@@ -876,22 +932,24 @@ get_stream()
     if [[ $sfmt == 'xbstream' ]]; then
         wsrep_log_debug "Streaming with xbstream"
 
-        if [[ ! -x ${XTRABACKUP_80_PATH}/bin/xbstream ]]; then
+        # It's ok to use any xbstream, it's compatible across versions
+        local xbstream_bin_path="${XTRABACKUP_THIS_VER_PATH}/bin/xbstream"
+
+        if [[ ! -x ${xbstream_bin_path} ]]; then
             wsrep_log_error "******** FATAL ERROR *********************** "
             wsrep_log_error "Could not find the xbstream executable (version 8.x)."
-            wsrep_log_error "    Expected location: $XTRABACKUP_80_PATH/bin/xbstream"
+            wsrep_log_error "    Expected location: $xbstream_bin_path"
             wsrep_log_error "Please verify that PXC was installed correctly."
             wsrep_log_error "* Line $LINENO"
             wsrep_log_error "******************************************** "
             exit 2
         fi
 
-        # It's ok to use the 8.0 xbstream, it's compatible with
-        # the 2.4 xbstream.
+        # It's ok to use any xbstream, it's compatible across versions
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
-            strmcmd="${XTRABACKUP_80_PATH}/bin/xbstream -x $xbstream_opts"
+            strmcmd="${xbstream_bin_path} -x $xbstream_opts"
         else
-            strmcmd="${XTRABACKUP_80_PATH}/bin/xbstream -c $xbstream_opts \${FILE_TO_STREAM}"
+            strmcmd="${xbstream_bin_path} -c $xbstream_opts \${FILE_TO_STREAM}"
         fi
     else
         wsrep_check_program tar
@@ -1594,8 +1652,7 @@ parse_sst_info()
 #   INNOBACKUP
 #   INNOPREPARE
 #   INNOMOVE
-#   XTRABACKUP_24_PATH
-#   XTRABACKUP_80_PATH
+#   XTRABACKUP_PATH_PREFIX
 #
 # Parameters:
 #   Argument 1: Donor MySQL version
@@ -1607,25 +1664,21 @@ parse_sst_info()
 #
 function initialize_pxb_commands()
 {
-    local donor_version_str=$(expr match "$1" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
-    donor_version_str=${donor_version_str:-"0.0.0"}
+    # We are interested only in major.minor part, as it is enough to determine
+    # the location of PXB to be used.
+    local donor_version_str=$(expr match "$1" '\([0-9]\+\.[0-9]\+\)')
+    donor_version_str=${donor_version_str:-"0.0"}
 
-    local local_version_str=$(expr match "$2" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
     local disver=""
     local pxb_root pxb_bin_path pxb_plugin_dir
 
-    # If the DONOR's version is less than 8.0.0, use PXB 2.4
-    # Else use PXB 8.0
-    if compare_versions "${donor_version_str}" "<" "8.0.0"; then
-        pxb_root="${XTRABACKUP_24_PATH}"
-    else
-        pxb_root="${XTRABACKUP_80_PATH}"
-    fi
+    # We need to use PXB compatible with donor
+    pxb_root="${XTRABACKUP_PATH_PREFIX}${donor_version_str}"
 
     pxb_bin_path="${pxb_root}/bin/xtrabackup"
     pxb_plugin_dir="${pxb_root}/lib/plugin"
 
-    wsrep_log_debug "local:$local_version_str donor:$donor_version_str"
+    wsrep_log_debug "local:$2 donor:$1"
     wsrep_log_debug "pxb-bin-path:$pxb_bin_path"
     wsrep_log_debug "pxb-plugin-dir:$pxb_plugin_dir"
 
@@ -1738,6 +1791,32 @@ function initialize_pxb_commands()
     fi
 }
 
+# Verify that provided path contains PXB in version at least specified
+function verify_pxb_version()
+{
+    local pxb_bin_path="${1}/bin/$XTRABACKUP_BIN"
+    local pxb_expected_version="${2}"
+
+    if [[ ! -x $pxb_bin_path ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "Could not find the $XTRABACKUP_BIN executable (version at least ${pxb_expected_version})."
+        wsrep_log_error "    Expected location: $pxb_bin_path"
+        wsrep_log_error "Please verify that PXC was installed correctly."
+        wsrep_log_error "****************************************************** "
+        exit 2
+    fi
+
+    local xb_version=$($pxb_bin_path --version 2>&1 | grep -oe ' [0-9]\.[0-9]\.[0-9]*' | head -n1)
+    xb_version=${xb_version# }
+    if compare_versions "$xb_version" "<" "$pxb_expected_version"; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "The $XTRABACKUP_BIN version is $xb_version."
+        wsrep_log_error "xtrabackup-$pxb_expected_version or higher is needed to perform an SST"
+        wsrep_log_error "$pxb_bin_path"
+        wsrep_log_error "****************************************************** "
+        exit 2
+    fi
+}
 
 #-------------------------------------------------------------------------------
 #
@@ -1755,71 +1834,9 @@ if [[ -z $MYSQL_VERSION ]]; then
 fi
 
 # Verify our PXB versions
-# XB_REQUIRED_VERSION requires at least major.minor version (e.g. 2.4.1 or 3.0)
-#
-# 2.4.3 : Starting with 5.7, the redo log format has changed and so XB-2.4.3 or higher is needed
-# for performing backup (read SST)
-#
-# 2.4.4 : needed to support the keyring option
-#
-# 2.4.11: XB now has its own keyring plugin complied and added support for vault plugin
-#         in addition to existing keyring_file plugin.
-#
-# 2.4.12: XB fixed bugs like keyring is empty + move-back stage now uses params from
-#         my.cnf.
-#
-# 2.4.17  PXB added Data-At-Rest Encryption support found in PS/PXC 5.7.28
-#
-# 2.4.20  Transition-key fixes
-#
-
-XB_2x_REQUIRED_VERSION="2.4.28"
-
-if [[ ! -x $XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN ]]; then
-    wsrep_log_error "******************* FATAL ERROR ********************** "
-    wsrep_log_error "Could not find the $XTRABACKUP_BIN executable (version 2.x)."
-    wsrep_log_error "    Expected location: $XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN"
-    wsrep_log_error "Please verify that PXC was installed correctly."
-    wsrep_log_error "****************************************************** "
-    exit 2
-fi
-XB_2x_VERSION=$($XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN --version 2>&1 | grep -oe ' [0-9]\.[0-9]\.[0-9]*' | head -n1)
-XB_2x_VERSION=${XB_2x_VERSION# }
-if compare_versions "$XB_2x_VERSION" "<" "$XB_2x_REQUIRED_VERSION"; then
-    wsrep_log_error "******************* FATAL ERROR ********************** "
-    wsrep_log_error "The $XTRABACKUP_BIN version is $XB_2x_VERSION."
-    wsrep_log_error "xtrabackup-$XB_2x_REQUIRED_VERSION or higher is needed to perform an SST"
-    wsrep_log_error "$XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN"
-    wsrep_log_error "****************************************************** "
-    exit 2
-fi
-
-# Verify our PXB 8.0 version
-#
-# 8.0.11  Transition-key fixes
-#
-
-XB_8x_REQUIRED_VERSION="8.0.34"
-
-if [[ ! -x $XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN ]]; then
-    wsrep_log_error "******************* FATAL ERROR ********************** "
-    wsrep_log_error "Could not find the $XTRABACKUP_BIN executable (version 8.x)."
-    wsrep_log_error "    Expected location: $XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN"
-    wsrep_log_error "Please verify that PXC was installed correctly."
-    wsrep_log_error "****************************************************** "
-    exit 2
-fi
-XB_8x_VERSION=$($XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN --version 2>&1 | grep -oe ' [0-9]\.[0-9]\.[0-9]*' | head -n1)
-XB_8x_VERSION=${XB_8x_VERSION# }
-if compare_versions "$XB_8x_VERSION" "<" "$XB_8x_REQUIRED_VERSION"; then
-    wsrep_log_error "******************* FATAL ERROR ********************** "
-    wsrep_log_error "The $XTRABACKUP_BIN version is $XB_8x_VERSION."
-    wsrep_log_error "xtrabackup-$XB_8x_REQUIRED_VERSION or higher is needed to perform an SST"
-    wsrep_log_error "$XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN"
-    wsrep_log_error "****************************************************** "
-    exit 2
-fi
-
+verify_pxb_version "${XTRABACKUP_THIS_VER_PATH}" "${XB_THIS_REQUIRED_VERSION}"
+verify_pxb_version "${XTRABACKUP_PREV_VER_PATH}" "${XB_PREV_REQUIRED_VERSION}"
+verify_pxb_version "${XTRABACKUP_PREV_LTS_VER_PATH}" "${XB_PREV_LTS_REQUIRED_VERSION}"
 
 
 rm -f "${XB_GTID_INFO_FILE_PATH}"
