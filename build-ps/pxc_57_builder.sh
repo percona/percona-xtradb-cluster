@@ -799,7 +799,7 @@ build_deb(){
         echo "cat <<'CALLHOME' > /tmp/call-home.sh" >> percona-xtradb-cluster-server-5.7.postinst
         cat call-home.sh >> percona-xtradb-cluster-server-5.7.postinst
         echo "CALLHOME" >> percona-xtradb-cluster-server-5.7.postinst
-        echo 'bash +x /tmp/call-home.sh -f "PRODUCT_FAMILY_PXC" -v "$MYSQL_VERSION-$WSREP_VERSION-$DEB_RELEASE" -d "PACKAGE" &>/dev/null || :' >> percona-xtradb-cluster-server-5.7.postinst
+        echo "bash +x /tmp/call-home.sh -f \"PRODUCT_FAMILY_PXC\" -v \"$MYSQL_VERSION-$WSREP_VERSION-$DEB_RELEASE\" -d \"PACKAGE\" &>/dev/null || :" >> percona-xtradb-cluster-server-5.7.postinst
         echo "rm -rf /tmp/call-home.sh" >> percona-xtradb-cluster-server-5.7.postinst
         echo "exit 0" >> percona-xtradb-cluster-server-5.7.postinst
         rm -f call-home.sh
