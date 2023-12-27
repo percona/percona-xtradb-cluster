@@ -2226,16 +2226,8 @@ performance-schema-max-rwlock-instances -1
 performance-schema-max-socket-classes 10
 performance-schema-max-socket-instances -1
 performance-schema-max-sql-text-length 1024
-<<<<<<< HEAD
 performance-schema-max-stage-classes 199
-performance-schema-max-statement-classes 227
-||||||| merged common ancestors
-performance-schema-max-stage-classes 175
-performance-schema-max-statement-classes 227
-=======
-performance-schema-max-stage-classes 175
 performance-schema-max-statement-classes 228
->>>>>>> ps/Percona-Server-8.1.0-1
 performance-schema-max-statement-stack 10
 performance-schema-max-table-handles -1
 performance-schema-max-table-instances -1
