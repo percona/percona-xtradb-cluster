@@ -1567,6 +1567,7 @@ fi
 %attr(755, root, root) %{_bindir}/mysql_ssl_rsa_setup
 #KH:
 %attr(755, root, root) %{_bindir}/zlib_decompress
+%attr(755, root, root) %{_bindir}/mysql_test_event_tracking
 
 %attr(755, root, root) %{_sbindir}/mysqld
 %attr(755, root, root) %{_sbindir}/mysqld-debug
