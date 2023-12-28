@@ -26,6 +26,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 #include "sql/reference_caching_setup.h"
 #include "sql/sql_class.h"
 
+#ifdef WITH_WSREP
+#include "sql/mysqld_thd_manager.h"
+#endif
+
 DEFINE_BOOL_METHOD(Dynamic_loader_services_loaded_notification_imp::notify,
                    (const char **services, unsigned int count)) {
   try {
@@ -39,6 +43,15 @@ DEFINE_BOOL_METHOD(Dynamic_loader_services_loaded_notification_imp::notify,
     return true;
   }
 }
+
+#ifdef WITH_WSREP
+class Refresh_wsrep_applier_threads : public Do_THD_Impl {
+ public:
+  virtual void operator()(THD *thd) {
+    if (thd->wsrep_applier) thd->refresh_reference_caches();
+  }
+};
+#endif
 
 DEFINE_BOOL_METHOD(Dynamic_loader_services_unload_notification_imp::notify,
                    (const char **services [[maybe_unused]],
@@ -54,6 +67,12 @@ DEFINE_BOOL_METHOD(Dynamic_loader_services_unload_notification_imp::notify,
       THD *thd = current_thd;
       if (thd) thd->refresh_reference_caches();
     }
+#ifdef WITH_WSREP
+    if (Global_THD_manager::is_initialized()) {
+      Refresh_wsrep_applier_threads refresher;
+      Global_THD_manager::get_instance()->do_for_all_thd(&refresher);
+    }
+#endif
     return false;
   } catch (...) {
     return true;

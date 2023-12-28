@@ -1994,18 +1994,34 @@ REVOKE TRIGGER ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 FLUSH PRIVILEGES;
 
+#
+# Q: Why do we use node_1a, node_2a below instead of node_1, node_2?
+# Server tracks active references to services internally. 
+# Every connection keeps cache of used components handles, and if it is detected during uninstall
+# that there are any active referrences, uninstall fails.
+# So it is not possible to uninstall component until connections using it are not closed.
+#
+# The problem is more general, as UNINSTALL COMPONENT is replicated and it may happen that it 
+# succeeds remotely, but fails locally, which will lead to inconsistency.
+# Maybe we should prohibit UNINSTALL COMPONENT if pxc_stric_mode=ENABLED?
+#
+# In this test we will use node_1a and node_2a to be able to close connections and release
+# references from server's cache.
+#
 
 #
-# SQLCOM_INSTALL_PLUGIN
+# SQLCOM_INSTALL_COMPONENT
 #
 --inc $test_id
 
 --echo #
---echo # SQLCOM_INSTALL_PLUGIN access test
+--echo # SQLCOM_INSTALL_COMPONENT access test
 --echo #
 
---echo # connection node_1
---connection node_1
+--echo # connection node_1a
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1a
+--source suite/component_audit_log_filter/inc/audit_tables_init.inc
 GRANT INSERT ON *.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
@@ -2017,87 +2033,96 @@ FLUSH PRIVILEGES;
 --connection node_testme
 use testdb;
 
-INSTALL PLUGIN audit_log SONAME "audit_log.so";
+INSTALL COMPONENT 'file://component_audit_log_filter';
 
 --eval INSERT INTO counter(count) VALUES($test_id);
 
---echo # connection node_1
---connection node_1
+--echo # connection node_1a
+--connection node_1a
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The audit_log PLUGIN should be installed on node 1
---let $assert_cond = COUNT(*) = 1 FROM information_schema.plugins WHERE plugin_name = "audit_log" AND plugin_status = "ACTIVE";
+--let $assert_text = The audit_log COMPONENT should be installed on node 1
+--let $assert_cond = COUNT(*) = 1 FROM mysql.component WHERE component_urn = "file://component_audit_log_filter";
 --source include/assert.inc
 
---echo # connection node_2
---connection node_2
+--echo # connection node_2a
+--connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--connection node_2a
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The audit_log PLUGIN should be installed on node 2
---let $assert_cond = COUNT(*) = 1 FROM information_schema.plugins WHERE plugin_name = "audit_log" AND plugin_status = "ACTIVE";
+--let $assert_text = The audit_log COMPONENT should be installed on node 2
+--let $assert_cond = COUNT(*) = 1 FROM mysql.component WHERE component_urn = "file://component_audit_log_filter";
 --source include/assert.inc
 
---echo # connection node_1
---connection node_1
+# disconnect to release component references from its cache
+--disconnect node_testme
+--disconnect node_2a
+
+--echo # connection node_1a
+--connection node_1a
 --disable_warnings
-UNINSTALL PLUGIN audit_log;
+UNINSTALL COMPONENT 'file://component_audit_log_filter';
+--source suite/component_audit_log_filter/inc/audit_tables_cleanup.inc
 --enable_warnings
 
 REVOKE INSERT ON *.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
 FLUSH PRIVILEGES;
+--disconnect node_1a
 
 
 #
-# SQLCOM_UNINSTALL_PLUGIN
+# SQLCOM_UNINSTALL_COMPONENT
 #
 --inc $test_id
 
 --echo #
---echo # SQLCOM_UNINSTALL_PLUGIN access test
+--echo # SQLCOM_UNINSTALL_COMPONENT access test
 --echo #
 
 # Test setup
 #
---echo # connection node_1
---connection node_1
+--echo # connection node_1a
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1a
+--source suite/component_audit_log_filter/inc/audit_tables_init.inc
 --disable_warnings
 --error 0,1125
-INSTALL PLUGIN null_audit SONAME "adt_null.so";
+INSTALL COMPONENT 'file://component_audit_log_filter';
 --enable_warnings
 
---let $assert_text = The null_audit PLUGIN should be installed on node 1
---let $assert_cond = COUNT(*) = 1 FROM information_schema.plugins WHERE plugin_name = "null_audit" AND plugin_status = "ACTIVE";
---let $assert_debug = SELECT plugin_name, plugin_status FROM information_schema.plugins;
+--let $assert_text = The audit_log COMPONENT should be installed on node 1
+--let $assert_cond = COUNT(*) = 1 FROM mysql.component WHERE component_urn = "file://component_audit_log_filter";
 --source include/assert.inc
 
---echo # connection node_2
---connection node_2
---let $assert_text = The null_audit PLUGIN should be installed on node 2
---let $assert_cond = COUNT(*) = 1 FROM information_schema.plugins WHERE plugin_name = "null_audit" AND plugin_status = "ACTIVE";
+--echo # connection node_2a
+--connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--connection node_2a
+--let $assert_text = The audit_log COMPONENT should be installed on node 2
+--let $assert_cond = COUNT(*) = 1 FROM mysql.component WHERE component_urn = "file://component_audit_log_filter";
 
---echo # connection node_1
---connection node_1
+--echo # connection node_1a
+--connection node_1a
 GRANT DELETE ON *.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
 FLUSH PRIVILEGES;
 
+# disconnect to release cached component refereces
+--disconnect node_1a
+--disconnect node_2a
+
 --echo # connection node_testme
---disconnect node_testme
 --connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
 --connection node_testme
 use testdb;
 
 --disable_warnings
-UNINSTALL PLUGIN null_audit;
+UNINSTALL COMPONENT 'file://component_audit_log_filter';
 --enable_warnings
-
-# Give the system some time to remove the plugin entirely
---sleep 5
 
 --eval INSERT INTO counter(count) VALUES($test_id);
 
@@ -2106,8 +2131,8 @@ UNINSTALL PLUGIN null_audit;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The null_audit PLUGIN should not be installed on node 1
---let $assert_cond = COUNT(*) = 0 FROM information_schema.plugins WHERE plugin_name = "null_audit" AND plugin_status = "ACTIVE";
+--let $assert_text = The audit_log COMPONENT should not be installed on node 1
+--let $assert_cond = COUNT(*) = 0 FROM mysql.component WHERE component_urn = "file://component_audit_log_filter";
 --source include/assert.inc
 
 --echo # connection node_2
@@ -2115,14 +2140,15 @@ UNINSTALL PLUGIN null_audit;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The null_audit PLUGIN should not be installed on node 2
---let $assert_cond = COUNT(*) = 0 FROM information_schema.plugins WHERE plugin_name = "null_audit" AND plugin_status = "ACTIVE";
+--let $assert_text = The audit_log COMPONENT should not be installed on node 2
+--let $assert_cond = COUNT(*) = 0 FROM mysql.component WHERE component_urn = "file://component_audit_log_filter";
 --source include/assert.inc
 
 # Test cleanup
 #
 --echo # connection node_1
 --connection node_1
+--source suite/component_audit_log_filter/inc/audit_tables_cleanup.inc
 REVOKE DELETE ON *.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';

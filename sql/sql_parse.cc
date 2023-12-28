@@ -5829,9 +5829,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
       }
 
       if (lex->sql_command == SQLCOM_CREATE_SRS ||
-          lex->sql_command == SQLCOM_DROP_SRS ||
-          lex->sql_command == SQLCOM_INSTALL_COMPONENT ||
-          lex->sql_command == SQLCOM_UNINSTALL_COMPONENT) {
+          lex->sql_command == SQLCOM_DROP_SRS) {
         WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL);
       }
 
