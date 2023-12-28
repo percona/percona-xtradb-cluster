@@ -2612,22 +2612,6 @@ class Find_wsrep_thd : public Find_THD_Impl {
   enum wsrep_thd_type m_type;
   bool is_server_shutdown;
 };
-
-class Count_wsrep_applier_threads : public Do_THD_Impl {
- public:
-  Count_wsrep_applier_threads() : m_count() {}
-
-  void reset() { m_count = 0; }
-
-  bool done(int threshold_count) { return (m_count <= threshold_count); }
-
-  virtual void operator()(THD *killing_thd) {
-    if (killing_thd->wsrep_applier) m_count++;
-  }
-
- private:
-  int m_count;
-};
 #endif /* WITH_WSREP */
 
 /**
