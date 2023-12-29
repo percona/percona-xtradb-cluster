@@ -506,13 +506,30 @@ static Sys_var_charptr Sys_pfs_instrument(
     CMD_LINE(OPT_ARG, OPT_PFS_INSTRUMENT), IN_FS_CHARSET, DEFAULT(""),
     PFS_TRAILING_PROPERTIES);
 
+/**
+  Update the performance_schema_show_processlist.
+  Warn that the use of information_schema processlist is deprecated.
+*/
+static bool performance_schema_show_processlist_update(sys_var *, THD *thd,
+                                                       enum_var_type) {
+  push_warning_printf(thd, Sql_condition::SL_WARNING,
+                      ER_WARN_DEPRECATED_WITH_NOTE,
+                      ER_THD(thd, ER_WARN_DEPRECATED_WITH_NOTE),
+                      "@@performance_schema_show_processlist",
+                      "When it is removed, SHOW PROCESSLIST will always use the"
+                      " performance schema implementation.");
+
+  return false;
+}
+
 static Sys_var_bool Sys_pfs_processlist(
     "performance_schema_show_processlist",
     "Default startup value to enable SHOW PROCESSLIST "
     "in the performance schema.",
     GLOBAL_VAR(pfs_processlist_enabled), CMD_LINE(OPT_ARG), DEFAULT(false),
-    NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(nullptr), ON_UPDATE(nullptr),
-    nullptr, sys_var::PARSE_NORMAL);
+    NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(nullptr),
+    ON_UPDATE(performance_schema_show_processlist_update), nullptr,
+    sys_var::PARSE_NORMAL);
 
 static Sys_var_bool Sys_pfs_consumer_events_stages_current(
     "performance_schema_consumer_events_stages_current",
@@ -3487,11 +3504,16 @@ static Sys_var_ulong Sys_net_retry_count(
 static Sys_var_bool Sys_new_mode("new",
                                  "Use very new possible \"unsafe\" functions",
                                  SESSION_VAR(new_mode), CMD_LINE(OPT_ARG, 'n'),
-                                 DEFAULT(false));
+                                 DEFAULT(false), NO_MUTEX_GUARD, NOT_IN_BINLOG,
+                                 ON_CHECK(nullptr), ON_UPDATE(nullptr),
+                                 DEPRECATED_VAR(""));
 
 static Sys_var_bool Sys_old_mode("old", "Use compatible behavior",
                                  READ_ONLY GLOBAL_VAR(old_mode),
-                                 CMD_LINE(OPT_ARG), DEFAULT(false));
+                                 CMD_LINE(OPT_ARG, OPT_OLD_OPTION),
+                                 DEFAULT(false), NO_MUTEX_GUARD, NOT_IN_BINLOG,
+                                 ON_CHECK(nullptr), ON_UPDATE(nullptr),
+                                 DEPRECATED_VAR(""));
 
 static Sys_var_bool Sys_old_alter_table("old_alter_table",
                                         "Use old, non-optimized alter table",
@@ -4538,10 +4560,12 @@ static Sys_var_enum Binlog_transaction_dependency_tracking(
     "replica_parallel_type=LOGICAL_CLOCK. "
     "Possible values are COMMIT_ORDER, WRITESET and WRITESET_SESSION.",
     GLOBAL_VAR(mysql_bin_log.m_dependency_tracker.m_opt_tracking_mode),
-    CMD_LINE(REQUIRED_ARG), opt_binlog_transaction_dependency_tracking_names,
+    CMD_LINE(REQUIRED_ARG, OPT_BINLOG_TRANSACTION_DEPENDENCY_TRACKING),
+    opt_binlog_transaction_dependency_tracking_names,
     DEFAULT(DEPENDENCY_TRACKING_COMMIT_ORDER), &PLock_slave_trans_dep_tracker,
     NOT_IN_BINLOG, ON_CHECK(check_binlog_transaction_dependency_tracking),
-    ON_UPDATE(update_binlog_transaction_dependency_tracking));
+    ON_UPDATE(update_binlog_transaction_dependency_tracking),
+    DEPRECATED_VAR(""));
 static Sys_var_ulong Binlog_transaction_dependency_history_size(
     "binlog_transaction_dependency_history_size",
     "Maximum number of rows to keep in the writeset history.",
@@ -6334,7 +6358,8 @@ static Sys_var_charptr Sys_license("license",
                                    NO_CMD_LINE, IN_SYSTEM_CHARSET,
                                    DEFAULT(STRINGIFY_ARG(LICENSE)));
 
-static bool check_log_path(sys_var *self, THD *, set_var *var) {
+static bool check_log_path_base(sys_var *self, THD *thd [[maybe_unused]],
+                                set_var *var, std::string &log_path) {
   if (!var->value) return false;  // DEFAULT is ok
 
   if (!var->save_result.string_value.str) return true;
@@ -6354,7 +6379,9 @@ static bool check_log_path(sys_var *self, THD *, set_var *var) {
   char path[FN_REFLEN];
   size_t path_length = unpack_filename(path, var->save_result.string_value.str);
 
-  if (!path_length) return true;
+  if (path_length == 0) return true;
+
+  log_path.assign(path, path_length);
 
   if (!is_filename_allowed(var->save_result.string_value.str,
                            var->save_result.string_value.length, true)) {
@@ -6384,21 +6411,41 @@ static bool check_log_path(sys_var *self, THD *, set_var *var) {
 
   if (my_access(path, (F_OK | W_OK))) return true;  // directory is not writable
 
-  if (!is_secure_log_path((path))) return true;
-
   return false;
 }
 
-static bool check_log_path_allow_empty(sys_var *self, THD *thd, set_var *var) {
+static bool check_buffered_error_log_filename(sys_var *self, THD *thd,
+                                              set_var *var) {
+  // Empty value is allowed
   if (!var->value) return false;
 
   if (!var->save_result.string_value.str) return false;
 
   if (strlen(var->save_result.string_value.str) == 0) return false;
 
-  if (!check_log_path(self, thd, var)) return false;
+  std::string log_path;
+  if (check_log_path_base(self, thd, var, log_path)) {
+    return true;
+  }
 
-  return true;
+  if (buffered_error_log_size > 0 && !is_secure_log_path(log_path)) {
+    return true;
+  }
+
+  return false;
+}
+
+static bool check_general_log_file(sys_var *self, THD *thd, set_var *var) {
+  std::string log_path;
+  if (check_log_path_base(self, thd, var, log_path)) {
+    return true;
+  }
+
+  if (opt_general_log && !is_secure_log_path(log_path)) {
+    return true;
+  }
+
+  return false;
 }
 
 static bool fix_general_log_file(sys_var *, THD *, enum_var_type) {
@@ -6434,8 +6481,21 @@ static bool fix_general_log_file(sys_var *, THD *, enum_var_type) {
 static Sys_var_charptr Sys_general_log_path(
     "general_log_file", "Log connections and queries to given file",
     GLOBAL_VAR(opt_general_logname), CMD_LINE(REQUIRED_ARG), IN_FS_CHARSET,
-    DEFAULT(nullptr), NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(check_log_path),
-    ON_UPDATE(fix_general_log_file));
+    DEFAULT(nullptr), NO_MUTEX_GUARD, NOT_IN_BINLOG,
+    ON_CHECK(check_general_log_file), ON_UPDATE(fix_general_log_file));
+
+static bool check_slow_log_file(sys_var *self, THD *thd, set_var *var) {
+  std::string log_path;
+  if (check_log_path_base(self, thd, var, log_path)) {
+    return true;
+  }
+
+  if (opt_slow_log && !is_secure_log_path(log_path)) {
+    return true;
+  }
+
+  return false;
+}
 
 static bool fix_slow_log_file(sys_var *, THD *thd [[maybe_unused]],
                               enum_var_type) {
@@ -6480,7 +6540,7 @@ static Sys_var_charptr Sys_slow_log_path(
     "other slow log options",
     PREALLOCATED GLOBAL_VAR(opt_slow_logname), CMD_LINE(REQUIRED_ARG),
     IN_FS_CHARSET, DEFAULT(nullptr), NO_MUTEX_GUARD, NOT_IN_BINLOG,
-    ON_CHECK(check_log_path), ON_UPDATE(fix_slow_log_file));
+    ON_CHECK(check_slow_log_file), ON_UPDATE(fix_slow_log_file));
 
 static Sys_var_have Sys_have_compress(
     "have_compress", "have_compress",
@@ -6766,6 +6826,18 @@ static Sys_var_enum Sys_slow_query_log_rate_type(
     GLOBAL_VAR(opt_slow_query_log_rate_type), CMD_LINE(REQUIRED_ARG),
     slow_query_log_rate_name, DEFAULT(SLOG_RT_SESSION));
 
+static bool check_general_log(sys_var *self [[maybe_unused]],
+                              THD *thd [[maybe_unused]], set_var *var) {
+  if (var->save_result.ulonglong_value != 0 &&
+      !is_secure_log_path(opt_general_logname)) {
+    my_error(ER_LOG_NAME_NOT_MATCHING_SEC_LOG_PATH_CLIENT, MYF(0),
+             "--general-log-file");
+    return true;
+  }
+
+  return false;
+}
+
 static bool fix_general_log_state(sys_var *, THD *thd, enum_var_type) {
   bool new_state = opt_general_log, res = false;
 
@@ -6792,7 +6864,7 @@ static Sys_var_bool Sys_general_log(
     "Defaults to logging to a file hostname.log, "
     "or if --log-output=TABLE is used, to a table mysql.general_log.",
     GLOBAL_VAR(opt_general_log), CMD_LINE(OPT_ARG), DEFAULT(false),
-    NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(nullptr),
+    NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(check_general_log),
     ON_UPDATE(fix_general_log_state));
 
 static Sys_var_bool Sys_log_raw(
@@ -6801,6 +6873,18 @@ static Sys_var_bool Sys_log_raw(
     "debugging, not production as sensitive information may be logged.",
     GLOBAL_VAR(opt_general_log_raw), CMD_LINE(OPT_ARG), DEFAULT(false),
     NO_MUTEX_GUARD, NOT_IN_BINLOG);
+
+static bool check_slow_log(sys_var *self [[maybe_unused]],
+                           THD *thd [[maybe_unused]], set_var *var) {
+  if (var->save_result.ulonglong_value != 0 &&
+      !is_secure_log_path(opt_slow_logname)) {
+    my_error(ER_LOG_NAME_NOT_MATCHING_SEC_LOG_PATH_CLIENT, MYF(0),
+             "--slow-query-log-file");
+    return true;
+  }
+
+  return false;
+}
 
 static bool fix_slow_log_state(sys_var *, THD *thd, enum_var_type) {
   bool new_state = opt_slow_log, res = false;
@@ -6828,7 +6912,7 @@ static Sys_var_bool Sys_slow_query_log(
     "hostname-slow.log or a table mysql.slow_log if --log-output=TABLE is "
     "used. Must be enabled to activate other slow log options",
     GLOBAL_VAR(opt_slow_log), CMD_LINE(OPT_ARG), DEFAULT(false), NO_MUTEX_GUARD,
-    NOT_IN_BINLOG, ON_CHECK(nullptr), ON_UPDATE(fix_slow_log_state));
+    NOT_IN_BINLOG, ON_CHECK(check_slow_log), ON_UPDATE(fix_slow_log_state));
 
 static bool check_slow_log_extra(sys_var *, THD *thd, set_var *) {
   // If FILE is not one of the log-targets, succeed but warn!
@@ -8897,7 +8981,20 @@ static Sys_var_enum Sys_terminology_use_previous(
 
 std::size_t buffered_error_log_size;
 
-static bool buffered_error_log_size_update(sys_var *, THD *, enum_var_type) {
+static bool check_buffered_error_log_size(sys_var *self [[maybe_unused]],
+                                          THD *thd [[maybe_unused]],
+                                          set_var *var) {
+  if (var->save_result.ulonglong_value > 0 &&
+      !is_secure_log_path(buffered_error_log_filename)) {
+    my_error(ER_LOG_NAME_NOT_MATCHING_SEC_LOG_PATH_CLIENT, MYF(0),
+             "--buffered-error-log-filename");
+    return true;
+  }
+
+  return false;
+}
+
+static bool update_buffered_error_log_size(sys_var *, THD *, enum_var_type) {
   buffered_error_log.resize(buffered_error_log_size * 1024);
   return false;
 }
@@ -8906,14 +9003,23 @@ static Sys_var_charptr Sys_var_buffered_error_log_filename(
     "buffered_error_log_filename", "Filename of the buffered error log",
     GLOBAL_VAR(buffered_error_log_filename), CMD_LINE(REQUIRED_ARG),
     IN_FS_CHARSET, DEFAULT(""), NO_MUTEX_GUARD, NOT_IN_BINLOG,
-    ON_CHECK(check_log_path_allow_empty));
+    ON_CHECK(check_buffered_error_log_filename));
 
 static Sys_var_ulonglong Sys_var_buffered_error_log_size(
     "buffered_error_log_size", "Size of the buffered error log (kB)",
     GLOBAL_VAR(buffered_error_log_size), CMD_LINE(REQUIRED_ARG),
     VALID_RANGE(0, ULLONG_MAX), DEFAULT(0), BLOCK_SIZE(1), NO_MUTEX_GUARD,
+<<<<<<< HEAD
     NOT_IN_BINLOG, ON_CHECK(nullptr),
     ON_UPDATE(buffered_error_log_size_update));
+||||||| merged common ancestors
+    NOT_IN_BINLOG, ON_CHECK(nullptr),
+    ON_UPDATE(buffered_error_log_size_update));
+>>>>>>>>> Temporary merge branch 2
+=======
+    NOT_IN_BINLOG, ON_CHECK(check_buffered_error_log_size),
+    ON_UPDATE(update_buffered_error_log_size));
+>>>>>>> Percona-Server-8.0.35-27
 
 #ifndef NDEBUG
 Debug_shutdown_actions Debug_shutdown_actions::instance;

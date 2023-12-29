@@ -5219,6 +5219,7 @@ void MDL_ticket_store::set_materialized() {
 MDL_ticket *MDL_ticket_store::materialized_front(int di) {
   return m_durations[di].m_mat_front;
 }
+<<<<<<< HEAD
 
 #ifdef WITH_WSREP
 void MDL_ticket::wsrep_report(bool debug) {
@@ -5313,3 +5314,7 @@ bool MDL_ticket_store::wsrep_has_non_preemptable_tickets() {
   return (non_preemptable);
 }
 #endif /* WITH_WSREP */
+||||||| merged common ancestors
+>>>>>>>>> Temporary merge branch 2
+=======
+>>>>>>> Percona-Server-8.0.35-27

@@ -5975,6 +5975,26 @@ int init_common_variables() {
                         make_query_log_name(slow_logname_path, QUERY_LOG_SLOW),
                         MYF(MY_WME)));
 
+  if (opt_general_log && opt_general_logname != nullptr &&
+      !is_secure_log_path(opt_general_logname)) {
+    LogErr(ERROR_LEVEL, ER_LOG_NAME_NOT_MATCHING_SEC_LOG_PATH,
+           "--general-log-file");
+    return 1;
+  }
+  if (opt_slow_log && opt_slow_logname != nullptr &&
+      !is_secure_log_path(opt_slow_logname)) {
+    LogErr(ERROR_LEVEL, ER_LOG_NAME_NOT_MATCHING_SEC_LOG_PATH,
+           "--slow-query-log-file");
+    return 1;
+  }
+  if (buffered_error_log_size > 0 && buffered_error_log_filename != nullptr &&
+      strlen(buffered_error_log_filename) > 0 &&
+      !is_secure_log_path(buffered_error_log_filename)) {
+    LogErr(ERROR_LEVEL, ER_LOG_NAME_NOT_MATCHING_SEC_LOG_PATH,
+           "--buffered-error-log-filename");
+    return 1;
+  }
+
 #if defined(ENABLED_DEBUG_SYNC)
   /* Initialize the debug sync facility. See debug_sync.cc. */
   if (debug_sync_init()) return 1; /* purecov: tested */
@@ -6214,6 +6234,10 @@ static int init_ssl() {
 
   if (opt_ssl_fips_mode != SSL_FIPS_MODE_OFF)
     LogErr(WARNING_LEVEL, ER_DEPRECATE_MSG_NO_REPLACEMENT, "--ssl-fips-mode");
+
+  if (get_fips_mode() == 1) {
+    LogErr(INFORMATION_LEVEL, ER_SSL_FIPS_MODE_ENABLED);
+  }
 
   return 0;
 }
@@ -10164,8 +10188,9 @@ struct my_option my_long_options[] = {
      "log.",
      nullptr, nullptr, nullptr, GET_STR, REQUIRED_ARG, 0, 0, 0, nullptr, 0,
      nullptr},
-    {"character-set-client-handshake", 0,
-     "Don't ignore client side character set value sent during handshake.",
+    {"character-set-client-handshake", OPT_CHARACTER_SET_CLIENT_HANDSHAKE,
+     "Deprecated. Don't ignore client side character set value sent during "
+     "handshake.",
      &opt_character_set_client_handshake, &opt_character_set_client_handshake,
      nullptr, GET_BOOL, NO_ARG, 1, 0, 0, nullptr, 0, nullptr},
     {"character-set-filesystem", 0, "Set the filesystem character set.",
@@ -12066,6 +12091,10 @@ bool mysqld_get_one_option(int optid,
       binlog_format_used = true;
       LogErr(WARNING_LEVEL, ER_DEPRECATE_MSG_NO_REPLACEMENT, "binlog_format");
       break;
+    case OPT_BINLOG_TRANSACTION_DEPENDENCY_TRACKING:
+      push_deprecated_warn_no_replacement(
+          nullptr, "--binlog-transaction-dependency-tracking");
+      break;
     case OPT_BINLOG_MAX_FLUSH_QUEUE_TIME:
       push_deprecated_warn_no_replacement(nullptr,
                                           "--binlog_max_flush_queue_time");
@@ -12082,8 +12111,6 @@ bool mysqld_get_one_option(int optid,
     case OPT_SSL_CERT:
     case OPT_SSL_CA:
     case OPT_SSL_CAPATH:
-    case OPT_SSL_CIPHER:
-    case OPT_TLS_CIPHERSUITES:
     case OPT_SSL_CRL:
     case OPT_SSL_CRLPATH:
       /*
@@ -12091,6 +12118,14 @@ bool mysqld_get_one_option(int optid,
         One can disable SSL later by using --skip-ssl or --ssl=0.
       */
       opt_use_ssl = true;
+      break;
+    case OPT_TLS_CIPHERSUITES:
+      opt_use_ssl = true;
+      validate_ciphers("tls-ciphersuites", argument, TLS_version::TLSv13);
+      break;
+    case OPT_SSL_CIPHER:
+      opt_use_ssl = true;
+      validate_ciphers("ssl-cipher", argument, TLS_version::TLSv12);
       break;
     case OPT_TLS_VERSION:
       opt_use_ssl = true;
@@ -12116,8 +12151,6 @@ bool mysqld_get_one_option(int optid,
     case OPT_ADMIN_SSL_CERT:
     case OPT_ADMIN_SSL_CA:
     case OPT_ADMIN_SSL_CAPATH:
-    case OPT_ADMIN_SSL_CIPHER:
-    case OPT_ADMIN_TLS_CIPHERSUITES:
     case OPT_ADMIN_SSL_CRL:
     case OPT_ADMIN_SSL_CRLPATH:
       /*
@@ -12126,6 +12159,16 @@ bool mysqld_get_one_option(int optid,
       */
       g_admin_ssl_configured = true;
       opt_use_admin_ssl = true;
+      break;
+    case OPT_ADMIN_SSL_CIPHER:
+      g_admin_ssl_configured = true;
+      opt_use_admin_ssl = true;
+      validate_ciphers("admin-ssl-cipher", argument, TLS_version::TLSv12);
+      break;
+    case OPT_ADMIN_TLS_CIPHERSUITES:
+      g_admin_ssl_configured = true;
+      opt_use_admin_ssl = true;
+      validate_ciphers("admin-tls-ciphersuites", argument, TLS_version::TLSv13);
       break;
     case OPT_ADMIN_TLS_VERSION:
       g_admin_ssl_configured = true;
@@ -12644,6 +12687,17 @@ bool mysqld_get_one_option(int optid,
     case OPT_SYNC_RELAY_LOG_INFO:
       LogErr(WARNING_LEVEL, ER_DEPRECATE_MSG_NO_REPLACEMENT,
              "--sync-relay-log-info");
+      break;
+    case OPT_CHARACTER_SET_CLIENT_HANDSHAKE:
+      push_deprecated_warn_no_replacement(nullptr,
+                                          "--character-set-client-handshake");
+      break;
+    case 'n':
+      push_deprecated_warn_no_replacement(nullptr, "--new");
+      break;
+    case OPT_OLD_OPTION:
+      push_deprecated_warn_no_replacement(nullptr, "--old");
+      break;
   }
   return false;
 }
@@ -12970,9 +13024,9 @@ static const char *get_relative_path(const char *path) {
   return path;
 }
 
-static bool is_secure_path(const char *path, const char *opt_base) {
+static bool is_secure_path(const std::string &path, const char *opt_base) {
   char buff1[FN_REFLEN], buff2[FN_REFLEN];
-  size_t opt_base_len;
+  size_t opt_base_len = 0;
   /*
     All paths are secure if opt_base is 0
   */
@@ -12980,17 +13034,17 @@ static bool is_secure_path(const char *path, const char *opt_base) {
 
   opt_base_len = strlen(opt_base);
 
-  if (strlen(path) >= FN_REFLEN) return false;
+  if (path.length() >= FN_REFLEN) return false;
 
   if (!my_strcasecmp(system_charset_info, opt_base, "NULL")) return false;
 
-  if (my_realpath(buff1, path, 0)) {
+  if (my_realpath(buff1, path.c_str(), 0)) {
     /*
       The supplied file path might have been a file and not a directory.
     */
-    int length = (int)dirname_length(path);
+    int length = (int)dirname_length(path.c_str());
     if (length >= FN_REFLEN) return false;
-    memcpy(buff2, path, length);
+    memcpy(buff2, path.c_str(), length);
     buff2[length] = '\0';
     if (length == 0 || my_realpath(buff1, buff2, 0)) return false;
   }
@@ -13023,13 +13077,18 @@ bool is_secure_file_path(const char *path) {
   Test a file path to determine if the path is compatible with the secure log
   path restriction.
 
-  @param path null terminated character string
+  @param path Log path
 
   @retval true The path is secure
   @retval false The path isn't secure
 */
-bool is_secure_log_path(const char *path) {
-  return is_secure_path(path, opt_secure_log_path);
+bool is_secure_log_path(const std::string &path) {
+  if (strlen(opt_secure_log_path) == 0) {
+    // No secure path set
+    return true;
+  }
+
+  return !path.empty() && is_secure_path(path, opt_secure_log_path);
 }
 
 /**
