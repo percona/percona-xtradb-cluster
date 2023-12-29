@@ -299,7 +299,6 @@ int32_t srv_conc_get_waiting_threads(void) {
 /** Get the count of threads active inside InnoDB. */
 int32_t srv_conc_get_active_threads(void) {
   return srv_conc.n_active.load(std::memory_order_relaxed);
-<<<<<<< HEAD
 }
 
 #ifdef WITH_WSREP
@@ -310,9 +309,4 @@ void wsrep_srv_conc_cancel_wait(trx_t *trx) {
   WSREP_DEBUG("WSREP: conc slot cancel, no atomics\n");
 }
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-}
->>>>>>>>> Temporary merge branch 2
-=======
-}
->>>>>>> Percona-Server-8.0.35-27
+

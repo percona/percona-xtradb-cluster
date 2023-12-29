@@ -12747,7 +12747,6 @@ int Delete_rows_log_event::do_exec_row(const Relay_log_info *const rli) {
     error = unpack_current_row(rli, &m_cols, &m_local_cols, false, false);
     if (error) return error;
   }
-<<<<<<< HEAD
 
 #ifdef WITH_WSREP
   if (WSREP(thd)) {
@@ -12760,10 +12759,6 @@ int Delete_rows_log_event::do_exec_row(const Relay_log_info *const rli) {
   }
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-=======
->>>>>>> Percona-Server-8.0.35-27
   /* m_table->record[0] contains the BI */
   m_table->mark_columns_per_binlog_row_image(thd);
   error = m_table->file->ha_delete_row(m_table->record[0]);
@@ -14754,3 +14749,4 @@ std::pair<bool, binary_log::Log_event_basic_info> extract_log_event_basic_info(
       uint2korr(buf + FLAGS_OFFSET) & LOG_EVENT_IGNORABLE_F;
   return std::make_pair(false, event_info);
 }
+

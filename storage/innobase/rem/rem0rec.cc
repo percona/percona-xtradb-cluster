@@ -1925,7 +1925,6 @@ trx_id_t rec_get_trx_id(const rec_t *rec,          /*!< in: record */
   return (trx_read_trx_id(trx_id));
 }
 #endif /* !UNIV_HOTBACKUP */
-<<<<<<< HEAD
 
 #ifdef WITH_WSREP
 dberr_t wsrep_rec_get_foreign_key(
@@ -2046,7 +2045,4 @@ err_out:
   return DB_ERROR;
 }
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-=======
->>>>>>> Percona-Server-8.0.35-27
+

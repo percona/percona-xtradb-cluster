@@ -1034,7 +1034,6 @@ error:
   BINLOG_ERROR(("Out of memory."), (ER_OUT_OF_RESOURCES, MYF(0)));
   RETURN_REPORTED_ERROR;
 }
-<<<<<<< HEAD
 
 #ifdef WITH_WSREP
 void Gtid_state::acquire_anonymous_ownership(THD *thd [[maybe_unused]]) {
@@ -1084,8 +1083,4 @@ void Gtid_state::release_anonymous_ownership(THD *thd [[maybe_unused]]) {
   assert(new_value >= 0);
   return;
 }
-#endif
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-=======
->>>>>>> Percona-Server-8.0.35-27
+#endif /* WITH_WSREP */

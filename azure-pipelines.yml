@@ -106,15 +106,8 @@ jobs:
           Compiler: clang
           BuildType: Debug
 
-<<<<<<< HEAD
-      clang-16 RelWithDebInfo [Ubuntu 22.04 Jammy]:
-||||||| merged common ancestors
-      # clang-6 and newer compilers
-      clang-16 RelWithDebInfo [Ubuntu 22.04 Jammy]:
-=======
       # clang-6 and newer compilers
       clang-17 RelWithDebInfo [Ubuntu 22.04 Jammy]:
->>>>>>> Percona-Server-8.0.35-27
         imageName: 'ubuntu-22.04'
         UBUNTU_CODE_NAME: jammy
         Compiler: clang
@@ -623,3 +616,4 @@ jobs:
       df -Th
 
     displayName: '*** Compile'
+

@@ -80,13 +80,7 @@ ELSE()
   # get a list of rocksdb library source files
   # run with env -i to avoid passing variables
   EXECUTE_PROCESS(
-<<<<<<< HEAD
-    COMMAND env -i ${CMAKE_CURRENT_SOURCE_DIR}/get_rocksdb_files.sh
-||||||| merged common ancestors
-    COMMAND env -i ${CMAKE_CURRENT_SOURCE_DIR}/get_rocksdb_files.sh ${ROCKSDB_FOLLY}
-=======
     COMMAND env -i CXX=${CMAKE_CXX_COMPILER} ${CMAKE_CURRENT_SOURCE_DIR}/get_rocksdb_files.sh ${ROCKSDB_FOLLY}
->>>>>>> Percona-Server-8.0.35-27
     OUTPUT_VARIABLE SCRIPT_OUTPUT
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   )
@@ -372,3 +366,4 @@ IF (NOT HAVE_EXTERNAL_ROCKSDB)
     TARGET_INCLUDE_DIRECTORIES(zenfs SYSTEM PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/tmp_gen")
   ENDIF()
 ENDIF()
+

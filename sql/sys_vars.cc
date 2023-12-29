@@ -9009,17 +9009,8 @@ static Sys_var_ulonglong Sys_var_buffered_error_log_size(
     "buffered_error_log_size", "Size of the buffered error log (kB)",
     GLOBAL_VAR(buffered_error_log_size), CMD_LINE(REQUIRED_ARG),
     VALID_RANGE(0, ULLONG_MAX), DEFAULT(0), BLOCK_SIZE(1), NO_MUTEX_GUARD,
-<<<<<<< HEAD
-    NOT_IN_BINLOG, ON_CHECK(nullptr),
-    ON_UPDATE(buffered_error_log_size_update));
-||||||| merged common ancestors
-    NOT_IN_BINLOG, ON_CHECK(nullptr),
-    ON_UPDATE(buffered_error_log_size_update));
->>>>>>>>> Temporary merge branch 2
-=======
     NOT_IN_BINLOG, ON_CHECK(check_buffered_error_log_size),
     ON_UPDATE(update_buffered_error_log_size));
->>>>>>> Percona-Server-8.0.35-27
 
 #ifndef NDEBUG
 Debug_shutdown_actions Debug_shutdown_actions::instance;
@@ -9100,3 +9091,4 @@ static Sys_var_enum_default_table_encryption Sys_default_table_encryption(
     HINT_UPDATEABLE SESSION_VAR(default_table_encryption), CMD_LINE(OPT_ARG),
     default_table_encryption_type_names, DEFAULT(DEFAULT_TABLE_ENC_OFF),
     NO_MUTEX_GUARD, IN_BINLOG, ON_CHECK(check_set_default_table_encryption));
+
