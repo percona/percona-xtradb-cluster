@@ -1,1 +1,0 @@
-/home/kamil/repo/kh-dev/tools/kh-debug/kh_debug.h
