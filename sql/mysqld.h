@@ -717,11 +717,17 @@ extern PSI_stage_info stage_wsrep_applied_writeset;
 extern PSI_stage_info stage_wsrep_applying_toi_writeset;
 extern PSI_stage_info stage_wsrep_applied_toi_writeset;
 
+extern PSI_stage_info stage_wsrep_applying_nbo_writeset;
+extern PSI_stage_info stage_wsrep_applied_nbo_writeset;
+
 extern PSI_stage_info stage_wsrep_committing;
 extern PSI_stage_info stage_wsrep_committed;
 
 extern PSI_stage_info stage_wsrep_toi_committing;
 extern PSI_stage_info stage_wsrep_toi_committed;
+
+extern PSI_stage_info stage_wsrep_nbo_committing;
+extern PSI_stage_info stage_wsrep_nbo_committed;
 
 extern PSI_stage_info stage_wsrep_rolling_back;
 extern PSI_stage_info stage_wsrep_rolled_back;
