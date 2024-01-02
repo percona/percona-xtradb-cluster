@@ -297,12 +297,13 @@ our @DEFAULT_SUITES = qw(
   x
   component_keyring_file
 
-  audit_log
-  audit_log_filter
+  component_audit_log_filter
   binlog_57_decryption
+  component_encryption_udf
+  percona
+  percona_innodb
   percona-pam-for-mysql
   component_masking_functions
-  data_masking
   procfs
   rpl_encryption
 

@@ -307,7 +307,7 @@ sub new {
     }
 
     # <option>=<value>
-    elsif ($line =~ /^([\@\w-]+)\s*=\s*(.*?)\s*$/) {
+    elsif ($line =~ /^([\@\w-]+\.?[\@\w-]*)\s*=\s*(.*?)\s*$/) {
       my $option = $1;
       my $value  = $2;
       croak "Found option '$option=$value' outside of group"

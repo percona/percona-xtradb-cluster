@@ -166,13 +166,13 @@ DATA="${WSREP_SST_OPT_DATA}"
 # This way, every PXB version needs to understand:
 # 1. Previous LTS backup
 # 2. Previous innovative backup
-# 3. Its own backup
+# 3. Backup from the current version of PXC
 #
 # E.g. PXC-8.3 needs to be bundled with PXB-8.0.x, PXB-8.2, PXB-8.3
 # The upgrade from one innovative version to another innovative version does
 # not support skipping versions. The same is for upgrading to next LTS: only
 # upgrade from previous LTS or previous innovative is supported.
-# If the cluster is on 8.1 the only way to upgrade it to 8.4 is to go throug
+# If the cluster is on 8.1 the only way to upgrade it to 8.4 is to go through
 # 8.2 and 8.3
 
 XTRABACKUP_PATH_PREFIX="$(dirname $0)/pxc_extra/pxb-"
