@@ -708,6 +708,7 @@ THD::THD(bool enable_plugins)
       parsing_system_view(false),
       sp_runtime_ctx(nullptr),
 #ifdef WITH_WSREP
+      wsrep_prepared_statement_TOI_started(false),
       wsrep_bin_log_flag_save(0),
       wsrep_applier(is_applier),
       wsrep_applier_closing(false),
