@@ -3197,7 +3197,9 @@ reexecute:
 #ifdef WITH_WSREP
     if (!error) { /* Success */
       // We are going to retry the statement, so clean up first.
-      wsrep_after_statement(thd);
+      if (!thd->wsrep_prepared_statement_TOI_started) {
+        wsrep_after_statement(thd);
+      }
       goto reexecute;
     }
 #else
