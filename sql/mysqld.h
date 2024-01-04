@@ -134,7 +134,7 @@ void kill_mysql(void);
 void refresh_status();
 void reset_status_by_thd();
 bool is_secure_file_path(const char *path);
-bool is_secure_log_path(const char *path);
+bool is_secure_log_path(const std::string &path);
 ulong sql_rnd_with_mutex();
 
 struct System_status_var *get_thd_status_var(THD *thd, bool *aggregated);
@@ -717,11 +717,17 @@ extern PSI_stage_info stage_wsrep_applied_writeset;
 extern PSI_stage_info stage_wsrep_applying_toi_writeset;
 extern PSI_stage_info stage_wsrep_applied_toi_writeset;
 
+extern PSI_stage_info stage_wsrep_applying_nbo_writeset;
+extern PSI_stage_info stage_wsrep_applied_nbo_writeset;
+
 extern PSI_stage_info stage_wsrep_committing;
 extern PSI_stage_info stage_wsrep_committed;
 
 extern PSI_stage_info stage_wsrep_toi_committing;
 extern PSI_stage_info stage_wsrep_toi_committed;
+
+extern PSI_stage_info stage_wsrep_nbo_committing;
+extern PSI_stage_info stage_wsrep_nbo_committed;
 
 extern PSI_stage_info stage_wsrep_rolling_back;
 extern PSI_stage_info stage_wsrep_rolled_back;

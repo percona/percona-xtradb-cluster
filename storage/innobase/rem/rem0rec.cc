@@ -2045,3 +2045,4 @@ err_out:
   return DB_ERROR;
 }
 #endif /* WITH_WSREP */
+

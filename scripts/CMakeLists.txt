@@ -448,7 +448,7 @@ ELSE()
       ${BIN_SCRIPTS}
       wsrep_sst_common
       wsrep_sst_xtrabackup-v2
-    )
+      )
   ENDIF()
 
   FOREACH(file ${BIN_SCRIPTS})
@@ -456,16 +456,16 @@ ELSE()
       CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/${file}.sh
         ${CMAKE_CURRENT_BINARY_DIR}/${file} ESCAPE_QUOTES @ONLY
         )
-    ELSEIF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${file})
-      CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/${file}
-        ${CMAKE_CURRENT_BINARY_DIR}/${file} ESCAPE_QUOTES @ONLY
-        )
     ELSEIF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${file}.pl.in)
       CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/${file}.pl.in
         ${CMAKE_CURRENT_BINARY_DIR}/${file} ESCAPE_QUOTES @ONLY
         )
+    ELSEIF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${file}.py.in)
+      CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/${file}.py.in
+        ${CMAKE_CURRENT_BINARY_DIR}/${file} ESCAPE_QUOTES @ONLY
+        )
     ELSE()
-      MESSAGE(FATAL_ERROR "Can not find ${file}.sh or ${file}.pl.in in "
+      MESSAGE(FATAL_ERROR "Can not find ${file}.sh or ${file}.pl.in or ${file}.py.in in "
         "${CMAKE_CURRENT_SOURCE_DIR}"
         )
     ENDIF()
@@ -509,17 +509,8 @@ ELSE()
     CONFIGURE_FILE(systemd/mysqld.tmpfiles.d.in
       ${CMAKE_CURRENT_BINARY_DIR}/mysql.conf ESCAPE_QUOTES @ONLY)
 
-    CONFIGURE_FILE(systemd/mysqld_bootstrap.in
-      ${CMAKE_CURRENT_BINARY_DIR}/mysqld_bootstrap ESCAPE_QUOTES @ONLY)
-
     INSTALL_SCRIPT(
       ${CMAKE_CURRENT_BINARY_DIR}/mysqld_pre_systemd
-      DESTINATION ${INSTALL_BINDIR}
-      COMPONENT Server
-    )
-
-    INSTALL_SCRIPT(
-      ${CMAKE_CURRENT_BINARY_DIR}/mysqld_bootstrap
       DESTINATION ${INSTALL_BINDIR}
       COMPONENT Server
     )
@@ -569,3 +560,4 @@ ELSE()
     ENDIF()
   ENDIF()
 ENDIF()
+

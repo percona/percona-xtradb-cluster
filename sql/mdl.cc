@@ -5313,3 +5313,4 @@ bool MDL_ticket_store::wsrep_has_non_preemptable_tickets() {
   return (non_preemptable);
 }
 #endif /* WITH_WSREP */
+

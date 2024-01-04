@@ -41,7 +41,7 @@ SELECT * FROM t1;
 ERROR 08S01: WSREP has not yet prepared node for application use
 EXECUTE stmt_select;
 ERROR 08S01: WSREP has not yet prepared node for application use
-SELECT COUNT(*) > 0 FROM INFORMATION_SCHEMA.PROCESSLIST;
+SELECT COUNT(*) > 0 FROM performance_schema.processlist;
 COUNT(*) > 0
 1
 SET GLOBAL wsrep_provider_options='gmcast.isolate=0';

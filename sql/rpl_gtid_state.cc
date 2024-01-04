@@ -1083,4 +1083,4 @@ void Gtid_state::release_anonymous_ownership(THD *thd [[maybe_unused]]) {
   assert(new_value >= 0);
   return;
 }
-#endif
+#endif /* WITH_WSREP */
