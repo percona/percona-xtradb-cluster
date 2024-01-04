@@ -68,8 +68,7 @@ uextra=0
 
 # keyring specific variables.
 
-# Till PXC-5.7.22, only supporting keyring plugin was keyring_file plugin.
-
+# 8.1.0 supports keyring file plugin, other keyrings are components
 keyring_plugin=0
 
 # Keyring component variables
@@ -79,7 +78,6 @@ keyring_manifest_file=""
 keyring_config_file=""
 
 keyring_file_data=""
-keyring_vault_config=""
 
 keyringbackupopt=""
 keyringapplyopt=""
@@ -134,14 +132,75 @@ declare -a RC
 XTRABACKUP_BIN=xtrabackup
 DATA="${WSREP_SST_OPT_DATA}"
 
-# default XB path (for 8.0+)  (relative to script location)
-# Use this path for 8.0+
-XTRABACKUP_80_PATH="$(dirname $0)/pxc_extra/pxb-8.0"
+# Which rolling upgrade combinations do we support?
+# MySql supports following in-place upgrades:
+# 1. 8.0.x (LTS) -> 8.i : 8.0 (LTS) to any 8 innovative
+# 2. 8.i -> 8.k : 8.i innovative to 8.k innovative
+# 3. 8.i -> 8.4 (LTS) : 8 innovative to 8.4 (LTS)
+# 4. 8.0.x (LTS) -> 8.4 (LTS) : LTS to LTS
+#
+# PXB 8.0.x supports prepare for 8.0 (LTS) only.
+# PXB 8.1 supports prepare for 8.1 innovative only.
+# PXB 8.2 supports prepare for 8.2 innovative only.
+# PXB 8.3 supports prepare for 8.3 innovative only.
+# PXB 8.4 supports prepare for 8.4 LTS only.
+#
+# If we wanted to support all possible upgrade paths in PXC we would have to
+# support:
+# 1. 8.0 (LTS) -> 8.i : LTS to any innovative
+# 2. 8.i -> 8.k : any innovative to any innovative
+# 3. 8.0 (LTS) -> 8.4 (LTS) : LTS to LTS
+#
+# To do so, PXC-8.4 SST script would have to support PXB 8.0/8.1/8.2/8.3/8.4
+# (5 pxb versions) to be able to prepare SST from any donor version.
+# It would be even worse for 9.x series, where there will be 8 versions,
+# plus possibility to upgrade from 8.4, which gives 9 PXB versions in total.
+#
+# To make things easier we will support the following paths, which require using
+# up to 3 versions of PXB:
+#
+# 1. 8.0.x (LTS) -> 8.i : 8.0 (LTS) to any 8 innovative
+# 2. 8.i -> 8.k : 8.i innovative to 8.k innovative
+# 3. 8.0.x (LTS) -> 8.4 (LTS) : LTS to LTS
+#
+# This way, every PXB version needs to understand:
+# 1. Previous LTS backup
+# 2. Previous innovative backup
+# 3. Backup from the current version of PXC
+#
+# E.g. PXC-8.3 needs to be bundled with PXB-8.0.x, PXB-8.2, PXB-8.3
+# The upgrade from one innovative version to another innovative version does
+# not support skipping versions. The same is for upgrading to next LTS: only
+# upgrade from previous LTS or previous innovative is supported.
+# If the cluster is on 8.1 the only way to upgrade it to 8.4 is to go through
+# 8.2 and 8.3
 
-# XB path for previous major/minor versison (5.7)  (relative to script location)
-# Use this for previous versions (5.7)
-# Upgrading from anything less than 5.7 is not supported
-XTRABACKUP_24_PATH="$(dirname $0)/pxc_extra/pxb-2.4"
+XTRABACKUP_PATH_PREFIX="$(dirname $0)/pxc_extra/pxb-"
+
+# XB path compatible with the current version of PXC
+XTRABACKUP_THIS_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.1"
+
+# XB path compatible with prev PXC version. It may be prev Innovative release or LTS
+# if current PXC version is 1st Innovative.
+# Note that this can be the same as XTRABACKUP_PREV_LTS_VER_PATH
+XTRABACKUP_PREV_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.0"
+
+# XB path compatible previous PXC LTS version
+XTRABACKUP_PREV_LTS_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.0"
+
+# Minimum PXB required versions for this node to work
+# To be able to service this version
+XB_THIS_REQUIRED_VERSION="8.1.0"
+# To be able to service previous version
+XB_PREV_REQUIRED_VERSION="8.0.35"
+# To be able to service previous LTS version
+XB_PREV_LTS_REQUIRED_VERSION="8.0.35"
+
+# Joiner requires Donor to be this LTS version...
+REQUIRED_DONOR_MYSQL_LTS_VERSION="8.0"
+# ...or to be this previous version (note that it may be LTS as well if this is
+# 1st innovative)
+REQUIRED_DONOR_MYSQL_PREV_VERSION="8.0"
 
 # These files carry some important information in form of GTID of the data
 # that is being backed up.
@@ -699,22 +758,12 @@ read_cnf()
     #------- KEYRING config parsing
 
     #======================================================================
-    # Parse for keyring plugin. Only 1 plugin can be enabled at given time.
+    # Parse for keyring plugin. Only 8.1 supports only keyring file plugin.
+    # Keyring vault is the component.
     keyring_file_data=$(parse_cnf mysqld keyring-file-data "")
-    keyring_vault_config=$(parse_cnf mysqld keyring-vault-config "")
-    if [[ -n $keyring_file_data && -n $keyring_vault_config ]]; then
-        wsrep_log_error "******************* FATAL ERROR ********************** "
-        wsrep_log_error "Can't have keyring_file and keyring_vault enabled at same time"
-        wsrep_log_error "Line $LINENO"
-        wsrep_log_error "****************************************************** "
-        exit 32
-    fi
-
-    if [[ -n $keyring_file_data || -n $keyring_vault_config ]]; then
-        keyring_plugin=1
-    fi
 
     if [[ -n $keyring_file_data ]]; then
+        keyring_plugin=1
         KEYRING_FILE_DIR=$(dirname "${keyring_file_data}")
     fi
 
@@ -876,22 +925,24 @@ get_stream()
     if [[ $sfmt == 'xbstream' ]]; then
         wsrep_log_debug "Streaming with xbstream"
 
-        if [[ ! -x ${XTRABACKUP_80_PATH}/bin/xbstream ]]; then
+        # It's ok to use any xbstream, it's compatible across versions
+        local xbstream_bin_path="${XTRABACKUP_THIS_VER_PATH}/bin/xbstream"
+
+        if [[ ! -x ${xbstream_bin_path} ]]; then
             wsrep_log_error "******** FATAL ERROR *********************** "
             wsrep_log_error "Could not find the xbstream executable (version 8.x)."
-            wsrep_log_error "    Expected location: $XTRABACKUP_80_PATH/bin/xbstream"
+            wsrep_log_error "    Expected location: $xbstream_bin_path"
             wsrep_log_error "Please verify that PXC was installed correctly."
             wsrep_log_error "* Line $LINENO"
             wsrep_log_error "******************************************** "
             exit 2
         fi
 
-        # It's ok to use the 8.0 xbstream, it's compatible with
-        # the 2.4 xbstream.
+        # It's ok to use any xbstream, it's compatible across versions
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
-            strmcmd="${XTRABACKUP_80_PATH}/bin/xbstream -x $xbstream_opts"
+            strmcmd="${xbstream_bin_path} -x $xbstream_opts"
         else
-            strmcmd="${XTRABACKUP_80_PATH}/bin/xbstream -c $xbstream_opts \${FILE_TO_STREAM}"
+            strmcmd="${xbstream_bin_path} -c $xbstream_opts \${FILE_TO_STREAM}"
         fi
     else
         wsrep_check_program tar
@@ -1594,8 +1645,7 @@ parse_sst_info()
 #   INNOBACKUP
 #   INNOPREPARE
 #   INNOMOVE
-#   XTRABACKUP_24_PATH
-#   XTRABACKUP_80_PATH
+#   XTRABACKUP_PATH_PREFIX
 #
 # Parameters:
 #   Argument 1: Donor MySQL version
@@ -1607,25 +1657,21 @@ parse_sst_info()
 #
 function initialize_pxb_commands()
 {
-    local donor_version_str=$(expr match "$1" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
-    donor_version_str=${donor_version_str:-"0.0.0"}
+    # We are interested only in major.minor part, as it is enough to determine
+    # the location of PXB to be used.
+    local donor_version_str=$(expr match "$1" '\([0-9]\+\.[0-9]\+\)')
+    donor_version_str=${donor_version_str:-"0.0"}
 
-    local local_version_str=$(expr match "$2" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
     local disver=""
     local pxb_root pxb_bin_path pxb_plugin_dir
 
-    # If the DONOR's version is less than 8.0.0, use PXB 2.4
-    # Else use PXB 8.0
-    if compare_versions "${donor_version_str}" "<" "8.0.0"; then
-        pxb_root="${XTRABACKUP_24_PATH}"
-    else
-        pxb_root="${XTRABACKUP_80_PATH}"
-    fi
+    # We need to use PXB compatible with donor
+    pxb_root="${XTRABACKUP_PATH_PREFIX}${donor_version_str}"
 
     pxb_bin_path="${pxb_root}/bin/xtrabackup"
     pxb_plugin_dir="${pxb_root}/lib/plugin"
 
-    wsrep_log_debug "local:$local_version_str donor:$donor_version_str"
+    wsrep_log_debug "local:$2 donor:$1"
     wsrep_log_debug "pxb-bin-path:$pxb_bin_path"
     wsrep_log_debug "pxb-plugin-dir:$pxb_plugin_dir"
 
@@ -1738,6 +1784,32 @@ function initialize_pxb_commands()
     fi
 }
 
+# Verify that provided path contains PXB in version at least specified
+function verify_pxb_version()
+{
+    local pxb_bin_path="${1}/bin/$XTRABACKUP_BIN"
+    local pxb_expected_version="${2}"
+
+    if [[ ! -x $pxb_bin_path ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "Could not find the $XTRABACKUP_BIN executable (version at least ${pxb_expected_version})."
+        wsrep_log_error "    Expected location: $pxb_bin_path"
+        wsrep_log_error "Please verify that PXC was installed correctly."
+        wsrep_log_error "****************************************************** "
+        exit 2
+    fi
+
+    local xb_version=$($pxb_bin_path --version 2>&1 | grep -oe ' [0-9]\.[0-9]\.[0-9]*' | head -n1)
+    xb_version=${xb_version# }
+    if compare_versions "$xb_version" "<" "$pxb_expected_version"; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "The $XTRABACKUP_BIN version is $xb_version."
+        wsrep_log_error "xtrabackup-$pxb_expected_version or higher is needed to perform an SST"
+        wsrep_log_error "$pxb_bin_path"
+        wsrep_log_error "****************************************************** "
+        exit 2
+    fi
+}
 
 #-------------------------------------------------------------------------------
 #
@@ -1754,72 +1826,10 @@ if [[ -z $MYSQL_VERSION ]]; then
     exit 2
 fi
 
-# Verify our PXB versions
-# XB_REQUIRED_VERSION requires at least major.minor version (e.g. 2.4.1 or 3.0)
-#
-# 2.4.3 : Starting with 5.7, the redo log format has changed and so XB-2.4.3 or higher is needed
-# for performing backup (read SST)
-#
-# 2.4.4 : needed to support the keyring option
-#
-# 2.4.11: XB now has its own keyring plugin complied and added support for vault plugin
-#         in addition to existing keyring_file plugin.
-#
-# 2.4.12: XB fixed bugs like keyring is empty + move-back stage now uses params from
-#         my.cnf.
-#
-# 2.4.17  PXB added Data-At-Rest Encryption support found in PS/PXC 5.7.28
-#
-# 2.4.20  Transition-key fixes
-#
-
-XB_2x_REQUIRED_VERSION="2.4.28"
-
-if [[ ! -x $XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN ]]; then
-    wsrep_log_error "******************* FATAL ERROR ********************** "
-    wsrep_log_error "Could not find the $XTRABACKUP_BIN executable (version 2.x)."
-    wsrep_log_error "    Expected location: $XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN"
-    wsrep_log_error "Please verify that PXC was installed correctly."
-    wsrep_log_error "****************************************************** "
-    exit 2
-fi
-XB_2x_VERSION=$($XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN --version 2>&1 | grep -oe ' [0-9]\.[0-9]\.[0-9]*' | head -n1)
-XB_2x_VERSION=${XB_2x_VERSION# }
-if compare_versions "$XB_2x_VERSION" "<" "$XB_2x_REQUIRED_VERSION"; then
-    wsrep_log_error "******************* FATAL ERROR ********************** "
-    wsrep_log_error "The $XTRABACKUP_BIN version is $XB_2x_VERSION."
-    wsrep_log_error "xtrabackup-$XB_2x_REQUIRED_VERSION or higher is needed to perform an SST"
-    wsrep_log_error "$XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN"
-    wsrep_log_error "****************************************************** "
-    exit 2
-fi
-
-# Verify our PXB 8.0 version
-#
-# 8.0.11  Transition-key fixes
-#
-
-XB_8x_REQUIRED_VERSION="8.0.34"
-
-if [[ ! -x $XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN ]]; then
-    wsrep_log_error "******************* FATAL ERROR ********************** "
-    wsrep_log_error "Could not find the $XTRABACKUP_BIN executable (version 8.x)."
-    wsrep_log_error "    Expected location: $XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN"
-    wsrep_log_error "Please verify that PXC was installed correctly."
-    wsrep_log_error "****************************************************** "
-    exit 2
-fi
-XB_8x_VERSION=$($XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN --version 2>&1 | grep -oe ' [0-9]\.[0-9]\.[0-9]*' | head -n1)
-XB_8x_VERSION=${XB_8x_VERSION# }
-if compare_versions "$XB_8x_VERSION" "<" "$XB_8x_REQUIRED_VERSION"; then
-    wsrep_log_error "******************* FATAL ERROR ********************** "
-    wsrep_log_error "The $XTRABACKUP_BIN version is $XB_8x_VERSION."
-    wsrep_log_error "xtrabackup-$XB_8x_REQUIRED_VERSION or higher is needed to perform an SST"
-    wsrep_log_error "$XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN"
-    wsrep_log_error "****************************************************** "
-    exit 2
-fi
-
+# Verify PXB versions we have
+verify_pxb_version "${XTRABACKUP_THIS_VER_PATH}" "${XB_THIS_REQUIRED_VERSION}"
+verify_pxb_version "${XTRABACKUP_PREV_VER_PATH}" "${XB_PREV_REQUIRED_VERSION}"
+verify_pxb_version "${XTRABACKUP_PREV_LTS_VER_PATH}" "${XB_PREV_LTS_REQUIRED_VERSION}"
 
 
 rm -f "${XB_GTID_INFO_FILE_PATH}"
@@ -2022,6 +2032,7 @@ then
     if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
     then
         usrst=0
+
         if [[ -z $sst_ver ]]; then
             wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "Upgrade joiner to 5.6.21 or higher for backup locks support"
@@ -2071,6 +2082,48 @@ then
             tcmd="$pcmd | $tcmd"
         fi
 
+        # Why we have sleep 10 here?
+        #
+        # The connection model is that Joiner acts as the server and Donor as
+        # a client (Joiner starts socat with listen option, then Donor connects).
+        # socat 1.7.4.3 has the following issue (full bug report here, because
+        # socat uses e-mail for bug reporting):
+        #
+        # Problem:
+        # 'connect-timeout' option makes 'retry' option to be not working for
+        # localhost connections.
+        # Moreover, 'connnect-timeout' is not respected for localhost connections.
+        # This makes problems when the client starts before the server in a microservices
+        # architecture.
+        #
+        # Steps to reproduce:
+        # echo "test" | ./socat -v -dddd -x stdio TCP:127.0.0.1:9999,retry=5,connect-timeout=10
+        #
+        # Current result:
+        # socat exits immediately with error write(7, 0x5595c8cc3030, 5): Connection refused
+        # Expected result:
+        # socat should try to connect with timeout 10s
+        # socat should try 5 times to connect
+        # More info:
+        # 1. Please note that without 'connect-timeout', 'retry' option is respected
+        # for localhost connections as it should.
+        # 2. It is well visible when ran with options -v -dddd that socat gives up
+        # just after 1st try.
+        # 3. When the destination address is not the localhost, it is visible that
+        # socat tries 5 times to connect with, respecting timeouts (the behavior is OK)
+        #
+        # The issue was fixed in v1.7.4.4:
+        # Address TCP with options connect-timeout and retry terminated
+	    # immediately when a connection attempt failed on network error or
+	    # connection refused.
+	    # Test: TCP_TIMEOUT_RETRY
+	    # Thanks to Kamil Holubicki for reporting this issue.
+        #
+        # Server needs to be actively listening when client is connecting. If it is not
+        # the client will exit immediately without any retry.
+        # The issue is visible only for localhost connections, so we could save 10 secs
+        # making the following 'sleep' executed conditionally, but I'm not sure
+        # if we are so brave to remove it from non-localhost connections.
         wsrep_log_debug "Sleeping before data transfer for SST"
         sleep 10
 
@@ -2169,10 +2222,10 @@ then
     # Get keyring component status
     get_mysqld_path
     plugin_dir=${WSREP_SST_OPT_PLUGINDIR}
+    # Get the type of the keyring given in the manifest file
     get_keyring_manifest_and_config "${DATA}" $plugin_dir
 
     if [[ -r $keyring_manifest_file && -r $keyring_config_file ]]; then
-        # Get the type of the keyring given in the manifest file
         keyring_component_enabled=1
     fi
 
@@ -2205,7 +2258,7 @@ then
     recv_data_from_donor_to_joiner $STATDIR "${stagemsg}-sst-info" $stimeout -2
 
     #
-    # Determine which file was received, the GTID or the SST_INFO
+    # We expect sst_info file to be present.
     #
     if [[ -r "${STATDIR}/${SST_INFO_FILE}" ]]; then
         #
@@ -2220,30 +2273,13 @@ then
         transition_key=$(parse_sst_info "$sst_file_info_path" sst transition-key "")
 
         if [[ -n $transition_key ]]; then
-
-            # Use the broken key if the donor version is < 5.7.29 and is not 5.7.28-31-57.2
-            # In other words, 5.7.28-31-57.2 and above will use the key that was sent
-            if compare_versions "$DONOR_MYSQL_VERSION" "<" "5.7.29" &&
-               [[ $DONOR_MYSQL_VERSION != "5.7.28-31-57.2" ]]; then
-                transition_key="\$transition_key"
-            fi
-
             encrypt_prepare_options="--transition-key=$transition_key"
             encrypt_move_options="--transition-key=$transition_key --generate-new-master-key"
         fi
 
-    elif [[ -r "${STATDIR}/${XB_GTID_INFO_FILE}" ]]; then
-        #
-        # For compatibility, we have received the gtid file
-        #
-        XB_GTID_INFO_FILE_PATH="${STATDIR}/${XB_GTID_INFO_FILE}"
-
-        DONOR_BINLOGNAME=""
-        DONOR_MYSQL_VERSION=""
-
     else
         wsrep_log_error "******************* FATAL ERROR ********************** "
-        wsrep_log_error "Did not receive expected file from donor: '${SST_INFO_FILE}' or '${XB_GTID_INFO_FILE}'"
+        wsrep_log_error "Did not receive expected file from donor: '${SST_INFO_FILE}'"
         wsrep_log_error "Line $LINENO"
         wsrep_log_error "****************************************************** "
         exit 32
@@ -2254,35 +2290,43 @@ then
         # -----------------------------------------------------
         # Reject the DONOR if it's version is too old
         # We also reject the donor if it does not send a version string.
-        # (which is true for any version of PXC < 5.7.19)
         #
         # Truncate the version numbers (we want the major.minor.revision version
-        # like "5.6.35", not "5.6.35-...")
-        local_version_str=$(expr match "$MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
-        donor_version_str=$(expr match "$DONOR_MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
-        donor_version_str=${donor_version_str:-"0.0.0"}
+        # like "8.0", not "8.0.35-...")
+        local_version_str=$(expr match "$MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\)')
+        donor_version_str=$(expr match "$DONOR_MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\)')
+        donor_version_str=${donor_version_str:-"0.0"}
+
+        local_version_full_str=$(expr match "$MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
+        donor_version_full_str=$(expr match "$DONOR_MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
+        donor_version_full_str=${donor_version_str:-"0.0.0"}
 
         # Required DONOR PXC version
         #
-        #   5.7.19  : This is the first version that sent the donor version
+        #   Allow Donor to be:
+        #   Previous LTS
+        #   Previous version (may be innovative or LTS)
+        #   The same version
         #
-        REQUIRED_DONOR_MYSQL_VERSION="5.7.19"
 
-        if [[ -z $DONOR_MYSQL_VERSION ]] || compare_versions "$donor_version_str" "<" "$REQUIRED_DONOR_MYSQL_VERSION"; then
+        if [[ -z $DONOR_MYSQL_VERSION ]] || compare_versions "$donor_version_str" "!=" "$REQUIRED_DONOR_MYSQL_LTS_VERSION" && compare_versions "$donor_version_str" "!=" "$REQUIRED_DONOR_MYSQL_PREV_VERSION" && compare_versions "$donor_version_str" "!=" "$local_version_str"; then
             wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "FATAL: The donor version is too old."
+            wsrep_log_error "FATAL: The donor version is not compatible with this node acting as a joiner."
             wsrep_log_error "This node's PXC version is $local_version_str.  The donor's PXC version is $donor_version_str."
-            wsrep_log_error "The donor node must be at least version $REQUIRED_DONOR_MYSQL_VERSION."
+            wsrep_log_error "The donor node must be one of the following versions:"
+            wsrep_log_error "${REQUIRED_DONOR_MYSQL_LTS_VERSION} (LTS)"
+            wsrep_log_error "${REQUIRED_DONOR_MYSQL_PREV_VERSION} (previous version)"
+            wsrep_log_error "${local_version_str} (the same version as this node)."
             wsrep_log_error "Line $LINENO"
             wsrep_log_error "****************************************************** "
             exit 2
         fi
 
         # Is this node's pxc version < donor's pxc version?
-        if compare_versions "$local_version_str" "<" "$donor_version_str"; then
+        if compare_versions "$local_version_full_str" "<" "$donor_version_full_str"; then
             wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "FATAL: PXC is receiving an SST from a node with a higher version."
-            wsrep_log_error "This node's PXC version is $local_version_str.  The donor's PXC version is $donor_version_str."
+            wsrep_log_error "This node's PXC version is $local_version_full_str.  The donor's PXC version is $donor_version_full_str."
             wsrep_log_error "Upgrade this node before joining the cluster."
             wsrep_log_error "Line $LINENO"
             wsrep_log_error "****************************************************** "
@@ -2328,62 +2372,15 @@ then
         # server-id is the id of the node that is acting as donor and not joiner node.
 
         # if keyring_plugin is enabled on JOINER and DONOR failed to send transition_key
-        # this means either of the 2 things:
-        # a. DONOR is at version < 5.7.22
-        # b. DONOR is not configured to use keyring_plugin
+        # this means DONOR is not configured to use keyring_plugin.
 
         if [[ $keyring_plugin -eq 1 && -z $transition_key ]]; then
-
-            # case-a: DONOR is at version < 5.7.22. We should expect keyring file
-            #         and not transition_key.
-            if compare_versions "$DONOR_MYSQL_VERSION" "<" "5.7.22"; then
-                if [[ -n $keyring_file_data ]]; then
-                     # joiner needs to wait to receive the file.
-                    sleep 3
-
-                    # Ensure that the destination directory exists and is R/W by us
-                    if [[ ! -d "$KEYRING_FILE_DIR" || ! -r "$KEYRING_FILE_DIR" || ! -w "$KEYRING_FILE_DIR" ]]; then
-                        wsrep_log_error "******************* FATAL ERROR ********************** "
-                        wsrep_log_error "FATAL: Cannot acccess the keyring directory"
-                        wsrep_log_error "  $KEYRING_FILE_DIR"
-                        wsrep_log_error "It must already exist and be readable/writeable by MySQL"
-                        wsrep_log_error "Line $LINENO"
-                        wsrep_log_error "****************************************************** "
-                        exit 22
-                    fi
-
-                    XB_DONOR_KEYRING_FILE_PATH="${KEYRING_FILE_DIR}/${XB_DONOR_KEYRING_FILE}"
-                    recv_data_from_donor_to_joiner "${KEYRING_FILE_DIR}" "${stagemsg}-keyring" 0 2 &
-                    jpid=$!
-                    monitor_sst_progress "${KEYRING_FILE_DIR}" $jpid ${WSREP_SST_IDLE_TIMEOUT} &
-                    wait $jpid
-                    keyringapplyopt=" --keyring-file-data=$XB_DONOR_KEYRING_FILE_PATH "
-                    wsrep_log_info "donor keyring received at: '${XB_DONOR_KEYRING_FILE_PATH}'"
-                else
-                    # There shouldn't be a keyring file, since we do not have a keyring here
-                    # This will error out if a keyring file IS found
-                    XB_DONOR_KEYRING_FILE_PATH="${KEYRING_FILE_DIR}/${XB_DONOR_KEYRING_FILE}"
-                    recv_data_from_donor_to_joiner "${KEYRING_FILE_DIR}" "${stagemsg}-keyring" 5 -1
-
-                    if [[ -r "${XB_DONOR_KEYRING_FILE_PATH}" ]]; then
-                        wsrep_log_error "******************* FATAL ERROR ********************** "
-                        wsrep_log_error "FATAL: xtrabackup found '${XB_DONOR_KEYRING_FILE_PATH}'"
-                        wsrep_log_error "The joiner is not using a keyring file but the donor has sent"
-                        wsrep_log_error "a keyring file.  Please check your configuration to ensure that"
-                        wsrep_log_error "both sides are using a keyring file"
-                        wsrep_log_error "****************************************************** "
-                        exit 32
-                    fi
-                fi
-            # case-b: JOINER is configured to use keyring but DONOR is not
-            else
-                wsrep_log_error "******************* FATAL ERROR ********************** "
-                wsrep_log_error "FATAL: JOINER is configured to use keyring_plugin" \
-                                "(file/vault) but DONOR is not"
-                wsrep_log_error "Line $LINENO"
-                wsrep_log_error "****************************************************** "
-                exit 32
-            fi
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "FATAL: JOINER is configured to use keyring_plugin" \
+                            "(file/vault) but DONOR is not"
+            wsrep_log_error "Line $LINENO"
+            wsrep_log_error "****************************************************** "
+            exit 32
         fi
 
         if [[ -n $transition_key && $keyring_plugin -eq 0 && $keyring_component_enabled -eq 0 ]]; then
@@ -2487,8 +2484,8 @@ then
             rebuildcmd="--rebuild-indexes --rebuild-threads=$nthreads"
         fi
 
+        # We still can receive qpress-compressed backup as the donor may be any 8.0.x
         if test -n "$(find ${DATA} -maxdepth 1 -type f -name '*.qp' -print -quit)"; then
-
             wsrep_log_info "Compressed qpress files found"
 
             if [[ ! -x `which qpress` ]]; then
@@ -2585,43 +2582,8 @@ then
         XB_GTID_INFO_FILE_PATH="${TDATA}/${XB_GTID_INFO_FILE}"
         rm -f $TDATA/innobackup.decompress.log $TDATA/innobackup.prepare.log $TDATA/innobackup.move.log
 
-        # Just rename the file till PXB-8.0.6 fix this issue of rename.
-        # moving file to property directory will be take care by PXB-8.0.5.
-        if  [[ -n "$WSREP_SST_OPT_BINLOG" && -n "$DONOR_BINLOGNAME" ]]; then
-
-            binlog_dir=$(dirname "$WSREP_SST_OPT_BINLOG")
-            binlog_file=$(basename "$WSREP_SST_OPT_BINLOG")
-            donor_binlog_file=$DONOR_BINLOGNAME
-
-            # rename the donor binlog to the name of the binlogs on the joiner
-            if [[ "$binlog_file" != "$donor_binlog_file" ]]; then
-                pushd "$DATA" &>/dev/null
-                for f in $donor_binlog_file.*; do
-                    if [[ ! -e "$f" ]]; then continue; fi
-                    f_new=$(echo $f | sed "s/$donor_binlog_file/$binlog_file/")
-                    mv "$f" "$f_new" 2>/dev/null || true
-                done
-                popd &> /dev/null
-            fi
-
-            # To avoid comparing data directory and BINLOG_DIRNAME
-            #mv $DATA/${binlog_file}.* "$binlog_dir"/ 2>/dev/null || true
-
-            pushd "$DATA" &>/dev/null
-            # starting PXB-8.0.5 it started shipping index file but since PXC
-            # may rename the file it is important that PXC re-generate the file.
-            rm -rf "${binlog_file}.index" || true
-            for bfiles in $binlog_file.*; do
-                if [[ ! -e "$bfiles" ]]; then continue; fi
-                echo "${binlog_dir}/${bfiles}" >> "${binlog_file}.index"
-            done
-            popd &> /dev/null
-
-        fi
-
         # If there is keyring file, move back needs to keep it and
         # add its keys there
-
         wsrep_log_info "Moving the backup to ${TDATA}"
 
         set +e

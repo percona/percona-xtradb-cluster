@@ -161,10 +161,10 @@ get_sources(){
         popd
         GALERA_REVNO="$(test -r percona-xtradb-cluster-galera/GALERA-REVISION && cat percona-xtradb-cluster-galera/GALERA-REVISION)"
     fi
-    if [ -f VERSION ]; then
-        source VERSION
-    elif [ -f MYSQL_VERSION ]; then
-        source MYSQL_VERSION
+    if [ -f ./VERSION ]; then
+        source ./VERSION
+    elif [ -f ./MYSQL_VERSION ]; then
+        source ./MYSQL_VERSION
     else
         echo "VERSION file does not exist"
        exit 1
@@ -424,8 +424,14 @@ install_deps() {
         apt-get -y install dirmngr || true
         wget https://repo.percona.com/apt/percona-release_latest.$(lsb_release -sc)_all.deb && dpkg -i percona-release_latest.$(lsb_release -sc)_all.deb
         percona-release enable tools release
+        
+        # (1) PXB compatible with previous PXC LTS version
         percona-release enable pxb-80 release
-        percona-release enable pxb-24 testing
+        # (2) PXB compatible with previous PXC version (note: it may be LTS as well)
+        percona-release enable pxb-80 release
+        # (3) PXB compatible with this PXC version (LTS or Innovative)
+        percona-release enable pxb-81 release
+        
         export DEBIAN_FRONTEND="noninteractive"
         export DIST="$(lsb_release -sc)"
             until apt-get update; do
@@ -469,8 +475,8 @@ install_deps() {
         apt-get -y install libtool libnuma-dev scons libboost-dev libboost-program-options-dev check
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
-        apt-get -y install --download-only percona-xtrabackup-24=2.4.28-1.${DIST}
         apt-get -y install --download-only percona-xtrabackup-80=8.0.34-29-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-81=8.1.0-1-1.${DIST}
     fi
     return;
 }
@@ -748,7 +754,7 @@ build_source_deb(){
         echo "It is not possible to build source deb here"
         exit 1
     fi
-     source ${WORKDIR}/pxc-80.properties
+    source ${WORKDIR}/pxc-80.properties
     rm -rf percona-server*
     get_tar "source_tarball"
     rm -f *.dsc *.orig.tar.gz *.debian.tar.gz *.changes
@@ -849,18 +855,28 @@ build_deb(){
 
     cd ${DIRNAME} || exit
 
-    mkdir pxb-2.4
-    mkdir pxb-8.0
-    dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-24* pxb-2.4
+    # (1) PXB compatible with previous PXC LTS version
+    mkdir -p pxb-8.0
+    # (2) PXB compatible with previous PXC version (note: it may be LTS as well)
+    mkdir -p pxb-8.0
+    # (3) PXB compatible with this PXC version (LTS or Innovative)
+    mkdir -p pxb-8.1
+
+
+    #  (1), (2)
     dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-80* pxb-8.0
-    cd pxb-2.4 || exit
+    dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-81* pxb-8.1
+    cd pxb-8.0 || exit
         mv usr/bin ./
         mv usr/lib* ./
         rm -rf usr *.deb DEBIAN
-    cd ../pxb-8.0 || exit
+
+    # (3)
+    cd ../pxb-8.1 || exit
         mv usr/bin ./
         mv usr/lib* ./
         rm -rf usr *.deb DEBIAN
+
     cd ../ || exit
 
     if [[ "x$DEBIAN_VERSION" == "xbionic" || "x$DEBIAN_VERSION" == "xstretch" || "x$DEBIAN_VERSION" == "xfocal" || "x$DEBIAN_VERSION" == "xbullseye" || "x$DEBIAN_VERSION" == "xjammy" || "x$DEBIAN_VERSION" == "xbookworm" ]]; then
@@ -966,19 +982,7 @@ build_tarball(){
     CURDIR=$(pwd)
     cd ${BUILD_ROOT} || exit
     if [ -f /etc/redhat-release ]; then
-        mkdir pxb-2.4
-        pushd pxb-2.4
-        yumdownloader percona-xtrabackup-24-2.4.28
-        rpm2cpio *.rpm | cpio --extract --make-directories --verbose
-        mv usr/bin ./
-        mv usr/lib* ./
-        mv lib64 lib
-        mv lib/xtrabackup/* lib/ || true
-        rm -rf lib/xtrabackup
-        rm -rf usr
-        rm -f *.rpm
-        popd
-
+        # (1), (2)
         mkdir pxb-8.0
         pushd pxb-8.0
         yumdownloader percona-xtrabackup-80-8.0.34
@@ -992,29 +996,50 @@ build_tarball(){
         rm -rf usr
         rm -f *.rpm
         popd
-        tar -zcvf  percona-xtrabackup-2.4.tar.gz pxb-2.4
+
+        # (3)
+        mkdir pxb-8.1
+        pushd pxb-8.1
+        yumdownloader percona-xtrabackup-81-8.1.0
+        rpm2cpio *.rpm | cpio --extract --make-directories --verbose
+        mv usr/bin ./
+        mv usr/lib* ./
+        mv lib64 lib
+        mv lib/xtrabackup/* lib/ || true
+        rm -rf lib/xtrabackup
+        rm -rf usr
+        rm -f *.rpm
+        popd
+
         tar -zcvf  percona-xtrabackup-8.0.tar.gz pxb-8.0
+        tar -zcvf  percona-xtrabackup-8.1.tar.gz pxb-8.1
     else
-        mkdir pxb-2.4
         mkdir pxb-8.0
-        dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-24* pxb-2.4
+        mkdir pxb-8.1
         dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-80* pxb-8.0
-        cd pxb-2.4 || exit
-            mv usr/bin ./
-            mv usr/lib* ./
-            rm -rf usr *.deb DEBIAN
+        dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-81* pxb-8.1
+        
+        # (1), (2)
         cd ../pxb-8.0 || exit
             mv usr/bin ./
             mv usr/lib* ./
             rm -rf usr *.deb DEBIAN
+        
+        # (3)
+        cd pxb-8.1 || exit
+            mv usr/bin ./
+            mv usr/lib* ./
+            rm -rf usr *.deb DEBIAN
+        
         cd ../ || exit
-        tar -zcvf  percona-xtrabackup-2.4.tar.gz pxb-2.4
+        
         tar -zcvf  percona-xtrabackup-8.0.tar.gz pxb-8.0
+        tar -zcvf  percona-xtrabackup-8.1.tar.gz pxb-8.1
     fi
     mkdir -p ${BUILD_ROOT}/target/pxc_extra/
     cp *.tar.gz ${BUILD_ROOT}/target/pxc_extra/
     cp *.tar.gz ${BUILD_ROOT}/target
-    rm -rf pxb-8.0 pxb-2.4
+    rm -rf pxb-8.0 pxb-8.1
     cd ${CURDIR} || exit
     rm -rf jemalloc
     wget https://github.com/jemalloc/jemalloc/releases/download/$JVERSION/jemalloc-$JVERSION.tar.bz2

@@ -662,9 +662,9 @@ fi
 
 mkdir pxc_extra
 pushd pxc_extra
-mkdir pxb-2.4
-pushd pxb-2.4
-yumdownloader percona-xtrabackup-24-2.4.28
+mkdir pxb-8.1
+pushd pxb-8.1
+yumdownloader percona-xtrabackup-81-8.1.0
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib* ./
@@ -1565,8 +1565,8 @@ fi
 # Explicit %attr() mode not applicaple to symlink
 %attr(755, root, root) %{_bindir}/lz4_decompress
 %attr(755, root, root) %{_bindir}/mysql_ssl_rsa_setup
-#KH:
 %attr(755, root, root) %{_bindir}/zlib_decompress
+%attr(755, root, root) %{_bindir}/mysql_test_event_tracking
 
 %attr(755, root, root) %{_sbindir}/mysqld
 %attr(755, root, root) %{_sbindir}/mysqld-debug
@@ -1579,7 +1579,7 @@ fi
 %attr(755, root, root) %{_sbindir}/rcmysql
 %endif
 %attr(644, root, root) %{_libdir}/mysql/plugin/daemon_example.ini
-%attr(644, root, root) %{_libdir}/mysql/plugin/data_masking.ini
+
 %attr(755, root, root) %{_libdir}/mysql/plugin/*.so*
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/*.so*
 

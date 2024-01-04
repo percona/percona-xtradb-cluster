@@ -454,35 +454,31 @@ include/assert.inc [The hellotrigger TRIGGER should still exist on node 2]
 # connection node_1
 DROP TRIGGER hellotrigger;
 #
-# SQLCOM_INSTALL_PLUGIN access test
+# SQLCOM_INSTALL_COMPONENT access test
 #
+# connection node_1
 # connection node_testme
-INSTALL PLUGIN audit_log SONAME "audit_log.so";
-ERROR 42000: INSERT command denied to user 'testme'@'localhost' for table 'plugin'
+INSTALL COMPONENT 'file://component_audit_log_filter';
+ERROR 42000: INSERT command denied to user 'testme'@'localhost' for table 'component'
 INSERT INTO counter(count) VALUES(30);;
 # connection node_1
-include/assert.inc [The audit_log PLUGIN should not be installed on node 1]
+include/assert.inc [The audit_log COMPONENT should not be installed on node 1]
 # connection node_2
-include/assert.inc [The audit_log PLUGIN should not be installed on node 2]
+include/assert.inc [The audit_log COMPONENT should not be installed on node 2]
 #
-# SQLCOM_UNINSTALL_PLUGIN access test
+# SQLCOM_UNINSTALL_COMPONENT access test
 #
 # connection node_1
-INSTALL PLUGIN audit_log SONAME "audit_log.so";
-include/assert.inc [The audit_log PLUGIN should be installed on node 1]
+include/assert.inc [The audit_log COMPONENT should be installed on node 1]
 # connection node_2
 # connection node_testme
-UNINSTALL PLUGIN audit_log;
-ERROR 42000: DELETE command denied to user 'testme'@'localhost' for table 'plugin'
+UNINSTALL COMPONENT 'file://component_audit_log_filter';
+ERROR 42000: DELETE command denied to user 'testme'@'localhost' for table 'component'
 INSERT INTO counter(count) VALUES(31);;
 # connection node_1
-include/assert.inc [The audit_log PLUGIN should still be installed on node 1]
+include/assert.inc [The audit_log COMPONENT should still be installed on node 1]
 # connection node_2
-include/assert.inc [The audit_log PLUGIN should still be installed on node 2]
-# connection node_1
-UNINSTALL plugin audit_log;
-Warnings:
-Warning	1620	Plugin is busy and will be uninstalled on shutdown
+include/assert.inc [The audit_log COMPONENT should still be installed on node 2]
 #
 # SQLCOM_CREATE_EVENT access test
 #
@@ -516,7 +512,6 @@ include/assert.inc [The helloevent EVENT should still exist on node 1]
 # connection node_2
 include/assert.inc [The helloevent EVENT should still exist on node 2]
 #
-# SQLCOM_DROP_EVENT access test
 #
 # connection node_testme
 DROP EVENT helloevent;

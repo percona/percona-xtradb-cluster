@@ -24,7 +24,6 @@ Build-Depends: libtool (>= 1.4.2-7),
                po-debconf,
                psmisc,
                zlib1g-dev (>= 1:1.1.3-5),
-               libreadline-dev,
                libpam-dev,
                libssl-dev,
                libnuma-dev,
@@ -39,19 +38,18 @@ Build-Depends: libtool (>= 1.4.2-7),
                libboost-program-options-dev (>= 1.41),
                libwrap0-dev,
                libcurl4-openssl-dev,
-               libldap2-dev,
-               stunnel
+               libldap2-dev
 Standards-Version: 7.0.0
 Homepage: http://www.percona.com/software/percona-xtradb-cluster/
 Vcs-Git: https://github.com/percona/percona-xtradb-cluster
 
-Package: libperconaserverclient21
+Package: libperconaserverclient22
 Architecture: any
 Section: libs
 Pre-Depends: ${misc:Pre-Depends}
 Multi-Arch: same
 Depends: percona-xtradb-cluster-common (= ${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
-Replaces: libpercona-server-client16, libperconaserverclient18, libperconaserverclient18.1, libperconaserverclient20
+Replaces: libpercona-server-client16, libperconaserverclient18, libperconaserverclient18.1, libperconaserverclient20, libperconaserverclient21
 Description: Percona XtraDB Cluster database client library
  Percona XtraDB Cluster is based on the Percona Server database
  server and provides a High Availability solution.
@@ -61,12 +59,13 @@ Description: Percona XtraDB Cluster database client library
  .
  This package includes the client library.
 
-Package: libperconaserverclient21-dev
+Package: libperconaserverclient22-dev
 Architecture: any
 Section: libdevel
-Depends: libperconaserverclient21 (= ${binary:Version}),
+Depends: libperconaserverclient22 (= ${binary:Version}),
          zlib1g-dev, ${misc:Depends}
-Breaks: libperconaserverclient20-dev,
+Breaks: libperconaserverclient21-dev,
+	libperconaserverclient20-dev,
         libperconaserverclient18.1-dev,
         libperconaserverclient18-dev,
         libperconaserverclient16-dev,
@@ -77,8 +76,10 @@ Breaks: libperconaserverclient20-dev,
         libmysqlclient-dev,
         libmysqlclient18-dev,
         libmysqlclient20-dev,
+        libmysqlclient21-dev,
         libmariadbclient-dev
-Replaces: libperconaserverclient20-dev,
+Replaces: libperconaserverclient21-dev,
+	  libperconaserverclient20-dev,
           libperconaserverclient18.1-dev,
           libperconaserverclient18-dev,
           libperconaserverclient16-dev,

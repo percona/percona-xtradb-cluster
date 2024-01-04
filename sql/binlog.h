@@ -35,7 +35,6 @@
 #endif /* WITH_WSREP */
 
 #include "libbinlogevents/include/binlog_event.h"  // enum_binlog_checksum_alg
-#include "m_string.h"                              // llstr
 #include "my_dbug.h"
 #include "my_inttypes.h"
 #include "my_io.h"
@@ -967,6 +966,7 @@ class MYSQL_BIN_LOG : public TC_LOG {
   inline char *get_log_fname() { return log_file_name; }
   const char *get_name() const { return name; }
   inline mysql_mutex_t *get_log_lock() { return &LOCK_log; }
+  inline mysql_mutex_t *get_index_lock() { return &LOCK_index; }
   inline mysql_mutex_t *get_commit_lock() { return &LOCK_commit; }
   inline mysql_mutex_t *get_after_commit_lock() { return &LOCK_after_commit; }
   inline mysql_mutex_t *get_sync_lock() { return &LOCK_sync; }
