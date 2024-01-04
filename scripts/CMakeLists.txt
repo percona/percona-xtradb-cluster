@@ -465,7 +465,7 @@ ELSE()
         ${CMAKE_CURRENT_BINARY_DIR}/${file} ESCAPE_QUOTES @ONLY
         )
     ELSE()
-      MESSAGE(FATAL_ERROR "Can not find ${file}.sh or ${file}.pl.in ${file}.py.in in "
+      MESSAGE(FATAL_ERROR "Can not find ${file}.sh or ${file}.pl.in or ${file}.py.in in "
         "${CMAKE_CURRENT_SOURCE_DIR}"
         )
     ENDIF()
