@@ -71,6 +71,12 @@ ENABLE_ASAN=0
 # build comment
 BUILD_COMMENT=""
 
+if [ -f /etc/redhat-release ]; then
+    RHEL=$(rpm --eval %rhel)
+else
+    RHEL="0"
+fi
+
 #-------------------------------------------------------------------------------
 #
 # Step-1: Set default configuration.
@@ -404,6 +410,12 @@ fi
     cd "$TARGETDIR/bld"
     echo "$(pwd)"
 
+    if [ "x$RHEL" = "x7" ]; then
+        add_fido_plugin="none"
+    else
+        add_fido_plugin="bundled"
+    fi
+
     if [[ $CMAKE_BUILD_TYPE == 'Debug' ]]; then
         cmake $SOURCEDIR/ ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
             -DCMAKE_BUILD_TYPE=Debug \
@@ -426,7 +438,7 @@ fi
             -DWITH_EDITLINE=bundled \
             -DWITH_ZLIB=bundled \
             -DWITH_ZSTD=bundled \
-            -DWITH_FIDO=bundled \
+            -DWITH_FIDO="$add_fido_plugin" \
             -DWITH_NUMA=ON \
             -DWITH_LDAP=system \
             -DWITH_BOOST="$TARGETDIR/libboost" \
@@ -464,7 +476,7 @@ fi
             -DWITH_LIBEVENT=bundled \
             -DWITH_ZLIB=bundled \
             -DWITH_ZSTD=bundled \
-            -DWITH_FIDO=bundled \
+            -DWITH_FIDO="$add_fido_plugin" \
             -DWITH_NUMA=ON \
             -DWITH_LDAP=system \
             -DWITH_BOOST="$TARGETDIR/libboost" \
