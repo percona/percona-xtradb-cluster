@@ -1690,6 +1690,15 @@ std::atomic<ulong> wsrep_running_threads{0};
 */
 bool wsrep_unireg_abort = false;
 
+/* This flag is to avoid duplicate initialization of main TLS_channel.
+   We initialize it when pxc_encrypt_cluster_traffic == true, prior to
+   init_ssl_communication() call. Inside init_ssl_communication() we need
+   to decide if singleton initialization should be called.
+   We could do it better, if mysql_main was set to nullptr when not initialized
+   but the original code does not do so, so let's introduce this static flag
+   to do minimal changes. */
+static bool wsrep_mysql_main_channel_initialized = false;
+
 static void wsrep_close_threads(THD *thd);
 #endif /* WITH_WSREP */
 
@@ -6243,10 +6252,19 @@ static int init_ssl() {
 }
 
 static int init_ssl_communication() {
+#ifdef WITH_WSREP
+  if (!wsrep_mysql_main_channel_initialized) {
+    if (TLS_channel::singleton_init(&mysql_main, mysql_main_channel,
+                                    opt_use_ssl, &server_main_callback,
+                                    opt_initialize))
+      return 1;
+    wsrep_mysql_main_channel_initialized = true;
+  }
+#else
   if (TLS_channel::singleton_init(&mysql_main, mysql_main_channel, opt_use_ssl,
                                   &server_main_callback, opt_initialize))
     return 1;
-
+#endif
   /*
     The default value of --admin-ssl is ON. If it is set
     to off, we should treat it as an explicit attempt to
@@ -6285,6 +6303,9 @@ static void end_ssl() {
   TLS_channel::singleton_deinit(mysql_main);
   TLS_channel::singleton_deinit(mysql_admin);
   deinit_rsa_keys();
+#ifdef WITH_WSREP
+  wsrep_mysql_main_channel_initialized = false;
+#endif
 }
 
 /**
@@ -7172,11 +7193,14 @@ static int init_server_components() {
         !is_help_or_validate_option()) {
       bool bootstrap = (wsrep_new_cluster ||
                         (strcmp(wsrep_cluster_address, "gcomm://") == 0));
+      /* Note: There will be the same initialization attempt called from
+         init_ssl_communication() afterwards. */
       if (TLS_channel::singleton_init(&mysql_main, mysql_main_channel,
                                       opt_use_ssl, &server_main_callback,
                                       opt_initialize)) {
         unireg_abort(MYSQLD_ABORT_EXIT);
       }
+      wsrep_mysql_main_channel_initialized = true;
       if (server_main_callback.wsrep_ssl_artifacts_check(bootstrap)) {
         unireg_abort(MYSQLD_ABORT_EXIT);
       }
