@@ -566,6 +566,7 @@ build_srpm(){
     sed -i "s:@@PERCONA_VERSION@@:${RELEASE}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
     sed -i "s:@@WSREP_VERSION@@:${WSREP_VERSION}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
     sed -i "s:@@REVISION@@:${REVISION}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
+    sed -i "s:@@RPM_RELEASE@@:${RPM_RELEASE}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
 
     #
 
@@ -903,7 +904,7 @@ build_deb(){
         echo "cat <<'CALLHOME' > /tmp/call-home.sh" >> percona-xtradb-cluster-server.postinst
         cat call-home.sh >> percona-xtradb-cluster-server.postinst 
         echo "CALLHOME" >> percona-xtradb-cluster-server.postinst
-        echo 'bash +x /tmp/call-home.sh -f "PRODUCT_FAMILY_PXC" -v "8.0.34-26-1" -d "PACKAGE" &>/dev/null || :' >> percona-xtradb-cluster-server.postinst
+        echo "bash +x /tmp/call-home.sh -f \"PRODUCT_FAMILY_PXC\" -v \"${MYSQL_VERSION}-${MYSQL_RELEASE}-${DEB_RELEASE}\" -d \"PACKAGE\" &>/dev/null || :" >> percona-xtradb-cluster-server.postinst
         echo "rm -rf /tmp/call-home.sh" >> percona-xtradb-cluster-server.postinst
         echo "exit 0" >> percona-xtradb-cluster-server.postinst
         rm -f call-home.sh
@@ -985,7 +986,7 @@ build_tarball(){
         # (1), (2)
         mkdir pxb-8.0
         pushd pxb-8.0
-        yumdownloader percona-xtrabackup-80-8.0.34
+        yumdownloader percona-xtrabackup-80-8.0.35
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
         mv usr/bin ./
         mv usr/lib64 ./
@@ -1020,18 +1021,17 @@ build_tarball(){
         dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-81* pxb-8.1
         
         # (1), (2)
-        cd ../pxb-8.0 || exit
+        pushd pxb-8.0
             mv usr/bin ./
             mv usr/lib* ./
             rm -rf usr *.deb DEBIAN
-        
+        popd
         # (3)
-        cd pxb-8.1 || exit
+        pushd pxb-8.1
             mv usr/bin ./
             mv usr/lib* ./
             rm -rf usr *.deb DEBIAN
-        
-        cd ../ || exit
+        popd
         
         tar -zcvf  percona-xtrabackup-8.0.tar.gz pxb-8.0
         tar -zcvf  percona-xtrabackup-8.1.tar.gz pxb-8.1
