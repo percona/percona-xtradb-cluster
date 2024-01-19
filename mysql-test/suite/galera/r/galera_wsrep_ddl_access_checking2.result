@@ -704,6 +704,45 @@ GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
+# SQLCOM_CREATE_SPFUNCTION (with log_bin_trust_function_creators=OFF) access test
+#
+# connection node_1
+SET @old_log_bin_trust_function_creators= @@global.log_bin_trust_function_creators;
+Warnings:
+Warning	1287	'@@log_bin_trust_function_creators' is deprecated and will be removed in a future release.
+SET global log_bin_trust_function_creators=OFF;
+Warnings:
+Warning	1287	'@@log_bin_trust_function_creators' is deprecated and will be removed in a future release.
+GRANT ALL PRIVILEGES ON testdb.* TO 'testme'@'%';
+SHOW GRANTS FOR 'testme';
+Grants for testme@%
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT ALL PRIVILEGES ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
+FLUSH PRIVILEGES;
+# connection node_testme
+use testdb;
+CREATE FUNCTION hello (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT('Hello, ',s,'!');
+ERROR HY000: You do not have the SUPER privilege and binary logging is enabled (you *might* want to use the less safe log_bin_trust_function_creators variable)
+INSERT INTO counter(count) VALUES(23);;
+# connection node_1
+include/assert.inc [The hello function should not exist on node 1]
+# connection node_2
+include/assert.inc [The hello function should not exist on node 2]
+# connection node_1
+REVOKE ALL ON testdb.* FROM 'testme'@'%';
+GRANT SELECT ON testdb.* TO 'testme'@'%';
+GRANT INSERT ON testdb.counter TO 'testme'@'%';
+SHOW GRANTS FOR 'testme';
+Grants for testme@%
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
+FLUSH PRIVILEGES;
+SET @@global.log_bin_trust_function_creators= @old_log_bin_trust_function_creators;
+Warnings:
+Warning	1287	'@@log_bin_trust_function_creators' is deprecated and will be removed in a future release.
+#
 # SQLCOM_DROP_PROCEDURE access test
 #
 # connection node_1
@@ -730,7 +769,7 @@ FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 DROP PROCEDURE hellop;
-INSERT INTO counter(count) VALUES(23);;
+INSERT INTO counter(count) VALUES(24);;
 # connection node_1
 include/assert.inc [The hellop procedure should not exist on node 1]
 # connection node_2
@@ -773,7 +812,7 @@ FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 ALTER PROCEDURE hellop SQL SECURITY INVOKER;
-INSERT INTO counter(count) VALUES(24);;
+INSERT INTO counter(count) VALUES(25);;
 # connection node_1
 include/assert.inc [The hellop procedure should use the invoker on node 1]
 # connection node_2
@@ -816,7 +855,7 @@ FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 ALTER FUNCTION hellof SQL SECURITY INVOKER;
-INSERT INTO counter(count) VALUES(25);;
+INSERT INTO counter(count) VALUES(26);;
 # connection node_1
 include/assert.inc [The hellof function should use the invoker on node 1]
 # connection node_2
@@ -845,7 +884,7 @@ FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 CREATE VIEW testview AS SELECT * FROM t1;
-INSERT INTO counter(count) VALUES(26);;
+INSERT INTO counter(count) VALUES(27);;
 # connection node_1
 include/assert.inc [The testview VIEW should exist on node 1]
 # connection node_2
@@ -882,7 +921,7 @@ FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 DROP VIEW helloview;
-INSERT INTO counter(count) VALUES(27);;
+INSERT INTO counter(count) VALUES(28);;
 # connection node_1
 include/assert.inc [The helloview VIEW should not exist on node 1]
 # connection node_2
@@ -910,7 +949,7 @@ FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 CREATE TRIGGER testtrigger BEFORE INSERT ON t1 FOR EACH ROW SET @sum = @sum + 1;
-INSERT INTO counter(count) VALUES(28);;
+INSERT INTO counter(count) VALUES(29);;
 # connection node_1
 include/assert.inc [The testtrigger TRIGGER should exist on node 1]
 # connection node_2
@@ -944,7 +983,7 @@ FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 DROP TRIGGER hellotrigger;
-INSERT INTO counter(count) VALUES(29);;
+INSERT INTO counter(count) VALUES(30);;
 # connection node_1
 include/assert.inc [The hellotrigger TRIGGER should not exist on node 1]
 # connection node_2
@@ -971,7 +1010,7 @@ FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 INSTALL PLUGIN audit_log SONAME "audit_log.so";
-INSERT INTO counter(count) VALUES(30);;
+INSERT INTO counter(count) VALUES(31);;
 # connection node_1
 include/assert.inc [The audit_log PLUGIN should be installed on node 1]
 # connection node_2
@@ -1003,7 +1042,7 @@ FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 UNINSTALL PLUGIN null_audit;
-INSERT INTO counter(count) VALUES(31);;
+INSERT INTO counter(count) VALUES(32);;
 # connection node_1
 include/assert.inc [The null_audit PLUGIN should not be installed on node 1]
 # connection node_2
@@ -1032,7 +1071,7 @@ use testdb;
 CREATE EVENT testevent
 ON SCHEDULE EVERY 1 HOUR
 DO INSERT INTO t1(f2) VALUES(3);
-INSERT INTO counter(count) VALUES(32);;
+INSERT INTO counter(count) VALUES(33);;
 # connection node_1
 include/assert.inc [The testevent EVENT should exist on node 1]
 # connection node_2
@@ -1072,7 +1111,7 @@ FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 ALTER EVENT helloevent ON SCHEDULE EVERY '2:3' DAY_HOUR;
-INSERT INTO counter(count) VALUES(33);;
+INSERT INTO counter(count) VALUES(34);;
 # connection node_1
 include/assert.inc [The helloevent EVENT should still exist on node 1]
 # connection node_2
@@ -1099,7 +1138,7 @@ FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 DROP EVENT helloevent;
-INSERT INTO counter(count) VALUES(34);;
+INSERT INTO counter(count) VALUES(35);;
 # connection node_1
 include/assert.inc [The helloevent EVENT should not exist on node 1]
 # connection node_2
@@ -1128,7 +1167,7 @@ FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 ALTER USER 'testother'@'%' PASSWORD EXPIRE;
-INSERT INTO counter(count) VALUES(35);;
+INSERT INTO counter(count) VALUES(36);;
 # connection node_1
 include/assert.inc [User testother should be expired on node 1]
 # connection node_2
