@@ -39,8 +39,15 @@ Prefix: %{_sysconfdir}
 %define mysql_version @@MYSQL_VERSION@@
 %define redhatversion %(lsb_release -rs | awk -F. '{ print $1}')
 %define percona_server_version @@PERCONA_VERSION@@
+%define rpm_release @@RPM_RELEASE@@
 %define revision @@REVISION@@
 %define distribution  rhel%{redhatversion}  
+
+%if 0%{?rhel} >= 8
+%global add_fido_plugins 1
+%else
+%global add_fido_plugins 0
+%endif # rhel8 or above
 
 #
 %bcond_with tokudb
@@ -664,7 +671,7 @@ mkdir pxc_extra
 pushd pxc_extra
 mkdir pxb-2.4
 pushd pxb-2.4
-yumdownloader percona-xtrabackup-24-2.4.28
+yumdownloader percona-xtrabackup-24-2.4.29
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib* ./
@@ -678,7 +685,7 @@ popd
 
 mkdir pxb-8.0
 pushd pxb-8.0
-yumdownloader percona-xtrabackup-80-8.0.34
+yumdownloader percona-xtrabackup-80-8.0.35
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib64 ./
@@ -747,7 +754,11 @@ mkdir debug
            -DWITH_EMBEDDED_SHARED_LIBRARY=0 \
            -DWITH_INNODB_MEMCACHED=1 \
            -DWITH_ZSTD=bundled \
+%if 0%{?add_fido_plugins}
            -DWITH_FIDO=bundled \
+%else
+           -DWITH_FIDO=none \
+%endif
            -DWITH_UNIT_TESTS=0 \
            -DWITH_SCALABILITY_METRICS=ON \
            -DMYSQL_SERVER_SUFFIX=".%{rel}" \
@@ -791,7 +802,11 @@ mkdir release
            -DWITH_EMBEDDED_SHARED_LIBRARY=0 \
            -DWITH_INNODB_MEMCACHED=1 \
            -DWITH_ZSTD=bundled \
+%if 0%{?add_fido_plugins}
            -DWITH_FIDO=bundled \
+%else
+           -DWITH_FIDO=none \
+%endif
            -DWITH_UNIT_TESTS=0 \
            -DWITH_SCALABILITY_METRICS=ON \
            %{?mecab_option} \
@@ -842,7 +857,7 @@ mv $RBR%{_libdir} $RPM_BUILD_DIR/%{_libdir}
 %install
 
 %if 0%{?rhel} == 9
-    sed -i 's/python2$/python3/' scripts/pyclustercheck
+    sed -i 's/python2$/python3/' scripts/pyclustercheck.py.in
 %endif
 
 %if 0%{?compatlib}
@@ -1011,7 +1026,9 @@ install -d $RBR%{_libdir}/mysql
 #%endif
 
 # set rpath for plugin to use private/libfido2.so
+%if 0%{?add_fido_plugins}
 patchelf --debug --set-rpath '$ORIGIN/../private' %{buildroot}/%{_libdir}/mysql/plugin/authentication_fido.so
+%endif # add_fido_plugins
 
 ##############################################################################
 #  Post processing actions, i.e. when installed
@@ -1345,7 +1362,7 @@ fi
 fi
 
 cp %SOURCE999 /tmp/ 2>/dev/null || :
-bash /tmp/call-home.sh -f "PRODUCT_FAMILY_PXC" -v "8.0.34-26-1" -d "PACKAGE" &>/dev/null || :
+bash /tmp/call-home.sh -f "PRODUCT_FAMILY_PXC" -v %{mysql_version}-%{percona_server_version}-%{rpm_release} -d "PACKAGE" &>/dev/null || :
 rm -f /tmp/call-home.sh
 
 echo "Percona XtraDB Cluster is distributed with several useful UDFs from Percona Toolkit."
@@ -1573,7 +1590,9 @@ fi
 %dir %{_libdir}/mysql/private
 %attr(755, root, root) %{_libdir}/mysql/private/libprotobuf-lite.so.*
 %attr(755, root, root) %{_libdir}/mysql/private/libprotobuf.so.*
+%if 0%{?add_fido_plugins}
 %attr(755, root, root) %{_libdir}/mysql/private/libfido2.so.*
+%endif # add_fido_plugins
 
 %if 0%{?systemd} == 0
 %attr(755, root, root) %{_sbindir}/rcmysql

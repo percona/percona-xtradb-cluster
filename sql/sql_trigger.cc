@@ -701,3 +701,4 @@ int wsrep_create_trigger_query(THD *thd, uchar **buf, size_t *buf_len) {
                              buf_len);
 }
 #endif /* WITH_WSREP */
+

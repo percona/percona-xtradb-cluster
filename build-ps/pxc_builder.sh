@@ -469,8 +469,8 @@ install_deps() {
         apt-get -y install libtool libnuma-dev scons libboost-dev libboost-program-options-dev check
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
-        apt-get -y install --download-only percona-xtrabackup-24=2.4.28-1.${DIST}
-        apt-get -y install --download-only percona-xtrabackup-80=8.0.34-29-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-24=2.4.29-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-80=8.0.35-30-1.${DIST}
     fi
     return;
 }
@@ -560,6 +560,7 @@ build_srpm(){
     sed -i "s:@@PERCONA_VERSION@@:${RELEASE}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
     sed -i "s:@@WSREP_VERSION@@:${WSREP_VERSION}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
     sed -i "s:@@REVISION@@:${REVISION}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
+    sed -i "s:@@RPM_RELEASE@@:${RPM_RELEASE}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
 
     #
 
@@ -887,7 +888,7 @@ build_deb(){
         echo "cat <<'CALLHOME' > /tmp/call-home.sh" >> percona-xtradb-cluster-server.postinst
         cat call-home.sh >> percona-xtradb-cluster-server.postinst 
         echo "CALLHOME" >> percona-xtradb-cluster-server.postinst
-        echo 'bash +x /tmp/call-home.sh -f "PRODUCT_FAMILY_PXC" -v "8.0.34-26-1" -d "PACKAGE" &>/dev/null || :' >> percona-xtradb-cluster-server.postinst
+        echo "bash +x /tmp/call-home.sh -f \"PRODUCT_FAMILY_PXC\" -v \"${MYSQL_VERSION}-${MYSQL_RELEASE}-${DEB_RELEASE}\" -d \"PACKAGE\" &>/dev/null || :" >> percona-xtradb-cluster-server.postinst
         echo "rm -rf /tmp/call-home.sh" >> percona-xtradb-cluster-server.postinst
         echo "exit 0" >> percona-xtradb-cluster-server.postinst
         rm -f call-home.sh
@@ -968,7 +969,7 @@ build_tarball(){
     if [ -f /etc/redhat-release ]; then
         mkdir pxb-2.4
         pushd pxb-2.4
-        yumdownloader percona-xtrabackup-24-2.4.28
+        yumdownloader percona-xtrabackup-24-2.4.29
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
         mv usr/bin ./
         mv usr/lib* ./
@@ -981,7 +982,7 @@ build_tarball(){
 
         mkdir pxb-8.0
         pushd pxb-8.0
-        yumdownloader percona-xtrabackup-80-8.0.34
+        yumdownloader percona-xtrabackup-80-8.0.35
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
         mv usr/bin ./
         mv usr/lib64 ./

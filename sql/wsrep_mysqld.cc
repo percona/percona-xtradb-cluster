@@ -2470,12 +2470,12 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
   wsrep::key_array key_array = wsrep_prepare_keys_for_toi(
       db_, table_, table_list, trefs, alter_info, fk_tables);
 
-  THD_STAGE_INFO(thd, stage_wsrep_preparing_for_TO_isolation);
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
            "wsrep: initiating TOI for write set (%lld)",
            (long long)wsrep_thd_trx_seqno(thd));
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
+  THD_STAGE_INFO(thd, stage_wsrep_preparing_for_TO_isolation);
 
   wsrep::client_state &cs(thd->wsrep_cs());
   int ret =
@@ -2515,12 +2515,12 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
         WSREP_QUERY(thd), (long long)wsrep_thd_trx_seqno(thd),
         wsrep_thd_client_mode_str(thd));
 
-    THD_STAGE_INFO(thd, stage_wsrep_TO_isolation_initiated);
     snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
              "wsrep: TO isolation initiated for write set (%lld)",
              (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
+    THD_STAGE_INFO(thd, stage_wsrep_TO_isolation_initiated);
 
     /* DDL transactions are now atomic, so append wsrep xid.
     This will ensure transactions are logged with the given xid. */
@@ -2551,12 +2551,12 @@ static void wsrep_TOI_end(THD *thd) {
   WSREP_DEBUG("TO END: %lld: %s", client_state.toi_meta().seqno().get(),
               WSREP_QUERY(thd));
 
-  THD_STAGE_INFO(thd, stage_wsrep_completed_TO_isolation);
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
            "wsrep: completed TOI write set (%lld)",
            (long long)wsrep_thd_trx_seqno(thd));
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
+  THD_STAGE_INFO(thd, stage_wsrep_completed_TO_isolation);
 
   if (wsrep_thd_is_local_toi(thd)) {
     wsrep_set_SE_checkpoint(client_state.toi_meta().gtid());
@@ -2650,12 +2650,12 @@ static int wsrep_NBO_begin_phase_one(THD *thd, const char *db_,
   wsrep::key_array key_array = wsrep_prepare_keys_for_toi(
       db_, table_, table_list, trefs, alter_info, fk_tables);
 
-  THD_STAGE_INFO(thd, stage_wsrep_preparing_for_TO_isolation);
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
            "wsrep: initiating NBO for write set (%lld)",
            (long long)wsrep_thd_trx_seqno(thd));
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
+  THD_STAGE_INFO(thd, stage_wsrep_preparing_for_TO_isolation);
 
   wsrep::client_state &client_state(thd->wsrep_cs());
 
@@ -2810,11 +2810,11 @@ static void wsrep_NBO_end_phase_two(THD *thd) {
     */
     if (!thd->wsrep_applier) --wsrep_to_isolation;
 
-    THD_STAGE_INFO(thd, stage_wsrep_completed_TO_isolation);
     snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
              "wsrep: completed NBO write set (%lld)", nbo_seqno);
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
+    THD_STAGE_INFO(thd, stage_wsrep_completed_TO_isolation);
 
     wsrep::mutable_buffer err;
     if (thd->is_error() && !wsrep_must_ignore_error(thd)) {

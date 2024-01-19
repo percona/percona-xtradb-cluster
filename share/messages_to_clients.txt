@@ -9961,6 +9961,10 @@ ER_WARN_NO_SPACE_VERSION_COMMENT
 
 ER_VALIDATE_PASSWORD_INSUFFICIENT_CHANGED_CHARACTERS
   eng "The new password must have at least '%u' characters that are different from the old password. It has only '%u' character(s) different. For this comparison, uppercase letters and lowercase letters are considered to be equal."
+
+ER_WARN_DEPRECATED_WITH_NOTE
+  eng "'%s' is deprecated and will be removed in a future release. %s"
+
 #
 #  End of 8.0 error messages (server-to-client).
 #  Do NOT add messages intended for the error log above!
@@ -10079,6 +10083,8 @@ ER_TOO_BIG_ERROR_CODE
 ER_DYNAMIC_ROLE
   eng "The role %s is a dynamic role and can't be revoked or dropped. It should be managed by the external authentication plugin instead."
 
+ER_LOG_NAME_NOT_MATCHING_SEC_LOG_PATH_CLIENT
+  eng "The --secure-file-path is configured, %s must be set accordingly."
 #
 # Keep PXC messages after PS messages, to ensure that error numnbers are
 # consistent with PS.

@@ -3,7 +3,7 @@ CREATE TABLE xtest.empty(a INT, b FLOAT);
 connecting...
 active session is now 'next_ses'
 COUNT(*)
-7
+6
 0 rows affected
 
 0 rows affected
