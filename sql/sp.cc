@@ -802,6 +802,18 @@ bool sp_create_routine(THD *thd, sp_head *sp, const LEX_USER *definer,
          sp->m_type == enum_sp_type::FUNCTION);
   assert(!sp_already_exists);
 
+#ifdef WITH_WSREP
+  if (create_routine_precheck(thd, sp)) {
+    /* If this happens, an error should have been reported. */
+    return true;
+  }
+
+  if (WSREP(thd) &&
+      wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, nullptr, nullptr)) {
+    return true;
+  }
+#endif /* WITH_WSREP */
+
   /* Grab an exclusive MDL lock. */
   MDL_key::enum_mdl_namespace mdl_type = (sp->m_type == enum_sp_type::FUNCTION)
                                              ? MDL_key::FUNCTION
@@ -835,10 +847,13 @@ bool sp_create_routine(THD *thd, sp_head *sp, const LEX_USER *definer,
     return false;
   }
 
+#ifndef WITH_WSREP
+  // For WITH_WSREP we do this check at the beginning, before starting TOI
   if (create_routine_precheck(thd, sp)) {
     /* If this happens, an error should have been reported. */
     return true;
   }
+#endif
 
   DBUG_EXECUTE_IF("fail_while_acquiring_routine_schema_obj",
                   DBUG_SET("+d,fail_while_acquiring_dd_object"););
