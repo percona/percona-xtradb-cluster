@@ -392,7 +392,7 @@ static unsigned char trx_sys_cur_xid_uuid[16];
 long long read_wsrep_xid_seqno(const XID *xid) {
   // TODO: replace this with XID provided functions.
   long long seqno;
-  memcpy(&seqno, xid->get_data() + 24, sizeof(long long));
+  int8store(reinterpret_cast<uchar*>(&seqno),*reinterpret_cast<const unsigned long long*>(xid->get_data() + 24));
   return seqno;
 }
 
