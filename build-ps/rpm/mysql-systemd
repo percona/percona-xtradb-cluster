@@ -133,7 +133,11 @@ wait_for_pid () {
         fi
     fi
 
-    i=$(( i+1 ))
+# incrementing sleep to 10x if we're doing an SST is just random.
+# instead, we're just not going to timeout if we doing an SST
+if [[ $startup_sleep -ne 10 ]];then
+  i=$(( i+1 ))
+fi
     sleep $startup_sleep
 
     if [[ $verb = 'created' ]];then 
