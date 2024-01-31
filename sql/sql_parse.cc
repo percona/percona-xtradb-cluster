@@ -6089,10 +6089,60 @@ finish:
   }
 
 #ifdef WITH_WSREP
+  /*
+    It can sometimes happen that the DDL executed as a prepared statement may
+    fail with transient errors like ER_NEED_PREPARE if the table metadata was
+    changed between PREPARE and EXECUTE. In such cases, the statement is
+    re-prepared and re-executed from Prepared_statement::execute_loop().
 
+    However, before the statement is reprepared, PXC's TOI_end() hook captures
+    this transient error (i.e, ER_NEED_REPREPARE) and sends it to galera thereby
+    triggering the inconsistenct voting and kicking this node out of the
+    cluster.
+
+    So, in such cases, we need to delay sending the final error to galera until
+    all reprepare attempts are over. This is done by attaching a temporary
+    Diagnostics_area to THD and resetting it later if the required conditions
+    are met.
+
+    The requried conditions are
+
+    1. THD is wsrep enabled.
+    2. THD is a DDL.
+    3. THD is using prepared statement.
+    4. THD can reprepare the prepared statement.
+  */
+  bool thd_needs_da_restore = false;
+  Diagnostics_area tmp_da(true);
+  bool finish_toi = true;
+  if (WSREP(thd) && wsrep_thd_is_in_to_isolation(thd, false)) {
+    Reprepare_observer *reprepare_observer = thd->get_reprepare_observer();
+    if (reprepare_observer != nullptr && reprepare_observer->is_invalidated()) {
+      assert(thd->get_stmt_da()->mysql_errno() == ER_NEED_REPREPARE);
+
+      if (reprepare_observer->can_retry()) {
+        thd->push_diagnostics_area(&tmp_da, false);
+        thd_needs_da_restore = true;
+
+        // We defer calling TOI_end for the prepared statement
+        // if it failed with ER_NEED_REPREPARE as it will be re-prepared and
+        // re-executed.
+        finish_toi = false;
+      } else {
+        // This means all retries are exhausted. We should call TOI_end now.
+        finish_toi = true;
+      }
+    }
+  }
   thd->wsrep_consistency_check = NO_CONSISTENCY_CHECK;
-  WSREP_TO_ISOLATION_END;
+  if (finish_toi) {
+    WSREP_TO_ISOLATION_END;
+    thd->wsrep_prepared_statement_TOI_started = false;
+  }
 
+  if (thd_needs_da_restore) {
+    thd->pop_diagnostics_area();
+  }
   /*
     Force release of transactional locks if not in active MST and wsrep is on.
   */
