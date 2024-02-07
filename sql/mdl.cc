@@ -4479,6 +4479,21 @@ void MDL_context::release_locks_stored_before(enum_mdl_duration duration,
 void MDL_context::release_explicit_locks() {
   release_locks_stored_before(MDL_EXPLICIT, NULL);
 }
+
+void MDL_context::dump_locks() {
+  MDL_ticket *ticket;
+  WSREP_INFO("MDL_context::dump_locks() >>>\n");
+  for (int i = 0; i < MDL_DURATION_END; i++) {
+    enum_mdl_duration duration = static_cast<enum_mdl_duration>(i);
+
+    MDL_ticket_store::List_iterator it = m_ticket_store.list_iterator(duration);
+    while ((ticket = it++)) {
+      WSREP_INFO("duration: %d, name: %s", i, ticket->get_lock()->key.name());
+    }
+  }
+  WSREP_INFO("MDL_context::dump_locks() <<<\n");
+}
+
 #endif /* WITH_WSREP */
 
 /**

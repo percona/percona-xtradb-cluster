@@ -357,9 +357,8 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
         (node->is_delete ||
          row_upd_changes_first_fields_binary(entry, index, node->update,
                                              foreign->n_fields))) {
-      if (foreign->referenced_table == NULL) {
-        MDL_ticket *mdl;
-
+      MDL_ticket *mdl = nullptr;
+      if (foreign->referenced_table == nullptr) {
         foreign->referenced_table = dd_table_open_on_name(
             trx->mysql_thd, &mdl, foreign->referenced_table_name_lookup, false,
             DICT_ERR_IGNORE_NONE);
@@ -373,9 +372,9 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
 
       err = row_ins_check_foreign_constraint(true, foreign, table, entry, thr);
 
-      if (foreign->referenced_table != NULL) {
+      if (foreign->referenced_table != nullptr) {
         if (opened) {
-          dict_table_close(foreign->referenced_table, false, false);
+          dd_table_close(foreign->referenced_table, current_thd, &mdl, false);
           opened = false;
         }
       }
