@@ -689,6 +689,9 @@ fi
         unset override && export override=true && set_runpath bin/mysqlrouter_keyring '$ORIGIN/../lib/mysqlrouter/private/:$ORIGIN/../lib/mysqlrouter/plugin/:$ORIGIN/../lib/private/'
         #  BINS XTRABACKUP
         unset override && export override=true && set_runpath bin/pxc_extra/pxb-8.0/bin/xtrabackup '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'
+        unset override && export override=true && set_runpath bin/pxc_extra/pxb-8.0/bin/xtrabackup-debug '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'
+        unset override && export override=true && set_runpath bin/pxc_extra/pxb-8.1/bin/xtrabackup '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'
+        unset override && export override=true && set_runpath bin/pxc_extra/pxb-8.1/bin/xtrabackup-debug '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'
 
         # Replace libs
         for DIR in ${DIRLIST}; do
