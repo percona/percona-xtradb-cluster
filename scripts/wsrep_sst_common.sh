@@ -654,22 +654,6 @@ function run_post_processing_steps()
         run_mysql_upgrade='no'
     fi
 
-    # If the donor version is less than 8.0, remove the redo logs
-    # Otherwise mysqld will not start up on the 5.7 datadir
-    if [[ -n $WSREP_LOG_DIR && $run_mysql_upgrade == "yes" ]] && compare_versions "${donor_version_str}" "<" "8.0.0"; then
-        wsrep_log_info "Removing the redo logs (older version:$donor_version_str)"
-        remove_redo_logs "${WSREP_LOG_DIR}"
-        errcode=$?
-        if [[ $errcode -ne 0 ]]; then
-            wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "FATAL: Failed to remove the redo logs that were received"
-            wsrep_log_error "       from an older version."
-            wsrep_log_error "       donor:${donor_version_str}"
-            wsrep_log_error "****************************************************** "
-            return $errcode
-        fi
-    fi
-
     # If we have received an IST, do NOT reset the async slave info
     # If we have received an SST, we always try to reset the slave info
     #

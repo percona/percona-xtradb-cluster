@@ -39,6 +39,7 @@ Prefix: %{_sysconfdir}
 %define mysql_version @@MYSQL_VERSION@@
 %define redhatversion %(lsb_release -rs | awk -F. '{ print $1}')
 %define percona_server_version @@PERCONA_VERSION@@
+%define rpm_release @@RPM_RELEASE@@
 %define revision @@REVISION@@
 %define distribution  rhel%{redhatversion}  
 
@@ -662,9 +663,9 @@ fi
 
 mkdir pxc_extra
 pushd pxc_extra
-mkdir pxb-2.4
-pushd pxb-2.4
-yumdownloader percona-xtrabackup-24-2.4.28
+mkdir pxb-8.1
+pushd pxb-8.1
+yumdownloader percona-xtrabackup-81-8.1.0
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib* ./
@@ -678,7 +679,7 @@ popd
 
 mkdir pxb-8.0
 pushd pxb-8.0
-yumdownloader percona-xtrabackup-80-8.0.34
+yumdownloader percona-xtrabackup-80-8.0.35
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib64 ./
@@ -842,7 +843,7 @@ mv $RBR%{_libdir} $RPM_BUILD_DIR/%{_libdir}
 %install
 
 %if 0%{?rhel} == 9
-    sed -i 's/python2$/python3/' scripts/pyclustercheck
+    sed -i 's/python2$/python3/' scripts/pyclustercheck.py.in
 %endif
 
 %if 0%{?compatlib}
@@ -1345,7 +1346,7 @@ fi
 fi
 
 cp %SOURCE999 /tmp/ 2>/dev/null || :
-bash /tmp/call-home.sh -f "PRODUCT_FAMILY_PXC" -v "8.0.34-26-1" -d "PACKAGE" &>/dev/null || :
+bash /tmp/call-home.sh -f "PRODUCT_FAMILY_PXC" -v %{mysql_version}-%{percona_server_version}-%{rpm_release} -d "PACKAGE" &>/dev/null || :
 rm -f /tmp/call-home.sh
 
 echo "Percona XtraDB Cluster is distributed with several useful UDFs from Percona Toolkit."
@@ -1565,8 +1566,8 @@ fi
 # Explicit %attr() mode not applicaple to symlink
 %attr(755, root, root) %{_bindir}/lz4_decompress
 %attr(755, root, root) %{_bindir}/mysql_ssl_rsa_setup
-#KH:
 %attr(755, root, root) %{_bindir}/zlib_decompress
+%attr(755, root, root) %{_bindir}/mysql_test_event_tracking
 
 %attr(755, root, root) %{_sbindir}/mysqld
 %attr(755, root, root) %{_sbindir}/mysqld-debug
@@ -1579,7 +1580,7 @@ fi
 %attr(755, root, root) %{_sbindir}/rcmysql
 %endif
 %attr(644, root, root) %{_libdir}/mysql/plugin/daemon_example.ini
-%attr(644, root, root) %{_libdir}/mysql/plugin/data_masking.ini
+
 %attr(755, root, root) %{_libdir}/mysql/plugin/*.so*
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/*.so*
 

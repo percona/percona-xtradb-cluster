@@ -56,7 +56,6 @@
 #include "my_dbug.h"
 #include "my_double2ulonglong.h"
 #include "my_hostname.h"
-#include "my_loglevel.h"
 #include "my_psi_config.h"
 #include "my_sqlcommand.h"
 #include "my_sys.h"
@@ -69,6 +68,7 @@
 #include "mysql/components/services/bits/psi_mutex_bits.h"
 #include "mysql/components/services/log_builtins.h"
 #include "mysql/components/services/log_shared.h"
+#include "mysql/my_loglevel.h"
 #include "mysql/mysql_lex_string.h"
 #include "mysql/plugin_audit.h"
 #include "mysql/psi/mysql_cond.h"
@@ -76,6 +76,10 @@
 #include "mysql/service_mysql_password_policy.h"
 #include "mysql/service_thd_wait.h"
 #include "mysql/status_var.h"
+#include "mysql/strings/dtoa.h"
+#include "mysql/strings/int2str.h"
+#include "mysql/strings/m_ctype.h"
+#include "mysql/strings/my_strtoll10.h"
 #include "prealloced_array.h"
 #include "sql-common/json_dom.h"  // Json_wrapper
 #include "sql/auth/auth_acls.h"
@@ -142,6 +146,8 @@
 #include "sql/thd_raii.h"
 #include "sql/val_int_compare.h"  // Integer_value
 #include "sql_string.h"
+#include "string_with_len.h"
+#include "template_utils.h"
 #include "template_utils.h"  // pointer_cast
 #include "thr_mutex.h"
 
@@ -356,9 +362,9 @@ Item_func::Item_func(THD *thd, const Item_func *item)
   std::copy_n(item->args, arg_count, args);
 }
 
-bool Item_func::itemize(Parse_context *pc, Item **res) {
+bool Item_func::do_itemize(Parse_context *pc, Item **res) {
   if (skip_itemize(res)) return false;
-  if (Item_result_field::itemize(pc, res)) return true;
+  if (Item_result_field::do_itemize(pc, res)) return true;
   const bool no_named_params = !may_have_named_parameters();
   for (size_t i = 0; i < arg_count; i++) {
     add_accum_properties(args[i]);
@@ -407,7 +413,7 @@ bool Item_func::fix_fields(THD *thd, Item **) {
   Item **arg, **arg_end;
   uchar buff[STACK_BUFF_ALLOC];  // Max argument in function
 
-  Condition_context CCT(thd->lex->current_query_block());
+  const Condition_context CCT(thd->lex->current_query_block());
 
   used_tables_cache = get_initial_pseudo_tables();
   not_null_tables_cache = 0;
@@ -568,7 +574,7 @@ inline bool param_type_uses_non_param_inner(THD *thd, uint arg_count,
   // @todo If there are multiple non-parameter items, we could use a
   // consolidated type instead of the first one (consider CASE, COALESCE,
   // BETWEEN).
-  uint col_cnt = args[0]->cols();
+  const uint col_cnt = args[0]->cols();
   if (col_cnt > 1) {
     /*
       Row or subquery object: set parameter type recursively for the ith
@@ -583,7 +589,8 @@ inline bool param_type_uses_non_param_inner(THD *thd, uint arg_count,
           arguments[j] = down_cast<Item_row *>(args[j])->element_index(i);
         else if (args[j]->type() == Item::SUBSELECT_ITEM)
           arguments[j] = (*down_cast<Item_subselect *>(args[j])
-                               ->unit->get_unit_column_types())[i];
+                               ->query_expr()
+                               ->get_unit_column_types())[i];
       }
       if (param_type_uses_non_param_inner(thd, arg_count, arguments, def))
         return true;
@@ -820,6 +827,7 @@ my_decimal *Item_func::val_decimal(my_decimal *decimal_value) {
   assert(fixed);
   longlong nr = val_int();
   if (null_value) return nullptr; /* purecov: inspected */
+  if (current_thd->is_error()) return error_decimal(decimal_value);
   int2my_decimal(E_DEC_FATAL_ERROR, nr, unsigned_flag, decimal_value);
   return decimal_value;
 }
@@ -1093,7 +1101,7 @@ Item_field *get_gc_for_expr(const Item *func, Field *fld, Item_result type,
   }
 
   // JSON implementation always uses binary collation
-  bool bin_cmp = (expr->data_type() == MYSQL_TYPE_JSON);
+  const bool bin_cmp = (expr->data_type() == MYSQL_TYPE_JSON);
   if (type == fld->result_type() && func->eq(expr, bin_cmp)) {
     if (found) {
       // Temporary mark the field in order to check correct value conversion
@@ -1169,7 +1177,8 @@ static bool substitute_gc_expression(Item **expr, Item **value,
     String str_val, buf;
     Field_typed_array *afld = down_cast<Field_typed_array *>(item_field->field);
 
-    Functional_index_error_handler functional_index_error_handler(afld, thd);
+    const Functional_index_error_handler functional_index_error_handler(afld,
+                                                                        thd);
 
     if (get_json_atom_wrapper(value, 0, "MEMBER OF", &str_val, &buf, &wr,
                               nullptr, true))
@@ -1346,7 +1355,7 @@ Item *Item_func::gc_subst_transformer(uchar *arg) {
 
       // Can only substitute if all the operands on the right-hand
       // side are constants of the same type.
-      Item_result type = args[1]->result_type();
+      const Item_result type = args[1]->result_type();
       if (!std::all_of(
               args + 1, args + arg_count,
               [type, is_const_or_outer_reference](const Item *item_arg) {
@@ -1360,7 +1369,7 @@ Item *Item_func::gc_subst_transformer(uchar *arg) {
       break;
     }
     case MEMBER_OF_FUNC: {
-      Item_result type = args[0]->result_type();
+      const Item_result type = args[0]->result_type();
       /*
         Check whether MEMBER OF is applicable for optimization:
         1) 1st arg is constant for execution
@@ -1451,9 +1460,9 @@ String *Item_int_func::val_str(String *str) {
   return str;
 }
 
-bool Item_func_connection_id::itemize(Parse_context *pc, Item **res) {
+bool Item_func_connection_id::do_itemize(Parse_context *pc, Item **res) {
   if (skip_itemize(res)) return false;
-  if (super::itemize(pc, res)) return true;
+  if (super::do_itemize(pc, res)) return true;
   pc->thd->lex->safe_to_cache_query = false;
   return false;
 }
@@ -1484,8 +1493,8 @@ void Item_num_op::set_numeric_type(void) {
   DBUG_TRACE;
   DBUG_PRINT("info", ("name %s", func_name()));
   assert(arg_count == 2);
-  Item_result r0 = args[0]->numeric_context_result_type();
-  Item_result r1 = args[1]->numeric_context_result_type();
+  const Item_result r0 = args[0]->numeric_context_result_type();
+  const Item_result r1 = args[1]->numeric_context_result_type();
 
   assert(r0 != STRING_RESULT && r1 != STRING_RESULT);
 
@@ -1495,10 +1504,8 @@ void Item_num_op::set_numeric_type(void) {
       type codes, we should never get to here when both fields are temporal.
     */
     assert(!args[0]->is_temporal() || !args[1]->is_temporal());
-    set_data_type(MYSQL_TYPE_DOUBLE);
+    aggregate_float_properties(MYSQL_TYPE_DOUBLE, args, arg_count);
     hybrid_type = REAL_RESULT;
-    aggregate_float_properties(args, arg_count);
-    max_length = float_length(decimals);
   } else if (r0 == DECIMAL_RESULT || r1 == DECIMAL_RESULT) {
     set_data_type(MYSQL_TYPE_NEWDECIMAL);
     hybrid_type = DECIMAL_RESULT;
@@ -1658,13 +1665,13 @@ String *Item_func_numhybrid::val_str(String *str) {
       break;
     }
     case INT_RESULT: {
-      longlong nr = int_op();
+      const longlong nr = int_op();
       if (null_value) return nullptr; /* purecov: inspected */
       str->set_int(nr, unsigned_flag, collation.collation);
       break;
     }
     case REAL_RESULT: {
-      double nr = real_op();
+      const double nr = real_op();
       if (null_value) return nullptr; /* purecov: inspected */
       str->set_real(nr, decimals, collation.collation);
       break;
@@ -1699,7 +1706,7 @@ double Item_func_numhybrid::val_real() {
       return result;
     }
     case INT_RESULT: {
-      longlong result = int_op();
+      const longlong result = int_op();
       return unsigned_flag ? (double)((ulonglong)result) : (double)result;
     }
     case REAL_RESULT:
@@ -1776,12 +1783,12 @@ my_decimal *Item_func_numhybrid::val_decimal(my_decimal *decimal_value) {
       val = decimal_op(decimal_value);
       break;
     case INT_RESULT: {
-      longlong result = int_op();
+      const longlong result = int_op();
       int2my_decimal(E_DEC_FATAL_ERROR, result, unsigned_flag, decimal_value);
       break;
     }
     case REAL_RESULT: {
-      double result = real_op();
+      const double result = real_op();
       double2my_decimal(E_DEC_FATAL_ERROR, result, decimal_value);
       break;
     }
@@ -1867,7 +1874,7 @@ static longlong val_int_from_str(Item *item, bool unsigned_flag,
   *null_value = item->null_value;
   if (*null_value) return 0;
 
-  size_t length = res->length();
+  const size_t length = res->length();
   const char *start = res->ptr();
   const char *end = start + length;
   return longlong_from_string_with_check(res->charset(), start, end,
@@ -1992,7 +1999,7 @@ err:
 
 void Item_typecast_decimal::print(const THD *thd, String *str,
                                   enum_query_type query_type) const {
-  uint precision =
+  const uint precision =
       my_decimal_length_to_precision(max_length, decimals, unsigned_flag);
   str->append(STRING_WITH_LEN("cast("));
   args[0]->print(thd, str, query_type);
@@ -2002,6 +2009,13 @@ void Item_typecast_decimal::print(const THD *thd, String *str,
   str->append_ulonglong(decimals);
   str->append(')');
   str->append(')');
+}
+
+void Item_typecast_decimal::add_json_info(Json_object *obj) {
+  const uint precision =
+      my_decimal_length_to_precision(max_length, decimals, unsigned_flag);
+  obj->add_alias("precision", create_dom_ptr<Json_uint>(precision));
+  obj->add_alias("scale", create_dom_ptr<Json_uint>(decimals));
 }
 
 String *Item_typecast_real::val_str(String *str) {
@@ -2049,7 +2063,7 @@ bool Item_typecast_real::get_time(MYSQL_TIME *ltime) {
 }
 
 my_decimal *Item_typecast_real::val_decimal(my_decimal *decimal_value) {
-  double result = val_real();
+  const double result = val_real();
   if (null_value) return nullptr;
   double2my_decimal(E_DEC_FATAL_ERROR, result, decimal_value);
 
@@ -2065,23 +2079,23 @@ void Item_typecast_real::print(const THD *thd, String *str,
 }
 
 double Item_func_plus::real_op() {
-  double val1 = args[0]->val_real();
+  const double val1 = args[0]->val_real();
   if (current_thd->is_error()) return error_real();
-  double val2 = args[1]->val_real();
+  const double val2 = args[1]->val_real();
   if (current_thd->is_error()) return error_real();
 
   if ((null_value = args[0]->null_value || args[1]->null_value)) return 0.0;
-  double value = val1 + val2;
+  const double value = val1 + val2;
   return check_float_overflow(value);
 }
 
 longlong Item_func_plus::int_op() {
-  longlong val0 = args[0]->val_int();
+  const longlong val0 = args[0]->val_int();
   if (current_thd->is_error()) return error_int();
-  longlong val1 = args[1]->val_int();
+  const longlong val1 = args[1]->val_int();
   if (current_thd->is_error()) return error_int();
-  longlong res = static_cast<unsigned long long>(val0) +
-                 static_cast<unsigned long long>(val1);
+  const longlong res = static_cast<unsigned long long>(val0) +
+                       static_cast<unsigned long long>(val1);
   bool res_unsigned = false;
 
   if ((null_value = args[0]->null_value || args[1]->null_value)) return 0;
@@ -2151,9 +2165,9 @@ my_decimal *Item_func_plus::decimal_op(my_decimal *decimal_value) {
 */
 void Item_func_additive_op::result_precision() {
   decimals = max(args[0]->decimals, args[1]->decimals);
-  int arg1_int = args[0]->decimal_precision() - args[0]->decimals;
-  int arg2_int = args[1]->decimal_precision() - args[1]->decimals;
-  int precision = max(arg1_int, arg2_int) + 1 + decimals;
+  const int arg1_int = args[0]->decimal_precision() - args[0]->decimals;
+  const int arg2_int = args[1]->decimal_precision() - args[1]->decimals;
+  const int precision = max(arg1_int, arg2_int) + 1 + decimals;
 
   /* Integer operations keep unsigned_flag if one of arguments is unsigned */
   if (result_type() == INT_RESULT)
@@ -2177,23 +2191,23 @@ bool Item_func_minus::resolve_type(THD *thd) {
 }
 
 double Item_func_minus::real_op() {
-  double val1 = args[0]->val_real();
+  const double val1 = args[0]->val_real();
   if (current_thd->is_error()) return error_real();
-  double val2 = args[1]->val_real();
+  const double val2 = args[1]->val_real();
   if (current_thd->is_error()) return error_real();
 
   if ((null_value = args[0]->null_value || args[1]->null_value)) return 0.0;
-  double value = val1 - val2;
+  const double value = val1 - val2;
   return check_float_overflow(value);
 }
 
 longlong Item_func_minus::int_op() {
-  longlong val0 = args[0]->val_int();
+  const longlong val0 = args[0]->val_int();
   if (current_thd->is_error()) return error_int();
-  longlong val1 = args[1]->val_int();
+  const longlong val1 = args[1]->val_int();
   if (current_thd->is_error()) return error_int();
-  longlong res = static_cast<unsigned long long>(val0) -
-                 static_cast<unsigned long long>(val1);
+  const longlong res = static_cast<unsigned long long>(val0) -
+                       static_cast<unsigned long long>(val1);
   bool res_unsigned = false;
 
   if ((null_value = args[0]->null_value || args[1]->null_value)) return 0;
@@ -2265,13 +2279,13 @@ my_decimal *Item_func_minus::decimal_op(my_decimal *decimal_value) {
 
 double Item_func_mul::real_op() {
   assert(fixed == 1);
-  double val1 = args[0]->val_real();
+  const double val1 = args[0]->val_real();
   if (current_thd->is_error()) return error_real();
-  double val2 = args[1]->val_real();
+  const double val2 = args[1]->val_real();
   if (current_thd->is_error()) return error_real();
 
   if ((null_value = args[0]->null_value || args[1]->null_value)) return 0.0;
-  double value = val1 * val2;
+  const double value = val1 * val2;
   return check_float_overflow(value);
 }
 
@@ -2332,10 +2346,10 @@ longlong Item_func_mul::int_op() {
     b = -b;
   }
 
-  ulong a0 = 0xFFFFFFFFUL & a;
-  ulong a1 = ((ulonglong)a) >> 32;
-  ulong b0 = 0xFFFFFFFFUL & b;
-  ulong b1 = ((ulonglong)b) >> 32;
+  const ulong a0 = 0xFFFFFFFFUL & a;
+  const ulong a1 = ((ulonglong)a) >> 32;
+  const ulong b0 = 0xFFFFFFFFUL & b;
+  const ulong b1 = ((ulonglong)b) >> 32;
 
   if (a1 && b1) goto err;
 
@@ -2383,7 +2397,8 @@ void Item_func_mul::result_precision() {
   else
     unsigned_flag = args[0]->unsigned_flag & args[1]->unsigned_flag;
   decimals = min(args[0]->decimals + args[1]->decimals, DECIMAL_MAX_SCALE);
-  uint est_prec = args[0]->decimal_precision() + args[1]->decimal_precision();
+  const uint est_prec =
+      args[0]->decimal_precision() + args[1]->decimal_precision();
   uint precision = min<uint>(est_prec, DECIMAL_MAX_PRECISION);
   max_length = my_decimal_precision_to_length_no_truncation(precision, decimals,
                                                             unsigned_flag);
@@ -2391,9 +2406,9 @@ void Item_func_mul::result_precision() {
 
 double Item_func_div_base::real_op() {
   assert(fixed);
-  double val1 = args[0]->val_real();
+  const double val1 = args[0]->val_real();
   if (current_thd->is_error()) return error_real();
-  double val2 = args[1]->val_real();
+  const double val2 = args[1]->val_real();
   if (current_thd->is_error()) return error_real();
 
   if ((null_value = args[0]->null_value || args[1]->null_value)) return 0.0;
@@ -2506,11 +2521,13 @@ longlong Item_func_div_base::int_op() {
     my_decimal tmp;
     my_decimal *val0p = args[0]->val_decimal(&tmp);
     if ((null_value = args[0]->null_value)) return 0;
-    my_decimal val0 = *val0p;
+    if (current_thd->is_error()) return error_int();
+    const my_decimal val0 = *val0p;
 
     my_decimal *val1p = args[1]->val_decimal(&tmp);
     if ((null_value = args[1]->null_value)) return 0;
-    my_decimal val1 = *val1p;
+    if (current_thd->is_error()) return error_int();
+    const my_decimal val1 = *val1p;
 
     int err;
     if ((err = my_decimal_div(E_DEC_FATAL_ERROR & ~E_DEC_DIV_ZERO, &tmp, &val0,
@@ -2531,8 +2548,8 @@ longlong Item_func_div_base::int_op() {
     return res;
   }
 
-  longlong val0 = args[0]->val_int();
-  longlong val1 = args[1]->val_int();
+  const longlong val0 = args[0]->val_int();
+  const longlong val1 = args[1]->val_int();
   bool val0_negative, val1_negative, res_negative;
   ulonglong uval0, uval1, res;
   if ((null_value = (args[0]->null_value || args[1]->null_value))) return 0;
@@ -2573,9 +2590,9 @@ void Item_func_div_int::set_numeric_type() {
 
 longlong Item_func_mod::int_op() {
   assert(fixed == 1);
-  longlong val0 = args[0]->val_int();
+  const longlong val0 = args[0]->val_int();
   if (current_thd->is_error()) return error_int();
-  longlong val1 = args[1]->val_int();
+  const longlong val1 = args[1]->val_int();
   if (current_thd->is_error()) return error_int();
   bool val0_negative, val1_negative;
   ulonglong uval0, uval1;
@@ -2608,9 +2625,9 @@ longlong Item_func_mod::int_op() {
 
 double Item_func_mod::real_op() {
   assert(fixed == 1);
-  double val1 = args[0]->val_real();
+  const double val1 = args[0]->val_real();
   if (current_thd->is_error()) return error_real();
-  double val2 = args[1]->val_real();
+  const double val2 = args[1]->val_real();
   if (current_thd->is_error()) return error_real();
 
   if ((null_value = args[0]->null_value || args[1]->null_value)) return 0.0;
@@ -2645,7 +2662,7 @@ my_decimal *Item_func_mod::decimal_op(my_decimal *decimal_value) {
 
 void Item_func_mod::result_precision() {
   decimals = max(args[0]->decimals, args[1]->decimals);
-  uint precision =
+  const uint precision =
       max(args[0]->decimal_precision(), args[1]->decimal_precision());
 
   max_length = my_decimal_precision_to_length_no_truncation(precision, decimals,
@@ -2667,13 +2684,13 @@ bool Item_func_mod::resolve_type(THD *thd) {
 }
 
 double Item_func_neg::real_op() {
-  double value = args[0]->val_real();
+  const double value = args[0]->val_real();
   null_value = args[0]->null_value;
   return -value;
 }
 
 longlong Item_func_neg::int_op() {
-  longlong value = args[0]->val_int();
+  const longlong value = args[0]->val_int();
   if ((null_value = args[0]->null_value)) return 0;
   if (args[0]->unsigned_flag && (ulonglong)value > (ulonglong)LLONG_MAX + 1ULL)
     return raise_integer_overflow();
@@ -2715,7 +2732,7 @@ bool Item_func_neg::resolve_type(THD *thd) {
   */
   if (hybrid_type == INT_RESULT && args[0]->const_item() &&
       args[0]->may_eval_const_item(thd)) {
-    longlong val = args[0]->val_int();
+    const longlong val = args[0]->val_int();
     if ((ulonglong)val >= (ulonglong)LLONG_MIN &&
         ((ulonglong)val != (ulonglong)LLONG_MIN ||
          args[0]->type() != INT_ITEM)) {
@@ -2734,13 +2751,13 @@ bool Item_func_neg::resolve_type(THD *thd) {
 }
 
 double Item_func_abs::real_op() {
-  double value = args[0]->val_real();
+  const double value = args[0]->val_real();
   null_value = args[0]->null_value;
   return fabs(value);
 }
 
 longlong Item_func_abs::int_op() {
-  longlong value = args[0]->val_int();
+  const longlong value = args[0]->val_int();
   if ((null_value = args[0]->null_value)) return 0;
   if (unsigned_flag) return value;
   /* -LLONG_MIN = LLONG_MAX + 1 => outside of signed longlong range */
@@ -2775,7 +2792,7 @@ bool Item_dec_func::resolve_type(THD *thd) {
 /** Gateway to natural LOG function. */
 double Item_func_ln::val_real() {
   assert(fixed == 1);
-  double value = args[0]->val_real();
+  const double value = args[0]->val_real();
   if ((null_value = args[0]->null_value)) return 0.0;
   if (value <= 0.0) {
     signal_invalid_argument_for_log();
@@ -2792,14 +2809,14 @@ double Item_func_ln::val_real() {
 */
 double Item_func_log::val_real() {
   assert(fixed == 1);
-  double value = args[0]->val_real();
+  const double value = args[0]->val_real();
   if ((null_value = args[0]->null_value)) return 0.0;
   if (value <= 0.0) {
     signal_invalid_argument_for_log();
     return 0.0;
   }
   if (arg_count == 2) {
-    double value2 = args[1]->val_real();
+    const double value2 = args[1]->val_real();
     if ((null_value = args[1]->null_value)) return 0.0;
     if (value2 <= 0.0 || value == 1.0) {
       signal_invalid_argument_for_log();
@@ -2812,7 +2829,7 @@ double Item_func_log::val_real() {
 
 double Item_func_log2::val_real() {
   assert(fixed == 1);
-  double value = args[0]->val_real();
+  const double value = args[0]->val_real();
 
   if ((null_value = args[0]->null_value)) return 0.0;
   if (value <= 0.0) {
@@ -2824,7 +2841,7 @@ double Item_func_log2::val_real() {
 
 double Item_func_log10::val_real() {
   assert(fixed == 1);
-  double value = args[0]->val_real();
+  const double value = args[0]->val_real();
   if ((null_value = args[0]->null_value)) return 0.0;
   if (value <= 0.0) {
     signal_invalid_argument_for_log();
@@ -2835,14 +2852,14 @@ double Item_func_log10::val_real() {
 
 double Item_func_exp::val_real() {
   assert(fixed == 1);
-  double value = args[0]->val_real();
+  const double value = args[0]->val_real();
   if ((null_value = args[0]->null_value)) return 0.0; /* purecov: inspected */
   return check_float_overflow(exp(value));
 }
 
 double Item_func_sqrt::val_real() {
   assert(fixed == 1);
-  double value = args[0]->val_real();
+  const double value = args[0]->val_real();
   if ((null_value = (args[0]->null_value || value < 0)))
     return 0.0; /* purecov: inspected */
   return sqrt(value);
@@ -2850,8 +2867,8 @@ double Item_func_sqrt::val_real() {
 
 double Item_func_pow::val_real() {
   assert(fixed == 1);
-  double value = args[0]->val_real();
-  double val2 = args[1]->val_real();
+  const double value = args[0]->val_real();
+  const double val2 = args[1]->val_real();
   if ((null_value = (args[0]->null_value || args[1]->null_value)))
     return 0.0; /* purecov: inspected */
   const double pow_result = pow(value, val2);
@@ -2864,7 +2881,7 @@ double Item_func_acos::val_real() {
   assert(fixed == 1);
   /* One can use this to defer SELECT processing. */
   DEBUG_SYNC(current_thd, "before_acos_function");
-  double value = args[0]->val_real();
+  const double value = args[0]->val_real();
   if ((null_value = (args[0]->null_value || (value < -1.0 || value > 1.0))))
     return 0.0;
   return acos(value);
@@ -2872,7 +2889,7 @@ double Item_func_acos::val_real() {
 
 double Item_func_asin::val_real() {
   assert(fixed == 1);
-  double value = args[0]->val_real();
+  const double value = args[0]->val_real();
   if ((null_value = (args[0]->null_value || (value < -1.0 || value > 1.0))))
     return 0.0;
   return asin(value);
@@ -2880,10 +2897,10 @@ double Item_func_asin::val_real() {
 
 double Item_func_atan::val_real() {
   assert(fixed == 1);
-  double value = args[0]->val_real();
+  const double value = args[0]->val_real();
   if ((null_value = args[0]->null_value)) return 0.0;
   if (arg_count == 2) {
-    double val2 = args[1]->val_real();
+    const double val2 = args[1]->val_real();
     if ((null_value = args[1]->null_value)) return 0.0;
     return check_float_overflow(atan2(value, val2));
   }
@@ -2892,30 +2909,30 @@ double Item_func_atan::val_real() {
 
 double Item_func_cos::val_real() {
   assert(fixed == 1);
-  double value = args[0]->val_real();
+  const double value = args[0]->val_real();
   if ((null_value = args[0]->null_value)) return 0.0;
   return cos(value);
 }
 
 double Item_func_sin::val_real() {
   assert(fixed == 1);
-  double value = args[0]->val_real();
+  const double value = args[0]->val_real();
   if ((null_value = args[0]->null_value)) return 0.0;
   return sin(value);
 }
 
 double Item_func_tan::val_real() {
   assert(fixed == 1);
-  double value = args[0]->val_real();
+  const double value = args[0]->val_real();
   if ((null_value = args[0]->null_value)) return 0.0;
   return check_float_overflow(tan(value));
 }
 
 double Item_func_cot::val_real() {
   assert(fixed == 1);
-  double value = args[0]->val_real();
+  const double value = args[0]->val_real();
   if ((null_value = args[0]->null_value)) return 0.0;
-  double val2 = tan(value);
+  const double val2 = tan(value);
   if (val2 == 0.0) {
     return raise_float_overflow();
   }
@@ -2962,7 +2979,7 @@ longlong Item_func_bit::val_int() {
 
     int ovf_error;
     const char *from = res->ptr();
-    size_t len = res->length();
+    const size_t len = res->length();
     const char *end = from + len;
     return my_strtoll10(from, &end, &ovf_error);
   }
@@ -2978,7 +2995,7 @@ double Item_func_bit::val_real() {
 
     int ovf_error;
     const char *from = res->ptr();
-    size_t len = res->length();
+    const size_t len = res->length();
     const char *end = from + len;
     return my_strtod(from, &end, &ovf_error);
   }
@@ -2995,7 +3012,7 @@ my_decimal *Item_func_bit::val_decimal(my_decimal *decimal_value) {
 String *Item_func_bit::val_str(String *str) {
   assert(fixed);
   if (hybrid_type == INT_RESULT) {
-    longlong nr = int_op();
+    const longlong nr = int_op();
     if (null_value) return nullptr;
     str->set_int(nr, unsigned_flag, collation.collation);
     return str;
@@ -3106,7 +3123,7 @@ template String *Item_func_shift::eval_str_op<false>(String *);
 
 longlong Item_func_bit_neg::int_op() {
   assert(fixed);
-  ulonglong res = (ulonglong)args[0]->val_int();
+  const ulonglong res = (ulonglong)args[0]->val_int();
   if (args[0]->null_value) return error_int();
   null_value = false;
   return ~res;
@@ -3119,7 +3136,7 @@ String *Item_func_bit_neg::str_op(String *str) {
 
   if (tmp_value.alloc(res->length())) return error_str();
 
-  size_t arg_length = res->length();
+  const size_t arg_length = res->length();
   tmp_value.length(arg_length);
   tmp_value.set_charset(&my_charset_bin);
   const unsigned char *from_c = pointer_cast<const unsigned char *>(res->ptr());
@@ -3234,11 +3251,11 @@ bool Item::bit_func_returns_binary(const Item *a, const Item *b) {
     and at least one of them should be different from the hex/bit/NULL literal
   */
   // Check if a is [VAR]BINARY Item
-  bool a_is_binary = a->result_type() == STRING_RESULT &&
-                     a->collation.collation == &my_charset_bin;
+  const bool a_is_binary = a->result_type() == STRING_RESULT &&
+                           a->collation.collation == &my_charset_bin;
   // Check if b is not null and is [VAR]BINARY Item
-  bool b_is_binary = b && b->result_type() == STRING_RESULT &&
-                     b->collation.collation == &my_charset_bin;
+  const bool b_is_binary = b && b->result_type() == STRING_RESULT &&
+                           b->collation.collation == &my_charset_bin;
 
   return a_is_binary && (!b || b_is_binary) &&
          ((a->type() != Item::VARBIN_ITEM && a->type() != Item::NULL_ITEM) ||
@@ -3332,7 +3349,7 @@ longlong Item_func_ceiling::int_op() {
 }
 
 double Item_func_ceiling::real_op() {
-  double value = args[0]->val_real();
+  const double value = args[0]->val_real();
   null_value = args[0]->null_value;
   return ceil(value);
 }
@@ -3368,7 +3385,7 @@ longlong Item_func_floor::int_op() {
 }
 
 double Item_func_floor::real_op() {
-  double value = args[0]->val_real();
+  const double value = args[0]->val_real();
   null_value = args[0]->null_value;
   return floor(value);
 }
@@ -3453,19 +3470,19 @@ bool Item_func_round::resolve_type(THD *thd) {
 
 double my_double_round(double value, longlong dec, bool dec_unsigned,
                        bool truncate) {
-  bool dec_negative = (dec < 0) && !dec_unsigned;
+  const bool dec_negative = (dec < 0) && !dec_unsigned;
   int log_10_size = array_elements(log_10);  // 309
   if (dec_negative && dec <= -log_10_size) return 0.0;
 
-  ulonglong abs_dec = dec_negative ? -dec : dec;
+  const ulonglong abs_dec = dec_negative ? -dec : dec;
 
   double tmp = (abs_dec < array_elements(log_10) ? log_10[abs_dec]
                                                  : pow(10.0, (double)abs_dec));
 
-  double value_mul_tmp = value * tmp;
+  const double value_mul_tmp = value * tmp;
   if (!dec_negative && !std::isfinite(value_mul_tmp)) return value;
 
-  double value_div_tmp = value / tmp;
+  const double value_div_tmp = value / tmp;
   if (truncate) {
     if (value >= 0.0)
       return dec < 0 ? floor(value_div_tmp) * tmp : floor(value_mul_tmp) / tmp;
@@ -3492,7 +3509,7 @@ double Item_func_round::real_op() {
 */
 static inline ulonglong my_unsigned_round(ulonglong value, ulonglong to,
                                           bool *round_overflow) {
-  ulonglong tmp = value / to * to;
+  const ulonglong tmp = value / to * to;
   if (value - tmp < (to >> 1)) {
     return tmp;
   } else {
@@ -3505,8 +3522,8 @@ static inline ulonglong my_unsigned_round(ulonglong value, ulonglong to,
 }
 
 longlong Item_func_round::int_op() {
-  longlong value = args[0]->val_int();
-  longlong dec = args[1]->val_int();
+  const longlong value = args[0]->val_int();
+  const longlong dec = args[1]->val_int();
   decimals = 0;
   ulonglong abs_dec;
   if ((null_value = args[0]->null_value || args[1]->null_value)) return 0;
@@ -3530,7 +3547,7 @@ longlong Item_func_round::int_op() {
                            : (value / tmp) * tmp;
   else if (unsigned_flag || value >= 0) {
     bool round_overflow = false;
-    ulonglong rounded_value =
+    const ulonglong rounded_value =
         my_unsigned_round(static_cast<ulonglong>(value), tmp, &round_overflow);
     if (!unsigned_flag && rounded_value > LLONG_MAX)
       return raise_integer_overflow();
@@ -3562,7 +3579,7 @@ longlong Item_func_round::int_op() {
       }
     }
     bool not_used = false;
-    ulonglong rounded_value =
+    const ulonglong rounded_value =
         my_unsigned_round(static_cast<ulonglong>(-value), tmp, &not_used);
     if (rounded_value > LLONG_MAX) return raise_integer_overflow();
 
@@ -3585,9 +3602,9 @@ my_decimal *Item_func_round::decimal_op(my_decimal *decimal_value) {
   return nullptr;
 }
 
-bool Item_func_rand::itemize(Parse_context *pc, Item **res) {
+bool Item_func_rand::do_itemize(Parse_context *pc, Item **res) {
   if (skip_itemize(res)) return false;
-  if (super::itemize(pc, res)) return true;
+  if (super::do_itemize(pc, res)) return true;
   /*
     When RAND() is binlogged, the seed is binlogged too.  So the
     sequence of random numbers is the same on a replication slave as
@@ -3620,7 +3637,7 @@ void Item_func_rand::seed_random(Item *arg) {
     tmp = (uint32)arg->val_int();
   }
 #else
-  uint32 tmp = (uint32)arg->val_int();
+  const uint32 tmp = (uint32)arg->val_int();
 #endif /* WITH_WSREP */
   randominit(m_rand, (uint32)(tmp * 0x10001L + 55555555L),
              (uint32)(tmp * 0x10000001L));
@@ -3703,7 +3720,7 @@ bool Item_func_sign::resolve_type(THD *thd) {
 
 longlong Item_func_sign::val_int() {
   assert(fixed == 1);
-  double value = args[0]->val_real();
+  const double value = args[0]->val_real();
   null_value = args[0]->null_value;
   return value < 0.0 ? -1 : (value > 0 ? 1 : 0);
 }
@@ -3717,7 +3734,7 @@ bool Item_func_units::resolve_type(THD *thd) {
 
 double Item_func_units::val_real() {
   assert(fixed == 1);
-  double value = args[0]->val_real();
+  const double value = args[0]->val_real();
   if ((null_value = args[0]->null_value)) return 0;
   return check_float_overflow(value * mul + add);
 }
@@ -3757,7 +3774,7 @@ static int temporal_rank(enum_field_types type) {
 
 bool Item_func_min_max::resolve_type_inner(THD *thd) {
   if (param_type_uses_non_param(thd)) return true;
-  aggregate_type(make_array(args, arg_count));
+  if (aggregate_type(func_name(), args, arg_count)) return true;
   hybrid_type = Field::result_merge_type(data_type());
   if (hybrid_type == STRING_RESULT) {
     /*
@@ -3765,6 +3782,7 @@ bool Item_func_min_max::resolve_type_inner(THD *thd) {
       must be set for correct conversion from temporal values to various result
       types.
     */
+    fsp_for_string = 0;
     for (uint i = 0; i < arg_count; i++) {
       if (args[i]->is_temporal()) {
         /*
@@ -3773,26 +3791,41 @@ bool Item_func_min_max::resolve_type_inner(THD *thd) {
           most general and detailed data type to which other temporal types can
           be converted without loss of information.
         */
-        if (!temporal_item || (temporal_rank(args[i]->data_type()) >
-                               temporal_rank(temporal_item->data_type())))
+        if (temporal_item == nullptr ||
+            temporal_rank(args[i]->data_type()) >
+                temporal_rank(temporal_item->data_type()))
           temporal_item = args[i];
       }
     }
     /*
-      If one or more, but not all, of the arguments have a temporal data type,
-      the data type of this item must be set temporarily to ensure that the
-      various aggregate functions derive the correct properties.
+      Calculate a correct datetime precision, also including  values that are
+      converted from decimal and float numbers, and possibly adjust the
+      maximum length of the resulting string accordingly.
     */
-    enum_field_types tmp_data_type = (!is_temporal() && has_temporal_arg())
-                                         ? temporal_item->data_type()
-                                         : data_type();
-    enum_field_types aggregated_data_type = data_type();
-    set_data_type(tmp_data_type);
-    if (aggregate_string_properties(func_name(), args, arg_count)) return true;
-    set_data_type(aggregated_data_type);
-  } else
-    aggregate_num_type(hybrid_type, args, arg_count);
-
+    if (temporal_item != nullptr) {
+      if (temporal_item->data_type() == MYSQL_TYPE_TIME) {
+        for (uint i = 0; i < arg_count; i++)
+          fsp_for_string =
+              max<uint8>(fsp_for_string, args[i]->time_precision());
+      } else if (temporal_item->data_type() == MYSQL_TYPE_DATETIME ||
+                 temporal_item->data_type() == MYSQL_TYPE_TIMESTAMP) {
+        for (uint i = 0; i < arg_count; i++)
+          fsp_for_string =
+              max<uint8>(fsp_for_string, args[i]->datetime_precision());
+      }
+      if (temporal_item->data_type() != MYSQL_TYPE_DATE && fsp_for_string > 0) {
+        uint32 new_size = 0;
+        if (temporal_item->data_type() == MYSQL_TYPE_DATETIME ||
+            temporal_item->data_type() == MYSQL_TYPE_TIMESTAMP)
+          new_size = MAX_DATETIME_WIDTH + 1 + fsp_for_string;
+        else if (temporal_item->data_type() == MYSQL_TYPE_TIME)
+          new_size = MAX_TIME_WIDTH + 1 + fsp_for_string;
+        if (new_size > max_char_length()) {
+          set_data_type_string(new_size);
+        }
+      }
+    }
+  }
   /*
   LEAST and GREATEST convert JSON values to strings before they are
   compared, so their JSON nature is lost. Raise a warning to
@@ -3818,11 +3851,14 @@ bool Item_func_min_max::cmp_datetimes(longlong *value) {
   for (uint i = 0; i < arg_count; i++) {
     Item **arg = args + i;
     bool is_null;
-    longlong tmp =
+    const longlong tmp =
         get_datetime_value(thd, &arg, nullptr, temporal_item, &is_null);
 
     // Check if we need to stop (because of error or KILL)  and stop the loop
-    if ((null_value = thd->is_error())) return true;
+    if (thd->is_error()) {
+      null_value = is_nullable();
+      return true;
+    }
     if ((null_value = args[i]->null_value)) return true;
     if (i == 0 || (tmp < res) == m_is_least_func) res = tmp;
   }
@@ -3833,7 +3869,7 @@ bool Item_func_min_max::cmp_datetimes(longlong *value) {
 bool Item_func_min_max::cmp_times(longlong *value) {
   longlong res = 0;
   for (uint i = 0; i < arg_count; i++) {
-    longlong tmp = args[i]->val_time_temporal();
+    const longlong tmp = args[i]->val_time_temporal();
     if ((null_value = args[i]->null_value)) return true;
     if (i == 0 || (tmp < res) == m_is_least_func) res = tmp;
   }
@@ -3856,9 +3892,9 @@ String *Item_func_min_max::str_op(String *str) {
     */
     if (result > 0) {
       MYSQL_TIME ltime;
-      enum_field_types field_type = temporal_item->data_type();
+      const enum_field_types field_type = temporal_item->data_type();
       TIME_from_longlong_packed(&ltime, field_type, result);
-      null_value = my_TIME_to_str(&ltime, str, decimals);
+      null_value = my_TIME_to_str(&ltime, str, fsp_for_string);
       if (null_value) return nullptr;
       if (str->needs_conversion(collation.collation)) {
         uint errors = 0;
@@ -3955,7 +3991,7 @@ longlong Item_func_min_max::int_op() {
     const longlong val = args[i]->val_int();
     if ((null_value = args[i]->null_value)) return 0;
 #ifndef NDEBUG
-    Integer_value arg_val(val, args[i]->unsigned_flag);
+    const Integer_value arg_val(val, args[i]->unsigned_flag);
     assert(!unsigned_flag || !arg_val.is_negative());
 #endif
     const bool val_is_smaller = unsigned_flag ? static_cast<ulonglong>(val) <
@@ -3971,7 +4007,7 @@ my_decimal *Item_func_min_max::decimal_op(my_decimal *dec) {
   null_value = false;
   if (compare_as_dates()) {
     longlong result = 0;
-    if (cmp_datetimes(&result)) return nullptr;
+    if (cmp_datetimes(&result)) return error_decimal(dec);
     return my_decimal_from_datetime_packed(dec, temporal_item->data_type(),
                                            result);
   }
@@ -4038,7 +4074,7 @@ double Item_rollup_group_item::val_real() {
     null_value = true;
     return 0.0;
   }
-  double res = args[0]->val_real();
+  const double res = args[0]->val_real();
   if ((null_value = args[0]->null_value)) return 0.0;
   return res;
 }
@@ -4049,7 +4085,7 @@ longlong Item_rollup_group_item::val_int() {
     null_value = true;
     return 0;
   }
-  longlong res = args[0]->val_int();
+  const longlong res = args[0]->val_int();
   if ((null_value = args[0]->null_value)) return 0;
   return res;
 }
@@ -4082,7 +4118,7 @@ bool Item_rollup_group_item::val_json(Json_wrapper *result) {
     null_value = true;
     return false;
   }
-  bool res = args[0]->val_json(result);
+  const bool res = args[0]->val_json(result);
   null_value = args[0]->null_value;
   return res;
 }
@@ -4222,7 +4258,7 @@ longlong Item_func_field::val_int() {
       }
     }
   } else if (cmp_type == INT_RESULT) {
-    longlong val = args[0]->val_int();
+    const longlong val = args[0]->val_int();
     if (args[0]->null_value) return 0;
     for (uint i = 1; i < arg_count; i++) {
       if (val == args[i]->val_int() && !args[i]->null_value) {
@@ -4240,7 +4276,7 @@ longlong Item_func_field::val_int() {
       }
     }
   } else {
-    double val = args[0]->val_real();
+    const double val = args[0]->val_real();
     if (args[0]->null_value) return 0;
     for (uint i = 1; i < arg_count; i++) {
       if (val == args[i]->val_real() && !args[i]->null_value) {
@@ -4335,7 +4371,7 @@ longlong Item_func_find_in_set::val_int() {
     // enum_value is set iff args[0]->const_item() in resolve_type().
     assert(args[0]->const_item());
 
-    ulonglong tmp = static_cast<ulonglong>(args[1]->val_int());
+    const ulonglong tmp = static_cast<ulonglong>(args[1]->val_int());
     if (args[1]->null_value) return error_int();
     /*
       No need to check args[0]->null_value since enum_value is set iff
@@ -4354,7 +4390,7 @@ longlong Item_func_find_in_set::val_int() {
       down_cast<Item_field *>(args[1])->field->real_type() == MYSQL_TYPE_SET) {
     Field *field = down_cast<Item_field *>(args[1])->field;
 
-    ulonglong tmp = static_cast<ulonglong>(args[1]->val_int());
+    const ulonglong tmp = static_cast<ulonglong>(args[1]->val_int());
     if (args[1]->null_value) return error_int();
 
     uint value = find_type(down_cast<Field_enum *>(field)->typelib, find->ptr(),
@@ -4372,7 +4408,7 @@ longlong Item_func_find_in_set::val_int() {
     const char *str_end = buffer->ptr();
     const char *real_end = str_end + buffer->length();
     const uchar *find_str = (const uchar *)find->ptr();
-    size_t find_str_len = find->length();
+    const size_t find_str_len = find->length();
     int position = 0;
     while (true) {
       int symbol_len;
@@ -4380,8 +4416,8 @@ longlong Item_func_find_in_set::val_int() {
                cs->cset->mb_wc(cs, &wc, pointer_cast<const uchar *>(str_end),
                                pointer_cast<const uchar *>(real_end))) > 0) {
         const char *substr_end = str_end + symbol_len;
-        bool is_last_item = (substr_end == real_end);
-        bool is_separator = (wc == (my_wc_t)separator);
+        const bool is_last_item = (substr_end == real_end);
+        const bool is_separator = (wc == (my_wc_t)separator);
         if (is_separator || is_last_item) {
           position++;
           if (is_last_item && !is_separator) str_end = substr_end;
@@ -4414,7 +4450,7 @@ longlong Item_func_bit_count::val_int() {
 
     longlong len = 0;
     size_t i = 0;
-    size_t arg_length = s->length();
+    const size_t arg_length = s->length();
     while (i + sizeof(longlong) <= arg_length) {
       len += my_count_bits(uint8korr(&val[i]));
       i += sizeof(longlong);
@@ -4428,7 +4464,7 @@ longlong Item_func_bit_count::val_int() {
     return len;
   }
 
-  ulonglong value = (ulonglong)args[0]->val_int();
+  const ulonglong value = (ulonglong)args[0]->val_int();
   if (args[0]->null_value) return error_int(); /* purecov: inspected */
 
   null_value = false;
@@ -4747,7 +4783,7 @@ double udf_handler::val_real(bool *null_value) {
     return 0.0;
   }
   Udf_func_double func = (Udf_func_double)u_d->func;
-  double tmp = func(&initid, &f_args, &is_null, &error);
+  const double tmp = func(&initid, &f_args, &is_null, &error);
   if (is_null || error) {
     *null_value = true;
     return 0.0;
@@ -4765,7 +4801,7 @@ longlong udf_handler::val_int(bool *null_value) {
   }
   DEBUG_SYNC(current_thd, "execute_uninstall_component");
   Udf_func_longlong func = (Udf_func_longlong)u_d->func;
-  longlong tmp = func(&initid, &f_args, &is_null, &error);
+  const longlong tmp = func(&initid, &f_args, &is_null, &error);
   if (is_null || error) {
     *null_value = true;
     return 0LL;
@@ -4931,9 +4967,9 @@ bool udf_handler::get_and_convert_string(uint index) {
   return false;
 }
 
-bool Item_udf_func::itemize(Parse_context *pc, Item **res) {
+bool Item_udf_func::do_itemize(Parse_context *pc, Item **res) {
   if (skip_itemize(res)) return false;
-  if (super::itemize(pc, res)) return true;
+  if (super::do_itemize(pc, res)) return true;
   pc->thd->lex->set_has_udf();
   pc->thd->lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_UDF);
   pc->thd->lex->safe_to_cache_query = false;
@@ -4966,7 +5002,7 @@ double Item_func_udf_float::val_real() {
 
 String *Item_func_udf_float::val_str(String *str) {
   assert(fixed == 1);
-  double nr = val_real();
+  const double nr = val_real();
   if (null_value) return nullptr; /* purecov: inspected */
   str->set_real(nr, decimals, &my_charset_bin);
   return str;
@@ -4979,7 +5015,7 @@ longlong Item_func_udf_int::val_int() {
 
 String *Item_func_udf_int::val_str(String *str) {
   assert(fixed == 1);
-  longlong nr = val_int();
+  const longlong nr = val_int();
   if (null_value) return nullptr;
   str->set_int(nr, unsigned_flag, &my_charset_bin);
   return str;
@@ -5039,9 +5075,9 @@ String *Item_func_udf_str::val_str(String *str) {
   return res;
 }
 
-bool Item_source_pos_wait::itemize(Parse_context *pc, Item **res) {
+bool Item_source_pos_wait::do_itemize(Parse_context *pc, Item **res) {
   if (skip_itemize(res)) return false;
-  if (super::itemize(pc, res)) return true;
+  if (super::do_itemize(pc, res)) return true;
   pc->thd->lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_SYSTEM_FUNCTION);
   pc->thd->lex->safe_to_cache_query = false;
   return false;
@@ -5064,8 +5100,8 @@ longlong Item_source_pos_wait::val_int() {
     return 0;
   }
   Master_info *mi;
-  longlong pos = (ulong)args[1]->val_int();
-  double timeout = (arg_count >= 3) ? args[2]->val_real() : 0;
+  const longlong pos = (ulong)args[1]->val_int();
+  const double timeout = (arg_count >= 3) ? args[2]->val_real() : 0;
   if (timeout < 0) {
     if (thd->is_strict_mode()) {
       my_error(ER_WRONG_ARGUMENTS, MYF(0), "SOURCE_POS_WAIT.");
@@ -5326,7 +5362,7 @@ static bool check_and_convert_ull_name(char *buff, const String *org_name) {
 
   if (well_formed_error_pos || cannot_convert_error_pos ||
       from_end_pos < org_name->ptr() + org_name->length()) {
-    ErrConvString err(org_name);
+    const ErrConvString err(org_name);
     if (well_formed_error_pos || cannot_convert_error_pos)
       my_error(ER_USER_LOCK_WRONG_NAME, MYF(0), err.ptr());
     else
@@ -5342,9 +5378,9 @@ static bool check_and_convert_ull_name(char *buff, const String *org_name) {
   return false;
 }
 
-bool Item_func_get_lock::itemize(Parse_context *pc, Item **res) {
+bool Item_func_get_lock::do_itemize(Parse_context *pc, Item **res) {
   if (skip_itemize(res)) return false;
-  if (super::itemize(pc, res)) return true;
+  if (super::do_itemize(pc, res)) return true;
   pc->thd->lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_SYSTEM_FUNCTION);
   pc->thd->lex->set_uncacheable(pc->select, UNCACHEABLE_SIDEEFFECT);
   return false;
@@ -5481,9 +5517,9 @@ longlong Item_func_get_lock::val_int() {
   return 1;
 }
 
-bool Item_func_release_lock::itemize(Parse_context *pc, Item **res) {
+bool Item_func_release_lock::do_itemize(Parse_context *pc, Item **res) {
   if (skip_itemize(res)) return false;
-  if (super::itemize(pc, res)) return true;
+  if (super::do_itemize(pc, res)) return true;
   pc->thd->lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_SYSTEM_FUNCTION);
   pc->thd->lex->set_uncacheable(pc->select, UNCACHEABLE_SIDEEFFECT);
   return false;
@@ -5582,9 +5618,9 @@ longlong Item_func_release_lock::val_int() {
   return 1;
 }
 
-bool Item_func_release_all_locks::itemize(Parse_context *pc, Item **res) {
+bool Item_func_release_all_locks::do_itemize(Parse_context *pc, Item **res) {
   if (skip_itemize(res)) return false;
-  if (super::itemize(pc, res)) return true;
+  if (super::do_itemize(pc, res)) return true;
   pc->thd->lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_SYSTEM_FUNCTION);
   pc->thd->lex->set_uncacheable(pc->select, UNCACHEABLE_SIDEEFFECT);
   return false;
@@ -5613,9 +5649,9 @@ longlong Item_func_release_all_locks::val_int() {
   return result;
 }
 
-bool Item_func_is_free_lock::itemize(Parse_context *pc, Item **res) {
+bool Item_func_is_free_lock::do_itemize(Parse_context *pc, Item **res) {
   if (skip_itemize(res)) return false;
-  if (super::itemize(pc, res)) return true;
+  if (super::do_itemize(pc, res)) return true;
   pc->thd->lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_SYSTEM_FUNCTION);
   pc->thd->lex->set_uncacheable(pc->select, UNCACHEABLE_SIDEEFFECT);
   return false;
@@ -5659,9 +5695,9 @@ longlong Item_func_is_free_lock::val_int() {
   return (get_owner_visitor.get_owner_id() == 0);
 }
 
-bool Item_func_is_used_lock::itemize(Parse_context *pc, Item **res) {
+bool Item_func_is_used_lock::do_itemize(Parse_context *pc, Item **res) {
   if (skip_itemize(res)) return false;
-  if (super::itemize(pc, res)) return true;
+  if (super::do_itemize(pc, res)) return true;
   pc->thd->lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_SYSTEM_FUNCTION);
   pc->thd->lex->set_uncacheable(pc->select, UNCACHEABLE_SIDEEFFECT);
   return false;
@@ -5697,16 +5733,16 @@ longlong Item_func_is_used_lock::val_int() {
 
   if (thd->mdl_context.find_lock_owner(&ull_key, &get_owner_visitor)) return 0;
 
-  my_thread_id thread_id = get_owner_visitor.get_owner_id();
+  const my_thread_id thread_id = get_owner_visitor.get_owner_id();
   if (thread_id == 0) return 0;
 
   null_value = false;
   return thread_id;
 }
 
-bool Item_func_last_insert_id::itemize(Parse_context *pc, Item **res) {
+bool Item_func_last_insert_id::do_itemize(Parse_context *pc, Item **res) {
   if (skip_itemize(res)) return false;
-  if (super::itemize(pc, res)) return true;
+  if (super::do_itemize(pc, res)) return true;
   pc->thd->lex->safe_to_cache_query = false;
   pc->thd->lex->set_uncacheable(pc->select, UNCACHEABLE_SIDEEFFECT);
   return false;
@@ -5716,7 +5752,7 @@ longlong Item_func_last_insert_id::val_int() {
   THD *thd = current_thd;
   assert(fixed == 1);
   if (arg_count) {
-    longlong value = args[0]->val_int();
+    const longlong value = args[0]->val_int();
     null_value = args[0]->null_value;
     /*
       LAST_INSERT_ID(X) must affect the client's mysql_insert_id() as
@@ -5733,9 +5769,9 @@ longlong Item_func_last_insert_id::val_int() {
       thd->read_first_successful_insert_id_in_prev_stmt());
 }
 
-bool Item_func_benchmark::itemize(Parse_context *pc, Item **res) {
+bool Item_func_benchmark::do_itemize(Parse_context *pc, Item **res) {
   if (skip_itemize(res)) return false;
-  if (super::itemize(pc, res)) return true;
+  if (super::do_itemize(pc, res)) return true;
   pc->thd->lex->set_uncacheable(pc->select, UNCACHEABLE_SIDEEFFECT);
   return false;
 }
@@ -5841,9 +5877,9 @@ void item_func_sleep_free() {
   }
 }
 
-bool Item_func_sleep::itemize(Parse_context *pc, Item **res) {
+bool Item_func_sleep::do_itemize(Parse_context *pc, Item **res) {
   if (skip_itemize(res)) return false;
-  if (super::itemize(pc, res)) return true;
+  if (super::do_itemize(pc, res)) return true;
   pc->thd->lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_SYSTEM_FUNCTION);
   pc->thd->lex->set_uncacheable(pc->select, UNCACHEABLE_SIDEEFFECT);
   return false;
@@ -6015,7 +6051,7 @@ bool Item_func_set_user_var::resolve_type(THD *thd) {
   else
     collation.collation = args[0]->collation.collation;
 
-  enum_field_types type = Item::type_for_variable(args[0]->data_type());
+  const enum_field_types type = Item::type_for_variable(args[0]->data_type());
   switch (type) {
     case MYSQL_TYPE_LONGLONG:
       set_data_type_longlong();
@@ -6053,7 +6089,7 @@ user_var_entry *user_var_entry::create(THD *thd, const Name_string &name,
   }
 
   user_var_entry *entry;
-  size_t size =
+  const size_t size =
       ALIGN_SIZE(sizeof(user_var_entry)) + (name.length() + 1) + extra_size;
   if (!(entry = (user_var_entry *)my_malloc(key_memory_user_var_entry, size,
                                             MYF(MY_WME | ME_FATALERROR))))
@@ -6208,7 +6244,7 @@ longlong user_var_entry::val_int(bool *null_value) const {
   switch (m_type) {
     case REAL_RESULT: {
       // TODO(tdidriks): Consider reporting a possible overflow warning.
-      double var_val = *(reinterpret_cast<double *>(m_ptr));
+      const double var_val = *(reinterpret_cast<double *>(m_ptr));
       longlong res;
       if (var_val <= LLONG_MIN) {
         res = LLONG_MIN;
@@ -6544,7 +6580,7 @@ void Item_func_set_user_var::make_field(Send_field *tmp_field) {
 
 type_conversion_status Item_func_set_user_var::save_in_field(
     Field *field, bool no_conversions, bool can_use_result_field) {
-  bool use_result_field =
+  const bool use_result_field =
       (!can_use_result_field ? 0 : (result_field && result_field != field));
   type_conversion_status error;
 
@@ -6571,7 +6607,7 @@ type_conversion_status Item_func_set_user_var::save_in_field(
     error = field->store(result->ptr(), result->length(), cs);
     str_value.set_quick(nullptr, 0, cs);
   } else if (result_type() == REAL_RESULT) {
-    double nr = entry->val_real(&null_value);
+    const double nr = entry->val_real(&null_value);
     if (null_value) return set_field_to_null(field);
     field->set_notnull();
     error = field->store(nr);
@@ -6582,7 +6618,7 @@ type_conversion_status Item_func_set_user_var::save_in_field(
     field->set_notnull();
     error = field->store_decimal(val);
   } else {
-    longlong nr = entry->val_int(&null_value);
+    const longlong nr = entry->val_int(&null_value);
     if (null_value)
       return set_field_to_null_with_conversions(field, no_conversions);
     field->set_notnull();
@@ -6711,7 +6747,7 @@ static int get_var_with_binlog(THD *thd, enum_sql_command sql_command,
     cleared before executing sub-statement. So instead we have to look
     at THD::variables::sql_log_bin member.
   */
-  bool log_on = mysql_bin_log.is_open() && thd->variables.sql_log_bin;
+  const bool log_on = mysql_bin_log.is_open() && thd->variables.sql_log_bin;
 
   /*
     Any reference to user-defined variable which is done from stored
@@ -6782,7 +6818,8 @@ static int get_var_with_binlog(THD *thd, enum_sql_command sql_command,
     may need to be valid after current [SP] statement execution pool is
     destroyed.
   */
-  size_t size = ALIGN_SIZE(sizeof(Binlog_user_var_event)) + var_entry->length();
+  const size_t size =
+      ALIGN_SIZE(sizeof(Binlog_user_var_event)) + var_entry->length();
   if (!(user_var_event =
             (Binlog_user_var_event *)thd->user_var_events_alloc->Alloc(size)))
     return 1;
@@ -7119,10 +7156,10 @@ Audit_global_variable_get_event::Audit_global_variable_get_event(
     THD *thd, Item_func_get_system_var *item, uchar cache_type)
     : m_thd(thd), m_item(item), m_val_type(cache_type) {
   // Variable is of GLOBAL scope.
-  bool is_global_var = m_item->var_scope == OPT_GLOBAL;
+  const bool is_global_var = m_item->var_scope == OPT_GLOBAL;
 
   // Event is already audited for the same query.
-  bool event_is_audited =
+  const bool event_is_audited =
       m_item->cache_present != 0 && m_item->used_query_id == m_thd->query_id;
 
   m_audit_event = (is_global_var && !event_is_audited);
@@ -7134,7 +7171,7 @@ Audit_global_variable_get_event::~Audit_global_variable_get_event() {
     cached for the types other then m_val_type for intermediate type
     conversions then event is already notified.
   */
-  bool event_already_notified = (m_item->cache_present & (~m_val_type));
+  const bool event_already_notified = (m_item->cache_present & (~m_val_type));
 
   if (m_audit_event && !event_already_notified) {
     String str;
@@ -7155,10 +7192,10 @@ Audit_global_variable_get_event::~Audit_global_variable_get_event() {
                      m_item->collation.collation);
     }
 
-    mysql_audit_notify(m_thd, AUDIT_EVENT(MYSQL_AUDIT_GLOBAL_VARIABLE_GET),
-                       m_item->var_tracker.get_var_name(),
-                       outStr ? outStr->ptr() : nullptr,
-                       outStr ? outStr->length() : 0);
+    mysql_event_tracking_global_variable_notify(
+        m_thd, AUDIT_EVENT(EVENT_TRACKING_GLOBAL_VARIABLE_GET),
+        m_item->var_tracker.get_var_name(), outStr ? outStr->ptr() : nullptr,
+        outStr ? outStr->length() : 0);
   }
 }
 
@@ -7180,8 +7217,8 @@ longlong Item_func_get_system_var::get_sys_var_safe(THD *thd, sys_var *var) {
 
 longlong Item_func_get_system_var::val_int() {
   THD *thd = current_thd;
-  Audit_global_variable_get_event audit_sys_var(thd, this,
-                                                GET_SYS_VAR_CACHE_LONG);
+  const Audit_global_variable_get_event audit_sys_var(thd, this,
+                                                      GET_SYS_VAR_CACHE_LONG);
   assert(fixed);
 
   if (cache_present && thd->query_id == used_query_id) {
@@ -7228,7 +7265,7 @@ longlong Item_func_get_system_var::val_int() {
       case SHOW_MY_BOOL:
         return get_sys_var_safe<bool>(thd, var);
       case SHOW_DOUBLE: {
-        double dval = val_real();
+        const double dval = val_real();
 
         used_query_id = thd->query_id;
         cached_llval = (longlong)dval;
@@ -7264,8 +7301,8 @@ longlong Item_func_get_system_var::val_int() {
 String *Item_func_get_system_var::val_str(String *str) {
   DEBUG_SYNC(current_thd, "after_error_checking");
   THD *thd = current_thd;
-  Audit_global_variable_get_event audit_sys_var(thd, this,
-                                                GET_SYS_VAR_CACHE_STRING);
+  const Audit_global_variable_get_event audit_sys_var(thd, this,
+                                                      GET_SYS_VAR_CACHE_STRING);
   assert(fixed);
 
   if (cache_present && thd->query_id == used_query_id) {
@@ -7356,8 +7393,8 @@ String *Item_func_get_system_var::val_str(String *str) {
 
 double Item_func_get_system_var::val_real() {
   THD *thd = current_thd;
-  Audit_global_variable_get_event audit_sys_var(thd, this,
-                                                GET_SYS_VAR_CACHE_DOUBLE);
+  const Audit_global_variable_get_event audit_sys_var(thd, this,
+                                                      GET_SYS_VAR_CACHE_DOUBLE);
   assert(fixed);
 
   if (cache_present && thd->query_id == used_query_id) {
@@ -7459,9 +7496,9 @@ void Item_func_get_system_var::cleanup() {
   cached_strval.mem_free();
 }
 
-bool Item_func_match::itemize(Parse_context *pc, Item **res) {
+bool Item_func_match::do_itemize(Parse_context *pc, Item **res) {
   if (skip_itemize(res)) return false;
-  if (super::itemize(pc, res) || against->itemize(pc, &against)) return true;
+  if (super::do_itemize(pc, res) || against->itemize(pc, &against)) return true;
   add_accum_properties(against);
 
   pc->select->add_ftfunc_to_list(this);
@@ -7604,7 +7641,7 @@ bool Item_func_match::fix_fields(THD *thd, Item **ref) {
     modifications to find_best and auto_close as complement to auto_init code
     above.
   */
-  enum_mark_columns save_mark_used_columns = thd->mark_used_columns;
+  const enum_mark_columns save_mark_used_columns = thd->mark_used_columns;
   /*
     Since different engines require different columns for FTS index lookup
     we prevent updating of table read_set in argument's ::fix_fields().
@@ -7703,7 +7740,7 @@ bool Item_func_match::fix_fields(THD *thd, Item **ref) {
   }
 
   if (!master) {
-    Prepared_stmt_arena_holder ps_arena_holder(thd);
+    const Prepared_stmt_arena_holder ps_arena_holder(thd);
     hints = new (thd->mem_root) Ft_hints(flags);
     if (!hints) {
       my_error(ER_TABLE_CANT_HANDLE_FT, MYF(0));
@@ -7753,7 +7790,7 @@ bool Item_func_match::fix_index(const THD *thd) {
         down_cast<Item_field *>(unwrap_rollup_group(args[i])->real_item());
     for (keynr = 0; keynr < fts; keynr++) {
       KEY *ft_key = &table->key_info[ft_to_key[keynr]];
-      uint key_parts = ft_key->user_defined_key_parts;
+      const uint key_parts = ft_key->user_defined_key_parts;
 
       for (uint part = 0; part < key_parts; part++) {
         if (item->field->eq(ft_key->key_part[part].field)) ft_cnt[keynr]++;
@@ -7857,6 +7894,15 @@ void Item_func_match::print(const THD *thd, String *str,
   else if (flags & FT_EXPAND)
     str->append(STRING_WITH_LEN(" with query expansion"));
   str->append(STRING_WITH_LEN("))"));
+}
+
+void Item_func_match::add_json_info(Json_object *obj) {
+  if (flags & FT_BOOL)
+    obj->add_alias("match_options",
+                   create_dom_ptr<Json_string>("in boolean mode"));
+  else if (flags & FT_EXPAND)
+    obj->add_alias("match_options",
+                   create_dom_ptr<Json_string>("with query expansion"));
 }
 
 /**
@@ -7998,8 +8044,9 @@ Item *get_system_variable(Parse_context *pc, enum_var_type scope,
     v->do_deprecated_warning(thd);
     return false;
   };
-  System_variable_tracker var_tracker = System_variable_tracker::make_tracker(
-      to_string_view(prefix), to_string_view(suffix));
+  const System_variable_tracker var_tracker =
+      System_variable_tracker::make_tracker(to_string_view(prefix),
+                                            to_string_view(suffix));
   if (var_tracker.access_system_variable<bool>(thd, f).value_or(true)) {
     return nullptr;
   }
@@ -8012,9 +8059,9 @@ Item *get_system_variable(Parse_context *pc, enum_var_type scope,
   return new Item_func_get_system_var(var_tracker, resolved_scope);
 }
 
-bool Item_func_row_count::itemize(Parse_context *pc, Item **res) {
+bool Item_func_row_count::do_itemize(Parse_context *pc, Item **res) {
   if (skip_itemize(res)) return false;
-  if (super::itemize(pc, res)) return true;
+  if (super::do_itemize(pc, res)) return true;
 
   LEX *lex = pc->thd->lex;
   lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_SYSTEM_FUNCTION);
@@ -8045,9 +8092,9 @@ Item_func_sp::Item_func_sp(const POS &pos, const LEX_STRING &db_name,
       sp_name(to_lex_cstring(db_name), fn_name, use_explicit_name);
 }
 
-bool Item_func_sp::itemize(Parse_context *pc, Item **res) {
+bool Item_func_sp::do_itemize(Parse_context *pc, Item **res) {
   if (skip_itemize(res)) return false;
-  if (super::itemize(pc, res)) return true;
+  if (super::do_itemize(pc, res)) return true;
   if (m_name == nullptr) return true;  // OOM
 
   THD *thd = pc->thd;
@@ -8081,7 +8128,7 @@ void Item_func_sp::cleanup() {
 const char *Item_func_sp::func_name() const {
   const THD *thd = current_thd;
   /* Calculate length to avoid reallocation of string for sure */
-  size_t len =
+  const size_t len =
       (((m_name->m_explicit_name ? m_name->m_db.length : 0) +
         m_name->m_name.length) *
            2 +                              // characters*quoting
@@ -8137,7 +8184,7 @@ static void my_missing_function_error(const LEX_STRING &token,
 */
 
 bool Item_func_sp::init_result_field(THD *thd) {
-  LEX_CSTRING empty_name = {STRING_WITH_LEN("")};
+  const LEX_CSTRING empty_name = {STRING_WITH_LEN("")};
   DBUG_TRACE;
 
   assert(m_sp == nullptr);
@@ -8312,7 +8359,7 @@ bool Item_func_sp::execute_impl(THD *thd) {
   bool err_status = true;
   Sub_statement_state statement_state;
   Security_context *save_security_ctx = thd->security_context();
-  enum enum_sp_data_access access =
+  const enum enum_sp_data_access access =
       (m_sp->m_chistics->daccess == SP_DEFAULT_ACCESS)
           ? SP_DEFAULT_ACCESS_MAPPING
           : m_sp->m_chistics->daccess;
@@ -8367,9 +8414,9 @@ Item_result Item_func_sp::result_type() const {
   return sp_result_field->result_type();
 }
 
-bool Item_func_found_rows::itemize(Parse_context *pc, Item **res) {
+bool Item_func_found_rows::do_itemize(Parse_context *pc, Item **res) {
   if (skip_itemize(res)) return false;
-  if (super::itemize(pc, res)) return true;
+  if (super::do_itemize(pc, res)) return true;
   pc->thd->lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_SYSTEM_FUNCTION);
   pc->thd->lex->safe_to_cache_query = false;
   push_warning(current_thd, Sql_condition::SL_WARNING,
@@ -8438,8 +8485,8 @@ bool Item_func_sp::fix_fields(THD *thd, Item **ref) {
     Internal_error_handler_holder<View_error_handler, Table_ref> view_handler(
         thd, context->view_error_handler, context->view_error_handler_arg);
 
-    bool res = check_routine_access(thd, EXECUTE_ACL, m_name->m_db.str,
-                                    m_name->m_name.str, false, false);
+    const bool res = check_routine_access(thd, EXECUTE_ACL, m_name->m_db.str,
+                                          m_name->m_name.str, false, false);
     thd->set_security_context(save_security_ctx);
 
     if (res) return res;
@@ -8539,9 +8586,9 @@ void uuid_short_init() {
       ((((ulonglong)server_id) << 56) + (((ulonglong)server_start_time) << 24));
 }
 
-bool Item_func_uuid_short::itemize(Parse_context *pc, Item **res) {
+bool Item_func_uuid_short::do_itemize(Parse_context *pc, Item **res) {
   if (skip_itemize(res)) return false;
-  if (super::itemize(pc, res)) return true;
+  if (super::do_itemize(pc, res)) return true;
   pc->thd->lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_SYSTEM_FUNCTION);
   pc->thd->lex->safe_to_cache_query = false;
   return false;
@@ -8555,9 +8602,9 @@ longlong Item_func_uuid_short::val_int() {
   return (longlong)val;
 }
 
-bool Item_func_version::itemize(Parse_context *pc, Item **res) {
+bool Item_func_version::do_itemize(Parse_context *pc, Item **res) {
   if (skip_itemize(res)) return false;
-  if (super::itemize(pc, res)) return true;
+  if (super::do_itemize(pc, res)) return true;
   pc->thd->lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_SYSTEM_FUNCTION);
   return false;
 }
@@ -8844,7 +8891,7 @@ longlong Item_func_can_access_routine::val_int() {
   String *routine_name_ptr = args[1]->val_str(&routine_name);
   String *type_ptr = args[2]->val_str(&type);
   String *definer_ptr = args[3]->val_str(&definer);
-  bool check_full_access = args[4]->val_int();
+  const bool check_full_access = args[4]->val_int();
   if (schema_name_ptr == nullptr || routine_name_ptr == nullptr ||
       type_ptr == nullptr || definer_ptr == nullptr || args[4]->null_value) {
     null_value = true;
@@ -8857,7 +8904,7 @@ longlong Item_func_can_access_routine::val_int() {
   type_ptr->c_ptr_safe();
   definer_ptr->c_ptr_safe();
 
-  bool is_procedure = (strcmp(type_ptr->ptr(), "PROCEDURE") == 0);
+  const bool is_procedure = (strcmp(type_ptr->ptr(), "PROCEDURE") == 0);
 
   // Skip INFORMATION_SCHEMA database
   if (is_infoschema_db(schema_name_ptr->ptr()) ||
@@ -8887,8 +8934,8 @@ longlong Item_func_can_access_routine::val_int() {
   }
 
   THD *thd = current_thd;
-  bool full_access = has_full_view_routine_access(thd, schema_name_ptr->ptr(),
-                                                  user_name.str, host_name.str);
+  const bool full_access = has_full_view_routine_access(
+      thd, schema_name_ptr->ptr(), user_name.str, host_name.str);
 
   if (check_full_access) {
     return full_access ? 1 : 0;
@@ -9081,7 +9128,7 @@ longlong Item_func_can_access_column::val_int() {
                    &grant_info.privilege, nullptr, false, true))
     return 0;
 
-  uint col_access =
+  const uint col_access =
       get_column_grant(thd, &grant_info, schema_name_ptr->ptr(),
                        table_name_ptr->ptr(), column_name_ptr->ptr()) &
       COL_ACLS;
@@ -9169,7 +9216,7 @@ longlong Item_func_can_access_view::val_int() {
   const String name_str(table_name_ptr->c_ptr_safe(), system_charset_info);
   if (!is_view_valid &&
       !thd->lex->m_IS_table_stats.check_error_for_key(db_str, name_str)) {
-    std::string err_message = push_view_warning_or_error(
+    const std::string err_message = push_view_warning_or_error(
         current_thd, schema_name_ptr->ptr(), table_name_ptr->ptr());
 
     /*
@@ -9197,8 +9244,8 @@ longlong Item_func_can_access_view::val_int() {
   parse_user(definer_ptr->ptr(), definer_ptr->length(), user_name.str,
              &user_name.length, host_name.str, &host_name.length);
 
-  std::string definer_user(user_name.str, user_name.length);
-  std::string definer_host(host_name.str, host_name.length);
+  const std::string definer_user(user_name.str, user_name.length);
+  const std::string definer_host(host_name.str, host_name.length);
 
   if (!strcmp(definer_user.c_str(), sctx->priv_user().str) &&
       !my_strcasecmp(system_charset_info, definer_host.c_str(),
@@ -9346,10 +9393,10 @@ static ulonglong get_table_statistics(
   String *schema_name_ptr = args[0]->val_str(&schema_name);
   String *table_name_ptr = args[1]->val_str(&table_name);
   String *engine_name_ptr = args[2]->val_str(&engine_name);
-  bool skip_hidden_table = args[4]->val_int();
+  const bool skip_hidden_table = args[4]->val_int();
   String *ts_se_private_data_ptr = args[5]->val_str(&ts_se_private_data);
-  ulonglong stat_data = args[6]->val_uint();
-  ulonglong cached_timestamp = args[7]->val_uint();
+  const ulonglong stat_data = args[6]->val_uint();
+  const ulonglong cached_timestamp = args[7]->val_uint();
 
   String *tbl_se_private_data_ptr = nullptr;
 
@@ -9381,8 +9428,8 @@ static ulonglong get_table_statistics(
 
   // Read the statistic value from cache.
   THD *thd = current_thd;
-  dd::Object_id se_private_id = (dd::Object_id)args[3]->val_uint();
-  ulonglong result = thd->lex->m_IS_table_stats.read_stat(
+  const dd::Object_id se_private_id = (dd::Object_id)args[3]->val_uint();
+  const ulonglong result = thd->lex->m_IS_table_stats.read_stat(
       thd, *schema_name_ptr, *table_name_ptr, *engine_name_ptr,
       (partition_name_ptr ? partition_name_ptr->c_ptr_safe() : nullptr),
       se_private_id,
@@ -9397,7 +9444,7 @@ static ulonglong get_table_statistics(
 longlong Item_func_internal_table_rows::val_int() {
   DBUG_TRACE;
 
-  ulonglong result = get_table_statistics(
+  const ulonglong result = get_table_statistics(
       args, arg_count, dd::info_schema::enum_table_stats_type::TABLE_ROWS,
       &null_value);
 
@@ -9409,7 +9456,7 @@ longlong Item_func_internal_table_rows::val_int() {
 longlong Item_func_internal_avg_row_length::val_int() {
   DBUG_TRACE;
 
-  ulonglong result = get_table_statistics(
+  const ulonglong result = get_table_statistics(
       args, arg_count,
       dd::info_schema::enum_table_stats_type::TABLE_AVG_ROW_LENGTH,
       &null_value);
@@ -9419,7 +9466,7 @@ longlong Item_func_internal_avg_row_length::val_int() {
 longlong Item_func_internal_data_length::val_int() {
   DBUG_TRACE;
 
-  ulonglong result = get_table_statistics(
+  const ulonglong result = get_table_statistics(
       args, arg_count, dd::info_schema::enum_table_stats_type::DATA_LENGTH,
       &null_value);
   return result;
@@ -9428,7 +9475,7 @@ longlong Item_func_internal_data_length::val_int() {
 longlong Item_func_internal_max_data_length::val_int() {
   DBUG_TRACE;
 
-  ulonglong result = get_table_statistics(
+  const ulonglong result = get_table_statistics(
       args, arg_count, dd::info_schema::enum_table_stats_type::MAX_DATA_LENGTH,
       &null_value);
   return result;
@@ -9437,7 +9484,7 @@ longlong Item_func_internal_max_data_length::val_int() {
 longlong Item_func_internal_index_length::val_int() {
   DBUG_TRACE;
 
-  ulonglong result = get_table_statistics(
+  const ulonglong result = get_table_statistics(
       args, arg_count, dd::info_schema::enum_table_stats_type::INDEX_LENGTH,
       &null_value);
   return result;
@@ -9446,7 +9493,7 @@ longlong Item_func_internal_index_length::val_int() {
 longlong Item_func_internal_data_free::val_int() {
   DBUG_TRACE;
 
-  ulonglong result = get_table_statistics(
+  const ulonglong result = get_table_statistics(
       args, arg_count, dd::info_schema::enum_table_stats_type::DATA_FREE,
       &null_value);
 
@@ -9458,7 +9505,7 @@ longlong Item_func_internal_data_free::val_int() {
 longlong Item_func_internal_auto_increment::val_int() {
   DBUG_TRACE;
 
-  ulonglong result = get_table_statistics(
+  const ulonglong result = get_table_statistics(
       args, arg_count, dd::info_schema::enum_table_stats_type::AUTO_INCREMENT,
       &null_value);
 
@@ -9470,7 +9517,7 @@ longlong Item_func_internal_auto_increment::val_int() {
 longlong Item_func_internal_checksum::val_int() {
   DBUG_TRACE;
 
-  ulonglong result = get_table_statistics(
+  const ulonglong result = get_table_statistics(
       args, arg_count, dd::info_schema::enum_table_stats_type::CHECKSUM,
       &null_value);
 
@@ -9556,13 +9603,13 @@ longlong Item_func_internal_index_column_cardinality::val_int() {
   String *table_name_ptr = args[1]->val_str(&table_name);
   String *index_name_ptr = args[2]->val_str(&index_name);
   String *column_name_ptr = args[3]->val_str(&column_name);
-  uint index_ordinal_position = args[4]->val_uint();
-  uint column_ordinal_position = args[5]->val_uint();
+  const uint index_ordinal_position = args[4]->val_uint();
+  const uint column_ordinal_position = args[5]->val_uint();
   String *engine_name_ptr = args[6]->val_str(&engine_name);
-  dd::Object_id se_private_id = (dd::Object_id)args[7]->val_uint();
-  bool hidden_index = args[8]->val_int();
-  ulonglong stat_cardinality = args[9]->val_uint();
-  ulonglong cached_timestamp = args[10]->val_uint();
+  const dd::Object_id se_private_id = (dd::Object_id)args[7]->val_uint();
+  const bool hidden_index = args[8]->val_int();
+  const ulonglong stat_cardinality = args[9]->val_uint();
+  const ulonglong cached_timestamp = args[10]->val_uint();
 
   // stat_cardinality and cached_timestamp from mysql.index_stats can be null
   // when stat is fetched for 1st time without executing ANALYZE command.
@@ -9813,11 +9860,12 @@ longlong Item_func_internal_dd_char_length::val_int() {
   DBUG_TRACE;
   null_value = false;
 
-  dd::enum_column_types col_type = (dd::enum_column_types)args[0]->val_int();
+  const dd::enum_column_types col_type =
+      (dd::enum_column_types)args[0]->val_int();
   uint field_length = args[1]->val_int();
   String cs_name;
   String *cs_name_ptr = args[2]->val_str(&cs_name);
-  uint flag = args[3]->val_int();
+  const uint flag = args[3]->val_int();
 
   // Stop if we found a NULL argument.
   if (args[0]->null_value || args[1]->null_value || cs_name_ptr == nullptr ||
@@ -9834,8 +9882,8 @@ longlong Item_func_internal_dd_char_length::val_int() {
   }
 
   // Check data types for getting info
-  enum_field_types field_type = dd_get_old_field_type(col_type);
-  bool blob_flag = is_blob(field_type);
+  const enum_field_types field_type = dd_get_old_field_type(col_type);
+  const bool blob_flag = is_blob(field_type);
   if (!blob_flag && field_type != MYSQL_TYPE_ENUM &&
       field_type != MYSQL_TYPE_SET &&
       field_type != MYSQL_TYPE_VARCHAR &&  // For varbinary type
@@ -9946,26 +9994,26 @@ longlong Item_func_get_dd_index_sub_part_length::val_int() {
   null_value = true;
 
   // Read arguments
-  uint key_part_length = args[0]->val_int();
-  dd::enum_column_types col_type =
+  const uint key_part_length = args[0]->val_int();
+  const dd::enum_column_types col_type =
       static_cast<dd::enum_column_types>(args[1]->val_int());
-  uint column_length = args[2]->val_int();
-  uint csid = args[3]->val_int();
-  dd::Index::enum_index_type idx_type =
+  const uint column_length = args[2]->val_int();
+  const uint csid = args[3]->val_int();
+  const dd::Index::enum_index_type idx_type =
       static_cast<dd::Index::enum_index_type>(args[4]->val_int());
   if (args[0]->null_value || args[1]->null_value || args[2]->null_value ||
       args[3]->null_value || args[4]->null_value)
     return 0;
 
   // Read server col_type and check if we have key part.
-  enum_field_types field_type = dd_get_old_field_type(col_type);
+  const enum_field_types field_type = dd_get_old_field_type(col_type);
   if (!Field::type_can_have_key_part(field_type)) return 0;
 
   // Calculate the key length for the column. Note that we pass inn dummy values
   // for "decimals", "is_unsigned" and "elements" since none of those arguments
   // will affect the key length for any of the data types that can have a prefix
   // index (see Field::type_can_have_key_part above).
-  uint32 column_key_length =
+  const uint32 column_key_length =
       calc_key_length(field_type, column_length, 0, false, 0);
 
   // Read column charset id from args[3]
@@ -9977,7 +10025,7 @@ longlong Item_func_get_dd_index_sub_part_length::val_int() {
 
   if ((idx_type != dd::Index::IT_FULLTEXT) &&
       (key_part_length != column_key_length)) {
-    longlong sub_part_length = key_part_length / column_charset->mbmaxlen;
+    const longlong sub_part_length = key_part_length / column_charset->mbmaxlen;
     null_value = false;
     return sub_part_length;
   }

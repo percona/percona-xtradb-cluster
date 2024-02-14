@@ -297,12 +297,13 @@ our @DEFAULT_SUITES = qw(
   x
   component_keyring_file
 
-  audit_log
-  audit_log_filter
+  component_audit_log_filter
   binlog_57_decryption
+  component_encryption_udf
+  percona
+  percona_innodb
   percona-pam-for-mysql
   component_masking_functions
-  data_masking
   procfs
   rpl_encryption
 
@@ -383,7 +384,7 @@ our $exe_mysql_migrate_keyring;
 our $exe_mysql_keyring_encryption_test;
 our $exe_mysqladmin;
 our $exe_mysqltest;
-our $exe_mysql_zenfs;
+our $exe_mysql_test_event_tracking;
 our $exe_openssl;
 our $glob_mysql_test_dir;
 our $mysql_version_extra;
@@ -2837,7 +2838,11 @@ sub executable_setup () {
     mtr_exe_exists("$path_client_bindir/mysql_migrate_keyring");
   $exe_mysql_keyring_encryption_test =
     mtr_exe_exists("$path_client_bindir/mysql_keyring_encryption_test");
-  $exe_mysql_zenfs = mtr_exe_maybe_exists("$path_client_bindir/zenfs");
+
+  # Look for mysql_test_event_tracking binary
+  $exe_mysql_test_event_tracking = my_find_bin($bindir,
+                [ "runtime_output_directory", "bin" ],
+                "mysql_test_event_tracking", NOT_REQUIRED);
 
   # For custom OpenSSL builds, look for the my_openssl executable.
   $exe_openssl =
@@ -3393,6 +3398,7 @@ sub environment_setup {
   $ENV{'MYSQLXTEST'}          = mysqlxtest_arguments();
   $ENV{'MYSQL_MIGRATE_KEYRING'} = $exe_mysql_migrate_keyring;
   $ENV{'MYSQL_KEYRING_ENCRYPTION_TEST'} = $exe_mysql_keyring_encryption_test;
+  $ENV{'MYSQL_TEST_EVENT_TRACKING'} = $exe_mysql_test_event_tracking;
   $ENV{'PATH_CONFIG_FILE'}    = $path_config_file;
   $ENV{'MYSQL_CLIENT_BIN_PATH'}    = $path_client_bindir;
   $ENV{'MYSQLBACKUP_PLUGIN_DIR'} = mysqlbackup_plugin_dir()
@@ -3401,7 +3407,6 @@ sub environment_setup {
     client_arguments_no_grp_suffix("mysql_config_editor");
   $ENV{'MYSQL_SECURE_INSTALLATION'} =
     "$path_client_bindir/mysql_secure_installation";
-  $ENV{'MYSQL_ZENFS'} = $exe_mysql_zenfs;
   $ENV{'OPENSSL_EXECUTABLE'} = $exe_openssl;
 
   my $exe_mysqld = find_mysqld($basedir);

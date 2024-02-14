@@ -1462,19 +1462,23 @@ DROP TRIGGER hellotrigger;
 
 
 #
-# SQLCOM_INSTALL_PLUGIN
+# SQLCOM_INSTALL_COMPONENT
 #
 --inc $test_id
 
 --echo #
---echo # SQLCOM_INSTALL_PLUGIN access test
+--echo # SQLCOM_INSTALL_COMPONENT access test
 --echo #
+
+--echo # connection node_1
+--connection node_1
+--source suite/component_audit_log_filter/inc/audit_tables_init.inc
 
 --echo # connection node_testme
 --connection node_testme
 
 --error ER_TABLEACCESS_DENIED_ERROR
-INSTALL PLUGIN audit_log SONAME "audit_log.so";
+INSTALL COMPONENT 'file://component_audit_log_filter';
 
 --eval INSERT INTO counter(count) VALUES($test_id);
 
@@ -1483,8 +1487,8 @@ INSTALL PLUGIN audit_log SONAME "audit_log.so";
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The audit_log PLUGIN should not be installed on node 1
---let $assert_cond = COUNT(*) = 0 FROM information_schema.plugins WHERE plugin_name = "audit_log";
+--let $assert_text = The audit_log COMPONENT should not be installed on node 1
+--let $assert_cond = COUNT(*) = 0 FROM mysql.component WHERE component_urn = "file://component_audit_log_filter";
 --source include/assert.inc
 
 --echo # connection node_2
@@ -1492,42 +1496,40 @@ INSTALL PLUGIN audit_log SONAME "audit_log.so";
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The audit_log PLUGIN should not be installed on node 2
---let $assert_cond = COUNT(*) = 0 FROM information_schema.plugins WHERE plugin_name = "audit_log";
+--let $assert_text = The audit_log COMPONENT should not be installed on node 2
+--let $assert_cond = COUNT(*) = 0 FROM mysql.component WHERE component_urn = "file://component_audit_log_filter";
 --source include/assert.inc
 
-
 #
-# SQLCOM_UNINSTALL_PLUGIN
+# SQLCOM_UNINSTALL_COMPONENT
 #
 --inc $test_id
 
 --echo #
---echo # SQLCOM_UNINSTALL_PLUGIN access test
+--echo # SQLCOM_UNINSTALL_COMPONENT access test
 --echo #
 
 # Test setup
 #
 --echo # connection node_1
 --connection node_1
-INSTALL PLUGIN audit_log SONAME "audit_log.so";
+--source suite/component_audit_log_filter/inc/audit_comp_install.inc
 
---let $assert_text = The audit_log PLUGIN should be installed on node 1
---let $assert_cond = COUNT(*) = 1 FROM information_schema.plugins WHERE plugin_name = "audit_log" AND plugin_status = "ACTIVE";
---let $assert_debug = SELECT plugin_name, plugin_status FROM information_schema.plugins;
+--let $assert_text = The audit_log COMPONENT should be installed on node 1
+--let $assert_cond = COUNT(*) = 1 FROM mysql.component WHERE component_urn = "file://component_audit_log_filter";
 --source include/assert.inc
 
 --echo # connection node_2
 --connection node_2
---let $assert_text = The audit_log PLUGIN should be installed on node 1
---let $assert_cond = COUNT(*) = 1 FROM information_schema.plugins WHERE plugin_name = "audit_log" AND plugin_status = "ACTIVE";
+--let $assert_text = The audit_log COMPONENT should be installed on node 2
+--let $assert_cond = COUNT(*) = 1 FROM mysql.component WHERE component_urn = "file://component_audit_log_filter";
 
 
 --echo # connection node_testme
 --connection node_testme
 
 --error ER_TABLEACCESS_DENIED_ERROR
-UNINSTALL PLUGIN audit_log;
+UNINSTALL COMPONENT 'file://component_audit_log_filter';
 
 --eval INSERT INTO counter(count) VALUES($test_id);
 
@@ -1536,8 +1538,8 @@ UNINSTALL PLUGIN audit_log;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The audit_log PLUGIN should still be installed on node 1
---let $assert_cond = COUNT(*) = 1 FROM information_schema.plugins WHERE plugin_name = "audit_log" AND plugin_status = "ACTIVE";
+--let $assert_text = The audit_log COMPONENT should still be installed on node 1
+--let $assert_cond = COUNT(*) = 1 FROM mysql.component WHERE component_urn = "file://component_audit_log_filter";
 --source include/assert.inc
 
 --echo # connection node_2
@@ -1545,16 +1547,26 @@ UNINSTALL PLUGIN audit_log;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The audit_log PLUGIN should still be installed on node 2
---let $assert_cond = COUNT(*) = 1 FROM information_schema.plugins WHERE plugin_name = "audit_log" AND plugin_status = "ACTIVE";
+--let $assert_text = The audit_log COMPONENT should still be installed on node 2
+--let $assert_cond = COUNT(*) = 1 FROM mysql.component WHERE component_urn = "file://component_audit_log_filter";
 --source include/assert.inc
 
 
 # Test cleanup
 #
---echo # connection node_1
---connection node_1
-UNINSTALL plugin audit_log;
+
+#
+# We will not uninstall component now.
+# For detailed explanation about the problem with uninstalling componets caused by internal
+# reference counting, please see the comment in galera_wsrep_ddl_access_checking2.test
+# I left it "as is" here intentionally to be able to easy demonstrate the problem by uncommenting
+# the following part of the test.
+#
+
+#--echo # connection node_1
+#--connection node_1
+#--source suite/component_audit_log_filter/inc/audit_comp_uninstall.inc
+#--source suite/component_audit_log_filter/inc/audit_tables_cleanup.inc
 
 
 #
@@ -1663,7 +1675,6 @@ ALTER EVENT helloevent ON SCHEDULE EVERY '2:3' DAY_HOUR;
 --inc $test_id
 
 --echo #
---echo # SQLCOM_DROP_EVENT access test
 --echo #
 
 --echo # connection node_testme

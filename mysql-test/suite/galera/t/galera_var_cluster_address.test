@@ -61,7 +61,9 @@ SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_N
 #
 --connection node_2
 --let $wsrep_cluster_address_orig = `SELECT @@wsrep_cluster_address`
-INSTALL PLUGIN audit_log SONAME 'audit_log.so';
+
+--source suite/component_audit_log_filter/inc/audit_tables_init.inc
+--source suite/component_audit_log_filter/inc/audit_comp_install.inc
 
 --connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
 show status like 'wsrep_local_state_comment';
@@ -71,7 +73,10 @@ show status like 'wsrep_local_state_comment';
 --source include/wait_until_connected_again.inc
 --source include/galera_wait_ready.inc
 #
-UNINSTALL PLUGIN audit_log;
+
+--source suite/component_audit_log_filter/inc/audit_comp_uninstall.inc
+--source suite/component_audit_log_filter/inc/audit_tables_cleanup.inc
+
 show status like 'wsrep_cluster_size';
 #
 --echo #shutdown node-2 to get rid of audit plugin that is marked deleted but not removed

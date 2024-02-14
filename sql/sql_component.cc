@@ -48,6 +48,11 @@
 
 #include "sql/sql_component.h"
 
+#ifdef WITH_WSREP
+#include "sql/auth/auth_acls.h"
+#include "sql/sql_parse.h"
+#endif
+
 using manifest::Manifest_reader;
 
 bool Sql_cmd_install_component::execute(THD *thd) {
@@ -59,11 +64,23 @@ bool Sql_cmd_install_component::execute(THD *thd) {
     return true;
   }
 
+#ifdef WITH_WSREP
+  Table_ref tables("mysql", "component", TL_WRITE);
+
+  if (!opt_noacl &&
+      check_table_access(thd, INSERT_ACL, &tables, false, 1, false)) {
+    return true;
+  }
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL)) {
+    return true;
+  }
+#endif
+
   if (acquire_shared_backup_lock(thd, thd->variables.lock_wait_timeout))
     return true;
 
-  Disable_autocommit_guard autocommit_guard(thd);
-  dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+  const Disable_autocommit_guard autocommit_guard(thd);
+  const dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
 
   DBUG_EXECUTE_IF("disable_rg_pfs_notifications", {
     auto name = "file://component_test_pfs_notification";
@@ -183,11 +200,23 @@ bool Sql_cmd_uninstall_component::execute(THD *thd) {
     return true;
   }
 
+#ifdef WITH_WSREP
+  Table_ref tables("mysql", "component", TL_WRITE);
+
+  if (!opt_noacl &&
+      check_table_access(thd, DELETE_ACL, &tables, false, 1, false)) {
+    return true;
+  }
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL)) {
+    return true;
+  }
+#endif
+
   if (acquire_shared_backup_lock(thd, thd->variables.lock_wait_timeout))
     return true;
 
-  Disable_autocommit_guard autocommit_guard(thd);
-  dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+  const Disable_autocommit_guard autocommit_guard(thd);
+  const dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
 
   std::vector<const char *> urns(m_urns.size());
   for (size_t i = 0; i < m_urns.size(); ++i) {

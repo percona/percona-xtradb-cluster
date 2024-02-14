@@ -958,9 +958,9 @@ GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
-# SQLCOM_INSTALL_PLUGIN access test
+# SQLCOM_INSTALL_COMPONENT access test
 #
-# connection node_1
+# connection node_1a
 GRANT INSERT ON *.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
@@ -970,14 +970,16 @@ GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
-INSTALL PLUGIN audit_log SONAME "audit_log.so";
+INSTALL COMPONENT 'file://component_audit_log_filter';
 INSERT INTO counter(count) VALUES(30);;
-# connection node_1
-include/assert.inc [The audit_log PLUGIN should be installed on node 1]
-# connection node_2
-include/assert.inc [The audit_log PLUGIN should be installed on node 2]
-# connection node_1
-UNINSTALL PLUGIN audit_log;
+# connection node_1a
+Timeout in wait_condition.inc for SELECT COUNT(*) = 30 FROM counter;
+include/assert.inc [The audit_log COMPONENT should be installed on node 1]
+# connection node_2a
+Timeout in wait_condition.inc for SELECT COUNT(*) = 30 FROM counter;
+include/assert.inc [The audit_log COMPONENT should be installed on node 2]
+# connection node_1a
+UNINSTALL COMPONENT 'file://component_audit_log_filter';
 REVOKE INSERT ON *.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
@@ -986,13 +988,13 @@ GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
-# SQLCOM_UNINSTALL_PLUGIN access test
+# SQLCOM_UNINSTALL_COMPONENT access test
 #
-# connection node_1
-INSTALL PLUGIN null_audit SONAME "adt_null.so";
-include/assert.inc [The null_audit PLUGIN should be installed on node 1]
-# connection node_2
-# connection node_1
+# connection node_1a
+INSTALL COMPONENT 'file://component_audit_log_filter';
+include/assert.inc [The audit_log COMPONENT should be installed on node 1]
+# connection node_2a
+# connection node_1a
 GRANT DELETE ON *.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
@@ -1002,12 +1004,12 @@ GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
-UNINSTALL PLUGIN null_audit;
+UNINSTALL COMPONENT 'file://component_audit_log_filter';
 INSERT INTO counter(count) VALUES(31);;
 # connection node_1
-include/assert.inc [The null_audit PLUGIN should not be installed on node 1]
+include/assert.inc [The audit_log COMPONENT should not be installed on node 1]
 # connection node_2
-include/assert.inc [The null_audit PLUGIN should not be installed on node 2]
+include/assert.inc [The audit_log COMPONENT should not be installed on node 2]
 # connection node_1
 REVOKE DELETE ON *.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';

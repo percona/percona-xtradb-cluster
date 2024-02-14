@@ -3220,7 +3220,6 @@ void srv_shutdown() {
 
   dict_close();
   dict_persist_close();
-  btr_search_sys_free();
   undo_spaces_deinit();
   os_aio_free();
   que_close();
