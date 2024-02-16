@@ -969,15 +969,18 @@ bool Sql_cmd_alter_tablespace::execute(THD *thd) {
 
     // mdl_lock scope begin
     {
+      bool mdl_acquired = false;
       MDL_request request;
       MDL_REQUEST_INIT(&request, MDL_key::TABLESPACE, "", m_tablespace_name.str,
                        MDL_INTENTION_EXCLUSIVE, MDL_EXPLICIT);
       wsrep_scope_guard mdl_lock(
-          [thd, &request]() {
-            thd->mdl_context.acquire_lock(&request,
-                                          thd->variables.lock_wait_timeout);
+          [thd, &request, &mdl_acquired]() {
+            mdl_acquired = !thd->mdl_context.acquire_lock(
+                &request, thd->variables.lock_wait_timeout);
           },
-          [thd, &request]() { thd->mdl_context.release_lock(request.ticket); });
+          [thd, &request, &mdl_acquired]() {
+            if (mdl_acquired) thd->mdl_context.release_lock(request.ticket);
+          });
 
       dd::cache::Dictionary_client *dc = thd->dd_client();
       dd::cache::Dictionary_client::Auto_releaser releaser(dc);
@@ -1359,15 +1362,18 @@ bool Sql_cmd_alter_tablespace_rename::execute(THD *thd) {
 
     // mdl_lock scope begin
     {
+      bool mdl_acquired = false;
       MDL_request request;
       MDL_REQUEST_INIT(&request, MDL_key::TABLESPACE, "", m_tablespace_name.str,
                        MDL_INTENTION_EXCLUSIVE, MDL_EXPLICIT);
       wsrep_scope_guard mdl_lock(
-          [thd, &request]() {
-            thd->mdl_context.acquire_lock(&request,
-                                          thd->variables.lock_wait_timeout);
+          [thd, &request, &mdl_acquired]() {
+            mdl_acquired = !thd->mdl_context.acquire_lock(
+                &request, thd->variables.lock_wait_timeout);
           },
-          [thd, &request]() { thd->mdl_context.release_lock(request.ticket); });
+          [thd, &request, &mdl_acquired]() {
+            if (mdl_acquired) thd->mdl_context.release_lock(request.ticket);
+          });
 
       dd::cache::Dictionary_client *dc = thd->dd_client();
       dd::cache::Dictionary_client::Auto_releaser releaser(dc);
