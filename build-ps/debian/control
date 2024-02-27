@@ -38,12 +38,67 @@ Build-Depends: libtool (>= 1.4.2-7),
                libboost-program-options-dev (>= 1.41),
                libwrap0-dev,
                libcurl4-openssl-dev,
+<<<<<<< HEAD
                libldap2-dev
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+               libldap2-dev,
+               stunnel
+=======
+               libldap2-dev,
+               stunnel
+>>>>>>> origin/release-8.0.35
 Standards-Version: 7.0.0
 Homepage: http://www.percona.com/software/percona-xtradb-cluster/
 Vcs-Git: https://github.com/percona/percona-xtradb-cluster
+<<<<<<< HEAD
 
 Package: libperconaserverclient22
+||||||| merged common ancestors
+||||||||| merged common ancestors
+               libldap2-dev
+Standards-Version: 3.9.4
+Homepage: http://www.percona.com/software/percona-server/
+Vcs-Git: git://github.com/percona/percona-server.git -b 8.0
+
+Package: percona-server-rocksdb
+Section: database
+Architecture: any
+Depends: percona-server-server (= ${binary:Version}), ${misc:Depends}
+Breaks: percona-server-rocksdb-5.7
+Replaces: percona-server-rocksdb-5.7
+Description: MyRocks storage engine plugin for Percona Server
+ .
+ MyRocks is a storage engine for Percona Server which incorporates RocksDB
+ library optimized for fast storage and space efficiency.
+ .
+ This package includes the MyRocks/RocksDB plugin library.
+=========
+               libldap2-dev
+Standards-Version: 3.9.4
+Homepage: http://www.percona.com/software/percona-server/
+Vcs-Git: git://github.com/percona/percona-server.git -b 8.0
+
+Package: percona-server-rocksdb
+Section: database
+Architecture: any
+Depends: percona-server-server (= ${binary:Version}), ${misc:Depends}
+Breaks: percona-server-rocksdb-5.7
+Replaces: percona-server-rocksdb-5.7, percona-server-rocksdb-pro
+Conflicts: percona-server-rocksdb-pro
+Description: MyRocks storage engine plugin for Percona Server
+ .
+ MyRocks is a storage engine for Percona Server which incorporates RocksDB
+ library optimized for fast storage and space efficiency.
+ .
+ This package includes the MyRocks/RocksDB plugin library.
+>>>>>>>>> Temporary merge branch 2
+
+Package: libperconaserverclient21
+=======
+
+Package: libperconaserverclient21
+>>>>>>> origin/release-8.0.35
 Architecture: any
 Section: libs
 Pre-Depends: ${misc:Pre-Depends}

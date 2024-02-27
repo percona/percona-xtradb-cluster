@@ -2564,17 +2564,16 @@ bool MDL_lock::can_grant_lock(enum_mdl_type type_arg,
                   wsrep_thd_thread_id(requestor_ctx->wsrep_get_thd()),
                   wsrep_thd_query(requestor_ctx->wsrep_get_thd()));
               can_grant = true;
-            } else if (!wsrep_handle_mdl_conflict(requestor_ctx, ticket,
-                                                  &key)) {
-              wsrep_can_grant = false;
-              if (wsrep_log_conflicts) {
-                auto key = ticket->get_key();
-                WSREP_INFO(
-                    "MDL conflict db=%s table=%s ticket=%d solved by abort",
-                    key->db_name(), key->name(), ticket->get_type());
-              }
             } else {
-              can_grant = true;
+              if (wsrep_handle_mdl_conflict(requestor_ctx, ticket, &key)) {
+                if (wsrep_log_conflicts) {
+                  auto key = ticket->get_key();
+                  WSREP_INFO(
+                      "MDL conflict db=%s table=%s ticket=%d solved by abort",
+                      key->db_name(), key->name(), ticket->get_type());
+                }
+              }
+              wsrep_can_grant = false;
             }
           }
         } /* while */
@@ -5316,3 +5315,12 @@ bool MDL_ticket_store::wsrep_has_non_preemptable_tickets() {
   return (non_preemptable);
 }
 #endif /* WITH_WSREP */
+<<<<<<< HEAD
+||||||| merged common ancestors
+||||||||| merged common ancestors
+>>>>>>>>>>> Temporary merge branch 2
+=========
+>>>>>>>>> Temporary merge branch 2
+=======
+
+>>>>>>> origin/release-8.0.35

@@ -309,3 +309,14 @@ void wsrep_srv_conc_cancel_wait(trx_t *trx) {
   WSREP_DEBUG("WSREP: conc slot cancel, no atomics\n");
 }
 #endif /* WITH_WSREP */
+<<<<<<< HEAD
+||||||| merged common ancestors
+||||||||| merged common ancestors
+}
+>>>>>>>>>>> Temporary merge branch 2
+=========
+}
+>>>>>>>>> Temporary merge branch 2
+=======
+
+>>>>>>> origin/release-8.0.35

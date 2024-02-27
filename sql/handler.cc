@@ -2073,6 +2073,29 @@ int ha_commit_low(THD *thd, bool all, bool run_after_commit) {
         Commit_order_manager::wait_and_finish(thd, error);
       }
     }
+  } else {
+      /* This function is common for group commit flow and the flow that skips
+      group commit. We register the thread in wsrep_group_commit_queue always.
+      For group commit it is done during binlog flush stage, for 1-phase commit
+      it is done in wsrep_before_commit().
+      Ideally, for one-phase (with binlog=off) or two-phase (with binlog=on)
+      this step would be executed when transaction commits in InnoDB.
+      If galera node is acting as async slave and replicated action from async
+      master result in empty changes on slave (slave directly applied the said
+      changes and has skipped error through skip-slave-error configuration) it
+      can result in said situation. In this case slave protocol directly commits
+      gtid through gtid_end_transaction that invokes ordered_commit causing
+      thread handler to register in wsrep group commit queue but since storage
+      engine commit is not done it would fail to unregister the said thread
+      handler as part of storage engine commit. Handle unregistration here,
+      because doing it in wsrep_after_commit() is too late. If there is another
+      thread following this thread in currently processed commit queue,
+      current thread is commited (but does not commit in SE, so does not unregister
+      from wsrep_group_commit_queue. Then the following thread calls
+      wsrep_wait_for_turn_in_group_commit() but sees the previous thread at the front
+      and waits infinitely. */
+      wsrep_wait_for_turn_in_group_commit(thd);
+      wsrep_unregister_from_group_commit(thd);
   }
 
 err:

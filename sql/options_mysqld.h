@@ -134,7 +134,17 @@ enum options_mysqld {
   OPT_SSL_SESSION_CACHE_TIMEOUT,
   OPT_REPLICA_PARALLEL_WORKERS,
   OPT_OLD_STYLE_USER_LIMITS,
+<<<<<<< HEAD
   OPT_SYNC_RELAY_LOG_INFO
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+  OPT_SYNC_RELAY_LOG_INFO
+=======
+  OPT_SYNC_RELAY_LOG_INFO,
+  OPT_BINLOG_TRANSACTION_DEPENDENCY_TRACKING,
+  OPT_CHARACTER_SET_CLIENT_HANDSHAKE,
+  OPT_OLD_OPTION
+>>>>>>> origin/release-8.0.35
 #ifdef WITH_WSREP
   ,
   OPT_WSREP_PROVIDER,
@@ -146,3 +156,4 @@ enum options_mysqld {
 };
 
 #endif  // OPTIONS_MYSQLD_INCLUDED
+

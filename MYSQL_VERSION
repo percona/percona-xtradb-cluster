@@ -1,4 +1,26 @@
 MYSQL_VERSION_MAJOR=8
+<<<<<<< HEAD
 MYSQL_VERSION_MINOR=1
 MYSQL_VERSION_PATCH=0
 MYSQL_VERSION_EXTRA=-1
+||||||| merged common ancestors
+MYSQL_VERSION_MINOR=0
+<<<<<<<<< Temporary merge branch 1
+MYSQL_VERSION_PATCH=34
+MYSQL_VERSION_EXTRA=-26
+||||||||| merged common ancestors
+MYSQL_VERSION_PATCH=34
+MYSQL_VERSION_EXTRA=-26
+>>>>>>>>>>> Temporary merge branch 2
+=========
+MYSQL_VERSION_PATCH=35
+MYSQL_VERSION_EXTRA=-27
+MYSQL_VERSION_STABILITY="LTS"
+>>>>>>>>> Temporary merge branch 2
+=======
+MYSQL_VERSION_MINOR=0
+MYSQL_VERSION_PATCH=35
+MYSQL_VERSION_EXTRA=-27
+MYSQL_VERSION_STABILITY="LTS"
+
+>>>>>>> origin/release-8.0.35

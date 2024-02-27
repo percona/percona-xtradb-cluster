@@ -10,7 +10,37 @@ Introduction
    third-party software which may be included in this distribution of
    MySQL 8.1 (and later).
 
+<<<<<<< HEAD
    Last updated: June 2023
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+<<<<<<< HEAD
+   Last updated: February 2023
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+   Last updated: November 2022
+||||||||| b9848e44dce
+   Last updated: August 2022
+=========
+   Last updated: February 2023
+>>>>>>>>> Temporary merge branch 2
+=======
+   Last updated: June 2023
+>>>>>>> Percona-Server-8.0.34-26
+||||||||| merged common ancestors
+<<<<<<<<<<< Temporary merge branch 1
+   Last updated: February 2023
+||||||||||| merged common ancestors
+   Last updated: November 2022
+===========
+   Last updated: June 2023
+>>>>>>>>>>> Temporary merge branch 2
+=========
+   Last updated: August 2023
+>>>>>>>>> Temporary merge branch 2
+=======
+   Last updated: August 2023
+>>>>>>> origin/release-8.0.35
 
 Licensing Information
 
@@ -5752,3 +5782,4 @@ Written Offer for Source Code
 
     b. in the case of code licensed under the GPL v3 for as long as Oracle
        offers spare parts or customer support for that product model.
+

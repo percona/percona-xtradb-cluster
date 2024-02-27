@@ -12577,12 +12577,12 @@ int Write_rows_log_event::do_exec_row(const Relay_log_info *const rli) {
 
 #ifdef WITH_WSREP
   if (WSREP(thd)) {
-    THD_STAGE_INFO(thd, stage_wsrep_writing_rows);
     snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
              "wsrep: writing row for write-set (%lld)",
              (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
+    THD_STAGE_INFO(thd, stage_wsrep_writing_rows);
   }
 #endif /* WITH_WSREP */
 
@@ -12696,12 +12696,12 @@ int Delete_rows_log_event::do_exec_row(const Relay_log_info *const rli) {
 
 #ifdef WITH_WSREP
   if (WSREP(thd)) {
-    THD_STAGE_INFO(thd, stage_wsrep_deleting_rows);
     snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
              "wsrep: deleting row for write-set (%lld)",
              (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
+    THD_STAGE_INFO(thd, stage_wsrep_deleting_rows);
   }
 #endif /* WITH_WSREP */
 
@@ -12876,12 +12876,12 @@ int Update_rows_log_event::do_exec_row(const Relay_log_info *const rli) {
 
 #ifdef WITH_WSREP
   if (WSREP(thd)) {
-    THD_STAGE_INFO(thd, stage_wsrep_updating_rows);
     snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
              "wsrep: updating row for write-set (%lld)",
              (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
+    THD_STAGE_INFO(thd, stage_wsrep_updating_rows);
   }
 #endif /* WITH_WSREP */
 
@@ -14695,3 +14695,4 @@ std::pair<bool, binary_log::Log_event_basic_info> extract_log_event_basic_info(
       uint2korr(buf + FLAGS_OFFSET) & LOG_EVENT_IGNORABLE_F;
   return std::make_pair(false, event_info);
 }
+

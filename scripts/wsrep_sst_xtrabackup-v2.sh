@@ -1826,10 +1826,146 @@ if [[ -z $MYSQL_VERSION ]]; then
     exit 2
 fi
 
+<<<<<<< HEAD
 # Verify PXB versions we have
 verify_pxb_version "${XTRABACKUP_THIS_VER_PATH}" "${XB_THIS_REQUIRED_VERSION}"
 verify_pxb_version "${XTRABACKUP_PREV_VER_PATH}" "${XB_PREV_REQUIRED_VERSION}"
 verify_pxb_version "${XTRABACKUP_PREV_LTS_VER_PATH}" "${XB_PREV_LTS_REQUIRED_VERSION}"
+||||||| merged common ancestors
+# Verify our PXB versions
+# XB_REQUIRED_VERSION requires at least major.minor version (e.g. 2.4.1 or 3.0)
+#
+# 2.4.3 : Starting with 5.7, the redo log format has changed and so XB-2.4.3 or higher is needed
+# for performing backup (read SST)
+#
+# 2.4.4 : needed to support the keyring option
+#
+# 2.4.11: XB now has its own keyring plugin complied and added support for vault plugin
+#         in addition to existing keyring_file plugin.
+#
+# 2.4.12: XB fixed bugs like keyring is empty + move-back stage now uses params from
+#         my.cnf.
+#
+# 2.4.17  PXB added Data-At-Rest Encryption support found in PS/PXC 5.7.28
+#
+# 2.4.20  Transition-key fixes
+#
+
+XB_2x_REQUIRED_VERSION="2.4.28"
+
+if [[ ! -x $XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN ]]; then
+    wsrep_log_error "******************* FATAL ERROR ********************** "
+    wsrep_log_error "Could not find the $XTRABACKUP_BIN executable (version 2.x)."
+    wsrep_log_error "    Expected location: $XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN"
+    wsrep_log_error "Please verify that PXC was installed correctly."
+    wsrep_log_error "****************************************************** "
+    exit 2
+fi
+XB_2x_VERSION=$($XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN --version 2>&1 | grep -oe ' [0-9]\.[0-9]\.[0-9]*' | head -n1)
+XB_2x_VERSION=${XB_2x_VERSION# }
+if compare_versions "$XB_2x_VERSION" "<" "$XB_2x_REQUIRED_VERSION"; then
+    wsrep_log_error "******************* FATAL ERROR ********************** "
+    wsrep_log_error "The $XTRABACKUP_BIN version is $XB_2x_VERSION."
+    wsrep_log_error "xtrabackup-$XB_2x_REQUIRED_VERSION or higher is needed to perform an SST"
+    wsrep_log_error "$XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN"
+    wsrep_log_error "****************************************************** "
+    exit 2
+fi
+
+# Verify our PXB 8.0 version
+#
+# 8.0.11  Transition-key fixes
+#
+
+XB_8x_REQUIRED_VERSION="8.0.34"
+
+if [[ ! -x $XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN ]]; then
+    wsrep_log_error "******************* FATAL ERROR ********************** "
+    wsrep_log_error "Could not find the $XTRABACKUP_BIN executable (version 8.x)."
+    wsrep_log_error "    Expected location: $XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN"
+    wsrep_log_error "Please verify that PXC was installed correctly."
+    wsrep_log_error "****************************************************** "
+    exit 2
+fi
+XB_8x_VERSION=$($XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN --version 2>&1 | grep -oe ' [0-9]\.[0-9]\.[0-9]*' | head -n1)
+XB_8x_VERSION=${XB_8x_VERSION# }
+if compare_versions "$XB_8x_VERSION" "<" "$XB_8x_REQUIRED_VERSION"; then
+    wsrep_log_error "******************* FATAL ERROR ********************** "
+    wsrep_log_error "The $XTRABACKUP_BIN version is $XB_8x_VERSION."
+    wsrep_log_error "xtrabackup-$XB_8x_REQUIRED_VERSION or higher is needed to perform an SST"
+    wsrep_log_error "$XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN"
+    wsrep_log_error "****************************************************** "
+    exit 2
+fi
+
+=======
+# Verify our PXB versions
+# XB_REQUIRED_VERSION requires at least major.minor version (e.g. 2.4.1 or 3.0)
+#
+# 2.4.3 : Starting with 5.7, the redo log format has changed and so XB-2.4.3 or higher is needed
+# for performing backup (read SST)
+#
+# 2.4.4 : needed to support the keyring option
+#
+# 2.4.11: XB now has its own keyring plugin complied and added support for vault plugin
+#         in addition to existing keyring_file plugin.
+#
+# 2.4.12: XB fixed bugs like keyring is empty + move-back stage now uses params from
+#         my.cnf.
+#
+# 2.4.17  PXB added Data-At-Rest Encryption support found in PS/PXC 5.7.28
+#
+# 2.4.20  Transition-key fixes
+#
+
+XB_2x_REQUIRED_VERSION="2.4.29"
+
+if [[ ! -x $XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN ]]; then
+    wsrep_log_error "******************* FATAL ERROR ********************** "
+    wsrep_log_error "Could not find the $XTRABACKUP_BIN executable (version 2.x)."
+    wsrep_log_error "    Expected location: $XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN"
+    wsrep_log_error "Please verify that PXC was installed correctly."
+    wsrep_log_error "****************************************************** "
+    exit 2
+fi
+XB_2x_VERSION=$($XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN --version 2>&1 | grep -oe ' [0-9]\.[0-9]\.[0-9]*' | head -n1)
+XB_2x_VERSION=${XB_2x_VERSION# }
+if compare_versions "$XB_2x_VERSION" "<" "$XB_2x_REQUIRED_VERSION"; then
+    wsrep_log_error "******************* FATAL ERROR ********************** "
+    wsrep_log_error "The $XTRABACKUP_BIN version is $XB_2x_VERSION."
+    wsrep_log_error "xtrabackup-$XB_2x_REQUIRED_VERSION or higher is needed to perform an SST"
+    wsrep_log_error "$XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN"
+    wsrep_log_error "****************************************************** "
+    exit 2
+fi
+
+# Verify our PXB 8.0 version
+#
+# 8.0.11  Transition-key fixes
+#
+
+XB_8x_REQUIRED_VERSION="8.0.35"
+
+if [[ ! -x $XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN ]]; then
+    wsrep_log_error "******************* FATAL ERROR ********************** "
+    wsrep_log_error "Could not find the $XTRABACKUP_BIN executable (version 8.x)."
+    wsrep_log_error "    Expected location: $XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN"
+    wsrep_log_error "Please verify that PXC was installed correctly."
+    wsrep_log_error "****************************************************** "
+    exit 2
+fi
+XB_8x_VERSION=$($XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN --version 2>&1 | grep -oe ' [0-9]\.[0-9]\.[0-9]*' | head -n1)
+XB_8x_VERSION=${XB_8x_VERSION# }
+if compare_versions "$XB_8x_VERSION" "<" "$XB_8x_REQUIRED_VERSION"; then
+    wsrep_log_error "******************* FATAL ERROR ********************** "
+    wsrep_log_error "The $XTRABACKUP_BIN version is $XB_8x_VERSION."
+    wsrep_log_error "xtrabackup-$XB_8x_REQUIRED_VERSION or higher is needed to perform an SST"
+    wsrep_log_error "$XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN"
+    wsrep_log_error "****************************************************** "
+    exit 2
+fi
+
+>>>>>>> origin/release-8.0.35
 
 
 rm -f "${XB_GTID_INFO_FILE_PATH}"

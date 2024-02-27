@@ -448,7 +448,7 @@ ELSE()
       ${BIN_SCRIPTS}
       wsrep_sst_common
       wsrep_sst_xtrabackup-v2
-    )
+      )
   ENDIF()
 
   FOREACH(file ${BIN_SCRIPTS})
@@ -560,3 +560,4 @@ ELSE()
     ENDIF()
   ENDIF()
 ENDIF()
+
