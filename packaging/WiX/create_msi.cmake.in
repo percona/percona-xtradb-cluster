@@ -114,33 +114,6 @@ EXECUTE_PROCESS(
  RESULT_VARIABLE LIGHT_RESULT
 )
 
-<<<<<<< HEAD
 IF(LIGHT_RESULT)
   MESSAGE(FATAL_ERROR "ERROR: can't run light")
 ENDIF()
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-IF(LIGHT_RESULT)
-  MESSAGE(FATAL_ERROR "ERROR: can't run light")
-ENDIF()
-||||||||| merged common ancestors
-IF(LIGHT_RESULT)
-  MESSAGE(FATAL_ERROR "ERROR: can't run light")
-<<<<<<<<<<< Temporary merge branch 1
-ENDIF()
-||||||||||| merged common ancestors
-ENDIF()
->>>>>>>>>>>>> Temporary merge branch 2
-===========
-ENDIF()
->>>>>>>>>>> Temporary merge branch 2
-=========
-IF(WIX_RESULT)
-  MESSAGE(FATAL_ERROR "ERROR: can't run WiX: ${WIX_RESULT} ${WIX_OUTPUT}")
-ENDIF()
->>>>>>>>> Temporary merge branch 2
-=======
-IF(WIX_RESULT)
-  MESSAGE(FATAL_ERROR "ERROR: can't run WiX: ${WIX_RESULT} ${WIX_OUTPUT}")
-ENDIF()
->>>>>>> origin/release-8.0.35

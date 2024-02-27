@@ -2044,15 +2044,4 @@ err_out:
   }
   return DB_ERROR;
 }
-<<<<<<< HEAD
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-#endif /* WITH_WSREP */
-||||||||| merged common ancestors
->>>>>>>>>>> Temporary merge branch 2
-=========
->>>>>>>>> Temporary merge branch 2
-=======
-#endif /* WITH_WSREP */
-
->>>>>>> origin/release-8.0.35
