@@ -6258,6 +6258,15 @@ void innobase_commit_low(trx_t *trx) /*!< in: transaction handle */
   }
 
   DEBUG_SYNC_C("innobase_commit_low_begin");
+
+  /* Error only for non system thread (skip gtid_clone_thread) */
+  DBUG_EXECUTE_IF("innobase_commit_low_fail", {
+    if (thd->system_thread == NON_SYSTEM_THREAD) {
+      DBUG_SET("-d,innobase_commit_low_fail");
+      return;
+    }
+  });
+
 #endif /* WITH_WSREP */
 
   if (trx_is_started(trx)) {
