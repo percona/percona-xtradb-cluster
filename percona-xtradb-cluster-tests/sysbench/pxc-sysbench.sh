@@ -315,9 +315,9 @@ start_node_1()
   echo "Starting node-1 ...."
   ${MYSQL_BASEDIR}/bin/mysqld --no-defaults --defaults-group-suffix=.1 \
         --basedir=${MYSQL_BASEDIR} --datadir=$MYSQL_VARDIR/node1 \
-	--loose-debug-sync-timeout=600 --skip-performance-schema \
+	--skip-performance-schema \
 	--innodb_file_per_table $1 \
-	--innodb_autoinc_lock_mode=2 --innodb_locks_unsafe_for_binlog=1 \
+	--innodb_autoinc_lock_mode=2 --log-error-verbosity=3 \
 	--wsrep-provider=${MYSQL_BASEDIR}/lib/libgalera_smm.so \
 	--wsrep_cluster_address=gcomm:// \
 	--wsrep_node_incoming_address=$ADDR \
@@ -363,9 +363,9 @@ start_node_2()
   echo "Starting node-2 ...."
   ${MYSQL_BASEDIR}/bin/mysqld --no-defaults --defaults-group-suffix=.2 \
       --basedir=${MYSQL_BASEDIR} --datadir=$MYSQL_VARDIR/node2 \
-	--loose-debug-sync-timeout=600 --skip-performance-schema \
+	--skip-performance-schema \
 	--innodb_file_per_table $1 \
-	--innodb_autoinc_lock_mode=2 --innodb_locks_unsafe_for_binlog=1 \
+	--innodb_autoinc_lock_mode=2 --log-error-verbosity=3 \
 	--wsrep-provider=${MYSQL_BASEDIR}/lib/libgalera_smm.so \
         --wsrep_cluster_address=gcomm://$LADDR1,$LADDR3 \
 	--wsrep_node_incoming_address=$ADDR \
@@ -413,9 +413,9 @@ start_node_3()
   echo "Starting node-3 ...."
   ${MYSQL_BASEDIR}/bin/mysqld --no-defaults --defaults-group-suffix=.3 \
         --basedir=${MYSQL_BASEDIR} --datadir=$MYSQL_VARDIR/node3 \
-	--loose-debug-sync-timeout=600 --skip-performance-schema \
+	--skip-performance-schema \
 	--innodb_file_per_table $1 \
-	--innodb_autoinc_lock_mode=2 --innodb_locks_unsafe_for_binlog=1 \
+	--innodb_autoinc_lock_mode=2 --log-error-verbosity=3 \
 	--wsrep-provider=${MYSQL_BASEDIR}/lib/libgalera_smm.so \
         --wsrep_cluster_address=gcomm://$LADDR1,$LADDR2 \
 	--wsrep_node_incoming_address=$ADDR \
