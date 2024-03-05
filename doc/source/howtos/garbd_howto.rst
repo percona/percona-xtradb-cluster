@@ -54,7 +54,8 @@ When starting from the shell, you can set the parameters from the command line o
   --option="socket.ssl=YES; socket.ssl_key=/etc/ssl/mysql/server-key.pem; \
   socket.ssl_cert=/etc/ssl/mysql/server-cert.pem; \
   socket.ssl_ca=/etc/ssl/mysql/ca.pem; \
-  socket.ssl_cipher=AES128-SHA256"
+  socket.ssl_cipher=AES128-SHA256; \
+  socket.ssl=yes"
 
 To avoid entering the options each time you start ``garbd``, edit the options in the configuration file. To configure *Galera Arbitrator* on *Ubuntu/Debian*, edit the :file:`/etc/default/garb` file. On RedHat or derivative distributions, the configuration can be found in :file:`/etc/sysconfig/garb` file.
 
