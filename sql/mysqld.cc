@@ -1780,16 +1780,6 @@ bool binlog_expire_logs_seconds_supplied = false;
 /* Static variables */
 
 static bool opt_myisam_log;
-<<<<<<< HEAD
-#ifdef WITH_WSREP
-static std::atomic_int cleanup_done;
-#else
-static int cleanup_done;
-#endif /* WITH_WSREP */
-||||||| 2f8eeab28b8
-static int cleanup_done;
-=======
->>>>>>> Percona-Server-8.0.36-28
 static ulong opt_specialflag;
 char *opt_binlog_index_name;
 char *mysql_home_ptr, *pidfile_name_ptr;
@@ -3190,7 +3180,7 @@ static void clean_up_mutexes() {
   mysql_mutex_destroy(&LOCK_partial_revokes);
   mysql_mutex_destroy(&LOCK_authentication_policy);
   mysql_mutex_destroy(&LOCK_global_conn_mem_limit);
-<<<<<<< HEAD
+  mysql_rwlock_destroy(&LOCK_server_shutting_down);
 #ifdef WITH_WSREP
   mysql_mutex_destroy(&LOCK_wsrep_ready);
   mysql_cond_destroy(&COND_wsrep_ready);
@@ -3210,10 +3200,6 @@ static void clean_up_mutexes() {
   mysql_mutex_destroy(&LOCK_wsrep_SR_store);
   mysql_mutex_destroy(&LOCK_wsrep_alter_tablespace);
 #endif /* WITH_WSREP */
-||||||| 2f8eeab28b8
-=======
-  mysql_rwlock_destroy(&LOCK_server_shutting_down);
->>>>>>> Percona-Server-8.0.36-28
 }
 
 /****************************************************************************
@@ -6191,7 +6177,8 @@ static int init_thread_environment() {
                    MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_global_conn_mem_limit, &LOCK_global_conn_mem_limit,
                    MY_MUTEX_INIT_FAST);
-<<<<<<< HEAD
+  mysql_rwlock_init(key_rwlock_LOCK_server_shutting_down,
+                    &LOCK_server_shutting_down);
 #ifdef WITH_WSREP
   mysql_mutex_init(key_LOCK_wsrep_ready, &LOCK_wsrep_ready, MY_MUTEX_INIT_FAST);
   mysql_cond_init(key_COND_wsrep_ready, &COND_wsrep_ready);
@@ -6220,11 +6207,6 @@ static int init_thread_environment() {
   mysql_mutex_init(key_LOCK_wsrep_alter_tablespace,
                    &LOCK_wsrep_alter_tablespace, MY_MUTEX_INIT_FAST);
 #endif /* WITH_WSREP */
-||||||| 2f8eeab28b8
-=======
-  mysql_rwlock_init(key_rwlock_LOCK_server_shutting_down,
-                    &LOCK_server_shutting_down);
->>>>>>> Percona-Server-8.0.36-28
   return 0;
 }
 
@@ -11730,7 +11712,12 @@ SHOW_VAR status_vars[] = {
      SHOW_SCOPE_GLOBAL},
     {"Telemetry_traces_supported", (char *)show_telemetry_traces_support,
      SHOW_FUNC, SHOW_SCOPE_GLOBAL},
-<<<<<<< HEAD
+    {"Deprecated_use_i_s_processlist_count",
+     (char *)&show_deprecated_use_i_s_processlist_count, SHOW_FUNC,
+     SHOW_SCOPE_GLOBAL},
+    {"Deprecated_use_i_s_processlist_last_timestamp",
+     (char *)&show_deprecated_use_i_s_processlist_last_timestamp, SHOW_FUNC,
+     SHOW_SCOPE_GLOBAL},
 #ifdef WITH_WSREP
     {"wsrep_connected", (char *)&wsrep_connected, SHOW_BOOL, SHOW_SCOPE_GLOBAL},
     {"wsrep_ready", (char *)&wsrep_show_ready, SHOW_FUNC, SHOW_SCOPE_GLOBAL},
@@ -11760,18 +11747,7 @@ SHOW_VAR status_vars[] = {
      SHOW_CHAR_PTR, SHOW_SCOPE_GLOBAL},
     {"wsrep", (char *)&wsrep_show_status, SHOW_FUNC, SHOW_SCOPE_ALL},
 #endif /* WITH_WSREP */
-    {NullS, NullS, SHOW_LONG, SHOW_SCOPE_ALL}};
-||||||| 2f8eeab28b8
-    {NullS, NullS, SHOW_LONG, SHOW_SCOPE_ALL}};
-=======
-    {"Deprecated_use_i_s_processlist_count",
-     (char *)&show_deprecated_use_i_s_processlist_count, SHOW_FUNC,
-     SHOW_SCOPE_GLOBAL},
-    {"Deprecated_use_i_s_processlist_last_timestamp",
-     (char *)&show_deprecated_use_i_s_processlist_last_timestamp, SHOW_FUNC,
-     SHOW_SCOPE_GLOBAL},
     {NullS, NullS, SHOW_FUNC, SHOW_SCOPE_ALL}};
->>>>>>> Percona-Server-8.0.36-28
 
 void add_terminator(vector<my_option> *options) {
   my_option empty_element = {nullptr, 0,          nullptr, nullptr, nullptr,
