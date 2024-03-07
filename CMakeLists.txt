@@ -812,7 +812,7 @@ IF(WITH_DEFAULT_COMPILER_OPTIONS)
 ENDIF()
 
 # Assume, for now at least, that we want build-id for all kinds of Linux builds.
-IF(LINUX)
+IF(LINUX AND NOT LINUX_ALPINE)
   OPTION(WITH_BUILD_ID "Add --build-id=sha1 to all executables." ON)
   IF(WITH_BUILD_ID)
     SET(HAVE_BUILD_ID_SUPPORT 1)
@@ -2570,6 +2570,7 @@ IF(NOT INSTALL_LAYOUT MATCHES "RPM")
   SET(MYSQL_DOCS_LOCATION "" CACHE PATH
     "Location from where documentation is copied")
   MARK_AS_ADVANCED(MYSQL_DOCS_LOCATION)
+<<<<<<< HEAD
   INSTALL(DIRECTORY Docs/ DESTINATION ${INSTALL_DOCDIR}
     COMPONENT Documentation
     PATTERN "README-wsrep" EXCLUDE
@@ -2580,6 +2581,18 @@ IF(NOT INSTALL_LAYOUT MATCHES "RPM")
     PATTERN "sp-imp-spec.txt" EXCLUDE
     PATTERN "README.build" EXCLUDE
   )
+||||||| 2f8eeab28b8
+  INSTALL(DIRECTORY Docs/ DESTINATION ${INSTALL_DOCDIR}
+    COMPONENT Documentation
+    PATTERN "Makefile.*" EXCLUDE
+    PATTERN "glibc*" EXCLUDE
+    PATTERN "linuxthreads.txt" EXCLUDE
+    PATTERN "myisam.txt" EXCLUDE
+    PATTERN "sp-imp-spec.txt" EXCLUDE
+    PATTERN "README.build" EXCLUDE
+  )
+=======
+>>>>>>> Percona-Server-8.0.36-28
 ENDIF()
 
 # Now that we're done with all ADD_SUBDIRECTORY and thus all feature tests,

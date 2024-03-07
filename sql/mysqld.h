@@ -418,6 +418,7 @@ extern bool wsrep_unireg_abort;
 #endif /* WITH_WSREP */
 extern "C" MYSQL_PLUGIN_IMPORT int orig_argc;
 extern "C" MYSQL_PLUGIN_IMPORT char **orig_argv;
+extern bool server_shutting_down;
 extern my_thread_attr_t connection_attrib;
 extern bool old_mode;
 extern bool avoid_temporal_upgrade;
@@ -839,6 +840,7 @@ extern mysql_cond_t COND_manager;
 extern mysql_rwlock_t LOCK_sys_init_connect;
 extern mysql_rwlock_t LOCK_sys_init_replica;
 extern mysql_rwlock_t LOCK_system_variables_hash;
+extern mysql_rwlock_t LOCK_server_shutting_down;
 extern mysql_rwlock_t LOCK_consistent_snapshot;
 
 extern ulong opt_ssl_fips_mode;
