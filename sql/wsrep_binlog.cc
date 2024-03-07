@@ -409,6 +409,47 @@ bool wsrep_commit_will_write_binlog(THD *thd) {
             opt_log_replica_updates)));
 }
 
+bool wsrep_implicit_transaction(THD *thd) {
+  if (!thd) {
+    return false;
+  }
+  return thd->is_operating_substatement_implicitly ||
+         thd->is_operating_gtid_table_implicitly;
+}
+
+/*
+KH: What is the purpose of wsrep_group_commit_queue?
+
+Interim commit makes use of the assumption that as soon as the thread if added
+to mysql commit queue, commit manager will take care of proper order
+of transactions committing. So we can release Galera commit_monitor allowing
+other threads to go on. In such a case we achieve more parallelism.
+
+wsrep_register_for_group_commit  - add thd to wsrep_group_commit_queue and
+release Galera commit_monitor
+
+wsrep_wait_for_turn_in_group_commit - just wait for this thread to be the
+1st one
+
+wsrep_unregister_from_group_commit - just remove the thread from the queue
+
+So the important this is what happens between
+wsrep_wait_for_turn_in_group_commit and wsrep_unregister_from_group_commit .
+This is the critical section when particular thread is allowed to move on,
+and all other threads have to wait until it unregisters.
+
+If we look to the code, what happens between these two calls, there is nothing
+important. In trx_sys_update_wsrep_checkpoint we grab trx_sys_cur_xid_seqno,
+but it serves only debug/assert purposes. In all other cases these two functions
+are called one after another.
+
+The bottom line is that wsrep_group_commit_queue is used only for:
+1. Ensure that MySql commit manager really commits in the order Galera expects
+2. Protect access to trx_sys_cur_xid_seqno in debug builds
+
+so it can be safely removed.
+*/
+
 #include <queue>
 
 static std::queue<THD *> wsrep_group_commit_queue;
@@ -427,14 +468,6 @@ void wsrep_register_for_group_commit(THD *thd) {
   WSREP_DEBUG("Registering thread with id (%d) in wsrep group commit queue",
               thd->thread_id());
   return;
-}
-
-bool wsrep_implicit_transaction(THD *thd) {
-  if (!thd) {
-    return false;
-  }
-  return thd->is_operating_substatement_implicitly ||
-         thd->is_operating_gtid_table_implicitly;
 }
 
 void wsrep_wait_for_turn_in_group_commit(THD *thd) {
