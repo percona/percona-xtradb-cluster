@@ -1,0 +1,36 @@
+# Test the following problematic case is handled correctly:
+# 1. group commit queue consist of one thread thd_1
+# 2. thd_1 is being processed, it registers in wsrep_group_commit_queue
+# 3. InnoDB commit fails (it may happen because of transaction abort or other reason)
+# 4. As the result thd_1 fails to unregister from wsrep_group_commit_queue
+# 5. thd_2 is being processed as another commit queue
+# 6. thd_2 commits in InnoDB and tries to unregister from wsrep_group_commit_queue
+# 7. thd_2 waits, because thd_1 is still the 1st item in the wsrep_group_commit_queue
+
+--source include/have_debug.inc
+--source include/have_debug_sync.inc
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+CALL mtr.add_suppression("Transaction not registered for MySQL 2PC");
+
+CREATE TABLE t1 (a INT PRIMARY KEY);
+
+# Force InnoDB commit failure, which will cause skip of unregistration from wsrep_group_commit_queue
+SET DEBUG = '+d,innobase_commit_low_fail';
+INSERT INTO t1 VALUES (0);
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1a
+
+# node_1 connection is the 1st one in wsrep_group_commit_queue, so node_1a will assert in debug build
+# For release build it would cause '[InnoDB] A long semaphore wait', but unfortunately debug_sync
+# is not available, so no way to simulate. 
+INSERT INTO t1 VALUES (1);
+--assert(`SELECT COUNT(*) = 2 FROM t1`)
+
+# cleanup
+--disconnect node_1a
+--connection node_1
+DROP TABLE t1;
+--source include/wait_until_count_sessions.inc

@@ -1,0 +1,6 @@
+CALL mtr.add_suppression("Transaction not registered for MySQL 2PC");
+CREATE TABLE t1 (a INT PRIMARY KEY);
+SET DEBUG = '+d,innobase_commit_low_fail';
+INSERT INTO t1 VALUES (0);
+INSERT INTO t1 VALUES (1);
+DROP TABLE t1;
