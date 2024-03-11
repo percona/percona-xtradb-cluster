@@ -3,9 +3,13 @@ Warnings:
 Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 Note	####	Storing MySQL user name or password information in the connection metadata repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START REPLICA; see the 'START REPLICA Syntax' in the MySQL Manual for more information.
 [connection master]
-SET @@global.keyring_vault_config='MYSQLTEST_VARDIR/keyring_vault2.conf';
+include/rpl_stop_server.inc [server_number=2]
+include/rpl_stop_server.inc [server_number=1]
 [On Master]
-SET @@global.keyring_vault_config='MYSQLTEST_VARDIR/keyring_vault1.conf';
+include/rpl_start_server.inc [server_number=1]
+[On Slave]
+include/rpl_start_server.inc [server_number=2]
+include/start_slave.inc
 CHANGE REPLICATION SOURCE TO SOURCE_CONNECT_RETRY = 100;
 
 ALTER INSTANCE ROTATE INNODB MASTER KEY;
@@ -70,8 +74,6 @@ INSERT INTO t4 VALUES(1, "rpltest");
 START REPLICA SQL_THREAD;
 include/wait_for_slave_sql_error.inc [errno=3185]
 INSTALL PLUGIN keyring_vault SONAME 'keyring_vault.so';
-Warnings:
-Warning	42000	keyring_vault initialization failure. Please check the server log.
 SET @@global.keyring_vault_config='MYSQLTEST_VARDIR/keyring_vault2.conf';
 SELECT PLUGIN_NAME,PLUGIN_VERSION,PLUGIN_STATUS
 FROM INFORMATION_SCHEMA.PLUGINS WHERE plugin_name='keyring_vault';
@@ -99,21 +101,17 @@ ALTER INSTANCE ROTATE INNODB MASTER KEY;
 ERROR HY000: Can't find master key from keyring, please check in the server log if a keyring is loaded and initialized successfully.
 # Installing keyring_vault plugin on master.
 INSTALL PLUGIN keyring_vault SONAME 'keyring_vault.so';
-Warnings:
-Warning	42000	keyring_vault initialization failure. Please check the server log.
 # Cleanup
 DROP TABLE t1,t2,t3,t4;
 UNINSTALL PLUGIN keyring_vault;
 include/sync_slave_sql_with_master.inc
 include/rpl_restart_server.inc [server_number=1]
 SELECT @@global.keyring_vault_config;
-@@global.keyring_vault_config
-
+ERROR HY000: Unknown system variable 'keyring_vault_config'
 include/sync_slave_sql_with_master.inc
 UNINSTALL PLUGIN keyring_vault;
 include/rpl_restart_server.inc [server_number=2]
 START REPLICA;
 SELECT @@global.keyring_vault_config;
-@@global.keyring_vault_config
-
+ERROR HY000: Unknown system variable 'keyring_vault_config'
 include/rpl_end.inc
