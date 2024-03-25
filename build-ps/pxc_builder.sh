@@ -251,9 +251,9 @@ get_sources(){
 
     cd ${WORKDIR} || exit
     #
-    pushd ${PXCDIR}
-        sed -i 's:boostorg\.jfrog\.io/artifactory/main/release/.*/source:jenkins.percona.com/downloads/boost:g' cmake/boost.cmake
-    popd
+    #pushd ${PXCDIR}
+    #    sed -i 's:boostorg\.jfrog\.io/artifactory/main/release/.*/source:jenkins.percona.com/downloads/boost:g' cmake/boost.cmake
+    #popd
     #
     tar --owner=0 --group=0 --exclude=.bzr --exclude=.git -czf ${PXCDIR}.tar.gz ${PXCDIR}
     rm -fr ${PXCDIR}
@@ -313,14 +313,10 @@ install_deps() {
         yum install -y perl
         yum install -y https://repo.percona.com/yum/percona-release-latest.noarch.rpm
         percona-release enable tools testing
-        if [ "${RHEL}" -lt 9 ]; then
-            add_percona_yum_repo
-        fi
         if [ "x$RHEL" = "x8" -o "x$RHEL" = "x9" ]; then
             yum -y install dnf-plugins-core epel-release
             yum config-manager --set-enabled powertools
 	    yum -y install git
-            yum -y install python2-scons || true
             yum -y install python2-pip python36-devel
             yum -y install autoconf automake binutils bison boost-static cmake gcc gcc-c++ make
             yum -y install gperf glibc glibc-devel jemalloc jemalloc-devel libaio-devel
@@ -344,12 +340,13 @@ install_deps() {
                 yum -y install scons pip python3-devel
                 pip install --user typing pyyaml regex Cheetah3
             else
-                wget https://jenkins.percona.com/yum-repo/percona-dev.repo
-                mv -vf percona-dev.repo /etc/yum.repos.d
+            #    wget https://jenkins.percona.com/yum-repo/percona-dev.repo
+            #    mv -vf percona-dev.repo /etc/yum.repos.d
+                wget https://downloads.percona.com/downloads/packaging/python2-scons-3.0.1-9.el8.noarch.rpm
+                yum -y install ./python2-scons-3.0.1-9.el8.noarch.rpm || true
                 yum -y clean all
                 yum -y install libtirpc-devel
-                yum -y install perl-Dig
-                yum -y install python2-scons python2-pip python36-devel
+                yum -y install python2-pip python36-devel
                 yum -y install python2-devel
                 /usr/bin/pip3.6 install --user typing pyyaml regex Cheetah3
                 /usr/bin/pip2.7 install --user typing pyyaml regex Cheetah
@@ -450,16 +447,9 @@ install_deps() {
         else
             apt-get -y install python-mysqldb
         fi
-        if [ x"${DIST}" = xbionic ]; then
-            apt-get -y install gcc-8 g++-8
-            wget http://jenkins.percona.com/downloads/libfido2-1/libcbor0.6_0.6.0-0ubuntu1_amd64.deb
-            wget http://jenkins.percona.com/downloads/libfido2-1/libfido2-1_1.3.1-1ubuntu2_amd64.deb
-            dpkg -i libcbor0.6_0.6.0-0ubuntu1_amd64.deb
-            dpkg -i libfido2-1_1.3.1-1ubuntu2_amd64.deb
-        fi
         if [ x"${DIST}" = xbuster ]; then
-            wget http://jenkins.percona.com/downloads/libfido2-1/libfido2-1_1.5.0-2~bpo10+1_amd64.deb
-            wget http://jenkins.percona.com/downloads/libfido2-1/libcbor0_0.5.0+dfsg-2_amd64.deb
+            wget https://downloads.percona.com/downloads/packaging/libfido2-1/libfido2-1_1.5.0-2~bpo10+1_amd64.deb
+            wget https://downloads.percona.com/downloads/packaging/libfido2-1/libcbor0_0.5.0+dfsg-2_amd64.deb
             dpkg -i libcbor0_0.5.0+dfsg-2_amd64.deb
             dpkg -i libfido2-1_1.5.0-2~bpo10+1_amd64.deb
         fi
@@ -611,7 +601,7 @@ build_srpm(){
 
 build_mecab_lib(){
     MECAB_TARBAL="mecab-0.996.tar.gz"
-    MECAB_LINK="http://jenkins.percona.com/downloads/mecab/${MECAB_TARBAL}"
+    MECAB_LINK="https://downloads.percona.com/downloads/packaging/mecab/${MECAB_TARBAL}"
     MECAB_DIR="${WORKDIR}/${MECAB_TARBAL%.tar.gz}"
     MECAB_INSTALL_DIR="${WORKDIR}/mecab-install"
     rm -f ${MECAB_TARBAL}
@@ -630,7 +620,7 @@ build_mecab_lib(){
 
 build_mecab_dict(){
     MECAB_IPADIC_TARBAL="mecab-ipadic-2.7.0-20070801.tar.gz"
-    MECAB_IPADIC_LINK="http://jenkins.percona.com/downloads/mecab/${MECAB_IPADIC_TARBAL}"
+    MECAB_IPADIC_LINK="https://downloads.percona.com/downloads/packaging/mecab/${MECAB_IPADIC_TARBAL}"
     MECAB_IPADIC_DIR="${WORKDIR}/${MECAB_IPADIC_TARBAL%.tar.gz}"
     rm -f ${MECAB_IPADIC_TARBAL}
     rm -rf ${MECAB_IPADIC_DIR}
@@ -867,6 +857,10 @@ build_deb(){
     if [[ "x$DEBIAN_VERSION" == "xbionic" || "x$DEBIAN_VERSION" == "xstretch" || "x$DEBIAN_VERSION" == "xfocal" || "x$DEBIAN_VERSION" == "xbullseye" || "x$DEBIAN_VERSION" == "xjammy" || "x$DEBIAN_VERSION" == "xbookworm" ]]; then
         sed -i 's/fabi-version=2/fabi-version=2 -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -Wno-error=literal-suffix -Wno-misleading-indentation/' cmake/build_configurations/compiler_options.cmake
         sed -i 's/gnu++11/gnu++11 -Wno-virtual-move-assign/' cmake/build_configurations/compiler_options.cmake
+    fi
+
+    if [[ "x$DEBIAN_VERSION" == "xfocal" || "x$DEBIAN_VERSION" == "xbullseye" || "x$DEBIAN_VERSION" == "xbuster" || "x$DEBIAN_VERSION" == "xbookworm" ]]; then
+        sed -i 's/-fno-omit-frame-pointer/-fno-omit-frame-pointer -Wno-error=undef/' cmake/build_configurations/compiler_options.cmake
     fi
 
     #==========

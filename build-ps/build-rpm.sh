@@ -123,8 +123,8 @@ export CC="${CC:-gcc}"
 export CXX="${CXX:-g++}"
 export HS_CXX="${HS_CXX:-g++}"
 export UDF_CXX="${UDF_CXX:-g++}"
-export CFLAGS="-fPIC -Wall -O3 -g -static-libgcc -fno-omit-frame-pointer -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION $TARGET_CFLAGS ${CFLAGS:-}"
-export CXXFLAGS="-O2 -fno-omit-frame-pointer -g -pipe -Wall -Wp,-D_FORTIFY_SOURCE=2 -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION $TARGET_CFLAGS ${CXXFLAGS:-}"
+export CFLAGS="-fPIC -Wall -O3 -g -static-libgcc -Wno-error=undef -Wno-error=write-strings -fno-omit-frame-pointer -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION $TARGET_CFLAGS ${CFLAGS:-}"
+export CXXFLAGS="-O2 -Wno-error=undef -Wno-error=write-strings -fno-omit-frame-pointer -g -pipe -Wall -Wp,-D_FORTIFY_SOURCE=2 -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION $TARGET_CFLAGS ${CXXFLAGS:-}"
 export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
 
 # Create directories for rpmbuild if these don't exist
