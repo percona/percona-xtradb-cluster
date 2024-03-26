@@ -106,7 +106,14 @@ jobs:
           Compiler: clang
           BuildType: Debug
 
+<<<<<<< HEAD
       # clang-10 and newer compilers
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+      # clang-6 and newer compilers
+=======
+      # clang-6 and newer compilers
+>>>>>>> Percona-XtraDB-Cluster-8.0.35-27.1
       clang-17 RelWithDebInfo [Ubuntu 22.04 Jammy]:
         imageName: 'ubuntu-22.04'
         UBUNTU_CODE_NAME: jammy
@@ -509,3 +516,4 @@ jobs:
       df -Th
 
     displayName: '*** Compile'
+

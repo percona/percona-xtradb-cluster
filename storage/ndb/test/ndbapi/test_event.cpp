@@ -24,18 +24,27 @@
 
 #include "util/require.h"
 #include <ndb_opts.h>
-#include <NDBT_ReturnCodes.h>
-#include <NdbEnv.h>
-#include <Bitmask.hpp>
-#include <HugoTransactions.hpp>
+<<<<<<< HEAD
+||||||| merged common ancestors
 #include <NDBT_Test.hpp>
+||||||||| 057f5c9509c
+#include <NDBT_Test.hpp>
+=========
+>>>>>>>>> Temporary merge branch 2
+=======
+#include <NDBT_Test.hpp>
+>>>>>>> Percona-XtraDB-Cluster-8.0.35-27.1
+#include <NDBT_ReturnCodes.h>
+#include <HugoTransactions.hpp>
+#include <UtilTransactions.hpp>
+#include <TestNdbEventOperation.hpp>
 #include <NdbAutoPtr.hpp>
 #include <NdbRestarter.hpp>
 #include <NdbRestarts.hpp>
 #include <NdbSleep.h>
-#include <TestNdbEventOperation.hpp>
-#include <UtilTransactions.hpp>
 #include <signaldata/DumpStateOrd.hpp>
+#include <NdbEnv.h>
+#include <Bitmask.hpp>
 #include "../src/kernel/ndbd.hpp"
 
 #define CHK(b, e)                                                         \
@@ -2208,13 +2217,33 @@ int errorInjectBufferOverflowOnly(NDBT_Context *ctx, NDBT_Step *step) {
 int errorInjectStalling(NDBT_Context *ctx, NDBT_Step *step) {
   Ndb *ndb = GETNDB(step);
   NdbRestarter restarter;
+<<<<<<< HEAD
   const NdbDictionary::Table *pTab = ctx->getTab();
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+  const NdbDictionary::Table* pTab = ctx->getTab();
+=======
+  const NdbDictionary::Table* pTab = ctx->getTab();
+>>>>>>> Percona-XtraDB-Cluster-8.0.35-27.1
   const bool usePollEvents2 = ((rand() % 2) == 0);
   const char* method = (usePollEvents2?
                         "PollEvents2":
                         "PollEvents");
 
+<<<<<<< HEAD
   NdbEventOperation *pOp = createEventOperation(ndb, *pTab);
+||||||| merged common ancestors
+  NdbEventOperation *pOp= createEventOperation(ndb, *pTab);
+||||||||| 057f5c9509c
+  const NdbDictionary::Table* pTab = ctx->getTab();
+  NdbEventOperation *pOp= createEventOperation(ndb, *pTab);
+=========
+  const NdbDictionary::Table *pTab = ctx->getTab();
+  NdbEventOperation *pOp = createEventOperation(ndb, *pTab);
+>>>>>>>>> Temporary merge branch 2
+=======
+  NdbEventOperation *pOp= createEventOperation(ndb, *pTab);
+>>>>>>> Percona-XtraDB-Cluster-8.0.35-27.1
   int result = NDBT_OK;
   int res = 0;
   bool connected = true;
@@ -2222,7 +2251,21 @@ int errorInjectStalling(NDBT_Context *ctx, NDBT_Step *step) {
 
   ndbout_c("errorInjectStalling using %s", method);
 
+<<<<<<< HEAD
   if (pOp == 0) {
+||||||| merged common ancestors
+  if (pOp == 0)
+  {
+||||||||| 057f5c9509c
+  if (pOp == 0)
+  {
+=========
+  if (pOp == 0) {
+>>>>>>>>> Temporary merge branch 2
+=======
+  if (pOp == 0)
+  {
+>>>>>>> Percona-XtraDB-Cluster-8.0.35-27.1
     g_err << "Failed to createEventOperation" << endl;
     return NDBT_FAILED;
   }
@@ -2243,11 +2286,37 @@ int errorInjectStalling(NDBT_Context *ctx, NDBT_Step *step) {
       res = ndb->pollEvents(5000, &curr_gci) > 0;
     }
 
+<<<<<<< HEAD
     if (ndb->getNdbError().code != 0)
     {
       g_err << method << " failed: \n";
       g_err << ndb->getNdbError().code << " "
             << ndb->getNdbError().message << endl;
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+    if (ndb->getNdbError().code != 0)
+    {
+      g_err << method << " failed: \n";
+      g_err << ndb->getNdbError().code << " "
+            << ndb->getNdbError().message << endl;
+||||||||| 057f5c9509c
+    if (ndb->getNdbError().code != 0)
+    {
+      g_err << "pollEvents failed: \n";
+      g_err << ndb->getNdbError().code << " "
+            << ndb->getNdbError().message << endl;
+=========
+    if (ndb->getNdbError().code != 0) {
+      g_err << "pollEvents failed: \n";
+      g_err << ndb->getNdbError().code << " " << ndb->getNdbError().message
+            << endl;
+>>>>>>>>> Temporary merge branch 2
+=======
+    if (ndb->getNdbError().code != 0) {
+      g_err << method << " failed: \n";
+      g_err << ndb->getNdbError().code << " " << ndb->getNdbError().message
+            << endl;
+>>>>>>> Percona-XtraDB-Cluster-8.0.35-27.1
       result = NDBT_FAILED;
       goto cleanup;
     }
@@ -2334,11 +2403,37 @@ int errorInjectStalling(NDBT_Context *ctx, NDBT_Step *step) {
       res = ndb->pollEvents(5000, &curr_gci) > 0;
     }
 
+<<<<<<< HEAD
     if (ndb->getNdbError().code != 0)
     {
       g_err << method << " failed: \n";
       g_err << ndb->getNdbError().code << " "
             << ndb->getNdbError().message << endl;
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+    if (ndb->getNdbError().code != 0)
+    {
+      g_err << method << " failed: \n";
+      g_err << ndb->getNdbError().code << " "
+            << ndb->getNdbError().message << endl;
+||||||||| 057f5c9509c
+    if (ndb->getNdbError().code != 0)
+    {
+      g_err << "pollEvents failed: \n";
+      g_err << ndb->getNdbError().code << " "
+            << ndb->getNdbError().message << endl;
+=========
+    if (ndb->getNdbError().code != 0) {
+      g_err << "pollEvents failed: \n";
+      g_err << ndb->getNdbError().code << " " << ndb->getNdbError().message
+            << endl;
+>>>>>>>>> Temporary merge branch 2
+=======
+    if (ndb->getNdbError().code != 0) {
+      g_err << method << " failed: \n";
+      g_err << ndb->getNdbError().code << " " << ndb->getNdbError().message
+            << endl;
+>>>>>>> Percona-XtraDB-Cluster-8.0.35-27.1
       result = NDBT_FAILED;
       goto cleanup;
     }
@@ -3236,7 +3331,24 @@ testPKUpdates(NDBT_Context* ctx, NDBT_Step* step)
 }
 ///////////////////////////
 
+<<<<<<< HEAD
 int runBug35208_createTable(NDBT_Context *ctx, NDBT_Step *step) {
+||||||| merged common ancestors
+int
+runBug35208_createTable(NDBT_Context* ctx, NDBT_Step* step)
+{
+||||||||| 057f5c9509c
+int
+runBug35208_createTable(NDBT_Context* ctx, NDBT_Step* step)
+{
+=========
+int runBug35208_createTable(NDBT_Context *ctx, NDBT_Step *step) {
+>>>>>>>>> Temporary merge branch 2
+=======
+int
+runBug35208_createTable(NDBT_Context* ctx, NDBT_Step* step)
+{
+>>>>>>> Percona-XtraDB-Cluster-8.0.35-27.1
   NdbDictionary::Table tab = *ctx->getTab();
 
   while (tab.getNoOfColumns() < 100) {

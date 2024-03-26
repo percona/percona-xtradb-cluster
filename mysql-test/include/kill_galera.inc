@@ -20,7 +20,7 @@ if (!$kill_signal)
         my $pid_filename = $ENV{'KILL_NODE_PIDFILE'};
         my $mysqld_pid = `cat $pid_filename`;
         chomp($mysqld_pid);
-        system("kill -s $kill_sig $mysqld_pid");
+        system("kill -s $kill_sig $mysqld_pid  ||:");
         exit(0);
 EOF
 

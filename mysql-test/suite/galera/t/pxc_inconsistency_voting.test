@@ -1,0 +1,44 @@
+#
+# This test ensures that server performs recomputation of votes based only on
+# the error codes instead of full error messages.
+#
+--source include/galera_cluster.inc
+
+CREATE TABLE t1 (c1 INTEGER AUTO_INCREMENT PRIMARY KEY, c2 INTEGER);
+
+# Modify the lc_messages setting to simulate different error message on node1
+SET lc_messages = 'fr_FR';
+
+--error ER_WRONG_AUTO_KEY
+ALTER TABLE t1 MODIFY c2 BIGINT UNSIGNED NOT NULL AUTO_INCREMENT ;
+
+# Assert that node1 logs the message in the language set above.
+--let $assert_text= Verify that node1 logs the message in the language set above
+--let $assert_select= Member 0.* initiates vote on .* Un seul champ automatique est permis et il doit être indexé
+--let $assert_file= $MYSQLTEST_VARDIR/log/mysqld.1.err
+--let $assert_count=1
+--source include/assert_grep.inc
+
+# Assert that node2 logs the message in the default language.
+--let $assert_text= Verify that node2 logs the message in the default language
+--let $assert_select= Member 1.* initiates vote on .* Incorrect table definition; there can be only one auto column and it must be defined as a key
+
+--let $assert_file= $MYSQLTEST_VARDIR/log/mysqld.1.err
+--let $assert_count=1
+--source include/assert_grep.inc
+
+# Verify that cluster remains operational even when the above query failed with different error messages.
+ALTER TABLE t1 MODIFY c2 BIGINT UNSIGNED NOT NULL;
+INSERT INTO t1 (c2) VALUES (123123), (234234);
+SELECT * FROM t1;
+--assert(`SELECT COUNT(*) = 2 FROM t1`)
+
+--connection node_2
+SELECT * FROM t1;
+--assert(`SELECT COUNT(*) = 2 FROM t1`)
+
+# Suppressions
+CALL mtr.add_suppression("Replica SQL: Error 'Incorrect table definition; there can be only one auto column and it must be defined as a key'");
+
+# Cleanup
+DROP TABLE t1;

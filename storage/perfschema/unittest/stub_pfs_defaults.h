@@ -35,3 +35,9 @@ void wsrep_pfs_instr_cb(wsrep_pfs_instr_type_t, wsrep_pfs_instr_ops_t,
                         wsrep_pfs_instr_tag_t, void **, void **,
                         const void *) {}
 #endif /* WITH_WSREP */
+<<<<<<< HEAD
+||||||| merged common ancestors
+>>>>>>>>> Temporary merge branch 2
+=======
+
+>>>>>>> Percona-XtraDB-Cluster-8.0.35-27.1

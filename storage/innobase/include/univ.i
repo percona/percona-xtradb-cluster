@@ -55,7 +55,13 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #define INNODB_VERSION_BUGFIX MYSQL_VERSION_PATCH
 
 #ifndef PERCONA_INNODB_VERSION
+<<<<<<< HEAD
 #define PERCONA_INNODB_VERSION 1
+||||||| merged common ancestors
+#define PERCONA_INNODB_VERSION 26
+=======
+#define PERCONA_INNODB_VERSION 27
+>>>>>>> Percona-XtraDB-Cluster-8.0.35-27.1
 #endif
 
 /* The following is the InnoDB version as shown in

@@ -33,10 +33,12 @@ Mysqlx.Ok {
 ok
 SHOW PROCESSLIST;
 Id	User	Host	db	Command	Time	State	Info	Time_ms	Rows_sent	Rows_examined
+<ID>	1287	<HOST_NAME>
 <ID>	event_scheduler	<HOST_NAME>	NULL	Daemon	<TIME>	Waiting on empty queue	NULL	<TIME_MS>	0	0
 <ID>	root	<HOST_NAME>	test	Query	<TIME>	STATE	SHOW PROCESSLIST	<TIME_MS>	0	0
 <ID>	root	<HOST_NAME>	test	Sleep	<TIME>		NULL	<TIME_MS>	1	1
 <ID>	system user	<HOST_NAME>	NULL	Sleep	<TIME>	innobase_commit_low (-1)	NULL	<TIME_MS>	0	0
-<ID>	system user	<HOST_NAME>	NULL	Sleep	<TIME>	wsrep aborter idle	NULL	<TIME_MS>	0	0
+<ID>	system user	<HOST_NAME>	NULL	Sleep	<TIME>	wsrep: aborter idle	NULL	<TIME_MS>	0	0
+Warnings:
 SET DEBUG_SYNC= 'RESET';
 DROP TABLE x;

@@ -7982,7 +7982,20 @@ runCheckWriteTransactionOverOtherNodeFailure(NDBT_Context* ctx,
 
   ndbout_c("Waiting for node to recover");
   CHECK(restarter.waitClusterStarted() == 0);
+<<<<<<< HEAD
 
+||||||| merged common ancestors
+  
+||||||||| 057f5c9509c
+         hugoOps);  
+  
+=========
+         hugoOps);
+
+>>>>>>>>> Temporary merge branch 2
+=======
+  
+>>>>>>> Percona-XtraDB-Cluster-8.0.35-27.1
   return NDBT_OK;
 }
 
@@ -8049,6 +8062,12 @@ int runCheckSlowCommit(NDBT_Context* ctx, NDBT_Step* step)
         errorCode = 8114;
         break;
       }
+<<<<<<< HEAD
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+=======
+      ndbout << "Inserting error " << errorCode
+>>>>>>> Percona-XtraDB-Cluster-8.0.35-27.1
 
       int ret = runCheckWriteTransactionOverOtherNodeFailure(ctx,
                                                              step,

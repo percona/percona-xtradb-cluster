@@ -1706,6 +1706,15 @@ std::atomic<ulong> wsrep_running_threads{0};
 */
 bool wsrep_unireg_abort = false;
 
+/* This flag is to avoid duplicate initialization of main TLS_channel.
+   We initialize it when pxc_encrypt_cluster_traffic == true, prior to
+   init_ssl_communication() call. Inside init_ssl_communication() we need
+   to decide if singleton initialization should be called.
+   We could do it better, if mysql_main was set to nullptr when not initialized
+   but the original code does not do so, so let's introduce this static flag
+   to do minimal changes. */
+static bool wsrep_mysql_main_channel_initialized = false;
+
 static void wsrep_close_threads(THD *thd);
 #endif /* WITH_WSREP */
 
@@ -8012,10 +8021,19 @@ static int init_ssl() {
 }
 
 static int init_ssl_communication() {
+#ifdef WITH_WSREP
+  if (!wsrep_mysql_main_channel_initialized) {
+    if (TLS_channel::singleton_init(&mysql_main, mysql_main_channel,
+                                    opt_use_ssl, &server_main_callback,
+                                    opt_initialize))
+      return 1;
+    wsrep_mysql_main_channel_initialized = true;
+  }
+#else
   if (TLS_channel::singleton_init(&mysql_main, mysql_main_channel, opt_use_ssl,
                                   &server_main_callback, opt_initialize))
     return 1;
-
+#endif
   /*
     The default value of --admin-ssl is ON. If it is set
     to off, we should treat it as an explicit attempt to
@@ -8054,6 +8072,9 @@ static void end_ssl() {
   TLS_channel::singleton_deinit(mysql_main);
   TLS_channel::singleton_deinit(mysql_admin);
   deinit_rsa_keys();
+#ifdef WITH_WSREP
+  wsrep_mysql_main_channel_initialized = false;
+#endif
 }
 
 /**
@@ -8955,11 +8976,14 @@ static int init_server_components() {
         !is_help_or_validate_option()) {
       bool bootstrap = (wsrep_new_cluster ||
                         (strcmp(wsrep_cluster_address, "gcomm://") == 0));
+      /* Note: There will be the same initialization attempt called from
+         init_ssl_communication() afterwards. */
       if (TLS_channel::singleton_init(&mysql_main, mysql_main_channel,
                                       opt_use_ssl, &server_main_callback,
                                       opt_initialize)) {
         unireg_abort(MYSQLD_ABORT_EXIT);
       }
+      wsrep_mysql_main_channel_initialized = true;
       if (server_main_callback.wsrep_ssl_artifacts_check(bootstrap)) {
         unireg_abort(MYSQLD_ABORT_EXIT);
       }
@@ -12455,7 +12479,22 @@ static int init_wsrep_thread(THD *thd) {
     Populate the PROCESSLIST_ID in the instrumentation.
   */
   struct PSI_thread *psi = PSI_THREAD_CALL(get_thread)();
+  thd_set_psi(thd, psi);
   PSI_THREAD_CALL(set_thread_id)(psi, thd->thread_id());
+  /*
+    perfshema table_processlist::index_init() filters out threads which
+    do not have set user_name set.
+    If it detects thd marked as system thread, and the user_name is "root"
+    it converts it to "system_user".
+    Q: Why we set it explicitly here?
+    A: If wsrep thread is created by 'set global wsrep_applier_threads=30;'
+       pfs descriptor inherits the user_name from the parrent thread, which
+       is being connection thread. However, when wsrep thread is created
+       during server startup (rollbacker, applier, etc), creating thread is
+       the main server thread which does not have user set. As the result
+       P_S filters this thred out from processlist table as described above.
+  */
+  PSI_THREAD_CALL(set_thread_account)("root", strlen("root"), nullptr, 0);
 #endif /* HAVE_PSI_INTERFACE */
 
   DBUG_EXECUTE_IF("simulate_wsrep_slave_error_on_init", simulate_error |= 1;);
@@ -15811,12 +15850,12 @@ PSI_FLAG_USER | PSI_FLAG_NO_SEQNUM, 0, PSI_DOCUMENT_ME},
   { &key_thread_parser_service, "parser_service", "parser_srv", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_thread_handle_con_admin_sockets, "admin_interface", "con_admin", PSI_FLAG_USER, 0, PSI_DOCUMENT_ME},
 #ifdef WITH_WSREP
-  { &key_THREAD_wsrep_sst_joiner, "THREAD_wsrep_sst_joiner", "sst_joiner", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_THREAD_wsrep_sst_donor, "THREAD_wsrep_sst_donor", "sst_donor", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_THREAD_wsrep_sst_logger, "THREAD_wsrep_sst_logger", "sst_logger", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_THREAD_wsrep_applier, "THREAD_wsrep_applier", "applier", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_THREAD_wsrep_rollbacker, "THREAD_wsrep_rollbacker", "rlb", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_THREAD_wsrep_post_rollbacker, "THREAD_wsrep_post_rollbacker", "postrlb", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME}
+  { &key_THREAD_wsrep_sst_joiner, "THREAD_wsrep_sst_joiner", "sst_joiner", PSI_FLAG_SINGLETON | PSI_FLAG_THREAD_SYSTEM, 0, PSI_DOCUMENT_ME},
+  { &key_THREAD_wsrep_sst_donor, "THREAD_wsrep_sst_donor", "sst_donor", PSI_FLAG_SINGLETON | PSI_FLAG_THREAD_SYSTEM, 0, PSI_DOCUMENT_ME},
+  { &key_THREAD_wsrep_sst_logger, "THREAD_wsrep_sst_logger", "sst_logger", PSI_FLAG_SINGLETON | PSI_FLAG_THREAD_SYSTEM, 0, PSI_DOCUMENT_ME},
+  { &key_THREAD_wsrep_applier, "THREAD_wsrep_applier", "applier", PSI_FLAG_SINGLETON | PSI_FLAG_THREAD_SYSTEM, 0, PSI_DOCUMENT_ME},
+  { &key_THREAD_wsrep_rollbacker, "THREAD_wsrep_rollbacker", "rlb", PSI_FLAG_SINGLETON | PSI_FLAG_THREAD_SYSTEM, 0, PSI_DOCUMENT_ME},
+  { &key_THREAD_wsrep_post_rollbacker, "THREAD_wsrep_post_rollbacker", "postrlb", PSI_FLAG_SINGLETON | PSI_FLAG_THREAD_SYSTEM, 0, PSI_DOCUMENT_ME}
 #endif /* WITH_WSREP */
 };
 /* clang-format on */
@@ -16010,6 +16049,11 @@ PSI_stage_info stage_wsrep_applying_toi_writeset = {
 PSI_stage_info stage_wsrep_applied_toi_writeset = {
     0, "wsrep: applied TOI write set", 0, PSI_DOCUMENT_ME};
 
+PSI_stage_info stage_wsrep_applying_nbo_writeset = {
+    0, "wsrep: applying NBO write set", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_applied_nbo_writeset = {
+    0, "wsrep: applied NBO write set", 0, PSI_DOCUMENT_ME};
+
 PSI_stage_info stage_wsrep_committing = {0, "wsrep: committing write set", 0,
                                          PSI_DOCUMENT_ME};
 PSI_stage_info stage_wsrep_committed = {0, "wsrep: committed write set", 0,
@@ -16018,6 +16062,11 @@ PSI_stage_info stage_wsrep_committed = {0, "wsrep: committed write set", 0,
 PSI_stage_info stage_wsrep_toi_committing = {
     0, "wsrep: committing TOI write set", 0, PSI_DOCUMENT_ME};
 PSI_stage_info stage_wsrep_toi_committed = {0, "wsrep: TOI committed write set",
+                                            0, PSI_DOCUMENT_ME};
+
+PSI_stage_info stage_wsrep_nbo_committing = {
+    0, "wsrep: committing NBO write set", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_nbo_committed = {0, "wsrep: NBO committed write set",
                                             0, PSI_DOCUMENT_ME};
 
 PSI_stage_info stage_wsrep_rolling_back = {0, "wsrep: rolling back", 0,

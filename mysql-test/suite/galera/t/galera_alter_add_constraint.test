@@ -1,0 +1,38 @@
+
+# Test that contraint check is done on source and replicated node
+# and produces the same error, which leaves the cluster in consistent
+# state after consistency voting.
+
+--source include/galera_cluster.inc
+
+--connection node_2
+CALL mtr.add_suppression("Replica SQL: Error .Check constraint .CHK_i. is violated");
+CALL mtr.add_suppression("Replica SQL: Error 'Duplicate check constraint name .CHK_i.* on query");
+CALL mtr.add_suppression("Replica SQL: Error 'Constraint .CHK_i2. does not exist");
+
+--connection node_1
+
+CREATE TABLE t (id INT PRIMARY KEY, i INT NOT NULL);
+INSERT INTO t VALUES(1, 100);
+
+# TOI will replicate before local execution.
+# Then it will fail locally, as the constraint check fails.
+# It is expected that the replica will fail as well with the same error.
+
+# Case 1: add a constraint which can't be fulfilled
+--error ER_CHECK_CONSTRAINT_VIOLATED
+ALTER TABLE t ADD CONSTRAINT CHK_i CHECK (i <=75);
+
+# Case 2: add a constraint which already exists
+ALTER TABLE t ADD CONSTRAINT CHK_i CHECK (i <=200);
+--error ER_CHECK_CONSTRAINT_DUP_NAME
+ALTER TABLE t ADD CONSTRAINT CHK_i CHECK (i <=200);
+
+# Case 3: drop nonexistent constraint
+--error ER_CONSTRAINT_NOT_FOUND
+ALTER TABLE t DROP CONSTRAINT CHK_i2;
+
+# Case 4: drop the constraint that exists
+ALTER TABLE t DROP CONSTRAINT CHK_i;
+
+DROP TABLE t;
