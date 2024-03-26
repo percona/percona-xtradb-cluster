@@ -417,16 +417,6 @@ static PSI_memory_info all_server_memory[] = {
      "Memory allocated for in-memory maps for persisted variables"},
     {&key_memory_persisted_variables_unordered_set,
      "Persisted_variables::unordered_set", PSI_FLAG_ONLY_GLOBAL_STAT, 0,
-<<<<<<< HEAD
-     "Memory allocated for in-memory sets for persisted variables"}
-#ifdef WITH_WSREP
-    ,
-    {&key_memory_wsrep, "wsrep", PSI_FLAG_ONLY_GLOBAL_STAT, 0, PSI_DOCUMENT_ME}
-#endif /* WITH_WSREP */
-};
-||||||| 74ca9072a3c
-     "Memory allocated for in-memory sets for persisted variables"}};
-=======
      "Memory allocated for in-memory sets for persisted variables"},
     {&key_memory_rpl_thd_context, "Rpl_thd_context", 0, 0, PSI_DOCUMENT_ME},
     {&key_memory_applier,
@@ -434,8 +424,12 @@ static PSI_memory_info all_server_memory[] = {
      PSI_DOCUMENT_ME},
     {&key_memory_recovery, "Binlog_recovery::recover", 0, 0, PSI_DOCUMENT_ME},
     {&key_memory_show_binlog_events, "show_binlog_events", 0, 0,
-     PSI_DOCUMENT_ME}};
->>>>>>> Percona-Server-8.2.0-1
+     PSI_DOCUMENT_ME}
+#ifdef WITH_WSREP
+    ,
+    {&key_memory_wsrep, "wsrep", PSI_FLAG_ONLY_GLOBAL_STAT, 0, PSI_DOCUMENT_ME}
+#endif /* WITH_WSREP */
+};
 
 void register_server_memory_keys() {
   const char *category = "sql";

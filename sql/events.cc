@@ -1215,7 +1215,7 @@ static bool load_events_from_db(THD *thd, Event_queue *event_queue) {
         WSREP_DEBUG("Disabling non-native event (name: %s)",
                     et->m_event_name.str);
 
-        if (et->m_status == Event_parse_data::SLAVESIDE_DISABLED) continue;
+        if (et->m_status == Event_parse_data::REPLICA_SIDE_DISABLED) continue;
 
         if (lock_object_name(thd, MDL_key::EVENT, et->m_schema_name.str,
                              et->m_event_name.str)) {
@@ -1230,7 +1230,7 @@ static bool load_events_from_db(THD *thd, Event_queue *event_queue) {
 
         (void)Event_db_repository::update_timing_fields_for_event(
             thd, et->m_schema_name, et->m_event_name, et->m_last_executed,
-            Event_parse_data::SLAVESIDE_DISABLED);
+            Event_parse_data::REPLICA_SIDE_DISABLED);
 
         thd->mdl_context.release_transactional_locks();
 

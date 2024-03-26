@@ -408,16 +408,12 @@ extern uint opt_server_id_bits;
 extern ulong opt_server_id_mask;
 extern const char *load_default_groups[];
 extern struct my_option my_long_early_options[];
-<<<<<<< HEAD
-extern bool mysqld_server_started;
+
 #ifdef WITH_WSREP
 extern bool wsrep_unireg_abort;
 #endif /* WITH_WSREP */
-||||||| 74ca9072a3c
-extern bool mysqld_server_started;
-=======
+
 extern "C" MYSQL_PLUGIN_IMPORT bool mysqld_server_started;
->>>>>>> Percona-Server-8.2.0-1
 extern "C" MYSQL_PLUGIN_IMPORT int orig_argc;
 extern "C" MYSQL_PLUGIN_IMPORT char **orig_argv;
 extern my_thread_attr_t connection_attrib;

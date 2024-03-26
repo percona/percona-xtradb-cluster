@@ -1886,7 +1886,6 @@ static void check_secondary_engine_statement(THD *thd,
                                              Parser_state *parser_state,
                                              const char *query_string,
                                              size_t query_length) {
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (WSREP(thd)) {
     /* While running in cluster mode disable the check for now */
@@ -1894,11 +1893,8 @@ static void check_secondary_engine_statement(THD *thd,
   }
 #endif /* WITH_WSREP */
 
-||||||| 74ca9072a3c
-=======
   assert(thd->is_error());
 
->>>>>>> Percona-Server-8.2.0-1
   bool use_secondary_engine = false;
 
   // Only restart the statement if a non-fatal error was raised.
@@ -2185,7 +2181,6 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
   thd->reset_rewritten_query();
   thd_manager->inc_thread_running();
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (WSREP(thd) && thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID) {
     thd->set_wsrep_next_trx_id(thd->query_id);
@@ -2195,12 +2190,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
   bool do_end_of_statement = true;
 #endif /* WITH_WSREP */
 
-  if (!(server_command_flags[command] & CF_SKIP_QUESTIONS))
-||||||| 74ca9072a3c
-  if (!(server_command_flags[command] & CF_SKIP_QUESTIONS))
-=======
   if (!(server_command_flags[command] & CF_SKIP_QUESTIONS)) {
->>>>>>> Percona-Server-8.2.0-1
     thd->status_var.questions++;
     global_aggregated_stats.get_shard(thd->thread_id()).questions++;
   }
@@ -2289,15 +2279,11 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     }
     case COM_RESET_CONNECTION: {
       thd->status_var.com_other++;
-<<<<<<< HEAD
+      global_aggregated_stats.get_shard(thd->thread_id()).com_other++;
 #ifdef WITH_WSREP
       wsrep_after_command_ignore_result(thd);
       wsrep_close(thd);
 #endif /* WITH_WSREP */
-||||||| 74ca9072a3c
-=======
-      global_aggregated_stats.get_shard(thd->thread_id()).com_other++;
->>>>>>> Percona-Server-8.2.0-1
       thd->cleanup_connection();
 #ifdef WITH_WSREP
       wsrep_open(thd);
@@ -2641,13 +2627,18 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
           Count each statement from the client.
         */
         thd->status_var.questions++;
-<<<<<<< HEAD
+        global_aggregated_stats.get_shard(thd->thread_id()).questions++;
 #ifdef WITH_WSREP
         if (!WSREP(thd)) thd->set_time(); /* Reset the query start time. */
+#else
+        thd->set_time(); /* Reset the query start time. */
+#endif /* WITH_WSREP */
         parser_state.reset(beginning_of_next_stmt, length);
         thd->set_secondary_engine_optimization(
             Secondary_engine_optimization::PRIMARY_TENTATIVELY);
+        /* TODO: set thd->lex->sql_command to SQLCOM_END here */
 
+#ifdef WITH_WSREP
         if (WSREP_ON) {
           if (wsrep_dispatch_sql_command(thd, beginning_of_next_stmt, length,
                                          &parser_state, false)) {
@@ -2663,15 +2654,6 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
           dispatch_sql_command(thd, &parser_state, false);
         }
 #else
-||||||| 74ca9072a3c
-=======
-        global_aggregated_stats.get_shard(thd->thread_id()).questions++;
->>>>>>> Percona-Server-8.2.0-1
-        thd->set_time(); /* Reset the query start time. */
-        parser_state.reset(beginning_of_next_stmt, length);
-        thd->set_secondary_engine_optimization(
-            Secondary_engine_optimization::PRIMARY_TENTATIVELY);
-        /* TODO: set thd->lex->sql_command to SQLCOM_END here */
         dispatch_sql_command(thd, &parser_state, false);
 #endif /* WITH_WSREP */
 

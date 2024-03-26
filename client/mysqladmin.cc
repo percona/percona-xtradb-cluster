@@ -1009,21 +1009,10 @@ static int execute_commands(MYSQL *mysql, int argc, char **argv) {
         char buff[buff_len];
 #else
         char buff[128];
-<<<<<<< HEAD
 #endif /* WITH_WSREP */
-        time_t start_time;
-||||||| 74ca9072a3c
-        time_t start_time;
-=======
->>>>>>> Percona-Server-8.2.0-1
         char *typed_password = nullptr, *verified = nullptr, *tmp = nullptr;
         bool log_off = true, err = false;
         size_t password_len;
-
-<<<<<<< HEAD
-        /* Do initialization the same way as we do in mysqld */
-        start_time = time((time_t *)nullptr);
-        randominit(&rand_st, (ulong)start_time, (ulong)start_time / 2);
 
 #ifdef WITH_WSREP
         if (opt_use_set_password && mysql_get_server_version(mysql) < 50700) {
@@ -1035,13 +1024,6 @@ static int execute_commands(MYSQL *mysql, int argc, char **argv) {
         }
 #endif /* WITH_WSREP */
 
-||||||| 74ca9072a3c
-        /* Do initialization the same way as we do in mysqld */
-        start_time = time((time_t *)nullptr);
-        randominit(&rand_st, (ulong)start_time, (ulong)start_time / 2);
-
-=======
->>>>>>> Percona-Server-8.2.0-1
         if (argc < 1) {
           my_printf_error(0, "Too few arguments to change password",
                           error_flags);

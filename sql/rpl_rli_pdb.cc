@@ -2557,26 +2557,14 @@ int slave_worker_exec_job_group(Slave_worker *worker, Relay_log_info *rli) {
            ev->get_type_code() == mysql::binlog::event::QUERY_EVENT ||
            is_mts_db_partitioned(rli) || worker->id == 0 || seen_gtid);
 
-<<<<<<< HEAD
-    if (ev->ends_group() || (!seen_begin && !is_gtid_event(ev) &&
-                             (ev->get_type_code() == binary_log::QUERY_EVENT ||
-                              /* break through by LC only in GTID off */
-                              (!seen_gtid && !is_mts_db_partitioned(rli)))))
-#ifdef WITH_WSREP
-    {
-      wsrep_after_statement(thd);
-||||||| 74ca9072a3c
-    if (ev->ends_group() || (!seen_begin && !is_gtid_event(ev) &&
-                             (ev->get_type_code() == binary_log::QUERY_EVENT ||
-                              /* break through by LC only in GTID off */
-                              (!seen_gtid && !is_mts_db_partitioned(rli)))))
-=======
     if (ev->ends_group() ||
         (!seen_begin && !is_gtid_event(ev) &&
          (ev->get_type_code() == mysql::binlog::event::QUERY_EVENT ||
           /* break through by LC only in GTID off */
           (!seen_gtid && !is_mts_db_partitioned(rli)))))
->>>>>>> Percona-Server-8.2.0-1
+#ifdef WITH_WSREP
+    {
+      wsrep_after_statement(thd);
       break;
     }
 #else

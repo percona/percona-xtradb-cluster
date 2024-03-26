@@ -1002,14 +1002,8 @@ MYSQL_ADD_PLUGIN(mysql_native_password
 
 TARGET_LINK_LIBRARIES(sql_main ${MYSQLD_STATIC_PLUGIN_LIBS}
   mysql_server_component_services mysys strings vio
-<<<<<<< HEAD
   ${WSREP_LIB}
-  binlogevents_static ${LIBWRAP} ${LIBDL} ${SSL_LIBRARIES}
-||||||| 74ca9072a3c
-  binlogevents_static ${LIBWRAP} ${LIBDL} ${SSL_LIBRARIES}
-=======
   mysql_binlog_event ${LIBWRAP} ${LIBDL} OpenSSL::SSL OpenSSL::Crypto
->>>>>>> Percona-Server-8.2.0-1
   extra::rapidjson)
 
 # sql/immutable_string.h uses

@@ -29,17 +29,11 @@
 #include <atomic>
 #include <utility>
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 #include "sql/log.h"
 #include "include/mysql/components/services/log_builtins.h"
 #endif /* WITH_WSREP */
 
-#include "libbinlogevents/include/binlog_event.h"  // enum_binlog_checksum_alg
-||||||| 74ca9072a3c
-#include "libbinlogevents/include/binlog_event.h"  // enum_binlog_checksum_alg
-=======
->>>>>>> Percona-Server-8.2.0-1
 #include "my_dbug.h"
 #include "my_inttypes.h"
 #include "my_io.h"

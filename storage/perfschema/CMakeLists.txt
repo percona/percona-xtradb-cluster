@@ -205,14 +205,10 @@ table_log_status.h
 table_plugin_table.h
 table_replication_applier_filters.h
 table_replication_applier_global_filters.h
-<<<<<<< HEAD
+telemetry_pfs_metrics.h
 # -- WITH_WSREP
 table_pxc_cluster_view.h
 # -- WITH_WSREP
-||||||| 74ca9072a3c
-=======
-telemetry_pfs_metrics.h
->>>>>>> Percona-Server-8.2.0-1
 cursor_by_account.cc
 cursor_by_error_log.cc
 cursor_by_host.cc

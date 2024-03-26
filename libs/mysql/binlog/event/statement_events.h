@@ -426,6 +426,20 @@ const uint64_t INVALID_XID = 0xffffffffffffffffULL;
     <td>2 byte integer</td>
     <td>Value of the config variable default_table_encryption</td>
   </tr>
+#ifdef WITH_WSREP
+  <tr>
+    <td>ddl_skip_rewrite</td>
+    <td>Q_DDL_SKIP_REWRITE</td>
+    <td>2 byte integer</td>
+    <td>Value of the config variable ddl_skip_rewrite</td>
+  </tr>
+  <tr>
+    <td>wsrep_applier_skip_readonly_checks</td>
+    <td>Q_WSREP_SKIP_READONLY_CHECKS</td>
+    <td>2 byte integer</td>
+    <td> This will be set only for replication applier threads </td>
+  </tr>
+#endif
   </table>
 
   @subsection Query_event_notes_on_previous_versions Notes on Previous Versions
@@ -529,6 +543,17 @@ class Query_event : public Binary_log_event {
       Replicate default_table_encryption.
     */
     Q_DEFAULT_TABLE_ENCRYPTION
+#ifdef WITH_WSREP
+    ,
+    /*
+      Replicate ddl_skip_rewrite.
+    */
+    Q_DDL_SKIP_REWRITE,
+    /*
+     Replicate Q_WSREP_SKIP_READONLY_CHECKS.
+    */
+    Q_WSREP_SKIP_READONLY_CHECKS = 128
+#endif /* WITH_WSREP */
   };
   const char *query;
   const char *db;
@@ -645,6 +670,18 @@ class Query_event : public Binary_log_event {
   uint8_t sql_require_primary_key;
 
   uint8_t default_table_encryption;
+
+  /**
+    This class is used by server and mysqldump.
+    The server is compiled with WITH_WSREP defined, but mysqldump is not.
+    This causes compilation error -Werror=odr if we compile with
+    MYSQL_MAINTAINER_MODE=ON. Let the following two members be declared always.
+  */
+// #ifdef WITH_WSREP
+  uint8_t ddl_skip_rewrite;
+  uint8_t wsrep_applier_skip_readonly_checks;
+// #endif /* WITH_WSREP */
+
 
   /**
     The constructor will be used while creating a Query_event, to be
@@ -932,6 +969,10 @@ class Intvar_event : public Binary_log_event {
     INVALID_INT_EVENT,
     LAST_INSERT_ID_EVENT,
     INSERT_ID_EVENT
+#ifdef WITH_WSREP
+    ,
+    BINLOG_CONTROL_EVENT
+#endif
   };
 
   /**
@@ -954,6 +995,10 @@ class Intvar_event : public Binary_log_event {
         return "LAST_INSERT_ID";
       case INSERT_ID_EVENT:
         return "INSERT_ID";
+#ifdef WITH_WSREP
+      case BINLOG_CONTROL_EVENT:
+        return "BINLOG_CONTROL";
+#endif
       default: /* impossible */
         return "UNKNOWN";
     }

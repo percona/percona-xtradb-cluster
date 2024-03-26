@@ -7221,28 +7221,10 @@ wsrep_restart_point :
 {
   DBUG_TRACE;
 
-<<<<<<< HEAD
   assert(rli->inited);
   mysql_mutex_lock(&rli->run_lock);
   assert(!rli->slave_running);
   errmsg = nullptr;
-#ifndef NDEBUG
-  rli->events_until_exit = abort_slave_event_count;
-#endif
-||||||| 74ca9072a3c
-    assert(rli->inited);
-    mysql_mutex_lock(&rli->run_lock);
-    assert(!rli->slave_running);
-    errmsg = nullptr;
-#ifndef NDEBUG
-    rli->events_until_exit = abort_slave_event_count;
-#endif
-=======
-    assert(rli->inited);
-    mysql_mutex_lock(&rli->run_lock);
-    assert(!rli->slave_running);
-    errmsg = nullptr;
->>>>>>> Percona-Server-8.2.0-1
 
   thd = new THD;  // note that constructor of THD uses DBUG_ !
   thd->thread_stack = (char *)&thd;  // remember where our stack is

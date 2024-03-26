@@ -60,27 +60,18 @@ IF(MY_COMPILER_IS_GNU)
   # This is included in -Wall on some platforms, enable it explicitly.
   MY_ADD_C_WARNING_FLAG("Wstringop-truncation")
   MY_ADD_CXX_WARNING_FLAG("Wstringop-truncation")
-<<<<<<< HEAD
-  IF(NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9)
-    # GCC 8 has bugs with "final".
 
-    # Disable this flag for PXC. Codership's wsrep-lib part and wsrep server
-    # hooks are not compatible with this flag. This causes errors during
-    # compilation of server part and storage engines including wsrep-lib and 
-    # wsrep hooks headers.
-    # Enable it back when wsrep-lib part is fixed. Disabled for now instead of
-    # fixing wsrep-lib to make next upstream merges easier.
- 
-    # MY_ADD_CXX_WARNING_FLAG("Wsuggest-override")
-  ENDIF()
-||||||| 74ca9072a3c
-  IF(NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9)
-    # GCC 8 has bugs with "final".
-    MY_ADD_CXX_WARNING_FLAG("Wsuggest-override")
-  ENDIF()
-=======
-  MY_ADD_CXX_WARNING_FLAG("Wsuggest-override")
->>>>>>> Percona-Server-8.2.0-1
+  # GCC 8 has bugs with "final".
+
+  # Disable "suggest-override" flag for PXC. Codership's wsrep-lib part and wsrep server
+  # hooks are not compatible with this flag. This causes errors during
+  # compilation of server part and storage engines including wsrep-lib and
+  # wsrep hooks headers.
+  # Enable it back when wsrep-lib part is fixed. Disabled for now instead of
+  # fixing wsrep-lib to make next upstream merges easier.
+
+  # MY_ADD_CXX_WARNING_FLAG("Wsuggest-override")
+
   MY_ADD_C_WARNING_FLAG("Wmissing-include-dirs")
   MY_ADD_CXX_WARNING_FLAG("Wmissing-include-dirs")
 

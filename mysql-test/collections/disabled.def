@@ -261,7 +261,6 @@ group_replication.gr_xa_commit_failure_before_gtid_externalization @windows : BU
 group_replication.gr_xa_commit_one_phase_failure_before_gtid_externalization @windows : BUG#34155238 Disabled until bug is fixed
 group_replication.gr_xa_prepare_failure_before_gtid_externalization @windows : BUG#34155238 Disabled until bug is fixed
 group_replication.gr_xa_rollback_failure_before_gtid_externalization @windows : BUG#34155238 Disabled until bug is fixed
-<<<<<<< HEAD
 
 # galera-x underfinished tests
 galera-x.connection_unixsocket_rpl : BUG#0 PXC-4154 underfinished test
@@ -282,7 +281,3 @@ galera-x.connection_openssl_unixsocket : BUG#0 PXC-4154 TLS version is invalid (
 galera-x.connection_tls_version : BUG#0 PXC-4154 TLS version is invalid (code 2026)
 galera-x.admin_list_objects_case_insensitive_names : BUG#0 PXC-4154 unexpected case value
 galera-x.admin_list_objects_case_insensitive_names_forced : BUG#0 PXC-4154 unexpected case value
-||||||| 74ca9072a3c
-
-=======
->>>>>>> Percona-Server-8.2.0-1

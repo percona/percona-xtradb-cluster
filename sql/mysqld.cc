@@ -9734,14 +9734,6 @@ static int init_server_components() {
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
 
-<<<<<<< HEAD
-  if (rpl_encryption.is_enabled() && !opt_bin_log) {
-    sql_print_information(
-        "binlog and relay log encryption enabled without binary logging being "
-        "enabled. "
-        "If relay logs are in use, they will be encrypted.");
-  }
-
 #ifdef WITH_WSREP
   /* Don't spawn a new binlog file during wsrep-recovery. Why ?
   - Recovery flow is only going to read existing wsrep saved co-ordinate
@@ -9753,16 +9745,6 @@ static int init_server_components() {
     to be empty. */
   if (opt_bin_log && !wsrep_recovery) {
 #else
-||||||| 74ca9072a3c
-  if (rpl_encryption.is_enabled() && !opt_bin_log) {
-    sql_print_information(
-        "binlog and relay log encryption enabled without binary logging being "
-        "enabled. "
-        "If relay logs are in use, they will be encrypted.");
-  }
-
-=======
->>>>>>> Percona-Server-8.2.0-1
   if (opt_bin_log) {
 #endif /* WITH_WSREP */
     /*
@@ -9783,69 +9765,19 @@ static int init_server_components() {
     mysql_mutex_unlock(log_lock);
   }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   /* In wsrep_recovery mode, PXC avoid creation of new binlog file for
   the reason mentioned above. In light of the said flow avoid purge
   action on binlog. */
   if (!wsrep_recovery) {
 #endif /* WITH_WSREP */
-    /*
-      When we pass non-zero values for both expire_logs_days and
-      binlog_expire_logs_seconds at the server start-up, the value of
-      expire_logs_days will be ignored and only binlog_expire_logs_seconds
-      will be used.
-    */
-    if (binlog_expire_logs_seconds_supplied && expire_logs_days_supplied) {
-      if (binlog_expire_logs_seconds != 0 && expire_logs_days != 0) {
-        LogErr(WARNING_LEVEL, ER_EXPIRE_LOGS_DAYS_IGNORED);
-        expire_logs_days = 0;
-      }
-    } else if (expire_logs_days_supplied)
-      binlog_expire_logs_seconds = 0;
-    assert(expire_logs_days == 0 || binlog_expire_logs_seconds == 0);
-
-    if (opt_bin_log) {
-      if (binlog_space_limit) mysql_bin_log.purge_logs_by_size(true);
-    } else {
-      if (binlog_expire_logs_seconds_supplied)
-        LogErr(WARNING_LEVEL, ER_NEED_LOG_BIN, "--binlog-expire-logs-seconds");
-      if (expire_logs_days_supplied)
-        LogErr(WARNING_LEVEL, ER_NEED_LOG_BIN, "--expire_logs_days");
-      if (binlog_space_limit)
-        LogErr(WARNING_LEVEL, ER_NEED_LOG_BIN, "--binlog-space-limit");
-    }
+  if (!opt_bin_log) {
+    if (binlog_expire_logs_seconds_supplied)
+      LogErr(WARNING_LEVEL, ER_NEED_LOG_BIN, "--binlog-expire-logs-seconds");
+    if (binlog_space_limit)
+      LogErr(WARNING_LEVEL, ER_NEED_LOG_BIN, "--binlog-space-limit");
+  }
 #ifdef WITH_WSREP
-||||||| 74ca9072a3c
-  /*
-    When we pass non-zero values for both expire_logs_days and
-    binlog_expire_logs_seconds at the server start-up, the value of
-    expire_logs_days will be ignored and only binlog_expire_logs_seconds
-    will be used.
-  */
-  if (binlog_expire_logs_seconds_supplied && expire_logs_days_supplied) {
-    if (binlog_expire_logs_seconds != 0 && expire_logs_days != 0) {
-      LogErr(WARNING_LEVEL, ER_EXPIRE_LOGS_DAYS_IGNORED);
-      expire_logs_days = 0;
-    }
-  } else if (expire_logs_days_supplied)
-    binlog_expire_logs_seconds = 0;
-  assert(expire_logs_days == 0 || binlog_expire_logs_seconds == 0);
-
-  if (!opt_bin_log) {
-    if (binlog_expire_logs_seconds_supplied)
-      LogErr(WARNING_LEVEL, ER_NEED_LOG_BIN, "--binlog-expire-logs-seconds");
-    if (expire_logs_days_supplied)
-      LogErr(WARNING_LEVEL, ER_NEED_LOG_BIN, "--expire_logs_days");
-    if (binlog_space_limit)
-      LogErr(WARNING_LEVEL, ER_NEED_LOG_BIN, "--binlog-space-limit");
-=======
-  if (!opt_bin_log) {
-    if (binlog_expire_logs_seconds_supplied)
-      LogErr(WARNING_LEVEL, ER_NEED_LOG_BIN, "--binlog-expire-logs-seconds");
-    if (binlog_space_limit)
-      LogErr(WARNING_LEVEL, ER_NEED_LOG_BIN, "--binlog-space-limit");
->>>>>>> Percona-Server-8.2.0-1
   }
 #endif /* WITH_WSREP */
 
@@ -12272,23 +12204,6 @@ struct my_option my_long_options[] = {
      nullptr, nullptr, nullptr, GET_NO_ARG, NO_ARG, 0, 0, 0, nullptr, 0,
      nullptr},
 #if defined(_WIN32)
-<<<<<<< HEAD
-  {"slow-start-timeout", 0,
-   "Maximum number of milliseconds that the service control manager should "
-   "wait "
-   "before trying to kill the windows service during startup"
-   "(Default: 15000).",
-   &slow_start_timeout, &slow_start_timeout, 0, GET_ULONG, REQUIRED_ARG, 15000,
-   0, 0, 0, 0, 0},
-||||||| 74ca9072a3c
-    {"slow-start-timeout", 0,
-     "Maximum number of milliseconds that the service control manager should "
-     "wait "
-     "before trying to kill the windows service during startup"
-     "(Default: 15000).",
-     &slow_start_timeout, &slow_start_timeout, 0, GET_ULONG, REQUIRED_ARG,
-     15000, 0, 0, 0, 0, 0},
-=======
     {"slow-start-timeout", 0,
      "Maximum number of milliseconds that the service control manager should "
      "wait "
@@ -12296,7 +12211,6 @@ struct my_option my_long_options[] = {
      "(Default: 15000).",
      &slow_start_timeout, &slow_start_timeout, nullptr, GET_ULONG, REQUIRED_ARG,
      15000, 0, 0, nullptr, 0, nullptr},
->>>>>>> Percona-Server-8.2.0-1
 #endif
     {"sporadic-binlog-dump-fail", 0,
      "Option used by mysql-test for debugging and testing of replication.",
@@ -12311,23 +12225,11 @@ struct my_option my_long_options[] = {
      &opt_use_admin_ssl, &opt_use_admin_ssl, nullptr, GET_BOOL, OPT_ARG, 1, 0,
      0, nullptr, 0, nullptr},
 #ifdef _WIN32
-<<<<<<< HEAD
-  {"standalone", 0, "Dummy option to start as a standalone program (NT).", 0, 0,
-   0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0},
-  {"no-monitor", 0, "Disable monitor process.", &opt_no_monitor,
-   &opt_no_monitor, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
-||||||| 74ca9072a3c
-    {"standalone", 0, "Dummy option to start as a standalone program (NT).", 0,
-     0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0},
-    {"no-monitor", 0, "Disable monitor process.", &opt_no_monitor,
-     &opt_no_monitor, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
-=======
     {"standalone", 0, "Dummy option to start as a standalone program (NT).",
      nullptr, nullptr, nullptr, GET_NO_ARG, NO_ARG, 0, 0, 0, nullptr, 0,
      nullptr},
     {"no-monitor", 0, "Disable monitor process.", &opt_no_monitor,
      &opt_no_monitor, nullptr, GET_BOOL, NO_ARG, 0, 0, 0, nullptr, 0, nullptr},
->>>>>>> Percona-Server-8.2.0-1
 #endif
   {"symbolic-links", 's',
    "Enable symbolic link support (deprecated and will be  removed in a future"
@@ -14765,7 +14667,6 @@ static int get_options(int *argc_ptr, char ***argv_ptr) {
   else
     global_system_variables.option_bits &= ~OPTION_BIG_SELECTS;
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (global_system_variables.wsrep_causal_reads) {
     WSREP_WARN(
@@ -14796,8 +14697,6 @@ static int get_options(int *argc_ptr, char ***argv_ptr) {
   }
 #endif /* WITH_WSREP */
 
-||||||| 74ca9072a3c
-=======
   // reset the values of some variables that might affect initialize
   if ((opt_initialize || opt_initialize_insecure) && !opt_autocommit) {
     opt_autocommit = true;
@@ -14805,7 +14704,6 @@ static int get_options(int *argc_ptr, char ***argv_ptr) {
            "--autocommit");
   }
 
->>>>>>> Percona-Server-8.2.0-1
   // Synchronize @@global.autocommit value on --autocommit
   const ulonglong turn_bit_on =
       opt_autocommit ? OPTION_AUTOCOMMIT : OPTION_NOT_AUTOCOMMIT;
