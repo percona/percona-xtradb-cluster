@@ -354,11 +354,15 @@ int Slave_worker::init_worker(Relay_log_info *rli, ulong i) {
   server_version = version_product(rli->slave_version_split);
   bitmap_shifted = 0;
   workers = c_rli->workers;  // shallow copying is sufficient
-  wq_empty_waits = wq_size_waits_cnt = groups_done = events_done = curr_jobs =
-      0;
+  wq_empty_waits = 0;
+  wq_size_waits_cnt = 0;
+  groups_done = 0;
+  events_done = 0;
+  curr_jobs = 0;
   usage_partition = 0;
   end_group_sets_max_dbs = false;
-  gaq_index = last_group_done_index = c_rli->gaq->capacity;  // out of range
+  gaq_index = c_rli->gaq->capacity;              // out of range
+  last_group_done_index = c_rli->gaq->capacity;  // out of range
   last_groups_assigned_index = 0;
   assert(!jobs.inited_queue);
   jobs.avail = 0;
@@ -1614,11 +1618,8 @@ static bool may_have_timestamp(Log_event *ev) {
   bool res = false;
 
   switch (ev->get_type_code()) {
-    case binary_log::QUERY_EVENT:
-      res = true;
-      break;
-
-    case binary_log::GTID_LOG_EVENT:
+    case mysql::binlog::event::QUERY_EVENT:
+    case mysql::binlog::event::GTID_LOG_EVENT:
       res = true;
       break;
 
@@ -1633,7 +1634,7 @@ static int64 get_last_committed(Log_event *ev) {
   int64 res = SEQ_UNINIT;
 
   switch (ev->get_type_code()) {
-    case binary_log::GTID_LOG_EVENT:
+    case mysql::binlog::event::GTID_LOG_EVENT:
       res = static_cast<Gtid_log_event *>(ev)->last_committed;
       break;
 
@@ -1648,7 +1649,7 @@ static int64 get_sequence_number(Log_event *ev) {
   int64 res = SEQ_UNINIT;
 
   switch (ev->get_type_code()) {
-    case binary_log::GTID_LOG_EVENT:
+    case mysql::binlog::event::GTID_LOG_EVENT:
       res = static_cast<Gtid_log_event *>(ev)->sequence_number;
       break;
 
@@ -1750,7 +1751,7 @@ int Slave_worker::slave_worker_exec_event(Log_event *ev) {
   ret = ev->do_apply_event_worker(this);
 
   DBUG_EXECUTE_IF("after_executed_write_rows_event", {
-    if (ev->get_type_code() == binary_log::WRITE_ROWS_EVENT) {
+    if (ev->get_type_code() == mysql::binlog::event::WRITE_ROWS_EVENT) {
       static constexpr char act[] = "now signal executed";
       assert(opt_debug_sync_timeout > 0);
       assert(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
@@ -1806,9 +1807,10 @@ void Slave_worker::report_commit_order_deadlock() {
 
 void Slave_worker::prepare_for_retry(Log_event &event) {
   if (event.get_type_code() ==
-      binary_log::ROWS_QUERY_LOG_EVENT) {  // If a `Rows_query_log_event`, let
-                                           // the event be disposed in the main
-                                           // worker loop.
+      mysql::binlog::event::
+          ROWS_QUERY_LOG_EVENT) {  // If a `Rows_query_log_event`, let
+                                   // the event be disposed in the main
+                                   // worker loop.
     event.worker = this;
     this->rows_query_ev = nullptr;
   }
@@ -2552,9 +2554,10 @@ int slave_worker_exec_job_group(Slave_worker *worker, Relay_log_info *rli) {
       with the final disjunct.
     */
     assert(seen_begin || is_gtid_event(ev) ||
-           ev->get_type_code() == binary_log::QUERY_EVENT ||
+           ev->get_type_code() == mysql::binlog::event::QUERY_EVENT ||
            is_mts_db_partitioned(rli) || worker->id == 0 || seen_gtid);
 
+<<<<<<< HEAD
     if (ev->ends_group() || (!seen_begin && !is_gtid_event(ev) &&
                              (ev->get_type_code() == binary_log::QUERY_EVENT ||
                               /* break through by LC only in GTID off */
@@ -2562,6 +2565,18 @@ int slave_worker_exec_job_group(Slave_worker *worker, Relay_log_info *rli) {
 #ifdef WITH_WSREP
     {
       wsrep_after_statement(thd);
+||||||| 74ca9072a3c
+    if (ev->ends_group() || (!seen_begin && !is_gtid_event(ev) &&
+                             (ev->get_type_code() == binary_log::QUERY_EVENT ||
+                              /* break through by LC only in GTID off */
+                              (!seen_gtid && !is_mts_db_partitioned(rli)))))
+=======
+    if (ev->ends_group() ||
+        (!seen_begin && !is_gtid_event(ev) &&
+         (ev->get_type_code() == mysql::binlog::event::QUERY_EVENT ||
+          /* break through by LC only in GTID off */
+          (!seen_gtid && !is_mts_db_partitioned(rli)))))
+>>>>>>> Percona-Server-8.2.0-1
       break;
     }
 #else
@@ -2596,7 +2611,7 @@ int slave_worker_exec_job_group(Slave_worker *worker, Relay_log_info *rli) {
       assert(opt_debug_sync_timeout > 0);
       assert(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
     };);
-    if (ev->get_type_code() == binary_log::QUERY_EVENT &&
+    if (ev->get_type_code() == mysql::binlog::event::QUERY_EVENT &&
         ((Query_log_event *)ev)->rollback_injected_by_coord) {
       /*
         If this was a rollback event injected by the coordinator because of a
