@@ -669,19 +669,9 @@ fi
 
 mkdir pxc_extra
 pushd pxc_extra
-<<<<<<< HEAD
 mkdir pxb-8.1
 pushd pxb-8.1
 yumdownloader percona-xtrabackup-81-8.1.0
-||||||| merged common ancestors
-mkdir pxb-2.4
-pushd pxb-2.4
-yumdownloader percona-xtrabackup-24-2.4.28
-=======
-mkdir pxb-2.4
-pushd pxb-2.4
-yumdownloader percona-xtrabackup-24-2.4.29
->>>>>>> Percona-XtraDB-Cluster-8.0.35-27.1
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib* ./

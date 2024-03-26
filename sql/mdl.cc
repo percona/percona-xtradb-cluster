@@ -5315,9 +5315,3 @@ bool MDL_ticket_store::wsrep_has_non_preemptable_tickets() {
   return (non_preemptable);
 }
 #endif /* WITH_WSREP */
-<<<<<<< HEAD
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-=======
-
->>>>>>> Percona-XtraDB-Cluster-8.0.35-27.1

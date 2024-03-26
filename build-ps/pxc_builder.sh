@@ -475,16 +475,8 @@ install_deps() {
         apt-get -y install libtool libnuma-dev scons libboost-dev libboost-program-options-dev check
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
-<<<<<<< HEAD
         apt-get -y install --download-only percona-xtrabackup-80=8.0.34-29-1.${DIST}
         apt-get -y install --download-only percona-xtrabackup-81=8.1.0-1-1.${DIST}
-||||||| merged common ancestors
-        apt-get -y install --download-only percona-xtrabackup-24=2.4.28-1.${DIST}
-        apt-get -y install --download-only percona-xtrabackup-80=8.0.34-29-1.${DIST}
-=======
-        apt-get -y install --download-only percona-xtrabackup-24=2.4.29-1.${DIST}
-        apt-get -y install --download-only percona-xtrabackup-80=8.0.35-30-1.${DIST}
->>>>>>> Percona-XtraDB-Cluster-8.0.35-27.1
     fi
     return;
 }
@@ -991,37 +983,7 @@ build_tarball(){
     CURDIR=$(pwd)
     cd ${BUILD_ROOT} || exit
     if [ -f /etc/redhat-release ]; then
-<<<<<<< HEAD
         # (1), (2)
-||||||| merged common ancestors
-        mkdir pxb-2.4
-        pushd pxb-2.4
-        yumdownloader percona-xtrabackup-24-2.4.28
-        rpm2cpio *.rpm | cpio --extract --make-directories --verbose
-        mv usr/bin ./
-        mv usr/lib* ./
-        mv lib64 lib
-        mv lib/xtrabackup/* lib/ || true
-        rm -rf lib/xtrabackup
-        rm -rf usr
-        rm -f *.rpm
-        popd
-
-=======
-        mkdir pxb-2.4
-        pushd pxb-2.4
-        yumdownloader percona-xtrabackup-24-2.4.29
-        rpm2cpio *.rpm | cpio --extract --make-directories --verbose
-        mv usr/bin ./
-        mv usr/lib* ./
-        mv lib64 lib
-        mv lib/xtrabackup/* lib/ || true
-        rm -rf lib/xtrabackup
-        rm -rf usr
-        rm -f *.rpm
-        popd
-
->>>>>>> Percona-XtraDB-Cluster-8.0.35-27.1
         mkdir pxb-8.0
         pushd pxb-8.0
         yumdownloader percona-xtrabackup-80-8.0.35

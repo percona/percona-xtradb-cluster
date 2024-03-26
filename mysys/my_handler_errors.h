@@ -38,22 +38,8 @@ static const char *handler_error_messages[] = {
     "Didn't find key on read or update",
     "Duplicate key on write or update",
     "Internal (unspecified) error in handler",
-<<<<<<< HEAD
     ("Someone has changed the row since it was read (while the table was "
      "locked to prevent it)"),
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-    "Someone has changed the row since it was read (while the table was locked to prevent it)",
-||||||||| 057f5c9509c
-    "Someone has changed the row since it was read (while the table was locked "
-    "to prevent it)",
-=========
-    ("Someone has changed the row since it was read (while the table was "
-     "locked to prevent it)"),
->>>>>>>>> Temporary merge branch 2
-=======
-    "Someone has changed the row since it was read (while the table was locked to prevent it)",
->>>>>>> Percona-XtraDB-Cluster-8.0.35-27.1
     "Wrong index given to function",
     "Transaction has been rolled back",
     "Index file is crashed",
@@ -93,22 +79,8 @@ static const char *handler_error_messages[] = {
     "There's no partition in table for the given value",
     "Row-based binlogging of row failed",
     "Index needed in foreign key constraint",
-<<<<<<< HEAD
     ("Upholding foreign key constraints would lead to a duplicate key error in "
      "some other table"),
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-    "Upholding foreign key constraints would lead to a duplicate key error in some other table",
-||||||||| 057f5c9509c
-    "Upholding foreign key constraints would lead to a duplicate key error in "
-    "some other table",
-=========
-    ("Upholding foreign key constraints would lead to a duplicate key error in "
-     "some other table"),
->>>>>>>>> Temporary merge branch 2
-=======
-    "Upholding foreign key constraints would lead to a duplicate key error in some other table",
->>>>>>> Percona-XtraDB-Cluster-8.0.35-27.1
     "Table needs to be upgraded before it can be used",
     "Table is read only",
     "Failed to get next auto increment value",

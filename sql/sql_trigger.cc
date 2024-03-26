@@ -702,9 +702,3 @@ int wsrep_create_trigger_query(THD *thd, uchar **buf, size_t *buf_len) {
                              buf_len);
 }
 #endif /* WITH_WSREP */
-<<<<<<< HEAD
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-=======
-
->>>>>>> Percona-XtraDB-Cluster-8.0.35-27.1

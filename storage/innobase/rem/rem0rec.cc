@@ -2045,12 +2045,4 @@ err_out:
   }
   return DB_ERROR;
 }
-<<<<<<< HEAD
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-#endif /* WITH_WSREP */
->>>>>>>>> Temporary merge branch 2
-=======
-#endif /* WITH_WSREP */
-
->>>>>>> Percona-XtraDB-Cluster-8.0.35-27.1
