@@ -43,6 +43,12 @@ Prefix: %{_sysconfdir}
 %define revision @@REVISION@@
 %define distribution  rhel%{redhatversion}  
 
+%if 0%{?rhel} >= 8
+%global add_fido_plugins 1
+%else
+%global add_fido_plugins 0
+%endif # rhel8 or above
+
 #
 %bcond_with tokudb
 #
@@ -748,7 +754,11 @@ mkdir debug
            -DWITH_EMBEDDED_SHARED_LIBRARY=0 \
            -DWITH_INNODB_MEMCACHED=1 \
            -DWITH_ZSTD=bundled \
+%if 0%{?add_fido_plugins}
            -DWITH_FIDO=bundled \
+%else
+           -DWITH_FIDO=none \
+%endif
            -DWITH_UNIT_TESTS=0 \
            -DWITH_SCALABILITY_METRICS=ON \
            -DMYSQL_SERVER_SUFFIX=".%{rel}" \
@@ -792,7 +802,11 @@ mkdir release
            -DWITH_EMBEDDED_SHARED_LIBRARY=0 \
            -DWITH_INNODB_MEMCACHED=1 \
            -DWITH_ZSTD=bundled \
+%if 0%{?add_fido_plugins}
            -DWITH_FIDO=bundled \
+%else
+           -DWITH_FIDO=none \
+%endif
            -DWITH_UNIT_TESTS=0 \
            -DWITH_SCALABILITY_METRICS=ON \
            %{?mecab_option} \
@@ -1012,7 +1026,9 @@ install -d $RBR%{_libdir}/mysql
 #%endif
 
 # set rpath for plugin to use private/libfido2.so
+%if 0%{?add_fido_plugins}
 patchelf --debug --set-rpath '$ORIGIN/../private' %{buildroot}/%{_libdir}/mysql/plugin/authentication_fido.so
+%endif # add_fido_plugins
 
 ##############################################################################
 #  Post processing actions, i.e. when installed
@@ -1574,7 +1590,9 @@ fi
 %dir %{_libdir}/mysql/private
 %attr(755, root, root) %{_libdir}/mysql/private/libprotobuf-lite.so.*
 %attr(755, root, root) %{_libdir}/mysql/private/libprotobuf.so.*
+%if 0%{?add_fido_plugins}
 %attr(755, root, root) %{_libdir}/mysql/private/libfido2.so.*
+%endif # add_fido_plugins
 
 %if 0%{?systemd} == 0
 %attr(755, root, root) %{_sbindir}/rcmysql

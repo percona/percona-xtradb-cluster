@@ -17,7 +17,7 @@ t1	CREATE TABLE `t1` (
   `f2` int DEFAULT NULL,
   PRIMARY KEY (`f1`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
-SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE = 'Waiting for table metadata lock';
+SELECT COUNT(*) = 0 FROM performance_schema.processlist WHERE USER = 'system user' AND STATE = 'Waiting for table metadata lock';
 COUNT(*) = 0
 1
 DROP TABLE t1;

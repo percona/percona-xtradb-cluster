@@ -32,7 +32,7 @@ LOCK TABLE t2 WRITE;
 --connection node_2
 SET SESSION wsrep_sync_wait = 0;
 --echo #node-2 (check ddl are waiting)
---let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'Waiting for table metadata lock'
+--let $wait_condition = SELECT COUNT(*) = 1 FROM performance_schema.processlist WHERE STATE = 'Waiting for table metadata lock'
 --source include/wait_condition.inc
 
 --connection node_1
@@ -81,7 +81,7 @@ FLUSH TABLE WITH READ LOCK;
 --connection node_2
 SET SESSION wsrep_sync_wait = 0;
 --echo #node-2 (check ddl are waiting)
---let $wait_condition = SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'Waiting for global read lock';
+--let $wait_condition = SELECT COUNT(*) = 2 FROM performance_schema.processlist WHERE STATE = 'Waiting for global read lock';
 --source include/wait_condition.inc
 
 --connection node_1
@@ -130,7 +130,7 @@ FLUSH TABLE t2 WITH READ LOCK;
 --connection node_2
 SET SESSION wsrep_sync_wait = 0;
 --echo #node-2 (check ddl are waiting)
---let $wait_condition = SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'wsrep: initiating TOI for write set (-1)';
+--let $wait_condition = SELECT COUNT(*) = 2 FROM performance_schema.processlist WHERE STATE = 'wsrep: preparing for TO isolation';
 --source include/wait_condition.inc
 
 --connection node_1

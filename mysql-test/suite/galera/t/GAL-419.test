@@ -16,8 +16,8 @@ SET SESSION wsrep_sync_wait = 0;
 --sleep 2
 
 # Node #1 has wsrep_cluster_address=gcomm:// in my.cnf, so should fail to bootstrap
-
---error 1
+# The following mysqld invocation will end up with server abort. In such a case ASan will report problems, so allow error 42 as well.
+--error 1, 42
 --exec $MYSQLD --defaults-group-suffix=.1 --defaults-file=$MYSQLTEST_VARDIR/my.cnf | grep 'This node is not safe to bootstrap the cluster'
 
 # Unless we remove grastate.dat

@@ -34,7 +34,7 @@ SET GLOBAL DEBUG = "d,thd_proc_info.wsrep_commit";
 
 --connection node_3
 SELECT f1 = 111 FROM t1;
-SELECT COUNT(*) IN (1, 2) FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE '%wsrep: committed%';
+SELECT COUNT(*) IN (1, 2) FROM performance_schema.processlist WHERE USER = 'system user' AND STATE LIKE '%wsrep: committed%';
 
 SET GLOBAL DEBUG = "";
 

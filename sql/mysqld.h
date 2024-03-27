@@ -67,6 +67,7 @@
 #ifdef _WIN32
 #include "sql/nt_servc.h"
 #endif  // _WIN32
+#include "aggregated_stats.h"
 #include "sql/sql_bitmap.h"
 #include "sql/sql_const.h"  // UUID_LENGTH
 #include "sql_connect.h"
@@ -256,7 +257,6 @@ extern bool using_udf_functions;
 extern bool locked_in_memory;
 extern bool opt_using_transactions;
 extern ulong current_pid;
-extern ulong expire_logs_days;
 extern ulong max_slowlog_size;
 extern ulong max_slowlog_files;
 extern ulong binlog_expire_logs_seconds;
@@ -387,6 +387,7 @@ extern const char *in_left_expr_name;
 extern SHOW_VAR status_vars[];
 extern struct System_variables max_system_variables;
 extern struct System_status_var global_status_var;
+extern struct aggregated_stats global_aggregated_stats;
 extern struct rand_struct sql_rand;
 
 using user_stats_t = collation_unordered_map<std::string, USER_STATS>;
@@ -407,10 +408,12 @@ extern uint opt_server_id_bits;
 extern ulong opt_server_id_mask;
 extern const char *load_default_groups[];
 extern struct my_option my_long_early_options[];
-extern bool mysqld_server_started;
+
 #ifdef WITH_WSREP
 extern bool wsrep_unireg_abort;
 #endif /* WITH_WSREP */
+
+extern "C" MYSQL_PLUGIN_IMPORT bool mysqld_server_started;
 extern "C" MYSQL_PLUGIN_IMPORT int orig_argc;
 extern "C" MYSQL_PLUGIN_IMPORT char **orig_argv;
 extern my_thread_attr_t connection_attrib;
@@ -712,11 +715,17 @@ extern PSI_stage_info stage_wsrep_applied_writeset;
 extern PSI_stage_info stage_wsrep_applying_toi_writeset;
 extern PSI_stage_info stage_wsrep_applied_toi_writeset;
 
+extern PSI_stage_info stage_wsrep_applying_nbo_writeset;
+extern PSI_stage_info stage_wsrep_applied_nbo_writeset;
+
 extern PSI_stage_info stage_wsrep_committing;
 extern PSI_stage_info stage_wsrep_committed;
 
 extern PSI_stage_info stage_wsrep_toi_committing;
 extern PSI_stage_info stage_wsrep_toi_committed;
+
+extern PSI_stage_info stage_wsrep_nbo_committing;
+extern PSI_stage_info stage_wsrep_nbo_committed;
 
 extern PSI_stage_info stage_wsrep_rolling_back;
 extern PSI_stage_info stage_wsrep_rolled_back;

@@ -44,7 +44,6 @@
 #include <vector>
 
 #include "keycache.h"
-#include "libbinlogevents/include/binlog_event.h"
 #include "m_string.h"
 #include "my_bit.h"     // my_count_bits
 #include "my_bitmap.h"  // MY_BITMAP
@@ -56,6 +55,7 @@
 #include "my_sqlcommand.h"
 #include "my_sys.h"  // MEM_DEFINED_IF_ADDRESSABLE()
 #include "myisam.h"  // TT_FOR_UPGRADE
+#include "mysql/binlog/event/binlog_event.h"
 #include "mysql/components/services/bits/psi_bits.h"
 #include "mysql/components/services/log_builtins.h"
 #include "mysql/components/services/log_shared.h"
@@ -154,17 +154,17 @@
 #ifdef HAVE_PSI_TABLE_INTERFACE
 #define MYSQL_TABLE_IO_WAIT(OP, INDEX, RESULT, PAYLOAD)                     \
   {                                                                         \
-    if (m_psi != NULL) {                                                    \
+    if (m_psi != nullptr) {                                                 \
       switch (m_psi_batch_mode) {                                           \
         case PSI_BATCH_MODE_NONE: {                                         \
-          PSI_table_locker *sub_locker = NULL;                              \
+          PSI_table_locker *sub_locker = nullptr;                           \
           PSI_table_locker_state reentrant_safe_state;                      \
           reentrant_safe_state.m_thread = nullptr;                          \
           reentrant_safe_state.m_wait = nullptr;                            \
           sub_locker = PSI_TABLE_CALL(start_table_io_wait)(                 \
               &reentrant_safe_state, m_psi, OP, INDEX, __FILE__, __LINE__); \
           PAYLOAD                                                           \
-          if (sub_locker != NULL) PSI_TABLE_CALL(end_table_io_wait)         \
+          if (sub_locker != nullptr) PSI_TABLE_CALL(end_table_io_wait)      \
           (sub_locker, 1);                                                  \
           break;                                                            \
         }                                                                   \
@@ -203,13 +203,13 @@
 #ifdef HAVE_PSI_TABLE_INTERFACE
 #define MYSQL_TABLE_LOCK_WAIT(OP, FLAGS, PAYLOAD)                              \
   {                                                                            \
-    if (m_psi != NULL) {                                                       \
+    if (m_psi != nullptr) {                                                    \
       PSI_table_locker *locker;                                                \
       PSI_table_locker_state state;                                            \
       locker = PSI_TABLE_CALL(start_table_lock_wait)(&state, m_psi, OP, FLAGS, \
                                                      __FILE__, __LINE__);      \
       PAYLOAD                                                                  \
-      if (locker != NULL) PSI_TABLE_CALL(end_table_lock_wait)(locker);         \
+      if (locker != nullptr) PSI_TABLE_CALL(end_table_lock_wait)(locker);      \
     } else {                                                                   \
       PAYLOAD                                                                  \
     }                                                                          \
@@ -257,7 +257,7 @@ st_plugin_int *insert_hton2plugin(uint slot, st_plugin_int *plugin) {
 
 st_plugin_int *remove_hton2plugin(uint slot) {
   st_plugin_int *retval = se_plugin_array[slot];
-  se_plugin_array[slot] = NULL;
+  se_plugin_array[slot] = nullptr;
   builtin_htons.assign_at(slot, false);
   return retval;
 }
@@ -801,7 +801,7 @@ int ha_finalize_handlerton(st_plugin_int *plugin) {
     /* Make sure we are not unpluging another plugin */
     assert(se_plugin_array[hton->slot] == plugin);
     assert(hton->slot < se_plugin_array.size());
-    se_plugin_array[hton->slot] = NULL;
+    se_plugin_array[hton->slot] = nullptr;
     builtin_htons[hton->slot] = false; /* Extra correctness. */
   }
 
@@ -981,6 +981,17 @@ static bool closecon_handlerton(THD *thd, plugin_ref plugin, void *) {
     thd_set_ha_data(thd, hton, nullptr);
   }
   return false;
+}
+
+static bool reset_plugin_vars_handlerton(THD *thd, plugin_ref plugin, void *) {
+  handlerton *hton = plugin_data<handlerton *>(plugin);
+  if (hton->reset_plugin_vars != nullptr) hton->reset_plugin_vars(thd);
+  return false;
+}
+
+void ha_reset_plugin_vars(THD *thd) {
+  plugin_foreach(thd, reset_plugin_vars_handlerton, MYSQL_STORAGE_ENGINE_PLUGIN,
+                 nullptr);
 }
 
 /**
@@ -1962,7 +1973,7 @@ end:
       if (thd->slave_thread && thd->rli_slave &&
           thd->rli_slave->current_event &&
           thd->rli_slave->current_event->get_type_code() ==
-              binary_log::XID_EVENT &&
+              mysql::binlog::event::XID_EVENT &&
           !thd->is_operating_substatement_implicitly &&
           !thd->is_operating_gtid_table_implicitly && !transaction_to_skip)
         DBUG_SUICIDE();
@@ -2052,6 +2063,7 @@ int ha_commit_low(THD *thd, bool all, bool run_after_commit) {
       }
       assert(!thd->status_var_aggregated);
       thd->status_var.ha_commit_count++;
+      global_aggregated_stats.get_shard(thd->thread_id()).ha_commit_count++;
       ha_info.reset(); /* keep it conveniently zero-filled */
     }
     if (restore_backup_ha_data) thd->rpl_reattach_engine_ha_data();
@@ -2073,6 +2085,29 @@ int ha_commit_low(THD *thd, bool all, bool run_after_commit) {
         Commit_order_manager::wait_and_finish(thd, error);
       }
     }
+  } else {
+      /* This function is common for group commit flow and the flow that skips
+      group commit. We register the thread in wsrep_group_commit_queue always.
+      For group commit it is done during binlog flush stage, for 1-phase commit
+      it is done in wsrep_before_commit().
+      Ideally, for one-phase (with binlog=off) or two-phase (with binlog=on)
+      this step would be executed when transaction commits in InnoDB.
+      If galera node is acting as async slave and replicated action from async
+      master result in empty changes on slave (slave directly applied the said
+      changes and has skipped error through skip-slave-error configuration) it
+      can result in said situation. In this case slave protocol directly commits
+      gtid through gtid_end_transaction that invokes ordered_commit causing
+      thread handler to register in wsrep group commit queue but since storage
+      engine commit is not done it would fail to unregister the said thread
+      handler as part of storage engine commit. Handle unregistration here,
+      because doing it in wsrep_after_commit() is too late. If there is another
+      thread following this thread in currently processed commit queue,
+      current thread is commited (but does not commit in SE, so does not unregister
+      from wsrep_group_commit_queue. Then the following thread calls
+      wsrep_wait_for_turn_in_group_commit() but sees the previous thread at the front
+      and waits infinitely. */
+      wsrep_wait_for_turn_in_group_commit(thd);
+      wsrep_unregister_from_group_commit(thd);
   }
 
 err:
@@ -2156,6 +2191,7 @@ int ha_rollback_low(THD *thd, bool all) {
       }
       assert(!thd->status_var_aggregated);
       thd->status_var.ha_rollback_count++;
+      global_aggregated_stats.get_shard(thd->thread_id()).ha_rollback_count++;
       ha_info.reset(); /* keep it conveniently zero-filled */
 #ifdef WITH_WSREP
       DEBUG_SYNC(thd, "ha_rollback_low_after_ha_reset");
@@ -2336,6 +2372,7 @@ int ha_commit_attachable(THD *thd) {
       }
       assert(!thd->status_var_aggregated);
       thd->status_var.ha_commit_count++;
+      global_aggregated_stats.get_shard(thd->thread_id()).ha_commit_count++;
       ha_info.reset(); /* keep it conveniently zero-filled */
     }
     trn_ctx->reset_scope(Transaction_ctx::STMT);
@@ -2420,6 +2457,8 @@ int ha_rollback_to_savepoint(THD *thd, SAVEPOINT *sv) {
     }
     assert(!thd->status_var_aggregated);
     thd->status_var.ha_savepoint_rollback_count++;
+    global_aggregated_stats.get_shard(thd->thread_id())
+        .ha_savepoint_rollback_count++;
     if (ht->prepare == nullptr) trn_ctx->set_no_2pc(trx_scope, true);
   }
 
@@ -2460,6 +2499,7 @@ int ha_rollback_to_savepoint(THD *thd, SAVEPOINT *sv) {
 
     assert(!thd->status_var_aggregated);
     thd->status_var.ha_rollback_count++;
+    global_aggregated_stats.get_shard(thd->thread_id()).ha_rollback_count++;
     ha_info->reset(); /* keep it conveniently zero-filled */
   }
   trn_ctx->set_ha_trx_info(trx_scope, sv->ha_list);
@@ -2566,6 +2606,7 @@ int ha_prepare_low(THD *thd, bool all) {
 #endif /* WITH_WSREP */
       assert(!thd->status_var_aggregated);
       thd->status_var.ha_prepare_count++;
+      global_aggregated_stats.get_shard(thd->thread_id()).ha_prepare_count++;
 
       if (error) break;
     }
@@ -2627,6 +2668,7 @@ int ha_savepoint(THD *thd, SAVEPOINT *sv) {
     }
     assert(!thd->status_var_aggregated);
     thd->status_var.ha_savepoint_count++;
+    global_aggregated_stats.get_shard(thd->thread_id()).ha_savepoint_count++;
   }
   /*
     Remember the list of registered storage engines. All new
@@ -5595,12 +5637,16 @@ int handler::ha_create(const char *name, TABLE *form, HA_CREATE_INFO *info,
 /**
  * Loads a table into its defined secondary storage engine: public interface.
  *
- * @param table The table to load into the secondary engine. Its read_set tells
- * which columns to load.
+ * @param[in] table - The table to load into the secondary engine. Its read_set
+ * tells which columns to load.
+ * @param[out] skip_metadata_update - should the DD metadata be updated for the
+ * load of this table
  *
  * @sa handler::load_table()
  */
-int handler::ha_load_table(const TABLE &table) { return load_table(table); }
+int handler::ha_load_table(const TABLE &table, bool *skip_metadata_update) {
+  return load_table(table, skip_metadata_update);
+}
 
 /**
  * Unloads a table from its defined secondary storage engine: public interface.
@@ -5716,8 +5762,7 @@ void handler::update_global_table_stats() {
   if (it == global_table_stats->cend()) {
     global_table_stats->emplace(
         std::piecewise_construct, std::forward_as_tuple(key),
-        std::forward_as_tuple(static_cast<int>(ht->db_type), rows_read,
-                              rows_changed, rows_changed_x_indexes));
+        std::forward_as_tuple(rows_read, rows_changed, rows_changed_x_indexes));
   } else {
     TABLE_STATS *const table_stats = &it->second;
     table_stats->rows_read += rows_read;
@@ -6304,6 +6349,7 @@ static int ha_discover(THD *thd, const char *db, const char *name,
   if (!error) {
     assert(!thd->status_var_aggregated);
     thd->status_var.ha_discover_count++;
+    global_aggregated_stats.get_shard(thd->thread_id()).ha_discover_count++;
   }
   return error;
 }

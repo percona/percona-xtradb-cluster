@@ -19,7 +19,7 @@ CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
 	my $pid_filename = $ENV{'NODE_2_PIDFILE'};
 	my $mysqld_pid = `cat $pid_filename`;
         chomp($mysqld_pid);
-	system("kill -SIGSTOP $mysqld_pid");
+	system("kill -s STOP $mysqld_pid ||:");
 	exit(0);
 EOF
 
@@ -38,7 +38,7 @@ INSERT INTO t1 VALUES (1);
 	my $pid_filename = $ENV{'NODE_2_PIDFILE'};
 	my $mysqld_pid = `cat $pid_filename`;
         chomp($mysqld_pid);
-	system("kill -SIGCONT $mysqld_pid");
+	system("kill -s CONT $mysqld_pid ||:");
 	exit(0);
 EOF
 

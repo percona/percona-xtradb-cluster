@@ -22,6 +22,7 @@
 
 #include "debug_sync.h"
 #include "mysql/plugin.h"
+#include "mysql/binlog/event/binlog_event.h"
 #include "sql/binlog_reader.h"
 #include "sql/sql_lex.h"
 
@@ -148,13 +149,13 @@ int wsrep_apply_events(THD *thd, Relay_log_info *rli __attribute__((unused)),
     }
 
     switch (ev->get_type_code()) {
-      case binary_log::FORMAT_DESCRIPTION_EVENT:
+      case mysql::binlog::event::FORMAT_DESCRIPTION_EVENT:
         wsrep_set_apply_format(thd, (Format_description_log_event *)ev);
         continue;
       /* If gtid_mode=OFF then async master-slave will generate ANONYMOUS GTID.
        */
-      case binary_log::GTID_LOG_EVENT:
-      case binary_log::ANONYMOUS_GTID_LOG_EVENT: {
+      case mysql::binlog::event::GTID_LOG_EVENT:
+      case mysql::binlog::event::ANONYMOUS_GTID_LOG_EVENT: {
         Gtid_log_event *gev = (Gtid_log_event *)ev;
         if (gev->get_gno() == 0) {
           /* Skip GTID log event to make binlog to generate LTID on commit */
@@ -221,7 +222,7 @@ int wsrep_apply_events(THD *thd, Relay_log_info *rli __attribute__((unused)),
     event++;
 
     switch (ev->get_type_code()) {
-      case binary_log::ROWS_QUERY_LOG_EVENT:
+      case mysql::binlog::event::ROWS_QUERY_LOG_EVENT:
         /*
           Setting binlog_rows_query_log_events to ON will generate
           ROW_QUERY_LOG_EVENT. This event logs an extra information while

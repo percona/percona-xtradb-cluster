@@ -22,15 +22,15 @@
 
 #include "sql/sql_check_constraint.h"
 
-#include "libbinlogevents/include/binlog_event.h"  // UNDEFINED_SERVER_VERSION
-#include "my_inttypes.h"                           // MYF, uchar
-#include "my_sys.h"                                // my_error
-#include "mysql/strings/m_ctype.h"                 // CHARSET_INFO
-#include "mysql/thread_type.h"                     // SYSTEM_THREAD_SLAVE_*
-#include "mysql_com.h"                             // NAME_CHAR_LEN
-#include "mysqld_error.h"                          // ER_*
-#include "sql/create_field.h"                      // Create_field
-#include "sql/enum_query_type.h"                   // QT_*
+#include "my_inttypes.h"                      // MYF, uchar
+#include "my_sys.h"                           // my_error
+#include "mysql/binlog/event/binlog_event.h"  // UNDEFINED_SERVER_VERSION
+#include "mysql/strings/m_ctype.h"            // CHARSET_INFO
+#include "mysql/thread_type.h"                // SYSTEM_THREAD_SLAVE_*
+#include "mysql_com.h"                        // NAME_CHAR_LEN
+#include "mysqld_error.h"                     // ER_*
+#include "sql/create_field.h"                 // Create_field
+#include "sql/enum_query_type.h"              // QT_*
 #include "sql/field.h"             // pre_validate_value_generator_expr
 #include "sql/item.h"              // Item, Item_field
 #include "sql/sql_class.h"         // THD
@@ -103,10 +103,18 @@ bool Sql_check_constraint_spec::expr_refers_column(const char *column_name) {
 }
 
 bool is_slave_with_master_without_check_constraints_support(THD *thd) {
+#ifdef WITH_WSREP
+  return (!thd->wsrep_applier &&
+          (thd->system_thread &
+           (SYSTEM_THREAD_SLAVE_SQL | SYSTEM_THREAD_SLAVE_WORKER)) &&
+          (thd->variables.original_server_version == UNDEFINED_SERVER_VERSION ||
+           thd->variables.original_server_version < 80016));
+#else
   return ((thd->system_thread &
            (SYSTEM_THREAD_SLAVE_SQL | SYSTEM_THREAD_SLAVE_WORKER)) &&
           (thd->variables.original_server_version == UNDEFINED_SERVER_VERSION ||
            thd->variables.original_server_version < 80016));
+#endif
 }
 
 bool check_constraint_expr_refers_to_only_column(Item *check_expr,
@@ -116,7 +124,7 @@ bool check_constraint_expr_refers_to_only_column(Item *check_expr,
                    (uchar *)&fields);
 
   // Expression does not refer to any columns.
-  if (fields.empty()) return false;
+  if (fields.empty()) return true;
 
   for (Item_field *cur_item : fields) {
     // Expression refers to some other column.

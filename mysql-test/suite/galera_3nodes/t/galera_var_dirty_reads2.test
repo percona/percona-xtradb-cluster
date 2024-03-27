@@ -92,10 +92,10 @@ SELECT * FROM t1;
 --error ER_UNKNOWN_COM_ERROR
 EXECUTE stmt_select;
 
-# But reads from INFORMATION_SCHEMA are allowed
+# But reads from performance_schema are allowed
 
 --error 0
-SELECT COUNT(*) > 0 FROM INFORMATION_SCHEMA.PROCESSLIST;
+SELECT COUNT(*) > 0 FROM performance_schema.processlist;
 
 # Restore cluster
 SET GLOBAL wsrep_provider_options='gmcast.isolate=0';

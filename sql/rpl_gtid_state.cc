@@ -24,12 +24,12 @@
 #include <atomic>
 
 #include "lex_string.h"
-#include "libbinlogevents/include/control_events.h"
 #include "my_compiler.h"
 #include "my_dbug.h"
 #include "my_inttypes.h"
 #include "my_sys.h"
 #include "my_systime.h"
+#include "mysql/binlog/event/control_events.h"
 #include "mysql/components/services/bits/psi_stage_bits.h"
 #include "mysql/components/services/log_builtins.h"  //LogErr
 #include "mysql/psi/mysql_mutex.h"
@@ -103,7 +103,8 @@ enum_return_status Gtid_state::acquire_ownership(THD *thd, const Gtid &gtid) {
     thd->owned_gtid = gtid;
     thd->owned_gtid.dbug_print(nullptr, "set owned_gtid in acquire_ownership");
     thd->owned_sid = sid_map->sidno_to_sid(gtid.sidno);
-    thd->rpl_thd_ctx.last_used_gtid_tracker_ctx().set_last_used_gtid(gtid);
+    thd->rpl_thd_ctx.last_used_gtid_tracker_ctx().set_last_used_gtid(
+        gtid, thd->owned_sid);
   }
   RETURN_OK;
 err:
@@ -345,15 +346,15 @@ bool Gtid_state::wait_for_gtid_set(THD *thd, Gtid_set *wait_for, double timeout,
 
     Once the loop over SIDNOs has completed, 'todo' is guaranteed to
     be empty.  However, it may still be the case that not all GTIDs of
-    wait_for are included in gtid_executed, since RESET MASTER may
-    have been executed while we were waiting.
+    wait_for are included in gtid_executed, since RESET BINARY LOGS AND GTIDS
+    may have been executed while we were waiting.
 
-    RESET MASTER requires global_sid_lock.wrlock.  We hold
+    RESET BINARY LOGS AND GTIDS requires global_sid_lock.wrlock.  We hold
     global_sid_lock.rdlock while removing GTIDs from 'todo', but the
     wait operation releases global_sid_lock.rdlock.  So if we
     completed the 'for' loop without waiting, we know for sure that
     global_sid_lock.rdlock was held while emptying 'todo', and thus
-    RESET MASTER cannot have executed in the meantime.  But if we
+    RESET BINARY LOGS AND GTIDS cannot have executed in the meantime.  But if we
     waited at some point during the execution of the 'for' loop, RESET
     MASTER may have been called.  Thus, we repeatedly run 'for' loop
     until it completes without waiting (this is the outermost 'while'
@@ -505,8 +506,23 @@ enum_return_status Gtid_state::generate_automatic_gtid(
     /* The caller must lock the sid_lock when locked_sidno is passed */
     sid_lock->assert_some_lock();
 
+#ifdef WITH_WSREP
+  bool skip_gtid = false;
+  /* If binlog is disabled permanently we don't get here.
+  If it is disabled only in a particular session, we need to
+  do PXC replication, however we will not binlog it.
+  So we need to skip GTID generation for this transaction.
+  Just pretend for a while that gtid_mode=OFF */
+  if (!(thd->variables.option_bits & OPTION_BIN_LOG) &&
+      !(thd->variables.option_bits & OPTION_BIN_LOG_INTERNAL_OFF)) {
+    skip_gtid = true;
+  }
+  // If GTID_MODE = ON_PERMISSIVE or ON, generate a new GTID
+  if (!skip_gtid && global_gtid_mode.get() >= Gtid_mode::ON_PERMISSIVE) {
+#else
   // If GTID_MODE = ON_PERMISSIVE or ON, generate a new GTID
   if (global_gtid_mode.get() >= Gtid_mode::ON_PERMISSIVE) {
+#endif
     Gtid automatic_gtid = {specified_sidno, specified_gno};
 
 #ifdef WITH_WSREP
@@ -565,7 +581,11 @@ enum_return_status Gtid_state::generate_automatic_gtid(
     // using an anonymous transaction.
     thd->owned_gtid.sidno = THD::OWNED_SIDNO_ANONYMOUS;
     thd->owned_gtid.gno = 0;
+#ifdef WITH_WSREP
+    acquire_anonymous_ownership(thd);
+#else
     acquire_anonymous_ownership();
+#endif
     thd->owned_gtid.dbug_print(
         nullptr, "set owned_gtid (anonymous) in generate_automatic_gtid");
   }
@@ -695,7 +715,7 @@ int Gtid_state::init() {
   global_sid_lock->assert_some_wrlock();
 
   rpl_sid server_sid{};
-  if (server_sid.parse(server_uuid, binary_log::Uuid::TEXT_LENGTH) != 0)
+  if (server_sid.parse(server_uuid, mysql::gtid::Uuid::TEXT_LENGTH) != 0)
     return 1;
   rpl_sidno sidno = sid_map->add_sid(server_sid);
   if (sidno <= 0) return 1;
@@ -981,7 +1001,11 @@ void Gtid_state::update_gtids_impl_own_anonymous(THD *thd, bool *more_trx) {
     }
   }
   if (!(*more_trx && thd->variables.gtid_next.type == ANONYMOUS_GTID)) {
+#ifdef WITH_WSREP
+    release_anonymous_ownership(thd);
+#else
     release_anonymous_ownership();
+#endif
     thd->clear_owned_gtids();
   }
 }
@@ -1011,3 +1035,53 @@ error:
   BINLOG_ERROR(("Out of memory."), (ER_OUT_OF_RESOURCES, MYF(0)));
   RETURN_REPORTED_ERROR;
 }
+
+#ifdef WITH_WSREP
+void Gtid_state::acquire_anonymous_ownership(THD *thd [[maybe_unused]]) {
+  DBUG_TRACE;
+  sid_lock->assert_some_lock();
+
+  /* We are allowed to get here only in two cases:
+  1. If this is WSREP-enabled thread
+      and binlog is disabled
+      and binlog is not disabled internally
+      This means that this is the session with sql_log_bin=OFF.
+  2. if gtid_mode != ON (the original condition) */
+  assert((WSREP(thd) && !(thd->variables.option_bits & OPTION_BIN_LOG) &&
+          !(thd->variables.option_bits & OPTION_BIN_LOG_INTERNAL_OFF)) ||
+         (global_gtid_mode.get() != Gtid_mode::ON));
+
+#ifndef NDEBUG
+  int32 new_value =
+#endif
+      ++atomic_anonymous_gtid_count;
+  DBUG_PRINT("info",
+             ("atomic_anonymous_gtid_count increased to %d", new_value));
+  assert(new_value >= 1);
+  return;
+}
+
+void Gtid_state::release_anonymous_ownership(THD *thd [[maybe_unused]]) {
+  DBUG_TRACE;
+  sid_lock->assert_some_lock();
+
+  /* We are allowed to get here only in two cases:
+  1. If this is WSREP-enabled thread
+      and binlog is disabled
+      and binlog is not disabled internally
+      This means that this is the session with sql_log_bin=OFF.
+  2. if gtid_mode != ON (the original condition) */
+  assert((WSREP(thd) && !(thd->variables.option_bits & OPTION_BIN_LOG) &&
+          !(thd->variables.option_bits & OPTION_BIN_LOG_INTERNAL_OFF)) ||
+         (global_gtid_mode.get() != Gtid_mode::ON));
+
+#ifndef NDEBUG
+  int32 new_value =
+#endif
+      --atomic_anonymous_gtid_count;
+  DBUG_PRINT("info",
+             ("atomic_anonymous_gtid_count decreased to %d", new_value));
+  assert(new_value >= 0);
+  return;
+}
+#endif /* WITH_WSREP */

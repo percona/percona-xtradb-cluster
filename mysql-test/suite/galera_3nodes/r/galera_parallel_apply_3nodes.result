@@ -7,7 +7,7 @@ UPDATE t1 SET f1 = f1 + 100;;
 SELECT f1 = 111 FROM t1;
 f1 = 111
 1
-SELECT COUNT(*) IN (1, 2) FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE '%wsrep: committed%';
+SELECT COUNT(*) IN (1, 2) FROM performance_schema.processlist WHERE USER = 'system user' AND STATE LIKE '%wsrep: committed%';
 COUNT(*) IN (1, 2)
 1
 SET GLOBAL DEBUG = "";

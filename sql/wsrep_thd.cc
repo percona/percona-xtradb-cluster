@@ -259,6 +259,7 @@ static void wsrep_rollback_process(THD *rollbacker,
   WSREP_INFO("Starting rollbacker thread %u", rollbacker->thread_id());
 
   thd_proc_info(rollbacker, "wsrep aborter idle");
+  THD_STAGE_INFO(rollbacker, stage_wsrep_aborter_idle);
   while ((thd = wsrep_rollback_queue->pop_front()) != NULL) {
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
     wsrep::client_state &cs(thd->wsrep_cs());
@@ -277,6 +278,7 @@ static void wsrep_rollback_process(THD *rollbacker,
     thd->wsrep_cs().acquire_ownership();
 
     thd_proc_info(rollbacker, "wsrep aborter active");
+    THD_STAGE_INFO(rollbacker, stage_wsrep_aborter_active);
 
     /* Rollback methods below may free thd pointer. Do not try
        to access it after method returns. */
@@ -290,6 +292,7 @@ static void wsrep_rollback_process(THD *rollbacker,
     }
     wsrep_store_threadvars(rollbacker);
     thd_proc_info(rollbacker, "wsrep aborter idle");
+    THD_STAGE_INFO(rollbacker, stage_wsrep_aborter_idle);
   }
 
   delete wsrep_rollback_queue;

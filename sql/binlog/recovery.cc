@@ -23,8 +23,10 @@
 #include "sql/binlog/recovery.h"
 
 #include "sql/binlog/decompressing_event_object_istream.h"  // binlog::Decompressing_event_object_istream
-#include "sql/raii/sentry.h"                                // raii::Sentry<>
-#include "sql/xa/xid_extract.h"                             // xa::XID_extractor
+#include "sql/psi_memory_key.h"
+#include "sql/psi_memory_resource.h"
+#include "sql/raii/sentry.h"     // raii::Sentry<>
+#include "sql/xa/xid_extract.h"  // xa::XID_extractor
 
 #ifdef WITH_WSREP
 #include "sql/wsrep_mysqld.h"  // WSREP_DEBUG
@@ -60,7 +62,8 @@ std::string const &binlog::Binlog_recovery::get_failure_message() const {
 }
 
 binlog::Binlog_recovery &binlog::Binlog_recovery::recover() {
-  binlog::Decompressing_event_object_istream istream{this->m_reader};
+  binlog::Decompressing_event_object_istream istream{
+      this->m_reader, psi_memory_resource(key_memory_recovery)};
   std::shared_ptr<Log_event> ev;
   this->m_valid_pos = this->m_reader.position();
 
@@ -133,15 +136,15 @@ binlog::Binlog_recovery &binlog::Binlog_recovery::recover() {
 
   while (istream >> ev) {
     switch (ev->get_type_code()) {
-      case binary_log::QUERY_EVENT: {
+      case mysql::binlog::event::QUERY_EVENT: {
         this->process_query_event(dynamic_cast<Query_log_event &>(*ev));
         break;
       }
-      case binary_log::XID_EVENT: {
+      case mysql::binlog::event::XID_EVENT: {
         this->process_xid_event(dynamic_cast<Xid_log_event &>(*ev));
         break;
       }
-      case binary_log::XA_PREPARE_LOG_EVENT: {
+      case mysql::binlog::event::XA_PREPARE_LOG_EVENT: {
         this->process_xa_prepare_event(
             dynamic_cast<XA_prepare_log_event &>(*ev));
         break;

@@ -31,9 +31,9 @@ INSERT INTO t2 VALUES (1);
 --connection node_2a
 SET SESSION wsrep_sync_wait=0;
 
---let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'Waiting for table metadata lock%';
+--let $wait_condition = SELECT COUNT(*) = 1 FROM performance_schema.processlist WHERE STATE LIKE 'Waiting for table metadata lock%';
 --source include/wait_condition.inc
---let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'wsrep: preparing to commit write set%';
+--let $wait_condition = SELECT COUNT(*) = 1 FROM performance_schema.processlist WHERE STATE LIKE 'wsrep: replicating and certifying write set';
 --source include/wait_condition.inc
 
 SELECT COUNT(*) = 0 FROM t1;
@@ -46,7 +46,7 @@ UNLOCK TABLES;
 --eval SET SESSION wsrep_sync_wait = $wsrep_sync_wait_orig;
 SELECT COUNT(*) = 1 FROM t1;
 SELECT COUNT(*) = 1 FROM t2;
---let $wait_condition = SELECT COUNT(*) = 2  FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'wsrep: committed write set%';
+--let $wait_condition = SELECT COUNT(*) = 2  FROM performance_schema.processlist WHERE STATE LIKE 'wsrep: committed write set';
 --source include/wait_condition.inc
 
 --eval SET GLOBAL wsrep_applier_threads = $wsrep_applier_threads_orig;

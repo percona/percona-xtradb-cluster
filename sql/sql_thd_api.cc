@@ -355,7 +355,30 @@ extern "C" const char *set_thd_proc_info(MYSQL_THD thd_arg, const char *info,
   PSI_stage_info old_stage;
   PSI_stage_info new_stage;
 
+#ifdef WITH_WSREP
+  /* Setting current stage key to 0 is probably not something we want to do.
+  It would cause filtering out 'state' column in p_s.processlist,
+  if we do the following order of calls:
+
+  THD_STAGE_INFO()
+  thd_proc_info()
+
+  because of stage key being set to 0.
+  Probably the code below should be:
+
+  old_stage.m_key thd_arg->get_current_stage_key();
+
+  but that causes some original MTR tests to fail because of result mismatch.
+  Instead of fixing it here, just maintain the proper order of calls:
+
+  thd_proc_info()
+  THD_STAGE_INFO()
+
+  Additionally old/new names seem to be swapped here. */
   old_stage.m_key = 0;
+#else
+  old_stage.m_key = 0;
+#endif
   old_stage.m_name = info;
 
   set_thd_stage_info(thd_arg, &old_stage, &new_stage, calling_function,

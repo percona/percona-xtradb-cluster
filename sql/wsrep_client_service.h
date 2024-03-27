@@ -51,6 +51,10 @@ class Wsrep_client_service : public wsrep::client_service {
   enum wsrep::provider::status replay() override;
   void wait_for_replayers(wsrep::unique_lock<wsrep::mutex> &) override;
   enum wsrep::provider::status commit_by_xid() override;
+  bool is_prepared_xa() override
+  {
+    return false;
+  }
   bool is_explicit_xa() override
   {
     return false;

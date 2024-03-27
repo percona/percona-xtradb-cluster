@@ -27,7 +27,7 @@ call mtr.add_suppression("Plugin \'InnoDB\'");
 # wait a little to give time for internal temporary session to die out
 select sleep(1);
 --replace_regex /localhost[:0-9]*/localhost/ /Execute/Query/
-SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM INFORMATION_SCHEMA.PROCESSLIST WHERE `state` != 'cleaning up' ORDER BY user, state ASC;
+SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM performance_schema.processlist WHERE `state` != 'cleaning up' ORDER BY user, state ASC;
 
 ## Test starts here
 --write_file $MYSQL_TMP_DIR/client_close.tmp
@@ -410,7 +410,7 @@ select sleep(10);
 show global status like 'mysqlx_sessions';
 show global status like 'mysqlx_connections_%';
 --replace_regex /localhost[:0-9]*/localhost/ /Execute/Query/
-SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM INFORMATION_SCHEMA.PROCESSLIST WHERE `state` != 'cleaning up' ORDER BY user, state ASC;
+SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM performance_schema.processlist WHERE `state` != 'cleaning up' ORDER BY user, state ASC;
 drop procedure test.get_stuck;
 
 ## Cleanup

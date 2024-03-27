@@ -1,0 +1,14 @@
+CALL mtr.add_suppression("Replica SQL: Error .Check constraint .CHK_i. is violated");
+CALL mtr.add_suppression("Replica SQL: Error 'Duplicate check constraint name .CHK_i.* on query");
+CALL mtr.add_suppression("Replica SQL: Error 'Constraint .CHK_i2. does not exist");
+CREATE TABLE t (id INT PRIMARY KEY, i INT NOT NULL);
+INSERT INTO t VALUES(1, 100);
+ALTER TABLE t ADD CONSTRAINT CHK_i CHECK (i <=75);
+ERROR HY000: Check constraint 'CHK_i' is violated.
+ALTER TABLE t ADD CONSTRAINT CHK_i CHECK (i <=200);
+ALTER TABLE t ADD CONSTRAINT CHK_i CHECK (i <=200);
+ERROR HY000: Duplicate check constraint name 'CHK_i'.
+ALTER TABLE t DROP CONSTRAINT CHK_i2;
+ERROR HY000: Constraint 'CHK_i2' does not exist.
+ALTER TABLE t DROP CONSTRAINT CHK_i;
+DROP TABLE t;

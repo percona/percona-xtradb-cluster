@@ -13,7 +13,7 @@
 
 -->macro Long_run	%PROC_NAME%	%TABLE_NAME%
 -->newsession next_ses	x_root
--->stmtsql SELECT COUNT(*) FROM information_schema.processlist
+-->stmtsql SELECT COUNT(*) FROM performance_schema.processlist
 -->recvresult
 
 -->sql
@@ -34,7 +34,7 @@ DELIMITER ;
 
 -->closesession abort
 
--->wait_for 6	SELECT COUNT(*) FROM information_schema.processlist 
+-->wait_for 6	SELECT COUNT(*) FROM performance_schema.processlist 
 -->sleep 0.2
 
 -->stmtadmin list_clients

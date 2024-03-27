@@ -100,13 +100,13 @@
  TODO list :
  - CREATE EVENT should not go into binary log! Does it now? The SQL statements
    issued by the EVENT are replicated.
-   I have an idea how to solve the problem at failover. So the status field
-   will be ENUM('DISABLED', 'ENABLED', 'SLAVESIDE_DISABLED').
+   I have an idea how to solve the problem at failover. So the internal table
+   status field will be ENUM('DISABLED', 'ENABLED', 'SLAVESIDE_DISABLED').
    In this case when CREATE EVENT is replicated it should go into the binary
-   as SLAVESIDE_DISABLED if it is ENABLED, when it's created as DISABLEd it
+   as DISABLE ON REPLICA if it is ENABLED, when it's created as DISABLEd it
    should be replicated as disabled. If an event is ALTERed as DISABLED the
    query should go untouched into the binary log, when ALTERed as enable then
-   it should go as SLAVESIDE_DISABLED. This is regarding the SQL interface.
+   it should go as DISABLE ON REPLICA. This is regarding the SQL interface.
    TT routines however modify mysql.event internally and this does not go the
    log so in this case queries has to be injected into the log...somehow... or
    maybe a solution is RBR for this case, because the event may go only from
@@ -1215,7 +1215,7 @@ static bool load_events_from_db(THD *thd, Event_queue *event_queue) {
         WSREP_DEBUG("Disabling non-native event (name: %s)",
                     et->m_event_name.str);
 
-        if (et->m_status == Event_parse_data::SLAVESIDE_DISABLED) continue;
+        if (et->m_status == Event_parse_data::REPLICA_SIDE_DISABLED) continue;
 
         if (lock_object_name(thd, MDL_key::EVENT, et->m_schema_name.str,
                              et->m_event_name.str)) {
@@ -1230,7 +1230,7 @@ static bool load_events_from_db(THD *thd, Event_queue *event_queue) {
 
         (void)Event_db_repository::update_timing_fields_for_event(
             thd, et->m_schema_name, et->m_event_name, et->m_last_executed,
-            Event_parse_data::SLAVESIDE_DISABLED);
+            Event_parse_data::REPLICA_SIDE_DISABLED);
 
         thd->mdl_context.release_transactional_locks();
 

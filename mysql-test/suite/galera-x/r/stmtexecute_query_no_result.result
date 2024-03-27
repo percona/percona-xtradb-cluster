@@ -30,14 +30,14 @@ send Mysqlx.Sql.StmtExecute {
 
 
 1 rows affected
-last insert id: 2
+last insert id: 3
 send Mysqlx.Sql.StmtExecute {
   stmt: "insert into mytable values (DEFAULT, \'three\')"
 }
 
 
 1 rows affected
-last insert id: 3
+last insert id: 5
 RUN drop schema if exists xtest
 
 1 rows affected

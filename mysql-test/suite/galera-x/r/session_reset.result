@@ -4,12 +4,12 @@ call mtr.add_suppression("Plugin mysqlx reported: '2.1: Unhandled message of typ
 select sleep(1);
 sleep(1)
 0
-SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM INFORMATION_SCHEMA.PROCESSLIST WHERE `state` != 'cleaning up' ORDER BY user, state ASC;
+SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM performance_schema.processlist WHERE `state` != 'cleaning up' ORDER BY user, state ASC;
 user	host	db	command	state	info
 event_scheduler	localhost	NULL	Daemon	Waiting on empty queue	NULL
-root	localhost	test	Query	executing	SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM INFORMATION_SCHEMA.PROCESSLIST WHERE `state` != 'cleaning up' ORDER BY user, state ASC
-system user		NULL	Sleep	innobase_commit_low (-1)	NULL
-system user		NULL	Sleep	wsrep aborter idle	NULL
+root	localhost	test	Query	executing	SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM performance_schema.processlist WHERE `state` != 'cleaning up' ORDER BY user, state ASC
+system user	NULL	NULL	Connect		DELETE FROM mysql.wsrep_cluster_members
+system user	NULL	NULL	Sleep	wsrep: aborter idle	NULL
 
 Session reset (Session_reset_empty)
 ===================================

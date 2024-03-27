@@ -590,7 +590,7 @@ drop table tmyisam;
 --error 1
 --exec $MYSQLD --no-defaults --wsrep_provider="libgalera_smm.so" --wsrep_replicate_myisam=1 > $restartdir/restart.log 2>&1
 --echo "grep --count \"Percona-XtraDB-Cluster prohibits use of MyISAM table replication"
---exec grep --count "Percona-XtraDB-Cluster prohibits use of MyISAM table replication" $restartdir/restart.log
+--exec grep --count "Percona-XtraDB-Cluster prohibits use of MyISAM table replication" $restartdir/restart.log ||:
 --remove_file $restartdir/restart.log
 
 #-------------------------------------------------------------------------------
@@ -771,7 +771,7 @@ drop table tinnodb;
 --error 1
 --exec $MYSQLD --no-defaults --wsrep_provider="libgalera_smm.so" --binlog_format=STATEMENT > $restartdir/restart.log 2>&1
 --echo "grep --count \"Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED at global level\""
---exec grep --count "Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED at global level" $restartdir/restart.log
+--exec grep --count "Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED at global level" $restartdir/restart.log ||:
 --remove_file $restartdir/restart.log
 
 #-------------------------------------------------------------------------------
@@ -911,7 +911,7 @@ set global log_output = 'FILE';
 select 1 from dual;
 --sleep 1
 --echo # grep --count "select 1 from dual"
---exec grep --count "select 1 from dual" $restartdir/pxc.strict.mode.log
+--exec grep --count "select 1 from dual" $restartdir/pxc.strict.mode.log ||:
 
 #
 # log_output=TABLE
@@ -950,7 +950,7 @@ set global log_output = 'FILE';
 select 1 from dual;
 --sleep 1
 --echo # grep --count "select 1 from dual"
---exec grep --count "select 1 from dual" $restartdir/pxc.strict.mode.log
+--exec grep --count "select 1 from dual" $restartdir/pxc.strict.mode.log ||:
 
 #
 # log_output=TABLE
@@ -992,7 +992,7 @@ set global log_output = 'FILE';
 select 1 from dual;
 --sleep 1
 --echo # grep --count "select 1 from dual"
---exec grep --count "select 1 from dual" $restartdir/pxc.strict.mode.log
+--exec grep --count "select 1 from dual" $restartdir/pxc.strict.mode.log ||:
 
 #
 # log_output=TABLE
@@ -1010,7 +1010,7 @@ select count(*) from mysql.general_log;
 --error 1
 --exec $MYSQLD --no-defaults --wsrep_provider="libgalera_smm.so" --log_output=TABLE > $restartdir/restart.log 2>&1
 --echo "grep --count \"Percona-XtraDB-Cluster prohibits setting log_output to TABLE\""
---exec grep --count "Percona-XtraDB-Cluster prohibits setting log_output to TABLE" $restartdir/restart.log
+--exec grep --count "Percona-XtraDB-Cluster prohibits setting log_output to TABLE" $restartdir/restart.log ||:
 --remove_file $restartdir/restart.log
 
 --disable_query_log
@@ -1337,7 +1337,7 @@ drop table t;
 --sleep 30
 #
 --echo "grep --count \"Percona-XtraDB-Cluster prohibits setting innodb_autoinc_lock_mode to"
---exec grep --count "Percona-XtraDB-Cluster prohibits setting innodb_autoinc_lock_mode to" $restartdir/restart.log
+--exec grep --count "Percona-XtraDB-Cluster prohibits setting innodb_autoinc_lock_mode to" $restartdir/restart.log ||:
 #--remove_file $restartdir/restart.log
 #
 --echo "Try restarting node-2 with default options"

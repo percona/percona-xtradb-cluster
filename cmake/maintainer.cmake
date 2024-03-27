@@ -40,12 +40,7 @@ ENDMACRO()
 
 # Common warning flags for GCC, G++, Clang and Clang++
 SET(MY_WARNING_FLAGS
-    "-Wall -Wextra -Wformat-security -Wvla -Wundef")
-
-# Gives spurious warnings on 32-bit; see GCC bug 81890.
-IF(SIZEOF_VOIDP EQUAL 8)
-  STRING_APPEND(MY_WARNING_FLAGS " -Wmissing-format-attribute")
-ENDIF()
+  "-Wall -Wextra -Wformat-security -Wvla -Wundef -Wmissing-format-attribute")
 
 # Clang 6.0 and newer on Windows treat -Wall as -Weverything; use /W4 instead
 IF(WIN32_CLANG)
@@ -65,18 +60,18 @@ IF(MY_COMPILER_IS_GNU)
   # This is included in -Wall on some platforms, enable it explicitly.
   MY_ADD_C_WARNING_FLAG("Wstringop-truncation")
   MY_ADD_CXX_WARNING_FLAG("Wstringop-truncation")
-  IF(NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9)
-    # GCC 8 has bugs with "final".
 
-    # Disable this flag for PXC. Codership's wsrep-lib part and wsrep server
-    # hooks are not compatible with this flag. This causes errors during
-    # compilation of server part and storage engines including wsrep-lib and 
-    # wsrep hooks headers.
-    # Enable it back when wsrep-lib part is fixed. Disabled for now instead of
-    # fixing wsrep-lib to make next upstream merges easier.
- 
-    # MY_ADD_CXX_WARNING_FLAG("Wsuggest-override")
-  ENDIF()
+  # GCC 8 has bugs with "final".
+
+  # Disable "suggest-override" flag for PXC. Codership's wsrep-lib part and wsrep server
+  # hooks are not compatible with this flag. This causes errors during
+  # compilation of server part and storage engines including wsrep-lib and
+  # wsrep hooks headers.
+  # Enable it back when wsrep-lib part is fixed. Disabled for now instead of
+  # fixing wsrep-lib to make next upstream merges easier.
+
+  # MY_ADD_CXX_WARNING_FLAG("Wsuggest-override")
+
   MY_ADD_C_WARNING_FLAG("Wmissing-include-dirs")
   MY_ADD_CXX_WARNING_FLAG("Wmissing-include-dirs")
 
@@ -92,7 +87,7 @@ IF(MY_COMPILER_IS_GNU)
   MY_ADD_CXX_WARNING_FLAG("Wlogical-op")
 ENDIF()
 
-# Extra warning flags for Clang
+# Extra warning flags for Clang/Clang++
 IF(MY_COMPILER_IS_CLANG)
   STRING_APPEND(MY_C_WARNING_FLAGS " -Wconditional-uninitialized")
   STRING_APPEND(MY_C_WARNING_FLAGS " -Wextra-semi")
@@ -100,10 +95,8 @@ IF(MY_COMPILER_IS_CLANG)
 
   MY_ADD_C_WARNING_FLAG("Wunreachable-code-break")
   MY_ADD_C_WARNING_FLAG("Wunreachable-code-return")
-ENDIF()
+  MY_ADD_C_WARNING_FLAG("Wstring-concatenation")
 
-# Extra warning flags for Clang++
-IF(MY_COMPILER_IS_CLANG)
   # Disable a few default Clang++ warnings
   STRING_APPEND(MY_CXX_WARNING_FLAGS " -Wno-null-conversion")
   STRING_APPEND(MY_CXX_WARNING_FLAGS " -Wno-unused-private-field")
@@ -136,6 +129,7 @@ IF(MY_COMPILER_IS_CLANG)
   MY_ADD_CXX_WARNING_FLAG("Winconsistent-missing-destructor-override")
   MY_ADD_CXX_WARNING_FLAG("Winconsistent-missing-override")
   MY_ADD_CXX_WARNING_FLAG("Wshadow-field")
+  MY_ADD_CXX_WARNING_FLAG("Wstring-concatenation")
 
   # Other possible options that give warnings (Clang 6.0):
   # -Wabstract-vbase-init
@@ -213,9 +207,9 @@ IF(MY_COMPILER_IS_GNU_OR_CLANG)
 ENDIF()
 
 MACRO(ADD_WSHADOW_WARNING)
-  IF(MY_COMPILER_IS_GNU AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7)
+  IF(MY_COMPILER_IS_GNU)
     ADD_COMPILE_OPTIONS("-Wshadow=local")
-  ELSEIF(MY_COMPILER_IS_CLANG AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 5)
+  ELSEIF(MY_COMPILER_IS_CLANG)
     # added in clang-5.0
     ADD_COMPILE_OPTIONS("-Wshadow-uncaptured-local")
   ENDIF()
