@@ -1,0 +1,45 @@
+# Test that TOI that locks ACL tables does not deadlock with replicated TOI that locks ACL tables as well.
+# In other words test that the order of replicating TOI and acquiring MDL locks on ACL tables is correct.
+
+--source include/have_debug_sync.inc
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+--connection node_1
+--echo node_1
+CREATE USER 'test' identified by 'password';
+
+# stop just before TOI replication
+--let $galera_sync_point = before_replicate_sync
+--source include/galera_set_sync_point.inc
+
+--send SET PASSWORD FOR test = 'password1'
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+--connection node_2
+--echo node_2
+ALTER USER 'test' ACCOUNT LOCK;
+
+--connection node_1a
+--echo node_1a
+# TOI replicated from node_2 should not be blocked in any way on node_1
+--echo Waiting for TOI from node_2 to complete
+--let $wait_condition = SELECT ACCOUNT_LOCKED = 'Y' FROM mysql.user WHERE USER = 'test'
+--source include/wait_condition.inc
+
+# unblock node_1
+--source include/galera_signal_sync_point.inc
+
+--disconnect node_1a
+
+--connection node_1
+# TOI replicated from node_2 should complete, then TOI from node_1 should proceed.
+# No deadlock expected.
+--reap
+
+# cleanup
+DROP USER 'test';
+--source include/wait_until_count_sessions.inc

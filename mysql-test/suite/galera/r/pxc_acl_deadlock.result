@@ -1,0 +1,13 @@
+node_1
+CREATE USER 'test' identified by 'password';
+SET GLOBAL wsrep_provider_options = 'dbug=d,before_replicate_sync';
+SET PASSWORD FOR test = 'password1';
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+node_2
+ALTER USER 'test' ACCOUNT LOCK;
+node_1a
+Waiting for TOI from node_2 to complete
+SET GLOBAL wsrep_provider_options = 'signal=before_replicate_sync';
+DROP USER 'test';
