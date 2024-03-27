@@ -178,21 +178,21 @@ DATA="${WSREP_SST_OPT_DATA}"
 XTRABACKUP_PATH_PREFIX="$(dirname $0)/pxc_extra/pxb-"
 
 # XB path compatible with the current version of PXC
-XTRABACKUP_THIS_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.1"
+XTRABACKUP_THIS_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.2"
 
 # XB path compatible with prev PXC version. It may be prev Innovative release or LTS
 # if current PXC version is 1st Innovative.
 # Note that this can be the same as XTRABACKUP_PREV_LTS_VER_PATH
-XTRABACKUP_PREV_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.0"
+XTRABACKUP_PREV_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.1"
 
 # XB path compatible previous PXC LTS version
 XTRABACKUP_PREV_LTS_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.0"
 
 # Minimum PXB required versions for this node to work
 # To be able to service this version
-XB_THIS_REQUIRED_VERSION="8.1.0"
+XB_THIS_REQUIRED_VERSION="8.2.0"
 # To be able to service previous version
-XB_PREV_REQUIRED_VERSION="8.0.35"
+XB_PREV_REQUIRED_VERSION="8.1.0"
 # To be able to service previous LTS version
 XB_PREV_LTS_REQUIRED_VERSION="8.0.35"
 
