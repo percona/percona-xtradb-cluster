@@ -1,0 +1,75 @@
+# Test that during replication of TOI related to CREATE/DROP TRIGGER no MDL locks are acquired.
+# Having MDL locks acquired (especially on database level) will lead to the deadlock, when
+# another DDL (ALTER DATABASE) which acquires them runs in parallel.
+
+--source include/have_debug_sync.inc
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+--connection node_1
+--echo node_1
+CREATE DATABASE test2;
+USE test2;
+CREATE TABLE t1 (a INT PRIMARY KEY);
+
+#
+# CREATE TRIGGER
+#
+
+# stop just before TOI replication
+--let $galera_sync_point = before_replicate_sync
+--source include/galera_set_sync_point.inc
+
+--send CREATE TRIGGER trg1 BEFORE INSERT ON t1 FOR EACH ROW DELETE FROM t1 WHERE a=1
+
+--connect node_1a, 127.0.0.1, root, , test2, $NODE_MYPORT_1
+--echo node_1a
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+# ALTER DATABASE should be replicated as TOI, should not block waiting for CREATE TRIGGER
+# as node_1 should not hold any MDL locks at the moment.
+ALTER DATABASE test2 CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_ci;
+
+# unblock node_1
+--source include/galera_signal_sync_point.inc
+
+--connection node_1
+# TOI replicated from node_2 should complete, then TOI from node_1 should proceed.
+# No deadlock expected.
+--reap
+
+#
+# DROP TRIGGER
+#
+
+# stop just before TOI replication
+--let $galera_sync_point = before_replicate_sync
+--source include/galera_set_sync_point.inc
+
+--send DROP TRIGGER trg1
+
+--connection node_1a
+--echo node_1a
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+# ALTER DATABASE should be replicated as TOI, should not block waiting for DROP TRIGGER
+# as node_1 should not hold any MDL locks at the moment.
+ALTER DATABASE test2 CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_ci;
+
+# unblock node_1
+--source include/galera_signal_sync_point.inc
+
+--connection node_1
+# TOI replicated from node_2 should complete, then TOI from node_1 should proceed.
+# No deadlock expected.
+--reap
+
+
+--disconnect node_1a
+
+# cleanup
+DROP DATABASE test2;
+--source include/wait_until_count_sessions.inc
+
