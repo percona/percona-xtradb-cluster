@@ -859,10 +859,6 @@ build_deb(){
         sed -i 's/gnu++11/gnu++11 -Wno-virtual-move-assign/' cmake/build_configurations/compiler_options.cmake
     fi
 
-    if [[ "x$DEBIAN_VERSION" == "xfocal" || "x$DEBIAN_VERSION" == "xbullseye" || "x$DEBIAN_VERSION" == "xbuster" || "x$DEBIAN_VERSION" == "xbookworm" ]]; then
-        sed -i 's/-fno-omit-frame-pointer/-fno-omit-frame-pointer -Wno-error=undef/' cmake/build_configurations/compiler_options.cmake
-    fi
-
     #==========
     export DEB_CFLAGS_APPEND="$CFLAGS" DEB_CXXFLAGS_APPEND="$CXXFLAGS"
     export MYSQL_BUILD_CFLAGS="$CFLAGS"
