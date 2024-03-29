@@ -3109,8 +3109,27 @@ bool Protocol_classic::start_result_metadata(uint num_cols_arg, uint flags,
     ::storeXXX() method's asserts failures.
   */
   if (m_thd->variables.resultset_metadata == RESULTSET_METADATA_FULL)
+#ifdef WITH_WSREP
+  {
+    /* field_types will be disposed from
+    dispatch_sql_command() -> Thd::cleanup_after_query() if it is allocated by
+    m_thd->alloc().
+    If we are retrying the query, we are not resending metadata,
+    so fields_types will be a dangling pointer causing problem in store_string()
+    and others referring to it. */
+    enum_field_types *mem =
+        new enum_field_types[sizeof(field_types) * num_cols];
+    field_types_ptr =
+        std::shared_ptr<enum_field_types>(mem, [this](enum_field_types *p) {
+          delete[] p;
+          field_types = nullptr;
+        });
+    field_types = field_types_ptr.get();
+  }
+#else
     field_types =
         (enum_field_types *)m_thd->alloc(sizeof(field_types) * num_cols);
+#endif /* WITH_WSREP */
   else
     field_types = nullptr;
   count = 0;

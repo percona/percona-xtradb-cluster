@@ -36,6 +36,10 @@
 #include "sql/protocol.h"  // Protocol
 #include "violite.h"
 
+#ifdef WITH_WSREP
+#include <memory>
+#endif
+
 class Item_param;
 class Send_field;
 class String;
@@ -63,7 +67,10 @@ class Protocol_classic : public Protocol {
   uint field_pos;
   bool send_metadata;
 #ifndef NDEBUG
-  enum enum_field_types *field_types;
+#ifdef WITH_WSREP
+  std::shared_ptr<enum_field_types> field_types_ptr;
+#endif
+  enum_field_types *field_types;
   uint count;
 #endif
   uint field_count;

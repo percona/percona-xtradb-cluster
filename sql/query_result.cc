@@ -73,8 +73,8 @@ uint Query_result::field_count(const mem_root_deque<Item *> &fields) const {
 bool Query_result_send::send_result_set_metadata(
     THD *thd, const mem_root_deque<Item *> &list, uint flags) {
 #ifdef WITH_WSREP
-  if (WSREP(thd) && thd->wsrep_retry_query) {
-    /* Metadata is already send during first try that failed so avoid
+  if (WSREP(thd) && thd->wsrep_retry_query && is_result_set_started) {
+    /* If metadata is already sent during first try that failed so avoid
     resending it. Just plan to send the result. */
     WSREP_DEBUG("Skip resending metadata if query is being re-tried");
     return false;
