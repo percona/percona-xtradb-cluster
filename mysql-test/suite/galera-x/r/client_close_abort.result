@@ -3,12 +3,12 @@ call mtr.add_suppression('Message of size 4294967040 received, exceeding the lim
 select sleep(1);
 sleep(1)
 0
-SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM INFORMATION_SCHEMA.PROCESSLIST WHERE `state` != 'cleaning up' ORDER BY `user`, `state`;
+SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM performance_schema.processlist WHERE `state` != 'cleaning up' ORDER BY `user`, `state`;
 user	host	db	command	state	info
 event_scheduler	localhost	NULL	Daemon	Waiting on empty queue	NULL
-root	localhost	test	Query	executing	SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM INFORMATION_SCHEMA.PROCESSLIST WHERE `state` != 'cleaning up' ORDER BY `user`, `state`
-system user		NULL	Sleep	innobase_commit_low (-1)	NULL
-system user		NULL	Sleep	wsrep aborter idle	NULL
+root	localhost	test	Query	executing	SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM performance_schema.processlist WHERE `state` != 'cleaning up' ORDER BY `user`, `state`
+system user	NULL	NULL	Connect		DELETE FROM mysql.wsrep_cluster_members
+system user	NULL	NULL	Sleep	wsrep: aborter idle	NULL
 
 Close in a pipeline and try to do something after close
 -------------------------------------------------------
@@ -61,9 +61,9 @@ Variable_name	Value
 Mysqlx_connections_accepted	2
 Mysqlx_connections_closed	2
 Mysqlx_connections_rejected	0
-SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM INFORMATION_SCHEMA.PROCESSLIST WHERE `state` != 'cleaning up' ORDER BY `user`, `state`;
+SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM performance_schema.processlist WHERE `state` != 'cleaning up' ORDER BY `user`, `state`;
 user	host	db	command	state	info
 event_scheduler	localhost	NULL	Daemon	Waiting on empty queue	NULL
-root	localhost	test	Query	executing	SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM INFORMATION_SCHEMA.PROCESSLIST WHERE `state` != 'cleaning up' ORDER BY `user`, `state`
-system user		NULL	Sleep	innobase_commit_low (-1)	NULL
-system user		NULL	Sleep	wsrep aborter idle	NULL
+root	localhost	test	Query	executing	SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM performance_schema.processlist WHERE `state` != 'cleaning up' ORDER BY `user`, `state`
+system user	NULL	NULL	Connect		DELETE FROM mysql.wsrep_cluster_members
+system user	NULL	NULL	Sleep	wsrep: aborter idle	NULL

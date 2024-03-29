@@ -33,6 +33,6 @@ UNLOCK TABLES;
 SET SESSION wsrep_sync_wait = 15;
 
 SHOW CREATE TABLE t1;
-SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE = 'Waiting for table metadata lock';
+SELECT COUNT(*) = 0 FROM performance_schema.processlist WHERE USER = 'system user' AND STATE = 'Waiting for table metadata lock';
 
 DROP TABLE t1;

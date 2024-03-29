@@ -292,10 +292,23 @@ get_mysqld_path()
     # directory from the SST scripts (it may be in /usr/sbin not /usr/bin)
     # So, first, try to use readlink to read from /proc/<pid>/exe
     if which readlink >/dev/null; then
+
+        # Set +e to instruct the shell interpreter not to exit immediately if
+        # the readlink returns a non-zero exit status.
+        set +e
+
         # Check to see if the symlink for the exe exists
         if [[ -L /proc/${WSREP_SST_OPT_PARENT}/exe ]]; then
             MYSQLD_PATH=$(readlink -f /proc/${WSREP_SST_OPT_PARENT}/exe)
+
+            # Reset MYSQLD_PATH if readlink failed with an error
+            if [[ $? -ne 0 ]]; then
+                MYSQLD_PATH=
+            fi
         fi
+
+        # Set -e again
+        set -e
     fi
     if [[ -z $MYSQLD_PATH ]]; then
         # We don't have readlink, so look for mysqld in the path

@@ -30,14 +30,14 @@ send Mysqlx.Sql.StmtExecute {
 
 
 1 rows affected
-last insert id: 2
+last insert id: 3
 send Mysqlx.Sql.StmtExecute {
   stmt: "insert into mytable values (DEFAULT, \'three\')"
 }
 
 
 1 rows affected
-last insert id: 3
+last insert id: 5
 send Mysqlx.Sql.StmtExecute {
   stmt: "select * from mytable"
 }
@@ -72,12 +72,12 @@ Mysqlx.Resultset.Row {
 }
 
 Mysqlx.Resultset.Row {
-  field: "\004"
+  field: "\006"
   field: "two\000"
 }
 
 Mysqlx.Resultset.Row {
-  field: "\006"
+  field: "\n"
   field: "three\000"
 }
 

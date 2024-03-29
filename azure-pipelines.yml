@@ -106,7 +106,7 @@ jobs:
           Compiler: clang
           BuildType: Debug
 
-      # clang-6 and newer compilers
+      # clang-10 and newer compilers
       clang-17 RelWithDebInfo [Ubuntu 22.04 Jammy]:
         imageName: 'ubuntu-22.04'
         UBUNTU_CODE_NAME: jammy
@@ -226,12 +226,11 @@ jobs:
           CompilerVer: 11
           BuildType: Debug
 
-      ${{ if or(ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
-        clang-10 RelWithDebInfo [Ubuntu 20.04 Focal]:
-          imageName: 'ubuntu-20.04'
-          Compiler: clang
-          CompilerVer: 10
-          BuildType: RelWithDebInfo
+      clang-10 RelWithDebInfo [Ubuntu 20.04 Focal]:
+        imageName: 'ubuntu-20.04'
+        Compiler: clang
+        CompilerVer: 10
+        BuildType: RelWithDebInfo
 
       clang-10 Debug [Ubuntu 20.04 Focal]:
         imageName: 'ubuntu-20.04'
@@ -239,61 +238,7 @@ jobs:
         CompilerVer: 10
         BuildType: Debug
 
-      ${{ if or(ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
-        clang-9 RelWithDebInfo [Ubuntu 20.04 Focal]:
-          imageName: 'ubuntu-20.04'
-          Compiler: clang
-          CompilerVer: 9
-          BuildType: RelWithDebInfo
-
-      ${{ if or(ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
-        clang-9 Debug [Ubuntu 20.04 Focal]:
-          imageName: 'ubuntu-20.04'
-          Compiler: clang
-          CompilerVer: 9
-          BuildType: Debug
-
-      ${{ if or(ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
-        clang-8 RelWithDebInfo [Ubuntu 20.04 Focal]:
-          imageName: 'ubuntu-20.04'
-          Compiler: clang
-          CompilerVer: 8
-          BuildType: RelWithDebInfo
-
-      clang-8 Debug [Ubuntu 20.04 Focal]:
-        imageName: 'ubuntu-20.04'
-        Compiler: clang
-        CompilerVer: 8
-        BuildType: Debug
-
-      ${{ if or(ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
-        clang-7 RelWithDebInfo [Ubuntu 20.04 Focal]:
-          imageName: 'ubuntu-20.04'
-          Compiler: clang
-          CompilerVer: 7
-          BuildType: RelWithDebInfo
-
-      ${{ if or(ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
-        clang-7 Debug [Ubuntu 20.04 Focal]:
-          imageName: 'ubuntu-20.04'
-          Compiler: clang
-          CompilerVer: 7
-          BuildType: Debug
-
-      clang-6 RelWithDebInfo [Ubuntu 20.04 Focal]:
-        imageName: 'ubuntu-20.04'
-        Compiler: clang
-        CompilerVer: 6.0
-        BuildType: RelWithDebInfo
-
-      clang-6 Debug [Ubuntu 20.04 Focal]:
-        imageName: 'ubuntu-20.04'
-        Compiler: clang
-        CompilerVer: 6.0
-        BuildType: Debug
-
-
-      # gcc-8 and newer compilers
+      # gcc-10 and newer compilers
       gcc-13 RelWithDebInfo [Ubuntu 22.04 Jammy]:
         imageName: 'ubuntu-22.04'
         Compiler: gcc
@@ -333,43 +278,16 @@ jobs:
           CompilerVer: 11
           BuildType: Debug
 
-      ${{ if or(ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
-        gcc-10 RelWithDebInfo [Ubuntu 20.04 Focal]:
-          imageName: 'ubuntu-20.04'
-          Compiler: gcc
-          CompilerVer: 10
-          BuildType: RelWithDebInfo
+      gcc-10 RelWithDebInfo [Ubuntu 20.04 Focal]:
+        imageName: 'ubuntu-20.04'
+        Compiler: gcc
+        CompilerVer: 10
+        BuildType: RelWithDebInfo
 
       gcc-10 Debug [Ubuntu 20.04 Focal]:
         imageName: 'ubuntu-20.04'
         Compiler: gcc
         CompilerVer: 10
-        BuildType: Debug
-
-      ${{ if or(ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
-        gcc-9 RelWithDebInfo [Ubuntu 20.04 Focal]:
-          imageName: 'ubuntu-20.04'
-          Compiler: gcc
-          CompilerVer: 9
-          BuildType: RelWithDebInfo
-
-      ${{ if or(ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
-        gcc-9 Debug [Ubuntu 20.04 Focal]:
-          imageName: 'ubuntu-20.04'
-          Compiler: gcc
-          CompilerVer: 9
-          BuildType: Debug
-
-      gcc-8 RelWithDebInfo [Ubuntu 20.04 Focal]:
-        imageName: 'ubuntu-20.04'
-        Compiler: gcc
-        CompilerVer: 8
-        BuildType: RelWithDebInfo
-
-      gcc-8 Debug [Ubuntu 20.04 Focal]:
-        imageName: 'ubuntu-20.04'
-        Compiler: gcc
-        CompilerVer: 8
         BuildType: Debug
 
   steps:
@@ -408,14 +326,8 @@ jobs:
         sudo -E apt-add-repository -y "ppa:ubuntu-toolchain-r/test"
         sudo -E apt-get -yq update >> ~/apt-get-update.log 2>&1
 
-<<<<<<< HEAD
         sudo -E apt-get -yq --no-install-suggests --no-install-recommends --allow-unauthenticated install scons socat check libasio-dev libatomic1 libboost-all-dev || exit 1
         sudo -E apt-get -yq --no-install-suggests --no-install-recommends --allow-unauthenticated install $PACKAGES cmake cmake-curses-gui ccache bison libudev-dev libaio-dev libmecab-dev libnuma-dev libssl-dev libreadline-dev libedit-dev libpam-dev libcurl4-openssl-dev libldap2-dev libkrb5-dev libsasl2-dev libsasl2-modules-gssapi-mit || exit 1;
-||||||| merged common ancestors
-        sudo -E apt-get -yq --no-install-suggests --no-install-recommends --allow-unauthenticated install $PACKAGES cmake cmake-curses-gui ccache bison libudev-dev libaio-dev libmecab-dev libnuma-dev libssl-dev libreadline-dev libedit-dev libpam-dev libcurl4-openssl-dev libldap2-dev libkrb5-dev libsasl2-dev libsasl2-modules-gssapi-mit || exit 1;
-=======
-        sudo -E apt-get -yq --no-install-suggests --no-install-recommends --allow-unauthenticated install $PACKAGES cmake cmake-curses-gui ccache bison libudev-dev libaio-dev libmecab-dev libnuma-dev libssl-dev libedit-dev libpam-dev libcurl4-openssl-dev libldap2-dev libkrb5-dev libsasl2-dev libsasl2-modules-gssapi-mit || exit 1;
->>>>>>> ps/Percona-Server-8.1.0-1
         `# SYSTEM_LIBRARIES = CURL EDITLINE ICU LIBEVENT LZ4 PROTOBUF SSL ZSTD FIDO (Ubuntu 21.04+)`
         if [[ "$(INVERTED)" != "ON" ]]; then
           sudo -E apt-get -yq --no-install-suggests --no-install-recommends --allow-unauthenticated install libicu-dev libevent-dev liblz4-dev zlib1g-dev protobuf-compiler libprotobuf-dev libprotoc-dev libzstd-dev libfido2-dev || exit 1;
@@ -507,14 +419,6 @@ jobs:
         -DWITH_PAM=ON
       "
 
-      function get_ver { printf "%03d%03d%03d%03d" $(echo "$1" | tr '.' ' '); }
-      if [[ ( "$(Compiler)" == "clang" ) && ( 10#$(get_ver $REAL_COMPILER_VER) -lt 10#$(get_ver 7.0.0) ) ]]; then
-        CMAKE_OPT+="
-          -DWITH_COMPONENT_AUDIT_LOG_FILTER=OFF
-          -DWITH_ROUTER=OFF
-        "
-      fi
-
       if [[ "$OS_NAME" == "Darwin" ]]; then
         CMAKE_OPT+="
           -DMYSQL_MAINTAINER_MODE=OFF
@@ -560,6 +464,7 @@ jobs:
             -DWITH_RAPIDJSON=bundled
             -DWITH_ZLIB=bundled
             -DWITH_ZSTD=bundled
+            -DWITH_CURL=bundled
 
             -DWITH_ARCHIVE_STORAGE_ENGINE=OFF
             -DWITH_BLACKHOLE_STORAGE_ENGINE=OFF
@@ -598,3 +503,4 @@ jobs:
       df -Th
 
     displayName: '*** Compile'
+

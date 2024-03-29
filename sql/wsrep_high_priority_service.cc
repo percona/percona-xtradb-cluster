@@ -262,7 +262,7 @@ int Wsrep_high_priority_service::append_fragment_and_commit(
   // TODO: G-4
   assert(0);
   const bool do_binlog_commit = false;
-  
+
   /*
    Write skip event into binlog if gtid_mode is on. This is to
    maintain gtid continuity.
@@ -303,12 +303,12 @@ int Wsrep_high_priority_service::commit(const wsrep::ws_handle &ws_handle,
   thd->wsrep_cs().prepare_for_ordering(ws_handle, ws_meta, true);
 
   // thd_proc_info(thd, "committing");
-  THD_STAGE_INFO(thd, stage_wsrep_committing);
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
            "wsrep: committing write set (%lld)",
            (long long)wsrep_thd_trx_seqno(thd));
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
+  THD_STAGE_INFO(thd, stage_wsrep_committing);
 
   const bool is_ordered = !ws_meta.seqno().is_undefined();
   int ret = trans_commit(thd);
@@ -320,14 +320,13 @@ int Wsrep_high_priority_service::commit(const wsrep::ws_handle &ws_handle,
 
   m_thd->mdl_context.release_transactional_locks();
 
-  // thd_proc_info(thd, "wsrep applier committed");
-  THD_STAGE_INFO(thd, stage_wsrep_committed);
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
            "wsrep: %s write set (%lld)",
            !ret ? "committed" : "failed to commit",
            (long long)wsrep_thd_trx_seqno(thd));
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
+  THD_STAGE_INFO(thd, stage_wsrep_committed);
 
   if (!is_ordered) {
     m_thd->wsrep_cs().before_rollback();
@@ -366,12 +365,12 @@ int Wsrep_high_priority_service::rollback(const wsrep::ws_handle &ws_handle,
     assert(ws_handle == wsrep::ws_handle());
   }
 
-  THD_STAGE_INFO(m_thd, stage_wsrep_rolling_back);
   snprintf(m_thd->wsrep_info, sizeof(m_thd->wsrep_info),
            "wsrep: rolling back write set (%lld)",
            (long long)wsrep_thd_trx_seqno(m_thd));
   WSREP_DEBUG("%s", m_thd->wsrep_info);
   thd_proc_info(m_thd, m_thd->wsrep_info);
+  THD_STAGE_INFO(m_thd, stage_wsrep_rolling_back);
 
 #if 0
   int ret = (trans_rollback_stmt(m_thd) || trans_rollback(m_thd));
@@ -393,13 +392,13 @@ int Wsrep_high_priority_service::rollback(const wsrep::ws_handle &ws_handle,
     m_thd->variables.gtid_next.set_automatic();
   }
 
-  THD_STAGE_INFO(m_thd, stage_wsrep_rolled_back);
   snprintf(m_thd->wsrep_info, sizeof(m_thd->wsrep_info),
            "wsrep: %s write set (%lld)",
            !ret ? "rolled back" : "failed to rollback",
            (long long)wsrep_thd_trx_seqno(m_thd));
   WSREP_DEBUG("%s", m_thd->wsrep_info);
   thd_proc_info(m_thd, m_thd->wsrep_info);
+  THD_STAGE_INFO(m_thd, stage_wsrep_rolled_back);
 
   /* This being a background thread doesn't take a global read
   lock and backup lock. */
@@ -442,13 +441,12 @@ int Wsrep_high_priority_service::apply_toi(const wsrep::ws_meta &ws_meta,
   wsrep::client_state &client_state(thd->wsrep_cs());
   assert(client_state.in_toi());
 
-  // thd_proc_info(thd, "wsrep applier toi");
-  THD_STAGE_INFO(m_thd, stage_wsrep_applying_toi_writeset);
   snprintf(m_thd->wsrep_info, sizeof(m_thd->wsrep_info),
            "wsrep: applying TOI write-set (%lld)",
            (long long)wsrep_thd_trx_seqno(m_thd));
   WSREP_DEBUG("%s", m_thd->wsrep_info);
   thd_proc_info(thd, m_thd->wsrep_info);
+  THD_STAGE_INFO(m_thd, stage_wsrep_applying_toi_writeset);
   thd->set_command(COM_QUERY);
 
   WSREP_DEBUG("Wsrep_high_priority_service::apply_toi: %lld",
@@ -461,30 +459,30 @@ int Wsrep_high_priority_service::apply_toi(const wsrep::ws_meta &ws_meta,
   int ret = apply_events(thd, m_rli, data, err);
   wsrep_thd_set_ignored_error(thd, false);
 
-  THD_STAGE_INFO(m_thd, stage_wsrep_applied_writeset);
   snprintf(m_thd->wsrep_info, sizeof(m_thd->wsrep_info),
            "wsrep: %s TOI write set (%lld)",
            !ret ? "applied" : "failed to apply",
            (long long)wsrep_thd_trx_seqno(m_thd));
   WSREP_DEBUG("%s", m_thd->wsrep_info);
   thd_proc_info(thd, m_thd->wsrep_info);
+  THD_STAGE_INFO(m_thd, stage_wsrep_applied_toi_writeset);
 
-  THD_STAGE_INFO(m_thd, stage_wsrep_toi_committing);
   snprintf(m_thd->wsrep_info, sizeof(m_thd->wsrep_info),
            "wsrep: committing TOI write set (%lld)",
            (long long)wsrep_thd_trx_seqno(m_thd));
   WSREP_DEBUG("%s", m_thd->wsrep_info);
   thd_proc_info(thd, m_thd->wsrep_info);
+  THD_STAGE_INFO(m_thd, stage_wsrep_toi_committing);
 
   ret = trans_commit(thd);
 
-  THD_STAGE_INFO(m_thd, stage_wsrep_committed);
   snprintf(m_thd->wsrep_info, sizeof(m_thd->wsrep_info),
            "wsrep: %s TOI write set (%lld)",
            (!ret ? "committed" : "failed to commit"),
            (long long)wsrep_thd_trx_seqno(m_thd));
   WSREP_DEBUG("%s", m_thd->wsrep_info);
   thd_proc_info(thd, m_thd->wsrep_info);
+  THD_STAGE_INFO(m_thd, stage_wsrep_toi_committed);
   thd->set_command(COM_SLEEP);
 
   wsrep_wait_rollback_complete_and_acquire_ownership(m_thd);
@@ -628,11 +626,11 @@ int Wsrep_applier_service::apply_write_set(const wsrep::ws_meta &ws_meta,
   assert(thd->wsrep_trx().state() == wsrep::transaction::s_executing);
 
   // thd_proc_info(thd, "applying write set");
-  THD_STAGE_INFO(thd, stage_wsrep_applying_writeset);
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
            "wsrep: applying write-set (%lld)", ws_meta.seqno().get());
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
+  THD_STAGE_INFO(thd, stage_wsrep_applying_writeset);
   /* Note that COM_QUERY is set in Rows_log_event::do_apply_event() anyway,
      but let's set it here for sanity.
    */
@@ -666,13 +664,12 @@ int Wsrep_applier_service::apply_write_set(const wsrep::ws_meta &ws_meta,
     thd->wsrep_cs().fragment_applied(ws_meta.seqno());
   }
 
-  // thd_proc_info(thd, "wsrep applied write set");
-  THD_STAGE_INFO(thd, stage_wsrep_applied_writeset);
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
            "wsrep: %s write set (%lld)", !ret ? "applied" : "failed to apply",
            ws_meta.seqno().get());
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
+  THD_STAGE_INFO(thd, stage_wsrep_applied_writeset);
   thd->set_command(COM_SLEEP);
 
   return ret;
@@ -681,7 +678,7 @@ int Wsrep_applier_service::apply_write_set(const wsrep::ws_meta &ws_meta,
 PSI_thread_key key_nbo_thread;
 
 static PSI_thread_info nbo_threads[] = {
-    {&key_nbo_thread, "NBO update thread", "NBO_upd", 0, 0, PSI_DOCUMENT_ME}};
+    {&key_nbo_thread, "NBO update thread", "NBO_upd", PSI_FLAG_THREAD_SYSTEM, 0, PSI_DOCUMENT_ME}};
 
 int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
                                            const wsrep::const_buffer &data,
@@ -724,6 +721,7 @@ int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
     replayer_thd->set_psi(psi);
     PSI_THREAD_CALL(set_thread)(psi);
     PSI_THREAD_CALL(set_thread_os_id)(psi);
+    PSI_THREAD_CALL(set_thread_account)("root", strlen("root"), nullptr, 0);
     assert(psi != nullptr);
 #endif
     replayer_thd->store_globals();
@@ -795,6 +793,7 @@ int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
              (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
+    THD_STAGE_INFO(thd, stage_wsrep_applying_nbo_writeset);
     thd->set_command(COM_QUERY);
     DBUG_EXECUTE_IF("wsrep_signal_nbo_applier_thread", {
       const char act[] =
@@ -821,32 +820,32 @@ int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
     ret = apply_events(thd, m_rli, our_buffer, err2);
     wsrep_thd_set_ignored_error(thd, false);
 
-    THD_STAGE_INFO(thd, stage_wsrep_applied_writeset);
     snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
              "wsrep: %s NBO write set (%lld)",
              !ret ? "applied" : "failed to apply",
              (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
+    THD_STAGE_INFO(thd, stage_wsrep_applied_nbo_writeset);
 
-    THD_STAGE_INFO(thd, stage_wsrep_toi_committing);
     snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
              "wsrep: committing NBO write set (%lld)",
              (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
+    THD_STAGE_INFO(thd, stage_wsrep_nbo_committing);
 
     ret = trans_commit(thd);
 
     /* This thread is going to be removed soon and will be not visible in
        I_S.PROCESSLIST anymore, but set proper info for sanity. */
-    THD_STAGE_INFO(thd, stage_wsrep_committed);
     snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
              "wsrep: %s NBO write set (%lld)",
              (!ret ? "committed" : "failed to commit"),
              (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
+    THD_STAGE_INFO(thd, stage_wsrep_nbo_committed);
     thd->set_command(COM_SLEEP);
 
     DBUG_EXECUTE_IF("wsrep_signal_nbo_applier_thread", {
@@ -977,13 +976,12 @@ Wsrep_replayer_service::Wsrep_replayer_service(THD *replayer_thd, THD *orig_thd)
     orig_thd->variables.option_bits &= ~(OPTION_TABLE_LOCK);
   }
 
-  // thd_proc_info(orig_thd, "wsrep replaying trx");
-  THD_STAGE_INFO(orig_thd, stage_wsrep_replaying_trx);
   snprintf(orig_thd->wsrep_info, sizeof(orig_thd->wsrep_info),
            "wsrep: replaying transaction with write set (%lld)",
            (long long)wsrep_thd_trx_seqno(orig_thd));
   WSREP_DEBUG("%s", orig_thd->wsrep_info);
   thd_proc_info(orig_thd, orig_thd->wsrep_info);
+  THD_STAGE_INFO(orig_thd, stage_wsrep_replaying_trx);
 
   /*
     Switch execution context to replayer_thd and prepare it for
@@ -1076,12 +1074,12 @@ int Wsrep_replayer_service::apply_write_set(const wsrep::ws_meta &ws_meta,
   }
 
   // thd_proc_info(thd, "wsrep replayed write set");
-  THD_STAGE_INFO(thd, stage_wsrep_replayed_write_set);
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
            "wsrep: replayed write set (%lld)",
            (long long)wsrep_thd_trx_seqno(thd));
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
+  THD_STAGE_INFO(thd, stage_wsrep_replayed_write_set);
 
   return ret;
 }
