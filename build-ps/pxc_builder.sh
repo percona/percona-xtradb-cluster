@@ -252,7 +252,7 @@ get_sources(){
     cd ${WORKDIR} || exit
     #
     pushd ${PXCDIR}
-        sed -i 's:boostorg\.jfrog\.io/artifactory/main/release/.*/source:jenkins.percona.com/downloads/boost:g' cmake/boost.cmake
+        sed -i 's:boostorg\.jfrog\.io/artifactory/main/release/.*/source:downloads.percona.com/downloads/packaging/boost:g' cmake/boost.cmake
     popd
     #
     tar --owner=0 --group=0 --exclude=.bzr --exclude=.git -czf ${PXCDIR}.tar.gz ${PXCDIR}
@@ -313,9 +313,6 @@ install_deps() {
         yum install -y perl
         yum install -y https://repo.percona.com/yum/percona-release-latest.noarch.rpm
         percona-release enable tools testing
-        if [ "${RHEL}" -lt 9 ]; then
-            add_percona_yum_repo
-        fi
         if [ "x$RHEL" = "x8" -o "x$RHEL" = "x9" ]; then
             yum -y install dnf-plugins-core epel-release
             yum config-manager --set-enabled powertools
@@ -344,8 +341,8 @@ install_deps() {
                 yum -y install scons pip python3-devel
                 pip install --user typing pyyaml regex Cheetah3
             else
-                wget https://jenkins.percona.com/yum-repo/percona-dev.repo
-                mv -vf percona-dev.repo /etc/yum.repos.d
+               # wget https://jenkins.percona.com/yum-repo/percona-dev.repo
+               # mv -vf percona-dev.repo /etc/yum.repos.d
                 yum -y clean all
                 yum -y install libtirpc-devel
                 yum -y install perl-Dig
@@ -458,14 +455,14 @@ install_deps() {
         fi
         if [ x"${DIST}" = xbionic ]; then
             apt-get -y install gcc-8 g++-8
-            wget http://jenkins.percona.com/downloads/libfido2-1/libcbor0.6_0.6.0-0ubuntu1_amd64.deb
-            wget http://jenkins.percona.com/downloads/libfido2-1/libfido2-1_1.3.1-1ubuntu2_amd64.deb
+            wget https://downloads.percona.com/downloads/packaging/libfido2-1/libcbor0.6_0.6.0-0ubuntu1_amd64.deb
+            wget https://downloads.percona.com/downloads/packaging/libfido2-1/libfido2-1_1.3.1-1ubuntu2_amd64.deb
             dpkg -i libcbor0.6_0.6.0-0ubuntu1_amd64.deb
             dpkg -i libfido2-1_1.3.1-1ubuntu2_amd64.deb
         fi
         if [ x"${DIST}" = xbuster ]; then
-            wget http://jenkins.percona.com/downloads/libfido2-1/libfido2-1_1.5.0-2~bpo10+1_amd64.deb
-            wget http://jenkins.percona.com/downloads/libfido2-1/libcbor0_0.5.0+dfsg-2_amd64.deb
+            wget https://downloads.percona.com/downloads/packaging/libfido2-1/libfido2-1_1.5.0-2~bpo10+1_amd64.deb
+            wget https://downloads.percona.com/downloads/packaging/libfido2-1/libcbor0_0.5.0+dfsg-2_amd64.deb
             dpkg -i libcbor0_0.5.0+dfsg-2_amd64.deb
             dpkg -i libfido2-1_1.5.0-2~bpo10+1_amd64.deb
         fi
@@ -618,7 +615,7 @@ build_srpm(){
 
 build_mecab_lib(){
     MECAB_TARBAL="mecab-0.996.tar.gz"
-    MECAB_LINK="http://jenkins.percona.com/downloads/mecab/${MECAB_TARBAL}"
+    MECAB_LINK="https://downloads.percona.com/downloads/packaging/mecab/${MECAB_TARBAL}"
     MECAB_DIR="${WORKDIR}/${MECAB_TARBAL%.tar.gz}"
     MECAB_INSTALL_DIR="${WORKDIR}/mecab-install"
     rm -f ${MECAB_TARBAL}
@@ -637,7 +634,7 @@ build_mecab_lib(){
 
 build_mecab_dict(){
     MECAB_IPADIC_TARBAL="mecab-ipadic-2.7.0-20070801.tar.gz"
-    MECAB_IPADIC_LINK="http://jenkins.percona.com/downloads/mecab/${MECAB_IPADIC_TARBAL}"
+    MECAB_IPADIC_LINK="https://downloads.percona.com/downloads/packaging/mecab/${MECAB_IPADIC_TARBAL}"
     MECAB_IPADIC_DIR="${WORKDIR}/${MECAB_IPADIC_TARBAL%.tar.gz}"
     rm -f ${MECAB_IPADIC_TARBAL}
     rm -rf ${MECAB_IPADIC_DIR}
