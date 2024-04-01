@@ -1497,7 +1497,7 @@ RESET SLAVE ALL;
 Warnings:
 Warning	1287	'RESET SLAVE' is deprecated and will be removed in a future release. Please use RESET REPLICA instead
 # connection node_1
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 call mtr.add_suppression("Pending to replicate MySQL GTID event.*");
 call mtr.add_suppression("Pending to replicate MySQL GTID event.*");
 call mtr.add_suppression("Pending to replicate MySQL GTID event.*");

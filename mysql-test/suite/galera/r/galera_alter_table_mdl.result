@@ -1,4 +1,4 @@
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 SET GLOBAL wsrep_sync_wait = 0;
 CREATE TABLE t1 (a INTEGER PRIMARY KEY);
 # --------------------------------
@@ -19,7 +19,7 @@ include/assert_binlog_events.inc [Anonymous_Gtid # Query/.*CREATE TABLE.* # Anon
 # --------------------------------
 # Test 2: Execute ALTER TABLE on node1 (Local)
 # --------------------------------
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 ALTER TABLE t1 ENGINE = InnoDB;;
 SET DEBUG_SYNC = 'now WAIT_FOR alter_table_inplace_after_downgrade';
 INSERT INTO test.t1 VALUES(11);
@@ -35,7 +35,7 @@ include/assert_binlog_events.inc [Anonymous_Gtid # Query/.*ALTER TABLE.* # Anony
 # --------------------------------
 # Test 3: Testing with wsrep_OSU_method = "RSU"
 # --------------------------------
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 SET SESSION wsrep_OSU_method = "RSU";
 ALTER TABLE t1 ENGINE = InnoDB;;
 SET DEBUG_SYNC = 'now WAIT_FOR alter_table_inplace_after_downgrade';

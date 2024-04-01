@@ -8,7 +8,7 @@
 # Running RESET MASTER on a live cluster results in an error
 
 --error 1148
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 
 # But is allowed if WSREP_ON=OFF;
 
@@ -17,7 +17,7 @@ SET SESSION WSREP_ON=OFF;
 CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 DROP TABLE t1;
 --error 0
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 SET SESSION WSREP_ON=ON;
 
 # The CREATE above is no longer in the binlog

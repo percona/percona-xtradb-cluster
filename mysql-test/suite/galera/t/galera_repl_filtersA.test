@@ -6660,7 +6660,7 @@ RESET SLAVE ALL;
 
 --echo # connection node_1
 --connection node_1
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 
 
 # ==== PXC-2368 test cases ====

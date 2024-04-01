@@ -11,17 +11,17 @@
 --source include/galera_cluster_master_slave.inc
 
 --connection node_1
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 
 --connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
 --connection node_3
 SET SESSION wsrep_on=OFF;
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 SET SESSION wsrep_on=ON;
 
 --connection node_2
 SET SESSION wsrep_on=OFF;
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 SET SESSION wsrep_on=ON;
 
 --connection node_2

@@ -35,4 +35,4 @@ CALL mtr.add_suppression("Schema 'testdb' is in read only mode.");
 CALL mtr.add_suppression("Query apply failed");
 CALL mtr.add_suppression("Schema 'testdb' is in read only mode.");
 CALL mtr.add_suppression("Query apply failed");
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;

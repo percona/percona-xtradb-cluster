@@ -97,4 +97,4 @@ Warning	1287	'RESET SLAVE' is deprecated and will be removed in a future release
 SET GLOBAL binlog_format='ROW';
 Warnings:
 Warning	1287	'@@binlog_format' is deprecated and will be removed in a future release.
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;

@@ -2,12 +2,12 @@
 
 --connection node_1
 SET SESSION wsrep_on=OFF;
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 SET SESSION wsrep_on=ON;
 
 --connection node_2
 SET SESSION wsrep_on=OFF;
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 SET SESSION wsrep_on=ON;
 
 
