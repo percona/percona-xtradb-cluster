@@ -8,10 +8,10 @@
 #
 
 --connection node_1
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 
 --connection node_2
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 
 --connection node_1
 CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB;
@@ -59,10 +59,10 @@ DROP TABLE t2;
 --echo # but events are not recorded in the binlog
 --echo #
 --connection node_2
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 
 --connection node_1
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 
 --let $master_pos_before= query_get_value(SHOW MASTER STATUS,Position,1)
 SET SESSION sql_log_bin = OFF;
@@ -122,10 +122,10 @@ DROP TABLE t2;
 --echo # The same, but for streaming replication
 --echo #
 --connection node_2
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 
 --connection node_1
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 
 --let $master_pos_before= query_get_value(SHOW MASTER STATUS,Position,1)
 SET SESSION sql_log_bin = OFF;
@@ -188,11 +188,11 @@ DROP TABLE t2;
 --source include/restart_mysqld.inc
 
 --connection node_2
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 --let $master_pos_before= query_get_value(SHOW MASTER STATUS,Position,1)
 
 --connection node_1
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 
 SET SESSION sql_log_bin = OFF;
 CREATE TABLE t1 (a int primary key);
@@ -238,4 +238,4 @@ DROP TABLE t1;
 DROP TABLE t2;
 
 --connection node_1
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;

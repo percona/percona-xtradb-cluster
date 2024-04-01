@@ -5594,7 +5594,7 @@ RESET SLAVE ALL;
 
 --echo # connection node_1
 --connection node_1
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 
 --connection node_1
 call mtr.add_suppression("Pending to replicate MySQL GTID event.*");

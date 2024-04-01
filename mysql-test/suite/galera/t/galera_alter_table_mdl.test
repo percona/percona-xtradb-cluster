@@ -8,7 +8,7 @@
 --source include/count_sessions.inc
 
 # Clear the binlogs before starting the test
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 
 # Don't make threads wait
 --let $wsrep_sync_wait_saved = `SELECT @@GLOBAL.wsrep_sync_wait`
@@ -68,7 +68,7 @@ SELECT * FROM t1;
 --echo # --------------------------------
 
 # Clear the binlogs before starting the next test
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 
 # Execute ALTER TABLE from node1
 --connection node_1
@@ -112,7 +112,7 @@ SELECT * FROM t1;
 --echo # --------------------------------
 
 # Clear the binlogs before starting the next test
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 
 --connection node_1
 SET SESSION wsrep_OSU_method = "RSU";

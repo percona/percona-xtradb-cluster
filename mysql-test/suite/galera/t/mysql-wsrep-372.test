@@ -30,11 +30,11 @@ call mtr.add_suppression("Pending to replicate MySQL GTID event");
 ###
 
 --connection node_1
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 
 --connection node_2
 SET wsrep_on=OFF;
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 SET wsrep_on=ON;
 
 --connection node_2
@@ -131,11 +131,11 @@ DROP DATABASE galera_replicated_db;
 ###
 
 --connection node_1
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 
 --connection node_2
 SET wsrep_on=OFF;
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 SET wsrep_on=ON;
 
 --connection node_2
@@ -228,11 +228,11 @@ DROP TABLE test.galera_replicated_table;
 ###
 
 --connection node_1
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 
 --connection node_2
 SET wsrep_on=OFF;
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 SET wsrep_on=ON;
 
 --connection node_2

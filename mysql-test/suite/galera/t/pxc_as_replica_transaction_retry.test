@@ -82,7 +82,7 @@ ROLLBACK;
 --echo # connection node_1
 --connection node_1
 DROP TABLE t1;
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 
 --echo # connection node_2
 --connection node_2

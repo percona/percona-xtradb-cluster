@@ -93,4 +93,4 @@ RESET SLAVE ALL;
 
 --connection node_1
 SET GLOBAL binlog_format='ROW';
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;

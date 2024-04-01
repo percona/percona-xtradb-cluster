@@ -1743,7 +1743,7 @@ RESET SLAVE ALL;
 Warnings:
 Warning	1287	'RESET SLAVE' is deprecated and will be removed in a future release. Please use RESET REPLICA instead
 # connection node_1
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1' FOR CHANNEL 'wsrep';
 ERROR HY000: CHANGE MASTER with the given parameters cannot be performed on channel 'wsrep'.
 START SLAVE FOR CHANNEL 'wsrep';

@@ -258,7 +258,7 @@ Warnings:
 Warning	1287	'RESET SLAVE' is deprecated and will be removed in a future release. Please use RESET REPLICA instead
 #node-1 (independent master)
 set session wsrep_on=off;
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 set session wsrep_on=on;
 #node-4 (independent slave replicating from galera-node-2)
 STOP SLAVE;
@@ -269,5 +269,5 @@ Warnings:
 Warning	1287	'RESET SLAVE' is deprecated and will be removed in a future release. Please use RESET REPLICA instead
 #node-3 (galera-cluster-node-2 that act as master to independent slave)
 set session wsrep_on=off;
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 set session wsrep_on=on;
