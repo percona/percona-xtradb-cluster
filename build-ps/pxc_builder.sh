@@ -469,7 +469,7 @@ install_deps() {
             apt update
             apt -y install cmake/buster-backports
         fi
-        if [ x"${DIST}" = xbuster ]; then
+        if [ x"${DIST}" = xfocal ]; then
             apt-get -y install gcc-10 g++-10
             update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 100
             update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 100
