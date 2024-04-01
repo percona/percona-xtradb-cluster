@@ -341,8 +341,8 @@ install_deps() {
                 yum -y install scons pip python3-devel
                 pip install --user typing pyyaml regex Cheetah3
             else
-               # wget https://jenkins.percona.com/yum-repo/percona-dev.repo
-               # mv -vf percona-dev.repo /etc/yum.repos.d
+                wget https://downloads.percona.com/downloads/packaging/python2-scons-3.0.1-9.el8.noarch.rpm
+                yum -y install ./python2-scons-3.0.1-9.el8.noarch.rpm || true
                 yum -y clean all
                 yum -y install libtirpc-devel
                 yum -y install perl-Dig
@@ -465,6 +465,16 @@ install_deps() {
             wget https://downloads.percona.com/downloads/packaging/libfido2-1/libcbor0_0.5.0+dfsg-2_amd64.deb
             dpkg -i libcbor0_0.5.0+dfsg-2_amd64.deb
             dpkg -i libfido2-1_1.5.0-2~bpo10+1_amd64.deb
+            echo "deb http://deb.debian.org/debian buster-backports main" >> /etc/apt/sources.list
+            apt update
+            apt -y install cmake/buster-backports
+        fi
+        if [ x"${DIST}" = xbuster ]; then
+            apt-get -y install gcc-10 g++-10
+            update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 100
+            update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 100
+            update-alternatives --config gcc
+            update-alternatives --config g++
         fi
         apt-get -y install libmecab2 mecab mecab-ipadic
         apt-get -y install build-essential devscripts
