@@ -1,0 +1,21 @@
+node_1
+CREATE DATABASE test2;
+USE test2;
+CREATE TABLE t1 (a INT PRIMARY KEY);
+SET GLOBAL wsrep_provider_options = 'dbug=d,before_replicate_sync';
+CREATE TRIGGER trg1 BEFORE INSERT ON t1 FOR EACH ROW DELETE FROM t1 WHERE a=1;
+node_1a
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+ALTER DATABASE test2 CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_ci;
+SET GLOBAL wsrep_provider_options = 'signal=before_replicate_sync';
+SET GLOBAL wsrep_provider_options = 'dbug=d,before_replicate_sync';
+DROP TRIGGER trg1;
+node_1a
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+ALTER DATABASE test2 CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_ci;
+SET GLOBAL wsrep_provider_options = 'signal=before_replicate_sync';
+DROP DATABASE test2;
