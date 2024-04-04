@@ -105,6 +105,10 @@ class Schema_MDL_locker {
 
   bool ensure_locked(const char *schema_name);
 
+#ifdef WITH_WSREP
+  void unlock();
+#endif
+
   /**
     Release the MDL ticket, if any, when the instance of this
     class leaves scope or is deleted.

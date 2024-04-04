@@ -130,4 +130,11 @@ Schema_MDL_locker::~Schema_MDL_locker() {
   if (m_ticket) m_thd->mdl_context.release_lock(m_ticket);
 }
 
+#ifdef WITH_WSREP
+void Schema_MDL_locker::unlock() {
+  if (m_ticket) m_thd->mdl_context.release_lock(m_ticket);
+  m_ticket = nullptr;
+}
+#endif
+
 }  // namespace dd
