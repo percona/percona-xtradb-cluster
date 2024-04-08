@@ -14,19 +14,21 @@
 SELECT GRANTEE FROM INFORMATION_SCHEMA.USER_PRIVILEGES
 WHERE PRIVILEGE_TYPE = 'SET_USER_ID' ORDER BY 1;
 
---echo # Test: FR8: Should include root
+--echo # Test: FR8: Should include root and mysql.pxc.internal.session
 SELECT GRANTEE FROM INFORMATION_SCHEMA.USER_PRIVILEGES
 WHERE PRIVILEGE_TYPE = 'SET_ANY_DEFINER' ORDER BY 1;
 
---echo # Test: FR8: Should include root
+--echo # Test: FR8: Should include root and mysql.pxc.internal.session
 SELECT GRANTEE FROM INFORMATION_SCHEMA.USER_PRIVILEGES
 WHERE PRIVILEGE_TYPE = 'ALLOW_NONEXISTENT_DEFINER' ORDER BY 1;
 
 --echo # set grants as it used to be pre-worklog
 CREATE USER wl15874@localhost;
 REVOKE SET_ANY_DEFINER,ALLOW_NONEXISTENT_DEFINER ON *.* FROM root@localhost;
+REVOKE SET_ANY_DEFINER,ALLOW_NONEXISTENT_DEFINER ON *.* FROM 'mysql.pxc.internal.session'@localhost;
 GRANT SET_USER_ID ON *.* TO wl15874@localhost WITH GRANT OPTION;
 GRANT SET_USER_ID ON *.* TO root@localhost WITH GRANT OPTION;
+GRANT SET_USER_ID ON *.* TO 'mysql.pxc.internal.session'@localhost;
 
 --let $restart_parameters = restart:--upgrade=FORCE
 --let $wait_counter= 10000
@@ -36,7 +38,7 @@ GRANT SET_USER_ID ON *.* TO root@localhost WITH GRANT OPTION;
 --let $restart_parameters = restart:
 --source include/restart_mysqld.inc
 
---echo # Test FR4: SET_USER_ID deprecated at startup: must be 2: root and wl15784
+--echo # Test FR4: SET_USER_ID deprecated at startup: must be 3: root, wl15784 and mysql.pxc.internal.session
 select COUNT(*) FROM performance_schema.error_log
   WHERE PRIO='Warning' AND DATA REGEXP 'SET_USER_ID.*deprecated';
 
@@ -44,17 +46,18 @@ select COUNT(*) FROM performance_schema.error_log
 SELECT GRANTEE FROM INFORMATION_SCHEMA.USER_PRIVILEGES
 WHERE PRIVILEGE_TYPE = 'SET_USER_ID' ORDER BY 1;
 
---echo # FR3: should return 2 rows: root and wl15874
+--echo # FR3: should return 3 rows: root, wl15874 and mysql.pxc.internal.session
 SELECT GRANTEE FROM INFORMATION_SCHEMA.USER_PRIVILEGES
 WHERE PRIVILEGE_TYPE = 'SET_ANY_DEFINER' ORDER BY 1;
 
---echo # FR3: should return 2 rows: root and wl15874
+--echo # FR3: should return 3 rows: root, wl15874 and mysql.pxc.internal.session
 SELECT GRANTEE FROM INFORMATION_SCHEMA.USER_PRIVILEGES
 WHERE PRIVILEGE_TYPE = 'ALLOW_NONEXISTENT_DEFINER' ORDER BY 1;
 
 --echo # set grants to test FR3.1
 REVOKE SET_USER_ID,ALLOW_NONEXISTENT_DEFINER,SET_ANY_DEFINER ON *.* FROM wl15874@localhost;
 REVOKE SET_USER_ID,ALLOW_NONEXISTENT_DEFINER,SET_ANY_DEFINER ON *.* FROM root@localhost;
+REVOKE SET_USER_ID,ALLOW_NONEXISTENT_DEFINER,SET_ANY_DEFINER ON *.* FROM 'mysql.pxc.internal.session'@localhost;
 GRANT SUPER ON *.* TO wl15874@localhost WITH GRANT OPTION;
 
 --echo # FR3.1: should return 0 rows
@@ -69,7 +72,9 @@ WHERE PRIVILEGE_TYPE = 'SET_ANY_DEFINER' ORDER BY 1;
 SELECT GRANTEE FROM INFORMATION_SCHEMA.USER_PRIVILEGES
 WHERE PRIVILEGE_TYPE = 'ALLOW_NONEXISTENT_DEFINER' ORDER BY 1;
 
---echo # FR3.1: should return 3 rows: root, mysql.session and wl15874
+--echo # FR3.1: should return 5 rows: root, mysql.session, wl15874
+--echo #        mysql.pxc.internal.session and mysql.pxc.sst.role
+
 SELECT GRANTEE FROM INFORMATION_SCHEMA.USER_PRIVILEGES
 WHERE PRIVILEGE_TYPE = 'SUPER' ORDER BY 1;
 
@@ -86,11 +91,13 @@ WHERE PRIVILEGE_TYPE = 'SUPER' ORDER BY 1;
 SELECT GRANTEE FROM INFORMATION_SCHEMA.USER_PRIVILEGES
 WHERE PRIVILEGE_TYPE = 'SET_USER_ID' ORDER BY 1;
 
---echo # FR3.1: should return 3 rows: root, mysql.session and wl15874
+--echo # FR3.1: should return 5 rows: root, mysql.session, wl15874
+--echo #        mysql.pxc.internal.session and mysql.pxc.sst.role
 SELECT GRANTEE FROM INFORMATION_SCHEMA.USER_PRIVILEGES
 WHERE PRIVILEGE_TYPE = 'SET_ANY_DEFINER' ORDER BY 1;
 
---echo # FR3.1: should return 3 rows: root, mysql.session and wl15874
+--echo # FR3.1: should return 5 rows: root, mysql.session, wl15874
+--echo #        mysql.pxc.internal.session and mysql.pxc.sst.role
 SELECT GRANTEE FROM INFORMATION_SCHEMA.USER_PRIVILEGES
 WHERE PRIVILEGE_TYPE = 'ALLOW_NONEXISTENT_DEFINER' ORDER BY 1;
 
@@ -99,6 +106,7 @@ WHERE PRIVILEGE_TYPE = 'ALLOW_NONEXISTENT_DEFINER' ORDER BY 1;
 REVOKE ALLOW_NONEXISTENT_DEFINER,SET_ANY_DEFINER ON *.* FROM wl15874@localhost;
 REVOKE SUPER ON *.* FROM wl15874@localhost;
 REVOKE SET_ANY_DEFINER, ALLOW_NONEXISTENT_DEFINER ON *.* FROM 'mysql.session'@'localhost';
+REVOKE SET_ANY_DEFINER, ALLOW_NONEXISTENT_DEFINER ON *.* FROM 'mysql.pxc.sst.role'@'localhost';
 DROP USER wl15874@localhost;
 
 --source include/mysql_upgrade_cleanup.inc
