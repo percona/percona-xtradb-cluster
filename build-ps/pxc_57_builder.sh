@@ -251,7 +251,11 @@ get_system(){
         GLIBC_VER_TMP="$(rpm glibc -qa --qf %{VERSION})"
         RHEL=$(rpm --eval %rhel)
         ARCH=$(echo $(uname -m) | sed -e 's:i686:i386:g')
-        OS_NAME="el$RHEL"
+        if [ "x$RHEL" = "x9" ]; then
+            OS_NAME="ol$RHEL"
+        else
+            OS_NAME="el$RHEL"
+        fi
         OS="rpm"
     else
         GLIBC_VER_TMP="$(dpkg-query -W -f='${Version}' libc6 | awk -F'-' '{print $1}')"
@@ -260,6 +264,7 @@ get_system(){
         OS="deb"
     fi
     export GLIBC_VER=".glibc${GLIBC_VER_TMP}"
+    export OS_NAME=".${OS_NAME}"
     return
 }
 
@@ -286,9 +291,9 @@ install_deps() {
         yum install -y perl
         yum install -y https://repo.percona.com/yum/percona-release-latest.noarch.rpm
         percona-release enable tools testing
-        if [ "${RHEL}" -lt 9 ]; then
-            add_percona_yum_repo
-        fi
+        #if [ "${RHEL}" -lt 9 ]; then
+        #    add_percona_yum_repo
+        #fi
         if [ "x$RHEL" = "x8" -o "x$RHEL" = "x9" ]; then
             yum -y install dnf-plugins-core epel-release
             yum config-manager --set-enabled powertools
@@ -316,12 +321,14 @@ install_deps() {
                 yum -y install scons pip python3-devel
 #                pip install --user typing pyyaml regex Cheetah3
             else
-                wget https://jenkins.percona.com/yum-repo/percona-dev.repo
-                mv -vf percona-dev.repo /etc/yum.repos.d
+              #  wget https://jenkins.percona.com/yum-repo/percona-dev.repo
+              #  mv -vf percona-dev.repo /etc/yum.repos.d
                 yum -y clean all
                 yum -y install libtirpc-devel
                 yum -y install perl-Dig
-                yum -y install python2-scons python2-pip python36-devel
+                wget https://downloads.percona.com/downloads/packaging/python2-scons-3.0.1-9.el8.noarch.rpm
+                yum -y install ./python2-scons-3.0.1-9.el8.noarch.rpm || true
+                yum -y install python2-pip python36-devel
                 yum -y install python2-devel
 #                /usr/bin/pip3.6 install --user typing pyyaml regex Cheetah3
 #                /usr/bin/pip2.7 install --user typing pyyaml regex Cheetah
@@ -520,7 +527,7 @@ build_srpm(){
 
 build_mecab_lib(){
     MECAB_TARBAL="mecab-0.996.tar.gz"
-    MECAB_LINK="http://jenkins.percona.com/downloads/mecab/${MECAB_TARBAL}"
+    MECAB_LINK="https://downloads.percona.com/downloads/packaging/mecab/${MECAB_TARBAL}"
     MECAB_DIR="${WORKDIR}/${MECAB_TARBAL%.tar.gz}"
     MECAB_INSTALL_DIR="${WORKDIR}/mecab-install"
     rm -f ${MECAB_TARBAL}
@@ -539,7 +546,7 @@ build_mecab_lib(){
 
 build_mecab_dict(){
     MECAB_IPADIC_TARBAL="mecab-ipadic-2.7.0-20070801.tar.gz"
-    MECAB_IPADIC_LINK="http://jenkins.percona.com/downloads/mecab/${MECAB_IPADIC_TARBAL}"
+    MECAB_IPADIC_LINK="https://downloads.percona.com/downloads/packaging/mecab/${MECAB_IPADIC_TARBAL}"
     MECAB_IPADIC_DIR="${WORKDIR}/${MECAB_IPADIC_TARBAL%.tar.gz}"
     rm -f ${MECAB_IPADIC_TARBAL}
     rm -rf ${MECAB_IPADIC_DIR}
