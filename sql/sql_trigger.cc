@@ -445,9 +445,17 @@ bool Sql_cmd_create_trigger::execute(THD *thd) {
   }
 
 #ifdef WITH_WSREP
-  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL,
-                                             m_trigger_table, NULL)) {
-    return true;
+  if (WSREP(thd)) {
+    schema_mdl_locker.unlock();
+    assert(!thd->mdl_context.has_locks());
+    if (wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, m_trigger_table,
+                                 NULL)) {
+      return true;
+    }
+    if (thd->locked_tables_mode &&
+        schema_mdl_locker.ensure_locked(m_trigger_table->db)) {
+      return true;
+    }
   }
 #endif /* WITH_WSREP */
 
@@ -546,6 +554,10 @@ bool Sql_cmd_drop_trigger::execute(THD *thd) {
 
   if (check_schema_readonly(thd, thd->lex->spname->m_db.str)) return true;
 
+#ifdef WITH_WSREP
+  MDL_savepoint mdl_savepoint = thd->mdl_context.mdl_savepoint();
+#endif
+
   if (acquire_exclusive_mdl_for_trigger(thd, thd->lex->spname->m_db.str,
                                         thd->lex->spname->m_name.str))
     return true;
@@ -577,9 +589,13 @@ bool Sql_cmd_drop_trigger::execute(THD *thd) {
 #ifdef WITH_WSREP
     /* Table doesn't exist but query is still being logged
     so replicate a query with NULL construct. */
-    if (WSREP(thd) &&
-        wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, tables)) {
-      return true;
+    if (WSREP(thd)) {
+      thd->mdl_context.rollback_to_savepoint(mdl_savepoint);
+      schema_mdl_locker.unlock();
+      assert(!thd->mdl_context.has_locks());
+      if (wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, tables)) {
+        return true;
+      }
     }
 #endif /* WITH_WSREP */
 
@@ -593,10 +609,19 @@ bool Sql_cmd_drop_trigger::execute(THD *thd) {
   if (check_trg_priv_on_subj_table(thd, tables)) return true;
 
 #ifdef WITH_WSREP
-  /* Table exist so log query with normal constrct */
-  if (WSREP(thd) &&
-      wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, tables)) {
-    return true;
+  if (WSREP(thd)) {
+    thd->mdl_context.rollback_to_savepoint(mdl_savepoint);
+    schema_mdl_locker.unlock();
+    assert(!thd->mdl_context.has_locks());
+    /* Table exist so log query with normal constrct */
+    if (wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, tables)) {
+      return true;
+    }
+    if (schema_mdl_locker.ensure_locked(thd->lex->spname->m_db.str) ||
+        acquire_exclusive_mdl_for_trigger(thd, thd->lex->spname->m_db.str,
+                                          thd->lex->spname->m_name.str)) {
+      return true;
+    }
   }
 #endif /* WITH_WSREP */
 
