@@ -682,8 +682,6 @@ rm -rf usr
 rm -f *.rpm
 popd
 
-mkdir pxc_extra
-pushd pxc_extra
 mkdir pxb-8.1
 pushd pxb-8.1
 yumdownloader percona-xtrabackup-81-8.1.0
@@ -696,7 +694,6 @@ rm -rf lib/xtrabackup
 rm -rf usr
 rm -f *.rpm
 popd
-
 
 mkdir pxb-8.0
 pushd pxb-8.0
