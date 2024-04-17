@@ -669,6 +669,21 @@ fi
 
 mkdir pxc_extra
 pushd pxc_extra
+mkdir pxb-8.2
+pushd pxb-8.2
+yumdownloader percona-xtrabackup-82-8.2.0
+rpm2cpio *.rpm | cpio --extract --make-directories --verbose
+mv usr/bin ./
+mv usr/lib* ./
+mv lib64 lib
+mv lib/xtrabackup/* lib/ || true
+rm -rf lib/xtrabackup
+rm -rf usr
+rm -f *.rpm
+popd
+
+mkdir pxc_extra
+pushd pxc_extra
 mkdir pxb-8.1
 pushd pxb-8.1
 yumdownloader percona-xtrabackup-81-8.1.0
