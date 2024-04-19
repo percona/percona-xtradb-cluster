@@ -8436,14 +8436,10 @@ alter_event_stmt:
             Lex->event_parse_data->identifier= $4;
 
             Lex->sql_command= SQLCOM_ALTER_EVENT;
-<<<<<<< HEAD
 #ifdef WITH_WSREP
             Lex->stmt_definition_begin= @3.cpp.start;
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-=======
             MAKE_CMD_DDL_DUMMY();
->>>>>>> tag/Percona-Server-8.3.0-1
           }
           ev_alter_on_schedule_completion
           opt_ev_rename_to
@@ -8461,12 +8457,9 @@ alter_event_stmt:
               can overwrite it
             */
             Lex->sql_command= SQLCOM_ALTER_EVENT;
-<<<<<<< HEAD
 #ifdef WITH_WSREP
             Lex->stmt_definition_end= const_cast<char*>(YYLIP->get_cpp_ptr());
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-=======
 
             /*
               assert that even if sql_command was overwritten,
@@ -8474,7 +8467,6 @@ alter_event_stmt:
             */
             assert(Lex->m_sql_cmd->sql_cmd_type() == SQL_CMD_DDL);
             assert(Lex->m_sql_cmd->sql_command_code() == SQLCOM_ALTER_EVENT);
->>>>>>> tag/Percona-Server-8.3.0-1
           }
         ;
 

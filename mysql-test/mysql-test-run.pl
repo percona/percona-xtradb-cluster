@@ -1886,12 +1886,8 @@ sub command_line_setup {
     'vardir=s'        => \$opt_vardir,
 
     # Misc
-<<<<<<< HEAD
     'fs-cleanup-hook=s'     => \$opt_fs_cleanup_hook,
-||||||| merged common ancestors
-=======
     'accept-test-fail'      => \$opt_accept_fail,
->>>>>>> tag/Percona-Server-8.3.0-1
     'charset-for-testdb=s'  => \$opt_charset_for_testdb,
     'colored-diff'          => \$opt_colored_diff,
     'comment=s'             => \$opt_comment,

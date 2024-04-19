@@ -74,7 +74,7 @@ static Relay_log_info *wsrep_relay_log_init(const char *) {
   uint rli_option = INFO_REPOSITORY_DUMMY;
   Relay_log_info *rli = NULL;
   rli =
-      Rpl_info_factory::create_rli(rli_option, false, WSREP_CHANNEL_NAME, true);
+      Rpl_info_factory::create_rli(rli_option, false, WSREP_CHANNEL_NAME);
   if (!rli) {
     WSREP_ERROR("Failed to create Relay-Log for wsrep thread, aborting");
     unireg_abort(MYSQLD_ABORT_EXIT);

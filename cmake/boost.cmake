@@ -1,5 +1,5 @@
 # Copyright (c) 2014, 2023, Oracle and/or its affiliates.
-# 
+#
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
 # as published by the Free Software Foundation.
@@ -21,20 +21,6 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
 SET(BOOST_PACKAGE_NAME "boost_1_77_0")
-<<<<<<< HEAD
-SET(BOOST_TARBALL "${BOOST_PACKAGE_NAME}.tar.bz2")
-SET(BOOST_DOWNLOAD_URL
- # "https://boostorg.jfrog.io/artifactory/main/release/1.77.0/source/${BOOST_TARBALL}"
-   "https://downloads.percona.com/downloads/packaging/boost/${BOOST_TARBALL}"
-  )
-||||||| merged common ancestors
-SET(BOOST_TARBALL "${BOOST_PACKAGE_NAME}.tar.bz2")
-SET(BOOST_DOWNLOAD_URL
- # "https://boostorg.jfrog.io/artifactory/main/release/1.77.0/source/${BOOST_TARBALL}"
-   "http://jenkins.percona.com/downloads/boost/${BOOST_TARBALL}"
-  )
-=======
->>>>>>> tag/Percona-Server-8.3.0-1
 
 # Always use the bundled version.
 SET(BOOST_SOURCE_DIR ${CMAKE_SOURCE_DIR}/extra/boost)

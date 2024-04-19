@@ -99,12 +99,6 @@ main.gtid_next_xa_binlog_off : BUG#33650776 Failure of XA COMMIT of prepared txn
 main.print_stacktrace : Bug#36027494 Add mtr test for my_print_stacktrace
 
 # Disabled due to InnoDB issues
-<<<<<<< HEAD
-main.internal_tmp_disk_storage_engine             : BUG#26917416 Disabled it since it's failing on pb2.
-||||||| merged common ancestors
-main.internal_tmp_disk_storage_engine : BUG#26917416 Disabled it since it's failing on pb2.
-=======
->>>>>>> tag/Percona-Server-8.3.0-1
 
 main.events_time_zone                             : BUG#2179 percona https://jira.percona.com/browse/PS-2179
 

@@ -1011,15 +1011,9 @@ int configure_group_member_manager() {
                   { local_version = 0x080015; };);
   DBUG_EXECUTE_IF("group_replication_version_8_0_28",
                   { local_version = 0x080028; };);
-<<<<<<< HEAD
-||||||| merged common ancestors
-  DBUG_EXECUTE_IF("group_replication_version_8_0_35",
-                  { local_version = 0x080035; };);
-=======
   DBUG_EXECUTE_IF("group_replication_version_with_vcle", {
     local_version = (MEMBER_VERSION_REMOVING_VCLE) - (0x000100);
   };);
->>>>>>> tag/Percona-Server-8.3.0-1
   Member_version local_member_plugin_version(local_version);
   DBUG_EXECUTE_IF("group_replication_force_member_uuid", {
     uuid = const_cast<char *>("cccccccc-cccc-cccc-cccc-cccccccccccc");
@@ -1157,18 +1151,10 @@ int configure_compatibility_manager() {
     Member_version higher_version(0x080015);
     compatibility_mgr->set_local_version(higher_version);
   };);
-<<<<<<< HEAD
-||||||| merged common ancestors
-  DBUG_EXECUTE_IF("group_replication_version_8_0_35", {
-    Member_version version(0x080035);
-    compatibility_mgr->set_local_version(version);
-  };);
-=======
   DBUG_EXECUTE_IF("group_replication_version_with_vcle", {
     Member_version version = (MEMBER_VERSION_REMOVING_VCLE) - (0x000100);
     compatibility_mgr->set_local_version(version);
   };);
->>>>>>> tag/Percona-Server-8.3.0-1
 
   return 0;
 }

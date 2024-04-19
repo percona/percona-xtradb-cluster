@@ -22,50 +22,18 @@
  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 */
 
-<<<<<<< HEAD
-#include "util/require.h"
-#include <ndb_opts.h>
-||||||| merged common ancestors
-#include "util/require.h"
-#include <ndb_opts.h>
-<<<<<<<<< Temporary merge branch 1
-#include <NDBT_Test.hpp>
-||||||||| merged common ancestors
-#include <NDBT_Test.hpp>
-||||||||||| 057f5c9509c
-#include <NDBT_Test.hpp>
-===========
->>>>>>>>>>> Temporary merge branch 2
-=========
->>>>>>>>> Temporary merge branch 2
-=======
->>>>>>> tag/Percona-Server-8.3.0-1
 #include <NDBT_ReturnCodes.h>
-<<<<<<< HEAD
-#include <NdbEnv.h>
-#include <Bitmask.hpp>
-||||||| merged common ancestors
-=======
 #include <NdbEnv.h>
 #include <NdbSleep.h>
 #include <ndb_opts.h>
 #include <Bitmask.hpp>
->>>>>>> tag/Percona-Server-8.3.0-1
 #include <HugoTransactions.hpp>
 #include <NDBT_Test.hpp>
 #include <NdbAutoPtr.hpp>
 #include <NdbRestarter.hpp>
 #include <NdbRestarts.hpp>
-<<<<<<< HEAD
-#include <NdbSleep.h>
 #include <TestNdbEventOperation.hpp>
 #include <UtilTransactions.hpp>
-||||||| merged common ancestors
-#include <NdbSleep.h>
-=======
-#include <TestNdbEventOperation.hpp>
-#include <UtilTransactions.hpp>
->>>>>>> tag/Percona-Server-8.3.0-1
 #include <signaldata/DumpStateOrd.hpp>
 #include "../src/kernel/ndbd.hpp"
 #include "util/require.h"
@@ -2270,50 +2238,10 @@ int errorInjectStalling(NDBT_Context *ctx, NDBT_Step *step) {
       res = ndb->pollEvents(5000, &curr_gci) > 0;
     }
 
-<<<<<<< HEAD
-    if (ndb->getNdbError().code != 0)
-    {
-      g_err << method << " failed: \n";
-      g_err << ndb->getNdbError().code << " "
-            << ndb->getNdbError().message << endl;
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
     if (ndb->getNdbError().code != 0) {
       g_err << method << " failed: \n";
       g_err << ndb->getNdbError().code << " " << ndb->getNdbError().message
             << endl;
-||||||||| merged common ancestors
-<<<<<<<<<<< Temporary merge branch 1
-    if (ndb->getNdbError().code != 0)
-    {
-      g_err << method << " failed: \n";
-      g_err << ndb->getNdbError().code << " "
-            << ndb->getNdbError().message << endl;
-||||||||||| 057f5c9509c
-    if (ndb->getNdbError().code != 0)
-    {
-      g_err << "pollEvents failed: \n";
-      g_err << ndb->getNdbError().code << " "
-            << ndb->getNdbError().message << endl;
-===========
-    if (ndb->getNdbError().code != 0) {
-      g_err << "pollEvents failed: \n";
-      g_err << ndb->getNdbError().code << " " << ndb->getNdbError().message
-            << endl;
->>>>>>>>>>> Temporary merge branch 2
-=========
-    if (ndb->getNdbError().code != 0)
-    {
-      g_err << method << " failed: \n";
-      g_err << ndb->getNdbError().code << " "
-            << ndb->getNdbError().message << endl;
->>>>>>>>> Temporary merge branch 2
-=======
-    if (ndb->getNdbError().code != 0) {
-      g_err << method << " failed: \n";
-      g_err << ndb->getNdbError().code << " " << ndb->getNdbError().message
-            << endl;
->>>>>>> tag/Percona-Server-8.3.0-1
       result = NDBT_FAILED;
       goto cleanup;
     }
@@ -2397,50 +2325,10 @@ int errorInjectStalling(NDBT_Context *ctx, NDBT_Step *step) {
       res = ndb->pollEvents(5000, &curr_gci) > 0;
     }
 
-<<<<<<< HEAD
-    if (ndb->getNdbError().code != 0)
-    {
-      g_err << method << " failed: \n";
-      g_err << ndb->getNdbError().code << " "
-            << ndb->getNdbError().message << endl;
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
     if (ndb->getNdbError().code != 0) {
       g_err << method << " failed: \n";
       g_err << ndb->getNdbError().code << " " << ndb->getNdbError().message
             << endl;
-||||||||| merged common ancestors
-<<<<<<<<<<< Temporary merge branch 1
-    if (ndb->getNdbError().code != 0)
-    {
-      g_err << method << " failed: \n";
-      g_err << ndb->getNdbError().code << " "
-            << ndb->getNdbError().message << endl;
-||||||||||| 057f5c9509c
-    if (ndb->getNdbError().code != 0)
-    {
-      g_err << "pollEvents failed: \n";
-      g_err << ndb->getNdbError().code << " "
-            << ndb->getNdbError().message << endl;
-===========
-    if (ndb->getNdbError().code != 0) {
-      g_err << "pollEvents failed: \n";
-      g_err << ndb->getNdbError().code << " " << ndb->getNdbError().message
-            << endl;
->>>>>>>>>>> Temporary merge branch 2
-=========
-    if (ndb->getNdbError().code != 0)
-    {
-      g_err << method << " failed: \n";
-      g_err << ndb->getNdbError().code << " "
-            << ndb->getNdbError().message << endl;
->>>>>>>>> Temporary merge branch 2
-=======
-    if (ndb->getNdbError().code != 0) {
-      g_err << method << " failed: \n";
-      g_err << ndb->getNdbError().code << " " << ndb->getNdbError().message
-            << endl;
->>>>>>> tag/Percona-Server-8.3.0-1
       result = NDBT_FAILED;
       goto cleanup;
     }

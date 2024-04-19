@@ -573,13 +573,10 @@ void init_sql_command_flags() {
   server_command_flags[COM_STMT_RESET] |= CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_STMT_SEND_LONG_DATA] |= CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_QUIT] |= CF_SKIP_WSREP_CHECK;
-  server_command_flags[COM_PROCESS_INFO] |= CF_SKIP_WSREP_CHECK;
-  server_command_flags[COM_PROCESS_KILL] |= CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_SLEEP] |= CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_TIME] |= CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_INIT_DB] |= CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_END] |= CF_SKIP_WSREP_CHECK;
-  server_command_flags[COM_FIELD_LIST] |= CF_SKIP_WSREP_CHECK;
 
   /*
     COM_QUERY and COM_SET_OPTION are allowed to pass the early COM_xxx filter,
@@ -5015,7 +5012,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
 
       /* REFRESH_TABLES is taken care inside handle_reload_request */
       if (lex->type &
-          (REFRESH_GRANT | REFRESH_HOSTS | REFRESH_STATUS |
+          (REFRESH_GRANT | REFRESH_STATUS |
            REFRESH_USER_RESOURCES | REFRESH_ERROR_LOG | REFRESH_SLOW_LOG |
            REFRESH_GENERAL_LOG | REFRESH_ENGINE_LOG | REFRESH_RELAY_LOG |
            /* Percona Server specific */

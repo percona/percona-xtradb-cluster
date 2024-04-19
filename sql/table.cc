@@ -7773,11 +7773,9 @@ bool TABLE::setup_partial_update() {
   THD *thd = current_thd;
 #ifdef WITH_WSREP
   const bool logical_diffs =
-      (thd->variables.binlog_row_value_options & PARTIAL_JSON_UPDATES) !=
-          0 &&
+      (thd->variables.binlog_row_value_options & PARTIAL_JSON_UPDATES) != 0 &&
       (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open()) &&
       (thd->variables.option_bits & OPTION_BIN_LOG) != 0 &&
-      log_bin_use_v1_row_events == 0 &&
       thd->is_current_stmt_binlog_format_row();
 #else
   const bool logical_diffs = 
@@ -7785,31 +7783,7 @@ bool TABLE::setup_partial_update() {
       mysql_bin_log.is_open() &&
       (thd->variables.option_bits & OPTION_BIN_LOG) != 0 &&
       thd->is_current_stmt_binlog_format_row();
-<<<<<<< HEAD
 #endif /* WITH_WSREP */
-
-  DBUG_PRINT(
-      "info",
-      ("TABLE::setup_partial_update(): logical_diffs=%d "
-       "because binlog_row_value_options=%d binlog.is_open=%d "
-       "sql_log_bin=%d use_v1_row_events=%d rbr=%d",
-       logical_diffs,
-       (thd->variables.binlog_row_value_options & PARTIAL_JSON_UPDATES) != 0,
-       mysql_bin_log.is_open(),
-       (thd->variables.option_bits & OPTION_BIN_LOG) != 0,
-       log_bin_use_v1_row_events, thd->is_current_stmt_binlog_format_row()));
-||||||| merged common ancestors
-  DBUG_PRINT(
-      "info",
-      ("TABLE::setup_partial_update(): logical_diffs=%d "
-       "because binlog_row_value_options=%d binlog.is_open=%d "
-       "sql_log_bin=%d use_v1_row_events=%d rbr=%d",
-       logical_diffs,
-       (thd->variables.binlog_row_value_options & PARTIAL_JSON_UPDATES) != 0,
-       mysql_bin_log.is_open(),
-       (thd->variables.option_bits & OPTION_BIN_LOG) != 0,
-       log_bin_use_v1_row_events, thd->is_current_stmt_binlog_format_row()));
-=======
   DBUG_PRINT("info", ("TABLE::setup_partial_update(): logical_diffs=%d "
                       "because binlog_row_value_options=%d binlog.is_open=%d "
                       "sql_log_bin=%d rbr=%d",
@@ -7819,7 +7793,6 @@ bool TABLE::setup_partial_update() {
                       mysql_bin_log.is_open(),
                       (thd->variables.option_bits & OPTION_BIN_LOG) != 0,
                       thd->is_current_stmt_binlog_format_row()));
->>>>>>> tag/Percona-Server-8.3.0-1
   return setup_partial_update(logical_diffs);
 }
 

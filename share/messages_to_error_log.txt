@@ -12246,49 +12246,6 @@ ER_CONVERT_MULTI_VALUE
 ER_IB_DDL_CONVERT_HEAP_NOT_FOUND
   eng "Heap required to convert columns is not present."
 
-<<<<<<< HEAD
-ER_SERVER_DOWNGRADE_FROM_VERSION
-  eng "MySQL server downgrading from version '%u' to '%u'."
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-ER_SERVER_DOWNGRADE_FROM_VERSION
-  eng "MySQL server downgrading from version '%u' to '%u'."
-
-ER_BEYOND_SERVER_DOWNGRADE_THRESHOLD
-  eng "Invalid MySQL server downgrade: Cannot downgrade from %u to %u. Target MySQL server version is lower than the server downgrade threshold %u."
-
-ER_BEYOND_SERVER_UPGRADE_THRESHOLD
-  eng "Invalid MySQL server upgrade: Cannot upgrade from %u to %u. Target MySQL server version is lower than the server upgrade threshold %u."
-
-ER_INVALID_SERVER_UPGRADE_NOT_LTS
-  eng "Invalid MySQL server upgrade: Cannot upgrade from %u to %u. Upgrade to next major version is only allowed from the last LTS release, which version %u is not."
-
-ER_INVALID_SERVER_DOWNGRADE_NOT_PATCH
-  eng "Invalid MySQL server downgrade: Cannot downgrade from %u to %u. Downgrade is only permitted between patch releases."
-
-ER_FAILED_GET_DD_PROPERTY
-  eng "Failed to get the data dictionary property %s."
-
-ER_FAILED_SET_DD_PROPERTY
-  eng "Failed to set the data dictionary property %s."
-
-ER_SERVER_DOWNGRADE_STATUS
-  eng "Server downgrade from '%d' to '%d' %s."
-
-ER_INFORMATION_SCHEMA_VERSION_CHANGE
-  eng "%s information schema from version %u to %u."
-
-ER_PERFORMANCE_SCHEMA_VERSION_CHANGE
-  eng "%s performance schema from version %u to %u."
-
-ER_WARN_DEPRECATED_OR_BLOCKED_CIPHER
-   eng "Value for option '%s' contains cipher '%s' that is either blocked or deprecated (and will be removed in a future release). Please refer to the documentation for more details."
-
-||||||||| merged common ancestors
-=========
-ER_SERVER_DOWNGRADE_FROM_VERSION
-  eng "MySQL server downgrading from version '%u' to '%u'."
-=======
 ER_SERVER_DOWNGRADE_FROM_VERSION
   eng "MySQL server downgrading from version '%u' to '%u'."
 
@@ -12324,7 +12281,6 @@ ER_WARN_DEPRECATED_OR_BLOCKED_CIPHER
 
 ER_IB_MSG_DDL_FAIL_NO_BUILDER
   eng "DDL failed as Builder is already freed. Builder: state=%u, error_state=%u. Index: id=%zu, name='%s', space_id=%u, page=%u. Table: old_name='%s', new_name='%s'."
->>>>>>> tag/Percona-Server-8.3.0-1
 
 ER_GRP_RPL_MEMBER_INFO_DOES_NOT_EXIST
   eng "Member identified %s: '%s' does not exist on Group Replication membership during %s."
@@ -12474,10 +12430,6 @@ ER_IB_WRONG_PAGEID_AFTER_SYNC_READ
 ER_IB_SYNC_READ_FAILED
   eng "Sync read to fix wrong page_id failed: buf_block_t[space_id=%zu, page_no=%zu], file=%s, err=%zu, retry=%zu"
 
-<<<<<<< HEAD
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-=======
 ER_START_REPLICA_CHANNEL_INVALID_CONFIGURATION_LOG
   eng "Cannot start replication channel '%s' because %s."
 
@@ -12640,7 +12592,6 @@ ER_GRP_RPL_MSG_DECODING_FAILED
 ER_GRP_RPL_APPLIER_ERROR_PACKET_RECEIVED
   eng "The Applier process of Group Replication found an error and was requested to stop: %s"
 
->>>>>>> tag/Percona-Server-8.3.0-1
 # DO NOT add server-to-client messages here;
 # they go in messages_to_clients.txt
 # in the same directory as this file.

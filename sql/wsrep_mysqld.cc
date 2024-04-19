@@ -650,10 +650,10 @@ void wsrep_init_sidno(const wsrep::id &uuid) {
     memcpy((void *)&sid, (const uchar *)ltid_uuid.data, 16);
   }
 
-  global_sid_lock->wrlock();
-  wsrep_sidno = global_sid_map->add_sid(sid);
+  global_tsid_lock->wrlock();
+  wsrep_sidno = global_tsid_map->add_tsid(sid);
   WSREP_INFO("Initialized wsrep sidno %d", wsrep_sidno);
-  global_sid_lock->unlock();
+  global_tsid_lock->unlock();
 }
 
 bool wsrep_init_schema(THD *thd) {

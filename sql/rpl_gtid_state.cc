@@ -527,15 +527,6 @@ enum_return_status Gtid_state::generate_automatic_gtid(
   assert(specified_gno >= 0);
   assert(thd->owned_gtid.is_empty());
 
-<<<<<<< HEAD
-  bool locked_sidno_was_passed_null = (locked_sidno == nullptr);
-
-  if (locked_sidno_was_passed_null)
-    sid_lock->rdlock();
-  else
-    /* The caller must lock the sid_lock when locked_sidno is passed */
-    sid_lock->assert_some_lock();
-
 #ifdef WITH_WSREP
   bool skip_gtid = false;
   /* If binlog is disabled permanently we don't get here.
@@ -550,22 +541,10 @@ enum_return_status Gtid_state::generate_automatic_gtid(
   // If GTID_MODE = ON_PERMISSIVE or ON, generate a new GTID
   if (!skip_gtid && global_gtid_mode.get() >= Gtid_mode::ON_PERMISSIVE) {
 #else
-||||||| merged common ancestors
-  bool locked_sidno_was_passed_null = (locked_sidno == nullptr);
-
-  if (locked_sidno_was_passed_null)
-    sid_lock->rdlock();
-  else
-    /* The caller must lock the sid_lock when locked_sidno is passed */
-    sid_lock->assert_some_lock();
-
-=======
->>>>>>> tag/Percona-Server-8.3.0-1
   // If GTID_MODE = ON_PERMISSIVE or ON, generate a new GTID
   if (global_gtid_mode.get() >= Gtid_mode::ON_PERMISSIVE) {
 #endif
     Gtid automatic_gtid = {specified_sidno, specified_gno};
-<<<<<<< HEAD
 
 #ifdef WITH_WSREP
     /* If node is running in cluster mode then get wsrep_sidno */
@@ -581,57 +560,9 @@ enum_return_status Gtid_state::generate_automatic_gtid(
       automatic_gtid.sidno = wsrep_sidno;
     else if (automatic_gtid.sidno == 0)
       automatic_gtid.sidno = get_server_sidno();
-#else
-    if (automatic_gtid.sidno == 0) automatic_gtid.sidno = get_server_sidno();
 #endif /* WITH_WSREP */
 
-    /*
-      We need to lock the sidno if locked_sidno wasn't passed as paramenter
-      or the already locked sidno doesn't match the one to generate the new
-      automatic GTID.
-    */
-    bool need_to_lock_sidno =
-        (locked_sidno_was_passed_null || *locked_sidno != automatic_gtid.sidno);
-    if (need_to_lock_sidno) {
-      /*
-        When locked_sidno contains a value greater than zero we must release
-        the current locked sidno. This should not happen with current code, as
-        the server only generates automatic GTIDs with server's UUID as sid.
-      */
-      if (!locked_sidno_was_passed_null && *locked_sidno != 0)
-        unlock_sidno(*locked_sidno);
-      lock_sidno(automatic_gtid.sidno);
-      /* Update the locked_sidno, so the caller would know what to unlock */
-      if (!locked_sidno_was_passed_null) *locked_sidno = automatic_gtid.sidno;
-    }
-
-||||||| merged common ancestors
-
-    if (automatic_gtid.sidno == 0) automatic_gtid.sidno = get_server_sidno();
-
-    /*
-      We need to lock the sidno if locked_sidno wasn't passed as paramenter
-      or the already locked sidno doesn't match the one to generate the new
-      automatic GTID.
-    */
-    bool need_to_lock_sidno =
-        (locked_sidno_was_passed_null || *locked_sidno != automatic_gtid.sidno);
-    if (need_to_lock_sidno) {
-      /*
-        When locked_sidno contains a value greater than zero we must release
-        the current locked sidno. This should not happen with current code, as
-        the server only generates automatic GTIDs with server's UUID as sid.
-      */
-      if (!locked_sidno_was_passed_null && *locked_sidno != 0)
-        unlock_sidno(*locked_sidno);
-      lock_sidno(automatic_gtid.sidno);
-      /* Update the locked_sidno, so the caller would know what to unlock */
-      if (!locked_sidno_was_passed_null) *locked_sidno = automatic_gtid.sidno;
-    }
-
-=======
     assert(specified_sidno > 0);  // assert that sidno has been already assigned
->>>>>>> tag/Percona-Server-8.3.0-1
     if (automatic_gtid.gno == 0) {
       automatic_gtid.gno = get_automatic_gno(automatic_gtid.sidno);
       if (automatic_gtid.gno != -1) {
@@ -1107,7 +1038,7 @@ error:
 #ifdef WITH_WSREP
 void Gtid_state::acquire_anonymous_ownership(THD *thd [[maybe_unused]]) {
   DBUG_TRACE;
-  sid_lock->assert_some_lock();
+  tsid_lock->assert_some_lock();
 
   /* We are allowed to get here only in two cases:
   1. If this is WSREP-enabled thread
@@ -1131,7 +1062,7 @@ void Gtid_state::acquire_anonymous_ownership(THD *thd [[maybe_unused]]) {
 
 void Gtid_state::release_anonymous_ownership(THD *thd [[maybe_unused]]) {
   DBUG_TRACE;
-  sid_lock->assert_some_lock();
+  tsid_lock->assert_some_lock();
 
   /* We are allowed to get here only in two cases:
   1. If this is WSREP-enabled thread

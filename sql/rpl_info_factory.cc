@@ -223,7 +223,18 @@ Relay_log_info *Rpl_info_factory::create_rli(uint rli_option,
     return nullptr;
   }
 
-<<<<<<< HEAD
+  if (rli->set_info_search_keys(handler)) {
+    msg = "Failed to set keys for the applier metadata repository";
+    is_error = true;
+    return nullptr;
+  }
+  rli->set_rpl_info_handler(handler);
+
+  /*
+    By this time, rli must be loaded with it's primary key,
+    which is channel_name
+  */
+
 #ifdef WITH_WSREP
   /* Till MySQL-5.7, all slaves used the global replication filter.
      For now, PXC-8.0 (like Group Replication) will not use any filters,
@@ -238,28 +249,13 @@ Relay_log_info *Rpl_info_factory::create_rli(uint rli_option,
     rpl_filter = rpl_channel_filters.get_channel_filter(channel);
     if (rpl_filter == NULL) {
       LogErr(ERROR_LEVEL, ER_RPL_REPLICA_FILTER_CREATE_FAILED, channel);
-      msg = msg_alloc;
-      goto err;
+      msg = "Failed to get replication filter of a channel.";
+      return nullptr;
     }
     rli->set_filter(rpl_filter);
     rpl_filter->set_attached();
   }
 #else
-||||||| merged common ancestors
-=======
-  if (rli->set_info_search_keys(handler)) {
-    msg = "Failed to set keys for the applier metadata repository";
-    is_error = true;
-    return nullptr;
-  }
-  rli->set_rpl_info_handler(handler);
-
-  /*
-    By this time, rli must be loaded with it's primary key,
-    which is channel_name
-  */
-
->>>>>>> tag/Percona-Server-8.3.0-1
   /* Set filters here to guarantee that any rli object has a valid filter */
   rpl_filter = rpl_channel_filters.get_channel_filter(channel);
   if (rpl_filter == nullptr) {
@@ -270,13 +266,8 @@ Relay_log_info *Rpl_info_factory::create_rli(uint rli_option,
   }
   rli->set_filter(rpl_filter);
   rpl_filter->set_attached();
-<<<<<<< HEAD
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-
-=======
->>>>>>> tag/Percona-Server-8.3.0-1
   return rli;
 }
 

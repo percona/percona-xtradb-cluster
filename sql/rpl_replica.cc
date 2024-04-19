@@ -5258,7 +5258,6 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
                 Transaction_ctx::SESSION)) {
           const char *errmsg;
           /*
-<<<<<<< HEAD
             We were in a transaction which has been rolled back because of a
             temporary error;
             let's seek back to BEGIN log event and retry it all again.
@@ -5271,43 +5270,6 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
             then need the cache to be at position 0 (see comments at beginning
             of init_info()). b) init_relay_log_pos(), because the BEGIN may be
             an older relay log.
-||||||| merged common ancestors
-            The transactions has to be rolled back before
-            load_mi_and_rli_from_repositories is called. Because
-            load_mi_and_rli_from_repositories will starts a new
-            transaction if master_info_repository is TABLE.
-          */
-          rli->cleanup_context(thd, true);
-          /*
-            Temporary error status is both unneeded and harmful for following
-            open-and-lock slave system tables but store its number first for
-            monitoring purposes.
-          */
-          uint temp_trans_errno = thd->get_stmt_da()->mysql_errno();
-          thd->clear_error();
-          applier_reader->close();
-          /*
-             We need to figure out if there is a test case that covers
-             this part. \Alfranio.
-=======
-            The transactions has to be rolled back before
-            load_mi_and_rli_from_repositories is called. Because
-            load_mi_and_rli_from_repositories will start a new
-            transaction.
-          */
-          rli->cleanup_context(thd, true);
-          /*
-            Temporary error status is both unneeded and harmful for following
-            open-and-lock slave system tables but store its number first for
-            monitoring purposes.
-          */
-          uint temp_trans_errno = thd->get_stmt_da()->mysql_errno();
-          thd->clear_error();
-          applier_reader->close();
-          /*
-             We need to figure out if there is a test case that covers
-             this part. \Alfranio.
->>>>>>> tag/Percona-Server-8.3.0-1
           */
           if (rli->trans_retries < slave_trans_retries) {
             /*

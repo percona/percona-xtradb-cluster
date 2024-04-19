@@ -209,8 +209,7 @@ int replace_table_table(THD *thd, GRANT_TABLE *grant_table,
 int replace_routine_table(THD *thd, GRANT_NAME *grant_name, TABLE *table,
                           const LEX_USER &combo, const char *db,
                           const char *routine_name, bool is_proc, ulong rights,
-<<<<<<< HEAD
-                          bool revoke_grant);
+                          bool revoke_grant, bool all_current_privileges);
 #ifdef WITH_WSREP
 int open_grant_tables(THD *thd, Table_ref *tables, bool *transactional_tables,
                       const char *db = WSREP_MYSQL_DB,
@@ -218,13 +217,6 @@ int open_grant_tables(THD *thd, Table_ref *tables, bool *transactional_tables,
 #else
 int open_grant_tables(THD *thd, TABLE_LIST *tables, bool *transactional_tables);
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-                          bool revoke_grant);
-int open_grant_tables(THD *thd, Table_ref *tables, bool *transactional_tables);
-=======
-                          bool revoke_grant, bool all_current_privileges);
-int open_grant_tables(THD *thd, Table_ref *tables, bool *transactional_tables);
->>>>>>> tag/Percona-Server-8.3.0-1
 void acl_tables_setup_for_read(Table_ref *tables);
 
 void acl_print_ha_error(int handler_error);

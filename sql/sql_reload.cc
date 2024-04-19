@@ -422,15 +422,9 @@ bool handle_reload_request(THD *thd, unsigned long options, Table_ref *tables,
       }
     }
   }
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 cleanup:
 #endif /* WITH_WSREP */
-  if (options & REFRESH_HOSTS) hostname_cache_refresh();
-||||||| merged common ancestors
-  if (options & REFRESH_HOSTS) hostname_cache_refresh();
-=======
->>>>>>> tag/Percona-Server-8.3.0-1
   if (thd && (options & REFRESH_STATUS)) refresh_status();
   if (options & REFRESH_SOURCE) {
     assert(thd);
