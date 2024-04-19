@@ -61,8 +61,7 @@ CREATE TABLE non_persisted (name VARCHAR(100) PRIMARY KEY);
 INSERT INTO non_persisted VALUES
   ('gtid_executed'), ('gtid_owned'), ('gtid_purged'), ('log_bin'),
   ('log_bin_basename'), ('log_bin_index'), ('relay_log'), ('relay_log_basename'),
-  ('relay_log_index'), ('relay_log_info_file'), ('replica_load_tmpdir'),
-  ('slave_load_tmpdir'), ('log_bin_use_v1_row_events'),
+  ('relay_log_index'), ('replica_load_tmpdir'), ('slave_load_tmpdir'),
   ('have_backup_safe_binlog_info'), ('replica_enable_event');
 
 CREATE TABLE aliases (
@@ -95,7 +94,13 @@ INSERT INTO aliases(name) VALUES
 # 5. wsrep_replicate_myisam
 # 6. wsrep_restart_replica
 --echo
+<<<<<<< HEAD
 --let $expected = 125
+||||||| merged common ancestors
+--let $expected = 119
+=======
+--let $expected = 114
+>>>>>>> tag/Percona-Server-8.3.0-1
 --let $assert_text = Expect $expected variables in the table.
 --let $assert_cond = [SELECT COUNT(*) as count FROM rplvars, count, 1] = $expected
 --source include/assert.inc
@@ -140,7 +145,13 @@ while ( $varid <= $countvars )
 # 8. wsrep_applier_UK_checks
 # 9. wsrep_applier_FK_checks
 --echo
+<<<<<<< HEAD
 --let $expected = 113
+||||||| merged common ancestors
+--let $expected = 104
+=======
+--let $expected = 101
+>>>>>>> tag/Percona-Server-8.3.0-1
 --let $assert_text = Expect $expected persisted variables in persisted_variables table.
 --let $assert_cond = [SELECT COUNT(*) as count FROM performance_schema.persisted_variables, count, 1] = $expected
 --source include/assert.inc
