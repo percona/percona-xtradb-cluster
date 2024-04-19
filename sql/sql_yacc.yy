@@ -1413,7 +1413,7 @@ void warn_on_deprecated_user_defined_collation(
    Tokens from Percona Server 8.0
 */
 %token<lexer.keyword> EFFECTIVE_SYM 1350
-%token  SEQUENCE_TABLE_SYM 1351
+%token<lexer.keyword> SEQUENCE_TABLE_SYM 1351
 
 /*
   Precedence rules used to resolve the ambiguity when using keywords as idents
@@ -15756,6 +15756,7 @@ ident_keywords_unambiguous:
         | SECONDARY_UNLOAD_SYM
         | SECOND_SYM
         | SECURITY_SYM
+        | SEQUENCE_TABLE_SYM
         | SERIALIZABLE_SYM
         | SERIAL_SYM
         | SERVER_SYM
