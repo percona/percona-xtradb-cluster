@@ -200,7 +200,7 @@ XB_PREV_LTS_REQUIRED_VERSION="8.0.35"
 REQUIRED_DONOR_MYSQL_LTS_VERSION="8.0"
 # ...or to be this previous version (note that it may be LTS as well if this is
 # 1st innovative)
-REQUIRED_DONOR_MYSQL_PREV_VERSION="8.0"
+REQUIRED_DONOR_MYSQL_PREV_VERSION="8.1"
 
 # These files carry some important information in form of GTID of the data
 # that is being backed up.
