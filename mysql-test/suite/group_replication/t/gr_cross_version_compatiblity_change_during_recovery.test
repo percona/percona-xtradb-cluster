@@ -122,14 +122,7 @@ SET @@GLOBAL.group_replication_allow_local_lower_version_join=1;
 --let $rpl_connection_name= server2
 --source include/rpl_connection.inc
 
-<<<<<<< HEAD
---let $assert_text= The super_read_only mode should be 1 on server3.
-||||||| merged common ancestors
-# When server2 joined, server1 was 8.0.34, thence super_read_only was enabled.
 --let $assert_text= The super_read_only mode should be 1 on server2.
-=======
---let $assert_text= The super_read_only mode should be 1 on server2.
->>>>>>> tag/Percona-Server-8.3.0-1
 --let $assert_cond= "[SELECT @@GLOBAL.super_read_only]" = 1;
 --source include/assert.inc
 

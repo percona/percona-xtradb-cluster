@@ -561,6 +561,12 @@ class wsrep_scope_guard {
   std::function<void()> _scope_leave;
 };
 
+
+/**
+ * Should the statement be replicated for the given table.
+ */
+bool wsrep_should_replicate_for_table(Table_ref * table_ref);
+
 /**
  * User/Host components for the PXC internal session user.
  */

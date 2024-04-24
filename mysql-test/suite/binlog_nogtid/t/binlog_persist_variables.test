@@ -73,13 +73,7 @@ INSERT INTO rplvars (varname, varvalue)
 # 9. wsrep_replicate_myisam
 
 --echo
-<<<<<<< HEAD
---let $expected = 128
-||||||| merged common ancestors
---let $expected = 119
-=======
---let $expected = 114
->>>>>>> tag/Percona-Server-8.3.0-1
+--let $expected = 123
 --let $assert_text = Expect $expected variables in the table.
 --let $assert_cond = [SELECT COUNT(*) as count FROM rplvars, count, 1] = $expected
 --source include/assert.inc
@@ -102,13 +96,7 @@ while ( $varid <= $countvars )
 }
 
 --echo
-<<<<<<< HEAD
---let $expected = 101
-||||||| merged common ancestors
---let $expected = 92
-=======
---let $expected = 89
->>>>>>> tag/Percona-Server-8.3.0-1
+--let $expected = 98
 --let $assert_text = Expect $expected persisted variables in persisted_variables table.
 --let $assert_cond = [SELECT COUNT(*) as count FROM performance_schema.persisted_variables, count, 1] = $expected
 --source include/assert.inc

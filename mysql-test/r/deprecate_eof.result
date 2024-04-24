@@ -369,26 +369,14 @@ CLOSE cur1;
 END |
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 101
-||||||| merged common ancestors
--- 98
-=======
--- 97
->>>>>>> tag/Percona-Server-8.3.0-1
+-- 100
 
 CALL cursor1();
 v1
 6
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 115
-||||||| merged common ancestors
--- 112
-=======
--- 111
->>>>>>> tag/Percona-Server-8.3.0-1
+-- 114
 -- transaction_isolation
 -- READ-COMMITTED
 
@@ -413,26 +401,14 @@ CLOSE c2;
 END |
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 116
-||||||| merged common ancestors
--- 113
-=======
--- 112
->>>>>>> tag/Percona-Server-8.3.0-1
+-- 115
 
 CALL cursor2();
 (x+y)
 2
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 123
-||||||| merged common ancestors
--- 120
-=======
--- 119
->>>>>>> tag/Percona-Server-8.3.0-1
+-- 122
 -- transaction_isolation
 -- READ-COMMITTED
 
@@ -444,13 +420,7 @@ session state sent as part of above SELECT
 DROP DATABASE wl7766;
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 125
-||||||| merged common ancestors
--- 122
-=======
--- 121
->>>>>>> tag/Percona-Server-8.3.0-1
+-- 124
 
 -- Tracker : SESSION_TRACK_SCHEMA
 -- 
@@ -464,35 +434,17 @@ SET @@session.session_track_state_change=ON;
 -- session_track_state_change
 -- ON
 -- statement_id
-<<<<<<< HEAD
--- 126
-||||||| merged common ancestors
--- 123
-=======
--- 122
->>>>>>> tag/Percona-Server-8.3.0-1
+-- 125
 
 CREATE DATABASE bug19550875;
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 127
-||||||| merged common ancestors
--- 124
-=======
--- 123
->>>>>>> tag/Percona-Server-8.3.0-1
+-- 126
 
 USE bug19550875;
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 128
-||||||| merged common ancestors
--- 125
-=======
--- 124
->>>>>>> tag/Percona-Server-8.3.0-1
+-- 127
 
 -- Tracker : SESSION_TRACK_SCHEMA
 -- bug19550875
@@ -503,24 +455,12 @@ USE bug19550875;
 CREATE TABLE t1 (a int);
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 129
-||||||| merged common ancestors
--- 126
-=======
--- 125
->>>>>>> tag/Percona-Server-8.3.0-1
+-- 128
 
 INSERT INTO t1 VALUES (1), (2);
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 130
-||||||| merged common ancestors
--- 127
-=======
--- 126
->>>>>>> tag/Percona-Server-8.3.0-1
+-- 129
 
 CREATE PROCEDURE t_cache()
 BEGIN
@@ -533,13 +473,7 @@ SELECT * FROM t1;
 END |
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 131
-||||||| merged common ancestors
--- 128
-=======
--- 127
->>>>>>> tag/Percona-Server-8.3.0-1
+-- 130
 
 CALL t_cache();
 a
@@ -547,13 +481,7 @@ a
 2
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 134
-||||||| merged common ancestors
--- 131
-=======
--- 130
->>>>>>> tag/Percona-Server-8.3.0-1
+-- 133
 
 -- Tracker : SESSION_TRACK_STATE_CHANGE
 -- 1
@@ -577,13 +505,7 @@ SELECT * FROM t1 ORDER BY 1;
 END |
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 139
-||||||| merged common ancestors
--- 136
-=======
--- 135
->>>>>>> tag/Percona-Server-8.3.0-1
+-- 138
 
 CREATE PROCEDURE sel_with_no_session()
 BEGIN
@@ -591,25 +513,13 @@ SELECT * FROM t1 ORDER BY 1;
 END |
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 140
-||||||| merged common ancestors
--- 137
-=======
--- 136
->>>>>>> tag/Percona-Server-8.3.0-1
+-- 139
 
 #cleanup
 DROP DATABASE bug19550875;
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 141
-||||||| merged common ancestors
--- 138
-=======
--- 137
->>>>>>> tag/Percona-Server-8.3.0-1
+-- 140
 
 -- Tracker : SESSION_TRACK_SCHEMA
 -- 

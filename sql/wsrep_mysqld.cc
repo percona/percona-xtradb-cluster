@@ -3366,3 +3366,22 @@ bool wsrep_rotate_master_key() {
   wsrep::provider &provider = Wsrep_server_state::instance().provider();
   return (wsrep::provider::status::success != provider.rotate_gcache_key());
 }
+
+bool wsrep_should_replicate_for_table(Table_ref * table_ref) {
+  if (!table_ref) return false;
+
+  if (!is_perfschema_db(table_ref->db)) {
+    return true;
+  } else {
+    // This is P_S table.
+    if (!my_strcasecmp(system_charset_info, "host_cache", table_ref->table_name)) {
+      return true;
+    }
+    // skip all other P_S tables
+    return false;
+  }
+
+  //should never get here
+  assert(0);
+  return false;
+}

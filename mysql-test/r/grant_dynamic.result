@@ -51,6 +51,7 @@ mysql.pxc.internal.session	localhost	SYSTEM_USER	Y
 mysql.pxc.internal.session	localhost	SYSTEM_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
+mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
@@ -151,6 +152,7 @@ mysql.pxc.internal.session	localhost	SYSTEM_USER	Y
 mysql.pxc.internal.session	localhost	SYSTEM_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
+mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
@@ -250,6 +252,7 @@ mysql.pxc.internal.session	localhost	SYSTEM_USER	Y
 mysql.pxc.internal.session	localhost	SYSTEM_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
+mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
@@ -362,6 +365,7 @@ mysql.pxc.internal.session	localhost	SYSTEM_USER	Y
 mysql.pxc.internal.session	localhost	SYSTEM_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
+mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
@@ -466,6 +470,7 @@ mysql.pxc.internal.session	localhost	SYSTEM_USER	Y
 mysql.pxc.internal.session	localhost	SYSTEM_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
+mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
@@ -565,6 +570,7 @@ mysql.pxc.internal.session	localhost	SYSTEM_USER	Y
 mysql.pxc.internal.session	localhost	SYSTEM_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
+mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
@@ -687,6 +693,7 @@ mysql.pxc.internal.session	localhost	SYSTEM_USER	Y
 mysql.pxc.internal.session	localhost	SYSTEM_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
+mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
@@ -800,6 +807,7 @@ mysql.pxc.internal.session	localhost	SYSTEM_USER	Y
 mysql.pxc.internal.session	localhost	SYSTEM_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
+mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
@@ -921,6 +929,7 @@ mysql.pxc.internal.session	localhost	SYSTEM_USER	Y
 mysql.pxc.internal.session	localhost	SYSTEM_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
+mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N

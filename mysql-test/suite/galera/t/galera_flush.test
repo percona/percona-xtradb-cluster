@@ -17,13 +17,13 @@ DROP TABLE IF EXISTS t1, t2;
 
 #-------------------------------------------------------------------------------
 #
-# Test: FLUSH HOSTS
+# Test: FLUSH HOSTS is deprecated. Use TRUNCATE TABLE performance_schema.host_cache instead.
 #
 --connection node_2
 --let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
 --connection node_1
-FLUSH HOSTS;
+TRUNCATE TABLE performance_schema.host_cache;
 
 --connection node_2
 --let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
