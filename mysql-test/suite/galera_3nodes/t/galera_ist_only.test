@@ -106,8 +106,8 @@ INSERT INTO t1 VALUES (10);
 # prepare the donor with empty GCache
 --connection node_3
 --source include/shutdown_mysqld.inc
---let $restart_parameters = "restart: --wsrep_provider_options='base_port=$NODE_GALERAPORT_3;gcache.size=0;gcache.page_size=16k'"
 --remove_file $MYSQLTEST_VARDIR/mysqld.3/data/galera.cache
+--let $restart_parameters = "restart: --wsrep_provider_options='base_port=$NODE_GALERAPORT_3;gcache.size=0;gcache.page_size=16k'"
 --let $do_not_echo_parameters = 1
 --source include/start_mysqld.inc
 --source include/galera_wait_ready.inc
