@@ -346,6 +346,8 @@ install_deps() {
             else
                 #wget https://jenkins.percona.com/yum-repo/percona-dev.repo
                 #mv -vf percona-dev.repo /etc/yum.repos.d
+                wget https://downloads.percona.com/downloads/packaging/python2-scons-3.0.1-9.el8.noarch.rpm
+                yum -y install ./python2-scons-3.0.1-9.el8.noarch.rpm || true
                 yum -y clean all
                 yum -y install libtirpc-devel
                 yum -y install perl-Dig
