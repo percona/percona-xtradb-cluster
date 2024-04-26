@@ -21,9 +21,7 @@ SET DEBUG_SYNC= 'now SIGNAL continue';
 [connection node_2]
 [connection node_1]
 SET DEBUG_SYNC='RESET';
-FLUSH HOSTS;
-Warnings:
-Warning	1287	'FLUSH HOSTS' is deprecated and will be removed in a future release. Please use TRUNCATE TABLE performance_schema.host_cache instead
+TRUNCATE TABLE performance_schema.host_cache;
 SET GLOBAL super_read_only=0;
 CREATE USER 'user1'@'localhost' IDENTIFIED BY 'pass1';
 SET GLOBAL super_read_only=1;
