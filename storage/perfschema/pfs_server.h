@@ -55,7 +55,18 @@
 #define PFS_AUTOSIZE_VALUE (-1)
 
 #ifndef PFS_MAX_MUTEX_CLASS
-#define PFS_MAX_MUTEX_CLASS 350
+#ifdef WITH_WSREP
+/**
+   Max value for PXC builds.
+   WSREP patch defines 39 additional PSI_mutex_key keys:
+   key_COND_galera_* => 24
+   key_COND_wsrep_* => 15
+   Let's keep PFS_MAX_MUTEX_CLASS always bigger by this number.
+*/
+#define PFS_WSREP_MUTEX_CLASS 39
+#define PFS_MAX_MUTEX_CLASS (350 + PFS_WSREP_MUTEX_CLASS)
+#else
+#endif /* WITH WSREP */ /* PFS_MAX_MUTEX_CLASS */
 #endif
 #ifndef PFS_MAX_RWLOCK_CLASS
 #define PFS_MAX_RWLOCK_CLASS 100
@@ -73,7 +84,7 @@
 #define PFS_MAX_COND_CLASS (150 + PFS_WSREP_COND_CLASS)
 #else
 #define PFS_MAX_COND_CLASS 150
-#endif /* WITH_WSREP */
+#endif /* WITH_WSREP */ /* PFS_MAX_COND_CLASS */
 
 #endif
 #ifndef PFS_MAX_THREAD_CLASS
