@@ -71,6 +71,12 @@ ENABLE_ASAN=0
 # build comment
 BUILD_COMMENT=""
 
+if [ -f /etc/redhat-release ]; then
+    RHEL=$(rpm --eval %rhel)
+else
+    RHEL="0"
+fi
+
 #-------------------------------------------------------------------------------
 #
 # Step-1: Set default configuration.
@@ -404,6 +410,12 @@ fi
     cd "$TARGETDIR/bld"
     echo "$(pwd)"
 
+    if [ "x$RHEL" = "x7" ]; then
+        add_fido_plugin="none"
+    else
+        add_fido_plugin="bundled"
+    fi
+
     if [[ $CMAKE_BUILD_TYPE == 'Debug' ]]; then
         cmake $SOURCEDIR/ ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
             -DCMAKE_BUILD_TYPE=Debug \
@@ -426,7 +438,7 @@ fi
             -DWITH_EDITLINE=bundled \
             -DWITH_ZLIB=bundled \
             -DWITH_ZSTD=bundled \
-            -DWITH_FIDO=bundled \
+            -DWITH_FIDO="$add_fido_plugin" \
             -DWITH_NUMA=ON \
             -DWITH_LDAP=system \
             -DWITH_BOOST="$TARGETDIR/libboost" \
@@ -464,7 +476,7 @@ fi
             -DWITH_LIBEVENT=bundled \
             -DWITH_ZLIB=bundled \
             -DWITH_ZSTD=bundled \
-            -DWITH_FIDO=bundled \
+            -DWITH_FIDO="$add_fido_plugin" \
             -DWITH_NUMA=ON \
             -DWITH_LDAP=system \
             -DWITH_BOOST="$TARGETDIR/libboost" \
@@ -501,6 +513,37 @@ fi
     fi
 
     # Extract the Percona Xtrabackup binaries
+    # Look for the pxb 8.2 tarball
+    (
+        cd "$TARGETDIR"
+        pxb_tar=$(ls -1td percona-xtrabackup-8.2.* | grep ".tar" | sort --version-sort | tail -n1)
+        if [[ -z $pxb_tar ]]; then
+            echo "Could not find percona-xtrabackup-8.2 tarball in $TARGETDIR.  Terminating."
+            exit 1
+        fi
+        # Remove the .tar.gz extension
+        pxb_basename=${pxb_tar%.tar*}
+        # Pull the name (up-to-the x86_64 part
+        if [[ $pxb_basename =~ x86_64 ]]; then
+            pxb_basename="${pxb_basename%x86_64*}x86_64"
+        fi
+        pxb_dir="pxb-8.2"
+
+        mkdir -p pxc_extra
+        cd pxc_extra
+        if [[ -d ${pxb_basename} ]]; then
+            echo "Using existing pxb 8.2 directory : ${pxb_basename}"
+        else
+            echo "Removing existing percona-xtrabackup-8.2 basedir (if found)"
+            find . -maxdepth 1 -type d -name 'percona-xtrabackup-8.*' -exec rm -rf {} \+
+
+            echo "Extracting pxb 8.2 tarball"
+            tar -xzf "../$pxb_tar"
+        fi
+        echo "Creating symlink $pxb_dir --> $pxb_basename"
+        rm -f pxb-8.2
+        ln -s ./${pxb_basename} pxb-8.2
+    ) || exit 1
     # Look for the pxb 8.1 tarball
     (
         cd "$TARGETDIR"
@@ -533,6 +576,7 @@ fi
         ln -s ./${pxb_basename} pxb-8.1
     ) || exit 1
 
+    # Look for the pxb 8.0 tarball
     (
         cd "$TARGETDIR"
         pxb_tar=$(ls -1td percona-xtrabackup-8.0.* | grep ".tar" | sort --version-sort | tail -n1)
@@ -566,6 +610,10 @@ fi
 
     # Only copy over the bin and lib portions of the xtrabackup packages
     # Test cases and other files are not copied
+    mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-8.2"
+    (cp -v -r $TARGETDIR/pxc_extra/pxb-8.2/bin/  $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-8.2) || true
+    (cp -v -r $TARGETDIR/pxc_extra/pxb-8.2/lib/  $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-8.2) || true
+
     mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-8.1"
     (cp -v -r $TARGETDIR/pxc_extra/pxb-8.1/bin/  $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-8.1) || true
     (cp -v -r $TARGETDIR/pxc_extra/pxb-8.1/lib/  $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-8.1) || true
@@ -579,7 +627,7 @@ fi
 # Patch needed libraries
 (
     LIBLIST="libnuma.so libgssapi.so libldap_r-2.4.so.2 liblber-2.4.so.2 libaio.so libprocps.so libcrypto.so libssl.so libgcrypt.so libtinfo.so libsasl2.so libbrotlidec.so libbrotlicommon.so librtmp.so libfreebl3.so libssl3.so libsmime3.so libnss3.so libnssutil3.so libplds4.so libplc4.so libnspr4.so libtirpc.so libncurses.so.5 libboost_program_options"
-    DIRLIST="bin bin/pxc_extra/pxb-8.0/bin bin/pxc_extra/pxb-8.1/bin lib bin/pxc_extra/pxb-8.0/lib/plugin bin/pxc_extra/pxb-8.1/lib/plugin lib/private lib/plugin lib/mysqlrouter/plugin lib/mysqlrouter/private"
+    DIRLIST="bin bin/pxc_extra/pxb-8.0/bin bin/pxc_extra/pxb-8.1/bin bin/pxc_extra/pxb-8.2/bin lib bin/pxc_extra/pxb-8.0/lib/plugin bin/pxc_extra/pxb-8.1/lib/plugin bin/pxc_extra/pxb-8.2/lib/plugin lib/private lib/plugin lib/mysqlrouter/plugin lib/mysqlrouter/private"
 
     LIBPATH=""
     OVERRIDE=false
@@ -674,9 +722,11 @@ fi
         set_runpath bin '$ORIGIN/../lib/private/'
         set_runpath bin/pxc_extra/pxb-8.0/bin '$ORIGIN/../../../../lib/private/'
         set_runpath bin/pxc_extra/pxb-8.1/bin '$ORIGIN/../../../../lib/private/'
+        set_runpath bin/pxc_extra/pxb-8.2/bin '$ORIGIN/../../../../lib/private/'
         set_runpath lib '$ORIGIN/private/'
         set_runpath bin/pxc_extra/pxb-8.0/lib/plugin '$ORIGIN/../../../../../lib/private/'
         set_runpath bin/pxc_extra/pxb-8.1/lib/plugin '$ORIGIN/../../../../../lib/private/'
+        set_runpath bin/pxc_extra/pxb-8.2/lib/plugin '$ORIGIN/../../../../../lib/private/'
         set_runpath lib/plugin '$ORIGIN/../private/'
         set_runpath lib/private '$ORIGIN'
         #  LIBS MYSQLROUTER
@@ -692,6 +742,8 @@ fi
         unset override && export override=true && set_runpath bin/pxc_extra/pxb-8.0/bin/xtrabackup-debug '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'
         unset override && export override=true && set_runpath bin/pxc_extra/pxb-8.1/bin/xtrabackup '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'
         unset override && export override=true && set_runpath bin/pxc_extra/pxb-8.1/bin/xtrabackup-debug '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'
+        unset override && export override=true && set_runpath bin/pxc_extra/pxb-8.2/bin/xtrabackup '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'
+        unset override && export override=true && set_runpath bin/pxc_extra/pxb-8.2/bin/xtrabackup-debug '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'
 
         # Replace libs
         for DIR in ${DIRLIST}; do

@@ -95,7 +95,11 @@ bool set_gtid_next(THD *thd, const Gtid_specification &spec) {
       thd->variables.gtid_next.set_anonymous();
       thd->owned_gtid.sidno = THD::OWNED_SIDNO_ANONYMOUS;
       thd->owned_gtid.gno = 0;
+#ifdef WITH_WSREP
+      gtid_state->acquire_anonymous_ownership(thd);
+#else
       gtid_state->acquire_anonymous_ownership();
+#endif
       break;
 
     case ASSIGNED_GTID:

@@ -11,7 +11,7 @@ call mtr.add_suppression('Message of size 4294967040 received, exceeding the lim
 # wait a little to give time for internal temporary session to die out
 select sleep(1);
 --replace_regex /localhost[:0-9]*/localhost/ /Execute/Query/
-SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM INFORMATION_SCHEMA.PROCESSLIST WHERE `state` != 'cleaning up' ORDER BY `user`, `state`;
+SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM performance_schema.processlist WHERE `state` != 'cleaning up' ORDER BY `user`, `state`;
 
 ## Test starts here
 ## Due to Windows OS TCP stack characteristics, the client should not queue anything after the message that is closing the session.
@@ -51,7 +51,7 @@ select sleep(1);
 show global status like 'mysqlx_sessions';
 show global status like 'mysqlx_connections_%';
 --replace_regex /localhost[:0-9]*/localhost/ /Execute/Query/
-SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM INFORMATION_SCHEMA.PROCESSLIST WHERE `state` != 'cleaning up' ORDER BY `user`, `state`;
+SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM performance_schema.processlist WHERE `state` != 'cleaning up' ORDER BY `user`, `state`;
 
 ## Cleanup
 --remove_file $MYSQL_TMP_DIR/client_close_abort.tmp

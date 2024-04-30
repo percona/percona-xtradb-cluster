@@ -98,12 +98,6 @@ TARGET_LINK_LIBRARIES(gunit_small
 TARGET_LINK_LIBRARIES(gunit_large
   ${GTEST_LIBRARIES} ${UNITTEST_JEMALLOC_LIB} extra::rapidjson)
 
-IF(WIN32)
-  ## Create an object library of nt_servc.cc, so we don't have to
-  ## compile it again for each target
-  ADD_LIBRARY(my_nt_servc OBJECT ../../sql/nt_servc.cc)
-ENDIF()
-
 # Add some defines.
 ADD_DEFINITIONS(-DMYSQL_SERVER -DEXTRA_CODE_FOR_UNIT_TESTING)
 ADD_DEFINITIONS(-DERRMSG_DIR="${PROJECT_BINARY_DIR}/share")
@@ -307,7 +301,7 @@ SET(SERVER_TESTS
   log_event_status_size
 )
 
-IF(MY_COMPILER_IS_GNU AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 12)
+IF(MY_COMPILER_IS_GNU AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 12)
   ADD_COMPILE_FLAGS(regexp_engine-t.cc COMPILE_FLAGS "-Wno-restrict")
 ENDIF()
 
@@ -328,7 +322,7 @@ ENDIF()
 
 # Avoid 'requires dynamic R_X86_64_PC32 reloc' linker error for dd_sdi-t.cc
 # when built with ASAN
-IF(WITH_ASAN)
+IF(WITH_ASAN OR WITH_VALGRIND)
   ADD_CXX_COMPILE_FLAGS_TO_FILES(-fPIC FILES dd_sdi-t.cc)
 ENDIF()
 
@@ -368,9 +362,6 @@ MYSQL_ADD_EXECUTABLE(merge_small_tests-t ${ALL_SMALL_TESTS}
   LINK_LIBRARIES sqlgunitlib gunit_small extra::rapidjson
   )
 
-IF(WIN32)
-  LIST(APPEND ALL_LARGE_TESTS ../../sql/nt_servc.cc)
-ENDIF()
 LIST(APPEND ALL_LARGE_TESTS ../../storage/example/ha_example.cc)
 
 MYSQL_ADD_EXECUTABLE(merge_large_tests-t ${ALL_LARGE_TESTS}
@@ -404,9 +395,6 @@ ADD_COMPILE_FLAGS(
 
 FOREACH(test ${SERVER_TESTS})
   SET(SRC_FILES ${test}-t.cc)
-  IF(WIN32)
-    LIST(APPEND SRC_FILES $<TARGET_OBJECTS:my_nt_servc>)
-  ENDIF()
   IF(test MATCHES "table_cache")
     LIST(APPEND SRC_FILES ../../storage/example/ha_example.cc)
   ENDIF()

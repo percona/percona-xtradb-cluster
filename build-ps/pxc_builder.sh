@@ -252,7 +252,7 @@ get_sources(){
     cd ${WORKDIR} || exit
     #
     pushd ${PXCDIR}
-        sed -i 's:boostorg\.jfrog\.io/artifactory/main/release/.*/source:jenkins.percona.com/downloads/boost:g' cmake/boost.cmake
+        sed -i 's:boostorg\.jfrog\.io/artifactory/main/release/.*/source:downloads.percona.com/downloads/packaging/boost:g' cmake/boost.cmake
     popd
     #
     tar --owner=0 --group=0 --exclude=.bzr --exclude=.git -czf ${PXCDIR}.tar.gz ${PXCDIR}
@@ -313,9 +313,6 @@ install_deps() {
         yum install -y perl
         yum install -y https://repo.percona.com/yum/percona-release-latest.noarch.rpm
         percona-release enable tools testing
-        if [ "${RHEL}" -lt 9 ]; then
-            add_percona_yum_repo
-        fi
         if [ "x$RHEL" = "x8" -o "x$RHEL" = "x9" ]; then
             yum -y install dnf-plugins-core epel-release
             yum config-manager --set-enabled powertools
@@ -344,8 +341,8 @@ install_deps() {
                 yum -y install scons pip python3-devel
                 pip install --user typing pyyaml regex Cheetah3
             else
-                wget https://jenkins.percona.com/yum-repo/percona-dev.repo
-                mv -vf percona-dev.repo /etc/yum.repos.d
+                wget https://downloads.percona.com/downloads/packaging/python2-scons-3.0.1-9.el8.noarch.rpm
+                yum -y install ./python2-scons-3.0.1-9.el8.noarch.rpm || true
                 yum -y clean all
                 yum -y install libtirpc-devel
                 yum -y install perl-Dig
@@ -428,9 +425,9 @@ install_deps() {
         # (1) PXB compatible with previous PXC LTS version
         percona-release enable pxb-80 release
         # (2) PXB compatible with previous PXC version (note: it may be LTS as well)
-        percona-release enable pxb-80 release
+        percona-release enable pxc-8x-innovation release
         # (3) PXB compatible with this PXC version (LTS or Innovative)
-        percona-release enable pxb-81 release
+        percona-release enable pxc-8x-innovation release
         
         export DEBIAN_FRONTEND="noninteractive"
         export DIST="$(lsb_release -sc)"
@@ -458,16 +455,26 @@ install_deps() {
         fi
         if [ x"${DIST}" = xbionic ]; then
             apt-get -y install gcc-8 g++-8
-            wget http://jenkins.percona.com/downloads/libfido2-1/libcbor0.6_0.6.0-0ubuntu1_amd64.deb
-            wget http://jenkins.percona.com/downloads/libfido2-1/libfido2-1_1.3.1-1ubuntu2_amd64.deb
+            wget https://downloads.percona.com/downloads/packaging/libfido2-1/libcbor0.6_0.6.0-0ubuntu1_amd64.deb
+            wget https://downloads.percona.com/downloads/packaging/libfido2-1/libfido2-1_1.3.1-1ubuntu2_amd64.deb
             dpkg -i libcbor0.6_0.6.0-0ubuntu1_amd64.deb
             dpkg -i libfido2-1_1.3.1-1ubuntu2_amd64.deb
         fi
         if [ x"${DIST}" = xbuster ]; then
-            wget http://jenkins.percona.com/downloads/libfido2-1/libfido2-1_1.5.0-2~bpo10+1_amd64.deb
-            wget http://jenkins.percona.com/downloads/libfido2-1/libcbor0_0.5.0+dfsg-2_amd64.deb
+            wget https://downloads.percona.com/downloads/packaging/libfido2-1/libfido2-1_1.5.0-2~bpo10+1_amd64.deb
+            wget https://downloads.percona.com/downloads/packaging/libfido2-1/libcbor0_0.5.0+dfsg-2_amd64.deb
             dpkg -i libcbor0_0.5.0+dfsg-2_amd64.deb
             dpkg -i libfido2-1_1.5.0-2~bpo10+1_amd64.deb
+            echo "deb http://deb.debian.org/debian buster-backports main" >> /etc/apt/sources.list
+            apt update
+            apt -y install cmake/buster-backports
+        fi
+        if [ x"${DIST}" = xfocal ]; then
+            apt-get -y install gcc-10 g++-10
+            update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 100
+            update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 100
+            update-alternatives --config gcc
+            update-alternatives --config g++
         fi
         apt-get -y install libmecab2 mecab mecab-ipadic
         apt-get -y install build-essential devscripts
@@ -475,8 +482,9 @@ install_deps() {
         apt-get -y install libtool libnuma-dev scons libboost-dev libboost-program-options-dev check
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
-        apt-get -y install --download-only percona-xtrabackup-80=8.0.34-29-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-80=8.0.35-30-1.${DIST}
         apt-get -y install --download-only percona-xtrabackup-81=8.1.0-1-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-82=8.2.0-1-1.${DIST}
     fi
     return;
 }
@@ -617,7 +625,7 @@ build_srpm(){
 
 build_mecab_lib(){
     MECAB_TARBAL="mecab-0.996.tar.gz"
-    MECAB_LINK="http://jenkins.percona.com/downloads/mecab/${MECAB_TARBAL}"
+    MECAB_LINK="https://downloads.percona.com/downloads/packaging/mecab/${MECAB_TARBAL}"
     MECAB_DIR="${WORKDIR}/${MECAB_TARBAL%.tar.gz}"
     MECAB_INSTALL_DIR="${WORKDIR}/mecab-install"
     rm -f ${MECAB_TARBAL}
@@ -636,7 +644,7 @@ build_mecab_lib(){
 
 build_mecab_dict(){
     MECAB_IPADIC_TARBAL="mecab-ipadic-2.7.0-20070801.tar.gz"
-    MECAB_IPADIC_LINK="http://jenkins.percona.com/downloads/mecab/${MECAB_IPADIC_TARBAL}"
+    MECAB_IPADIC_LINK="https://downloads.percona.com/downloads/packaging/mecab/${MECAB_IPADIC_TARBAL}"
     MECAB_IPADIC_DIR="${WORKDIR}/${MECAB_IPADIC_TARBAL%.tar.gz}"
     rm -f ${MECAB_IPADIC_TARBAL}
     rm -rf ${MECAB_IPADIC_DIR}
@@ -859,21 +867,29 @@ build_deb(){
     # (1) PXB compatible with previous PXC LTS version
     mkdir -p pxb-8.0
     # (2) PXB compatible with previous PXC version (note: it may be LTS as well)
-    mkdir -p pxb-8.0
-    # (3) PXB compatible with this PXC version (LTS or Innovative)
     mkdir -p pxb-8.1
+    # (3) PXB compatible with this PXC version (LTS or Innovative)
+    mkdir -p pxb-8.2
 
 
-    #  (1), (2)
     dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-80* pxb-8.0
     dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-81* pxb-8.1
+    dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-82* pxb-8.2
+
+    #  (1)
     cd pxb-8.0 || exit
         mv usr/bin ./
         mv usr/lib* ./
         rm -rf usr *.deb DEBIAN
 
-    # (3)
+    # (2)
     cd ../pxb-8.1 || exit
+        mv usr/bin ./
+        mv usr/lib* ./
+        rm -rf usr *.deb DEBIAN
+
+    # (3)
+    cd ../pxb-8.2 || exit
         mv usr/bin ./
         mv usr/lib* ./
         rm -rf usr *.deb DEBIAN
@@ -983,7 +999,7 @@ build_tarball(){
     CURDIR=$(pwd)
     cd ${BUILD_ROOT} || exit
     if [ -f /etc/redhat-release ]; then
-        # (1), (2)
+        # (1)
         mkdir pxb-8.0
         pushd pxb-8.0
         yumdownloader percona-xtrabackup-80-8.0.35
@@ -998,10 +1014,25 @@ build_tarball(){
         rm -f *.rpm
         popd
 
-        # (3)
+        # (2)
         mkdir pxb-8.1
         pushd pxb-8.1
         yumdownloader percona-xtrabackup-81-8.1.0
+        rpm2cpio *.rpm | cpio --extract --make-directories --verbose
+        mv usr/bin ./
+        mv usr/lib64 ./
+        mv lib64 lib
+        mv usr/lib/private lib/
+        mv lib/xtrabackup/* lib/
+        rm -rf lib/xtrabackup
+        rm -rf usr
+        rm -f *.rpm
+        popd
+
+        # (3)
+        mkdir pxb-8.2
+        pushd pxb-8.2
+        yumdownloader percona-xtrabackup-82-8.2.0
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
         mv usr/bin ./
         mv usr/lib* ./
@@ -1014,20 +1045,31 @@ build_tarball(){
 
         tar -zcvf  percona-xtrabackup-8.0.tar.gz pxb-8.0
         tar -zcvf  percona-xtrabackup-8.1.tar.gz pxb-8.1
+        tar -zcvf  percona-xtrabackup-8.2.tar.gz pxb-8.2
     else
         mkdir pxb-8.0
         mkdir pxb-8.1
+        mkdir pxb-8.2
         dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-80* pxb-8.0
         dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-81* pxb-8.1
+        dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-82* pxb-8.2
         
-        # (1), (2)
+        # (1)
         pushd pxb-8.0
             mv usr/bin ./
             mv usr/lib* ./
             rm -rf usr *.deb DEBIAN
         popd
-        # (3)
+
+        # (2)
         pushd pxb-8.1
+            mv usr/bin ./
+            mv usr/lib* ./
+            rm -rf usr *.deb DEBIAN
+        popd
+
+        # (3)
+        pushd pxb-8.2
             mv usr/bin ./
             mv usr/lib* ./
             rm -rf usr *.deb DEBIAN
@@ -1035,11 +1077,12 @@ build_tarball(){
         
         tar -zcvf  percona-xtrabackup-8.0.tar.gz pxb-8.0
         tar -zcvf  percona-xtrabackup-8.1.tar.gz pxb-8.1
+        tar -zcvf  percona-xtrabackup-8.2.tar.gz pxb-8.2
     fi
     mkdir -p ${BUILD_ROOT}/target/pxc_extra/
     cp *.tar.gz ${BUILD_ROOT}/target/pxc_extra/
     cp *.tar.gz ${BUILD_ROOT}/target
-    rm -rf pxb-8.0 pxb-8.1
+    rm -rf pxb-8.0 pxb-8.1 pxb-8.2
     cd ${CURDIR} || exit
     rm -rf jemalloc
     wget https://github.com/jemalloc/jemalloc/releases/download/$JVERSION/jemalloc-$JVERSION.tar.bz2

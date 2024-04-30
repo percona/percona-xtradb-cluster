@@ -121,11 +121,11 @@ set session wsrep_on = TRUE;
 drop table t1;
 #node-1
 SET SESSION wsrep_on=OFF;
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 SET SESSION wsrep_on=ON;
 #node-2
 SET SESSION wsrep_on=OFF;
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 SET SESSION wsrep_on=ON;
 #node-1
 create table t (i int, primary key pk(i)) engine=innodb;

@@ -19,10 +19,10 @@ CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
 --connection node_2
 --let $wait_condition = SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 --source include/wait_condition.inc
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 
 --connection node_1
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 
 --let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
 
@@ -56,10 +56,10 @@ close FILE;
 EOF
 
 --connection node_1
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 
 --connection node_2
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 
 --connection node_1
 --let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
@@ -119,7 +119,7 @@ print FILE "1\n";
 close FILE;
 EOF
 
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 
 --let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
 

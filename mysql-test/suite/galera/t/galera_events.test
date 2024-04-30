@@ -8,21 +8,21 @@
 --let $event_scheduler_orig = `SELECT @@event_scheduler;`
 
 #
-# Events arrive on slave as SLAVESIDE_DISABLED
+# Events arrive on slave as DISABLED_ON_REPLICA
 #
 
 --connection node_1
 CREATE EVENT event1 ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 HOUR DO SELECT 1;
 
 --connection node_2
-SELECT DEFINER= 'root@localhost', ORIGINATOR = 1, STATUS = 'SLAVESIDE_DISABLED', EVENT_TYPE = 'ONE TIME', ON_COMPLETION = 'NOT PRESERVE' FROM INFORMATION_SCHEMA.EVENTS WHERE EVENT_NAME = 'event1';
+SELECT DEFINER= 'root@localhost', ORIGINATOR = 1, STATUS = 'DISABLED_ON_REPLICA', EVENT_TYPE = 'ONE TIME', ON_COMPLETION = 'NOT PRESERVE' FROM INFORMATION_SCHEMA.EVENTS WHERE EVENT_NAME = 'event1';
 
 --connection node_1
 ALTER EVENT event1 DISABLE;
 
 --connection node_2
-# The definition on node 2 should still say SLAVESIDE_DISABLED
-SELECT DEFINER= 'root@localhost', ORIGINATOR = 1, STATUS = 'SLAVESIDE_DISABLED', EVENT_TYPE = 'ONE TIME', ON_COMPLETION = 'NOT PRESERVE' FROM INFORMATION_SCHEMA.EVENTS WHERE EVENT_NAME = 'event1';
+# The definition on node 2 should still say DISABLED_ON_REPLICA
+SELECT DEFINER= 'root@localhost', ORIGINATOR = 1, STATUS = 'DISABLED_ON_REPLICA', EVENT_TYPE = 'ONE TIME', ON_COMPLETION = 'NOT PRESERVE' FROM INFORMATION_SCHEMA.EVENTS WHERE EVENT_NAME = 'event1';
 
 #
 # Expired event should be dropped from the slave

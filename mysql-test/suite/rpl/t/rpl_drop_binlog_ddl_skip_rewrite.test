@@ -193,7 +193,7 @@ SET binlog_ddl_skip_rewrite = OFF;
 # Clear all binary logs on replica server.
 --source include/rpl_connection_slave.inc
 --source include/stop_slave.inc
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 --source include/start_slave.inc
 
 --echo # Perform the replay.

@@ -100,4 +100,4 @@ CALL mtr.add_suppression("Worker 1 failed executing transaction");
 CALL mtr.add_suppression("The replica coordinator and worker threads are stopped, possibly leaving data in inconsistent state");
 
 --connection node_1
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;

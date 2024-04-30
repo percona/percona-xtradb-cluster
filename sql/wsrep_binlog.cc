@@ -447,12 +447,12 @@ void wsrep_wait_for_turn_in_group_commit(THD *thd) {
 
   }
 
-  MUTEX_LOCK(guard, &LOCK_wsrep_group_commit);
-
   if (!thd->wsrep_enforce_group_commit) {
     /* Said handler was not register for wsrep group commit */
     return;
   }
+
+  MUTEX_LOCK(guard, &LOCK_wsrep_group_commit);
 
   while (true) {
     if (thd == wsrep_group_commit_queue.front()) {
@@ -481,12 +481,12 @@ void wsrep_unregister_from_group_commit(THD *thd) {
     return;
   }
 
-  MUTEX_LOCK(guard, &LOCK_wsrep_group_commit);
-
   if (!thd->wsrep_enforce_group_commit) {
     /* Said handler was not register for wsrep group commit */
     return;
   }
+
+  MUTEX_LOCK(guard, &LOCK_wsrep_group_commit);
 
   thd->wsrep_enforce_group_commit = false;
   assert(wsrep_group_commit_queue.front() == thd);

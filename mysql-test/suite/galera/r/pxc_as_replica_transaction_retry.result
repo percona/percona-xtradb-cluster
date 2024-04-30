@@ -40,7 +40,7 @@ ROLLBACK;
 # 6. Cleanup
 # connection node_1
 DROP TABLE t1;
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 # connection node_2
 SET GLOBAL innodb_lock_wait_timeout = @saved_innodb_lock_wait_timeout;
 SET GLOBAL replica_transaction_retries = @saved_replica_transaction_retries;

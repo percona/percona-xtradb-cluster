@@ -235,7 +235,7 @@ RESET SLAVE ALL;
 --connection node_1
 --echo #node-1 (independent master)
 set session wsrep_on=off;
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 set session wsrep_on=on;
 
 --connection node_4
@@ -248,6 +248,6 @@ RESET SLAVE ALL;
 --connection node_3
 --echo #node-3 (galera-cluster-node-2 that act as master to independent slave)
 set session wsrep_on=off;
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 set session wsrep_on=on;
 

@@ -1,6 +1,6 @@
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 SET wsrep_on=OFF;
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 SET wsrep_on=ON;
 Warnings:
 Warning	1287	'CHANGE MASTER' is deprecated and will be removed in a future release. Please use CHANGE REPLICATION SOURCE instead
@@ -38,9 +38,9 @@ RESET REPLICA ALL;
 INSERT INTO galera_replicated_db.t1 VALUES (4);
 DROP TABLE galera_replicated_db.t1;
 DROP DATABASE galera_replicated_db;
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 SET wsrep_on=OFF;
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 SET wsrep_on=ON;
 Warnings:
 Warning	1287	'CHANGE MASTER' is deprecated and will be removed in a future release. Please use CHANGE REPLICATION SOURCE instead
@@ -71,9 +71,9 @@ STOP REPLICA;
 RESET REPLICA ALL;
 INSERT INTO test.galera_replicated_table VALUES (4);
 DROP TABLE test.galera_replicated_table;
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 SET wsrep_on=OFF;
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 SET wsrep_on=ON;
 Warnings:
 Warning	1287	'CHANGE MASTER' is deprecated and will be removed in a future release. Please use CHANGE REPLICATION SOURCE instead

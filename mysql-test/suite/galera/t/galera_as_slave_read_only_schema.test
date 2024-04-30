@@ -116,5 +116,5 @@ CALL mtr.add_suppression("Query apply failed");
 --disconnect node_3
 --disconnect node_2a
 --connection node_1
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
 

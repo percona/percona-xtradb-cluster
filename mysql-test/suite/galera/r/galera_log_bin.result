@@ -1,5 +1,5 @@
-RESET MASTER;
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
+RESET BINARY LOGS AND GTIDS;
 CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB;
 INSERT INTO t1 VALUES (1);
 CREATE TABLE t2 (id INT) ENGINE=InnoDB;
@@ -49,8 +49,8 @@ DROP TABLE t2;
 # Test that disabling binlog does not prevent Galera replication,
 # but events are not recorded in the binlog
 #
-RESET MASTER;
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
+RESET BINARY LOGS AND GTIDS;
 SET SESSION sql_log_bin = OFF;
 CREATE TABLE t1 (a int primary key);
 INSERT INTO t1 VALUES (1);
@@ -111,8 +111,8 @@ DROP TABLE t2;
 #
 # The same, but for streaming replication
 #
-RESET MASTER;
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
+RESET BINARY LOGS AND GTIDS;
 SET SESSION sql_log_bin = OFF;
 SET SESSION wsrep_trx_fragment_size = 1;
 CREATE TABLE t1 (a int primary key);
@@ -163,8 +163,8 @@ DROP TABLE t2;
 # Check that log-slave-updates=OFF block all PXC replicated binlogging on node_2
 #
 # restart:--log-slave-updates=OFF --log-bin
-RESET MASTER;
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
+RESET BINARY LOGS AND GTIDS;
 SET SESSION sql_log_bin = OFF;
 CREATE TABLE t1 (a int primary key);
 INSERT INTO t1 VALUES (1);
@@ -187,4 +187,4 @@ Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	#	Previous_gtids	#	#	
 DROP TABLE t1;
 DROP TABLE t2;
-RESET MASTER;
+RESET BINARY LOGS AND GTIDS;
