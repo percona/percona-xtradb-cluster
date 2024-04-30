@@ -2390,6 +2390,65 @@ int open_grant_tables(THD *thd, TABLE_LIST *tables,
 
   DEBUG_SYNC(thd, "wl14084_acl_ddl_before_mdl_acquisition");
 
+#ifdef WITH_WSREP
+  /* We have to check replication filters before TOI.
+     To do the check, we need to acquire MDL locks on ACL tables.
+     The check is done only for replica threads if filters are enabled.
+     Here we decide if async replicated transaction should be  PXC-replicated.
+     If so, we will start TOI, but can't do it while holding MDL lock, because
+     if we call TOI begin here and get to the point where Galera is just about
+     to replicate, and at the same time another, replicated TOI arrives, we will
+     end up waiting in Galera for our turn.
+     If that replicated TOI relates to ACL as well (e.g. SET PASSWORD) and calls
+     acl_tables_setup_for_write_and_acquire_mdl(), it will try to abort us,
+     but we are waiting in Galera, so not able to release locks.
+     The result is a deadlock.
+
+     Let's close ACL tables here and and lock them again after TOI, hoping
+     that replication filters won't change in the meantime. */
+  if (thd->slave_thread && thd->rli_slave->rpl_filter->is_on()) {
+    if (acl_tables_setup_for_write_and_acquire_mdl(thd, tables)) return -1;
+    /*
+      The tables must be marked "updating" so that tables_ok() takes them into
+      account in tests.
+    */
+    for (auto i = 0; i < ACL_TABLES::LAST_ENTRY; i++) tables[i].updating = true;
+
+    if (!(thd->sp_runtime_ctx ||
+          thd->rli_slave->rpl_filter->tables_ok(nullptr, tables))) {
+      thd->mdl_context.release_transactional_locks();
+      return 1;
+    }
+
+    for (auto i = 0; i < ACL_TABLES::LAST_ENTRY; i++)
+      tables[i].updating = false;
+
+    thd->mdl_context.release_transactional_locks();
+  }
+
+  /* CREATE/DROP function/procedure implicitly grant priviliges.
+  Check for detail comment in respected switch handler in sql_parse.cc
+  Since the original statement is already replicated using TOI
+  sub-action of grant/revoke privilges doesn't need to get replicated. */
+  bool skip_toi = (thd->lex->sql_command == SQLCOM_CREATE_SPFUNCTION ||
+                   thd->lex->sql_command == SQLCOM_CREATE_PROCEDURE ||
+                   thd->lex->sql_command == SQLCOM_DROP_FUNCTION ||
+                   thd->lex->sql_command == SQLCOM_DROP_PROCEDURE);
+  /*
+    Perform the TOI after the replication filter check to avoid
+    replicating commands that won't be applied locally (due to a filter).
+  */
+  if (WSREP(thd) && !skip_toi &&
+      wsrep_to_isolation_begin(thd, db, table, nullptr)) {
+    WSREP_ERROR("Fail to replicate: %s", thd->query().str);
+    return -1;
+  }
+
+  /* For replica thread we checked replication filters before TOI and then
+     released MDL locks.
+     Original flow continues with tables locked, so lock them again. */
+  if (acl_tables_setup_for_write_and_acquire_mdl(thd, tables)) return -1;
+#else
   if (acl_tables_setup_for_write_and_acquire_mdl(thd, tables)) return -1;
 
   /*
@@ -2411,29 +2470,6 @@ int open_grant_tables(THD *thd, TABLE_LIST *tables,
 
     for (auto i = 0; i < ACL_TABLES::LAST_ENTRY; i++)
       tables[i].updating = false;
-  }
-
-#ifdef WITH_WSREP
-  /* CREATE/DROP function/procedure implicitly grant priviliges.
-  Check for detail comment in respected switch handler in sql_parse.cc
-  Since the original statement is already replicated using TOI
-  sub-action of grant/revoke privilges doesn't need to get replicated. */
-  bool skip_toi = (thd->lex->sql_command == SQLCOM_CREATE_SPFUNCTION ||
-                   thd->lex->sql_command == SQLCOM_CREATE_PROCEDURE ||
-                   thd->lex->sql_command == SQLCOM_DROP_FUNCTION ||
-                   thd->lex->sql_command == SQLCOM_DROP_PROCEDURE);
-  /*
-    Perform the TOI after the replication filter check to avoid
-    replicating commands that won't be applied locally (due to a filter).
-  */
-  /* Doing TOI here is not the ideal solution, as we are holding
-  MDL locks already and the current thread can still be BF-aborted.
-  But we have to check replication filters before TOI and for this
-  we need MDL locks. */
-  if (WSREP(thd) && !skip_toi &&
-      wsrep_to_isolation_begin(thd, db, table, nullptr)) {
-    WSREP_ERROR("Fail to replicate: %s", thd->query().str);
-    return -1;
   }
 #endif /* WITH_WSREP */
 
