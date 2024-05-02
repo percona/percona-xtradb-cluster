@@ -1,5 +1,5 @@
 # Copyright (c) 2006, 2023, Oracle and/or its affiliates.
-#
+# 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
 # as published by the Free Software Foundation.
@@ -119,7 +119,7 @@ FIND_PACKAGE(Git)
 SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
 
 # First, decide about build type (debug or release)
-# If cmake is invoked with -DCMAKE_BUILD_TYPE,
+# If cmake is invoked with -DCMAKE_BUILD_TYPE, 
 # respect user wishes and do not (re)define CMAKE_BUILD_TYPE. If WITH_DEBUG
 # is given, set CMAKE_BUILD_TYPE = Debug. Otherwise, use Relwithdebinfo.
 
@@ -133,7 +133,7 @@ OPTION(CHECK_ERRMSG_FORMAT "Check printf format for English error messages" OFF)
 # Use a default manufacturer if no manufacturer was identified.
 SET(MANUFACTURER_DOCSTRING
   "Set the entity that appears as the manufacturer of packages that support a manufacturer field.")
-IF(NOT DEFINED MANUFACTURER)
+IF(NOT DEFINED MANUFACTURER) 
   SET(MANUFACTURER "Built from Source" CACHE  STRING ${MANUFACTURER_DOCSTRING})
   MARK_AS_ADVANCED(MANUFACTURER)
 ENDIF()
@@ -164,9 +164,9 @@ ENDIF()
 OPTION(WITH_PAM "Build with Percona PAM plugin" OFF)
 
 # We choose to provide WITH_DEBUG as alias to standard CMAKE_BUILD_TYPE=Debug
-# which turns out to be not trivial, as this involves synchronization
+# which turns out to be not trivial, as this involves synchronization 
 # between CMAKE_BUILD_TYPE and WITH_DEBUG. Besides, we have to deal with cases
-# where WITH_DEBUG is  reset from ON to OFF  and here we need to reset
+# where WITH_DEBUG is  reset from ON to OFF  and here we need to reset 
 # CMAKE_BUILD_TYPE to either none or default RelWithDebInfo
 
 # ---- WSREP
@@ -183,7 +183,7 @@ IF(WITH_DEBUG)
   SET(OLD_WITH_DEBUG 1 CACHE INTERNAL "" FORCE)
 ELSEIF(NOT HAVE_CMAKE_BUILD_TYPE OR OLD_WITH_DEBUG)
   IF(CMAKE_BUILD_TYPE MATCHES "Debug" OR NOT HAVE_CMAKE_BUILD_TYPE)
-    SET(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING
+    SET(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING 
        ${BUILDTYPE_DOCSTRING} FORCE)
   ENDIF()
   SET(OLD_WITH_DEBUG 0 CACHE INTERNAL "" FORCE)
@@ -1492,7 +1492,7 @@ IF(WITH_TEST_TRACE_PLUGIN AND NOT WITH_CLIENT_PROTOCOL_TRACING)
 ENDIF()
 
 IF(WITH_TEST_TRACE_PLUGIN AND NOT CMAKE_BUILD_TYPE_UPPER STREQUAL "DEBUG")
-  MESSAGE(SEND_ERROR
+  MESSAGE(SEND_ERROR 
     "Test trace plugin was selected but it can be included only in
      debug binaries. Set WITH_TEST_TRACE_PLUGIN to OFF or WITH_DEBUG to ON.")
 ENDIF()
@@ -2580,7 +2580,7 @@ IF(WIN32)
   SET(CPACK_GENERATOR "ZIP")
 ELSE()
   SET(CPACK_GENERATOR "TGZ")
-ENDIF()
+ENDIF() 
 IF(WIN32)
   ADD_SUBDIRECTORY(packaging/WiX)
 ENDIF()
