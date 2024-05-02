@@ -540,17 +540,26 @@ bool Sql_cmd_create_table::execute(THD *thd) {
           mysql_mutex_lock(&LOCK_wsrep_alter_tablespace);
         }
 
-        /* Note we are explictly opening the macro as we need to perform
+        bool prepared_stmt_execution = thd->get_reprepare_observer() != nullptr;
+        bool should_start_toi = !prepared_stmt_execution ||
+                                (prepared_stmt_execution &&
+                                 !wsrep_thd_is_in_to_isolation(thd, false));
+        /* Note we are explicitly opening the macro as we need to perform
         cleanup action on TOI failure. */
-        if (WSREP(thd) && wsrep_to_isolation_begin(thd, create_table->db,
-                                                   create_table->table_name,
-                                                   NULL, NULL, &alter_info)) {
+        if (WSREP(thd) && should_start_toi &&
+            wsrep_to_isolation_begin(thd, create_table->db,
+                                     create_table->table_name, NULL, NULL,
+                                     &alter_info)) {
           if (!thd->lex->is_ignore() && thd->is_strict_mode())
             thd->pop_internal_handler();
           if (create_info.tablespace) {
             mysql_mutex_unlock(&LOCK_wsrep_alter_tablespace);
           }
           return true;
+        }
+
+        if (should_start_toi) {
+          thd->wsrep_prepared_statement_TOI_started = true;
         }
 
         if (create_info.tablespace) {

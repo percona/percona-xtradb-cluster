@@ -1,0 +1,109 @@
+# This test ensures that transient errors during the execution of the DDL in
+# prepared statement mode are handled properly by server.
+
+--source include/have_debug.inc
+--source include/galera_cluster.inc
+
+--connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
+--connection node_1
+
+# Create a prepared statement involving a DDL.
+PREPARE stmt1 FROM "CREATE TABLE IF NOT EXISTS pxc4341 (id INT PRIMARY KEY AUTO_INCREMENT, a INT)";
+
+# Execute the prepared statement
+EXECUTE stmt1;
+
+# Assert that table pxc4341 was created on node1.
+--let $assert_text = Table pxc4341 was created on node1.
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.tables WHERE table_name = "pxc4341"
+--source include/assert.inc
+
+# Introduce a change in table metadata by executing FLUSH TABLES
+FLUSH TABLES;
+
+# Re-execute the prepared statement. Here the expectation is that the server
+# should detect the change in metadata and should re-prepare & re-execute the
+# prepared statement. However the transient error raised during the execution
+# of the query is handled properly by server.
+EXECUTE stmt1;
+
+SHOW TABLES;
+
+INSERT INTO pxc4341 VALUES(1,1),(2,2),(3,3);
+
+# Assert that node2 is still up, running and replicating.
+--connection node_2
+--let $assert_text = Table pxc4341 was created on node2.
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.tables WHERE table_name = "pxc4341"
+--source include/assert.inc
+
+# Wait till the data is replicated to node2
+--let $wait_condition = SELECT COUNT(*) = 3 FROM test.pxc4341
+--source include/wait_condition.inc
+
+# Assert that table has 3 rows on node2
+--let $assert_text = Node 2 is up, running and replicating.
+--let $assert_cond = COUNT(*) = 3 FROM test.pxc4341
+--source include/assert.inc
+
+
+# Assert that node3 is still up, running and replicating.
+--connection node_3
+--let $assert_text = Table pxc4341 was created on node3.
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.tables WHERE table_name = "pxc4341"
+--source include/assert.inc
+
+# Wait till the data is replicated to node3
+--let $wait_condition = SELECT COUNT(*) = 3 FROM test.pxc4341
+--source include/wait_condition.inc
+
+# Assert that table has 3 rows on node3
+--let $assert_text = Node 2 is up, running and replicating.
+--let $assert_cond = COUNT(*) = 3 FROM test.pxc4341
+--source include/assert.inc
+
+#
+# Simulate the case of exhausted retries on node3
+#
+--connection node_3
+PREPARE stmt1 FROM "CREATE TABLE IF NOT EXISTS temp (id INT PRIMARY KEY AUTO_INCREMENT, a INT)";
+EXECUTE stmt1;
+FLUSH TABLES;
+
+--let $debug_point=simulate_max_reprepare_attempts_hit_case
+--source include/add_debug_point.inc
+
+--error ER_NEED_REPREPARE
+EXECUTE stmt1;
+
+# Assert that cluster node3 became inconsistent with the group
+--connection node_1
+--let $assert_only_after = CURRENT_TEST
+--let $assert_count = 1
+--let $assert_text = Node 3 inconsistent message was found in the error log
+--let $assert_select = Member 2(.*) initiates vote .*:  Prepared statement needs to be re-prepared
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.3.err
+--source include/assert_grep.inc
+
+--let $assert_only_after = CURRENT_TEST
+--let $assert_count = 1
+--let $assert_text = Node 3 inconsistent message was found in the error log
+--let $assert_select = Inconsistency detected: Inconsistent by consensus
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.3.err
+--source include/assert_grep.inc
+
+# Restart node3
+--connection node_3
+SET SESSION wsrep_sync_wait=0;
+--source include/shutdown_mysqld.inc
+--source include/start_mysqld.inc
+
+# Test suppressions
+--connection node_3
+CALL mtr.add_suppression("Inconsistency detected: Inconsistent by consensus on");
+
+# Cleanup
+--disconnect node_3
+--connection node_1
+DROP TABLE temp;
+DROP TABLE pxc4341;
