@@ -11,25 +11,25 @@ SET SESSION wsrep_trx_fragment_size=1;
 INSERT INTO t1 VALUES (5), (6);
 SET SESSION wsrep_trx_fragment_unit=default;
 SET SESSION wsrep_trx_fragment_size=default;
-SHOW BINLOG EVENTS IN 'mysqld-bin.000002' FROM 358;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000002' FROM 359;
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000002	358	Anonymous_Gtid	1	437	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
-mysqld-bin.000002	437	Query	1	517	BEGIN
-mysqld-bin.000002	517	Table_map	1	565	table_id: # (test.t1)
-mysqld-bin.000002	565	Write_rows	1	605	table_id: # flags: STMT_END_F
-mysqld-bin.000002	605	Table_map	1	653	table_id: # (test.t1)
-mysqld-bin.000002	653	Write_rows	1	693	table_id: # flags: STMT_END_F
-mysqld-bin.000002	693	Xid	1	724	COMMIT /* xid=# */
-mysqld-bin.000002	724	Anonymous_Gtid	1	803	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
-mysqld-bin.000002	803	Query	1	883	BEGIN
-mysqld-bin.000002	883	Table_map	1	931	table_id: # (test.t1)
-mysqld-bin.000002	931	Write_rows	1	971	table_id: # flags: STMT_END_F
-mysqld-bin.000002	971	Table_map	1	1019	table_id: # (test.t1)
-mysqld-bin.000002	1019	Write_rows	1	1059	table_id: # flags: STMT_END_F
-mysqld-bin.000002	1059	Xid	1	1090	COMMIT /* xid=# */
-mysqld-bin.000002	1090	Anonymous_Gtid	1	1169	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
-mysqld-bin.000002	1169	Query	1	1249	BEGIN
-mysqld-bin.000002	1249	Table_map	1	1297	table_id: # (test.t1)
-mysqld-bin.000002	1297	Write_rows	1	1342	table_id: # flags: STMT_END_F
-mysqld-bin.000002	1342	Xid	1	1373	COMMIT /* xid=# */
+mysqld-bin.000002	359	Anonymous_Gtid	1	438	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000002	438	Query	1	518	BEGIN
+mysqld-bin.000002	518	Table_map	1	566	table_id: # (test.t1)
+mysqld-bin.000002	566	Write_rows	1	606	table_id: # flags: STMT_END_F
+mysqld-bin.000002	606	Table_map	1	654	table_id: # (test.t1)
+mysqld-bin.000002	654	Write_rows	1	694	table_id: # flags: STMT_END_F
+mysqld-bin.000002	694	Xid	1	725	COMMIT /* xid=# */
+mysqld-bin.000002	725	Anonymous_Gtid	1	804	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000002	804	Query	1	884	BEGIN
+mysqld-bin.000002	884	Table_map	1	932	table_id: # (test.t1)
+mysqld-bin.000002	932	Write_rows	1	972	table_id: # flags: STMT_END_F
+mysqld-bin.000002	972	Table_map	1	1020	table_id: # (test.t1)
+mysqld-bin.000002	1020	Write_rows	1	1060	table_id: # flags: STMT_END_F
+mysqld-bin.000002	1060	Xid	1	1091	COMMIT /* xid=# */
+mysqld-bin.000002	1091	Anonymous_Gtid	1	1170	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000002	1170	Query	1	1250	BEGIN
+mysqld-bin.000002	1250	Table_map	1	1298	table_id: # (test.t1)
+mysqld-bin.000002	1298	Write_rows	1	1343	table_id: # flags: STMT_END_F
+mysqld-bin.000002	1343	Xid	1	1374	COMMIT /* xid=# */
 DROP TABLE t1;

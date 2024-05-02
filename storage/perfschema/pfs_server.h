@@ -55,7 +55,19 @@
 #define PFS_AUTOSIZE_VALUE (-1)
 
 #ifndef PFS_MAX_MUTEX_CLASS
+#ifdef WITH_WSREP
+/**
+   Max value for PXC builds.
+   WSREP patch defines 39 additional PSI_mutex_key keys:
+   key_COND_galera_* => 24
+   key_COND_wsrep_* => 15
+   Let's keep PFS_MAX_MUTEX_CLASS always bigger by this number.
+*/
+#define PFS_WSREP_MUTEX_CLASS 39
+#define PFS_MAX_MUTEX_CLASS (350 + PFS_WSREP_MUTEX_CLASS)
+#else
 #define PFS_MAX_MUTEX_CLASS 350
+#endif /* WITH WSREP */ /* PFS_MAX_MUTEX_CLASS */
 #endif
 #ifndef PFS_MAX_RWLOCK_CLASS
 #define PFS_MAX_RWLOCK_CLASS 100
@@ -73,7 +85,7 @@
 #define PFS_MAX_COND_CLASS (150 + PFS_WSREP_COND_CLASS)
 #else
 #define PFS_MAX_COND_CLASS 150
-#endif /* WITH_WSREP */
+#endif /* WITH_WSREP */ /* PFS_MAX_COND_CLASS */
 
 #endif
 #ifndef PFS_MAX_THREAD_CLASS
@@ -415,18 +427,6 @@ void init_pfs_instrument_array();
   Process one PFS_INSTRUMENT configuration string.
 */
 int add_pfs_instr_to_array(const char *name, const char *value);
-
-/**
-  Register/unregister notification service.
-*/
-int register_pfs_notification_service();
-int unregister_pfs_notification_service();
-
-/**
-  Register/unregister resource group service.
-*/
-int register_pfs_resource_group_service();
-int unregister_pfs_resource_group_service();
 
 /**
   Shutdown the performance schema.

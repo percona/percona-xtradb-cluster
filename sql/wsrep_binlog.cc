@@ -179,7 +179,7 @@ static int wsrep_write_cache_inc(THD *const thd,
     Gtid_log_event gtid_event(thd, true, 0, 0, false, 0, 0,
                               UNKNOWN_SERVER_VERSION, UNKNOWN_SERVER_VERSION);
     int error = 0;
-    StringBuffer_ostream<Gtid_log_event::MAX_EVENT_LENGTH> ostream;
+    StringBuffer_ostream<Gtid_log_event::get_max_event_length()> ostream;
     if ((error = gtid_event.write(&ostream))) {
       WSREP_ERROR("Failed to write the GTID event");
       ret = -1;

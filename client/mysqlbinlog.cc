@@ -32,7 +32,9 @@
    Format_desc_of_slave, Rotate_of_master, Format_desc_of_master.
 */
 
+#ifdef WITH_WSREP
 #undef WITH_WSREP
+#endif
 
 #include "client/mysqlbinlog.h"
 
@@ -786,8 +788,8 @@ static MYSQL *mysql_handle = nullptr;
 static char *dirname_for_local_load = nullptr;
 static uint opt_server_id_bits = 0;
 ulong opt_server_id_mask = 0;
-Sid_map *global_sid_map = nullptr;
-Checkable_rwlock *global_sid_lock = nullptr;
+Tsid_map *global_tsid_map = nullptr;
+Checkable_rwlock *global_tsid_lock = nullptr;
 Gtid_set *gtid_set_included = nullptr;
 Gtid_set *gtid_set_excluded = nullptr;
 static uint opt_zstd_compress_level = default_zstd_compression_level;
@@ -1133,6 +1135,7 @@ static bool shall_skip_gtids(const Log_event *ev) {
 
   switch (ev->get_type_code()) {
     case mysql::binlog::event::GTID_LOG_EVENT:
+    case mysql::binlog::event::GTID_TAGGED_LOG_EVENT:
     case mysql::binlog::event::ANONYMOUS_GTID_LOG_EVENT: {
       Gtid_log_event *gtid =
           const_cast<Gtid_log_event *>(down_cast<const Gtid_log_event *>(ev));
@@ -1745,6 +1748,7 @@ static Exit_status process_event(PRINT_EVENT_INFO *print_event_info,
         break;
       }
       case mysql::binlog::event::ANONYMOUS_GTID_LOG_EVENT:
+      case mysql::binlog::event::GTID_TAGGED_LOG_EVENT:
       case mysql::binlog::event::GTID_LOG_EVENT: {
         seen_gtid = true;
         print_event_info->immediate_server_version =
@@ -2603,8 +2607,8 @@ static void fix_gtid_set(MYSQL_RPL *rpl, uchar *packet_gtid_set) {
     Note: we acquire lock in the dump_remote_log_entries()
     just before mysql_binlog_open() call if GTID used.
   */
-  global_sid_lock->assert_some_rdlock();
-  global_sid_lock->unlock();
+  global_tsid_lock->assert_some_rdlock();
+  global_tsid_lock->unlock();
 }
 
 /*
@@ -2695,7 +2699,7 @@ static Exit_status dump_remote_log_entries(PRINT_EVENT_INFO *print_event_info,
   if (opt_remote_proto != BINLOG_DUMP_NON_GTID) {
     rpl.flags |= MYSQL_RPL_GTID;
 
-    global_sid_lock->rdlock();
+    global_tsid_lock->rdlock();
     rpl.gtid_set_encoded_size = gtid_set_excluded->get_encoded_length();
     rpl.fix_gtid_set = fix_gtid_set;
     rpl.gtid_set_arg = (void *)gtid_set_excluded;
@@ -3198,13 +3202,13 @@ static int args_post_process(void) {
     }
   }
 
-  global_sid_lock->rdlock();
+  global_tsid_lock->rdlock();
 
   if (opt_include_gtids_str != nullptr) {
     if (gtid_set_included->add_gtid_text(opt_include_gtids_str) !=
         RETURN_STATUS_OK) {
       error("Could not configure --include-gtids '%s'", opt_include_gtids_str);
-      global_sid_lock->unlock();
+      global_tsid_lock->unlock();
       return ERROR_STOP;
     }
   }
@@ -3213,12 +3217,12 @@ static int args_post_process(void) {
     if (gtid_set_excluded->add_gtid_text(opt_exclude_gtids_str) !=
         RETURN_STATUS_OK) {
       error("Could not configure --exclude-gtids '%s'", opt_exclude_gtids_str);
-      global_sid_lock->unlock();
+      global_tsid_lock->unlock();
       return ERROR_STOP;
     }
   }
 
-  global_sid_lock->unlock();
+  global_tsid_lock->unlock();
 
   if (connection_server_id == 0 && stop_never)
     error("Cannot set --server-id=0 when --stop-never is specified.");
@@ -3236,12 +3240,12 @@ static int args_post_process(void) {
    Function is reentrant.
 */
 inline void gtid_client_cleanup() {
-  delete global_sid_lock;
-  delete global_sid_map;
+  delete global_tsid_lock;
+  delete global_tsid_map;
   delete gtid_set_excluded;
   delete gtid_set_included;
-  global_sid_lock = nullptr;
-  global_sid_map = nullptr;
+  global_tsid_lock = nullptr;
+  global_tsid_map = nullptr;
   gtid_set_excluded = nullptr;
   gtid_set_included = nullptr;
 }
@@ -3253,10 +3257,10 @@ inline void gtid_client_cleanup() {
            false if OK
 */
 inline bool gtid_client_init() {
-  const bool res = (!(global_sid_lock = new Checkable_rwlock) ||
-                    !(global_sid_map = new Sid_map(global_sid_lock)) ||
-                    !(gtid_set_excluded = new Gtid_set(global_sid_map)) ||
-                    !(gtid_set_included = new Gtid_set(global_sid_map)));
+  const bool res = (!(global_tsid_lock = new Checkable_rwlock) ||
+                    !(global_tsid_map = new Tsid_map(global_tsid_lock)) ||
+                    !(gtid_set_excluded = new Gtid_set(global_tsid_map)) ||
+                    !(gtid_set_included = new Gtid_set(global_tsid_map)));
   if (res) {
     gtid_client_cleanup();
   }
