@@ -2099,7 +2099,9 @@ int ha_commit_low(THD *thd, bool all, bool run_after_commit) {
         Commit_order_manager::wait_and_finish(thd, error);
       }
     }
-  } else {
+  }
+#ifdef WITH_WSREP
+  else {
       /* This function is common for group commit flow and the flow that skips
       group commit. We register the thread in wsrep_group_commit_queue always.
       For group commit it is done during binlog flush stage, for 1-phase commit
@@ -2123,6 +2125,7 @@ int ha_commit_low(THD *thd, bool all, bool run_after_commit) {
       wsrep_wait_for_turn_in_group_commit(thd);
       wsrep_unregister_from_group_commit(thd);
   }
+#endif /* WITH_WSREP */
 
 err:
   /* Free resources and perform other cleanup even for 'empty' transactions. */
@@ -2483,7 +2486,7 @@ int ha_rollback_to_savepoint(THD *thd, SAVEPOINT *sv) {
   ha_list = trn_ctx->ha_trx_info(trx_scope);
   for (auto ha_info = ha_list.begin(); ha_info != sv->ha_list; ++ha_info) {
     int err;
-    auto *ht = ha_info->ht();
+    auto ht = ha_info->ht();
 
 #ifdef WITH_WSREP
     if (WSREP(thd) && (ht->flags & HTON_WSREP_REPLICATION)) {

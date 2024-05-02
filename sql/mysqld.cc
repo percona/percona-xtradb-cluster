@@ -9224,17 +9224,17 @@ static int init_server_components() {
   /* Allow storage engine to give real error messages */
   if (ha_init_errors()) return 1;
 
-#ifndef WITH_WSREP
+#ifdef WITH_WSREP
   /* Leave the original location if wsrep is not involved otherwise
   we do this before initializing WSREP as wsrep needs access to
   gtid_mode which and for accessing gtid_mode gtid_sid_locks has to be
   initialized which is done by this function. */
-
+#else
   if (gtid_server_init()) {
     LogErr(ERROR_LEVEL, ER_CANT_INITIALIZE_GTID);
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
-#endif /* !WITH_WSREP */
+#endif /* WITH_WSREP */
 
   if (opt_log_replica_updates && replicate_same_server_id) {
     if (opt_bin_log && global_gtid_mode.get() != Gtid_mode::ON) {
@@ -11888,102 +11888,91 @@ vector<my_option> all_options;
 
 struct my_option my_long_early_options[] = {
 #if !defined(_WIN32)
-  {"daemonize", 'D', "Run mysqld as sysv daemon", &opt_daemonize,
-   &opt_daemonize, nullptr, GET_BOOL, NO_ARG, 0, 0, 0, nullptr, 0, nullptr},
+    {"daemonize", 'D', "Run mysqld as sysv daemon", &opt_daemonize,
+     &opt_daemonize, nullptr, GET_BOOL, NO_ARG, 0, 0, 0, nullptr, 0, nullptr},
 #endif
-  {"skip-grant-tables", 0,
-   "Start without grant tables. This gives all users FULL ACCESS to all "
-   "tables.",
-   &opt_noacl, &opt_noacl, nullptr, GET_BOOL, NO_ARG, 0, 0, 0, nullptr, 0,
-   nullptr},
-  {"help", '?', "Display this help and exit.", &opt_help, &opt_help, nullptr,
-   GET_BOOL, NO_ARG, 0, 0, 0, nullptr, 0, nullptr},
-  {"verbose", 'v', "Used with --help option for detailed help.", &opt_verbose,
-   &opt_verbose, nullptr, GET_BOOL, NO_ARG, 0, 0, 0, nullptr, 0, nullptr},
-  {"version", 'V', "Output version information and exit.", nullptr, nullptr,
-   nullptr, GET_NO_ARG, NO_ARG, 0, 0, 0, nullptr, 0, nullptr},
-  {"initialize", 'I',
-   "Create the default database and exit."
-   " Create a super user with a random expired password and store it into "
-   "the log.",
-   &opt_initialize, &opt_initialize, nullptr, GET_BOOL, NO_ARG, 0, 0, 0,
-   nullptr, 0, nullptr},
-  {"initialize-insecure", 0,
-   "Create the default database and exit."
-   " Create a super user with empty password.",
-   &opt_initialize_insecure, &opt_initialize_insecure, nullptr, GET_BOOL,
-   NO_ARG, 0, 0, 0, nullptr, 0, nullptr},
-  {"keyring-migration-source", OPT_KEYRING_MIGRATION_SOURCE,
-   "Keyring plugin from where the keys needs to "
-   "be migrated to. This option must be specified along with "
-   "--keyring-migration-destination.",
-   &opt_keyring_migration_source, &opt_keyring_migration_source, nullptr,
-   GET_STR, REQUIRED_ARG, 0, 0, 0, nullptr, 0, nullptr},
-  {"keyring-migration-destination", OPT_KEYRING_MIGRATION_DESTINATION,
-   "Keyring plugin or component to which the keys are "
-   "migrated to. This option must be specified along with "
-   "--keyring-migration-source.",
-   &opt_keyring_migration_destination, &opt_keyring_migration_destination,
-   nullptr, GET_STR, REQUIRED_ARG, 0, 0, 0, nullptr, 0, nullptr},
-  {"keyring-migration-user", OPT_KEYRING_MIGRATION_USER,
-   "User to login to server.", &opt_keyring_migration_user,
-   &opt_keyring_migration_user, nullptr, GET_STR, REQUIRED_ARG, 0, 0, 0,
-   nullptr, 0, nullptr},
-  {"keyring-migration-host", OPT_KEYRING_MIGRATION_HOST, "Connect to host.",
-   &opt_keyring_migration_host, &opt_keyring_migration_host, nullptr, GET_STR,
-   REQUIRED_ARG, 0, 0, 0, nullptr, 0, nullptr},
-  {"keyring-migration-password", 'p',
-   "Password to use when connecting to server during keyring migration. "
-   "If password value is not specified then it will be asked from the tty.",
-   nullptr, nullptr, nullptr, GET_PASSWORD, OPT_ARG, 0, 0, 0, nullptr, 0,
-   nullptr},
-  {"keyring-migration-socket", OPT_KEYRING_MIGRATION_SOCKET,
-   "The socket file to use for connection.", &opt_keyring_migration_socket,
-   &opt_keyring_migration_socket, nullptr, GET_STR, REQUIRED_ARG, 0, 0, 0,
-   nullptr, 0, nullptr},
-  {"keyring-migration-port", OPT_KEYRING_MIGRATION_PORT,
-   "Port number to use for connection.", &opt_keyring_migration_port,
-   &opt_keyring_migration_port, nullptr, GET_ULONG, REQUIRED_ARG, 0, 0, 0,
-   nullptr, 0, nullptr},
-  {"keyring-migration-to-component", OPT_KEYRING_MIGRATION_TO_COMPONENT,
-   "Migrate from keyring plugin to keyring component.",
-   &opt_keyring_migration_to_component, &opt_keyring_migration_to_component,
-   nullptr, GET_BOOL, NO_ARG, 0, 0, 0, nullptr, 0, nullptr},
-  {"keyring-migration-socket", OPT_KEYRING_MIGRATION_SOCKET,
-   "The socket file to use for connection.", &opt_keyring_migration_socket,
-   &opt_keyring_migration_socket, nullptr, GET_STR, REQUIRED_ARG, 0, 0, 0,
-   nullptr, 0, nullptr},
-  {"keyring-migration-port", OPT_KEYRING_MIGRATION_PORT,
-   "Port number to use for connection.", &opt_keyring_migration_port,
-   &opt_keyring_migration_port, nullptr, GET_ULONG, REQUIRED_ARG, 0, 0, 0,
-   nullptr, 0, nullptr},
-  {"no-dd-upgrade", 0,
-   "Abort restart if automatic upgrade or downgrade of the data dictionary "
-   "is needed. Deprecated option. Use --upgrade=NONE instead.",
-   &opt_no_dd_upgrade, &opt_no_dd_upgrade, nullptr, GET_BOOL, NO_ARG, 0, 0, 0,
-   nullptr, 0, nullptr},
-  {"validate-config", 0,
-   "Validate the server configuration specified by the user.",
-   &opt_validate_config, &opt_validate_config, nullptr, GET_BOOL, NO_ARG, 0, 0,
-   0, nullptr, 0, nullptr},
-  {"core-file", OPT_WANT_CORE, "Write core on errors.", 0, 0, nullptr,
-   GET_NO_ARG, NO_ARG, 0, 0, 0, nullptr, 0, nullptr},
-  {"coredumper", OPT_COREDUMPER,
-   "Use coredumper library to generate coredumps. Specify a path for "
-   "coredump "
-   "otherwise it will be generated on datadir",
-   &opt_libcoredumper_path, &opt_libcoredumper_path, 0, GET_STR, OPT_ARG, 0, 0,
-   0, 0, 0, 0},
-  {"skip-stack-trace", OPT_SKIP_STACK_TRACE,
-   "Don't print a stack trace on failure.", 0, 0, nullptr, GET_NO_ARG, NO_ARG,
-   0, 0, 0, nullptr, 0, nullptr},
-  /* We must always support the next option to make scripts like mysqltest
-     easier to do */
-  {"gdb", 0, "Set up signals usable for debugging.", &opt_debugging,
-   &opt_debugging, nullptr, GET_BOOL, NO_ARG, 0, 0, 0, nullptr, 0, nullptr},
-  {nullptr, 0, nullptr, nullptr, nullptr, nullptr, GET_NO_ARG, NO_ARG, 0, 0, 0,
-   nullptr, 0, nullptr}
-};
+    {"skip-grant-tables", 0,
+     "Start without grant tables. This gives all users FULL ACCESS to all "
+     "tables.",
+     &opt_noacl, &opt_noacl, nullptr, GET_BOOL, NO_ARG, 0, 0, 0, nullptr, 0,
+     nullptr},
+    {"help", '?', "Display this help and exit.", &opt_help, &opt_help, nullptr,
+     GET_BOOL, NO_ARG, 0, 0, 0, nullptr, 0, nullptr},
+    {"verbose", 'v', "Used with --help option for detailed help.", &opt_verbose,
+     &opt_verbose, nullptr, GET_BOOL, NO_ARG, 0, 0, 0, nullptr, 0, nullptr},
+    {"version", 'V', "Output version information and exit.", nullptr, nullptr,
+     nullptr, GET_NO_ARG, NO_ARG, 0, 0, 0, nullptr, 0, nullptr},
+    {"initialize", 'I',
+     "Create the default database and exit."
+     " Create a super user with a random expired password and store it into "
+     "the log.",
+     &opt_initialize, &opt_initialize, nullptr, GET_BOOL, NO_ARG, 0, 0, 0,
+     nullptr, 0, nullptr},
+    {"initialize-insecure", 0,
+     "Create the default database and exit."
+     " Create a super user with empty password.",
+     &opt_initialize_insecure, &opt_initialize_insecure, nullptr, GET_BOOL,
+     NO_ARG, 0, 0, 0, nullptr, 0, nullptr},
+    {"keyring-migration-source", OPT_KEYRING_MIGRATION_SOURCE,
+     "Keyring plugin from where the keys needs to "
+     "be migrated to. This option must be specified along with "
+     "--keyring-migration-destination.",
+     &opt_keyring_migration_source, &opt_keyring_migration_source, nullptr,
+     GET_STR, REQUIRED_ARG, 0, 0, 0, nullptr, 0, nullptr},
+    {"keyring-migration-destination", OPT_KEYRING_MIGRATION_DESTINATION,
+     "Keyring plugin or component to which the keys are migrated to.",
+     &opt_keyring_migration_destination, &opt_keyring_migration_destination,
+     nullptr, GET_STR, REQUIRED_ARG, 0, 0, 0, nullptr, 0, nullptr},
+    {"keyring-migration-user", OPT_KEYRING_MIGRATION_USER,
+     "User to login to server.", &opt_keyring_migration_user,
+     &opt_keyring_migration_user, nullptr, GET_STR, REQUIRED_ARG, 0, 0, 0,
+     nullptr, 0, nullptr},
+    {"keyring-migration-host", OPT_KEYRING_MIGRATION_HOST, "Connect to host.",
+     &opt_keyring_migration_host, &opt_keyring_migration_host, nullptr, GET_STR,
+     REQUIRED_ARG, 0, 0, 0, nullptr, 0, nullptr},
+    {"keyring-migration-password", 'p',
+     "Password to use when connecting to server during keyring migration. "
+     "If password value is not specified then it will be asked from the tty.",
+     nullptr, nullptr, nullptr, GET_PASSWORD, OPT_ARG, 0, 0, 0, nullptr, 0,
+     nullptr},
+    {"keyring-migration-socket", OPT_KEYRING_MIGRATION_SOCKET,
+     "The socket file to use for connection.", &opt_keyring_migration_socket,
+     &opt_keyring_migration_socket, nullptr, GET_STR, REQUIRED_ARG, 0, 0, 0,
+     nullptr, 0, nullptr},
+    {"keyring-migration-port", OPT_KEYRING_MIGRATION_PORT,
+     "Port number to use for connection.", &opt_keyring_migration_port,
+     &opt_keyring_migration_port, nullptr, GET_ULONG, REQUIRED_ARG, 0, 0, 0,
+     nullptr, 0, nullptr},
+    {"keyring-migration-to-component", OPT_KEYRING_MIGRATION_TO_COMPONENT,
+     "Migrate from keyring plugin to keyring component.",
+     &opt_keyring_migration_to_component, &opt_keyring_migration_to_component,
+     nullptr, GET_BOOL, NO_ARG, 0, 0, 0, nullptr, 0, nullptr},
+    {"no-dd-upgrade", 0,
+     "Abort restart if automatic upgrade or downgrade of the data dictionary "
+     "is needed. Deprecated option. Use --upgrade=NONE instead.",
+     &opt_no_dd_upgrade, &opt_no_dd_upgrade, nullptr, GET_BOOL, NO_ARG, 0, 0, 0,
+     nullptr, 0, nullptr},
+    {"validate-config", 0,
+     "Validate the server configuration specified by the user.",
+     &opt_validate_config, &opt_validate_config, nullptr, GET_BOOL, NO_ARG, 0,
+     0, 0, nullptr, 0, nullptr},
+    {"core-file", OPT_WANT_CORE, "Write core on errors.", 0, 0, nullptr,
+     GET_NO_ARG, NO_ARG, 0, 0, 0, nullptr, 0, nullptr},
+    {"coredumper", OPT_COREDUMPER,
+     "Use coredumper library to generate coredumps. Specify a path for "
+     "coredump "
+     "otherwise it will be generated on datadir",
+     &opt_libcoredumper_path, &opt_libcoredumper_path, 0, GET_STR, OPT_ARG, 0,
+     0, 0, 0, 0, 0},
+    {"skip-stack-trace", OPT_SKIP_STACK_TRACE,
+     "Don't print a stack trace on failure.", 0, 0, nullptr, GET_NO_ARG, NO_ARG,
+     0, 0, 0, nullptr, 0, nullptr},
+    /* We must always support the next option to make scripts like mysqltest
+       easier to do */
+    {"gdb", 0, "Set up signals usable for debugging.", &opt_debugging,
+     &opt_debugging, nullptr, GET_BOOL, NO_ARG, 0, 0, 0, nullptr, 0, nullptr},
+     {nullptr, 0, nullptr, nullptr, nullptr, nullptr, GET_NO_ARG, NO_ARG, 0, 0,
+     0, nullptr, 0, nullptr}};
 
 /**
   System variables are automatically command-line options (few
@@ -12257,30 +12246,31 @@ struct my_option my_long_options[] = {
     {"no-monitor", 0, "Disable monitor process.", &opt_no_monitor,
      &opt_no_monitor, nullptr, GET_BOOL, NO_ARG, 0, 0, 0, nullptr, 0, nullptr},
 #endif
-  {"symbolic-links", 's',
-   "Enable symbolic link support (deprecated and will be  removed in a future"
-   " release).",
-   &my_enable_symlinks, &my_enable_symlinks, nullptr, GET_BOOL, NO_ARG, 0, 0, 0,
-   nullptr, 0, nullptr},
-  {"sysdate-is-now", 0,
-   "Non-default option to alias SYSDATE() to NOW() to make it "
-   "safe-replicable. "
-   "Since 5.0, SYSDATE() returns a `dynamic' value different for different "
-   "invocations, even within the same statement.",
-   &global_system_variables.sysdate_is_now, nullptr, nullptr, GET_BOOL, NO_ARG,
-   0, 0, 1, nullptr, 1, nullptr},
-  {"tc-heuristic-recover", 0,
-   "Decision to use in heuristic recover process. Possible values are OFF, "
-   "COMMIT or ROLLBACK.",
-   &tc_heuristic_recover, &tc_heuristic_recover, &tc_heuristic_recover_typelib,
-   GET_ENUM, REQUIRED_ARG, TC_HEURISTIC_NOT_USED, 0, 0, nullptr, 0, nullptr},
+    {"symbolic-links", 's',
+     "Enable symbolic link support (deprecated and will be  removed in a future"
+     " release).",
+     &my_enable_symlinks, &my_enable_symlinks, nullptr, GET_BOOL, NO_ARG, 0, 0,
+     0, nullptr, 0, nullptr},
+    {"sysdate-is-now", 0,
+     "Non-default option to alias SYSDATE() to NOW() to make it "
+     "safe-replicable. "
+     "Since 5.0, SYSDATE() returns a `dynamic' value different for different "
+     "invocations, even within the same statement.",
+     &global_system_variables.sysdate_is_now, nullptr, nullptr, GET_BOOL,
+     NO_ARG, 0, 0, 1, nullptr, 1, nullptr},
+    {"tc-heuristic-recover", 0,
+     "Decision to use in heuristic recover process. Possible values are OFF, "
+     "COMMIT or ROLLBACK.",
+     &tc_heuristic_recover, &tc_heuristic_recover,
+     &tc_heuristic_recover_typelib, GET_ENUM, REQUIRED_ARG,
+     TC_HEURISTIC_NOT_USED, 0, 0, nullptr, 0, nullptr},
 #if defined(ENABLED_DEBUG_SYNC)
-  {"debug-sync-timeout", OPT_DEBUG_SYNC_TIMEOUT,
-   "Enable the debug sync facility "
-   "and optionally specify a default wait timeout in seconds. "
-   "A zero value keeps the facility disabled.",
-   &opt_debug_sync_timeout, nullptr, nullptr, GET_UINT, OPT_ARG, 0, 0, UINT_MAX,
-   nullptr, 0, nullptr},
+    {"debug-sync-timeout", OPT_DEBUG_SYNC_TIMEOUT,
+     "Enable the debug sync facility "
+     "and optionally specify a default wait timeout in seconds. "
+     "A zero value keeps the facility disabled.",
+     &opt_debug_sync_timeout, nullptr, nullptr, GET_UINT, OPT_ARG, 0, 0,
+     UINT_MAX, nullptr, 0, nullptr},
 #endif /* defined(ENABLED_DEBUG_SYNC) */
     {"transaction-isolation", 0, "Default transaction isolation level.",
      &global_system_variables.transaction_isolation,
@@ -12325,34 +12315,34 @@ struct my_option my_long_options[] = {
      &opt_upgrade_mode, &opt_upgrade_mode, &upgrade_mode_typelib, GET_ENUM,
      REQUIRED_ARG, UPGRADE_AUTO, 0, 0, nullptr, 0, nullptr},
 
-  {"utility_user", 0,
-   "Specifies a MySQL user that will be added to the "
-   "internal list of users and recognized as the utility user.",
-   &utility_user, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-  {"utility_user_password", 0,
-   "Specifies the password required for the "
-   "utility user.",
-   &utility_user_password, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-  {"utility_user_privileges", 0,
-   "Specifies the privileges that the utility "
-   "user will have in a comma delimited list. See the manual for a complete "
-   "list of privileges.",
-   &utility_user_privileges, 0, &utility_user_privileges_typelib, GET_SET,
-   REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-  {"utility_user_dynamic_privileges", 0,
-   "Specifies the dynamic privileges that the utility "
-   "user will have in a comma delimited list. See the manual for a complete "
-   "list of privileges.",
-   &utility_user_dynamic_privileges, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0,
-   0},
-  {"utility_user_schema_access", 0,
-   "Specifies the schemas that the utility "
-   "user has access to in a comma delimited list.",
-   &utility_user_schema_access, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+    {"utility_user", 0,
+     "Specifies a MySQL user that will be added to the "
+     "internal list of users and recognized as the utility user.",
+     &utility_user, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+    {"utility_user_password", 0,
+     "Specifies the password required for the "
+     "utility user.",
+     &utility_user_password, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+    {"utility_user_privileges", 0,
+     "Specifies the privileges that the utility "
+     "user will have in a comma delimited list. See the manual for a complete "
+     "list of privileges.",
+     &utility_user_privileges, 0, &utility_user_privileges_typelib, GET_SET,
+     REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+    {"utility_user_dynamic_privileges", 0,
+     "Specifies the dynamic privileges that the utility "
+     "user will have in a comma delimited list. See the manual for a complete "
+     "list of privileges.",
+     &utility_user_dynamic_privileges, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0,
+     0, 0},
+    {"utility_user_schema_access", 0,
+     "Specifies the schemas that the utility "
+     "user has access to in a comma delimited list.",
+     &utility_user_schema_access, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0,
+     0},
 
-  {nullptr, 0, nullptr, nullptr, nullptr, nullptr, GET_NO_ARG, NO_ARG, 0, 0, 0,
-   nullptr, 0, nullptr}
-};
+    {nullptr, 0, nullptr, nullptr, nullptr, nullptr, GET_NO_ARG, NO_ARG, 0, 0,
+     0, nullptr, 0, nullptr}};
 
 static int show_queries(THD *thd, SHOW_VAR *var, char *) {
   var->type = SHOW_LONGLONG;

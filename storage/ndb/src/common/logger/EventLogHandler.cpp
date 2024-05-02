@@ -58,7 +58,7 @@ static bool check_message_resource(void) {
 
   // Could not get message from own module, extract error
   // message from system and print it to help debugging
-  DWORD last_err = GetLastError();
+  const DWORD last_err = GetLastError();
   fprintf(stderr,
           "This program does not seem to have the message resource "
           "required for logging to Windows event log, error: %lu ",

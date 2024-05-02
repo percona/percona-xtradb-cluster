@@ -32,7 +32,9 @@
    Format_desc_of_slave, Rotate_of_master, Format_desc_of_master.
 */
 
+#ifdef WITH_WSREP
 #undef WITH_WSREP
+#endif
 
 #include "client/mysqlbinlog.h"
 

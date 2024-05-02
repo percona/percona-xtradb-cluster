@@ -5268,15 +5268,16 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
             (for when we will come back to this hot log after re-processing the
             possibly existing old logs where BEGIN is: applier_reader will
             then need the cache to be at position 0 (see comments at beginning
-            of init_info()). b) init_relay_log_pos(), because the BEGIN may be
-            an older relay log.
+            of init_info()).
+            b) init_relay_log_pos(), because the BEGIN may be an older relay
+            log.
           */
           if (rli->trans_retries < slave_trans_retries) {
             /*
               The transactions has to be rolled back before
               load_mi_and_rli_from_repositories is called. Because
               load_mi_and_rli_from_repositories will starts a new
-              transaction if master_info_repository is TABLE.
+              transaction.
             */
             rli->cleanup_context(thd, true);
             /*
@@ -6239,6 +6240,7 @@ static void *handle_slave_worker(void *arg) {
   w->set_require_table_primary_key_check(
       rli->get_require_table_primary_key_check());
 
+  // Replicas shall not create GIPKs if source tables have no PKs
   thd->variables.sql_generate_invisible_primary_key = false;
   if (thd->rpl_thd_ctx.get_rpl_channel_type() != GR_APPLIER_CHANNEL &&
       thd->rpl_thd_ctx.get_rpl_channel_type() != GR_RECOVERY_CHANNEL &&
@@ -7228,528 +7230,527 @@ extern "C" void *handle_slave_sql(void *arg) {
 #ifdef WITH_WSREP
 wsrep_restart_point :
 #endif /* WITH_WSREP */
-{
-  DBUG_TRACE;
+  {
+    DBUG_TRACE;
 
-  assert(rli->inited);
-  mysql_mutex_lock(&rli->run_lock);
-  assert(!rli->slave_running);
-  errmsg = nullptr;
+    assert(rli->inited);
+    mysql_mutex_lock(&rli->run_lock);
+    assert(!rli->slave_running);
+    errmsg = nullptr;
 
-  thd = new THD;  // note that constructor of THD uses DBUG_ !
-  thd->thread_stack = (char *)&thd;  // remember where our stack is
-  mysql_mutex_lock(&rli->info_thd_lock);
-  rli->info_thd = thd;
+    thd = new THD;  // note that constructor of THD uses DBUG_ !
+    thd->thread_stack = (char *)&thd;  // remember where our stack is
+    mysql_mutex_lock(&rli->info_thd_lock);
+    rli->info_thd = thd;
 
 #ifdef HAVE_PSI_THREAD_INTERFACE
-  // save the instrumentation for SQL thread in rli->info_thd
-  struct PSI_thread *psi = PSI_THREAD_CALL(get_thread)();
-  thd_set_psi(rli->info_thd, psi);
+    // save the instrumentation for SQL thread in rli->info_thd
+    struct PSI_thread *psi = PSI_THREAD_CALL(get_thread)();
+    thd_set_psi(rli->info_thd, psi);
 #endif
-  mysql_thread_set_psi_THD(thd);
+    mysql_thread_set_psi_THD(thd);
 
-  if (rli->channel_mts_submode != MTS_PARALLEL_TYPE_DB_NAME)
-    rli->current_mts_submode = new Mts_submode_logical_clock();
-  else
-    rli->current_mts_submode = new Mts_submode_database();
+    if (rli->channel_mts_submode != MTS_PARALLEL_TYPE_DB_NAME)
+      rli->current_mts_submode = new Mts_submode_logical_clock();
+    else
+      rli->current_mts_submode = new Mts_submode_database();
 
-  // Only use replica preserve commit order if more than 1 worker exists
-  if (opt_replica_preserve_commit_order && !rli->is_parallel_exec() &&
-      rli->opt_replica_parallel_workers > 1)
-    commit_order_mngr =
-        new Commit_order_manager(rli->opt_replica_parallel_workers);
+    // Only use replica preserve commit order if more than 1 worker exists
+    if (opt_replica_preserve_commit_order && !rli->is_parallel_exec() &&
+        rli->opt_replica_parallel_workers > 1)
+      commit_order_mngr =
+          new Commit_order_manager(rli->opt_replica_parallel_workers);
 
-  rli->set_commit_order_manager(commit_order_mngr);
+    rli->set_commit_order_manager(commit_order_mngr);
 
-  if (channel_map.is_group_replication_channel_name(rli->get_channel())) {
-    if (channel_map.is_group_replication_channel_name(rli->get_channel(),
-                                                      true)) {
-      thd->rpl_thd_ctx.set_rpl_channel_type(GR_APPLIER_CHANNEL);
+    if (channel_map.is_group_replication_channel_name(rli->get_channel())) {
+      if (channel_map.is_group_replication_channel_name(rli->get_channel(),
+                                                        true)) {
+        thd->rpl_thd_ctx.set_rpl_channel_type(GR_APPLIER_CHANNEL);
+      } else {
+        thd->rpl_thd_ctx.set_rpl_channel_type(GR_RECOVERY_CHANNEL);
+      }
     } else {
-      thd->rpl_thd_ctx.set_rpl_channel_type(GR_RECOVERY_CHANNEL);
+      thd->rpl_thd_ctx.set_rpl_channel_type(RPL_STANDARD_CHANNEL);
     }
-  } else {
-    thd->rpl_thd_ctx.set_rpl_channel_type(RPL_STANDARD_CHANNEL);
-  }
 
-  mysql_mutex_unlock(&rli->info_thd_lock);
+    mysql_mutex_unlock(&rli->info_thd_lock);
 
-  /* Inform waiting threads that slave has started */
-  rli->slave_run_id++;
-  rli->slave_running = 1;
-  rli->reported_unsafe_warning = false;
-  rli->sql_thread_kill_accepted = false;
-  rli->last_event_start_time = 0;
+    /* Inform waiting threads that slave has started */
+    rli->slave_run_id++;
+    rli->slave_running = 1;
+    rli->reported_unsafe_warning = false;
+    rli->sql_thread_kill_accepted = false;
+    rli->last_event_start_time = 0;
 
-  if (init_replica_thread(thd, SLAVE_THD_SQL)) {
-    /*
-      TODO: this is currently broken - slave start and change master
-      will be stuck if we fail here
-    */
-    mysql_cond_broadcast(&rli->start_cond);
-    mysql_mutex_unlock(&rli->run_lock);
-    rli->report(ERROR_LEVEL, ER_REPLICA_FATAL_ERROR,
-                ER_THD(thd, ER_REPLICA_FATAL_ERROR),
-                "Failed during replica thread initialization");
-    goto err;
-  }
-  thd->init_query_mem_roots();
-
-  if ((rli->deferred_events_collecting = rli->rpl_filter->is_on()))
-    rli->deferred_events = new Deferred_log_events();
-  thd->rli_slave = rli;
-  assert(thd->rli_slave->info_thd == thd);
-
-  thd->temporary_tables = rli->save_temporary_tables;  // restore temp tables
-  set_thd_in_use_temporary_tables(
-      rli);  // (re)set sql_thd in use for saved temp tables
-  /* Set applier thread InnoDB priority */
-  set_thd_tx_priority(thd, rli->get_thd_tx_priority());
-
-  /* Set write set related options */
-  set_thd_write_set_options(thd, rli->get_ignore_write_set_memory_limit(),
-                            rli->get_allow_drop_write_set());
-
-  thd->variables.require_row_format = rli->is_row_format_required();
-
-  if (Relay_log_info::PK_CHECK_STREAM !=
-      rli->get_require_table_primary_key_check())
-    thd->variables.sql_require_primary_key =
-        (rli->get_require_table_primary_key_check() ==
-         Relay_log_info::PK_CHECK_ON);
-
-  // Replicas shall not create GIPKs if source tables have no PKs
-  thd->variables.sql_generate_invisible_primary_key = false;
-  if (thd->rpl_thd_ctx.get_rpl_channel_type() != GR_APPLIER_CHANNEL &&
-      thd->rpl_thd_ctx.get_rpl_channel_type() != GR_RECOVERY_CHANNEL &&
-      Relay_log_info::PK_CHECK_GENERATE ==
-          rli->get_require_table_primary_key_check()) {
-    thd->variables.sql_generate_invisible_primary_key = true;
-  }
-
-  rli->transaction_parser.reset();
-
-  thd_manager->add_thd(thd);
-  thd_added = true;
-
-  rli->stats_exec_time = rli->stats_read_time = 0;
-  set_timespec_nsec(&rli->ts_exec[0], 0);
-  set_timespec_nsec(&rli->ts_exec[1], 0);
-  set_timespec_nsec(&rli->stats_begin, 0);
-
-  if (RUN_HOOK(binlog_relay_io, applier_start, (thd, rli->mi))) {
-    mysql_cond_broadcast(&rli->start_cond);
-    mysql_mutex_unlock(&rli->run_lock);
-    rli->report(ERROR_LEVEL, ER_REPLICA_FATAL_ERROR,
-                ER_THD(thd, ER_REPLICA_FATAL_ERROR),
-                "Failed to run 'applier_start' hook");
-    goto err;
-  }
-
-  /* MTS: starting the worker pool */
-  if (slave_start_workers(rli, rli->opt_replica_parallel_workers,
-                          &mts_inited) != 0) {
-    mysql_cond_broadcast(&rli->start_cond);
-    mysql_mutex_unlock(&rli->run_lock);
-    rli->report(ERROR_LEVEL, ER_REPLICA_FATAL_ERROR,
-                ER_THD(thd, ER_REPLICA_FATAL_ERROR),
-                "Failed during replica workers initialization");
-    goto err;
-  }
-  /*
-    We are going to set slave_running to 1. Assuming slave I/O thread is
-    alive and connected, this is going to make Seconds_Behind_Master be 0
-    i.e. "caught up". Even if we're just at start of thread. Well it's ok, at
-    the moment we start we can think we are caught up, and the next second we
-    start receiving data so we realize we are not caught up and
-    Seconds_Behind_Master grows. No big deal.
-  */
-  rli->abort_slave = false;
-
-  /*
-    Reset errors for a clean start (otherwise, if the master is idle, the SQL
-    thread may execute no Query_log_event, so the error will remain even
-    though there's no problem anymore). Do not reset the master timestamp
-    (imagine the slave has caught everything, the STOP SLAVE and START SLAVE:
-    as we are not sure that we are going to receive a query, we want to
-    remember the last master timestamp (to say how many seconds behind we are
-    now.
-    But the master timestamp is reset by RESET SLAVE & CHANGE MASTER.
-  */
-  rli->clear_error();
-  if (rli->workers_array_initialized) {
-    for (size_t i = 0; i < rli->get_worker_count(); i++) {
-      rli->get_worker(i)->clear_error();
-    }
-  }
-    if (rli->update_is_transactional() ||
-        DBUG_EVALUATE_IF("simulate_update_is_transactional_error", true,
-                         false)) {
+    if (init_replica_thread(thd, SLAVE_THD_SQL)) {
+      /*
+        TODO: this is currently broken - slave start and change master
+        will be stuck if we fail here
+      */
       mysql_cond_broadcast(&rli->start_cond);
       mysql_mutex_unlock(&rli->run_lock);
-      rli->report(
-          ERROR_LEVEL, ER_REPLICA_FATAL_ERROR,
-          ER_THD(thd, ER_REPLICA_FATAL_ERROR),
-          "Error checking if the relay log repository is transactional.");
+      rli->report(ERROR_LEVEL, ER_REPLICA_FATAL_ERROR,
+                  ER_THD(thd, ER_REPLICA_FATAL_ERROR),
+                  "Failed during replica thread initialization");
+      goto err;
+    }
+    thd->init_query_mem_roots();
+
+    if ((rli->deferred_events_collecting = rli->rpl_filter->is_on()))
+      rli->deferred_events = new Deferred_log_events();
+    thd->rli_slave = rli;
+    assert(thd->rli_slave->info_thd == thd);
+
+    thd->temporary_tables = rli->save_temporary_tables;  // restore temp tables
+    set_thd_in_use_temporary_tables(
+        rli);  // (re)set sql_thd in use for saved temp tables
+    /* Set applier thread InnoDB priority */
+    set_thd_tx_priority(thd, rli->get_thd_tx_priority());
+
+    /* Set write set related options */
+    set_thd_write_set_options(thd, rli->get_ignore_write_set_memory_limit(),
+                              rli->get_allow_drop_write_set());
+
+    thd->variables.require_row_format = rli->is_row_format_required();
+
+    if (Relay_log_info::PK_CHECK_STREAM !=
+        rli->get_require_table_primary_key_check())
+      thd->variables.sql_require_primary_key =
+          (rli->get_require_table_primary_key_check() ==
+          Relay_log_info::PK_CHECK_ON);
+
+    thd->variables.sql_generate_invisible_primary_key = false;
+    if (thd->rpl_thd_ctx.get_rpl_channel_type() != GR_APPLIER_CHANNEL &&
+        thd->rpl_thd_ctx.get_rpl_channel_type() != GR_RECOVERY_CHANNEL &&
+        Relay_log_info::PK_CHECK_GENERATE ==
+            rli->get_require_table_primary_key_check()) {
+      thd->variables.sql_generate_invisible_primary_key = true;
+    }
+
+    rli->transaction_parser.reset();
+
+    thd_manager->add_thd(thd);
+    thd_added = true;
+
+    rli->stats_exec_time = rli->stats_read_time = 0;
+    set_timespec_nsec(&rli->ts_exec[0], 0);
+    set_timespec_nsec(&rli->ts_exec[1], 0);
+    set_timespec_nsec(&rli->stats_begin, 0);
+
+    if (RUN_HOOK(binlog_relay_io, applier_start, (thd, rli->mi))) {
+      mysql_cond_broadcast(&rli->start_cond);
+      mysql_mutex_unlock(&rli->run_lock);
+      rli->report(ERROR_LEVEL, ER_REPLICA_FATAL_ERROR,
+                  ER_THD(thd, ER_REPLICA_FATAL_ERROR),
+                  "Failed to run 'applier_start' hook");
       goto err;
     }
 
-  if (!rli->is_transactional())
-    rli->report(WARNING_LEVEL, 0,
-                "If a crash happens this configuration does not guarantee that "
-                "the relay "
-                "log info will be consistent");
-
-  mysql_cond_broadcast(&rli->start_cond);
-  mysql_mutex_unlock(&rli->run_lock);
-
-#ifdef WITH_WSREP
-  /* Initialization of Galera/WSREP and async replication happens in parallel.
-     Allow async replication infrastructure to init up to this point, but
-     wait with applying async-replicated events until WSREP infrastructure
-     is fully initialized (wsrep_ready == true). wsrep_ready is set when
-     server state shifts to s_synced.
-     Before this state, events are rejected with error
-     'WSREP has not yet prepared node for application use' */
-  if (WSREP(thd)) {
-    Wsrep_server_state::instance().wait_until_state(
-        Wsrep_server_state::s_synced);
-  }
-#endif /* WITH_WSREP */
-
-  DEBUG_SYNC(thd, "after_start_replica");
-
-  // tell the I/O thread to take relay_log_space_limit into account from now
-  // on
-  mysql_mutex_lock(&rli->log_space_lock);
-  rli->ignore_log_space_limit = false;
-  mysql_mutex_unlock(&rli->log_space_lock);
-  rli->trans_retries = 0;  // start from "no error"
-  DBUG_PRINT("info", ("rli->trans_retries: %lu", rli->trans_retries));
-
-  if (applier_reader.open(&errmsg)) {
-    rli->report(ERROR_LEVEL, ER_REPLICA_FATAL_ERROR, "%s", errmsg);
-    goto err;
-  }
-
-  THD_CHECK_SENTRY(thd);
-  assert(rli->info_thd == thd);
-
-  DBUG_PRINT("source_info", ("log_file_name: %s  position: %s",
-                             rli->get_group_master_log_name(),
-                             llstr(rli->get_group_master_log_pos(), llbuff)));
-
-  if (check_temp_dir(rli->slave_patternload_file, rli->get_channel())) {
-    rli->report(ERROR_LEVEL, thd->get_stmt_da()->mysql_errno(),
-                "Unable to use replica's temporary directory %s - %s",
-                replica_load_tmpdir, thd->get_stmt_da()->message_text());
-    goto err;
-  }
-
-  priv_check_status = rli->check_privilege_checks_user();
-  if (!!priv_check_status) {
-    rli->report_privilege_check_error(ERROR_LEVEL, priv_check_status,
-                                      false /* to client*/);
-    rli->set_privilege_checks_user_corrupted(true);
-    goto err;
-  }
-  priv_check_status =
-      rli->initialize_applier_security_context();  // Applier security context
-                                                   // initialization with
-                                                   // `PRIVILEGE_CHECKS_USER`
-  if (!!priv_check_status) {
-    rli->report_privilege_check_error(ERROR_LEVEL, priv_check_status,
-                                      false /* to client*/);
-    goto err;
-  }
-
-  if (rli->is_privilege_checks_user_null())
-    LogErr(INFORMATION_LEVEL, ER_RPL_REPLICA_SQL_THREAD_STARTING,
-           rli->get_for_channel_str(), rli->get_rpl_log_name(),
-           llstr(rli->get_group_master_log_pos(), llbuff),
-           rli->get_group_relay_log_name(),
-           llstr(rli->get_group_relay_log_pos(), llbuff1));
-  else
-    LogErr(INFORMATION_LEVEL,
-           ER_RPL_REPLICA_SQL_THREAD_STARTING_WITH_PRIVILEGE_CHECKS,
-           rli->get_for_channel_str(), rli->get_rpl_log_name(),
-           llstr(rli->get_group_master_log_pos(), llbuff),
-           rli->get_group_relay_log_name(),
-           llstr(rli->get_group_relay_log_pos(), llbuff1),
-           rli->get_privilege_checks_username().c_str(),
-           rli->get_privilege_checks_hostname().c_str(),
-           opt_always_activate_granted_roles == 0 ? "DEFAULT" : "ALL");
-
-  /* execute init_replica variable */
-  if (opt_init_replica.length) {
-    execute_init_command(thd, &opt_init_replica, &LOCK_sys_init_replica);
-    if (thd->is_slave_error) {
-      rli->report(ERROR_LEVEL, ER_SERVER_REPLICA_INIT_QUERY_FAILED,
-                  ER_THD(current_thd, ER_SERVER_REPLICA_INIT_QUERY_FAILED),
-                  thd->get_stmt_da()->mysql_errno(),
-                  thd->get_stmt_da()->message_text());
+    /* MTS: starting the worker pool */
+    if (slave_start_workers(rli, rli->opt_replica_parallel_workers,
+                            &mts_inited) != 0) {
+      mysql_cond_broadcast(&rli->start_cond);
+      mysql_mutex_unlock(&rli->run_lock);
+      rli->report(ERROR_LEVEL, ER_REPLICA_FATAL_ERROR,
+                  ER_THD(thd, ER_REPLICA_FATAL_ERROR),
+                  "Failed during replica workers initialization");
       goto err;
     }
-  }
+    /*
+      We are going to set slave_running to 1. Assuming slave I/O thread is
+      alive and connected, this is going to make Seconds_Behind_Master be 0
+      i.e. "caught up". Even if we're just at start of thread. Well it's ok, at
+      the moment we start we can think we are caught up, and the next second we
+      start receiving data so we realize we are not caught up and
+      Seconds_Behind_Master grows. No big deal.
+    */
+    rli->abort_slave = false;
 
-  /*
-    First check until condition - probably there is nothing to execute. We
-    do not want to wait for next event in this case.
-  */
-  mysql_mutex_lock(&rli->data_lock);
-  if (rli->slave_skip_counter) {
-    strmake(saved_log_name, rli->get_group_relay_log_name(), FN_REFLEN - 1);
-    strmake(saved_master_log_name, rli->get_group_master_log_name(),
-            FN_REFLEN - 1);
-    saved_log_pos = rli->get_group_relay_log_pos();
-    saved_master_log_pos = rli->get_group_master_log_pos();
-    saved_skip = rli->slave_skip_counter;
-  }
-  if (rli->is_until_satisfied_at_start_slave()) {
-    mysql_mutex_unlock(&rli->data_lock);
-    goto err;
-  }
-  mysql_mutex_unlock(&rli->data_lock);
+    /*
+      Reset errors for a clean start (otherwise, if the master is idle, the SQL
+      thread may execute no Query_log_event, so the error will remain even
+      though there's no problem anymore). Do not reset the master timestamp
+      (imagine the slave has caught everything, the STOP SLAVE and START SLAVE:
+      as we are not sure that we are going to receive a query, we want to
+      remember the last master timestamp (to say how many seconds behind we are
+      now.
+      But the master timestamp is reset by RESET SLAVE & CHANGE MASTER.
+    */
+    rli->clear_error();
+    if (rli->workers_array_initialized) {
+      for (size_t i = 0; i < rli->get_worker_count(); i++) {
+        rli->get_worker(i)->clear_error();
+      }
+    }
+      if (rli->update_is_transactional() ||
+          DBUG_EVALUATE_IF("simulate_update_is_transactional_error", true,
+                          false)) {
+        mysql_cond_broadcast(&rli->start_cond);
+        mysql_mutex_unlock(&rli->run_lock);
+        rli->report(
+            ERROR_LEVEL, ER_REPLICA_FATAL_ERROR,
+            ER_THD(thd, ER_REPLICA_FATAL_ERROR),
+            "Error checking if the relay log repository is transactional.");
+        goto err;
+      }
+
+    if (!rli->is_transactional())
+        rli->report(
+            WARNING_LEVEL, 0,
+            "If a crash happens this configuration does not guarantee that "
+            "the relay "
+            "log info will be consistent");
+
+    mysql_cond_broadcast(&rli->start_cond);
+    mysql_mutex_unlock(&rli->run_lock);
 
 #ifdef WITH_WSREP
-  wsrep_open(thd);
-  if (wsrep_before_command(thd)) {
-    WSREP_WARN("Slave SQL wsrep_before_command() failed");
-    goto err;
-  }
+    /* Initialization of Galera/WSREP and async replication happens in parallel.
+      Allow async replication infrastructure to init up to this point, but
+      wait with applying async-replicated events until WSREP infrastructure
+      is fully initialized (wsrep_ready == true). wsrep_ready is set when
+      server state shifts to s_synced.
+      Before this state, events are rejected with error
+      'WSREP has not yet prepared node for application use' */
+    if (WSREP(thd)) {
+      Wsrep_server_state::instance().wait_until_state(
+          Wsrep_server_state::s_synced);
+    }
 #endif /* WITH_WSREP */
 
-  /* Read queries from the IO/THREAD until this thread is killed */
+    DEBUG_SYNC(thd, "after_start_replica");
 
-  while (!main_loop_error && !sql_slave_killed(thd, rli)) {
-    Log_event *ev = nullptr;
-    THD_STAGE_INFO(thd, stage_reading_event_from_the_relay_log);
-    assert(rli->info_thd == thd);
+    // tell the I/O thread to take relay_log_space_limit into account from now
+    // on
+    mysql_mutex_lock(&rli->log_space_lock);
+    rli->ignore_log_space_limit = false;
+    mysql_mutex_unlock(&rli->log_space_lock);
+    rli->trans_retries = 0;  // start from "no error"
+    DBUG_PRINT("info", ("rli->trans_retries: %lu", rli->trans_retries));
+
+    if (applier_reader.open(&errmsg)) {
+      rli->report(ERROR_LEVEL, ER_REPLICA_FATAL_ERROR, "%s", errmsg);
+      goto err;
+    }
+
     THD_CHECK_SENTRY(thd);
-    if (saved_skip && rli->slave_skip_counter == 0) {
-      LogErr(INFORMATION_LEVEL, ER_RPL_REPLICA_SKIP_COUNTER_EXECUTED,
-             (ulong)saved_skip, saved_log_name, (ulong)saved_log_pos,
-             saved_master_log_name, (ulong)saved_master_log_pos,
-             rli->get_group_relay_log_name(),
-             (ulong)rli->get_group_relay_log_pos(),
-             rli->get_group_master_log_name_info(),
-             (ulong)rli->get_group_master_log_pos_info());
-      saved_skip = 0;
+    assert(rli->info_thd == thd);
+
+    DBUG_PRINT("source_info", ("log_file_name: %s  position: %s",
+                              rli->get_group_master_log_name(),
+                              llstr(rli->get_group_master_log_pos(), llbuff)));
+
+    if (check_temp_dir(rli->slave_patternload_file, rli->get_channel())) {
+      rli->report(ERROR_LEVEL, thd->get_stmt_da()->mysql_errno(),
+                  "Unable to use replica's temporary directory %s - %s",
+                  replica_load_tmpdir, thd->get_stmt_da()->message_text());
+      goto err;
     }
 
-    // read next event
-    mysql_mutex_lock(&rli->data_lock);
-    ev = applier_reader.read_next_event();
-    mysql_mutex_unlock(&rli->data_lock);
+    priv_check_status = rli->check_privilege_checks_user();
+    if (!!priv_check_status) {
+      rli->report_privilege_check_error(ERROR_LEVEL, priv_check_status,
+                                        false /* to client*/);
+      rli->set_privilege_checks_user_corrupted(true);
+      goto err;
+    }
+    priv_check_status =
+        rli->initialize_applier_security_context();  // Applier security context
+                                                    // initialization with
+                                                    // `PRIVILEGE_CHECKS_USER`
+    if (!!priv_check_status) {
+      rli->report_privilege_check_error(ERROR_LEVEL, priv_check_status,
+                                        false /* to client*/);
+      goto err;
+    }
 
-    // set additional context as needed by the scheduler before execution
-    // takes place
-    if (ev != nullptr && rli->is_parallel_exec() &&
-        rli->current_mts_submode != nullptr) {
-      if (rli->current_mts_submode->set_multi_threaded_applier_context(*rli, 
-                                                                       *ev)) {
+    if (rli->is_privilege_checks_user_null())
+      LogErr(INFORMATION_LEVEL, ER_RPL_REPLICA_SQL_THREAD_STARTING,
+             rli->get_for_channel_str(), rli->get_rpl_log_name(),
+             llstr(rli->get_group_master_log_pos_info(), llbuff),
+             rli->get_group_relay_log_name(),
+             llstr(rli->get_group_relay_log_pos(), llbuff1));
+    else
+      LogErr(INFORMATION_LEVEL,
+             ER_RPL_REPLICA_SQL_THREAD_STARTING_WITH_PRIVILEGE_CHECKS,
+             rli->get_for_channel_str(), rli->get_rpl_log_name(),
+             llstr(rli->get_group_master_log_pos_info(), llbuff),
+             rli->get_group_relay_log_name(),
+             llstr(rli->get_group_relay_log_pos(), llbuff1),
+             rli->get_privilege_checks_username().c_str(),
+             rli->get_privilege_checks_hostname().c_str(),
+             opt_always_activate_granted_roles == 0 ? "DEFAULT" : "ALL");
+
+    /* execute init_replica variable */
+    if (opt_init_replica.length) {
+      execute_init_command(thd, &opt_init_replica, &LOCK_sys_init_replica);
+      if (thd->is_slave_error) {
+        rli->report(ERROR_LEVEL, ER_SERVER_REPLICA_INIT_QUERY_FAILED,
+                    ER_THD(current_thd, ER_SERVER_REPLICA_INIT_QUERY_FAILED),
+                    thd->get_stmt_da()->mysql_errno(),
+                    thd->get_stmt_da()->message_text());
         goto err;
       }
     }
 
-    // try to execute the event
-    switch (exec_relay_log_event(thd, rli, &applier_reader, ev)) {
-      case SLAVE_APPLY_EVENT_AND_UPDATE_POS_OK:
-        /** success, we read the next event. */
-        /** fall through */
-      case SLAVE_APPLY_EVENT_UNTIL_REACHED:
-        /** this will make the main loop abort in the next iteration */
-        /** fall through */
-      case SLAVE_APPLY_EVENT_RETRY:
-        /** single threaded applier has to retry.
-            Next iteration reads the same event. */
-        break;
-
-      case SLAVE_APPLY_EVENT_AND_UPDATE_POS_APPLY_ERROR:
-        /** fall through */
-      case SLAVE_APPLY_EVENT_AND_UPDATE_POS_UPDATE_POS_ERROR:
-        /** fall through */
-      case SLAVE_APPLY_EVENT_AND_UPDATE_POS_APPEND_JOB_ERROR:
-        main_loop_error = true;
-        break;
-
-      default:
-        /* This shall never happen. */
-        assert(0); /* purecov: inspected */
-        break;
+    /*
+      First check until condition - probably there is nothing to execute. We
+      do not want to wait for next event in this case.
+    */
+    mysql_mutex_lock(&rli->data_lock);
+    if (rli->slave_skip_counter) {
+      strmake(saved_log_name, rli->get_group_relay_log_name(), FN_REFLEN - 1);
+      strmake(saved_master_log_name, rli->get_group_master_log_name(),
+              FN_REFLEN - 1);
+      saved_log_pos = rli->get_group_relay_log_pos();
+      saved_master_log_pos = rli->get_group_master_log_pos();
+      saved_skip = rli->slave_skip_counter;
     }
-  }
-err:
-
-  // report error
+    if (rli->is_until_satisfied_at_start_slave()) {
+      mysql_mutex_unlock(&rli->data_lock);
+      goto err;
+    }
+    mysql_mutex_unlock(&rli->data_lock);
 
 #ifdef WITH_WSREP
-  /* Free the GTID buffer associated with the thread. */
-  free_gtid_event_buf(thd);
-  if (main_loop_error == true && WSREP_ON) {
-    mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    if (thd->wsrep_cs().current_error()) {
-      wsrep_node_dropped = true;
-      rli->abort_slave = true;
+    wsrep_open(thd);
+    if (wsrep_before_command(thd)) {
+      WSREP_WARN("Slave SQL wsrep_before_command() failed");
+      goto err;
     }
-    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-  }
 #endif /* WITH_WSREP */
 
-  if (main_loop_error == true && !sql_slave_killed(thd, rli))
-    slave_errno = report_apply_event_error(thd, rli);
+    /* Read queries from the IO/THREAD until this thread is killed */
 
-  /* At this point the SQL thread will not try to work anymore. */
-  rli->atomic_is_stopping = true;
-  (void)RUN_HOOK(
-      binlog_relay_io, applier_stop,
-      (thd, rli->mi, rli->is_error() || !rli->sql_thread_kill_accepted));
+    while (!main_loop_error && !sql_slave_killed(thd, rli)) {
+      Log_event *ev = nullptr;
+      THD_STAGE_INFO(thd, stage_reading_event_from_the_relay_log);
+      assert(rli->info_thd == thd);
+      THD_CHECK_SENTRY(thd);
+      if (saved_skip && rli->slave_skip_counter == 0) {
+        LogErr(INFORMATION_LEVEL, ER_RPL_REPLICA_SKIP_COUNTER_EXECUTED,
+              (ulong)saved_skip, saved_log_name, (ulong)saved_log_pos,
+              saved_master_log_name, (ulong)saved_master_log_pos,
+              rli->get_group_relay_log_name(),
+              (ulong)rli->get_group_relay_log_pos(),
+              rli->get_group_master_log_name_info(),
+              (ulong)rli->get_group_master_log_pos_info());
+        saved_skip = 0;
+      }
 
-  slave_stop_workers(rli, &mts_inited);  // stopping worker pool
-  /* Thread stopped. Print the current replication position to the log */
-  if (slave_errno)
-    LogErr(ERROR_LEVEL, slave_errno, rli->get_rpl_log_name(),
-           llstr(rli->get_group_master_log_pos(), llbuff));
-  else
-    LogErr(INFORMATION_LEVEL, ER_RPL_REPLICA_SQL_THREAD_EXITING,
-           rli->get_for_channel_str(), rli->get_rpl_log_name(),
-           llstr(rli->get_group_master_log_pos(), llbuff));
+      // read next event
+      mysql_mutex_lock(&rli->data_lock);
+      ev = applier_reader.read_next_event();
+      mysql_mutex_unlock(&rli->data_lock);
+
+      // set additional context as needed by the scheduler before execution
+      // takes place
+      if (ev != nullptr && rli->is_parallel_exec() &&
+          rli->current_mts_submode != nullptr) {
+        if (rli->current_mts_submode->set_multi_threaded_applier_context(*rli,
+                                                                        *ev)) {
+          goto err;
+        }
+      }
+
+      // try to execute the event
+      switch (exec_relay_log_event(thd, rli, &applier_reader, ev)) {
+        case SLAVE_APPLY_EVENT_AND_UPDATE_POS_OK:
+          /** success, we read the next event. */
+          /** fall through */
+        case SLAVE_APPLY_EVENT_UNTIL_REACHED:
+          /** this will make the main loop abort in the next iteration */
+          /** fall through */
+        case SLAVE_APPLY_EVENT_RETRY:
+          /** single threaded applier has to retry.
+              Next iteration reads the same event. */
+          break;
+
+        case SLAVE_APPLY_EVENT_AND_UPDATE_POS_APPLY_ERROR:
+          /** fall through */
+        case SLAVE_APPLY_EVENT_AND_UPDATE_POS_UPDATE_POS_ERROR:
+          /** fall through */
+        case SLAVE_APPLY_EVENT_AND_UPDATE_POS_APPEND_JOB_ERROR:
+          main_loop_error = true;
+          break;
+
+        default:
+          /* This shall never happen. */
+          assert(0); /* purecov: inspected */
+          break;
+      }
+    }
+  err:
+
+    // report error
 
 #ifdef WITH_WSREP
-  wsrep_after_command_before_result(thd);
-  wsrep_after_command_after_result(thd);
-  wsrep_close(thd);
+    /* Free the GTID buffer associated with the thread. */
+    free_gtid_event_buf(thd);
+    if (main_loop_error == true && WSREP_ON) {
+      mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+      if (thd->wsrep_cs().current_error()) {
+        wsrep_node_dropped = true;
+        rli->abort_slave = true;
+      }
+      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+    }
 #endif /* WITH_WSREP */
 
-  delete rli->current_mts_submode;
-  rli->current_mts_submode = nullptr;
-  rli->clear_mts_recovery_groups();
+    if (main_loop_error == true && !sql_slave_killed(thd, rli))
+      slave_errno = report_apply_event_error(thd, rli);
 
-  /*
-    Some events set some playgrounds, which won't be cleared because thread
-    stops. Stopping of this thread may not be known to these events ("stop"
-    request is detected only by the present function, not by events), so we
-    must "proactively" clear playgrounds:
-  */
-  thd->clear_error();
-  rli->cleanup_context(thd, true);
-  /*
-    Some extra safety, which should not been needed (normally, event deletion
-    should already have done these assignments (each event which sets these
-    variables is supposed to set them to 0 before terminating)).
-  */
-  thd->set_catalog(NULL_CSTR);
-  thd->reset_query();
-  thd->reset_db(NULL_CSTR);
+    /* At this point the SQL thread will not try to work anymore. */
+    rli->atomic_is_stopping = true;
+    (void)RUN_HOOK(
+        binlog_relay_io, applier_stop,
+        (thd, rli->mi, rli->is_error() || !rli->sql_thread_kill_accepted));
 
-  /*
-    Pause the SQL thread and wait for 'continue_to_stop_sql_thread'
-    signal to continue to shutdown the SQL thread.
-  */
-  DBUG_EXECUTE_IF("pause_after_sql_thread_stop_hook", {
-    rpl_replica_debug_point(DBUG_RPL_S_AFTER_SQL_STOP, thd);
-  };);
+    slave_stop_workers(rli, &mts_inited);  // stopping worker pool
+    /* Thread stopped. Print the current replication position to the log */
+    if (slave_errno)
+      LogErr(ERROR_LEVEL, slave_errno, rli->get_rpl_log_name(),
+             llstr(rli->get_group_master_log_pos_info(), llbuff));
+    else
+      LogErr(INFORMATION_LEVEL, ER_RPL_REPLICA_SQL_THREAD_EXITING,
+             rli->get_for_channel_str(), rli->get_rpl_log_name(),
+             llstr(rli->get_group_master_log_pos_info(), llbuff));
 
-  THD_STAGE_INFO(thd, stage_waiting_for_replica_mutex_on_exit);
-  mysql_mutex_lock(&rli->run_lock);
-  /* We need data_lock, at least to wake up any waiting source_pos_wait() */
-  mysql_mutex_lock(&rli->data_lock);
-  applier_reader.close();
-  assert(rli->slave_running == 1);  // tracking buffer overrun
-  /* When source_pos_wait() wakes up it will check this and terminate */
-  rli->slave_running = 0;
-  rli->atomic_is_stopping = false;
-  /* Forget the relay log's format */
-  if (rli->set_rli_description_event(nullptr)) {
+#ifdef WITH_WSREP
+    wsrep_after_command_before_result(thd);
+    wsrep_after_command_after_result(thd);
+    wsrep_close(thd);
+#endif /* WITH_WSREP */
+
+    delete rli->current_mts_submode;
+    rli->current_mts_submode = nullptr;
+    rli->clear_mts_recovery_groups();
+
+    /*
+      Some events set some playgrounds, which won't be cleared because thread
+      stops. Stopping of this thread may not be known to these events ("stop"
+      request is detected only by the present function, not by events), so we
+      must "proactively" clear playgrounds:
+    */
+    thd->clear_error();
+    rli->cleanup_context(thd, true);
+    /*
+      Some extra safety, which should not been needed (normally, event deletion
+      should already have done these assignments (each event which sets these
+      variables is supposed to set them to 0 before terminating)).
+    */
+    thd->set_catalog(NULL_CSTR);
+    thd->reset_query();
+    thd->reset_db(NULL_CSTR);
+
+    /*
+      Pause the SQL thread and wait for 'continue_to_stop_sql_thread'
+      signal to continue to shutdown the SQL thread.
+    */
+    DBUG_EXECUTE_IF("pause_after_sql_thread_stop_hook", {
+      rpl_replica_debug_point(DBUG_RPL_S_AFTER_SQL_STOP, thd);
+    };);
+
+    THD_STAGE_INFO(thd, stage_waiting_for_replica_mutex_on_exit);
+    mysql_mutex_lock(&rli->run_lock);
+    /* We need data_lock, at least to wake up any waiting source_pos_wait() */
+    mysql_mutex_lock(&rli->data_lock);
+    applier_reader.close();
+    assert(rli->slave_running == 1);  // tracking buffer overrun
+    /* When source_pos_wait() wakes up it will check this and terminate */
+    rli->slave_running = 0;
+    rli->atomic_is_stopping = false;
+    /* Forget the relay log's format */
+    if (rli->set_rli_description_event(nullptr)) {
 #ifndef NDEBUG
-    bool set_rli_description_event_failed = false;
+      bool set_rli_description_event_failed = false;
 #endif
-    assert(set_rli_description_event_failed);
-  }
-  /* Wake up source_pos_wait() */
-  DBUG_PRINT("info",
-             ("Signaling possibly waiting source_pos_wait() functions"));
-  mysql_cond_broadcast(&rli->data_cond);
-  mysql_mutex_unlock(&rli->data_lock);
-  rli->ignore_log_space_limit = false; /* don't need any lock */
-  rli->sql_force_rotate_relay = false;
-  /* we die so won't remember charset - re-update them on next thread start */
-  rli->cached_charset_invalidate();
-  rli->save_temporary_tables = thd->temporary_tables;
+      assert(set_rli_description_event_failed);
+    }
+    /* Wake up source_pos_wait() */
+    DBUG_PRINT("info",
+              ("Signaling possibly waiting source_pos_wait() functions"));
+    mysql_cond_broadcast(&rli->data_cond);
+    mysql_mutex_unlock(&rli->data_lock);
+    rli->ignore_log_space_limit = false; /* don't need any lock */
+    rli->sql_force_rotate_relay = false;
+    /* we die so won't remember charset - re-update them on next thread start */
+    rli->cached_charset_invalidate();
+    rli->save_temporary_tables = thd->temporary_tables;
 
-  /*
-    TODO: see if we can do this conditionally in next_event() instead
-    to avoid unneeded position re-init
-  */
-  thd->temporary_tables =
-      nullptr;  // remove temptation from destructor to close them
-  // destructor will not free it, because we are weird
-  thd->get_protocol_classic()->end_net();
-  assert(rli->info_thd == thd);
-  THD_CHECK_SENTRY(thd);
-  mysql_mutex_lock(&rli->info_thd_lock);
-  rli->info_thd = nullptr;
-  if (commit_order_mngr) {
-    rli->set_commit_order_manager(nullptr);
-    delete commit_order_mngr;
-  }
+    /*
+      TODO: see if we can do this conditionally in next_event() instead
+      to avoid unneeded position re-init
+    */
+    thd->temporary_tables =
+        nullptr;  // remove temptation from destructor to close them
+    // destructor will not free it, because we are weird
+    thd->get_protocol_classic()->end_net();
+    assert(rli->info_thd == thd);
+    THD_CHECK_SENTRY(thd);
+    mysql_mutex_lock(&rli->info_thd_lock);
+    rli->info_thd = nullptr;
+    if (commit_order_mngr) {
+      rli->set_commit_order_manager(nullptr);
+      delete commit_order_mngr;
+    }
 
-  mysql_mutex_unlock(&rli->info_thd_lock);
-  set_thd_in_use_temporary_tables(
-      rli);  // (re)set info_thd in use for saved temp tables
+    mysql_mutex_unlock(&rli->info_thd_lock);
+    set_thd_in_use_temporary_tables(
+        rli);  // (re)set info_thd in use for saved temp tables
 
-  thd->release_resources();
-  THD_CHECK_SENTRY(thd);
-  if (thd_added) thd_manager->remove_thd(thd);
+    thd->release_resources();
+    THD_CHECK_SENTRY(thd);
+    if (thd_added) thd_manager->remove_thd(thd);
 
-  /*
-    The thd can only be destructed after indirect references
-    through mi->rli->info_thd are cleared: mi->rli->info_thd= NULL.
+    /*
+      The thd can only be destructed after indirect references
+      through mi->rli->info_thd are cleared: mi->rli->info_thd= NULL.
 
-    For instance, user thread might be issuing show_slave_status
-    and attempting to read mi->rli->info_thd->proc_info().
-    Therefore thd must only be deleted after info_thd is set
-    to NULL.
-  */
-  mysql_thread_set_psi_THD(nullptr);
-  delete thd;
+      For instance, user thread might be issuing show_slave_status
+      and attempting to read mi->rli->info_thd->proc_info().
+      Therefore thd must only be deleted after info_thd is set
+      to NULL.
+    */
+    mysql_thread_set_psi_THD(nullptr);
+    delete thd;
 
 #ifdef WITH_WSREP
-  /* if slave stopped due to node going non primary, we set global flag to
-     trigger automatic restart of slave when node joins back to cluster
-  */
-  if (WSREP_ON && wsrep_node_dropped && wsrep_restart_slave) {
-    if (wsrep_ready_get()) {
-      WSREP_INFO(
-          "Slave error due to node temporarily went non-primary"
-          "SQL slave will continue");
-      wsrep_node_dropped = false;
-      mysql_mutex_unlock(&rli->run_lock);
-      WSREP_INFO("Restarting Slave (conflict-state: %s)",
-                 wsrep_thd_client_state_str(thd));
-      goto wsrep_restart_point;
-    } else {
-      WSREP_INFO("Slave error due to node going non-primary");
-      WSREP_INFO(
-          "wsrep_restart_slave is set. Slave will automatically"
-          " restart when node joins back the cluster");
-      wsrep_restart_slave_activated = true;
+    /* if slave stopped due to node going non primary, we set global flag to
+      trigger automatic restart of slave when node joins back to cluster
+    */
+    if (WSREP_ON && wsrep_node_dropped && wsrep_restart_slave) {
+      if (wsrep_ready_get()) {
+        WSREP_INFO(
+            "Slave error due to node temporarily went non-primary"
+            "SQL slave will continue");
+        wsrep_node_dropped = false;
+        mysql_mutex_unlock(&rli->run_lock);
+        WSREP_INFO("Restarting Slave (conflict-state: %s)",
+                  wsrep_thd_client_state_str(thd));
+        goto wsrep_restart_point;
+      } else {
+        WSREP_INFO("Slave error due to node going non-primary");
+        WSREP_INFO(
+            "wsrep_restart_slave is set. Slave will automatically"
+            " restart when node joins back the cluster");
+        wsrep_restart_slave_activated = true;
+      }
     }
-  }
-  // wsrep_close(thd);
+    // wsrep_close(thd);
 #endif /* WITH_WSREP */
 
-  /*
-   Note: the order of the broadcast and unlock calls below (first broadcast,
-   then unlock) is important. Otherwise a killer_thread can execute between
-   the calls and delete the mi structure leading to a crash! (see BUG#25306
-   for details)
-  */
-  mysql_cond_broadcast(&rli->stop_cond);
-  DBUG_EXECUTE_IF("simulate_replica_delay_at_terminate_bug38694",
-                  sleep(5););
-  mysql_mutex_unlock(&rli->run_lock);  // tell the world we are done
-}
+    /*
+    Note: the order of the broadcast and unlock calls below (first broadcast,
+    then unlock) is important. Otherwise a killer_thread can execute between
+    the calls and delete the mi structure leading to a crash! (see BUG#25306
+    for details)
+    */
+    mysql_cond_broadcast(&rli->stop_cond);
+    DBUG_EXECUTE_IF("simulate_replica_delay_at_terminate_bug38694", sleep(5););
+    mysql_mutex_unlock(&rli->run_lock);  // tell the world we are done
+  }
   my_thread_end();
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
   ERR_remove_thread_state(nullptr);
