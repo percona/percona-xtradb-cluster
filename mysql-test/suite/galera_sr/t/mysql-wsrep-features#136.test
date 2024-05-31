@@ -30,7 +30,7 @@ COMMIT;
 --connection node_1
 --echo #node-1
 --let $binlog_file = mysqld-bin.000001
---let $binlog_start = 364
+--let $binlog_start = 365
 --let $keep_gtid_events = 1
 --source include/show_binlog_events.inc
 
@@ -42,7 +42,7 @@ COMMIT;
 SELECT COUNT(*) = 4 FROM t1;
 
 --let $binlog_file = mysqld-bin.000001
---let $binlog_start = 366
+--let $binlog_start = 367
 --let $keep_gtid_events = 1
 --source include/show_binlog_events.inc
 

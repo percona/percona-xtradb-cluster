@@ -13,7 +13,7 @@ DELIMITER /*!*/;
 # at 4
 <ISO TIMESTAMP> server id 2  end_log_pos 0 	Start: binlog v 4, server v x.y.z created ###### ##:##:## at startup
 ROLLBACK/*!*/;
-# at 126
+# at 127
 <ISO TIMESTAMP> server id 1  end_log_pos 0 	Query	thread_id=<THREAD_ID>	exec_time=0	error_code=0
 use `test`/*!*/;
 SET TIMESTAMP=<TIMESTAMP>/*!*/;

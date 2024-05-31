@@ -8,8 +8,6 @@ default_table_encryption=ON
 #
 binlog_encryption=ON
 #
-innodb_parallel_dblwr_encrypt=ON
-#
 innodb_temp_tablespace_encrypt=ON
 #
 innodb_redo_log_encrypt=ON

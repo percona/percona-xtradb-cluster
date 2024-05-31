@@ -292,6 +292,13 @@ struct ORDER {
   ORDER *next{nullptr};
 
   /**
+    If the query block includes non-primitive grouping, then these modifiers are
+    represented as grouping sets. The variable 'grouping_set_info' functions as
+    a bitvector, containing the grouping set details. If the 'ith' bit of the
+    variable is set, then the corresponding element is included in the 'ith'
+    grouping set. */
+  MY_BITMAP *grouping_set_info{nullptr};
+  /**
     The initial ordering expression. Usually substituted during resolving
     and must not be used during optimization and execution.
   */
@@ -843,6 +850,7 @@ struct TABLE_SHARE {
   uint fields{0};            /* Number of fields */
   uint rec_buff_length{0};   /* Size of table->record[] buffer */
   uint keys{0};              /* Number of keys defined for the table*/
+  uint temp_table_key_id{0}; /* Serves the unique number for <auto_keyN> */
   uint key_parts{0};         /* Number of key parts of all keys
                              defined for the table
                           */

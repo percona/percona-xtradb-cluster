@@ -9,7 +9,7 @@ LENGTH(@@global.gtid_executed) > 1
 1
 SHOW BINARY LOGS;
 Log_name	File_size	Encrypted
-mysqld-bin.000001	649	No
+mysqld-bin.000001	650	No
 include/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	#	Previous_gtids	#	#	

@@ -2542,7 +2542,7 @@ bool MDL_lock::can_grant_lock(enum_mdl_type type_arg,
           other context.
 
           If we are trying to acquire "unobtrusive" type of lock then the
-          conflicting lock must be from "obtrusive" set, therefore it should
+          confliciting lock must be from "obtrusive" set, therefore it should
           have been acquired using "slow path" and should be present in
           m_granted list.
 
@@ -4230,7 +4230,7 @@ end:
 
   @retval true  A deadlock is found. A pointer to deadlock
                  victim is saved in the visitor.
-  @retval false
+  @retval false TBD
 */
 
 bool MDL_ticket::accept_visitor(MDL_wait_for_graph_visitor *gvisitor) {
@@ -4250,7 +4250,7 @@ bool MDL_ticket::accept_visitor(MDL_wait_for_graph_visitor *gvisitor) {
 
   @retval true  A deadlock is found. A pointer to deadlock
                 victim is saved in the visitor.
-  @retval false
+  @retval false TBD
 */
 
 bool MDL_context::visit_subgraph(MDL_wait_for_graph_visitor *gvisitor) {

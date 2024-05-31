@@ -17,9 +17,9 @@ INSERT INTO t1 VALUES (7);
 include/wait_for_removed_expect_file.inc
 # restart:<hidden args>
 include/assert.inc [Table t1 still should have 4 rows]
+include/assert_grep.inc [Assert that node_2 failed to join without SST]
 # restart:<hidden args>
 include/assert.inc [Table t1 should have 7 rows]
-include/assert_grep.inc [Assert that node_2 failed to join without SST]
 INSERT INTO t1 VALUES (8);
 INSERT INTO t1 VALUES (9);
 INSERT INTO t1 VALUES (10);

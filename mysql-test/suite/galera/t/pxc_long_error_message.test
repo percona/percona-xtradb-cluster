@@ -1,0 +1,86 @@
+# This test verifies that long messages resulting from the concatenation of
+# warnings and errors from the query are handled properly by galera while
+# performing inconsistency voting.
+
+--source include/galera_cluster.inc
+
+# Create a table that produces warnings and errors.
+--error ER_TOO_BIG_ROWSIZE
+CREATE TABLE TestTable (
+	ID INT NOT NULL,
+	A1 VARCHAR(512),
+	A2 VARCHAR(512),
+	A3 VARCHAR(512),
+	A4 VARCHAR(512),
+	A5 VARCHAR(512),
+	A6 VARCHAR(512),
+	A7 VARCHAR(512),
+	A8 VARCHAR(512),
+	A9 VARCHAR(512),
+	A10 VARCHAR(512),
+	A11 VARCHAR(512),
+	A12 VARCHAR(512),
+	A13 VARCHAR(512),
+	A14 VARCHAR(512),
+	A15 VARCHAR(512),
+	A16 VARCHAR(512),
+	A17 VARCHAR(512),
+	A18 VARCHAR(512),
+	A19 VARCHAR(512),
+	A20 VARCHAR(512),
+	A21 VARCHAR(512),
+	A22 VARCHAR(512),
+	A23 VARCHAR(512),
+	A24 VARCHAR(512),
+	A25 VARCHAR(512),
+	A26 VARCHAR(512),
+	A27 VARCHAR(512),
+	A28 VARCHAR(512),
+	A29 VARCHAR(512),
+	A30 NVARCHAR(512),
+	A31 NVARCHAR(512),
+	A32 NVARCHAR(512),
+  A33 NVARCHAR(512),
+  PRIMARY KEY (ID)
+) ENGINE = InnoDB;
+
+CREATE TABLE pxc4365 (i INT PRIMARY KEY, j INT);
+INSERT INTO pxc4365 VALUES(1,1),(2,2),(3,3);
+
+#
+# Assert that cluster is still operational
+#
+
+--connection node_2
+# Wait till the data is replicated to node2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM information_schema.tables WHERE table_name = "pxc4365"
+--source include/wait_condition.inc
+
+# Assert that node2 is still up, running and replicating.
+--let $assert_text = Table pxc4365 was created on node2.
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.tables WHERE table_name = "pxc4365"
+--source include/assert.inc
+
+# Wait till the data is replicated to node2
+--let $wait_condition = SELECT COUNT(*) = 3 FROM test.pxc4365
+--source include/wait_condition.inc
+
+# Assert that table has 3 rows on node2
+--let $assert_text = Node 2 is up, running and replicating.
+--let $assert_cond = COUNT(*) = 3 FROM test.pxc4365
+--source include/assert.inc
+
+# MTR suppressions
+CALL mtr.add_suppression("Row size too large.");
+
+# Cleanup
+DROP TABLE pxc4365;
+
+# Assert that node1 is still up, running and replicating.
+--connection node_1
+--let $wait_condition = SELECT COUNT(*) = 0 FROM information_schema.tables WHERE table_name = "pxc4365"
+--source include/wait_condition.inc
+
+--let $assert_text = Table pxc4365 was deleted on node1.
+--let $assert_cond = COUNT(*) = 0 FROM information_schema.tables WHERE table_name = "pxc4365"
+--source include/assert.inc

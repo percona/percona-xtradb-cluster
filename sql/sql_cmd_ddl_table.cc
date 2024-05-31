@@ -396,6 +396,21 @@ bool Sql_cmd_create_table::execute(THD *thd) {
         [lex] { lex->set_secondary_engine_execution_context(nullptr); });
     if (open_tables_for_query(thd, lex->query_tables, false)) return true;
 
+    // Use the hypergraph optimizer for the SELECT statement, if enabled.
+    const bool need_hypergraph_optimizer =
+        thd->optimizer_switch_flag(OPTIMIZER_SWITCH_HYPERGRAPH_OPTIMIZER);
+
+    if (!query_expression->is_prepared()) {
+      // Use the desired optimizer during following preparation
+
+      lex->set_using_hypergraph_optimizer(need_hypergraph_optimizer);
+    }
+    if (need_hypergraph_optimizer != lex->using_hypergraph_optimizer() &&
+        ask_to_reprepare(thd)) {
+      return true;
+    }
+    assert(need_hypergraph_optimizer == lex->using_hypergraph_optimizer());
+
     /* The table already exists */
     if (create_table->table || create_table->is_view()) {
       if (create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS) {
@@ -406,7 +421,7 @@ bool Sql_cmd_create_table::execute(THD *thd) {
         return false;
       } else {
         my_error(ER_TABLE_EXISTS_ERROR, MYF(0), create_info.alias);
-        return false;
+        return true;
       }
     }
 
@@ -443,8 +458,8 @@ bool Sql_cmd_create_table::execute(THD *thd) {
       }
 
       // Use the hypergraph optimizer for the SELECT statement, if enabled.
-      lex->using_hypergraph_optimizer =
-          thd->optimizer_switch_flag(OPTIMIZER_SWITCH_HYPERGRAPH_OPTIMIZER);
+      lex->set_using_hypergraph_optimizer(
+          thd->optimizer_switch_flag(OPTIMIZER_SWITCH_HYPERGRAPH_OPTIMIZER));
 
       if (query_expression->prepare(thd, result, nullptr, SELECT_NO_UNLOCK,
                                     0)) {
@@ -525,17 +540,26 @@ bool Sql_cmd_create_table::execute(THD *thd) {
           mysql_mutex_lock(&LOCK_wsrep_alter_tablespace);
         }
 
-        /* Note we are explictly opening the macro as we need to perform
+        bool prepared_stmt_execution = thd->get_reprepare_observer() != nullptr;
+        bool should_start_toi = !prepared_stmt_execution ||
+                                (prepared_stmt_execution &&
+                                 !wsrep_thd_is_in_to_isolation(thd, false));
+        /* Note we are explicitly opening the macro as we need to perform
         cleanup action on TOI failure. */
-        if (WSREP(thd) && wsrep_to_isolation_begin(thd, create_table->db,
-                                                   create_table->table_name,
-                                                   NULL, NULL, &alter_info)) {
+        if (WSREP(thd) && should_start_toi &&
+            wsrep_to_isolation_begin(thd, create_table->db,
+                                     create_table->table_name, NULL, NULL,
+                                     &alter_info)) {
           if (!thd->lex->is_ignore() && thd->is_strict_mode())
             thd->pop_internal_handler();
           if (create_info.tablespace) {
             mysql_mutex_unlock(&LOCK_wsrep_alter_tablespace);
           }
           return true;
+        }
+
+        if (should_start_toi) {
+          thd->wsrep_prepared_statement_TOI_started = true;
         }
 
         if (create_info.tablespace) {

@@ -191,7 +191,8 @@ void append_auth_id(const THD *thd, ACL_USER *acl_user, String *str);
 /* sql_user_table */
 ulong get_access(TABLE *form, uint fieldnr, uint *next_field);
 int replace_db_table(THD *thd, TABLE *table, const char *db,
-                     const LEX_USER &combo, ulong rights, bool revoke_grant);
+                     const LEX_USER &combo, ulong rights, bool revoke_grant,
+                     bool all_current_privileges);
 int replace_proxies_priv_table(THD *thd, TABLE *table, const LEX_USER *user,
                                const LEX_USER *proxied_user,
                                bool with_grant_arg, bool revoke_grant);
@@ -204,17 +205,17 @@ int replace_table_table(THD *thd, GRANT_TABLE *grant_table,
                             *deleted_grant_table,
                         TABLE *table, const LEX_USER &combo, const char *db,
                         const char *table_name, ulong rights, ulong col_rights,
-                        bool revoke_grant);
+                        bool revoke_grant, bool all_current_privileges);
 int replace_routine_table(THD *thd, GRANT_NAME *grant_name, TABLE *table,
                           const LEX_USER &combo, const char *db,
                           const char *routine_name, bool is_proc, ulong rights,
-                          bool revoke_grant);
+                          bool revoke_grant, bool all_current_privileges);
 #ifdef WITH_WSREP
 int open_grant_tables(THD *thd, Table_ref *tables, bool *transactional_tables,
                       const char *db = WSREP_MYSQL_DB,
                       const char *table = nullptr);
 #else
-int open_grant_tables(THD *thd, TABLE_LIST *tables, bool *transactional_tables);
+int open_grant_tables(THD *thd, Table_ref *tables, bool *transactional_tables);
 #endif /* WITH_WSREP */
 void acl_tables_setup_for_read(Table_ref *tables);
 

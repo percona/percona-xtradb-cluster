@@ -62,6 +62,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <time.h>
 
 #include <algorithm>
+#include <memory>
 
 #include <sql_table.h>
 #include "mysql/components/services/system_variable_source.h"
@@ -364,13 +365,6 @@ static bool innodb_optimize_fulltext_only = false;
 static char *innodb_version_str = (char *)INNODB_VERSION_STR;
 
 static Innodb_data_lock_inspector innodb_data_lock_inspector;
-
-/** Path to the Percona-specific parallel doublewrite buffer (Deprecated) */
-static char *srv_parallel_doublewrite_path_deprecated = nullptr;
-
-/** Enable or disable encryption of pages in parallel doublewrite buffer
-file (Deprecated) */
-static bool srv_parallel_dblwr_encrypt_deprecated = false;
 
 /** Note we cannot use rec_format_enum because we do not allow
 COMPRESSED row format for innodb_default_row_format option. */
@@ -792,6 +786,7 @@ static PSI_mutex_info all_innodb_mutexes[] = {
     PSI_MUTEX_KEY(dblwr_mutex, 0, 0, PSI_DOCUMENT_ME),
     PSI_MUTEX_KEY(purge_sys_pq_mutex, 0, 0, PSI_DOCUMENT_ME),
     PSI_MUTEX_KEY(recv_sys_mutex, 0, 0, PSI_DOCUMENT_ME),
+    PSI_MUTEX_KEY(recv_writer_mutex, 0, 0, PSI_DOCUMENT_ME),
     PSI_MUTEX_KEY(temp_space_rseg_mutex, 0, 0, PSI_DOCUMENT_ME),
     PSI_MUTEX_KEY(undo_space_rseg_mutex, 0, 0, PSI_DOCUMENT_ME),
     PSI_MUTEX_KEY(trx_sys_rseg_mutex, 0, 0, PSI_DOCUMENT_ME),
@@ -900,7 +895,8 @@ static PSI_thread_info all_innodb_threads[] = {
                    PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME),
     PSI_THREAD_KEY(log_flush_notifier_thread, "ib_log_fl_notif",
                    PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME),
-    PSI_THREAD_KEY(buf_lru_manager_thread, "ib_buf_lru", 0, 0, PSI_DOCUMENT_ME),
+    PSI_THREAD_KEY(recv_writer_thread, "ib_recv_write", PSI_FLAG_SINGLETON, 0,
+                   PSI_DOCUMENT_ME),
     PSI_THREAD_KEY(srv_error_monitor_thread, "ib_srv_err", PSI_FLAG_SINGLETON,
                    0, PSI_DOCUMENT_ME),
     PSI_THREAD_KEY(srv_lock_timeout_thread, "ib_srv_lock_to",
@@ -1980,7 +1976,7 @@ static handler *innobase_create_handler(handlerton *hton, TABLE_SHARE *table,
   if (partitioned) {
     ha_innopart *file = new (mem_root) ha_innopart(hton, table);
     if (file && file->init_partitioning(mem_root)) {
-      destroy(file);
+      ::destroy_at(file);
       return (nullptr);
     }
     return (file);
@@ -3780,10 +3776,17 @@ void Validate_files::check(const Const_iter &begin, const Const_iter &end,
 
   auto heap = mem_heap_create(FN_REFLEN * 2 + 1, UT_LOCATION_HERE);
 
-  /* If the setting for innodb_validate_tablespace_paths is NO and we are
-  not in recovery, then only validate undo tablespaces. */
+  /* Validate all tablespaces if innodb_validate_tablespace_paths=ON OR
+  server is in recovery  OR Change buffer is not empty. Change buffer
+  applier background thread will skip the change buffer entries of the
+  tablespaces which are not loaded which will cause corruption of
+  secondary indexes, so it is important to load the tablespaces for which
+  entry is present in the change buffer. Presently we are loading all the
+  tablespaces. If all the conditions mentioned above are false then
+  validate only undo tablespaces */
+
   const bool ibd_validate =
-      srv_validate_tablespace_paths || recv_needed_recovery;
+      srv_validate_tablespace_paths || recv_needed_recovery || !ibuf_is_empty();
 
   std::string prefix;
   if (m_n_threads > 0) {
@@ -3847,7 +3850,8 @@ void Validate_files::check(const Const_iter &begin, const Const_iter &end,
     }
 
     /* If --innodb_validate_tablespace_paths=OFF and
-    startup is not in recovery, then skip all IBD files. */
+    startup is not in recovery and change buffer is empty,
+    then skip all IBD files. */
     if (!ibd_validate && !fsp_is_undo_tablespace(space_id)) {
       ++m_n_skipped;
       continue;
@@ -4121,7 +4125,8 @@ dberr_t Validate_files::validate(const DD_tablespaces &tablespaces) {
   m_n_threads = fil_get_scan_threads(m_n_to_check);
   m_start_time = std::chrono::steady_clock::now();
 
-  if (!srv_validate_tablespace_paths && !recv_needed_recovery) {
+  if (!srv_validate_tablespace_paths && !recv_needed_recovery &&
+      ibuf_is_empty()) {
     ib::info(ER_IB_TABLESPACE_PATH_VALIDATION_SKIPPED);
   }
 
@@ -4949,38 +4954,6 @@ static void innodb_undo_tablespaces_deprecate() {
   }
 }
 
-/** Validate innodb_parallel_doublewrite_path. Log a warning if it was set
-explicitly. */
-static void innodb_parallel_doublewrite_path_deprecate() {
-  if (sysvar_source_svc != nullptr) {
-    static const char *variable_name = "innodb_parallel_doublewrite_path";
-    enum enum_variable_source source;
-    if (!sysvar_source_svc->get(
-            variable_name, static_cast<unsigned int>(strlen(variable_name)),
-            &source)) {
-      if (source != COMPILED) {
-        ib::warn(ER_IB_MSG_DEPRECATED_INNODB_PARALLEL_DOUBLEWRITE_PATH);
-      }
-    }
-  }
-}
-
-/** Validate innodb_parallel_dblwr_encrypt. Log a warning if it was set
-explicitly. */
-static void innodb_parallel_dblwr_encrypt_deprecate() {
-  if (sysvar_source_svc != nullptr) {
-    static const char *variable_name = "innodb_parallel_dblwr_encrypt";
-    enum enum_variable_source source;
-    if (!sysvar_source_svc->get(
-            variable_name, static_cast<unsigned int>(strlen(variable_name)),
-            &source)) {
-      if (source != COMPILED) {
-        ib::warn(ER_IB_MSG_DEPRECATED_INNODB_PARALLEL_DBLWR_ENCRYPT);
-      }
-    }
-  }
-}
-
 /** Initialize and normalize innodb_buffer_pool_size. */
 static void innodb_buffer_pool_size_init() {
 #ifdef UNIV_DEBUG
@@ -5540,8 +5513,6 @@ static int innodb_init_params() {
   innodb_buffer_pool_size_init();
 
   innodb_undo_tablespaces_deprecate();
-  innodb_parallel_doublewrite_path_deprecate();
-  innodb_parallel_dblwr_encrypt_deprecate();
 
   innodb_redo_log_capacity_init();
 
@@ -5987,6 +5958,8 @@ static int innodb_init(void *p) {
       HTON_SUPPORTS_ATOMIC_DDL | HTON_CAN_RECREATE |
       HTON_SUPPORTS_SECONDARY_ENGINE | HTON_SUPPORTS_TABLE_ENCRYPTION |
       HTON_SUPPORTS_GENERATED_INVISIBLE_PK | HTON_SUPPORTS_BULK_LOAD |
+  // TODO(WL9440): to be enabled when distance scan is implemented in innodb.
+  //| HTON_SUPPORTS_DISTANCE_SCAN;
       HTON_SUPPORTS_ONLINE_BACKUPS | HTON_SUPPORTS_COMPRESSED_COLUMNS;
 #ifdef WITH_WSREP
   innobase_hton->flags |= HTON_WSREP_REPLICATION;
@@ -11823,6 +11796,8 @@ page_cur_mode_t convert_search_mode_to_innobase(ha_rkey_function find_flag) {
       return (PAGE_CUR_DISJOINT);
     case HA_READ_MBR_EQUAL:
       return (PAGE_CUR_MBR_EQUAL);
+    case HA_READ_NEAREST_NEIGHBOR:
+      return (PAGE_CUR_NN);
     case HA_READ_PREFIX:
       return (PAGE_CUR_UNSUPP);
     case HA_READ_INVALID:
@@ -13497,14 +13472,11 @@ and set the encryption flag in table flags
 dberr_t create_table_info_t::enable_encryption(dict_table_t *table) {
   const char *encrypt = m_create_info->encrypt_type.str;
 
-  if (Encryption::is_none(encrypt)) return (DB_SUCCESS);
-
   /* If table is part of tablespace - no need for retrieving
   master key as tablespace key was already decrypted
-  either by validate_first_page or during tablespace creation.
-  Just set the encryption flag and return. */
-  if (!(m_flags2 & DICT_TF2_USE_FILE_PER_TABLE)) {
-    DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION_FILE_PER_TABLE);
+  either by validate_first_page or during tablespace creation. */
+  if (Encryption::is_none(encrypt) ||
+      !(m_flags2 & DICT_TF2_USE_FILE_PER_TABLE)) {
     return (DB_SUCCESS);
   }
 
@@ -23668,32 +23640,6 @@ static void innodb_undo_tablespaces_update(THD *thd [[maybe_unused]],
   innodb_undo_tablespaces_deprecate();
 }
 
-/** Validate the value of innodb_parallel_doublewrite_path global variable.
-This function is registered as a callback with MySQL.
-@param[in]	thd       thread handle
-@param[in]	var       pointer to system variable
-@param[in]	var_ptr   where the formal string goes
-@param[in]	save      immediate result from check function */
-static void innodb_parallel_doublewrite_path_update(
-    THD *thd [[maybe_unused]], SYS_VAR *var [[maybe_unused]],
-    void *var_ptr [[maybe_unused]], const void *save [[maybe_unused]]) {
-  innodb_parallel_doublewrite_path_deprecate();
-}
-
-/** Validate the value of innodb_parallel_dblwr_encrypt global variable.
-This function is registered as a callback with MySQL.
-@param[in]	thd       thread handle
-@param[in]	var       pointer to system variable
-@param[in]	var_ptr   where the formal string goes
-@param[in]	save      immediate result from check function */
-static void innodb_parallel_dblwr_encrypt_update(THD *thd [[maybe_unused]],
-                                                 SYS_VAR *var [[maybe_unused]],
-                                                 void *var_ptr [[maybe_unused]],
-                                                 const void *save
-                                                 [[maybe_unused]]) {
-  innodb_parallel_dblwr_encrypt_deprecate();
-}
-
 /* Declare default check function for boolean system variable. Cannot include
 sql_plugin_var.h header in this file due to conflicting macro definitions. */
 int check_func_bool(THD *, SYS_VAR *, void *save, st_mysql_value *value);
@@ -25036,20 +24982,6 @@ static MYSQL_SYSVAR_BOOL(
 
 #endif /* UNIV_LINUX */
 
-// TODO: the option is here, but currently a no-op
-static MYSQL_SYSVAR_ULONG(
-    cleaner_max_lru_time, srv_cleaner_max_lru_time, PLUGIN_VAR_RQCMDARG,
-    "The maximum time limit for a single LRU tail flush iteration by the page "
-    "cleaner thread in miliseconds",
-    NULL, NULL, 1000, 0, ~0UL, 0);
-
-// TODO: the option is here, but currently a no-op
-static MYSQL_SYSVAR_ULONG(cleaner_max_flush_time, srv_cleaner_max_flush_time,
-                          PLUGIN_VAR_RQCMDARG,
-                          "The maximum time limit for a single flush list "
-                          "flush iteration by the page "
-                          "cleaner thread in miliseconds",
-                          NULL, NULL, 1000, 0, ~0UL, 0);
 #endif /* defined UNIV_DEBUG || defined UNIV_PERF_DEBUG */
 
 static MYSQL_SYSVAR_BOOL(
@@ -25984,7 +25916,7 @@ static MYSQL_THDVAR_STR(interpreter, PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_NOPERSIST,
 output is stored in this innodb_interpreter_output variable. */
 static MYSQL_THDVAR_STR(interpreter_output,
                         PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_MEMALLOC |
-                            PLUGIN_VAR_NOPERSIST,
+                            PLUGIN_VAR_NOPERSIST | PLUGIN_VAR_READONLY,
                         "Output from InnoDB testing module (ut0test).", nullptr,
                         nullptr, "The Default Value");
 
@@ -26016,22 +25948,6 @@ static MYSQL_SYSVAR_ENUM(
     "All file io for the datafile after detected as corrupt are disabled, "
     "except for the deletion.",
     nullptr, nullptr, 0, &corrupt_table_action_typelib);
-
-static MYSQL_SYSVAR_STR(
-    parallel_doublewrite_path, srv_parallel_doublewrite_path_deprecated,
-    PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY | PLUGIN_VAR_NOPERSIST,
-    "Deprecated Percona-specific variable that was used to set path to the "
-    "parallel doublewrite file and has no effect now. "
-    "Use --innodb-doublewrite-dir instead.",
-    nullptr, innodb_parallel_doublewrite_path_update, "xb_doublewrite");
-
-static MYSQL_SYSVAR_BOOL(
-    parallel_dblwr_encrypt, srv_parallel_dblwr_encrypt_deprecated,
-    PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_NOPERSIST,
-    "Deprecated Percona-specific variable that was used to enable or "
-    "disable encryption of parallel doublewrite buffer file and has no "
-    "effect now.",
-    nullptr, innodb_parallel_dblwr_encrypt_update, false);
 
 static MYSQL_SYSVAR_UINT(
     compressed_columns_zip_level, srv_compressed_columns_zip_level,
@@ -26244,8 +26160,6 @@ static SYS_VAR *innobase_system_variables[] = {
     MYSQL_SYSVAR(priority_purge),
     MYSQL_SYSVAR(priority_master),
 #endif /* UNIV_LINUX */
-    MYSQL_SYSVAR(cleaner_max_lru_time),
-    MYSQL_SYSVAR(cleaner_max_flush_time),
 #endif /* defined UNIV_DEBUG || defined UNIV_PERF_DEBUG */
     MYSQL_SYSVAR(validate_tablespace_paths),
     MYSQL_SYSVAR(use_fdatasync),
@@ -26290,8 +26204,6 @@ static SYS_VAR *innobase_system_variables[] = {
     MYSQL_SYSVAR(parallel_read_threads),
     MYSQL_SYSVAR(segment_reserve_factor),
     MYSQL_SYSVAR(corrupt_table_action),
-    MYSQL_SYSVAR(parallel_doublewrite_path),
-    MYSQL_SYSVAR(parallel_dblwr_encrypt),
     MYSQL_SYSVAR(compressed_columns_zip_level),
     MYSQL_SYSVAR(compressed_columns_threshold),
     MYSQL_SYSVAR(ft_ignore_stopwords),
@@ -26494,7 +26406,9 @@ dfield_t *innobase_get_field_from_update_vector(dict_foreign_t *foreign,
                                 or NULL.
 @param[in]      parent_update   update vector for the parent row
 @param[in]      foreign         foreign key information
-@param[in]      compress_heap
+@param[in]      compress_heap   memory heap used to compress/decompress
+                                blob column
+
 @return the field filled with computed value, or NULL if just want
 to store the value in passed in "my_rec" */
 dfield_t *innobase_get_computed_value(

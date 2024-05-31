@@ -3,7 +3,6 @@
 [mysqld]
 wsrep_sst_method=xtrabackup-v2
 pxc-encrypt-cluster-traffic=ON
-innodb_parallel_dblwr_encrypt=ON
 
 [sst]
 ssl-dhparams=@ENV.MYSQL_TEST_DIR/std_data/dhparams.pem

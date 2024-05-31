@@ -26,8 +26,10 @@ ENDIF()
 
 MSVC_CPPCHECK_DISABLE()
 
-# Some tests require Boost.
-INCLUDE_DIRECTORIES(SYSTEM ${BOOST_PATCHES_DIR} ${BOOST_INCLUDE_DIR})
+IF(NOT WITH_DEBUG)
+  # the innodb parts are documented assuming WITH_DEBUG (UNIV_DEBUG)
+  DISABLE_DOCUMENTATION_WARNINGS()
+ENDIF()
 
 INCLUDE_DIRECTORIES(SYSTEM ${GMOCK_INCLUDE_DIRS})
 
@@ -237,6 +239,7 @@ SET(SERVER_TESTS
   gis_wkb_parser
   gis_wkb_writer
   graph_simplification
+  gtid_specification_parsing
   handler
   hash_join
   histograms
@@ -359,7 +362,7 @@ MYSQL_ADD_EXECUTABLE(merge_small_tests-t ${ALL_SMALL_TESTS}
   ADD_TEST merge_small_tests
   COMPILE_DEFINITIONS ${DISABLE_PSI_DEFINITIONS}
   ENABLE_EXPORTS
-  LINK_LIBRARIES sqlgunitlib gunit_small extra::rapidjson
+  LINK_LIBRARIES sqlgunitlib gunit_small extra::rapidjson extra::boost
   )
 
 LIST(APPEND ALL_LARGE_TESTS ../../storage/example/ha_example.cc)
@@ -375,7 +378,7 @@ FOREACH(test ${TESTS})
     COMPILE_DEFINITIONS ${DISABLE_PSI_DEFINITIONS}
     ENABLE_EXPORTS
     EXCLUDE_FROM_ALL
-    LINK_LIBRARIES sqlgunitlib gunit_small
+    LINK_LIBRARIES sqlgunitlib gunit_small extra::boost
     SKIP_INSTALL
     )
 ENDFOREACH()
@@ -452,3 +455,5 @@ ADD_SUBDIRECTORY(memory)
 ADD_SUBDIRECTORY(containers)
 ADD_SUBDIRECTORY(locks)
 ADD_SUBDIRECTORY(changestreams)
+ADD_SUBDIRECTORY(libs/utils)
+ADD_SUBDIRECTORY(libs/serialization)

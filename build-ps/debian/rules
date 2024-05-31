@@ -92,16 +92,16 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 		-DDOWNLOAD_BOOST=1 \
 		-DWITH_BOOST=libboost \
 		-DWITH_SYSTEM_LIBS=ON \
-                -DWITH_PROTOBUF=bundled \
-                -DWITH_RAPIDJSON=bundled \
-                -DWITH_ICU=bundled \
-                -DWITH_ZSTD=bundled \
-                -DWITH_LZ4=bundled \
-                -DWITH_ZLIB=bundled \
-                -DWITH_EDITLINE=bundled \
-                -DWITH_LIBEVENT=bundled \
-                -DWITH_FIDO=bundled \
-                -DWITH_NUMA=ON \
+		-DWITH_PROTOBUF=bundled \
+		-DWITH_RAPIDJSON=bundled \
+		-DWITH_ICU=bundled \
+		-DWITH_ZSTD=bundled \
+		-DWITH_LZ4=bundled \
+		-DWITH_ZLIB=bundled \
+		-DWITH_EDITLINE=bundled \
+		-DWITH_LIBEVENT=bundled \
+		-DWITH_FIDO=bundled \
+		-DWITH_NUMA=ON \
 		-DWITH_EXTRA_CHARSETS=all ..
 endif
 
@@ -143,16 +143,16 @@ endif
 		-DDOWNLOAD_BOOST=1 \
 		-DWITH_BOOST=libboost \
 		-DWITH_SYSTEM_LIBS=ON \
-                -DWITH_PROTOBUF=bundled \
-                -DWITH_RAPIDJSON=bundled \
-                -DWITH_ICU=bundled \
-                -DWITH_ZSTD=bundled \
-                -DWITH_LZ4=bundled \
-                -DWITH_ZLIB=bundled \
-                -DWITH_EDITLINE=bundled \
-                -DWITH_LIBEVENT=bundled \
-                -DWITH_FIDO=bundled \
-                -DWITH_NUMA=ON \
+		-DWITH_PROTOBUF=bundled \
+		-DWITH_RAPIDJSON=bundled \
+		-DWITH_ICU=bundled \
+		-DWITH_ZSTD=bundled \
+		-DWITH_LZ4=bundled \
+		-DWITH_ZLIB=bundled \
+		-DWITH_EDITLINE=bundled \
+		-DWITH_LIBEVENT=bundled \
+		-DWITH_FIDO=bundled \
+		-DWITH_NUMA=ON \
 		-DWITH_EXTRA_CHARSETS=all ..
 
 #	cd $(galeradir) &&  scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) psi=1 libgalera_smm.so $(SCONS_ARGS) && scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) garb/garbd $(SCONS_ARGS)
@@ -188,6 +188,9 @@ override_dh_auto_install:
 	(cd $(builddir)/$(galeradir) && cp libgalera_smm.so $(TMP)/)
 	(cd $(galeradir) && cp packages/rpm/README $(TMP)/)
 	mkdir -p $(TMP)/usr/bin/pxc_extra/
+	(cp -r pxb-8.3 $(TMP)/usr/bin/pxc_extra/)
+	(mv $(TMP)/usr/bin/pxc_extra/pxb-8.3/lib/xtrabackup/* $(TMP)/usr/bin/pxc_extra/pxb-8.3/lib/)
+	(rm -rf $(TMP)/usr/bin/pxc_extra/pxb-8.3/lib/xtrabackup)
 	(cp -r pxb-8.2 $(TMP)/usr/bin/pxc_extra/)
 	(mv $(TMP)/usr/bin/pxc_extra/pxb-8.2/lib/xtrabackup/* $(TMP)/usr/bin/pxc_extra/pxb-8.2/lib/)
 	(rm -rf $(TMP)/usr/bin/pxc_extra/pxb-8.2/lib/xtrabackup)
@@ -243,7 +246,7 @@ override_dh_auto_install:
 	# install default file for init script timeout params
 	install -d $(TMP)/etc/default
 	install -m 0644 debian/extra/default-mysql $(TMP)/etc/default/mysql
-        # Add helper functions for maintainer scripts
+	# Add helper functions for maintainer scripts
 	install -m 0644 debian/extra/mysql-helpers debian/tmp/usr/share/mysql/
 
 	install -m 0644 $(TMP)/garb/files/garb.cnf $(TMP)/etc/default/garb
