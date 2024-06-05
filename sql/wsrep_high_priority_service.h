@@ -55,6 +55,8 @@ class Wsrep_high_priority_service : public wsrep::high_priority_service,
 
   int next_fragment(const wsrep::ws_meta&) override;
 
+  bool has_mdl_locks() override;
+
  protected:
   friend Wsrep_server_service;
   THD *m_thd;

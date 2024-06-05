@@ -1603,6 +1603,7 @@ class MDL_context {
   inline bool has_explicit_locks() const {
     return !(m_ticket_store.is_empty(MDL_EXPLICIT));
   }
+  void dump_locks();
 #endif /* WITH_WSREP */
   bool has_locks(MDL_key::enum_mdl_namespace mdl_namespace) const;
 

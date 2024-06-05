@@ -594,6 +594,14 @@ void Wsrep_high_priority_service::debug_crash(const char *crash_point __attribut
   DBUG_EXECUTE_IF(crash_point, DBUG_SUICIDE(););
 }
 
+bool Wsrep_high_priority_service::has_mdl_locks() {
+  assert(m_thd == current_thd);
+  bool has_mdl_locks = m_thd->mdl_context.has_locks();
+  if (has_mdl_locks) {
+    m_thd->mdl_context.dump_locks();
+  }
+  return has_mdl_locks;
+}
 /****************************************************************************
                            Applier service
 *****************************************************************************/

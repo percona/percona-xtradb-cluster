@@ -1881,7 +1881,7 @@ bool wsrep_append_child_tables(THD *thd, Table_ref *tables,
 }
 
 /*
- * Collect wsrep keys corresponding to parent tables
+ * Collect wsrep keys corresponding to parent  tables
  */
 bool wsrep_append_fk_parent_table(THD *thd, Table_ref *tables,
                                   wsrep::key_array *keys) {

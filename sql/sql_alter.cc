@@ -429,17 +429,18 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
 
     // mdl_lock scope begin
     {
+      bool mdl_acquired = false;
       // Acquire lock on the table as it is needed to get the instance from DD
       MDL_request mdl_request;
       MDL_REQUEST_INIT(&mdl_request, MDL_key::TABLE, table->db,
                        table->table_name, MDL_SHARED, MDL_EXPLICIT);
       wsrep_scope_guard mdl_lock(
-          [thd, &mdl_request]() {
-            thd->mdl_context.acquire_lock(&mdl_request,
-                                          thd->variables.lock_wait_timeout);
+          [thd, &mdl_request, &mdl_acquired]() {
+            mdl_acquired = !thd->mdl_context.acquire_lock(
+                &mdl_request, thd->variables.lock_wait_timeout);
           },
-          [thd, &mdl_request]() {
-            thd->mdl_context.release_lock(mdl_request.ticket);
+          [thd, &mdl_request, &mdl_acquired]() {
+            if (mdl_acquired) thd->mdl_context.release_lock(mdl_request.ticket);
           });
 
       const char *schema_name = table->db;
