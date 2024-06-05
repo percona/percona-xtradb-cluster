@@ -5262,10 +5262,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
       */
       thd->binlog_invoker();
 
-#ifdef WITH_WSREP
-      WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-#endif /* WITH_WSREP */
-
       bool sp_already_exists = false;
       if (!(res = sp_create_routine(
                 thd, lex->sphead, thd->lex->definer,
