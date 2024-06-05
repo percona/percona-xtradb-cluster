@@ -8991,7 +8991,7 @@ uint wsrep_store_key_val_for_row(THD *thd, TABLE *table, uint keynr, char *buff,
 
       blob_data = row_mysql_read_blob_ref(
           &blob_len, (byte *)(record + (ulint)get_field_offset(table, field)),
-          (ulint)field->pack_length(), false, 0, 0, &prebuilt->compress_heap);
+          (ulint)field->pack_length(), false, 0, 0, &prebuilt->blob_heap);
 
       true_len = blob_len;
 
@@ -10764,7 +10764,7 @@ static int wsrep_calc_row_hash(byte *digest, const uchar *row, TABLE *table,
     switch (col_type) {
       case DATA_BLOB:
         ptr = row_mysql_read_blob_ref(&len, ptr, len, false, 0, 0,
-                                      &prebuilt->compress_heap);
+                                      &prebuilt->blob_heap);
         break;
 
       case DATA_VARCHAR:
