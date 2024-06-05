@@ -1,6 +1,10 @@
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) Engine=InnoDB;
+CALL mtr.add_suppression("The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.");
+CALL mtr.add_suppression("The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.");
 SET SESSION wsrep_OSU_method = "RSU";
 ALTER TABLE t1 ADD COLUMN f2 INTEGER;
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
 SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 't1';
 COUNT(*) = 2
 1
@@ -25,6 +29,8 @@ BEGIN;
 UPDATE t1 SET k=k+1 WHERE id<100;
 SET wsrep_OSU_method = RSU;
 ALTER TABLE t1 ADD KEY(k);
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
 COMMIT;
 ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 DROP TABLE t1;
@@ -35,6 +41,8 @@ BEGIN;
 UPDATE t1 SET k=k+1 WHERE id<100;
 SET wsrep_OSU_method = RSU;
 ALTER TABLE t1 ADD KEY(k);
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
 COMMIT;
 ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 SET SESSION wsrep_on = ON;

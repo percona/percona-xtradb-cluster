@@ -151,9 +151,17 @@ select @@session.wsrep_OSU_method;
 RSU
 use test;
 create table is1 (i int) engine=myisam;
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
 insert into is1 values (11), (12);
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
 insert is1 values (13), (14);
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
 rename table is1 to is2;
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
 select * from is2;
 i
 11
@@ -161,6 +169,8 @@ i
 13
 14
 drop table is2;
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
 #node-1
 set global wsrep_replicate_myisam = 0;
 set global wsrep_OSU_method = TOI;

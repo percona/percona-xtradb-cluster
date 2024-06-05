@@ -167,6 +167,7 @@ struct LOG_INFO;
 #include "wsrep_thd_context.h"
 
 class Wsrep_applier_service;
+class Disable_binlog_guard;
 #endif /* WITH_WSREP */
 
 extern bool opt_log_slow_admin_statements;
@@ -3339,6 +3340,9 @@ class THD : public MDL_context_owner,
     thd->lex->sql_command == SQLCOM_ROLLBACK_TO_SAVEPOINT skips actual
     rollback. */
   bool wsrep_force_savept_rollback;
+
+  /* Used to disable binlog when DDL is executed with wsrep_OSU_method=RSU. */
+  std::shared_ptr<Disable_binlog_guard> disable_binlog_guard;
 
   /*
     Transaction id:

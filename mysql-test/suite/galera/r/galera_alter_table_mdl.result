@@ -44,13 +44,14 @@ SET SESSION wsrep_sync_wait = 0;
 include/assert.inc [INSERT query should be waiting for the metadata lock.]
 SET DEBUG_SYNC = 'now SIGNAL continue_inplace_alter';
 SET DEBUG_SYNC = 'RESET';
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
 SELECT * FROM t1;
 a
 10
 11
 12
 SET SESSION wsrep_OSU_method = DEFAULT;
-include/assert_binlog_events.inc [Anonymous_Gtid # Query/.*ALTER TABLE.* # Anonymous_Gtid # Query/.*BEGIN # Table_map # Write_rows # Xid]
 # Removing debug point 'halt_alter_table_after_lock_downgrade' from @@GLOBAL.debug
 # --------------------------------
 # Test 4: Testing with ALGORITHM and LOCK syntax.
@@ -136,6 +137,7 @@ ALTER TABLE t1 RENAME TO t2, ALGORITHM= INPLACE, LOCK= EXCLUSIVE;
 affected rows: 0
 ALTER TABLE t2 RENAME TO t1, ALGORITHM= INPLACE, LOCK= DEFAULT;
 affected rows: 0
+CALL mtr.add_suppression("The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.");
 CALL mtr.add_suppression("LOCK=NONE is not supported for this operation. Try LOCK=SHARED.");
 CALL mtr.add_suppression("LOCK=NONE is not supported. Reason: COPY algorithm requires a lock. Try LOCK=SHARED.");
 CALL mtr.add_suppression("LOCK=NONE/SHARED is not supported for this operation. Try LOCK=EXCLUSIVE.");
