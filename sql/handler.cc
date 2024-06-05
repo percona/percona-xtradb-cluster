@@ -1873,6 +1873,50 @@ int ha_commit_trans(THD *thd, bool all, bool ignore_global_read_lock) {
     else if (trn_ctx->no_2pc(trx_scope) ||
              trn_ctx->rw_ha_count(trx_scope) == 1) {
       /* cache decision to run wsrep-commit-hook with log_bin=off. */
+      /* KH: The original comment above is not precise.
+         1. If log_bin=off or sql_log_bin=off, binlog is involved anyway
+         (cache for writeset data), so we don't hit this branch.
+         We hit 'if' branch.
+         2. We can get here if log_bin=off && wsrep_on=off
+         But in this case run_wsrep_commit_hooks will be false anyway.
+         3. The other option to get here is to use MyISAM. In sucha  case
+         we've got rw_ha_count()=1 (only binlog). no_2pc is false as
+         MyISAM is not registering itelf in 2pc coordinator.
+         The only option to have run_wsrep_commit_hooks=true is having
+         involved SE which does not support 2pc (MyISAM). In such a case
+         wsrep_run_commit_hook will be evaluated to false as well, because
+         transaction appears to be empty (MyISAM uses TOI replication, so no
+         writeset to replicate).
+
+         4. But streaming replication goes this path if it certifies a fragment.
+         In such a case binlog handler is not involved
+         When wsrep::transaction::certify_fragment() is called,
+         we get to ha_commit_low() via short path which skips wsrep commit hooks
+         certify_fragment:
+         wsrep::transaction::after_row
+         wsrep::transaction::streaming_step
+         wsrep::transaction::certify_fragment
+         Wsrep_storage_service::commit
+         trans_commit
+         ha_commit_trans
+         MYSQL_BIN_LOG::commit
+         trx_coordinator::commit_in_engines
+         ha_commit_low
+         wsrep_before_commit <- here we need to call wsrep commit hook
+
+         5. Applier thread on the server with 'log_replica_updates=OFF'
+         goes this path as well:
+         apply_cb
+         high_priority_service::apply
+         server_state::on_apply
+         apply_write_set
+         Wsrep_high_priority_service::commit
+         trans_commit
+         ha_commit_trans
+         MYSQL_BIN_LOG::commit
+         trx_coordinator::commit_in_engines
+         ha_commit_low <- here we need to call wsrep commit hook
+      */
       thd->run_wsrep_commit_hooks = wsrep_run_commit_hook(thd, all);
     }
 #else
@@ -2100,32 +2144,6 @@ int ha_commit_low(THD *thd, bool all, bool run_after_commit) {
       }
     }
   }
-#ifdef WITH_WSREP
-  else {
-      /* This function is common for group commit flow and the flow that skips
-      group commit. We register the thread in wsrep_group_commit_queue always.
-      For group commit it is done during binlog flush stage, for 1-phase commit
-      it is done in wsrep_before_commit().
-      Ideally, for one-phase (with binlog=off) or two-phase (with binlog=on)
-      this step would be executed when transaction commits in InnoDB.
-      If galera node is acting as async slave and replicated action from async
-      master result in empty changes on slave (slave directly applied the said
-      changes and has skipped error through skip-slave-error configuration) it
-      can result in said situation. In this case slave protocol directly commits
-      gtid through gtid_end_transaction that invokes ordered_commit causing
-      thread handler to register in wsrep group commit queue but since storage
-      engine commit is not done it would fail to unregister the said thread
-      handler as part of storage engine commit. Handle unregistration here,
-      because doing it in wsrep_after_commit() is too late. If there is another
-      thread following this thread in currently processed commit queue,
-      current thread is commited (but does not commit in SE, so does not unregister
-      from wsrep_group_commit_queue. Then the following thread calls
-      wsrep_wait_for_turn_in_group_commit() but sees the previous thread at the front
-      and waits infinitely. */
-      wsrep_wait_for_turn_in_group_commit(thd);
-      wsrep_unregister_from_group_commit(thd);
-  }
-#endif /* WITH_WSREP */
 
 err:
   /* Free resources and perform other cleanup even for 'empty' transactions. */
@@ -2149,10 +2167,60 @@ err:
   }
 
 #ifdef WITH_WSREP
+  /* This function is common for group commit flow and the flow that skips
+  group commit. We register the thread in wsrep_group_commit_queue always.
+  For group commit it is done during binlog flush stage, for 1-phase commit
+  it is done in wsrep_before_commit() called at the beginning of ha_commit_low()
+  (this function).
+
+  Ideally, for one-phase (without binlog involved) or two-phase
+  (with binlog involved), this step would be executed when transaction commits
+  in InnoDB.
+
+  However, there are cases when the flow does not reach unregistration
+  during InnoDB commit:
+
+  Case 1:
+  If Galera node is acting as async slave and replicated action from async
+  master results in empty changes on slave (slave directly applied the said
+  changes and has skipped error through skip-slave-error configuration) it
+  can result in said situation. In this case slave protocol directly commits
+  gtid through gtid_end_transaction that invokes ordered_commit causing
+  thread handler to register in wsrep group commit queue but since storage
+  engine commit is not done it would fail to unregister the said thread
+  handler as part of storage engine commit.Handle unregistration here,
+  because doing it in wsrep_after_commit() is too late. If there is another
+  thread following this thread in currently processed commit queue,
+  current thread is commited (but does not commit in SE, so does not unregister
+  from wsrep_group_commit_queue. Then the following thread calls
+  wsrep_wait_for_turn_in_group_commit() but sees the previous thread at
+  the front and waits infinitely.
+
+  Case 2:
+  Similar to the above. If the current thd's (thd_1) commit in InnoDB SE fails
+  (innobase_commit returns with error because the thread gets aborted, or
+  any other reason which causes that innobase_commit() desn't reach
+  trx_sys_update_wsrep_checkpoint() where thd unregistration from
+  wsrep_group_commit_queue happens), and there is another thread (thd_2)
+  in the commit queue following thd_1, we end up in the situation when thd_2
+  waits for being the 1st one in wsrep_group_commit_queue, but thd_1 is still
+  the 1st one, so the processing of commit queue is blocked.
+  We need to remove thd_1 from wsrep_group_commit_queue now, no matter if commit
+  failed or not, to give a chance to commit for the following threads.
+
+  Note:
+  Consider removing waiting and unregistration from
+  trx_sys_update_wsrep_checkpoint() as the below unregistration should hadle
+  all cases.
+  */
+  wsrep_wait_for_turn_in_group_commit(thd);
+  wsrep_unregister_from_group_commit(thd);
+
   if (!error && thd->run_wsrep_commit_hooks) {
     (void)wsrep_after_commit(thd, all);
   }
   thd->run_wsrep_commit_hooks = false;
+
 #endif /* WITH_WSREP */
 
   return error;
