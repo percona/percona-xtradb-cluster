@@ -376,8 +376,15 @@ static inline int wsrep_after_commit(THD *thd, bool all) {
               wsrep_has_changes(thd));
   assert(wsrep_run_commit_hook(thd, all));
 
-  /* It has to already unregistered from wsrep_group_commit_queue either
-  during SE commit or directly in ha_commit_low if SE commit was not done. */
+  /* It has to be already unregistered from wsrep_group_commit_queue either
+  during SE commit or directly in ha_commit_low if unregistration during
+  SE commit hasn't happened for any reason. */
+  if (thd->wsrep_enforce_group_commit) {
+    WSREP_WARN("%s",
+               "This thread has still not unregistered from "
+               "the wsrep group commit queue, may be because "
+               "of the storage engine commit. Server hang is expected.")
+  }
   assert(!thd->wsrep_enforce_group_commit);
 
   int ret = 0;
