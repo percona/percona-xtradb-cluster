@@ -431,7 +431,7 @@ install_deps() {
         done
         apt-get -y purge eatmydata || true
         apt-get update
-        if [ x"${DIST}" = noble ]; then
+        if [ x"${DIST}" = xnoble ]; then
             apt-get -y install gcc-11 g++-11
             update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100 --slave /usr/bin/g++ g++ /usr/bin/g++-11
         else
@@ -449,7 +449,7 @@ install_deps() {
         apt-get -y install stunnel libkrb5-dev
         apt-get -y install libudev-dev
 
-        if [ x"${DIST}" = xfocal -o x"${DIST}" = xbullseye -o x"${DIST}" = jammy -o x"${DIST}" = bookworm -o x"${DIST}" = noble ]; then
+        if [ x"${DIST}" = xfocal -o x"${DIST}" = xbullseye -o x"${DIST}" = xjammy -o x"${DIST}" = xbookworm -o x"${DIST}" = xnoble ]; then
             apt-get -y install python3-mysqldb
         else
             apt-get -y install python-mysqldb
