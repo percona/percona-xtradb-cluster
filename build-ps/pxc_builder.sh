@@ -324,7 +324,7 @@ install_deps() {
             yum -y install openldap-devel openssl-devel pam-devel perl-Data-Dumper
             yum -y install perl-Digest perl-Digest-MD5 perl-Env perl-JSON perl-Time-HiRes
             yum -y install readline-devel rpm-build rsync tar time unzip wget zlib-devel selinux-policy-devel
-            yum -y install bison boost-devel check-devel cmake gcc-c++ libaio-devel libcurl-devel libudev-devel
+            yum -y install bison boost-devel check-devel cmake libaio-devel libcurl-devel libudev-devel
             yum -y install redhat-rpm-config
             wget https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/30/Everything/x86_64/os/Packages/r/rpcgen-1.4-2.fc30.x86_64.rpm
             wget ftp://ftp.pbone.net/mirror/archive.fedoraproject.org/fedora/linux/releases/29/Everything/x86_64/os/Packages/g/gperf-3.1-6.fc29.x86_64.rpm
@@ -431,17 +431,24 @@ install_deps() {
         done
         apt-get -y purge eatmydata || true
         apt-get update
+        if [ x"${DIST}" = noble ]; then
+            apt-get -y install gcc-11 g++-11
+            update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100 --slave /usr/bin/g++ g++ /usr/bin/g++-11
+        else
+            apt-get -y install gcc g++
+        fi
         apt-get -y install git || true
         apt-get -y install psmisc
         apt-get -y install libsasl2-modules:amd64 || apt-get -y install libsasl2-modules
         apt-get -y install dh-systemd || true
-        apt-get -y install curl bison cmake perl libssl-dev gcc g++ libaio-dev libldap2-dev libwrap0-dev gdb unzip gawk
+        apt-get -y install curl bison cmake perl libssl-dev libaio-dev libldap2-dev libwrap0-dev gdb unzip gawk
         apt-get -y install lsb-release libmecab-dev libncurses5-dev libreadline-dev libpam-dev zlib1g-dev libcurl4-gnutls-dev
         apt-get -y install libldap2-dev libnuma-dev libjemalloc-dev libeatmydata libc6-dbg valgrind libjson-perl libsasl2-dev
         apt-get -y install patchelf
         apt-get -y install libsasl2-dev libsasl2-modules-gssapi-mit
         apt-get -y install stunnel libkrb5-dev
         apt-get -y install libudev-dev
+
         if [ x"${DIST}" = xfocal -o x"${DIST}" = xbullseye -o x"${DIST}" = jammy -o x"${DIST}" = bookworm -o x"${DIST}" = noble ]; then
             apt-get -y install python3-mysqldb
         else
@@ -824,7 +831,7 @@ build_deb(){
     ARCH=$(uname -m)
     DEBIAN_VERSION="$(lsb_release -sc)"
 
-    COMMON_FLAGS="-Wall -Wp,-D_FORTIFY_SOURCE=2 -Wno-error=nonnull-compare -Wno-error=unused-result -Wno-error=literal-suffix -Wno-misleading-indentation -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -DPERCONA_INNODB_VERSION=$MYSQL_RELEASE "
+    COMMON_FLAGS="-Wall -Wp,-D_FORTIFY_SOURCE=2 -Wno-error=unused-result -Wno-error=literal-suffix -Wno-misleading-indentation -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -DPERCONA_INNODB_VERSION=$MYSQL_RELEASE "
     export CFLAGS=" $COMMON_FLAGS -static-libgcc ${CFLAGS:-}"
     export CXXFLAGS=" $COMMON_FLAGS -Wno-virtual-move-assign  ${CXXFLAGS:-}"
 
