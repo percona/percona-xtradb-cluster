@@ -892,6 +892,11 @@ build_deb(){
         rm -f call-home.sh
     cd ../
 
+    if [ ${DEBIAN_VERSION} = "noble" ]; then
+        sed -i 's/export CFLAGS=/export CFLAGS=-Wno-error=nonnull-compare /' debian/rules
+        sed -i 's/export CXXFLAGS=/export CXXFLAGS=-Wno-error=nonnull-compare /' debian/rules
+    fi
+
     GALERA_REVNO="${GALERA_REVNO}" SCONS_ARGS=' strict_build_flags=0'  MAKE_JFLAG=-j4  dpkg-buildpackage -rfakeroot -uc -us -b
     #
     cd ${WORKSPACE} || exit
