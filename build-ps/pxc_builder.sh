@@ -431,12 +431,6 @@ install_deps() {
         done
         apt-get -y purge eatmydata || true
         apt-get update
-        if [ x"${DIST}" = xnoble ]; then
-            apt-get -y install gcc-11 g++-11
-            update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100 --slave /usr/bin/g++ g++ /usr/bin/g++-11
-        else
-            apt-get -y install gcc g++
-        fi
         apt-get -y install git || true
         apt-get -y install psmisc
         apt-get -y install libsasl2-modules:amd64 || apt-get -y install libsasl2-modules
@@ -449,17 +443,24 @@ install_deps() {
         apt-get -y install stunnel libkrb5-dev
         apt-get -y install libudev-dev
 
+        if [ x"${DIST}" = xnoble ]; then
+            apt-get -y install gcc-11 g++-11
+            update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100 --slave /usr/bin/g++ g++ /usr/bin/g++-11
+        fi
+
         if [ x"${DIST}" = xfocal -o x"${DIST}" = xbullseye -o x"${DIST}" = xjammy -o x"${DIST}" = xbookworm -o x"${DIST}" = xnoble ]; then
             apt-get -y install python3-mysqldb
         else
             apt-get -y install python-mysqldb
         fi
+
         if [ x"${DIST}" = xbuster ]; then
             wget https://downloads.percona.com/downloads/packaging/libfido2-1/libfido2-1_1.5.0-2~bpo10+1_amd64.deb
             wget https://downloads.percona.com/downloads/packaging/libfido2-1/libcbor0_0.5.0+dfsg-2_amd64.deb
             dpkg -i libcbor0_0.5.0+dfsg-2_amd64.deb
             dpkg -i libfido2-1_1.5.0-2~bpo10+1_amd64.deb
         fi
+
         apt-get -y install libmecab2 mecab mecab-ipadic
         apt-get -y install build-essential devscripts
         apt-get -y install cmake autotools-dev autoconf automake build-essential devscripts debconf debhelper fakeroot
