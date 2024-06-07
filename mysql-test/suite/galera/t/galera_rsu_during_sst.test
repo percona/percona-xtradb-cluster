@@ -54,6 +54,8 @@ SELECT * FROM t1;
 
 # Initiate RSU operation during SST:
 
+CALL mtr.add_suppression("The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.");
+
 SET SESSION wsrep_OSU_method = "RSU";
 CREATE TABLE t2 (f1 INTEGER);
 

@@ -1,3 +1,4 @@
+CALL mtr.add_suppression("The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.");
 CREATE TABLE t1 (f1 INTEGER);
 LOCK TABLE t1 WRITE;
 value prior to RSU:
@@ -24,6 +25,10 @@ wsrep_desync	OFF
 UNLOCK TABLES;
 SET GLOBAL wsrep_provider_options = 'signal=wsrep_desync_left_local_monitor';
 SET GLOBAL wsrep_provider_options = 'dbug=';
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
 value after RSU:
 SHOW STATUS LIKE 'wsrep_desync_count';
 Variable_name	Value

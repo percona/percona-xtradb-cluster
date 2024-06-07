@@ -6,6 +6,7 @@
 --source include/galera_cluster.inc
 
 --connection node_1
+CALL mtr.add_suppression("The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.");
 
 SET GLOBAL wsrep_desync=1;
 

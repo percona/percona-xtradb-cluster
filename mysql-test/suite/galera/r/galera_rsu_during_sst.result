@@ -9,8 +9,11 @@ Shutting down server ...
 SET GLOBAL wsrep_provider_options = 'dbug=d,sst_sent';
 Starting server ...
 # restart
+CALL mtr.add_suppression("The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.");
 SET SESSION wsrep_OSU_method = "RSU";
 CREATE TABLE t2 (f1 INTEGER);
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
 SET GLOBAL wsrep_provider_options = 'signal=sst_sent';
 SET GLOBAL wsrep_provider_options = 'dbug=';
 SELECT * FROM t1;
@@ -19,4 +22,6 @@ f1	f2
 2	a
 3	a
 DROP TABLE t2;
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
 DROP TABLE t1;

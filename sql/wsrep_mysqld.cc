@@ -2845,7 +2845,19 @@ static int wsrep_RSU_begin(THD *thd, const char *, const char *) {
   if (thd->wsrep_cs().begin_rsu(wsrep_RSU_commit_timeout)) {
     WSREP_WARN("RSU begin failed");
   } else {
-    thd->variables.wsrep_on = 0;
+    WSREP_WARN(
+        "The statement was neither written to the binary log "
+        "nor any GTID was generated as the statement "
+        "was executed with wsrep_OSU_method = RSU. "
+        "Query: %s",
+        WSREP_QUERY(thd));
+    push_warning_printf(
+        thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+        "The statement was neither written to the binary log "
+        "nor any GTID was generated as the statement "
+        "was executed with wsrep_OSU_method = RSU.");
+    thd->disable_binlog_guard =
+        std::make_shared<Disable_binlog_guard>(thd, true);
   }
   return 0;
 }
@@ -2855,7 +2867,7 @@ static void wsrep_RSU_end(THD *thd) {
   if (thd->wsrep_cs().end_rsu()) {
     WSREP_WARN("Failed to end RSU, server may need to be restarted");
   }
-  thd->variables.wsrep_on = 1;
+  thd->disable_binlog_guard.reset();
 }
 
 int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
