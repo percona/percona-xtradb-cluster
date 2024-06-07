@@ -421,7 +421,7 @@ install_deps() {
         apt-get -y install dirmngr || true
         wget https://repo.percona.com/apt/percona-release_latest.$(lsb_release -sc)_all.deb && dpkg -i percona-release_latest.$(lsb_release -sc)_all.deb
         percona-release enable tools release
-        percona-release enable pxb-80 release
+        percona-release enable pxb-80 testing
         percona-release enable pxb-24 testing
         export DEBIAN_FRONTEND="noninteractive"
         export DIST="$(lsb_release -sc)"
