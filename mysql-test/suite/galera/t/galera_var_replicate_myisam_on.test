@@ -7,6 +7,7 @@
 --connection node_1
 --disable_query_log
 call mtr.add_suppression("Ignoring error 'Duplicate entry '1' for key 't1.PRIMARY");
+call mtr.add_suppression("The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.");
 --enable_query_log
 
 --connection node_1

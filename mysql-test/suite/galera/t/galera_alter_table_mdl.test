@@ -152,9 +152,10 @@ SELECT * FROM t1;
 SET SESSION wsrep_OSU_method = DEFAULT;
 
 # Assert that INSERT query commits after the ALTER query
---let $limit= 2,10
---let $event_sequence= Anonymous_Gtid # Query/.*ALTER TABLE.* # Anonymous_Gtid # Query/.*BEGIN # Table_map # Write_rows # Xid
---source include/assert_binlog_events.inc
+# PXC-4313 disables binlogging for RSU, so no ALTER TABLE in binlog
+# --let $limit= 2,10
+# --let $event_sequence= Anonymous_Gtid # Query/.*ALTER TABLE.* # Anonymous_Gtid # Query/.*BEGIN # Table_map # Write_rows # Xid
+# --source include/assert_binlog_events.inc
 
 # Reset the debug point before further testing.
 --source include/remove_debug_point.inc
@@ -210,6 +211,8 @@ ALTER TABLE t1 RENAME TO t2, ALGORITHM= INPLACE, LOCK= EXCLUSIVE;
 ALTER TABLE t2 RENAME TO t1, ALGORITHM= INPLACE, LOCK= DEFAULT;
 
 --disable_info
+--connection node_1
+CALL mtr.add_suppression("The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.");
 --connection node_2
 CALL mtr.add_suppression("LOCK=NONE is not supported for this operation. Try LOCK=SHARED.");
 CALL mtr.add_suppression("LOCK=NONE is not supported. Reason: COPY algorithm requires a lock. Try LOCK=SHARED.");

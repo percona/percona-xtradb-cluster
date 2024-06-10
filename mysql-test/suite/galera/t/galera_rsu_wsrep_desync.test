@@ -6,6 +6,7 @@
 --source include/have_debug_sync.inc
 
 call mtr.add_suppression("Trying to desync a node that is already paused");
+CALL mtr.add_suppression("The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.");
 
 #-------------------------------------------------------------------------------
 #
