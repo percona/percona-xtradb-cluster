@@ -5,6 +5,7 @@
 --source suite/galera/include/galera_have_debug_sync.inc
 
 --connection node_1
+CALL mtr.add_suppression("The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.");
 CREATE TABLE t1 (f1 INTEGER);
 LOCK TABLE t1 WRITE;
 --echo value prior to RSU:

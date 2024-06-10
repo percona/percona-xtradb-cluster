@@ -1,4 +1,5 @@
 call mtr.add_suppression("Trying to desync a node that is already paused");
+CALL mtr.add_suppression("The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.");
 ** Test #1 **
 CREATE TABLE t1 (f1 INTEGER) Engine=InnoDB;
 SET GLOBAL wsrep_desync=1;
@@ -19,6 +20,8 @@ wsrep_desync	OFF
 Variable_name	Value
 wsrep_desync_count	1
 SET DEBUG_SYNC= 'now SIGNAL continue';
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
 SHOW CREATE TABLE t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
@@ -82,6 +85,8 @@ wsrep_desync	OFF
 Variable_name	Value
 wsrep_desync_count	2
 SET DEBUG_SYNC= 'now SIGNAL continue';
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
 SHOW CREATE TABLE t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (

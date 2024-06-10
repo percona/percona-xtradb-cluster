@@ -1,0 +1,53 @@
+#
+# When wsrep_OSU_method = RSU, DDL should not create binlog event
+# and GTID should not be generated.
+#
+
+--source include/galera_cluster.inc
+
+CALL mtr.add_suppression("The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.");
+--let $wsrep_OSU_method_save = `SELECT @@global.wsrep_OSU_method`
+
+SET wsrep_OSU_method = RSU;
+
+--let $gtid_executed_begin = `SELECT @@global.gtid_executed`
+--let $pos_begin = query_get_value(SHOW MASTER STATUS, Position, 1)
+
+# Let's do some DDLs. 
+
+CREATE TABLE t1 (a INT PRIMARY KEY);
+SHOW WARNINGS;
+
+CREATE USER 'testuser'@'%' IDENTIFIED BY 'testpass';
+SHOW WARNINGS;
+
+# No events logged
+--let $assert_text = Assert that the above event has not been added to binlog                                                                                                                                   
+--let $assert_cond = [SHOW MASTER STATUS, Position, 1] = $pos_begin                                                                                                                                             
+--source include/assert.inc
+
+# No gtid generated
+#--let $assert_text = Assert that GTID was not generated                                                                                                                                   
+#--let $assert_cond = [SHOW GLOBAL VARIABLES LIKE "gtid_executed", Value, 1] = $gtid_begin                                                                                                                                             
+#--source include/assert.inc
+
+# Log file should have warnings related to DDL execution
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
+--let $assert_count = 1
+
+--let $assert_select = Warning.*he statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU. Query: CREATE TABLE t1 \(a INT PRIMARY KEY\)
+--let $assert_text = Assert that DDL query warning was logged
+--source include/assert_grep.inc
+
+# No secrets logged
+--let $assert_select = Warning.*he statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU. Query: CREATE USER 'testuser'@'%' IDENTIFIED BY <secret>
+--let $assert_text = Assert that DDL query warning was logged without secrets
+--source include/assert_grep.inc
+
+
+# Cleanup
+--disable_query_log
+--eval SET wsrep_OSU_method = $wsrep_OSU_method_save
+--enable_query_log
+DROP TABLE IF EXISTS t1;
+DROP USER IF EXISTS 'testuser'@'%';

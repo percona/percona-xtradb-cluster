@@ -1,0 +1,19 @@
+CALL mtr.add_suppression("The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.");
+SET wsrep_OSU_method = RSU;
+CREATE TABLE t1 (a INT PRIMARY KEY);
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+SHOW WARNINGS;
+Level	Code	Message
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+CREATE USER 'testuser'@'%' IDENTIFIED BY 'testpass';
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+SHOW WARNINGS;
+Level	Code	Message
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+include/assert.inc [Assert that the above event has not been added to binlog                                                                                                                                   ]
+include/assert_grep.inc [Assert that DDL query warning was logged]
+include/assert_grep.inc [Assert that DDL query warning was logged without secrets]
+DROP TABLE IF EXISTS t1;
+DROP USER IF EXISTS 'testuser'@'%';
