@@ -765,7 +765,7 @@ build_deb(){
     dpkg-source -x ${DSC}
 
     cd ${DIRNAME} || exit
-    if [[ "x$DEBIAN_VERSION" == "xbionic" || "x$DEBIAN_VERSION" == "xfocal" || "x$DEBIAN_VERSION" == "xbuster" || "x$DEBIAN_VERSION" == "xcosmic" || "x$DEBIAN_VERSION" == "xyakkety" || "x$DEBIAN_VERSION" == "xstretch" || "x$DEBIAN_VERSION" == "xbullseye" || "x$DEBIAN_VERSION" == "xbookworm" || "x$DEBIAN_VERSION" == "xjammy" ]]; then
+    if [[ "x$DEBIAN_VERSION" == "xbionic" || "x$DEBIAN_VERSION" == "xfocal" || "x$DEBIAN_VERSION" == "xbuster" || "x$DEBIAN_VERSION" == "xcosmic" || "x$DEBIAN_VERSION" == "xyakkety" || "x$DEBIAN_VERSION" == "xstretch" || "x$DEBIAN_VERSION" == "xbullseye" || "x$DEBIAN_VERSION" == "xbookworm" || "x$DEBIAN_VERSION" == "xjammy" || "x$DEBIAN_VERSION" == "xnoble" ]]; then
         sed -i 's/fabi-version=2/fabi-version=2 -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -Wno-error=literal-suffix -Wno-misleading-indentation/' cmake/build_configurations/compiler_options.cmake
 	sed -i 's/gnu++11/gnu++11 -Wno-virtual-move-assign/' cmake/build_configurations/compiler_options.cmake
     fi
@@ -775,7 +775,7 @@ build_deb(){
     export MYSQL_BUILD_CFLAGS="$CFLAGS"
     export MYSQL_BUILD_CXXFLAGS="$CXXFLAGS"
 
-    if [ ${DEBIAN_VERSION} = xenial -o ${DEBIAN_VERSION} = stretch -o ${DEBIAN_VERSION} = bionic -o ${DEBIAN_VERSION} = focal -o ${DEBIAN_VERSION} = buster -o ${DEBIAN_VERSION} = bullseye -o ${DEBIAN_VERSION} = bookworm -o ${DEBIAN_VERSION} = jammy ]; then
+    if [ ${DEBIAN_VERSION} = xenial -o ${DEBIAN_VERSION} = stretch -o ${DEBIAN_VERSION} = bionic -o ${DEBIAN_VERSION} = focal -o ${DEBIAN_VERSION} = buster -o ${DEBIAN_VERSION} = bullseye -o ${DEBIAN_VERSION} = bookworm -o ${DEBIAN_VERSION} = jammy -o ${DEBIAN_VERSION} = noble ]; then
         rm -rf debian
         cp -r build-ps/ubuntu debian
         sed -i "s:@@MYSQL_VERSION@@:${MYSQL_VERSION}:g" debian/changelog
@@ -785,7 +785,7 @@ build_deb(){
         sed -i "s:@@WSREP_VERSION@@:${WSREP_VERSION}:g" debian/rules
         sed -i "s:@@XB_VERSION@@:${XB_VERSION}:g" debian/control
     fi
-    if [ x"${DEBIAN_VERSION}" = xbionic -o x"${DEBIAN_VERSION}" = xcosmic -o x"${DEBIAN_VERSION}" = xbuster -o x"${DEBIAN_VERSION}" = xfocal -o x"${DEBIAN_VERSION}" = xbullseye -o x"${DEBIAN_VERSION}" = xbookworm -o x"${DEBIAN_VERSION}" = xjammy ]; then
+    if [ x"${DEBIAN_VERSION}" = xbionic -o x"${DEBIAN_VERSION}" = xcosmic -o x"${DEBIAN_VERSION}" = xbuster -o x"${DEBIAN_VERSION}" = xfocal -o x"${DEBIAN_VERSION}" = xbullseye -o x"${DEBIAN_VERSION}" = xbookworm -o x"${DEBIAN_VERSION}" = xjammy -o x"${DEBIAN_VERSION}" = xnoble ]; then
         sed -i "s:iproute:iproute2:g" debian/control
     fi
 
