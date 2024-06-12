@@ -564,6 +564,9 @@ build_srpm(){
     cd ${WORKDIR}/rpmbuild/SPECS || exit
     tar vxzf ${WORKDIR}/${TARFILE} --wildcards '*/build-ps/*.spec' --strip=2
     #
+    sed -i "/^%changelog/a - Release ${VERSION}-${RELEASE}" percona-xtradb-cluster.spec
+    sed -i "/^%changelog/a * $(date "+%a") $(date "+%b") $(date "+%d") $(date "+%Y") Percona Development Team <info@percona.com> - ${VERSION}-${RELEASE}" percona-xtradb-cluster.spec
+    #
     cd ${WORKDIR} || exit
     #
     mv -fv ${TARFILE} ${WORKDIR}/rpmbuild/SOURCES
