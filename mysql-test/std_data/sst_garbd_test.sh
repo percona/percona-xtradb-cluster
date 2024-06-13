@@ -2,7 +2,9 @@
 
 set -x
 socat_pid=
-
+after_sst_sleep_duration=${3:-0}
+exit_code=${4:-0}
+ 
 function handle_sigint() {
   if [[ -n "${socat_pid}" ]]; then
       echo "SST request failed"
@@ -28,8 +30,9 @@ echo 2
 socat openssl-listen:$1,reuseaddr,$2 - > /dev/null
 echo 3
 
-sleep 5
+echo "Sleeping for ${after_sst_sleep_duration} seconds before finishing sst script"
+sleep ${after_sst_sleep_duration}
 
 echo 4
 
-exit 0
+exit ${exit_code}
