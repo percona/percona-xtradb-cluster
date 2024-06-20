@@ -20481,12 +20481,23 @@ innobase_commit_by_xid(
 	trx_t*	trx = trx_get_trx_by_xid(xid);
 
 	if (trx != NULL) {
+<<<<<<< HEAD
 		TrxInInnoDB	trx_in_innodb(trx);
 #ifdef WITH_WSREP
 		trx->wsrep_recover_xid = xid;
 #endif /* WITH_WSREP */
 
 		innobase_commit_low(trx);
+||||||| c643a1242d8
+		TrxInInnoDB	trx_in_innodb(trx);
+
+		innobase_commit_low(trx);
+=======
+		{
+			TrxInInnoDB	trx_in_innodb(trx);
+			innobase_commit_low(trx);
+		}
+>>>>>>> Percona-Server-5.7.44-50
                 ut_ad(trx->mysql_thd == NULL);
 		/* use cases are: disconnected xa, slave xa, recovery */
 		trx_deregister_from_2pc(trx);
@@ -20516,6 +20527,7 @@ innobase_rollback_by_xid(
 	trx_t*	trx = trx_get_trx_by_xid(xid);
 
 	if (trx != NULL) {
+<<<<<<< HEAD
 		TrxInInnoDB	trx_in_innodb(trx);
 
 #ifdef WITH_WSREP
@@ -20527,6 +20539,17 @@ innobase_rollback_by_xid(
 		}
 #endif /* WITH_WSREP */
 		int	ret = innobase_rollback_trx(trx);
+||||||| c643a1242d8
+		TrxInInnoDB	trx_in_innodb(trx);
+
+		int	ret = innobase_rollback_trx(trx);
+=======
+		int ret;
+		{
+			TrxInInnoDB trx_in_innodb(trx);
+			ret = innobase_rollback_trx(trx);
+		}
+>>>>>>> Percona-Server-5.7.44-50
 
 		trx_deregister_from_2pc(trx);
 		ut_ad(!trx->will_lock);
