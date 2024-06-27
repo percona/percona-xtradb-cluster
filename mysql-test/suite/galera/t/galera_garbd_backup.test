@@ -1,6 +1,7 @@
 
 # Test the sst receiver-function capability of garbd.
-#
+# sst_garbd_test.sh parameters:
+# sst_garbd_test.sh <port> <ssl_opts> <before_exit_sleep_sec> <exit_code>
 
 --source include/galera_cluster.inc
 
@@ -35,26 +36,77 @@ CALL mtr.add_suppression("Xtrabackup");
 CALL mtr.add_suppression("Allocated tablespace ID");
 
 --exec `chmod +x "$MYSQLTEST_VARDIR/std_data/sst_garbd_test.sh"`
+--exec `chmod +x "$MYSQLTEST_VARDIR/std_data/post_sst_garbd_test.sh"`
 
 --let $ssl_opts=cafile=$MYSQLTEST_VARDIR/std_data/cacert.pem,cert=$MYSQLTEST_VARDIR/std_data/server-cert.pem,key=$MYSQLTEST_VARDIR/std_data/server-key.pem
 
---exec $GALERA_GARBD --sst="xtrabackup-v2:127.0.0.1:9999/xtrabackup_sst//1" --recv-script="$MYSQLTEST_VARDIR/std_data/sst_garbd_test.sh 9999 $ssl_opts" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'evs.inactive_timeout=PT6S;base_port=$NODE_GALERAPORT_3' > $MYSQLTEST_VARDIR/tmp/garbd1.log 2>&1 
+#
+# Success scenario
+#
+--exec $GALERA_GARBD --sst="xtrabackup-v2:127.0.0.1:9999/xtrabackup_sst//1" --recv-script="$MYSQLTEST_VARDIR/std_data/sst_garbd_test.sh 9999 $ssl_opts 0 0" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'evs.inactive_timeout=PT6S;base_port=$NODE_GALERAPORT_3' > $MYSQLTEST_VARDIR/tmp/garbd1.log 2>&1 
 SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 
-# Error: incorrect donor sst script
+#
+# Success scenario with post-recv-script
+#
+--exec $GALERA_GARBD --sst="xtrabackup-v2:127.0.0.1:9999/xtrabackup_sst//1" --recv-script="$MYSQLTEST_VARDIR/std_data/sst_garbd_test.sh 9999 $ssl_opts 0 0" --post-recv-script="$MYSQLTEST_VARDIR/std_data/post_sst_garbd_test.sh $MYSQLTEST_VARDIR/tmp/post_recv_script_output1 0" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'evs.inactive_timeout=PT6S;base_port=$NODE_GALERAPORT_3' > $MYSQLTEST_VARDIR/tmp/garbd1.1.log 2>&1 
+SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+
+# Check that post_recv_script_output1 was created by post-recv-script
+--file_exists $MYSQLTEST_VARDIR/tmp/post_recv_script_output1
+
+#
+# Error: sst script does not finish within 5 secs after Donor finishes serving SST
+#
 --error 1
---exec $GALERA_GARBD --sst="nonexistent-script:127.0.0.1:9998/xtrabackup_sst//1" --recv-script="$MYSQLTEST_VARDIR/std_data/sst_garbd_test.sh 9998 $ssl_opts" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'evs.inactive_timeout=PT6S;base_port=$NODE_GALERAPORT_3' > $MYSQLTEST_VARDIR/tmp/garbd2.log 2>&1 
+--exec $GALERA_GARBD --sst="xtrabackup-v2:127.0.0.1:9999/xtrabackup_sst//1" --recv-script="$MYSQLTEST_VARDIR/std_data/sst_garbd_test.sh 9999 $ssl_opts 10 0" --post-recv-script="$MYSQLTEST_VARDIR/std_data/post_sst_garbd_test.sh $MYSQLTEST_VARDIR/tmp/post_recv_script_output2 0" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'evs.inactive_timeout=PT6S;base_port=$NODE_GALERAPORT_3' > $MYSQLTEST_VARDIR/tmp/garbd1.2.log 2>&1 
 SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 
+# Check that post-recv-script was not executed (post_recv_script_output2 was NOT created)
+--let $file_does_not_exist = $MYSQLTEST_VARDIR/tmp/post_recv_script_output2
+--source include/file_does_not_exist.inc
 
+#
+# Error: recv-script finishes, but returns non-zero error code. garbd should return the error returned by the script.
+#
+--error 4
+--exec $GALERA_GARBD --sst="xtrabackup-v2:127.0.0.1:9999/xtrabackup_sst//1" --recv-script="$MYSQLTEST_VARDIR/std_data/sst_garbd_test.sh 9999 $ssl_opts 0 4" --post-recv-script="$MYSQLTEST_VARDIR/std_data/post_sst_garbd_test.sh $MYSQLTEST_VARDIR/tmp/post_recv_script_output3 0" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'evs.inactive_timeout=PT6S;base_port=$NODE_GALERAPORT_3' > $MYSQLTEST_VARDIR/tmp/garbd1.3.log 2>&1 
+SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+
+# Check that post-recv-script was not executed (post_recv_script_output3 was NOT created)
+--let $file_does_not_exist = $MYSQLTEST_VARDIR/tmp/post_recv_script_output3
+--source include/file_does_not_exist.inc
+
+#
+# Error: recv-script finishes and returns 0, but post-recv-script returns non-zero error code.
+# Garbd should return the error returned by the post-recv-script.
+#
+--error 4
+--exec $GALERA_GARBD --sst="xtrabackup-v2:127.0.0.1:9999/xtrabackup_sst//1" --recv-script="$MYSQLTEST_VARDIR/std_data/sst_garbd_test.sh 9999 $ssl_opts 0 0" --post-recv-script="$MYSQLTEST_VARDIR/std_data/post_sst_garbd_test.sh $MYSQLTEST_VARDIR/tmp/post_recv_script_output4 4" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'evs.inactive_timeout=PT6S;base_port=$NODE_GALERAPORT_3' > $MYSQLTEST_VARDIR/tmp/garbd1.4.log 2>&1 
+SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+
+# Check that post-recv-script was executed (post_recv_script_output4 was created)
+--file_exists $MYSQLTEST_VARDIR/tmp/post_recv_script_output4
+
+#
+# Error: incorrect donor sst script
+#
+--error 1
+--exec $GALERA_GARBD --sst="nonexistent-script:127.0.0.1:9998/xtrabackup_sst//1" --recv-script="$MYSQLTEST_VARDIR/std_data/sst_garbd_test.sh 9998 $ssl_opts 0 0" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'evs.inactive_timeout=PT6S;base_port=$NODE_GALERAPORT_3' > $MYSQLTEST_VARDIR/tmp/garbd2.log 2>&1 
+SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+
+#
 # Error: incorrect receiver script
+#
 --error 2
 --exec $GALERA_GARBD --sst="xtrabackup-v2:127.0.0.1:9997/xtrabackup_sst//1" --recv-script="nonexistent-script" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'evs.inactive_timeout=PT6S;base_port=$NODE_GALERAPORT_3' > $MYSQLTEST_VARDIR/tmp/garbd3.log 2>&1 
 SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 
+#
 # Simulate two connection error 
+#
 --let $command = "$GALERA_GARBD"
---let $command_opt = --sst="xtrabackup-v2:127.0.0.1:9996/xtrabackup_sst//1" --donor node1 --recv-script="$MYSQLTEST_VARDIR/std_data/sst_garbd_test.sh 9996 $ssl_opts" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'evs.inactive_timeout=PT6S;base_port=$NODE_GALERAPORT_3'
+--let $command_opt = --sst="xtrabackup-v2:127.0.0.1:9996/xtrabackup_sst//1" --donor node1 --recv-script="$MYSQLTEST_VARDIR/std_data/sst_garbd_test.sh 9996 $ssl_opts 0 0" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'evs.inactive_timeout=PT6S;base_port=$NODE_GALERAPORT_3'
 --let $output_file = $MYSQLTEST_VARDIR/tmp/garbd3.log
 --let $pid_file = $MYSQLTEST_VARDIR/tmp/garbd3.pid
 --source include/start_proc_in_background.inc
@@ -63,7 +115,7 @@ SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME 
 # More than a few ms: the second garbd process knows abaut the SST transfer for the first, and waits until it is done
 # Minimal time: both garbd processes think that the donor sends data to them.
 # Second garbd process only notices the issue when the SST process finishes yet it didn't receive any data, and it exists with a failure.
---exec $GALERA_GARBD --sst="xtrabackup-v2:127.0.0.1:9998/xtrabackup_sst//1" --donor node1 --recv-script="$MYSQLTEST_VARDIR/std_data/sst_garbd_test.sh 9998 $ssl_opts" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'evs.inactive_timeout=PT6S;base_port=$NODE_GALERAPORT_3' > $MYSQLTEST_VARDIR/tmp/garbd4.log 2>&1  || exit 0
+--exec $GALERA_GARBD --sst="xtrabackup-v2:127.0.0.1:9998/xtrabackup_sst//1" --donor node1 --recv-script="$MYSQLTEST_VARDIR/std_data/sst_garbd_test.sh 9998 $ssl_opts 0 0" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'evs.inactive_timeout=PT6S;base_port=$NODE_GALERAPORT_3' > $MYSQLTEST_VARDIR/tmp/garbd4.log 2>&1  || exit 0
 
 --connection node_1
 
@@ -73,8 +125,14 @@ SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME 
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
---remove_file $MYSQLTEST_VARDIR/tmp/garbd1.log  
---remove_file $MYSQLTEST_VARDIR/tmp/garbd2.log  
---remove_file $MYSQLTEST_VARDIR/tmp/garbd3.log  
---remove_file $MYSQLTEST_VARDIR/tmp/garbd4.log  
---remove_file $MYSQLTEST_VARDIR/tmp/garbd3.pid  
+--remove_file $MYSQLTEST_VARDIR/tmp/garbd1.log
+--remove_file $MYSQLTEST_VARDIR/tmp/garbd1.1.log
+--remove_file $MYSQLTEST_VARDIR/tmp/garbd1.2.log
+--remove_file $MYSQLTEST_VARDIR/tmp/garbd1.3.log
+--remove_file $MYSQLTEST_VARDIR/tmp/garbd1.4.log
+--remove_file $MYSQLTEST_VARDIR/tmp/garbd2.log
+--remove_file $MYSQLTEST_VARDIR/tmp/garbd3.log
+--remove_file $MYSQLTEST_VARDIR/tmp/garbd4.log
+--remove_file $MYSQLTEST_VARDIR/tmp/garbd3.pid
+--remove_file $MYSQLTEST_VARDIR/tmp/post_recv_script_output1
+--remove_file $MYSQLTEST_VARDIR/tmp/post_recv_script_output4
