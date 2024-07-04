@@ -1615,18 +1615,18 @@ static void handle_event(connection_t *connection)
   err= start_io(connection);
 
 end:
+  if (err)
+    connection_abort(connection);
+
 #ifdef WITH_WSREP
   /* Set the thd->wsrep_query_state back to the QUERY_IDLE state. */
-  if (WSREP_ON)
+  if (WSREP_ON && !err)
   {
     mysql_mutex_lock(&connection->thd->LOCK_wsrep_thd);
     wsrep_thd_set_query_state(connection->thd, QUERY_IDLE);
     mysql_mutex_unlock(&connection->thd->LOCK_wsrep_thd);
   }
 #endif /* WITH_WSREP */
-
-  if (err)
-    connection_abort(connection);
 
   DBUG_VOID_RETURN;
 }
