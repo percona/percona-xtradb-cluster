@@ -20481,12 +20481,13 @@ innobase_commit_by_xid(
 	trx_t*	trx = trx_get_trx_by_xid(xid);
 
 	if (trx != NULL) {
-		TrxInInnoDB	trx_in_innodb(trx);
+		{
+			TrxInInnoDB	trx_in_innodb(trx);
 #ifdef WITH_WSREP
-		trx->wsrep_recover_xid = xid;
+			trx->wsrep_recover_xid = xid;
 #endif /* WITH_WSREP */
-
-		innobase_commit_low(trx);
+			innobase_commit_low(trx);
+		}
                 ut_ad(trx->mysql_thd == NULL);
 		/* use cases are: disconnected xa, slave xa, recovery */
 		trx_deregister_from_2pc(trx);
@@ -20516,17 +20517,19 @@ innobase_rollback_by_xid(
 	trx_t*	trx = trx_get_trx_by_xid(xid);
 
 	if (trx != NULL) {
-		TrxInInnoDB	trx_in_innodb(trx);
-
+		int ret;
+		{
+			TrxInInnoDB trx_in_innodb(trx);
 #ifdef WITH_WSREP
-		/* If a wsrep transaction is being rolled back during
-		   the recovery, we must clear the xid in order to avoid
-		   writing serialisation history for rolled back transaction. */
-		if (trx->xid && wsrep_is_wsrep_xid(trx->xid)) {
-			trx->xid->reset();
-		}
+			/* If a wsrep transaction is being rolled back during
+			the recovery, we must clear the xid in order to avoid
+			writing serialisation history for rolled back transaction. */
+			if (trx->xid && wsrep_is_wsrep_xid(trx->xid)) {
+				trx->xid->reset();
+			}
 #endif /* WITH_WSREP */
-		int	ret = innobase_rollback_trx(trx);
+			ret = innobase_rollback_trx(trx);
+		}
 
 		trx_deregister_from_2pc(trx);
 		ut_ad(!trx->will_lock);
