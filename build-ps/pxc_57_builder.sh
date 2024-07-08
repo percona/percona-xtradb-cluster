@@ -243,7 +243,7 @@ get_sources(){
 
 switch_to_vault_repo() {
     sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-Linux-*
-    sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-Linux-*
+    sed -i 's|#\s*baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-Linux-*
 }
 
 get_system(){
@@ -277,7 +277,7 @@ install_deps() {
     CURPLACE=$(pwd)
 
     if [ "x$OS" = "xrpm" ]; then
-        if [ x"$RHEL" = x8 ]; then
+        if [ x"$RHEL" = x8 -o x"$RHEL" = x7 ]; then
             switch_to_vault_repo
         fi
         RHEL=$(rpm --eval %rhel)
@@ -330,6 +330,7 @@ install_deps() {
             dnf -y module disable mysql
         else
             yum -y install epel-release
+            switch_to_vault_repo
             yum -y install git numactl-devel wget rpm-build gcc-c++ gperf ncurses-devel perl readline-devel openssl-devel jemalloc zstd zstd-devel
             yum -y install time zlib-devel libaio-devel bison cmake pam-devel libeatmydata autoconf automake jemalloc-devel make
             yum -y install perl-Time-HiRes openldap-devel unzip wget libcurl-devel boost-static selinux-policy-devel libudev-devel
@@ -338,6 +339,7 @@ install_deps() {
                 echo "waiting"
                 sleep 1
             done
+            switch_to_vault_repo
             yum -y install scons check-devel boost-devel cmake3
         fi
         yum -y install yum-utils patchelf
@@ -431,7 +433,7 @@ build_srpm(){
         echo "It is not possible to build src rpm here"
         exit 1
     fi
-    if [ x"$RHEL" = x8 ]; then
+    if [ x"$RHEL" = x8 -o x"$RHEL" = x7 ]; then
         switch_to_vault_repo
     fi
     cd $WORKDIR || exit
@@ -575,7 +577,7 @@ build_rpm(){
         echo "It is not possible to build rpm here"
         exit 1
     fi
-    if [ x"$RHEL" = x8 ]; then
+    if [ x"$RHEL" = x8 -o x"$RHEL" = x7 ]; then
         switch_to_vault_repo
     fi
     SRC_RPM=$(basename $(find $WORKDIR/srpm -iname 'percona-xtradb-cluster*.src.rpm' | sort | tail -n1))
@@ -828,7 +830,7 @@ build_tarball(){
         echo "Binary tarball will not be created"
         return;
     fi
-    if [ x"$RHEL" = x8 ]; then
+    if [ x"$RHEL" = x8 -o x"$RHEL" = x7 ]; then
         switch_to_vault_repo
     fi
     source ${WORKDIR}/pxc-57.properties
