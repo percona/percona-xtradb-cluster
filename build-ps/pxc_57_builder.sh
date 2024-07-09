@@ -302,9 +302,9 @@ install_deps() {
             yum -y install readline-devel rpm-build rsync tar time unzip wget zlib-devel selinux-policy-devel
             yum -y install bison boost-devel check-devel cmake gcc-c++ libaio-devel libcurl-devel libudev-devel
             yum -y install redhat-rpm-config
-            wget https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/30/Everything/x86_64/os/Packages/r/rpcgen-1.4-2.fc30.x86_64.rpm
-            wget ftp://ftp.pbone.net/mirror/archive.fedoraproject.org/fedora/linux/releases/29/Everything/x86_64/os/Packages/g/gperf-3.1-6.fc29.x86_64.rpm
-            yum -y install rpcgen-1.4-2.fc30.x86_64.rpm gperf-3.1-6.fc29.x86_64.rpm
+            wget https://downloads.percona.com/downloads/packaging/rpcgen-1.4-2.fc30.x86_64.rpm
+            # wget https://downloads.percona.com/downloads/packaging/gperf-3.1-6.el8.x86_64.rpm
+            yum -y install rpcgen-1.4-2.fc30.x86_64.rpm
 
             if [ "x${RHEL}" = "x9" ]; then
 #                yum install -y https://yum.oracle.com/repo/OracleLinux/OL9/distro/builder/x86_64/getPackage/procps-ng-devel-3.3.17-8.el9.x86_64.rpm
