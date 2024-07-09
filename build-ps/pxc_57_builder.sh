@@ -293,7 +293,6 @@ install_deps() {
             yum -y install dnf-plugins-core epel-release
             yum config-manager --set-enabled powertools
 	    yum -y install git
-            yum -y install python2-scons || true
             yum -y install bison boost-static cmake gcc gcc-c++ make
             yum -y install gperf glibc glibc-devel jemalloc jemalloc-devel libaio-devel
             yum -y install libstdc++-devel make ncurses-devel numactl-devel
@@ -318,10 +317,12 @@ install_deps() {
             else
                 #wget https://jenkins.percona.com/yum-repo/percona-dev.repo
                 #mv -vf percona-dev.repo /etc/yum.repos.d
+                wget https://downloads.percona.com/downloads/packaging/python2-scons-3.0.1-9.el8.noarch.rpm
+                yum -y install python2-scons-3.0.1-9.el8.noarch.rpm
                 yum -y clean all
                 yum -y install libtirpc-devel
                 yum -y install perl-Dig
-                yum -y install python2-scons python2-pip python36-devel
+                yum -y install python2-pip python36-devel
                 yum -y install python2-devel
 #                /usr/bin/pip3.6 install --user typing pyyaml regex Cheetah3
 #                /usr/bin/pip2.7 install --user typing pyyaml regex Cheetah
