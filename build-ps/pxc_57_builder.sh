@@ -346,7 +346,7 @@ install_deps() {
         yum -y install cyrus-sasl-devel cyrus-sasl-scram krb5-devel
     else
         apt-get -y update
-        DEBIAN_FRONTEND=noninteractive apt-get -y install curl lsb-release wget apt-transport-https software-properties-common
+        DEBIAN_FRONTEND=noninteractive apt-get -y install curl gnupg2 lsb-release wget apt-transport-https software-properties-common
         apt-get update
         wget https://repo.percona.com/apt/percona-release_latest.$(lsb_release -sc)_all.deb && dpkg -i percona-release_latest.$(lsb_release -sc)_all.deb
         percona-release enable tools testing
