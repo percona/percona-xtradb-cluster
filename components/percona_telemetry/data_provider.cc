@@ -42,6 +42,11 @@ const char *is_source = "is_source";
 const char *is_semisync_replica = "is_semisync_replica";
 const char *is_replica = "is_replica";
 const char *replication_info = "replication_info";
+#ifdef WITH_WSREP
+const char *gcache_encryption_enabled = "gcache_encryption_enabled";
+const char *ws_cache_encryption_enabled = "ws_cache_encryption_enabled";
+const char *galera_replication_info = "galera_replication_info";
+#endif
 }  // namespace JSONKey
 }  // namespace
 
@@ -59,7 +64,11 @@ class DbReplicationIdSolver {
   DbReplicationIdSolver &operator=(const DbReplicationIdSolver &&) = delete;
 
   /* Voters in the order of their priorities. Lower number, lower priority. */
+#ifdef WITH_WSREP
+  enum Voter { NONE, GROUP_REPLICATION, GALERA_REPLICATION };
+#else
   enum Voter { NONE, GROUP_REPLICATION };
+#endif
 
   void vote(const std::string &id, Voter voter) {
     if (voter > id_voter_) {
@@ -502,6 +511,80 @@ bool DataProvider::collect_async_replication_info(
   return false;
 }
 
+#ifdef WITH_WSREP
+bool DataProvider::collect_galera_replication_info(
+    rapidjson::Document *document) {
+  // Do fast check if there is anything to learn about PXC
+  QueryResult result;
+  if (do_query("SELECT @@global.wsrep_provider", &result, nullptr, true)) {
+    return true;
+  }
+
+  if (result.size() > 0) {
+    // We've got some rows. Check if the Galera provider is loaded.
+    if (strcmp(result[0][0].c_str(), "none") == 0) {
+      // Galera provider is not loaded. Nothing to collect.
+      return false;
+    }
+  } else {
+    // should not get here
+    assert(0);
+    return true;
+  }
+
+  // cluster size
+  if (do_query("SELECT COUNT(*) FROM mysql.wsrep_cluster_members", &result, nullptr, true)) {
+    return true;
+  }
+
+  rapidjson::Document::AllocatorType &allocator = document->GetAllocator();
+  rapidjson::Document pxc_json(rapidjson::Type::kObjectType);
+
+  /* replication group size */
+  rapidjson::Value group_size;
+  group_size.SetString(result[0][0].c_str(), allocator);
+  pxc_json.AddMember(rapidjson::StringRef(JSONKey::group_size), group_size,
+                    allocator);
+
+
+  // collect wsrep cluster_uuid and store it in replication_id_solver
+  if (do_query("SELECT cluster_uuid FROM mysql.wsrep_cluster", &result, nullptr, true)) {
+    return true;
+  }
+  db_replication_id_solver_->vote(
+      result[0][0], DbReplicationIdSolver::Voter::GALERA_REPLICATION);
+
+
+  /* things we can learn from wsrep_provider_options */
+  if (do_query("SELECT @@global.wsrep_provider_options", &result, nullptr, true)) {
+    return true;
+  }
+
+  /* gcache/writeset cache encryption */
+  bool gcache_encryption_enabled = (result[0][0].find("gcache.encryption = yes") != std::string::npos);
+  bool ws_cache_encryption_enabled = (result[0][0].find("allocator.disk_pages_encryption = yes") != std::string::npos);
+
+  if (gcache_encryption_enabled) {
+    rapidjson::Value gcache_encryption_enabled_json;
+    gcache_encryption_enabled_json.SetString(b2s(gcache_encryption_enabled), allocator);
+    pxc_json.AddMember(rapidjson::StringRef(JSONKey::gcache_encryption_enabled), gcache_encryption_enabled_json,
+                      allocator);
+  }
+
+  if (ws_cache_encryption_enabled) {
+    rapidjson::Value ws_cache_encryption_enabled_json;
+    ws_cache_encryption_enabled_json.SetString(b2s(ws_cache_encryption_enabled), allocator);
+    pxc_json.AddMember(rapidjson::StringRef(JSONKey::ws_cache_encryption_enabled), ws_cache_encryption_enabled_json,
+                      allocator);
+  }
+
+  document->AddMember(rapidjson::StringRef(JSONKey::galera_replication_info),
+                      pxc_json, allocator);
+
+  return false;
+}
+#endif /* WITH_WSREP */
+
 bool DataProvider::collect_db_replication_id(rapidjson::Document *document) {
   const std::string &id = db_replication_id_solver_->get_db_replication_id();
   if (id.length() > 0) {
@@ -539,6 +622,9 @@ bool DataProvider::collect_metrics(rapidjson::Document *document) {
   res |= collect_se_usage_info(document);
   res |= collect_group_replication_info(document);
   res |= collect_async_replication_info(document);
+#ifdef WITH_WSREP
+  res |= collect_galera_replication_info(document);
+#endif
 
   /* The requirement is to have db_replication_id key at the top of JSON
   structure. But it may originate from the different places. The above
