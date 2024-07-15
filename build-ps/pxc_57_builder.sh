@@ -251,7 +251,11 @@ get_system(){
         GLIBC_VER_TMP="$(rpm glibc -qa --qf %{VERSION})"
         RHEL=$(rpm --eval %rhel)
         ARCH=$(echo $(uname -m) | sed -e 's:i686:i386:g')
-        OS_NAME="el$RHEL"
+        if [ "x$RHEL" = "x9" ]; then
+            OS_NAME="ol$RHEL"
+        else
+            OS_NAME="el$RHEL"
+        fi
         OS="rpm"
     else
         GLIBC_VER_TMP="$(dpkg-query -W -f='${Version}' libc6 | awk -F'-' '{print $1}')"
@@ -260,6 +264,7 @@ get_system(){
         OS="deb"
     fi
     export GLIBC_VER=".glibc${GLIBC_VER_TMP}"
+    export OS_NAME=".${OS_NAME}"
     return
 }
 
