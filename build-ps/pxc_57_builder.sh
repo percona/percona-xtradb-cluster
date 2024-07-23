@@ -242,8 +242,8 @@ get_sources(){
 }
 
 switch_to_vault_repo() {
-    sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-Linux-*
-    sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-Linux-*
+    sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
+    sed -i 's|#\s*baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
 }
 
 get_system(){
@@ -251,7 +251,11 @@ get_system(){
         GLIBC_VER_TMP="$(rpm glibc -qa --qf %{VERSION})"
         RHEL=$(rpm --eval %rhel)
         ARCH=$(echo $(uname -m) | sed -e 's:i686:i386:g')
-        OS_NAME="el$RHEL"
+        if [ "x$RHEL" = "x9" ]; then
+            OS_NAME="ol$RHEL"
+        else
+            OS_NAME="el$RHEL"
+        fi
         OS="rpm"
     else
         GLIBC_VER_TMP="$(dpkg-query -W -f='${Version}' libc6 | awk -F'-' '{print $1}')"
@@ -260,6 +264,7 @@ get_system(){
         OS="deb"
     fi
     export GLIBC_VER=".glibc${GLIBC_VER_TMP}"
+    export OS_NAME=".${OS_NAME}"
     return
 }
 
@@ -277,7 +282,7 @@ install_deps() {
     CURPLACE=$(pwd)
 
     if [ "x$OS" = "xrpm" ]; then
-        if [ x"$RHEL" = x8 ]; then
+        if [ x"$RHEL" = x8 -o x"$RHEL" = x7 ]; then
             switch_to_vault_repo
         fi
         RHEL=$(rpm --eval %rhel)
@@ -286,14 +291,13 @@ install_deps() {
         yum install -y perl
         yum install -y https://repo.percona.com/yum/percona-release-latest.noarch.rpm
         percona-release enable tools testing
-        if [ "${RHEL}" -lt 9 ]; then
-            add_percona_yum_repo
-        fi
+        #if [ "${RHEL}" -lt 9 ]; then
+        #    add_percona_yum_repo
+        #fi
         if [ "x$RHEL" = "x8" -o "x$RHEL" = "x9" ]; then
             yum -y install dnf-plugins-core epel-release
             yum config-manager --set-enabled powertools
 	    yum -y install git
-            yum -y install python2-scons || true
             yum -y install bison boost-static cmake gcc gcc-c++ make
             yum -y install gperf glibc glibc-devel jemalloc jemalloc-devel libaio-devel
             yum -y install libstdc++-devel make ncurses-devel numactl-devel
@@ -302,9 +306,9 @@ install_deps() {
             yum -y install readline-devel rpm-build rsync tar time unzip wget zlib-devel selinux-policy-devel
             yum -y install bison boost-devel check-devel cmake gcc-c++ libaio-devel libcurl-devel libudev-devel
             yum -y install redhat-rpm-config
-            wget https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/30/Everything/x86_64/os/Packages/r/rpcgen-1.4-2.fc30.x86_64.rpm
-            wget ftp://ftp.pbone.net/mirror/archive.fedoraproject.org/fedora/linux/releases/29/Everything/x86_64/os/Packages/g/gperf-3.1-6.fc29.x86_64.rpm
-            yum -y install rpcgen-1.4-2.fc30.x86_64.rpm gperf-3.1-6.fc29.x86_64.rpm
+            wget https://downloads.percona.com/downloads/packaging/rpcgen-1.4-2.fc30.x86_64.rpm
+            # wget https://downloads.percona.com/downloads/packaging/gperf-3.1-6.el8.x86_64.rpm
+            yum -y install rpcgen-1.4-2.fc30.x86_64.rpm
 
             if [ "x${RHEL}" = "x9" ]; then
 #                yum install -y https://yum.oracle.com/repo/OracleLinux/OL9/distro/builder/x86_64/getPackage/procps-ng-devel-3.3.17-8.el9.x86_64.rpm
@@ -316,12 +320,14 @@ install_deps() {
                 yum -y install scons pip python3-devel
 #                pip install --user typing pyyaml regex Cheetah3
             else
-                wget https://jenkins.percona.com/yum-repo/percona-dev.repo
-                mv -vf percona-dev.repo /etc/yum.repos.d
+                #wget https://jenkins.percona.com/yum-repo/percona-dev.repo
+                #mv -vf percona-dev.repo /etc/yum.repos.d
+                wget https://downloads.percona.com/downloads/packaging/python2-scons-3.0.1-9.el8.noarch.rpm
+                yum -y install python2-scons-3.0.1-9.el8.noarch.rpm
                 yum -y clean all
                 yum -y install libtirpc-devel
                 yum -y install perl-Dig
-                yum -y install python2-scons python2-pip python36-devel
+                yum -y install python2-pip python36-devel
                 yum -y install python2-devel
 #                /usr/bin/pip3.6 install --user typing pyyaml regex Cheetah3
 #                /usr/bin/pip2.7 install --user typing pyyaml regex Cheetah
@@ -330,6 +336,7 @@ install_deps() {
             dnf -y module disable mysql
         else
             yum -y install epel-release
+            switch_to_vault_repo
             yum -y install git numactl-devel wget rpm-build gcc-c++ gperf ncurses-devel perl readline-devel openssl-devel jemalloc zstd zstd-devel
             yum -y install time zlib-devel libaio-devel bison cmake pam-devel libeatmydata autoconf automake jemalloc-devel make
             yum -y install perl-Time-HiRes openldap-devel unzip wget libcurl-devel boost-static selinux-policy-devel libudev-devel
@@ -338,13 +345,14 @@ install_deps() {
                 echo "waiting"
                 sleep 1
             done
+            switch_to_vault_repo
             yum -y install scons check-devel boost-devel cmake3
         fi
         yum -y install yum-utils patchelf
         yum -y install cyrus-sasl-devel cyrus-sasl-scram krb5-devel
     else
         apt-get -y update
-        DEBIAN_FRONTEND=noninteractive apt-get -y install curl lsb-release wget apt-transport-https software-properties-common
+        DEBIAN_FRONTEND=noninteractive apt-get -y install curl gnupg2 lsb-release wget apt-transport-https software-properties-common
         apt-get update
         wget https://repo.percona.com/apt/percona-release_latest.$(lsb_release -sc)_all.deb && dpkg -i percona-release_latest.$(lsb_release -sc)_all.deb
         percona-release enable tools testing
@@ -431,7 +439,7 @@ build_srpm(){
         echo "It is not possible to build src rpm here"
         exit 1
     fi
-    if [ x"$RHEL" = x8 ]; then
+    if [ x"$RHEL" = x8 -o x"$RHEL" = x7 ]; then
         switch_to_vault_repo
     fi
     cd $WORKDIR || exit
@@ -523,7 +531,7 @@ build_srpm(){
 
 build_mecab_lib(){
     MECAB_TARBAL="mecab-0.996.tar.gz"
-    MECAB_LINK="http://jenkins.percona.com/downloads/mecab/${MECAB_TARBAL}"
+    MECAB_LINK="https://downloads.percona.com/downloads/packaging/${MECAB_TARBAL}"
     MECAB_DIR="${WORKDIR}/${MECAB_TARBAL%.tar.gz}"
     MECAB_INSTALL_DIR="${WORKDIR}/mecab-install"
     rm -f ${MECAB_TARBAL}
@@ -542,7 +550,7 @@ build_mecab_lib(){
 
 build_mecab_dict(){
     MECAB_IPADIC_TARBAL="mecab-ipadic-2.7.0-20070801.tar.gz"
-    MECAB_IPADIC_LINK="http://jenkins.percona.com/downloads/mecab/${MECAB_IPADIC_TARBAL}"
+    MECAB_IPADIC_LINK="https://downloads.percona.com/downloads/packaging/${MECAB_IPADIC_TARBAL}"
     MECAB_IPADIC_DIR="${WORKDIR}/${MECAB_IPADIC_TARBAL%.tar.gz}"
     rm -f ${MECAB_IPADIC_TARBAL}
     rm -rf ${MECAB_IPADIC_DIR}
@@ -575,7 +583,7 @@ build_rpm(){
         echo "It is not possible to build rpm here"
         exit 1
     fi
-    if [ x"$RHEL" = x8 ]; then
+    if [ x"$RHEL" = x8 -o x"$RHEL" = x7 ]; then
         switch_to_vault_repo
     fi
     SRC_RPM=$(basename $(find $WORKDIR/srpm -iname 'percona-xtradb-cluster*.src.rpm' | sort | tail -n1))
@@ -828,7 +836,7 @@ build_tarball(){
         echo "Binary tarball will not be created"
         return;
     fi
-    if [ x"$RHEL" = x8 ]; then
+    if [ x"$RHEL" = x8 -o x"$RHEL" = x7 ]; then
         switch_to_vault_repo
     fi
     source ${WORKDIR}/pxc-57.properties

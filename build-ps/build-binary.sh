@@ -255,7 +255,7 @@ TOKUDB_BACKUP_VERSION="${MYSQL_VERSION}${MYSQL_VERSION_EXTRA}"
 
 RELEASE_TAG=''
 PRODUCT_NAME="Percona-XtraDB-Cluster-$MYSQL_VERSION-$PERCONA_SERVER_EXTENSION"
-PRODUCT_FULL_NAME="$PRODUCT_NAME-$RELEASE_TAG$PXC_VERSION_EXTRA.$TAG.$(uname -s)${DIST_NAME:-}.$MACHINE_SPECS${GLIBC_VER:-}${TARBALL_SUFFIX:-}"
+PRODUCT_FULL_NAME="$PRODUCT_NAME-$RELEASE_TAG$PXC_VERSION_EXTRA.$TAG.$(uname -s)${DIST_NAME:-}.$MACHINE_SPECS${OS_NAME:-}${TARBALL_SUFFIX:-}"
 
 #
 # This corresponds to GIT revision when the build/package is created.
@@ -451,7 +451,8 @@ fi
 
 # Patch needed libraries
 (
-    LIBLIST="libcrypto.so libssl.so libreadline.so libtinfo.so libsasl2.so libfreebl3.so libssl3.so libsmime3.so libnss3.so libnssutil3.so libplds4.so libplc4.so libnspr4.so libncurses.so"
+    #LIBLIST="libcrypto.so libssl.so libreadline.so libtinfo.so libsasl2.so libfreebl3.so libssl3.so libsmime3.so libnss3.so libnssutil3.so libplds4.so libplc4.so libnspr4.so libncurses.so"
+    LIBLIST=""
     DIRLIST="bin lib lib/private lib/mysql/plugin"
 
     LIBPATH=""
