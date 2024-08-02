@@ -77,7 +77,7 @@ REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'mysql.pxc.internal.session'@localhost;
 
 -- Due to bugs with roles, we need to grant superuser access here
 GRANT ALL PRIVILEGES ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
-GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
+GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER, SHUTDOWN,CLONE_ADMIN, SYSTEM_USER,GROUP_REPLICATION_STREAM,  ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
 -- GRANT CREATE USER ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
 -- GRANT SUPER ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
 -- GRANT RELOAD ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
@@ -89,7 +89,7 @@ GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *
 -- See https://www.percona.com/doc/percona-xtrabackup/8.0/using_xtrabackup/privileges.html
 CREATE ROLE 'mysql.pxc.sst.role'@localhost;
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'mysql.pxc.sst.role'@localhost;
-GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.*
+GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER, CLONE_ADMIN,GROUP_REPLICATION_STREAM,SYSTEM_USER, SHUTDOWN,CONNECTION_ADMIN ON *.*
  TO 'mysql.pxc.sst.role'@localhost;
 GRANT ALTER, CREATE, SELECT, INSERT ON PERCONA_SCHEMA.xtrabackup_history
  TO 'mysql.pxc.sst.role'@localhost;
