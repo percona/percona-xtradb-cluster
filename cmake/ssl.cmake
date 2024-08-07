@@ -1,15 +1,16 @@
-# Copyright (c) 2009, 2023, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2024, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
 # as published by the Free Software Foundation.
 #
-# This program is also distributed with certain software (including
+# This program is designed to work with certain software (including
 # but not limited to OpenSSL) that is licensed under separate terms,
 # as designated in a particular file or component or in included license
 # documentation.  The authors of MySQL hereby grant you an additional
 # permission to link the program and your derivative works with the
-# separately licensed software that they have included with MySQL.
+# separately licensed software that they have either included with
+# the program or referenced in the documentation.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -221,26 +222,6 @@ MACRO(FIND_ALTERNATIVE_SYSTEM_SSL)
   SET(OPENSSL_SSL_LIBRARY ${OPENSSL_LIBRARY})
   SET(OPENSSL_CRYPTO_LIBRARY ${CRYPTO_LIBRARY})
 
-  # Add support for bundled curl.
-  ADD_LIBRARY(OpenSSL::SSL UNKNOWN IMPORTED)
-  SET_TARGET_PROPERTIES(OpenSSL::SSL PROPERTIES
-    INTERFACE_INCLUDE_DIRECTORIES "${OPENSSL_INCLUDE_DIR}")
-  IF(EXISTS "${OPENSSL_SSL_LIBRARY}")
-    SET_TARGET_PROPERTIES(OpenSSL::SSL PROPERTIES
-      IMPORTED_LINK_INTERFACE_LANGUAGES "C"
-      IMPORTED_LOCATION "${OPENSSL_SSL_LIBRARY}")
-  ENDIF()
-
-  # Add support for bundled curl.
-  ADD_LIBRARY(OpenSSL::Crypto UNKNOWN IMPORTED)
-  SET_TARGET_PROPERTIES(OpenSSL::Crypto PROPERTIES
-    INTERFACE_INCLUDE_DIRECTORIES "${OPENSSL_INCLUDE_DIR}")
-  IF(EXISTS "${OPENSSL_CRYPTO_LIBRARY}")
-    SET_TARGET_PROPERTIES(OpenSSL::Crypto PROPERTIES
-      IMPORTED_LINK_INTERFACE_LANGUAGES "C"
-      IMPORTED_LOCATION "${OPENSSL_CRYPTO_LIBRARY}")
-  ENDIF()
-
 ENDMACRO(FIND_ALTERNATIVE_SYSTEM_SSL)
 
 # MYSQL_CHECK_SSL
@@ -446,6 +427,28 @@ MACRO (MYSQL_CHECK_SSL)
         "${CMAKE_BINARY_DIR}/copied_openssl.lib" COPYONLY)
       SET(MY_CRYPTO_LIBRARY  "${CMAKE_BINARY_DIR}/copied_crypto.lib")
       SET(MY_OPENSSL_LIBRARY "${CMAKE_BINARY_DIR}/copied_openssl.lib")
+    ENDIF()
+
+    # Create OpenSSL::SSL and OpenSSL::Crypto imported libs for all possible
+    # WITH_SSL values (system, openssl11, /path/to/openssl). This will fix
+    # building modules which rely on OpenSSL::SSL and OpenSSL::Crypto only with
+    # different openssl variants.
+    ADD_LIBRARY(OpenSSL::SSL UNKNOWN IMPORTED)
+    SET_TARGET_PROPERTIES(OpenSSL::SSL PROPERTIES
+      INTERFACE_INCLUDE_DIRECTORIES "${OPENSSL_INCLUDE_DIR}")
+    IF(EXISTS "${MY_OPENSSL_LIBRARY}")
+      SET_TARGET_PROPERTIES(OpenSSL::SSL PROPERTIES
+        IMPORTED_LINK_INTERFACE_LANGUAGES "C"
+        IMPORTED_LOCATION "${MY_OPENSSL_LIBRARY}")
+    ENDIF()
+
+    ADD_LIBRARY(OpenSSL::Crypto UNKNOWN IMPORTED)
+    SET_TARGET_PROPERTIES(OpenSSL::Crypto PROPERTIES
+      INTERFACE_INCLUDE_DIRECTORIES "${OPENSSL_INCLUDE_DIR}")
+    IF(EXISTS "${MY_CRYPTO_LIBRARY}")
+      SET_TARGET_PROPERTIES(OpenSSL::Crypto PROPERTIES
+        IMPORTED_LINK_INTERFACE_LANGUAGES "C"
+        IMPORTED_LOCATION "${MY_CRYPTO_LIBRARY}")
     ENDIF()
 
     MESSAGE(STATUS "OPENSSL_INCLUDE_DIR = ${OPENSSL_INCLUDE_DIR}")
