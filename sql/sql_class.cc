@@ -1417,7 +1417,7 @@ void THD::cleanup(void) {
     Resume the provider if it was paused by this session during FLUSH TABLE(S)
     FOR EXPORT and the session got disconnected.
   */
-  if (WSREP(this) && !global_read_lock.provider_resumed()) {
+  if (WSREP_NNULL(this) && !global_read_lock.provider_resumed()) {
     global_read_lock.wsrep_resume_once();
     global_read_lock.pause_provider(false);
   }
@@ -3413,7 +3413,7 @@ void THD::send_statement_status() {
     sanity check, don't send end statement while replaying
   */
   assert(wsrep_trx().state() != wsrep::transaction::s_replaying);
-  if (WSREP(this) && wsrep_trx().state() == wsrep::transaction::s_replaying) {
+  if (WSREP_NNULL(this) && wsrep_trx().state() == wsrep::transaction::s_replaying) {
     WSREP_ERROR("attempting net_end_statement while replaying");
     return;
   }
