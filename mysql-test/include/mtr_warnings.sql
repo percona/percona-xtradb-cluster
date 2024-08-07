@@ -478,10 +478,10 @@ INSERT INTO global_suppressions VALUES
  ("\\[ERROR\\] .*MY-\\d+.*clone_check_recovery_crashpoint.*"),
 
  /*
-   Warnings/errors seen when server is loaded with keyring plugin without
-   enabling pxc_encrypt_cluster_traffic.
+   Warnings/errors seen when server is loaded with keyring plugin or component
+   without enabling pxc_encrypt_cluster_traffic.
  */
- ("You have enabled keyring plugin. SST encryption is mandatory."),
+ ("You have enabled keyring plugin/component. SST encryption is mandatory."),
  ("No suitable '.*' service implementation found"),
 
 
