@@ -193,7 +193,6 @@ jobs:
           CompilerVer: 14
           BuildType: RelWithDebInfo
 
->>>>>>> Percona-Server-8.0.33-25
       clang-14 Debug [Ubuntu 20.04 Focal]:
         imageName: 'ubuntu-20.04'
         Compiler: clang

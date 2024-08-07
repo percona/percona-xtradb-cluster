@@ -22038,18 +22038,12 @@ static xa_status_code innobase_commit_by_xid(
   trx_t *trx = trx_get_trx_by_xid(xid);
 
   if (trx != nullptr) {
-<<<<<<< HEAD
-    TrxInInnoDB trx_in_innodb(trx);
-#ifdef WITH_WSREP
-    trx->wsrep_recover_xid = xid;
-#endif /* WITH_WSREP */
-||||||| 47601f19675
-    TrxInInnoDB trx_in_innodb(trx);
-=======
     {
       TrxInInnoDB trx_in_innodb(trx);
->>>>>>> Percona-Server-8.0.37-29
 
+#ifdef WITH_WSREP
+      trx->wsrep_recover_xid = xid;
+#endif /* WITH_WSREP */
       innobase_commit_low(trx);
     }
     ut_ad(trx->mysql_thd == nullptr);
@@ -22058,7 +22052,7 @@ static xa_status_code innobase_commit_by_xid(
     ut_ad(!trx->will_lock); /* trx cache requirement */
 
 #ifdef WITH_WSREP
-    trx->wsrep_recover_xid = NULL;
+    trx->wsrep_recover_xid = nullptr;
 #endif /* WITH_WSREP */
 
     trx_free_for_background(trx);

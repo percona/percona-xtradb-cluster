@@ -1206,7 +1206,6 @@ int Srv_session::execute_command(enum enum_server_command command,
   }
   int ret = dispatch_command(m_thd, data, command);
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (m_thd->wsrep_cs().state() == wsrep::client_state::s_exec) {
     wsrep_after_command_before_result(m_thd);
@@ -1214,10 +1213,7 @@ int Srv_session::execute_command(enum enum_server_command command,
   wsrep_after_command_after_result(m_thd);
 #endif /* WITH_WSREP */
 
-||||||| 47601f19675
-=======
   DEBUG_SYNC(m_thd, "wait_before_popping_protocol");
->>>>>>> Percona-Server-8.0.37-29
   m_thd->pop_protocol();
   assert(m_thd->get_protocol() == &m_protocol_error);
   return ret;

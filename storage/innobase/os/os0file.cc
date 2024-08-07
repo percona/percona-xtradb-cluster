@@ -3505,19 +3505,15 @@ pfs_os_file_t os_file_create_simple_no_error_handling_func(
   pfs_os_file_t file;
   int create_flag;
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (create_mode != OS_FILE_OPEN && create_mode != OS_FILE_OPEN_RAW)
     WAIT_ALLOW_WRITES();
 #endif /* WITH_WSREP */
 
-||||||| 47601f19675
-=======
   if (umask == os_innodb_umask_default) {
     umask = os_innodb_umask;
   }
 
->>>>>>> Percona-Server-8.0.37-29
   ut_a(!(create_mode & OS_FILE_ON_ERROR_SILENT));
   ut_a(!(create_mode & OS_FILE_ON_ERROR_NO_EXIT));
 
