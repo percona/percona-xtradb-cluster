@@ -12,7 +12,7 @@ DROP TABLE t1;
 include/assert.inc [All wsrep threads COMMAND should be Sleep after DDL]
 include/assert.inc [All wsrep threads COMMAND should be Sleep after DDL]
 CREATE TABLE t1 (a INT PRIMARY KEY AUTO_INCREMENT, b INT);
-INSERT INTO t1(b) (SELECT * FROM SEQUENCE_TABLE(4) AS tt);
+INSERT INTO t1(b) (SELECT * FROM PERCONA_SEQUENCE_TABLE(4) AS tt);
 SET SESSION wsrep_OSU_method='NBO';
 SET @debug_saved = @@global.debug;
 SET SESSION wsrep_sync_wait = 0;
