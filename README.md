@@ -1,6 +1,6 @@
 # Percona XtraDB Cluster
 
-![PXC logo](doc/source/percona-xtradb-cluster-logo.jpg)
+![PXC logo](doc/percona-xtradb-cluster-logo.jpg)
 
 
 For more information about the Percona XtraDB Cluster components and how to use this product, see [Percona XtraDB Cluster documentation](https://docs.percona.com/percona-xtradb-cluster/)
