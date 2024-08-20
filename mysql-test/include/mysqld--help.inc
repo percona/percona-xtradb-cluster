@@ -26,7 +26,8 @@ perl;
                tls-version admin-tls-version secure-file-priv wsrep-node-name wsrep-data-home-dir/;
   # Variables which we don't want to display in result file since
   # they depend on type of build
-  @build_specific=qw/auto-generate-certs lock-order tls-version admin-tls-version debug-enable-extended-set-ops version-suffix/;
+  @build_specific=qw/auto-generate-certs lock-order tls-version admin-tls-version debug-enable-extended-set-ops version-suffix
+                     percona-telemetry-disable/;
 
   # Plugins which may or may not be there:
   @plugins=qw/innodb ngram mecab ndb ndbinfo archive blackhole federated partition ndbcluster debug ssl des-key-file

@@ -43,9 +43,9 @@ INSERT INTO test.t1 VALUES(12);
 SET SESSION wsrep_sync_wait = 0;
 include/assert.inc [INSERT query should be waiting for the metadata lock.]
 SET DEBUG_SYNC = 'now SIGNAL continue_inplace_alter';
-SET DEBUG_SYNC = 'RESET';
 Warnings:
 Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+SET DEBUG_SYNC = 'RESET';
 SELECT * FROM t1;
 a
 10
