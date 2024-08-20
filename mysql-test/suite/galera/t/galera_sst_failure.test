@@ -7,7 +7,7 @@
 --connection node_1
 CALL mtr.add_suppression(".*Galera. SST preparation failed.*");
 CALL mtr.add_suppression(".*Galera. SST failed.*");
-CALL mtr.add_suppression(".*Galera.* State transfer to .* failed: -125 .Operation canceled.*");
+CALL mtr.add_suppression(".*Galera.* State transfer to .* failed: Operation canceled.*");
 CALL mtr.add_suppression(".*Found a stale sst_in_progress file.*");
 CALL mtr.add_suppression(".*Terminating IST AsyncSender.*");
 
