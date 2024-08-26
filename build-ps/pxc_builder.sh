@@ -269,8 +269,8 @@ get_sources(){
 }
 
 switch_to_vault_repo() {
-    sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-Linux-*
-    sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-Linux-*
+    sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
+    sed -i 's|#\s*baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
 }
 
 get_system(){
@@ -304,7 +304,7 @@ install_deps() {
     CURPLACE=$(pwd)
 
     if [ "x$OS" = "xrpm" ]; then
-        if [ x"$RHEL" = x8 ]; then
+        if [ "x${RHEL}" = "x7" -o x"$RHEL" = x8 ]; then
             switch_to_vault_repo
         fi
         RHEL=$(rpm --eval %rhel)
@@ -326,8 +326,8 @@ install_deps() {
             yum -y install readline-devel rpm-build rsync tar time unzip wget zlib-devel selinux-policy-devel
             yum -y install bison boost-devel check-devel cmake libaio-devel libcurl-devel libudev-devel
             yum -y install redhat-rpm-config
-            wget https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/30/Everything/x86_64/os/Packages/r/rpcgen-1.4-2.fc30.x86_64.rpm
-            wget ftp://ftp.pbone.net/mirror/archive.fedoraproject.org/fedora/linux/releases/29/Everything/x86_64/os/Packages/g/gperf-3.1-6.fc29.x86_64.rpm
+            wget https://downloads.percona.com/downloads/packaging/rpcgen-1.4-2.fc30.x86_64.rpm
+            wget https://downloads.percona.com/downloads/packaging/gperf-3.1-6.fc29.x86_64.rpm
             yum -y install rpcgen-1.4-2.fc30.x86_64.rpm gperf-3.1-6.fc29.x86_64.rpm
 
             if [ "x${RHEL}" = "x9" ]; then
@@ -363,6 +363,9 @@ install_deps() {
                 echo "waiting"
                 sleep 1
             done
+            if [ "x${RHEL}" = "x7" -o x"$RHEL" = x8 ]; then
+                switch_to_vault_repo
+            fi
             yum -y install  gcc-c++ devtoolset-8-gcc-c++ devtoolset-8-binutils
             source /opt/rh/devtoolset-8/enable
             yum -y install scons check-devel boost-devel cmake3
@@ -380,6 +383,7 @@ install_deps() {
         fi
         if [ "x${RHEL}" = "x8" ]; then
             yum -y install centos-release-stream
+            switch_to_vault_repo
             yum -y install git gcc-toolset-11-gcc gcc-toolset-11-gcc-c++ gcc-toolset-11-annobin-plugin-gcc
             source /opt/rh/gcc-toolset-11/enable
         fi
@@ -419,7 +423,7 @@ install_deps() {
         apt-get -y install dirmngr || true
         apt-get update
         apt-get -y install dirmngr || true
-        wget https://repo.percona.com/apt/percona-release_latest.$(lsb_release -sc)_all.deb && dpkg -i percona-release_latest.$(lsb_release -sc)_all.deb
+        wget https://repo.percona.com/apt/percona-release_latest.$(lsb_release -sc)_all.deb && apt -y install gnupg2 lsb-release ./percona-release_latest.$(lsb_release -sc)_all.deb
         percona-release enable tools release
         percona-release enable pxb-80 testing
         percona-release enable pxb-24 testing
@@ -523,7 +527,7 @@ build_srpm(){
         echo "It is not possible to build src rpm here"
         exit 1
     fi
-    if [ x"$RHEL" = x8 ]; then
+    if [ "x${RHEL}" = "x7" -o x"$RHEL" = x8 ]; then
         switch_to_vault_repo
     fi
     cd $WORKDIR || exit
@@ -664,7 +668,7 @@ build_rpm(){
         echo "It is not possible to build rpm here"
         exit 1
     fi
-    if [ x"$RHEL" = x8 ]; then
+    if [ "x${RHEL}" = "x7" -o x"$RHEL" = x8 ]; then
         switch_to_vault_repo
     fi
     SRC_RPM=$(basename $(find $WORKDIR/srpm -iname 'percona-xtradb-cluster*.src.rpm' | sort | tail -n1))
