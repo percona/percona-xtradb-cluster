@@ -15,14 +15,89 @@
 # Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston
 # MA  02110-1301  USA.
 
+# try to use my_print_defaults, mysql and mysqldump that come with the sources
+# (for MTR suite)
+SCRIPTS_DIR="$(cd $(dirname "$0"); pwd -P)"
+EXTRA_DIR="$SCRIPTS_DIR/../extra"
+BIN_DIR="$SCRIPTS_DIR/../bin"
+
+
+if [ -x "$BIN_DIR/mysql" ]; then
+    MYSQL_CLIENT="$BIN_DIR/mysql"
+else
+    MYSQL_CLIENT=mysql
+fi
+
+if [ -x "$BIN_DIR/mysqldump" ]; then
+    MYSQLDUMP="$BIN_DIR/mysqldump"
+else
+    MYSQLDUMP=mysqldump
+fi
+
+if [ -x "$SCRIPTS_DIR/my_print_defaults" ]; then
+    MY_PRINT_DEFAULTS="$SCRIPTS_DIR/my_print_defaults"
+elif [ -x "$EXTRA_DIR/my_print_defaults" ]; then
+    MY_PRINT_DEFAULTS="$EXTRA_DIR/my_print_defaults"
+else
+    MY_PRINT_DEFAULTS=my_print_defaults
+fi
+
+
 # This is a common command line parser to be sourced by other SST scripts
+# 1st param: group (config file section like sst) or my_print_defaults argument (like --mysqld)
+# 2nd param: var : name of the variable in the section, e.g. server-id
+# 3rd param: - : default value for the param
+
+parse_cnf_group()
+{
+    local group=$1
+    local var=$2
+
+    # first normalize output variable names specified in cnf file:
+    # user can use _ or - (for example log-bin or log_bin) and/or prefix
+    # variable with --loose-
+    # then search for needed variable
+    # finally get the variable value (if variables has been specified multiple
+    # time use the last value only)
+
+    $MY_PRINT_DEFAULTS "${group}" | \
+        awk -F= '{ sub(/^--loose/,"-",$0); \
+                   if ($1 ~ /_/) \
+                      { gsub(/_/,"-",$1); s = $2; for (i = 3; i <= NF; i++) s = s"="$i ; print $1"="s } \
+                   else \
+                      { print $0 } \
+                 }' | grep -- "--$var=" | cut -d= -f2- | tail -1
+}
+
+parse_cnf()
+{
+    local group=$1
+    local var=${2//_/-} # normalize variable name by replacing all '_' with '-'
+    local reval=""
+
+    # look in group+suffix
+    if [[ -n $WSREP_SST_OPT_CONF_SUFFIX ]]; then
+        reval=$(parse_cnf_group "${group}${WSREP_SST_OPT_CONF_SUFFIX}" $var)
+    fi
+
+    # look in group
+    if [[ -z $reval ]]; then
+        reval=$(parse_cnf_group "${group}" $var)
+    fi
+
+    # use default if we haven't found a value
+    if [[ -z $reval ]]; then
+        [[ -n $3 ]] && reval=$3
+    fi
+    echo $reval
+}
 
 wsrep_log()
 {
     # echo everything to stderr so that it gets into common error log
     # deliberately made to look different from the rest of the log
     local readonly tst="$(date +%Y%m%d\ %H:%M:%S.%N | cut -b -21)"
-    echo "WSREP_SST: $* ($tst)" >&2
+    echo "WSREP_SST: $* ($tst) " >&2
 }
 
 wsrep_log_error()
@@ -61,7 +136,7 @@ WSREP_SST_OPT_DATA=""
 WSREP_SST_OPT_AUTH=${WSREP_SST_OPT_AUTH:-}
 WSREP_SST_OPT_USER=${WSREP_SST_OPT_USER:-}
 WSREP_SST_OPT_PSWD=${WSREP_SST_OPT_PSWD:-}
-WSREP_SST_OPT_REMOTE_AUTH=${WSREP_SST_OPT_REMOTE_AUTH:-}
+WSREP_SST_OPT_REMOTE_AUTH=""
 WSREP_SST_OPT_VERSION=""
 WSREP_SST_OPT_PROTOCOL="0"
 WSREP_SST_OPT_DEFAULT=""
@@ -69,16 +144,23 @@ WSREP_SST_OPT_EXTRA_DEFAULT=""
 WSREP_SST_OPT_SUFFIX_DEFAULT=""
 WSREP_SST_OPT_PLUGIN_DIR=""
 INNODB_DATA_HOME_DIR_ARG=""
+WSREP_SST_OPT_LPORT=""
+WSREP_SST_OPT_PARENT=""
 
-readonly WSREP_SST_OPT_REMOTE_AUTH
 
 while [ $# -gt 0 ]; do
 case "$1" in
     '--address')
-        readonly WSREP_SST_OPT_ADDR="$2"
+        WSREP_SST_OPT_ADDR="$2"
+        # Doing this next tr only to bypass a limitation in wsrep_sst.c (development only)
+        WSREP_SST_OPT_ADDR=`echo $WSREP_SST_OPT_ADDR |tr ] @`
+        WSREP_SST_OPT_REMOTE_AUTH=$(echo $WSREP_SST_OPT_ADDR | cut -d '@' -f 1)
+        wsrep_log_info "AAAAAAAAAAAAAAAAAAA $WSREP_SST_OPT_ADDR"
+
         #
         # Break address string into host:port/path parts
         #
+        
         case "${WSREP_SST_OPT_ADDR}" in
         \[*)
             # IPv6
@@ -88,14 +170,20 @@ case "$1" in
             readonly WSREP_SST_OPT_HOST_ESCAPED="\\[${WSREP_SST_OPT_HOST_UNESCAPED}\\]"
             ;;
         *)
-            readonly WSREP_SST_OPT_HOST=${WSREP_SST_OPT_ADDR%%[:/]*}
+            readonly WSREP_SST_OPT_HOST=$(echo $WSREP_SST_OPT_ADDR| cut -d "@" -f 2|cut -d ":" -f 1) 
+            wsrep_log_info "AAAAAAAAAAAAAAAAAAA WSREP_SST_OPT_HOST $WSREP_SST_OPT_HOST"  
+#            readonly WSREP_SST_OPT_HOST=${WSREP_SST_OPT_ADDR%%[:/]*}
             readonly WSREP_SST_OPT_HOST_UNESCAPED=$WSREP_SST_OPT_HOST
             readonly WSREP_SST_OPT_HOST_ESCAPED=$WSREP_SST_OPT_HOST
             ;;
         esac
         remain=${WSREP_SST_OPT_ADDR#${WSREP_SST_OPT_HOST_ESCAPED}}
         remain=${remain#:}
-        readonly WSREP_SST_OPT_ADDR_PORT=${remain%%/*}
+#        readonly WSREP_SST_OPT_ADDR_PORT=${remain%%/*}
+        #we take the port
+        WSREP_SST_OPT_ADDR_PORT=$(echo $WSREP_SST_OPT_ADDR| cut -d ":" -f 3)
+        wsrep_log_info "AAAAAAAAAAAAAAAAAAA WSREP_SST_OPT_ADDR_PORT  $WSREP_SST_OPT_ADDR_PORT"
+        
         remain=${remain#*/}
         readonly WSREP_SST_OPT_MODULE=${remain%%/*}
         readonly WSREP_SST_OPT_PATH=${WSREP_SST_OPT_ADDR#*/}
@@ -147,7 +235,7 @@ case "$1" in
         shift
         ;;
     '--local-port')
-        readonly WSREP_SST_OPT_LPORT="$2"
+        WSREP_SST_OPT_LPORT="$2"
         shift
         ;;
     '--parent')
@@ -210,6 +298,10 @@ case "$1" in
         readonly WSREP_SST_OPT_PLUGIN_DIR="$2"
         shift
         ;;
+    '--plugindir')
+        readonly WSREP_SST_OPT_PLUGIN_DIR="$2"
+        shift
+        ;;
     *) # must be command
        # usage
        # exit 1
@@ -217,6 +309,24 @@ case "$1" in
 esac
 shift
 done
+
+#we save the password for future use
+ORIGINAL_PWD=""
+readonly ORIGINAL_PWD=$WSREP_SST_OPT_PSWD
+wsrep_log_info "AAAAAAAAAAAAAAAAAAA -> original PWD [$WSREP_SST_OPT_PSWD]"
+
+
+if [ "$WSREP_SST_OPT_ROLE" == "joiner" ]; then
+    WSREP_SST_OPT_ADDR_PORT=""
+    WSREP_SST_OPT_ADDR_PORT=$(parse_cnf mysqld port "3306") 
+    wsrep_log_info "AAAAAAAAAAAAAAAAAAA JOINER resetting port WSREP_SST_OPT_ADDR_PORT=$WSREP_SST_OPT_ADDR_PORT"
+fi
+
+# If Local port is empty by default we set as same value of port
+if [ -z "$WSREP_SST_OPT_LPORT" ]; then
+   WSREP_SST_OPT_LPORT=$(parse_cnf mysqld port "3306") 
+fi
+
 
 readonly WSREP_SST_OPT_BYPASS
 readonly WSREP_SST_OPT_BINLOG
@@ -237,31 +347,6 @@ if [ -n "${WSREP_SST_OPT_ADDR_PORT:-}" ]; then
   fi
 fi
 
-# try to use my_print_defaults, mysql and mysqldump that come with the sources
-# (for MTR suite)
-SCRIPTS_DIR="$(cd $(dirname "$0"); pwd -P)"
-EXTRA_DIR="$SCRIPTS_DIR/../extra"
-BIN_DIR="$SCRIPTS_DIR/../bin"
-
-if [ -x "$BIN_DIR/mysql" ]; then
-    MYSQL_CLIENT="$BIN_DIR/mysql"
-else
-    MYSQL_CLIENT=mysql
-fi
-
-if [ -x "$BIN_DIR/mysqldump" ]; then
-    MYSQLDUMP="$BIN_DIR/mysqldump"
-else
-    MYSQLDUMP=mysqldump
-fi
-
-if [ -x "$SCRIPTS_DIR/my_print_defaults" ]; then
-    MY_PRINT_DEFAULTS="$SCRIPTS_DIR/my_print_defaults"
-elif [ -x "$EXTRA_DIR/my_print_defaults" ]; then
-    MY_PRINT_DEFAULTS="$EXTRA_DIR/my_print_defaults"
-else
-    MY_PRINT_DEFAULTS=my_print_defaults
-fi
 
 if [ -n "$WSREP_SST_OPT_CONF" ]
 then
@@ -298,12 +383,19 @@ fi
 
 WSREP_SST_OPT_REMOTE_USER=
 WSREP_SST_OPT_REMOTE_PSWD=
-if [ -n "$WSREP_SST_OPT_REMOTE_AUTH" ]
+if [ -n "$WSREP_SST_OPT_REMOTE_AUTH" ] && [ "$WSREP_SST_OPT_ROLE" == "donor" ]
 then
     # Split auth string at the last ':'
-    WSREP_SST_OPT_REMOTE_USER="${WSREP_SST_OPT_REMOTE_AUTH%:*}"
-    WSREP_SST_OPT_REMOTE_PSWD="${WSREP_SST_OPT_REMOTE_AUTH##*:}"
+#    WSREP_SST_OPT_REMOTE_USER="${WSREP_SST_OPT_REMOTE_AUTH%:*}"
+#    WSREP_SST_OPT_REMOTE_PSWD="${WSREP_SST_OPT_REMOTE_AUTH##*:}"
+    readonly WSREP_SST_OPT_REMOTE_USER=$( echo $WSREP_SST_OPT_REMOTE_AUTH| cut -d ":" -f 1)
+    readonly WSREP_SST_OPT_REMOTE_PSWD=$( echo $WSREP_SST_OPT_REMOTE_AUTH| cut -d ":" -f 2)
+
 fi
+
+wsrep_log_info "AAAAAAAAAAAAAAAAAAA WSREP_SST_OPT_REMOTE_USER  $WSREP_SST_OPT_REMOTE_USER"
+wsrep_log_info "AAAAAAAAAAAAAAAAAAA WSREP_SST_OPT_REMOTE_PSWD  $WSREP_SST_OPT_REMOTE_PSWD"
+
 
 # Reads incoming data from STDIN and sets the variables
 #
@@ -335,15 +427,15 @@ function read_variables_from_stdin()
             *)
                 wsrep_log_warning "Unrecognized input: $line"
         esac
-        if [ ! -z $WSREP_SST_OPT_USER ]
-        then
-            WSREP_SST_OPT_REMOTE_USER="$WSREP_SST_OPT_USER"
-        fi
+#        if [ ! -z $WSREP_SST_OPT_USER ]
+#        then
+#            WSREP_SST_OPT_REMOTE_USER="$WSREP_SST_OPT_USER"
+#        fi
 
-        if [ ! -z $WSREP_SST_OPT_PSWD ]
-        then
-            WSREP_SST_OPT_REMOTE_PSWD="$WSREP_SST_OPT_PSWD"
-        fi
+#        if [ ! -z $WSREP_SST_OPT_PSWD ]
+#        then
+#            WSREP_SST_OPT_REMOTE_PSWD="$WSREP_SST_OPT_PSWD"
+#        fi
 
 
 
@@ -461,36 +553,7 @@ parse_cnf_group()
                  }' | grep -- "--$var=" | cut -d= -f2- | tail -1
 }
 
-#
-# user can specify mariabackup specific settings that will be used during sst
-# process like encryption, etc.....
-# parse such configuration option. (group for xb settings is [sst] in my.cnf
-#
-# 1st param: group (config file section like sst) or my_print_defaults argument (like --mysqld)
-# 2nd param: var : name of the variable in the section, e.g. server-id
-# 3rd param: - : default value for the param
-parse_cnf()
-{
-    local group=$1
-    local var=${2//_/-} # normalize variable name by replacing all '_' with '-'
-    local reval=""
 
-    # look in group+suffix
-    if [[ -n $WSREP_SST_OPT_CONF_SUFFIX ]]; then
-        reval=$(parse_cnf_group "${group}${WSREP_SST_OPT_CONF_SUFFIX}" $var)
-    fi
-
-    # look in group
-    if [[ -z $reval ]]; then
-        reval=$(parse_cnf_group "${group}" $var)
-    fi
-
-    # use default if we haven't found a value
-    if [[ -z $reval ]]; then
-        [[ -n $3 ]] && reval=$3
-    fi
-    echo $reval
-}
 
 #
 # Converts an input string into a boolean "on", "off"
