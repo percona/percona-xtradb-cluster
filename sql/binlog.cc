@@ -11289,18 +11289,12 @@ bool THD::is_binlog_cache_empty(bool is_transactional)
   // because binlog_hton has not been completely set up.
 #ifndef WITH_WSREP
   assert(opt_bin_log);
-<<<<<<< HEAD
 #endif /* !WITH_WSREP */
-  binlog_cache_mngr *cache_mngr= thd_get_cache_mngr(this);
-||||||| e968435f0c1
-  binlog_cache_mngr *cache_mngr= thd_get_cache_mngr(this);
-=======
   binlog_cache_mngr *const cache_mngr = thd_get_cache_mngr(this);
   if (cache_mngr == NULL) {
     // The cache has not been setup and is thus empty
     DBUG_RETURN(true);
   }
->>>>>>> Percona-Server-5.7.44-51
 
   binlog_cache_data *const cache_data=
     cache_mngr->get_binlog_cache_data(is_transactional);
