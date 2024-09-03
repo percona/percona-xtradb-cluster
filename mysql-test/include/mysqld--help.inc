@@ -23,15 +23,8 @@ perl;
                pid-file slow-query-log-file
                language lc-messages-dir
                datadir replica-load-tmpdir slave-load-tmpdir tmpdir socket table-definition-cache table-open-cache
-<<<<<<< HEAD
-               tls-version admin-tls-version secure-file-priv wsrep-node-name wsrep-data-home-dir/;
-||||||| merged common ancestors
-               tls-version admin-tls-version secure-file-priv/;
+               tls-version admin-tls-version secure-file-priv temptable-max-ram wsrep-node-name wsrep-data-home-dir/;
 
-=======
-               tls-version admin-tls-version secure-file-priv temptable-max-ram/;
-
->>>>>>> Percona-Server-8.4.0-1
   # Variables which we don't want to display in result file since
   # they depend on type of build
   @build_specific=qw/auto-generate-certs lock-order tls-version admin-tls-version debug-enable-extended-set-ops version-suffix

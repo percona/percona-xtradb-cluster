@@ -7,6 +7,7 @@ SELECT GRANTEE, PRIVILEGE_TYPE, IS_GRANTABLE FROM INFORMATION_SCHEMA.USER_PRIVIL
 WHERE PRIVILEGE_TYPE LIKE 'FLUSH_%' ORDER BY 1,2,3;
 GRANTEE	PRIVILEGE_TYPE	IS_GRANTABLE
 'mysql.pxc.internal.session'@'localhost'	FLUSH_OPTIMIZER_COSTS	YES
+'mysql.pxc.internal.session'@'localhost'	FLUSH_PRIVILEGES	YES
 'mysql.pxc.internal.session'@'localhost'	FLUSH_STATUS	YES
 'mysql.pxc.internal.session'@'localhost'	FLUSH_TABLES	YES
 'mysql.pxc.internal.session'@'localhost'	FLUSH_USER_RESOURCES	YES

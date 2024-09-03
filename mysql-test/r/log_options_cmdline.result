@@ -21,16 +21,8 @@ Note	1592	Unsafe statement written to the binary log using statement format sinc
 connect(localhost,unknown_user,,,SOURCE_PORT,SOURCE_SOCKET);
 ERROR 28000: Access denied for user 'unknown_user'@'localhost' (using password: NO)
 DROP TABLE t1;
-<<<<<<< HEAD
 # restart: --log-error=LOG_FILE8 --lc-messages-dir=MSG_DIR --log-error-verbosity=3 --wsrep-min-log-verbosity=1
-connect(localhost,unknown_user,,,MASTER_PORT,MASTER_SOCKET);
-||||||| merged common ancestors
-# restart: --log-error=LOG_FILE8 --lc-messages-dir=MSG_DIR --log-error-verbosity=3
-connect(localhost,unknown_user,,,MASTER_PORT,MASTER_SOCKET);
-=======
-# restart: --log-error=LOG_FILE8 --lc-messages-dir=MSG_DIR --log-error-verbosity=3
 connect(localhost,unknown_user,,,SOURCE_PORT,SOURCE_SOCKET);
->>>>>>> Percona-Server-8.4.0-1
 ERROR 28000: Access denied for user 'unknown_user'@'localhost' (using password: NO)
 # restart: --log-error=LOG_FILE8B --lc-messages=invalid_arg1 --lc-time-names=invalid_arg2
 connect(localhost,unknown_user,,,SOURCE_PORT,SOURCE_SOCKET);

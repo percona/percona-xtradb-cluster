@@ -15982,7 +15982,13 @@ PSI_stage_info *wsrep_server_stages[] = {
     &stage_wsrep_applier_idle,
     &stage_wsrep_in_rollback_thread,
     &stage_wsrep_aborter_idle,
-    &stage_wsrep_aborter_active};
+    &stage_wsrep_aborter_active,
+
+    // nbo
+    &stage_wsrep_applied_nbo_writeset,
+    &stage_wsrep_applying_nbo_writeset,
+    &stage_wsrep_nbo_committed,
+    &stage_wsrep_nbo_committing };
 
 /* clang-format on */
 #endif /* WITH_WSREP */

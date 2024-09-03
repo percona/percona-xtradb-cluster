@@ -33,7 +33,6 @@ SELECT COUNT(*) = 0 FROM mysql.wsrep_streaming_log;
 
 --connection node_2
 --echo #node-2
---enable_reconnect
 SELECT COUNT(*) = 0 FROM mysql.wsrep_streaming_log;
 
 DROP TABLE t1;

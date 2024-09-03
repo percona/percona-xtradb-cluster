@@ -3,7 +3,7 @@
 #
 
 --source include/have_binlog_format_row.inc
---source include/master-slave.inc
+--source include/rpl/init_source_replica.inc
 
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY);
 CREATE TABLE t2 (f1 INTEGER PRIMARY KEY);
@@ -38,6 +38,6 @@ DROP TABLE t1;
 
 DROP PROCEDURE p1;
 
---source include/sync_slave_sql_with_master.inc
---source include/rpl_end.inc
+--source include/rpl/sync_to_replica.inc
+--source include/rpl/deinit.inc
 

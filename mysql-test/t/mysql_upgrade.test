@@ -121,15 +121,12 @@ REVOKE SENSITIVE_VARIABLES_OBSERVER ON *.* FROM 'mysql.pxc.internal.session'@loc
 
 --echo # Must have SENSITIVE_VARIABLES_OBSERVER privilege
 SHOW GRANTS for u34068378;
-<<<<<<< HEAD
-SHOW GRANTS for root@localhost;
-SHOW GRANTS for 'mysql.pxc.internal.session'@localhost;
-||||||| merged common ancestors
-SHOW GRANTS for root@localhost;
-=======
+
+--let $user = 'mysql.pxc.internal.session'@localhost;
+--source include/show_grants.inc
+
 --let $user = root@localhost
 --source include/show_grants.inc
->>>>>>> Percona-Server-8.4.0-1
 
 # cleanup
 DROP USER u34068378;

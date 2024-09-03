@@ -46,13 +46,7 @@ INSERT INTO aliases(name) VALUES
 ('slave_parallel_workers'), ('slave_pending_jobs_size_max'),
 ('pseudo_slave_mode'), ('skip_slave_start'), ('wsrep_restart_slave');
 
-<<<<<<< HEAD
-include/assert.inc [Expect 120 variables in the table.]
-||||||| merged common ancestors
-include/assert.inc [Expect 114 variables in the table.]
-=======
-include/assert.inc [Expect 113 variables in the table.]
->>>>>>> Percona-Server-8.4.0-1
+include/assert.inc [Expect 119 variables in the table.]
 
 # Test SET PERSIST_ONLY
 SET PERSIST_ONLY binlog_cache_size = @@GLOBAL.binlog_cache_size;
@@ -291,32 +285,16 @@ Warnings:
 Warning	1287	'@@wsrep_slave_UK_checks' is deprecated and will be removed in a future release. Please use wsrep_applier_UK_checks instead.
 Warning	1287	'@@wsrep_slave_UK_checks' is deprecated and will be removed in a future release. Please use wsrep_applier_UK_checks instead.
 
-<<<<<<< HEAD
-include/assert.inc [Expect 110 persisted variables in persisted_variables table.]
-||||||| merged common ancestors
-include/assert.inc [Expect 101 persisted variables in persisted_variables table.]
-=======
-include/assert.inc [Expect 100 persisted variables in persisted_variables table.]
->>>>>>> Percona-Server-8.4.0-1
+include/assert.inc [Expect 109 persisted variables in persisted_variables table.]
 
 ############################################################
 # 2. Restart server, it must preserve the persisted variable
 #    settings. Verify persisted configuration.
 # restart
 
-<<<<<<< HEAD
-include/assert.inc [Expect 110 persisted variables in persisted_variables table.]
-include/assert.inc [Expect 110 persisted variables shown as PERSISTED in variables_info table.]
-include/assert.inc [Expect 110 persisted variables with matching persisted and global values.]
-||||||| merged common ancestors
-include/assert.inc [Expect 101 persisted variables in persisted_variables table.]
-include/assert.inc [Expect 101 persisted variables shown as PERSISTED in variables_info table.]
-include/assert.inc [Expect 101 persisted variables with matching persisted and global values.]
-=======
-include/assert.inc [Expect 100 persisted variables in persisted_variables table.]
-include/assert.inc [Expect 100 persisted variables shown as PERSISTED in variables_info table.]
-include/assert.inc [Expect 100 persisted variables with matching persisted and global values.]
->>>>>>> Percona-Server-8.4.0-1
+include/assert.inc [Expect 109 persisted variables in persisted_variables table.]
+include/assert.inc [Expect 109 persisted variables shown as PERSISTED in variables_info table.]
+include/assert.inc [Expect 109 persisted variables with matching persisted and global values.]
 
 ############################################################
 # 3. Test RESET PERSIST. Verify persisted variable settings
