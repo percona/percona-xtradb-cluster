@@ -14,7 +14,7 @@ server_id=1
 #!run-suite-setup-sh
 
 [mysqld.2]
-wsrep_provider_options='base_port=@mysqld.2.#galera_port;pc.ignore_sb=true'
+wsrep_provider_options='base_port=@mysqld.2.#galera_port;pc.ignore_sb=true;repl.causal_read_timeout=PT10M'
 server_id=2
 #!run-suite-setup-sh
 
