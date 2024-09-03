@@ -5,7 +5,6 @@
 
 --disable_result_log
 --disable_query_log
---enable_reconnect
 
 let $counter= 600;
 
