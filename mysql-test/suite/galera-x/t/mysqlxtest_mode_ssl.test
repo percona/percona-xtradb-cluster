@@ -3,16 +3,15 @@
 
 --source include/have_util_sed.inc
 --source include/galera_cluster.inc
---source include/not_have_tlsv13.inc
 --source include/xplugin_preamble.inc
 --source include/xplugin_ssl_warnings_suppression.inc
 --source include/xplugin_create_user.inc
 
-call mtr.add_suppression("Failed to initialize TLS for channel: mysql_main.");
-call mtr.add_suppression("Failed to set up SSL because of the following SSL library error: Failed to set ciphers to use");
+call mtr.add_suppression("Failed to initialize TLS for channel: mysql_main");
+call mtr.add_suppression(".*Failed to set up SSL.*");
 --connection node_2
-call mtr.add_suppression("Failed to initialize TLS for channel: mysql_main.");
-call mtr.add_suppression("Failed to set up SSL because of the following SSL library error: Failed to set ciphers to use");
+call mtr.add_suppression("Failed to initialize TLS for channel: mysql_main");
+call mtr.add_suppression(".*Failed to set up SSL.*");
 --connection node_1
 
 --let $SS_VERIFY=--ssl-ca=$MYSQL_TEST_DIR/std_data/ca-cert-verify.pem

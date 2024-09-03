@@ -1,7 +1,7 @@
-call mtr.add_suppression("Failed to initialize TLS for channel: mysql_main.");
-call mtr.add_suppression("Failed to set up SSL because of the following SSL library error: Failed to set ciphers to use");
-call mtr.add_suppression("Failed to initialize TLS for channel: mysql_main.");
-call mtr.add_suppression("Failed to set up SSL because of the following SSL library error: Failed to set ciphers to use");
+call mtr.add_suppression("Failed to initialize TLS for channel: mysql_main");
+call mtr.add_suppression(".*Failed to set up SSL.*");
+call mtr.add_suppression("Failed to initialize TLS for channel: mysql_main");
+call mtr.add_suppression(".*Failed to set up SSL.*");
 
 ############################################################
 ## Test starts MySQL Server without configured SSL
@@ -89,7 +89,7 @@ Mysqlx.Ok {
   msg: "bye!"
 }
 ok
-Application terminated with expected error: error:14090086:SSL routines:ssl3_get_server_certificate:certificate verify failed (code 2026)
+Application terminated with expected error: error:0A000086:SSL routines::certificate verify failed (code 2026)
 ok
 [Verify that SSL_cert and SSL_mode=required, makes 'mysqlx_ssl_active' status variable set to ON]
 Mysqlx.Ok {

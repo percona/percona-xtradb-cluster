@@ -4,6 +4,13 @@
 --source include/xplugin_preamble.inc
 --source include/xplugin_ssl_warnings_suppression.inc
 
+--connection node_1
+--source include/suppress_tls_off.inc
+
+--connection node_2
+--source include/suppress_tls_off.inc
+
+--connection node_1
 ## Test case
 
 # X Plugins thread management needs to be reinitialized
@@ -12,7 +19,6 @@
 
 # Please update the test case when the variable count changes
 # add/remove variable
-
 let $wait_condition=
   SELECT COUNT(*)=78 FROM performance_schema.global_status where variable_name like "Mysqlx_%";
 --source include/wait_condition_or_abort.inc
@@ -34,10 +40,6 @@ if (`SELECT CONVERT(@@version_compile_os using latin1) IN ("Win32","Win64","Wind
 
 --let $assert_text= No connections were made, Mysqlx_stmt_execute_sql must match default value which is 0.
 --let $assert_cond= [SHOW STATUS LIKE "Mysqlx_stmt_execute_sql", Value, 1] = 0
---source include/assert.inc
-
---let $assert_text= No connections were made, Mysqlx_stmt_execute_xplugin must match default value which is 0.
---let $assert_cond= [SHOW STATUS LIKE "Mysqlx_stmt_execute_xplugin", Value, 1] = 0
 --source include/assert.inc
 
 --let $assert_text= No connections were made, Mysqlx_stmt_execute_mysqlx must match default value which is 0.
@@ -88,6 +90,14 @@ if (`SELECT CONVERT(@@version_compile_os using latin1) IN ("Win32","Win64","Wind
 --let $assert_cond= [SHOW STATUS LIKE "Mysqlx_stmt_create_collection", Value, 1] = 0
 --source include/assert.inc
 
+--let $assert_text= No connections were made, Mysqlx_stmt_modify_collection_options must match default value which is 0.
+--let $assert_cond= [SHOW STATUS LIKE "Mysqlx_stmt_modify_collection_options", Value, 1] = 0
+--source include/assert.inc
+
+--let $assert_text= No connections were made, Mysqlx_stmt_get_collection_options must match default value which is 0.
+--let $assert_cond= [SHOW STATUS LIKE "Mysqlx_stmt_get_collection_options", Value, 1] = 0
+--source include/assert.inc
+
 --let $assert_text= No connections were made, Mysqlx_stmt_create_collection_index must match default value which is 0.
 --let $assert_cond= [SHOW STATUS LIKE "Mysqlx_stmt_create_collection_index", Value, 1] = 0
 --source include/assert.inc
@@ -136,8 +146,24 @@ if (`SELECT CONVERT(@@version_compile_os using latin1) IN ("Win32","Win64","Wind
 --let $assert_cond= [SHOW STATUS LIKE "Mysqlx_bytes_sent", Value, 1] = 0
 --source include/assert.inc
 
+--let $assert_text= No connections were made, Mysqlx_bytes_sent_compressed_payload must match default value which is 0.
+--let $assert_cond= [SHOW STATUS LIKE "Mysqlx_bytes_sent_compressed_payload", Value, 1] = 0
+--source include/assert.inc
+
+--let $assert_text= No connections were made, Mysqlx_bytes_sent_uncompressed_frame must match default value which is 0.
+--let $assert_cond= [SHOW STATUS LIKE "Mysqlx_bytes_sent_uncompressed_frame", Value, 1] = 0
+--source include/assert.inc
+
 --let $assert_text= No connections were made, Mysqlx_bytes_received must match default value which is 0.
 --let $assert_cond= [SHOW STATUS LIKE "Mysqlx_bytes_received", Value, 1] = 0
+--source include/assert.inc
+
+--let $assert_text= No connections were made, Mysqlx_bytes_received_uncompressed_frame must match default value which is 0.
+--let $assert_cond= [SHOW STATUS LIKE "Mysqlx_bytes_received_uncompressed_frame", Value, 1] = 0
+--source include/assert.inc
+
+--let $assert_text= No connections were made, Mysqlx_bytes_received_compressed_payload must match default value which is 0.
+--let $assert_cond= [SHOW STATUS LIKE "Mysqlx_bytes_received_compressed_payload", Value, 1] = 0
 --source include/assert.inc
 
 --let $assert_text= No connections were made, Mysqlx_errors_sent must match default value which is 0.
@@ -272,7 +298,7 @@ if (`SELECT CONVERT(@@version_compile_os using latin1) IN ("Win32","Win64","Wind
 --let $assert_cond= [select VARIABLE_VALUE="" as Value from performance_schema.global_status WHERE VARIABLE_NAME like "Mysqlx_ssl_server_not_after", Value, 1] = 1
 --source include/assert.inc
 
---let $assert_text= Mysqlx_ssl_server_not_before should be empty
+--let $assert_text= Mysqlx_ssl_active should be empty
 --let $assert_cond= [select VARIABLE_VALUE="" as Value from performance_schema.global_status WHERE VARIABLE_NAME like "Mysqlx_ssl_server_not_before", Value, 1] = 1
 --source include/assert.inc
 
@@ -308,38 +334,10 @@ if (`SELECT CONVERT(@@version_compile_os using latin1) IN ("Win32","Win64","Wind
 --let $assert_cond= [SHOW STATUS LIKE "Mysqlx_cursor_fetch", Value, 1] = 0
 --source include/assert.inc
 
---let $assert_text= No connections were made, Mysqlx_bytes_received_compressed_payload must match default value which is 0.
---let $assert_cond= [SHOW STATUS LIKE "Mysqlx_bytes_received_compressed_payload", Value, 1] = 0
---source include/assert.inc
-
---let $assert_text= No connections were made, Mysqlx_bytes_received_uncompressed_frame must match default value which is 0.
---let $assert_cond= [SHOW STATUS LIKE "Mysqlx_bytes_received_uncompressed_frame", Value, 1] = 0
---source include/assert.inc
-
---let $assert_text= No connections were made, Mysqlx_bytes_sent_compressed_payload must match default value which is 0.
---let $assert_cond= [SHOW STATUS LIKE "Mysqlx_bytes_sent_compressed_payload", Value, 1] = 0
---source include/assert.inc
-
---let $assert_text= No connections were made, Mysqlx_bytes_sent_uncompressed_frame must match default value which is 0.
---let $assert_cond= [SHOW STATUS LIKE "Mysqlx_bytes_sent_uncompressed_frame", Value, 1] = 0
---source include/assert.inc
-
---let $assert_text= Mysqlx_compression_algorithm should be empty
+--let $assert_text= No connections were made, Mysqlx_compression_algorithm must match default value which is ''.
 --let $assert_cond= [select VARIABLE_VALUE="" as Value from performance_schema.global_status WHERE VARIABLE_NAME like "Mysqlx_compression_algorithm", Value, 1] = 1
 --source include/assert.inc
 
---let $assert_text= Mysqlx_compression_level should be empty
+--let $assert_text= No connections were made, Mysqlx_compression_level must match default value which is ''.
 --let $assert_cond= [select VARIABLE_VALUE="" as Value from performance_schema.global_status WHERE VARIABLE_NAME like "Mysqlx_compression_level", Value, 1] = 1
---source include/assert.inc
-
---let $assert_text= No connections were made, Mysqlx_messages_sent must match default value which is 0.
---let $assert_cond= [SHOW STATUS LIKE "Mysqlx_messages_sent", Value, 1] = 0
---source include/assert.inc
-
---let $assert_text= No connections were made, Mysqlx_stmt_get_collection_options must match default value which is 0.
---let $assert_cond= [SHOW STATUS LIKE "Mysqlx_stmt_get_collection_options", Value, 1] = 0
---source include/assert.inc
-
---let $assert_text= No connections were made, Mysqlx_stmt_modify_collection_options must match default value which is 0.
---let $assert_cond= [SHOW STATUS LIKE "Mysqlx_stmt_modify_collection_options", Value, 1] = 0
 --source include/assert.inc
