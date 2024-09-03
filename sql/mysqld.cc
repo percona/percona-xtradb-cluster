@@ -9237,14 +9237,10 @@ static int init_server_components() {
   delete_optimizer_cost_module();
 
 #ifdef WITH_WSREP
-  static const LEX_CSTRING keyring_vault_name = {
-      STRING_WITH_LEN("keyring_vault")};
-  static const LEX_CSTRING keyring_name = {STRING_WITH_LEN("keyring_file")};
-  if (!pxc_encrypt_cluster_traffic &&
-      (plugin_is_ready(keyring_vault_name, MYSQL_KEYRING_PLUGIN) ||
-       plugin_is_ready(keyring_name, MYSQL_KEYRING_PLUGIN))) {
+  /* This check applies only if the server is started with galera loaded. */
+  if (wsrep_is_wsrep_on() && !pxc_encrypt_cluster_traffic && wsrep_keyring_component_loaded()) {
     WSREP_WARN(
-        "You have enabled keyring plugin. SST encryption is mandatory. "
+        "You have enabled keyring component. SST encryption is mandatory. "
         "Please enable pxc_encrypt_cluster_traffic. Check "
         "https://docs.percona.com/percona-xtradb-cluster/%u.%u/"
         "encrypt-traffic.html#encrypt-sst-traffic for more details.",

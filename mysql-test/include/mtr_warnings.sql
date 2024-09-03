@@ -484,7 +484,7 @@ INSERT INTO global_suppressions VALUES
    Warnings/errors seen when server is loaded with keyring plugin without
    enabling pxc_encrypt_cluster_traffic.
  */
- ("You have enabled keyring plugin. SST encryption is mandatory."),
+ ("You have enabled keyring component. SST encryption is mandatory."),
  ("No suitable '.*' service implementation found"),
 
 

@@ -3378,6 +3378,12 @@ bool wsrep_rotate_master_key() {
   return (wsrep::provider::status::success != provider.rotate_gcache_key());
 }
 
+bool wsrep_keyring_component_loaded() {
+  if (masterKeyManager) {
+    return masterKeyManager->IsServiceAlive();
+  }
+  return false;
+}
 bool wsrep_should_replicate_for_table(Table_ref * table_ref) {
   if (!table_ref) return false;
 
