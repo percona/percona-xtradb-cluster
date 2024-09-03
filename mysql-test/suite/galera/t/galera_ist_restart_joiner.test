@@ -61,8 +61,6 @@ UPDATE t1 SET f2 = 'd' WHERE f1 > 3;
 --connection node_2
 
 # Kill the connected server
---disable_reconnect
-
 --perl
         my $pid_filename = $ENV{'KILL_NODE_PIDFILE'};
         my $mysqld_pid = `cat $pid_filename`;

@@ -87,9 +87,7 @@ SET DEBUG_SYNC = "now SIGNAL continue";
 --echo # 7. Shutdown node2 started as a background process and restart
 --connection node_2
 --echo [connection node_2]
---enable_reconnect
 --source include/wait_until_connected_again.inc
---disable_reconnect
 --source include/restart_mysqld.inc
 --source include/wait_proc_to_finish.inc
 

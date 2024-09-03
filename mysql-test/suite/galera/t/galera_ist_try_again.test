@@ -78,8 +78,6 @@ CREATE TABLE t2 (f1 INTEGER);
 --connection node_2
 
 # Kill the connected server
---disable_reconnect
-
 --perl
 	my $pid_filename = $ENV{'KILL_NODE_PIDFILE'};
 	my $mysqld_pid = `cat $pid_filename`;

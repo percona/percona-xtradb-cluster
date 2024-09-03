@@ -11,7 +11,6 @@ if (!$kill_signal)
 --exec echo "wait" > $_expect_file_name
 
 # Kill the connected server
---disable_reconnect
 --let KILL_SIGNAL_VALUE = $kill_signal
 --let KILL_NODE_PIDFILE = `SELECT @@pid_file`
 

@@ -4,6 +4,7 @@ id INT NOT NULL PRIMARY KEY
 CREATE TABLE parent (
 id INT NOT NULL PRIMARY KEY,
 grandparent_id INT,
+UNIQUE (grandparent_id),
 FOREIGN KEY (grandparent_id)
 REFERENCES grandparent(id)
 ON UPDATE CASCADE
