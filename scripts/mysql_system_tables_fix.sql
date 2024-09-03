@@ -1821,9 +1821,10 @@ COMMIT;
 -- Add the privilege FLUSH_PRIVILEGES for every user who has the
 -- privilege RELOAD, provided that there is not a user who already has
 -- privilege FLUSH_PRIVILEGES
-SET @hadFlushPrivilegesPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'FLUSH_PRIVILEGES');
-INSERT INTO global_grants SELECT user, host, 'FLUSH_PRIVILEGES', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE Reload_priv = 'Y' AND @hadFlushPrivilegesPriv = 0;
+-- Do not count PXC user
+SET @hadFlushPrivilegesPriv = (SELECT COUNT(*) FROM mysql.global_grants WHERE priv = 'FLUSH_PRIVILEGES' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
+INSERT INTO mysql.global_grants SELECT user, host, 'FLUSH_PRIVILEGES', IF(grant_priv = 'Y', 'Y', 'N')
+FROM mysql.user WHERE Reload_priv = 'Y' AND @hadFlushPrivilegesPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 
 -- SET_USER_ID is removed dynamic privilege, revoke all grants of it.
 DELETE FROM global_grants WHERE PRIV = 'SET_USER_ID';
