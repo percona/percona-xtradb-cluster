@@ -17,7 +17,7 @@ SET SESSION wsrep_trx_fragment_size = 0;
 INSERT INTO t1 VALUES (3),(4);
 COMMIT;
 #node-1
-include/show_binlog_events.inc
+include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
 mysqld-bin.000001	#	Query	#	#	BEGIN
@@ -35,7 +35,7 @@ mysqld-bin.000001	#	Xid	#	#	COMMIT /* XID */
 SELECT COUNT(*) = 4 FROM t1;
 COUNT(*) = 4
 1
-include/show_binlog_events.inc
+include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
 mysqld-bin.000001	#	Query	#	#	BEGIN
