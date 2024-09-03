@@ -12283,22 +12283,6 @@ ER_WARN_DEPRECATED_OR_BLOCKED_CIPHER
 ER_IB_MSG_DDL_FAIL_NO_BUILDER
   eng "DDL failed as Builder is already freed. Builder: state=%u, error_state=%u. Index: id=%zu, name='%s', space_id=%u, page=%u. Table: old_name='%s', new_name='%s'."
 
-<<<<<<< HEAD
-ER_GRP_RPL_MEMBER_INFO_DOES_NOT_EXIST
-  eng "Member identified %s: '%s' does not exist on Group Replication membership during %s."
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-ER_GRP_RPL_MEMBER_INFO_DOES_NOT_EXIST
-  eng "Member identified %s: '%s' does not exist on Group Replication membership during %s."
-
-ER_USAGE_DEPRECATION_COUNTER
-  eng "Deprecated '%s' used %s times, last time used '%s'."
-
-||||||||| merged common ancestors
-=========
-ER_GRP_RPL_MEMBER_INFO_DOES_NOT_EXIST
-  eng "Member identified %s: '%s' does not exist on Group Replication membership during %s."
-=======
 ER_GRP_RPL_MEMBER_INFO_DOES_NOT_EXIST
   eng "Member identified %s: '%s' does not exist on Group Replication membership during %s."
 
@@ -12307,7 +12291,6 @@ ER_USAGE_DEPRECATION_COUNTER
 
 ER_WAITING_FOR_NO_CONNECTIONS
   eng "Waiting for %u connections to be closed."
->>>>>>> Percona-Server-8.4.0-1
 
 ER_WAITING_FOR_NO_THDS
   eng "Waiting for THDs in partition %u to be closed, %u still left. %u THDs left in total for all partitions."
@@ -12616,10 +12599,6 @@ ER_GRP_RPL_MSG_DECODING_FAILED
 ER_GRP_RPL_APPLIER_ERROR_PACKET_RECEIVED
   eng "The Applier process of Group Replication found an error and was requested to stop: %s"
 
-<<<<<<< HEAD
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-=======
 ER_LANGUAGE_COMPONENT_INSTALL_ERROR
   eng "Cannot install the component."
 
@@ -12752,7 +12731,6 @@ ER_SECONDARY_ENGINE_DDL_TRACK_PROGRESS
 ER_IB_MSG_INNODB_FLUSH_METHOD
   eng "Using innodb_flush_method=%s"
 
->>>>>>> Percona-Server-8.4.0-1
 # DO NOT add server-to-client messages here;
 # they go in messages_to_clients.txt
 # in the same directory as this file.

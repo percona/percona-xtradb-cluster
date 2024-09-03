@@ -117,16 +117,11 @@ BEGIN
     WHERE variable_name NOT IN ('timestamp', 'server_uuid',
                                 'gtid_executed', 'gtid_purged',
                                 'group_replication_group_name',
-<<<<<<< HEAD
                                 'wsrep_start_position',
                                 'auto_increment_offset',
                                 'auto_increment_increment',
                                 'wsrep_data_home_dir',
                                 'keyring_file_data',
-||||||| merged common ancestors
-                                'keyring_file_data',
-=======
->>>>>>> Percona-Server-8.4.0-1
                                 'innodb_thread_sleep_delay')
   ORDER BY VARIABLE_NAME;
 

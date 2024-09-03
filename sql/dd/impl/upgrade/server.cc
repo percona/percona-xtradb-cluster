@@ -463,19 +463,14 @@ class MySQL_check {
   }
 };
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 bool ignore_error_and_execute(THD *thd, const char *query_ptr,
+                              bool print_err = true,
                               const bool pxc_upgrade = false) {
 #else
-bool ignore_error_and_execute(THD *thd, const char *query_ptr) {
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-bool ignore_error_and_execute(THD *thd, const char *query_ptr) {
-=======
 bool ignore_error_and_execute(THD *thd, const char *query_ptr,
                               bool print_err = true) {
->>>>>>> Percona-Server-8.4.0-1
+#endif /* WITH_WSREP */
   Ed_connection con(thd);
   LEX_STRING str;
   lex_string_strmake(thd->mem_root, &str, query_ptr, strlen(query_ptr));
@@ -484,26 +479,16 @@ bool ignore_error_and_execute(THD *thd, const char *query_ptr,
   if (con.execute_direct(str) &&
       std::find(ignored_errors.begin(), ignored_errors.end(),
                 con.get_last_errno()) == ignored_errors.end()) {
-<<<<<<< HEAD
 #ifdef WITH_WSREP
     if (!pxc_upgrade) {
 #endif /* WITH_WSREP */
-      LogErr(ERROR_LEVEL, ER_DD_INITIALIZE_SQL_ERROR, query_ptr,
-             con.get_last_errno(), con.get_last_error());
+      if (print_err)
+        LogErr(ERROR_LEVEL, ER_DD_INITIALIZE_SQL_ERROR, query_ptr,
+              con.get_last_errno(), con.get_last_error());
       return true;
 #ifdef WITH_WSREP
     }
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-    LogErr(ERROR_LEVEL, ER_DD_INITIALIZE_SQL_ERROR, query_ptr,
-           con.get_last_errno(), con.get_last_error());
-    return true;
-=======
-    if (print_err)
-      LogErr(ERROR_LEVEL, ER_DD_INITIALIZE_SQL_ERROR, query_ptr,
-             con.get_last_errno(), con.get_last_error());
-    return true;
->>>>>>> Percona-Server-8.4.0-1
   }
   return false;
 }
@@ -933,7 +918,7 @@ bool pxc_fix_mysql_tables(THD *thd) {
     }
 
     if (in_pxc_section) {
-      if (ignore_error_and_execute(thd, *query_ptr, true)) return true;
+      if (ignore_error_and_execute(thd, *query_ptr, true, true)) return true;
     }
   }
   return false;

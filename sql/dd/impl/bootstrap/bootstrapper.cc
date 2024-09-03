@@ -1019,21 +1019,13 @@ bool restart_dictionary(THD *thd) {
                         d->get_actual_dd_version(thd)) ||
       upgrade::do_server_upgrade_checks(thd) || upgrade::upgrade_tables(thd) ||
       check_and_create_compression_dict_tables(thd) ||
-<<<<<<< HEAD
       repopulate_charsets_and_collations(thd) ||
 #ifdef WITH_WSREP
       wsrep_init_schema(thd) || dd::upgrade::upgrade_pxc_only(thd) ||
 #endif /* WITH_WSREP */
-      verify_contents(thd) || update_versions(thd, false)) {
-||||||| merged common ancestors
-      repopulate_charsets_and_collations(thd) || verify_contents(thd) ||
-      update_versions(thd, false)) {
-=======
-      repopulate_charsets_and_collations(thd) || verify_contents(thd) ||
-      update_versions(thd)) {
+      verify_contents(thd) || update_versions(thd)) {
     bootstrap_error_handler.set_log_error(true);
     thd->pop_internal_handler();
->>>>>>> Percona-Server-8.4.0-1
     return true;
   }
 
@@ -1104,16 +1096,10 @@ bool setup_dd_objects_and_collations(THD *thd) {
     upgrade does not need to be considered.
   */
   if (sync_meta_data(thd) || repopulate_charsets_and_collations(thd) ||
-<<<<<<< HEAD
 #ifdef WITH_WSREP
       wsrep_init_schema(thd) || dd::upgrade::upgrade_pxc_only(thd) ||
 #endif /* WITH_WSREP */
-      verify_contents(thd) || update_versions(thd, false)) {
-||||||| merged common ancestors
-      verify_contents(thd) || update_versions(thd, false)) {
-=======
       verify_contents(thd) || update_versions(thd)) {
->>>>>>> Percona-Server-8.4.0-1
     return true;
   }
 

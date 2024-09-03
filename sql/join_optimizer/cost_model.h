@@ -211,15 +211,8 @@ double EstimateSemijoinFanOut(THD *thd, double right_rows,
    @param right_rows Number of rows in the right hand relation.
    @param edge The join between the two relations.
 */
-<<<<<<< HEAD
-inline double FindOutputRowsForJoin(double left_rows, double right_rows,
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-inline double FindOutputRowsForJoin(double left_rows, double right_rows,
-=======
 inline double FindOutputRowsForJoin(THD *thd, double left_rows,
                                     double right_rows,
->>>>>>> Percona-Server-8.4.0-1
                                     const JoinPredicate *edge) {
   switch (edge->expr->type) {
     case RelationalExpression::LEFT_JOIN:

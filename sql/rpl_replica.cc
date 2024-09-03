@@ -781,11 +781,11 @@ bool start_slave_cmd(THD *thd) {
 #ifdef WITH_WSREP
     // Similar to GR, do not allow operations on the wsrep channel
   } else if (lex->mi.channel && wsrep_is_wsrep_channel_name(lex->mi.channel)) {
-    const char *command = "START SLAVE FOR CHANNEL";
-    if (thd->lex->slave_thd_opt & SLAVE_IO)
-      command = "START SLAVE IO_THREAD FOR CHANNEL";
-    else if (thd->lex->slave_thd_opt & SLAVE_SQL)
-      command = "START SLAVE SQL_THREAD FOR CHANNEL";
+    const char *command = "START REPLICA FOR CHANNEL";
+    if (thd->lex->replica_thd_opt & REPLICA_IO)
+      command = "START REPLICA IO_THREAD FOR CHANNEL";
+    else if (thd->lex->replica_thd_opt & REPLICA_SQL)
+      command = "START REPLICA SQL_THREAD FOR CHANNEL";
 
     my_error(ER_REPLICA_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0), command,
              lex->mi.channel, command);
@@ -895,11 +895,11 @@ bool stop_slave_cmd(THD *thd) {
 #ifdef WITH_WSREP
   // Similar to GR, do not allow operations on the wsrep channel
   else if (lex->mi.channel && wsrep_is_wsrep_channel_name(lex->mi.channel)) {
-    const char *command = "STOP SLAVE FOR CHANNEL";
-    if (thd->lex->slave_thd_opt & SLAVE_IO)
-      command = "STOP SLAVE IO_THREAD FOR CHANNEL";
-    else if (thd->lex->slave_thd_opt & SLAVE_SQL)
-      command = "STOP SLAVE SQL_THREAD FOR CHANNEL";
+    const char *command = "STOP REPLICA FOR CHANNEL";
+    if (thd->lex->replica_thd_opt & REPLICA_IO)
+      command = "STOP REPLICA IO_THREAD FOR CHANNEL";
+    else if (thd->lex->replica_thd_opt & REPLICA_SQL)
+      command = "STOP REPLICA SQL_THREAD FOR CHANNEL";
 
     my_error(ER_REPLICA_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0), command,
              lex->mi.channel, command);
@@ -5266,7 +5266,6 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
             b) init_relay_log_pos(), because the BEGIN may be an older relay
             log.
           */
-<<<<<<< HEAD
           if (rli->trans_retries < slave_trans_retries) {
             /*
               The transactions has to be rolled back before
@@ -5274,7 +5273,7 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
               load_mi_and_rli_from_repositories will starts a new
               transaction.
             */
-            rli->cleanup_context(thd, true);
+             rli->cleanup_context(thd, true);
             /*
               Temporary error status is both unneeded and harmful for following
               open-and-lock slave system tables but store its number first for
@@ -5288,12 +5287,7 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
                this part. \Alfranio.
             */
 
-          if (load_mi_and_rli_from_repositories(rli->mi, false, SLAVE_SQL,
-||||||| merged common ancestors
-          if (load_mi_and_rli_from_repositories(rli->mi, false, SLAVE_SQL,
-=======
           if (load_mi_and_rli_from_repositories(rli->mi, false, REPLICA_SQL,
->>>>>>> Percona-Server-8.4.0-1
                                                 false, true))
             LogErr(ERROR_LEVEL,
                    ER_RPL_REPLICA_FAILED_TO_INIT_CONNECTION_METADATA_STRUCTURE,
@@ -8974,23 +8968,6 @@ int flush_relay_logs(Master_info *mi, THD *thd) {
       if ((!is_group_replication_plugin_loaded() ||  // GR is disabled
            !mi->transaction_parser
                 .is_inside_transaction() ||  // not inside a transaction
-<<<<<<< HEAD
-           !channel_map.is_group_replication_channel_name(
-               mi->get_channel(), true) ||  // channel isn't GR applier channel
-           !mi->slave_running) &&  // the I/O thread isn't running
-          DBUG_EVALUATE_IF("deferred_flush_relay_log",
-                           !channel_map.is_group_replication_channel_name(
-                               mi->get_channel(), true),
-                           true)) {
-||||||| merged common ancestors
-           !channel_map.is_group_replication_channel_name(
-               mi->get_channel(), true) ||  // channel isn't GR applier channel
-           !mi->slave_running) &&           // the I/O thread isn't running
-          DBUG_EVALUATE_IF("deferred_flush_relay_log",
-                           !channel_map.is_group_replication_channel_name(
-                               mi->get_channel(), true),
-                           true)) {
-=======
            !channel_map.is_group_replication_applier_channel_name(
                mi->get_channel()) ||  // channel isn't GR applier channel
            !mi->slave_running) &&     // the I/O thread isn't running
@@ -8999,7 +8976,6 @@ int flush_relay_logs(Master_info *mi, THD *thd) {
               !channel_map.is_group_replication_applier_channel_name(
                   mi->get_channel()),
               true)) {
->>>>>>> Percona-Server-8.4.0-1
         if (rotate_relay_log(mi)) error = 1;
       }
       // Postpone the rotate action, delegating it to the I/O thread

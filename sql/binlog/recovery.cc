@@ -55,12 +55,6 @@ std::string const &binlog::Binlog_recovery::get_failure_message() const {
 }
 
 binlog::Binlog_recovery &binlog::Binlog_recovery::recover() {
-<<<<<<< HEAD
-  binlog::Decompressing_event_object_istream istream{
-      this->m_reader, psi_memory_resource(key_memory_recovery)};
-  std::shared_ptr<Log_event> ev;
-  this->m_valid_pos = this->m_reader.position();
-
 #ifdef WITH_WSREP
   /*
     If binlog is enabled then SE will persist redo at following stages:
@@ -128,51 +122,7 @@ binlog::Binlog_recovery &binlog::Binlog_recovery::recover() {
   binlogged */
 #endif /* WITH_WSREP */
 
-  while (istream >> ev) {
-    switch (ev->get_type_code()) {
-      case mysql::binlog::event::QUERY_EVENT: {
-        this->process_query_event(dynamic_cast<Query_log_event &>(*ev));
-        break;
-      }
-      case mysql::binlog::event::XID_EVENT: {
-        this->process_xid_event(dynamic_cast<Xid_log_event &>(*ev));
-        break;
-      }
-      case mysql::binlog::event::XA_PREPARE_LOG_EVENT: {
-        this->process_xa_prepare_event(
-            dynamic_cast<XA_prepare_log_event &>(*ev));
-        break;
-      }
-      default: {
-        break;
-      }
-    }
-
-    // Whenever the current position is at a transaction boundary, save it
-    // to m_valid_pos
-    if (!this->m_is_malformed && !this->m_in_transaction &&
-        !is_any_gtid_event(ev.get()) && !is_session_control_event(ev.get()))
-      this->m_valid_pos = this->m_reader.position();
-
-    if (this->m_is_malformed) break;
-  }
-  if (istream.has_error()) {
-    using Status_t = binlog::Decompressing_event_object_istream::Status_t;
-    switch (istream.get_status()) {
-      case Status_t::corrupted:
-      case Status_t::out_of_memory:
-      case Status_t::exceeds_max_size:
-        // @todo Uncomment this to fix BUG#34828252
-        // this->m_is_malformed = true;
-        // this->m_failure_message.assign(istream.get_error_str());
-        // break;
-      case Status_t::success:
-      case Status_t::end:
-      case Status_t::truncated:
-        // not malformed, just truncated
-        break;
-    }
-  }
+  process_logs(m_reader);
 
 #ifdef WITH_WSREP
   if (WSREP_ON) {
@@ -183,64 +133,7 @@ binlog::Binlog_recovery &binlog::Binlog_recovery::recover() {
   }
 #endif /* WITH_WSREP */
 
-  if (!this->m_is_malformed && total_ha_2pc > 1) {
-||||||| merged common ancestors
-  binlog::Decompressing_event_object_istream istream{
-      this->m_reader, psi_memory_resource(key_memory_recovery)};
-  std::shared_ptr<Log_event> ev;
-  this->m_valid_pos = this->m_reader.position();
-
-  while (istream >> ev) {
-    switch (ev->get_type_code()) {
-      case mysql::binlog::event::QUERY_EVENT: {
-        this->process_query_event(dynamic_cast<Query_log_event &>(*ev));
-        break;
-      }
-      case mysql::binlog::event::XID_EVENT: {
-        this->process_xid_event(dynamic_cast<Xid_log_event &>(*ev));
-        break;
-      }
-      case mysql::binlog::event::XA_PREPARE_LOG_EVENT: {
-        this->process_xa_prepare_event(
-            dynamic_cast<XA_prepare_log_event &>(*ev));
-        break;
-      }
-      default: {
-        break;
-      }
-    }
-
-    // Whenever the current position is at a transaction boundary, save it
-    // to m_valid_pos
-    if (!this->m_is_malformed && !this->m_in_transaction &&
-        !is_any_gtid_event(ev.get()) && !is_session_control_event(ev.get()))
-      this->m_valid_pos = this->m_reader.position();
-
-    if (this->m_is_malformed) break;
-  }
-  if (istream.has_error()) {
-    using Status_t = binlog::Decompressing_event_object_istream::Status_t;
-    switch (istream.get_status()) {
-      case Status_t::corrupted:
-      case Status_t::out_of_memory:
-      case Status_t::exceeds_max_size:
-        // @todo Uncomment this to fix BUG#34828252
-        // this->m_is_malformed = true;
-        // this->m_failure_message.assign(istream.get_error_str());
-        // break;
-      case Status_t::success:
-      case Status_t::end:
-      case Status_t::truncated:
-        // not malformed, just truncated
-        break;
-    }
-  }
-
-  if (!this->m_is_malformed && total_ha_2pc > 1) {
-=======
-  process_logs(m_reader);
   if (!this->is_log_malformed() && total_ha_2pc > 1) {
->>>>>>> Percona-Server-8.4.0-1
     Xa_state_list xa_list{this->m_external_xids};
     this->m_no_engine_recovery = ha_recover(&this->m_internal_xids, &xa_list);
     if (this->m_no_engine_recovery) {

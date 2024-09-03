@@ -303,22 +303,15 @@ SET(SERVER_TESTS
   xid_extract
   log_event_status_size
 )
-<<<<<<< HEAD
-||||||| merged common ancestors
-# Endless loop in FatalSignalDeathTest
-IF(LINUX_ALPINE)
-  LIST(REMOVE_ITEM SERVER_TESTS segfault)
-ENDIF()
-=======
 # Hangs forever.
 IF(LINUX_ARM AND CMAKE_BUILD_TYPE_UPPER STREQUAL "RELWITHDEBINFO")
   LIST(REMOVE_ITEM SERVER_TESTS bgc_ticket_manager)
 ENDIF()
 # Endless loop in FatalSignalDeathTest
+# KH: TODO PXC had the following removed. Why?
 IF(LINUX_ALPINE)
   LIST(REMOVE_ITEM SERVER_TESTS segfault)
 ENDIF()
->>>>>>> Percona-Server-8.4.0-1
 
 IF(MY_COMPILER_IS_GNU AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 12)
   ADD_COMPILE_FLAGS(regexp_engine-t.cc COMPILE_FLAGS "-Wno-restrict")

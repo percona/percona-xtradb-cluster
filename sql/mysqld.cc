@@ -7881,47 +7881,18 @@ static int init_ssl() {
 }
 
 static int init_ssl_communication() {
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (!wsrep_mysql_main_channel_initialized) {
     if (TLS_channel::singleton_init(&mysql_main, mysql_main_channel,
-                                    opt_use_ssl, &server_main_callback,
-                                    opt_initialize))
+                                    &server_main_callback, opt_initialize))
       return 1;
     wsrep_mysql_main_channel_initialized = true;
   }
 #else
-  if (TLS_channel::singleton_init(&mysql_main, mysql_main_channel, opt_use_ssl,
-||||||| merged common ancestors
-  if (TLS_channel::singleton_init(&mysql_main, mysql_main_channel, opt_use_ssl,
-=======
   if (TLS_channel::singleton_init(&mysql_main, mysql_main_channel,
->>>>>>> Percona-Server-8.4.0-1
                                   &server_main_callback, opt_initialize))
     return 1;
-<<<<<<< HEAD
 #endif
-  /*
-    The default value of --admin-ssl is ON. If it is set
-    to off, we should treat it as an explicit attempt to
-    set TLS off for admin channel and thereby not use
-    main channel's TLS configuration.
-  */
-  if (!opt_use_admin_ssl) g_admin_ssl_configured = true;
-
-||||||| merged common ancestors
-
-  /*
-    The default value of --admin-ssl is ON. If it is set
-    to off, we should treat it as an explicit attempt to
-    set TLS off for admin channel and thereby not use
-    main channel's TLS configuration.
-  */
-  if (!opt_use_admin_ssl) g_admin_ssl_configured = true;
-
-=======
-
->>>>>>> Percona-Server-8.4.0-1
   const bool initialize_admin_tls =
       !opt_initialize && (my_admin_bind_addr_str != nullptr);
 
@@ -8858,8 +8829,7 @@ static int init_server_components() {
       /* Note: There will be the same initialization attempt called from
          init_ssl_communication() afterwards. */
       if (TLS_channel::singleton_init(&mysql_main, mysql_main_channel,
-                                      opt_use_ssl, &server_main_callback,
-                                      opt_initialize)) {
+                                      &server_main_callback, opt_initialize)) {
         unireg_abort(MYSQLD_ABORT_EXIT);
       }
       wsrep_mysql_main_channel_initialized = true;
@@ -10983,16 +10953,7 @@ int mysqld_main(int argc, char **argv)
   //  Start signal handler thread.
   start_signal_handler();
 #endif
-<<<<<<< HEAD
-
-  if (opt_authentication_policy &&
-      validate_authentication_policy(opt_authentication_policy)) {
-||||||| merged common ancestors
-  if (opt_authentication_policy &&
-      validate_authentication_policy(opt_authentication_policy)) {
-=======
   if (authentication_policy::init(opt_authentication_policy)) {
->>>>>>> Percona-Server-8.4.0-1
     /* --authentication_policy is set to invalid value */
     LogErr(ERROR_LEVEL, ER_INVALID_AUTHENTICATION_POLICY);
     return 1;
@@ -13360,7 +13321,12 @@ SHOW_VAR status_vars[] = {
     {"Deprecated_use_i_s_processlist_last_timestamp",
      (char *)&show_deprecated_use_i_s_processlist_last_timestamp, SHOW_FUNC,
      SHOW_SCOPE_GLOBAL},
-<<<<<<< HEAD
+    {"Deprecated_use_fk_on_non_standard_key_count",
+     (char *)&show_deprecated_use_fk_on_non_standard_key_count, SHOW_FUNC,
+     SHOW_SCOPE_GLOBAL},
+    {"Deprecated_use_fk_on_non_standard_key_last_timestamp",
+     (char *)&show_deprecated_use_fk_on_non_standard_key_last_timestamp,
+     SHOW_FUNC, SHOW_SCOPE_GLOBAL},
 #ifdef WITH_WSREP
     {"wsrep_connected", (char *)&wsrep_connected, SHOW_BOOL, SHOW_SCOPE_GLOBAL},
     {"wsrep_ready", (char *)&wsrep_show_ready, SHOW_FUNC, SHOW_SCOPE_GLOBAL},
@@ -13390,15 +13356,6 @@ SHOW_VAR status_vars[] = {
      SHOW_CHAR_PTR, SHOW_SCOPE_GLOBAL},
     {"wsrep", (char *)&wsrep_show_status, SHOW_FUNC, SHOW_SCOPE_ALL},
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-=======
-    {"Deprecated_use_fk_on_non_standard_key_count",
-     (char *)&show_deprecated_use_fk_on_non_standard_key_count, SHOW_FUNC,
-     SHOW_SCOPE_GLOBAL},
-    {"Deprecated_use_fk_on_non_standard_key_last_timestamp",
-     (char *)&show_deprecated_use_fk_on_non_standard_key_last_timestamp,
-     SHOW_FUNC, SHOW_SCOPE_GLOBAL},
->>>>>>> Percona-Server-8.4.0-1
     {NullS, NullS, SHOW_FUNC, SHOW_SCOPE_ALL}};
 
 void add_terminator(vector<my_option> *options) {

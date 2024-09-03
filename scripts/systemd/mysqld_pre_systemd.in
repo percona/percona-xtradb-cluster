@@ -211,7 +211,7 @@ fix_mysql_upgrade_history () {
     fi
 }
 
->>>>>>> Percona-Server-8.4.0-1
+>>>>>>> ps/release-8.4.0-1
 install_db () {
     # Note: something different than datadir=/var/lib/mysql requires SELinux policy changes (in enforcing mode)
 
@@ -224,7 +224,7 @@ install_db () {
     # mysql_upgrade_history file should be owned by mysql user since MySQL 8.4 (new file in 8.4)
     fix_mysql_upgrade_history
 
->>>>>>> Percona-Server-8.4.0-1
+>>>>>>> ps/release-8.4.0-1
     # No automatic init wanted
     [ -e /etc/sysconfig/mysql ] && . /etc/sysconfig/mysql
     [ -n "$NO_INIT" ] && exit 0
@@ -280,7 +280,7 @@ install_db () {
     exit 0
 =======
     exit 0
->>>>>>> Percona-Server-8.4.0-1
+>>>>>>> ps/release-8.4.0-1
 }
 
 get_recover_pos () {

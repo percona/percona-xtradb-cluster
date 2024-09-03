@@ -45,7 +45,6 @@ innodb.ddl_crash_alter_table_partition_tablespace : WL#12034 Enable again once s
 innodb.innodb_bug14676111                         : BUG#18200831 The test has never worked correctly
 innodb.fts_exec_interrupt                         : Bug#28534199 The test is unstable and should be rewritten
 innodb.slow_shutdown                              : Bug#31763837 mtr hits this debug assert post test run cleanup
-<<<<<<< HEAD
 innodb.innodb_32k                                 : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
 innodb.innodb_64k                                 : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
 innodb.create_tablespace_4k                       : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
@@ -61,11 +60,6 @@ innodb.blob-crash-4k                              : BUG#3129 PXC requires 16k In
 innodb.innodb_max_recordsize                      : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
 innodb.instant_ddl_max_row_size                   : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
 innodb.instant_ddl_upgrade_rollback               : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
-innodb.upgrade_fts_aux                            : Bug#7904 Percona PS-7904, Bug#33034679 Test needs upgrading 5.7 data files
-||||||| merged common ancestors
-innodb.upgrade_fts_aux                            : Bug#33034679 Test needs an upgrade of its 5.7 data files
-=======
->>>>>>> Percona-Server-8.4.0-1
 innodb.instant_ddl_recovery_old                   : WL#12527 Redo format has changed - crashed_datadir.zip needs to be recreated.
 innodb.log_logical_size                           : Bug#35543413 Test is shaky - needs to be fixed.
 innodb.set_concurrency_in_readonly                : Bug#35573783 innodb.set_concurrency_in_readonly is failing in trunk
@@ -74,7 +68,6 @@ innodb.disable_ahi_other_blocks                   : BUG#3129 PXC requires 16k In
 # innodb_fts suite test
 innodb_fts.sync_block : BUG#2232 percona https://jira.percona.com/browse/PS-2232
 
-<<<<<<< HEAD
 # innodb_zip
 innodb_zip.4k                                     : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
 innodb_zip.index_large_prefix_4k                  : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
@@ -93,29 +86,16 @@ innodb_gis.gis_split_nan                          : BUG#3129 PXC requires 16k In
 # keyring tests
 keyring_encrypted_file.keyring_migration_bugs @darwin : Bug#31041633
 
-||||||| merged common ancestors
-# keyring tests
-keyring_encrypted_file.keyring_migration_bugs @darwin : Bug#31041633
-
-=======
->>>>>>> Percona-Server-8.4.0-1
 # Tests that run ALTER on the "mysql" database
 innodb.mysql_ts_alter_encrypt_1                 : BUG#29531106 - ATTACHABLE_TRX(): ASSERTION `!M_THD->TRANSACTION_ROLLBACK_REQUEST' FAILED
 component_keyring_file.mysql_ts_alter_encrypt_1 : BUG#29531106 - ATTACHABLE_TRX(): ASSERTION `!M_THD->TRANSACTION_ROLLBACK_REQUEST' FAILED
 
 
 # main suite tests
-<<<<<<< HEAD
 main.initialize                                   : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
 main.ds_mrr-big @solaris                          : BUG#14168107 Test leads to timeout on Solaris on slow sparc servers.
-main.gtid_next_xa_binlog_off : BUG#33650776 Failure of XA COMMIT of prepared txn, can result in txn rollback
-||||||| merged common ancestors
-main.ds_mrr-big @solaris : BUG#14168107 Test leads to timeout on Solaris on slow sparc servers.
-main.gtid_next_xa_binlog_off : BUG#33650776 Failure of XA COMMIT of prepared txn, can result in txn rollback
-=======
-main.ds_mrr-big @solaris : BUG#14168107 Test leads to timeout on Solaris on slow sparc servers.
->>>>>>> Percona-Server-8.4.0-1
-main.print_stacktrace : Bug#36027494 Add mtr test for my_print_stacktrace
+main.gtid_next_xa_binlog_off                      : BUG#33650776 Failure of XA COMMIT of prepared txn, can result in txn rollback
+main.print_stacktrace                             : Bug#36027494 Add mtr test for my_print_stacktrace
 
 # Disabled due to InnoDB issues
 
@@ -255,9 +235,6 @@ binlog.binlog_xa_prepared_disconnect : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-3
 galera.galera-index-online-fk : BUG#0 fk_40 triggers inconsistency voting, as it uses a debug_sync on node1
 galera.MW-284 : BUG#0000 test is incompatible with native mysql8.0 server slave behavior (upstream)
 galera.galera_fk_lock_parent_update_child : BUG#0 Few cases have timing issues(PXC-3431) and few are invalid after PXC-3501
-
-# auth_sec
-auth_sec.wrong_keyring_file_data                                        : BUG#0 PXC needs keyring_file/keyring_vault to load without errors
 
 
 # Read only wsrep_provider & wsrep_notify_cmd

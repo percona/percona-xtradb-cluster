@@ -8959,7 +8959,6 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all) {
       return RESULT_ABORTED;
     }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
     int error;
     const bool run_wsrep_hooks = wsrep_run_commit_hook(thd, all);
@@ -8991,31 +8990,28 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all) {
       return RESULT_ABORTED;
     }
 
-    int rc = ordered_commit(thd, all, skip_commit);
+    int rc = 0;
+    if (DBUG_EVALUATE_IF("simulate_xa_commit_log_inconsistency", true, false)) {
+      rc = 1;
+    }
+    rc = rc ? rc : ordered_commit(thd, all, skip_commit);
 
     if (run_wsrep_hooks) {
       wsrep_after_commit(thd, all);
     }
 
     thd->run_wsrep_ordered_commit = false;
+
+    if (rc) {
 #else
-    int rc = ordered_commit(thd, all, skip_commit);
-#endif /* WITH_WSREP */
-
-    if (rc) return RESULT_INCONSISTENT;
-||||||| merged common ancestors
-    int rc = ordered_commit(thd, all, skip_commit);
-
-    if (rc) return RESULT_INCONSISTENT;
-=======
     if (DBUG_EVALUATE_IF("simulate_xa_commit_log_inconsistency", true, false) ||
         ordered_commit(thd, all, skip_commit)) {
+#endif /* WITH_WSREP */
       thd_get_cache_mngr(thd)->reset();
       if (thd->get_stmt_da()->is_ok())
         thd->get_stmt_da()->reset_diagnostics_area();
       return RESULT_INCONSISTENT;
     }
->>>>>>> Percona-Server-8.4.0-1
 
     DBUG_EXECUTE_IF("ensure_binlog_cache_is_reset", {
       /* Assert that binlog cache is reset at commit time. */
@@ -10788,7 +10784,7 @@ int THD::decide_logging_format(Table_ref *tables) {
   */
 #ifdef WITH_WSREP
   // Note that wsrep_thd_is_local() returns false for TOI
-  if (WSREP(this) && wsrep_thd_is_local(this) &&
+  if (WSREP_NNULL(this) && wsrep_thd_is_local(this) &&
       variables.wsrep_trx_fragment_size > 0) {
     if (!is_current_stmt_binlog_format_row()) {
       my_message(ER_NOT_SUPPORTED_YET,

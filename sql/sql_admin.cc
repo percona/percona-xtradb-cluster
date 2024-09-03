@@ -2138,10 +2138,7 @@ bool Sql_cmd_optimize_table::execute(THD *thd) {
   bool res = true;
   DBUG_TRACE;
 
-<<<<<<< HEAD
-  if (check_table_access(thd, SELECT_ACL | INSERT_ACL, first_table, false,
-                         UINT_MAX, false))
-    goto error; /* purecov: inspected */
+  if (check_optimize_table_access(thd)) goto error; /* purecov: inspected */
 
 #ifdef WITH_WSREP
   if (pxc_strict_mode_admin_check(thd, first_table)) return res;
@@ -2151,14 +2148,6 @@ bool Sql_cmd_optimize_table::execute(THD *thd) {
   });
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-  if (check_table_access(thd, SELECT_ACL | INSERT_ACL, first_table, false,
-                         UINT_MAX, false))
-    goto error; /* purecov: inspected */
-=======
-  if (check_optimize_table_access(thd)) goto error; /* purecov: inspected */
-
->>>>>>> Percona-Server-8.4.0-1
   thd->set_slow_log_for_admin_command();
   res = (specialflag & SPECIAL_NO_NEW_FUNC)
             ? mysql_recreate_table(thd, first_table, true)

@@ -3893,8 +3893,6 @@ struct LEX : public Query_tables_list {
     does not properly understand yet. If a different optimizer is requested,
     the statement must be re-prepared with the proper optimizer settings.
    */
-<<<<<<< HEAD
-
   bool using_hypergraph_optimizer() const {
     return m_using_hypergraph_optimizer;
   }
@@ -3907,51 +3905,6 @@ struct LEX : public Query_tables_list {
   bool m_using_hypergraph_optimizer{false};
 
  public:
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-  bool using_hypergraph_optimizer() const {
-    return m_using_hypergraph_optimizer;
-  }
-
-  void set_using_hypergraph_optimizer(bool use_hypergraph) {
-    m_using_hypergraph_optimizer = use_hypergraph;
-  }
-
- private:
-  bool m_using_hypergraph_optimizer{false};
-
- public:
-||||||||| merged common ancestors
-  bool using_hypergraph_optimizer = false;
-=========
-
-  bool using_hypergraph_optimizer() const {
-    return m_using_hypergraph_optimizer;
-  }
-
-  void set_using_hypergraph_optimizer(bool use_hypergraph) {
-    m_using_hypergraph_optimizer = use_hypergraph;
-  }
-
- private:
-  bool m_using_hypergraph_optimizer{false};
-
- public:
->>>>>>>>> Temporary merge branch 2
-=======
-  bool using_hypergraph_optimizer() const {
-    return m_using_hypergraph_optimizer;
-  }
-
-  void set_using_hypergraph_optimizer(bool use_hypergraph) {
-    m_using_hypergraph_optimizer = use_hypergraph;
-  }
-
- private:
-  bool m_using_hypergraph_optimizer{false};
-
- public:
->>>>>>> Percona-Server-8.4.0-1
   LEX_STRING name;
   char *help_arg;
   char *to_log; /* For PURGE BINARY LOGS TO */

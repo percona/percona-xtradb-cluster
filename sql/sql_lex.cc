@@ -80,7 +80,6 @@
 #include "sql_update.h"  // Sql_cmd_update
 #include "string_with_len.h"
 #include "template_utils.h"
-<<<<<<< HEAD
 
 #ifdef WITH_WSREP
 #include "mysql/components/services/log_builtins.h"
@@ -88,10 +87,6 @@
 #include "wsrep_trans_observer.h"
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-
-=======
->>>>>>> Percona-Server-8.4.0-1
 class PT_hint_list;
 
 extern int my_hint_parser_parse(THD *thd, Hint_scanner *scanner,

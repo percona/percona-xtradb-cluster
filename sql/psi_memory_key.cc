@@ -424,20 +424,14 @@ static PSI_memory_info all_server_memory[] = {
      PSI_DOCUMENT_ME},
     {&key_memory_recovery, "Binlog_recovery::recover", 0, 0, PSI_DOCUMENT_ME},
     {&key_memory_show_binlog_events, "show_binlog_events", 0, 0,
-<<<<<<< HEAD
+     PSI_DOCUMENT_ME},
+    {&key_memory_relaylog_recovery, "Relay_log_sanitizer::analyze_logs", 0, 0,
      PSI_DOCUMENT_ME}
 #ifdef WITH_WSREP
     ,
     {&key_memory_wsrep, "wsrep", PSI_FLAG_ONLY_GLOBAL_STAT, 0, PSI_DOCUMENT_ME}
 #endif /* WITH_WSREP */
-};
-||||||| merged common ancestors
-     PSI_DOCUMENT_ME}};
-=======
-     PSI_DOCUMENT_ME},
-    {&key_memory_relaylog_recovery, "Relay_log_sanitizer::analyze_logs", 0, 0,
-     PSI_DOCUMENT_ME}};
->>>>>>> Percona-Server-8.4.0-1
+     };
 
 void register_server_memory_keys() {
   const char *category = "sql";

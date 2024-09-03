@@ -82,6 +82,7 @@ require "lib/mtr_process.pl";
 
 our $secondary_engine_support = eval 'use mtr_secondary_engine; 1';
 our $primary_engine_support = eval 'use mtr_external_engine; 1';
+our $external_language_support = eval 'use mtr_external_language; 1';
 
 # Global variable to keep track of completed test cases
 my $completed = [];
@@ -4490,12 +4491,7 @@ sub default_mysqld {
                                     baseport      => 0,
                                     user          => $opt_user,
                                     password      => '',
-<<<<<<< HEAD
                                     worker        => DEFAULT_WORKER_ID,
-||||||| merged common ancestors
-=======
-                                    bind_local    => $opt_bind_local
->>>>>>> Percona-Server-8.4.0-1
                                   });
 
   my $mysqld = $config->group('mysqld.1') or
@@ -5356,13 +5352,8 @@ sub run_testcase ($) {
                            tmpdir              => $opt_tmpdir,
                            user                => $opt_user,
                            vardir              => $opt_vardir,
-<<<<<<< HEAD
                            worker              => $tinfo->{worker} ||
                                                     DEFAULT_WORKER_ID
-||||||| merged common ancestors
-=======
-                           bind_local          => $opt_bind_local
->>>>>>> Percona-Server-8.4.0-1
                          });
 
       # Write the new my.cnf
@@ -7447,17 +7438,25 @@ sub start_servers($) {
     my $tmpdir = $mysqld->value('tmpdir');
     mkpath($tmpdir) unless -d $tmpdir;
 
+    my $name = $mysqld->name();
+
     # Run <tname>-master.sh
-    if ($mysqld->option('#!run-master-sh') and
-        run_sh_script($tinfo->{master_sh})) {
+    if ($mysqld->option('#!run-master-sh') and $tinfo->{master_sh} and
+        run_sh_script("$tinfo->{master_sh} $datadir $name")) {
       $tinfo->{'comment'} = "Failed to execute '$tinfo->{master_sh}'";
       return 1;
     }
 
     # Run <tname>-slave.sh
-    if ($mysqld->option('#!run-slave-sh') and
+    if ($mysqld->option('#!run-slave-sh') and $tinfo->{slave_sh} and
         run_sh_script($tinfo->{slave_sh})) {
       $tinfo->{'comment'} = "Failed to execute '$tinfo->{slave_sh}'";
+      return 1;
+    }
+
+    if ($mysqld->option('#!run-suite-setup-sh') and $tinfo->{suite_setup_sh} and
+        run_sh_script("$tinfo->{suite_setup_sh} $datadir $name")) {
+      $tinfo->{'comment'} = "Failed to execute '$tinfo->{suite_setup_sh}'";
       return 1;
     }
 
@@ -7486,7 +7485,8 @@ sub start_servers($) {
         return 1;
       }
     }
-    mtr_milli_sleep(3000);
+    # KH: Why?
+    # mtr_milli_sleep(3000);
   }
 
   # Wait for clusters to start

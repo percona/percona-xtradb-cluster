@@ -22211,17 +22211,11 @@ static xa_status_code innobase_commit_by_xid(
   trx_t *trx = trx_get_trx_by_xid(xid);
 
   if (trx != nullptr) {
-<<<<<<< HEAD
-    TrxInInnoDB trx_in_innodb(trx);
-#ifdef WITH_WSREP
-    trx->wsrep_recover_xid = xid;
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-    TrxInInnoDB trx_in_innodb(trx);
-=======
     {
       TrxInInnoDB trx_in_innodb(trx);
->>>>>>> Percona-Server-8.4.0-1
+#ifdef WITH_WSREP
+      trx->wsrep_recover_xid = xid;
+#endif /* WITH_WSREP */
 
       innobase_commit_low(trx);
     }
