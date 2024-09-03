@@ -1,17 +1,18 @@
 #! /bin/bash
 
-# Copyright (c) 2015, 2023, Oracle and/or its affiliates.
+# Copyright (c) 2015, 2024, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
 # as published by the Free Software Foundation.
 #
-# This program is also distributed with certain software (including
+# This program is designed to work with certain software (including
 # but not limited to OpenSSL) that is licensed under separate terms,
 # as designated in a particular file or component or in included license
 # documentation.  The authors of MySQL hereby grant you an additional
 # permission to link the program and your derivative works with the
-# separately licensed software that they have included with MySQL.
+# separately licensed software that they have either included with
+# the program or referenced in the documentation.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -45,9 +46,185 @@ install_validate_password_sql_file () {
     echo $initfile
 }
 
+<<<<<<< HEAD
+||||||| merged common ancestors
+my_which () {
+    save_ifs="${IFS-UNSET}"
+    IFS=:
+    ret=0
+    for file
+    do
+        for dir in $PATH
+        do
+        if [ -f "$dir/$file" ]
+        then
+            echo "$dir/$file"
+            continue 2
+        fi
+        done
+
+        ret=1  #signal an error
+        break
+    done
+
+    if [ "$save_ifs" = UNSET ]
+    then
+        unset IFS
+    else
+        IFS="$save_ifs"
+    fi
+    return $ret  # Success
+}
+
+fix_flush_caches() {
+    local instance=$1
+    flush_caches=$(get_option mysqld_safe flush_caches "0" $instance)
+    if [ ${flush_caches} = 1 ]; then
+        if [ ! $(my_which sync) ]; then
+            echo "sync command not found, required for --flush-caches"
+            exit 1
+        # Flush file system buffers.
+        else
+            sync
+            ret=$?
+            if [ $ret -ne 0 ]; then
+                # Huh, the sync() function is always successful...
+                echo "sync failed, check if sync is properly installed"
+            fi
+        fi
+
+        # Locate sysctl, ensure it exists.
+        if [ ! $(my_which sysctl) ]; then
+            echo "sysctl command not found, required for --flush-caches"
+            exit 1
+        # Purge page cache, dentries and inodes.
+        else
+            sysctl -q -w vm.drop_caches=3
+            ret=$?
+            if [ $ret -ne 0 ]; then
+                echo "sysctl failed, check the error message for details"
+                exit 1
+            fi
+        fi
+    fi
+}
+
+fix_thp_setting() {
+    [ -e /etc/sysconfig/mysql ] && . /etc/sysconfig/mysql
+    # If no THP_SETTING variable specified in /etc/sysconfig/mysql don't do anything
+    if [ ! -z "${THP_SETTING}" ]; then
+      # Set whatever option is specified in environment file
+      echo "${THP_SETTING}" > /sys/kernel/mm/transparent_hugepage/defrag
+      echo "${THP_SETTING}" > /sys/kernel/mm/transparent_hugepage/enabled
+    fi
+}
+
+fix_mysql_upgrade_info () {
+    datadir=$(get_option mysqld datadir "/var/lib/mysql${instance:+-$instance}" $instance)
+    if [ -d  "$datadir" ]  && [ -O "$datadir/mysql_upgrade_info" ]; then
+	chown --reference="$datadir" "$datadir/mysql_upgrade_info"
+	if [ -x /usr/bin/chcon ]; then
+            /usr/bin/chcon --reference="$datadir" "$datadir/mysql_upgrade_info" > /dev/null 2>&1
+	fi
+    fi
+}
+
+=======
+my_which () {
+    save_ifs="${IFS-UNSET}"
+    IFS=:
+    ret=0
+    for file
+    do
+        for dir in $PATH
+        do
+        if [ -f "$dir/$file" ]
+        then
+            echo "$dir/$file"
+            continue 2
+        fi
+        done
+
+        ret=1  #signal an error
+        break
+    done
+
+    if [ "$save_ifs" = UNSET ]
+    then
+        unset IFS
+    else
+        IFS="$save_ifs"
+    fi
+    return $ret  # Success
+}
+
+fix_flush_caches() {
+    local instance=$1
+    flush_caches=$(get_option mysqld_safe flush_caches "0" $instance)
+    if [ ${flush_caches} = 1 ]; then
+        if [ ! $(my_which sync) ]; then
+            echo "sync command not found, required for --flush-caches"
+            exit 1
+        # Flush file system buffers.
+        else
+            sync
+            ret=$?
+            if [ $ret -ne 0 ]; then
+                # Huh, the sync() function is always successful...
+                echo "sync failed, check if sync is properly installed"
+            fi
+        fi
+
+        # Locate sysctl, ensure it exists.
+        if [ ! $(my_which sysctl) ]; then
+            echo "sysctl command not found, required for --flush-caches"
+            exit 1
+        # Purge page cache, dentries and inodes.
+        else
+            sysctl -q -w vm.drop_caches=3
+            ret=$?
+            if [ $ret -ne 0 ]; then
+                echo "sysctl failed, check the error message for details"
+                exit 1
+            fi
+        fi
+    fi
+}
+
+fix_thp_setting() {
+    [ -e /etc/sysconfig/mysql ] && . /etc/sysconfig/mysql
+    # If no THP_SETTING variable specified in /etc/sysconfig/mysql don't do anything
+    if [ ! -z "${THP_SETTING}" ]; then
+      # Set whatever option is specified in environment file
+      echo "${THP_SETTING}" > /sys/kernel/mm/transparent_hugepage/defrag
+      echo "${THP_SETTING}" > /sys/kernel/mm/transparent_hugepage/enabled
+    fi
+}
+
+fix_mysql_upgrade_history () {
+    datadir=$(get_option mysqld datadir "/var/lib/mysql${instance:+-$instance}" $instance)
+    if [ -d  "$datadir" ]  && [ -O "$datadir/mysql_upgrade_history" ]; then
+	chown --reference="$datadir" "$datadir/mysql_upgrade_history"
+	if [ -x /usr/bin/chcon ]; then
+            /usr/bin/chcon --reference="$datadir" "$datadir/mysql_upgrade_history" > /dev/null 2>&1
+	fi
+    fi
+}
+
+>>>>>>> Percona-Server-8.4.0-1
 install_db () {
     # Note: something different than datadir=/var/lib/mysql requires SELinux policy changes (in enforcing mode)
 
+<<<<<<< HEAD
+||||||| merged common ancestors
+    # mysql_upgrade_info file should be owned by mysql user since MySQL 8.0.16
+    fix_mysql_upgrade_info
+
+=======
+    # mysql_upgrade_history file should be owned by mysql user since MySQL 8.4 (new file in 8.4)
+    fix_mysql_upgrade_history
+
+>>>>>>> Percona-Server-8.4.0-1
     # No automatic init wanted
     [ -e /etc/sysconfig/mysql ] && . /etc/sysconfig/mysql
     [ -n "$NO_INIT" ] && exit 0
@@ -89,11 +266,21 @@ install_db () {
 		     --datadir="$datadir" --user=@MYSQLD_USER@ --init-file="$initfile"
     rm -f "$initfile"
 
+<<<<<<< HEAD
     # Generate certs if needed
     if [ -x @bindir@/mysql_ssl_rsa_setup -a ! -e "${datadir}/server-key.pem" ] ; then
         @bindir@/mysql_ssl_rsa_setup --datadir="$datadir" --uid=@MYSQLD_USER@ >/dev/null 2>&1
     fi
     return 0
+||||||| merged common ancestors
+    # Generate certs if needed
+    if [ -x @bindir@/mysql_ssl_rsa_setup -a ! -e "${datadir}/server-key.pem" ] ; then
+        @bindir@/mysql_ssl_rsa_setup --datadir="$datadir" --uid=@MYSQLD_USER@ >/dev/null 2>&1
+    fi
+    exit 0
+=======
+    exit 0
+>>>>>>> Percona-Server-8.4.0-1
 }
 
 get_recover_pos () {

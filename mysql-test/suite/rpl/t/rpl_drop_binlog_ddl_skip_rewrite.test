@@ -1,5 +1,6 @@
 #
 # PS-7526 : Unexpected quoting and dropping of comments in DROP TABLE commands
+<<<<<<< HEAD
 #
 --source include/have_util_sed.inc
 --source include/have_grep.inc
@@ -29,15 +30,30 @@ CREATE TABLE t4 (a INT);
 --echo # Test-1: Dropping tables from the connection which has
 --echo #         binlog_ddl_skip_rewrite=ON
 --echo #
+||||||| merged common ancestors
+# 
+--source include/not_group_replication_plugin.inc
+source include/master-slave.inc;
+=======
+# 
+--source include/not_group_replication_plugin.inc
+source include/rpl/init_source_replica.inc;
+>>>>>>> Percona-Server-8.4.0-1
 
 SET binlog_ddl_skip_rewrite = ON;
 
 --let $query = DROP /* comment1 */ TABLE t1
 --eval $query
 
+<<<<<<< HEAD
 # Verify that the above DROP command is logged with comments.
 --let $mysqlbinlog_pipe= | $GREP '^DROP' | $GREP 'comment1'
 --source include/mysqlbinlog.inc
+||||||| merged common ancestors
+--source include/show_binlog_events.inc
+=======
+--source include/rpl/deprecated/show_binlog_events.inc
+>>>>>>> Percona-Server-8.4.0-1
 
 --echo Executed query: $query
 --echo Logged query: $result
@@ -138,6 +154,7 @@ SET binlog_ddl_skip_rewrite = ON;
 --let $binlog_position= query_get_value("SHOW MASTER STATUS", Position, 1)
 SET binlog_ddl_skip_rewrite = OFF;
 
+<<<<<<< HEAD
 --let $query = DROP /* comment4 */ TABLE t4;
 --eval $query
 
@@ -261,3 +278,12 @@ RESET BINARY LOGS AND GTIDS;
 --remove_file $MYSQLBINLOG_OUTFILE
 
 --source include/rpl_end.inc
+||||||| merged common ancestors
+--source include/sync_slave_sql_with_master.inc
+--source include/show_binlog_events.inc
+--source include/rpl_end.inc
+=======
+--source include/rpl/sync_to_replica.inc
+--source include/rpl/deprecated/show_binlog_events.inc
+--source include/rpl/deinit.inc
+>>>>>>> Percona-Server-8.4.0-1
