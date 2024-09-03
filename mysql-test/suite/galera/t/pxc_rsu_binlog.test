@@ -11,7 +11,7 @@ CALL mtr.add_suppression("The statement was neither written to the binary log no
 SET wsrep_OSU_method = RSU;
 
 --let $gtid_executed_begin = `SELECT @@global.gtid_executed`
---let $pos_begin = query_get_value(SHOW MASTER STATUS, Position, 1)
+--let $pos_begin = query_get_value(SHOW BINARY LOG STATUS, Position, 1)
 
 # Let's do some DDLs. 
 
@@ -23,7 +23,7 @@ SHOW WARNINGS;
 
 # No events logged
 --let $assert_text = Assert that the above event has not been added to binlog                                                                                                                                   
---let $assert_cond = [SHOW MASTER STATUS, Position, 1] = $pos_begin                                                                                                                                             
+--let $assert_cond = [SHOW BINARY LOG STATUS, Position, 1] = $pos_begin                                                                                                                                             
 --source include/assert.inc
 
 # No gtid generated

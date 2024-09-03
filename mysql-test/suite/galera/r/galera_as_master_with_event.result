@@ -1,8 +1,7 @@
 use test;
-CHANGE REPLICATION SOURCE TO  SOURCE_HOST='127.0.0.1', SOURCE_PORT=<PORT>;;
-START SLAVE USER='root';
+CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1', SOURCE_PORT=<PORT>;;
+START REPLICA USER='root';
 Warnings:
-Warning	1287	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
 #node-1
 select @@server_id;
@@ -31,7 +30,7 @@ select @@server_id;
 show events;
 Db	Name	Definer	Time zone	Type	Execute at	Interval value	Interval field	Starts	Ends	Status	Originator	character_set_client	collation_connection	Database Collation
 test	foo	root@localhost	SYSTEM	RECURRING	NULL	1	#	#	NULL	REPLICA_SIDE_DISABLED	1	utf8mb4	utf8mb4_0900_ai_ci	utf8mb4_0900_ai_ci
-#async-slave
+#async-replica
 select @@server_id;
 @@server_id
 3
@@ -40,13 +39,10 @@ Db	Name	Definer	Time zone	Type	Execute at	Interval value	Interval field	Starts	E
 select count(*) from mysql.t;
 count(*)
 NUMBER_OF_ROWS
-STOP SLAVE;
-Warnings:
-Warning	1287	'STOP SLAVE' is deprecated and will be removed in a future release. Please use STOP REPLICA instead
+STOP REPLICA;
 CHANGE REPLICATION SOURCE TO  SOURCE_HOST='127.0.0.1', SOURCE_PORT=<PORT>;;
-START SLAVE USER='root';
+START REPLICA USER='root';
 Warnings:
-Warning	1287	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
 #node-2
 # restart
@@ -55,15 +51,11 @@ Db	Name	Definer	Time zone	Type	Execute at	Interval value	Interval field	Starts	E
 test	foo	root@localhost	SYSTEM	RECURRING	NULL	1	#	#	NULL	REPLICA_SIDE_DISABLED	1	utf8mb4	utf8mb4_0900_ai_ci	utf8mb4_0900_ai_ci
 use mysql;
 drop table t;
-#async-slave
+#async-replica
 show create table mysql.t;
 ERROR 42S02: Table 'mysql.t' doesn't exist
 #node-1
 use test;
 drop event foo;
-STOP SLAVE;
-Warnings:
-Warning	1287	'STOP SLAVE' is deprecated and will be removed in a future release. Please use STOP REPLICA instead
-RESET SLAVE ALL;
-Warnings:
-Warning	1287	'RESET SLAVE' is deprecated and will be removed in a future release. Please use RESET REPLICA instead
+STOP REPLICA;
+RESET REPLICA ALL;

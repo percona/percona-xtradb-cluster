@@ -1,5 +1,5 @@
 #
-# Test that a MySQL slave can use CHANGE REPLICATION SOURCE SOURCE_AUTO_POSITION to begin replicating
+# Test that a MySQL replica can use CHANGE REPLICATION SOURCE SOURCE_AUTO_POSITION to begin replicating
 # from another Galera node
 #
 # The galera/galera_2node_master.cnf describes the setup of the nodes
@@ -13,7 +13,7 @@
 --disable_query_log
 --eval CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1', SOURCE_PORT=$NODE_MYPORT_1;
 --enable_query_log
-START SLAVE USER='root';
+START REPLICA USER='root';
 
 --connection node_1
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
@@ -23,11 +23,11 @@ INSERT INTO t1 VALUES(1);
 INSERT INTO t1 VALUES(2);
 
 --connection node_3
-STOP SLAVE;
+STOP REPLICA;
 --disable_query_log
 --eval CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1', SOURCE_PORT=$NODE_MYPORT_2, SOURCE_AUTO_POSITION=1;
 --enable_query_log
-START SLAVE USER='root';
+START REPLICA USER='root';
 
 --connection node_1
 INSERT INTO t1 VALUES(3);
@@ -49,5 +49,5 @@ DROP TABLE t1;
 --let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 --source include/wait_condition.inc
 
-STOP SLAVE;
-RESET SLAVE ALL;
+STOP REPLICA;
+RESET REPLICA ALL;

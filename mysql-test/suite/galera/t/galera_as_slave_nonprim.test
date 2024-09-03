@@ -1,5 +1,5 @@
 #
-# Test the behavior of a Galera async slave if it goes non-prim. Async replication
+# Test the behavior of a Galera async replica if it goes non-prim. Async replication
 # should abort with an error but it should be possible to restart it.
 #
 # The galera/galera_2node_slave.cnf describes the setup of the nodes
@@ -19,7 +19,7 @@
 --disable_query_log
 --eval CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1', SOURCE_PORT=$NODE_MYPORT_1;
 --enable_query_log
-START SLAVE USER='root';
+START REPLICA USER='root';
 SET SESSION wsrep_sync_wait = 0;
 
 --connection node_1
@@ -30,7 +30,7 @@ CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 --source include/wait_condition.inc
 
-# Step #2. Force async slave to go non-primary
+# Step #2. Force async replica to go non-primary
 
 SET GLOBAL wsrep_provider_options = 'gmcast.isolate=1';
 
@@ -40,7 +40,7 @@ SET GLOBAL wsrep_provider_options = 'gmcast.isolate=1';
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
-# Step #3. Force async replication to fail by creating a replication event while the slave is non-prim
+# Step #3. Force async replication to fail by creating a replication event while the replica is non-prim
 
 --connection node_1
 INSERT INTO t1 VALUES (1),(2),(3),(4),(5);
@@ -48,13 +48,13 @@ INSERT INTO t1 VALUES (1),(2),(3),(4),(5);
 --connection node_2
 --sleep 5
 
---let $value = query_get_value(SHOW SLAVE STATUS, Last_SQL_Error, 1)
+--let $value = query_get_value(SHOW REPLICA STATUS, Last_SQL_Error, 1)
 --connection node_3
 --disable_query_log
 --eval SELECT SUBSTRING("$value",1,146) IN ("Error 'WSREP has not yet prepared node for application use' on query. Default database: 'test'. Query: 'BEGIN'", "Node has dropped from cluster", "Coordinator stopped because there were error(s) in the worker(s). The most recent failure being: Worker 1 failed executing transaction 'ANONYMOUS'") AS expected_error
 --enable_query_log
 
-# Step #4. Bring back the async slave and restart replication
+# Step #4. Bring back the async replica and restart replication
 --connection node_2
 SET GLOBAL wsrep_provider_options = 'gmcast.isolate=0';
 
@@ -67,7 +67,7 @@ SET GLOBAL wsrep_provider_options = 'gmcast.isolate=0';
 --source include/galera_wait_ready.inc
 --source include/wait_until_connected_again.inc
 
-START SLAVE;
+START REPLICA;
 
 # Confirm that the replication events have arrived
 
@@ -82,8 +82,8 @@ DROP TABLE t1;
 --let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 --source include/wait_condition.inc
 
-STOP SLAVE;
-RESET SLAVE ALL;
+STOP REPLICA;
+RESET REPLICA ALL;
 
 CALL mtr.add_suppression("Replica SQL: Error 'Unknown command' on query");
 CALL mtr.add_suppression("Slave: Unknown command Error_code: 1047");

@@ -61,7 +61,7 @@ SELECT * FROM t1;
 # Assert that INSERT query commits after the ALTER query
 --let $limit= 2,10
 --let $event_sequence= Anonymous_Gtid # Query/.*CREATE TABLE.* # Anonymous_Gtid # Query/.*ALTER TABLE.* # Anonymous_Gtid # Query/.*BEGIN # Table_map # Write_rows # Xid
---source include/assert_binlog_events.inc
+--source include/rpl/assert_binlog_events.inc
 
 --echo # --------------------------------
 --echo # Test 2: Execute ALTER TABLE on node1 (Local)
@@ -105,7 +105,7 @@ SELECT * FROM t1;
 # Assert that INSERT query commits after the ALTER query
 --let $limit= 2,10
 --let $event_sequence= Anonymous_Gtid # Query/.*ALTER TABLE.* # Anonymous_Gtid # Query/.*BEGIN # Table_map # Write_rows # Xid
---source include/assert_binlog_events.inc
+--source include/rpl/assert_binlog_events.inc
 
 --echo # --------------------------------
 --echo # Test 3: Testing with wsrep_OSU_method = "RSU"
@@ -155,7 +155,7 @@ SET SESSION wsrep_OSU_method = DEFAULT;
 # PXC-4313 disables binlogging for RSU, so no ALTER TABLE in binlog
 # --let $limit= 2,10
 # --let $event_sequence= Anonymous_Gtid # Query/.*ALTER TABLE.* # Anonymous_Gtid # Query/.*BEGIN # Table_map # Write_rows # Xid
-# --source include/assert_binlog_events.inc
+# --source include/rpl/assert_binlog_events.inc
 
 # Reset the debug point before further testing.
 --source include/remove_debug_point.inc

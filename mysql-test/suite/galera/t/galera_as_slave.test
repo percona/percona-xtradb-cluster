@@ -1,5 +1,5 @@
 #
-# Test Galera as a slave to a MySQL master
+# Test Galera as a replica to a MySQL master
 #
 # The galera/galera_2node_slave.cnf describes the setup of the nodes
 #
@@ -15,7 +15,7 @@
 --disable_query_log
 --eval CHANGE REPLICATION SOURCE TO  SOURCE_HOST='127.0.0.1', SOURCE_PORT=$NODE_MYPORT_1;
 --enable_query_log
-START SLAVE USER='root';
+START REPLICA USER='root';
 
 --connection node_1
 --echo # connection node_1
@@ -57,7 +57,7 @@ DROP TABLE t1;
 
 #
 # PXC-761
-# Restart node_3, check that it doesn't have any slave info
+# Restart node_3, check that it doesn't have any replica info
 #
 --connection node_3
 --echo # connection node_3
@@ -71,7 +71,7 @@ DROP TABLE t1;
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
-query_vertical SHOW SLAVE STATUS;
+query_vertical SHOW REPLICA STATUS;
 
 # ==== PXC-761 TEST END ====
 
@@ -79,8 +79,8 @@ query_vertical SHOW SLAVE STATUS;
 # Test cleanup
 --connection node_2
 --echo # connection node_2
-STOP SLAVE;
-RESET SLAVE ALL;
+STOP REPLICA;
+RESET REPLICA ALL;
 
 --connection node_1
 RESET BINARY LOGS AND GTIDS;

@@ -1,5 +1,5 @@
 #
-# Test Galera as a master to a MySQL slave
+# Test Galera as a master to a MySQL replica
 #
 # The galera/galera_2node_as_master_with_event.cnf describes the setup of the nodes
 #
@@ -9,12 +9,12 @@
 --source include/big_test.inc
 
 #
-# connect to async slave and start replication.
+# connect to async replica and start replication.
 --connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
 use test;
 --replace_regex /SOURCE_PORT=[0-9]{1,5}/SOURCE_PORT=<PORT>/
---eval CHANGE REPLICATION SOURCE TO  SOURCE_HOST='127.0.0.1', SOURCE_PORT=$NODE_MYPORT_1;
-START SLAVE USER='root';
+--eval CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1', SOURCE_PORT=$NODE_MYPORT_1;
+START REPLICA USER='root';
 --sleep 1
 
 --connection node_1
@@ -47,7 +47,7 @@ show events;
 #
 # switch master from node-1 to node-2
 --connection node_3
---echo #async-slave
+--echo #async-replica
 select @@server_id;
 #
 --replace_column 8 # 9 #
@@ -55,14 +55,14 @@ show events;
 # check if replication has already started.
 --replace_regex /[0-9]+/NUMBER_OF_ROWS/
 select count(*) from mysql.t;
-STOP SLAVE;
+STOP REPLICA;
 --replace_regex /SOURCE_PORT=[0-9]{1,5}/SOURCE_PORT=<PORT>/
 --eval CHANGE REPLICATION SOURCE TO  SOURCE_HOST='127.0.0.1', SOURCE_PORT=$NODE_MYPORT_2;
-START SLAVE USER='root';
+START REPLICA USER='root';
 --sleep 1
 
 #
-# restart should cause re-connection of async slave once node-2 is up
+# restart should cause re-connection of async replica once node-2 is up
 --connection node_2
 --echo #node-2
 --source include/restart_mysqld.inc
@@ -72,7 +72,7 @@ use mysql;
 drop table t;
 
 --connection node_3
---echo #async-slave
+--echo #async-replica
 --sleep 90
 --error ER_NO_SUCH_TABLE
 show create table mysql.t;
@@ -85,6 +85,6 @@ drop event foo;
 --connection node_3
 # replication lag
 --sleep 1
-STOP SLAVE;
-RESET SLAVE ALL;
+STOP REPLICA;
+RESET REPLICA ALL;
 

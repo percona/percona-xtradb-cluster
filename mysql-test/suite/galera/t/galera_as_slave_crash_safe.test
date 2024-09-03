@@ -1,5 +1,5 @@
 #
-# Test Galera as a slave to a MySQL master
+# Test Galera as a replica to a MySQL master
 #
 # The galera/galera_2node_slave.cnf describes the setup of the nodes
 #
@@ -11,13 +11,13 @@
 --source include/galera_cluster_master_slave.inc
 
 --connection node_3
---echo #node-3 (async slave)
+--echo #node-3 (async replica)
 call mtr.add_suppression("Recovery from source pos");
 call mtr.add_suppression("when attempting to connect");
 --disable_query_log
 --eval CHANGE REPLICATION SOURCE TO  SOURCE_HOST='127.0.0.1', SOURCE_PORT=$NODE_MYPORT_1;
 --enable_query_log
-START SLAVE USER='root';
+START REPLICA USER='root';
 
 #
 # test if replication is working fine.
@@ -27,7 +27,7 @@ CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
 INSERT INTO t1 VALUES(1);
 
 --connection node_3
---echo #node-3 (async slave)
+--echo #node-3 (async replica)
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 --source include/wait_condition.inc
 --let $wait_condition = SELECT COUNT(*) = 1 FROM t1;
@@ -35,12 +35,12 @@ INSERT INTO t1 VALUES(1);
 
 #
 # restart node-3
---echo #Restarting node-3 (async slave) ...
+--echo #Restarting node-3 (async replica) ...
 --source include/restart_mysqld.inc
 # sleep for some time before checkin if replication is up and running.
 --sleep 10
-STOP SLAVE;
-START SLAVE USER='root';
+STOP REPLICA;
+START REPLICA USER='root';
 --sleep 10
 
 #
@@ -50,18 +50,18 @@ START SLAVE USER='root';
 INSERT INTO t1 VALUES (2);
 
 --connection node_3
---echo #node-3 (async slave)
+--echo #node-3 (async replica)
 --let $wait_condition = SELECT COUNT(*) = 2 FROM t1;
 --source include/wait_condition.inc
 
 --connection node_2
---echo #node-2 (galera replicated node non-slave)
+--echo #node-2 (galera replicated node non-replica)
 INSERT INTO t1 VALUES (3);
 --let $wait_condition = SELECT COUNT(*) = 3 FROM t1;
 --source include/wait_condition.inc
 
 --connection node_3
---echo #node-3 (async slave)
+--echo #node-3 (async replica)
 --let $wait_condition = SELECT COUNT(*) = 3 FROM t1;
 --source include/wait_condition.inc
 
@@ -73,8 +73,8 @@ DROP TABLE t1;
 --let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 --source include/wait_condition.inc
 
-STOP SLAVE;
-RESET SLAVE ALL;
+STOP REPLICA;
+RESET REPLICA ALL;
 
 --connection node_1
 RESET BINARY LOGS AND GTIDS;

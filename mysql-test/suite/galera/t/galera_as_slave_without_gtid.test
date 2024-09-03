@@ -1,5 +1,5 @@
 #
-# Test Galera as a slave to a MySQL master with gitd-mode=OFF
+# Test Galera as a replica to a MySQL master with gitd-mode=OFF
 #
 #
 
@@ -11,11 +11,11 @@
 --source include/galera_cluster_master_slave.inc
 
 --connection node_2
---echo # pxc-slave
+--echo # pxc-replica
 --disable_query_log
 --eval CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1', SOURCE_PORT=$NODE_MYPORT_1;
 --enable_query_log
-START SLAVE USER='root';
+START REPLICA USER='root';
 
 --connection node_1
 --echo # master
@@ -27,7 +27,7 @@ INSERT INTO t1 VALUES(4);
 INSERT INTO t1 VALUES(5);
 
 --connection node_2
---echo # pxc-slave
+--echo # pxc-replica
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 --source include/wait_condition.inc
 
@@ -59,10 +59,10 @@ select @@gtid_mode;
 DROP TABLE t1;
 
 --connection node_2
---echo # pxc-slave
+--echo # pxc-replica
 --let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 --source include/wait_condition.inc
 
-STOP SLAVE;
-RESET SLAVE ALL;
+STOP REPLICA;
+RESET REPLICA ALL;
 

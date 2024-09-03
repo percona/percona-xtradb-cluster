@@ -7,7 +7,7 @@
 --source include/galera_cluster_master_slave.inc
 
 --connection node_2
---source include/only_mts_replica_parallel_workers.inc
+--source include/have_replica_parallel_workers.inc
 
 --disable_query_log
 --eval CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1', SOURCE_PORT=$NODE_MYPORT_1;

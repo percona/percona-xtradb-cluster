@@ -1,7 +1,6 @@
-# pxc-slave
-START SLAVE USER='root';
+# pxc-replica
+START REPLICA USER='root';
 Warnings:
-Warning	1287	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
 # master
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
@@ -10,7 +9,7 @@ INSERT INTO t1 VALUES(2);
 INSERT INTO t1 VALUES(3);
 INSERT INTO t1 VALUES(4);
 INSERT INTO t1 VALUES(5);
-# pxc-slave
+# pxc-replica
 select @@gtid_mode;
 @@gtid_mode
 OFF
@@ -18,10 +17,6 @@ OFF
 include/assert_grep.inc [Rolling back unfinished transaction]
 # master
 DROP TABLE t1;
-# pxc-slave
-STOP SLAVE;
-Warnings:
-Warning	1287	'STOP SLAVE' is deprecated and will be removed in a future release. Please use STOP REPLICA instead
-RESET SLAVE ALL;
-Warnings:
-Warning	1287	'RESET SLAVE' is deprecated and will be removed in a future release. Please use RESET REPLICA instead
+# pxc-replica
+STOP REPLICA;
+RESET REPLICA ALL;

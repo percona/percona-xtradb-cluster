@@ -1,7 +1,7 @@
 #
-# Test Galera as a slave to a MySQL master
+# Test Galera as a replica to a MySQL master
 #
-# The galera/galera_2node_slave.cnf describes the setup of the nodes
+# The galera/galera_2node_replica.cnf describes the setup of the nodes
 #
 
 --source include/have_log_bin.inc
@@ -14,7 +14,7 @@
 --disable_query_log
 --eval CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1', SOURCE_PORT=$NODE_MYPORT_1;
 --enable_query_log
-START SLAVE USER='root';
+START REPLICA USER='root';
 
 --connection node_1
 
@@ -88,8 +88,8 @@ DROP TABLE t1;
 --let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 --source include/wait_condition.inc
 
-STOP SLAVE;
-RESET SLAVE ALL;
+STOP REPLICA;
+RESET REPLICA ALL;
 
 --connection node_1
 SET GLOBAL binlog_format='ROW';
