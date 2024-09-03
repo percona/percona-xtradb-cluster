@@ -26,5 +26,5 @@ SHOW BINARY LOGS;
 --let $binlog_file = mysqld-bin.000001
 --let $binlog_start = 125
 --let $keep_gtid_events = 1
---source include/show_binlog_events.inc
+--source include/rpl/deprecated/show_binlog_events.inc
 

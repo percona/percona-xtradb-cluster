@@ -5,9 +5,8 @@ SET SESSION wsrep_on=ON;
 SET SESSION wsrep_on=OFF;
 RESET BINARY LOGS AND GTIDS;
 SET SESSION wsrep_on=ON;
-START SLAVE USER='root';
+START REPLICA USER='root';
 Warnings:
-Warning	1287	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
 CREATE SCHEMA test1;
 CREATE SCHEMA test2;
@@ -29,7 +28,7 @@ INSERT INTO test2.t1 (f1) VALUES (3);
 INSERT INTO test1.t1 (f1) VALUES (3);
 INSERT INTO test2.t1 (f1) VALUES (3);
 SET SESSION wsrep_on=OFF;
-include/wait_for_slave_sql_error.inc [errno=1047]
+include/rpl/wait_for_applier_error.inc [errno=1047]
 INSERT INTO test1.t1 (f1) VALUES (4);
 INSERT INTO test2.t1 (f1) VALUES (4);
 INSERT INTO test1.t1 (f1) VALUES (4);
@@ -46,10 +45,8 @@ INSERT INTO test2.t1 (f1) VALUES (5);
 SET SESSION wsrep_on=ON;
 INSERT INTO test1.t1 (f1) VALUES (6);
 INSERT INTO test2.t1 (f1) VALUES (6);
-START SLAVE;
-Warnings:
-Warning	1287	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
-include/show_binlog_events.inc
+START REPLICA;
+include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	#	Previous_gtids	#	#	
 mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
@@ -172,7 +169,7 @@ gtid_executed_equal
 1
 USE test2;
 ERROR 42000: Unknown database 'test2'
-include/show_binlog_events.inc
+include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	#	Previous_gtids	#	#	
 mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
@@ -291,12 +288,8 @@ mysqld-bin.000001	#	Query	#	#	BEGIN
 mysqld-bin.000001	#	Query	#	#	COMMIT
 DROP SCHEMA test1;
 DROP SCHEMA test2;
-STOP SLAVE;
-Warnings:
-Warning	1287	'STOP SLAVE' is deprecated and will be removed in a future release. Please use STOP REPLICA instead
-RESET SLAVE ALL;
-Warnings:
-Warning	1287	'RESET SLAVE' is deprecated and will be removed in a future release. Please use RESET REPLICA instead
+STOP REPLICA;
+RESET REPLICA ALL;
 CALL mtr.add_suppression("GTID replication failed");
 CALL mtr.add_suppression("Replica SQL for channel '': Error in Xid_log_event: Commit could not be completed");
 CALL mtr.add_suppression("Replica SQL for channel '': Node has dropped from cluster");

@@ -1,12 +1,11 @@
-START SLAVE USER='root';
+START REPLICA USER='root';
 Warnings:
-Warning	1287	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
 INSERT INTO t1 VALUES(1);
 uuids_do_not_match
 1
-include/show_binlog_events.inc
+include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000002	#	Previous_gtids	#	#	
 mysqld-bin.000002	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
@@ -21,7 +20,7 @@ uuids_do_not_match
 1
 uuids_match
 1
-include/show_binlog_events.inc
+include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000004	#	Previous_gtids	#	#	
 mysqld-bin.000004	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
@@ -40,7 +39,7 @@ uuids_do_not_match
 1
 uuids_match
 1
-include/show_binlog_events.inc
+include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	#	Previous_gtids	#	#	
 mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
@@ -62,9 +61,5 @@ include/assert.inc ['gitd_executed should not change']
 include/assert.inc ['gtid_purged should be empty']
 include/assert.inc ['INSERT should not be replicated']
 DROP TABLE t1;
-STOP SLAVE;
-Warnings:
-Warning	1287	'STOP SLAVE' is deprecated and will be removed in a future release. Please use STOP REPLICA instead
-RESET SLAVE ALL;
-Warnings:
-Warning	1287	'RESET SLAVE' is deprecated and will be removed in a future release. Please use RESET REPLICA instead
+STOP REPLICA;
+RESET REPLICA ALL;

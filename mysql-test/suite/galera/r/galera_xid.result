@@ -50,7 +50,7 @@ i	k
 300	NULL
 1000	1000
 2000	2000
-include/show_binlog_events.inc
+include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	#	Previous_gtids	#	#	
 mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
@@ -99,7 +99,7 @@ mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F
 mysqld-bin.000001	#	Xid	#	#	COMMIT /* XID */
 #=============================================
 #node-2 (check for replication followed by XID)
-include/show_binlog_events.inc
+include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	#	Previous_gtids	#	#	
 mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'

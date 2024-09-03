@@ -2,7 +2,7 @@
 --source include/force_restart.inc
 
 #
-# Test Galera with --log-bin --log-slave-updates .
+# Test Galera with --log-bin --log-replica-updates .
 # This way the actual MySQL binary log is used,
 # rather than Galera's own implementation
 #
@@ -41,7 +41,7 @@ FLUSH LOGS;
 --let $binlog_file = mysqld-bin.000002
 --let $binlog_start = 124
 --let $keep_gtid_events = 1
---source include/show_binlog_events.inc
+--source include/rpl/deprecated/show_binlog_events.inc
 
 --connection node_2
 SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 't1';
@@ -49,7 +49,7 @@ SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 't1';
 --let $binlog_file = mysqld-bin.000001
 --let $binlog_start = 125
 --let $keep_gtid_events = 1
---source include/show_binlog_events.inc
+--source include/rpl/deprecated/show_binlog_events.inc
 
 DROP TABLE t1;
 DROP TABLE t2;
@@ -64,7 +64,7 @@ RESET BINARY LOGS AND GTIDS;
 --connection node_1
 RESET BINARY LOGS AND GTIDS;
 
---let $master_pos_before= query_get_value(SHOW MASTER STATUS,Position,1)
+--let $master_pos_before= query_get_value(SHOW BINARY LOG STATUS,Position,1)
 SET SESSION sql_log_bin = OFF;
 CREATE TABLE t1 (a int primary key);
 INSERT INTO t1 VALUES (1);
@@ -75,7 +75,7 @@ INSERT INTO t1 VALUES (12);
 COMMIT;
 
 # Assert that the above statements are not written to binlog.
---let $master_pos_after= query_get_value(SHOW MASTER STATUS,Position,1)
+--let $master_pos_after= query_get_value(SHOW BINARY LOG STATUS,Position,1)
 --let $assert_text= assert that the above events are not written to binlog
 --let $assert_cond= $master_pos_before = $master_pos_after
 --source include/assert.inc
@@ -94,7 +94,7 @@ COMMIT;
 --let $binlog_file = mysqld-bin.000001
 --let $binlog_start = 125
 --let $keep_gtid_events = 1
---source include/show_binlog_events.inc
+--source include/rpl/deprecated/show_binlog_events.inc
 
 # Check node_2
 --connection node_2
@@ -113,7 +113,7 @@ COMMIT;
 --let $binlog_file = mysqld-bin.000001
 --let $binlog_start = 125
 --let $keep_gtid_events = 1
---source include/show_binlog_events.inc
+--source include/rpl/deprecated/show_binlog_events.inc
 
 DROP TABLE t1;
 DROP TABLE t2;
@@ -127,7 +127,7 @@ RESET BINARY LOGS AND GTIDS;
 --connection node_1
 RESET BINARY LOGS AND GTIDS;
 
---let $master_pos_before= query_get_value(SHOW MASTER STATUS,Position,1)
+--let $master_pos_before= query_get_value(SHOW BINARY LOG STATUS,Position,1)
 SET SESSION sql_log_bin = OFF;
 SET SESSION wsrep_trx_fragment_size = 1;
 
@@ -139,7 +139,7 @@ INSERT INTO t1 VALUES (3);
 COMMIT;
 
 # Assert that the above statements are not written to binlog.
---let $master_pos_after= query_get_value(SHOW MASTER STATUS,Position,1)
+--let $master_pos_after= query_get_value(SHOW BINARY LOG STATUS,Position,1)
 --let $assert_text= assert that the above events are not written to binlog
 --let $assert_cond= $master_pos_before = $master_pos_after
 --source include/assert.inc
@@ -157,7 +157,7 @@ COMMIT;
 --let $binlog_file = mysqld-bin.000001
 --let $binlog_start = 125
 --let $keep_gtid_events = 1
---source include/show_binlog_events.inc
+--source include/rpl/deprecated/show_binlog_events.inc
 
 # Check node_2
 --connection node_2
@@ -176,20 +176,20 @@ COMMIT;
 --let $binlog_file = mysqld-bin.000001
 --let $binlog_start = 125
 --let $keep_gtid_events = 1
---source include/show_binlog_events.inc
+--source include/rpl/deprecated/show_binlog_events.inc
 
 DROP TABLE t1;
 DROP TABLE t2;
 
 --echo #
---echo # Check that log-slave-updates=OFF block all PXC replicated binlogging on node_2
+--echo # Check that log-replica-updates=OFF block all PXC replicated binlogging on node_2
 --echo #
---let $restart_parameters = "restart:--log-slave-updates=OFF --log-bin"
+--let $restart_parameters = "restart:--log-replica-updates=OFF --log-bin"
 --source include/restart_mysqld.inc
 
 --connection node_2
 RESET BINARY LOGS AND GTIDS;
---let $master_pos_before= query_get_value(SHOW MASTER STATUS,Position,1)
+--let $master_pos_before= query_get_value(SHOW BINARY LOG STATUS,Position,1)
 
 --connection node_1
 RESET BINARY LOGS AND GTIDS;
@@ -207,7 +207,7 @@ INSERT INTO t2 VALUES (1);
 --let $binlog_file = mysqld-bin.000001
 --let $binlog_start = 125
 --let $keep_gtid_events = 1
---source include/show_binlog_events.inc
+--source include/rpl/deprecated/show_binlog_events.inc
 
 # Check node_2
 --connection node_2
@@ -223,7 +223,7 @@ INSERT INTO t2 VALUES (1);
 --source include/wait_condition.inc
 
 # Assert that the above statements are not written to binlog.
---let $master_pos_after= query_get_value(SHOW MASTER STATUS,Position,1)
+--let $master_pos_after= query_get_value(SHOW BINARY LOG STATUS,Position,1)
 --let $assert_text= assert that the above events are not written to binlog
 --let $assert_cond= $master_pos_before = $master_pos_after
 --source include/assert.inc
@@ -232,7 +232,7 @@ INSERT INTO t2 VALUES (1);
 --let $binlog_file = mysqld-bin.000001
 --let $binlog_start = 125
 --let $keep_gtid_events = 1
---source include/show_binlog_events.inc
+--source include/rpl/deprecated/show_binlog_events.inc
 
 DROP TABLE t1;
 DROP TABLE t2;
