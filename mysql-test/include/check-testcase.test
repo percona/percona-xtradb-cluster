@@ -14,8 +14,9 @@
 # This tries to open additional connection, but it causes 
 # perfschema.no_threads and main.no-threads tests to hang as mysqltest
 # already opened the connection.
-# KH: is it needed at all?
-#--source include/wait_until_connected_again.inc
+# KH: TODO: is it needed at all?
+# Other tests fail without this, because check_testcase.inc fails
+--source include/wait_until_connected_again.inc
 
 --disable_query_log
 --let $wsrep_provider_loaded = `SELECT COUNT(*) = 1 FROM performance_schema.global_variables WHERE VARIABLE_NAME LIKE 'wsrep_provider' AND VARIABLE_VALUE NOT LIKE 'none'`

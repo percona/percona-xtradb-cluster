@@ -1,0 +1,5 @@
+# This setting will allow foreign key to reference non-unique key.
+# However, this is deprecated anyway, so expected to go away in the future,
+# making the whole test not valid.
+
+--restrict-fk-on-non-standard-key=OFF

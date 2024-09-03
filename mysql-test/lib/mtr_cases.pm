@@ -973,7 +973,9 @@ sub collect_one_suite($$$) {
   if (-f $suite_opt_file) {
     $suite_opts = opts_from_file($suite_opt_file);
   }
-
+  # Read suite-setup.sh and suite-teardown.sh
+  my $suite_setup_file = "$testdir/suite-setup.sh";
+  
   if (@$opt_cases) {
     # Collect in specified order
     foreach my $test_name_spec (@$opt_cases) {
@@ -1005,7 +1007,7 @@ sub collect_one_suite($$$) {
            collect_one_test_case($suitedir, $testdir,
                                  $resdir,   $suite,
                                  $tname,    "$tname.$extension",
-                                 $disabled, $suite_opts
+                                 $disabled, $suite_opts, $suite_setup_file
            ));
     }
   } else {
@@ -1021,7 +1023,7 @@ sub collect_one_suite($$$) {
       push(@cases,
            collect_one_test_case($suitedir, $testdir, $resdir,
                                  $suite,    $tname,   $elem,
-                                 $disabled, $suite_opts
+                                 $disabled, $suite_opts, $suite_setup_file
            ));
     }
     closedir TESTDIR;
@@ -1289,6 +1291,7 @@ sub collect_one_test_case {
   my $filename   = shift;
   my $disabled   = shift;
   my $suite_opts = shift;
+  my $suite_setup_file = shift;
 
   # Test file name should consist of only alpha-numeric characters, dash (-)
   # or underscore (_), but should not start with dash or underscore or hash.
@@ -1406,6 +1409,10 @@ sub collect_one_test_case {
     } else {
       $tinfo->{'slave_sh'} = $slave_sh;
     }
+  }
+
+  if (-f $suite_setup_file) {
+    $tinfo->{'suite_setup_sh'} = $suite_setup_file;
   }
 
   # <tname>.slave-mi
