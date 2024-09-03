@@ -446,6 +446,7 @@ fi
             -DWITH_WSREP=ON \
             -DWITH_UNIT_TESTS=0 \
             -DWITH_DEBUG=ON \
+            -DWITH_PERCONA_TELEMETRY=ON \
             $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
         (make $MAKE_JFLAG $QUIET) || exit 1
@@ -483,6 +484,7 @@ fi
             -DMYSQL_SERVER_SUFFIX=".$TAG" \
             -DWITH_WSREP=ON \
             -DWITH_UNIT_TESTS=0 \
+            -DWITH_PERCONA_TELEMETRY=ON \
             $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
         (make $MAKE_JFLAG $QUIET) || exit 1
