@@ -8,11 +8,11 @@
 --let $ofile= $MYSQLTEST_VARDIR/tmp/node.2.err
 
 --connection node_1
-CALL mtr.add_suppression(".*State transfer to .* failed: -125.*");
+CALL mtr.add_suppression(".*State transfer to .* failed: Operation canceled.*");
 CALL mtr.add_suppression(".*SST request is null, SST canceled.*");
 
 --connection node_3
-CALL mtr.add_suppression(".*State transfer to .* failed: -125.*");
+CALL mtr.add_suppression(".*State transfer to .* failed: Operation canceled.*");
 CALL mtr.add_suppression(".*SST request is null, SST canceled.*");
 
 --connection node_1

@@ -1,6 +1,6 @@
-CALL mtr.add_suppression(".*State transfer to .* failed: -125.*");
+CALL mtr.add_suppression(".*State transfer to .* failed: Operation canceled.*");
 CALL mtr.add_suppression(".*SST request is null, SST canceled.*");
-CALL mtr.add_suppression(".*State transfer to .* failed: -125.*");
+CALL mtr.add_suppression(".*State transfer to .* failed: Operation canceled.*");
 CALL mtr.add_suppression(".*SST request is null, SST canceled.*");
 CREATE TABLE t1 (a INT PRIMARY KEY);
 INSERT INTO t1 VALUES (1);
