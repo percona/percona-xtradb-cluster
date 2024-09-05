@@ -1370,8 +1370,8 @@ fi
 
 %if 0%{?rhel} >= 8
 install -d -m 2775 -o mysql -g percona-telemetry %{pxc_telemetry}
-chcon -t mysqld_t %{pxc_telemetry}
-chcon -u system_u %{pxc_telemetry}
+chcon -t mysqld_db_t %{pxc_telemetry} &>/dev/null || :
+chcon -u system_u %{pxc_telemetry} &>/dev/null || :
 %endif
 
 cp %SOURCE999 /tmp/ 2>/dev/null || :
