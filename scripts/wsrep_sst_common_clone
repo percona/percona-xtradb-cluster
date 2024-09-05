@@ -20,7 +20,7 @@
 SCRIPTS_DIR="$(cd $(dirname "$0"); pwd -P)"
 EXTRA_DIR="$SCRIPTS_DIR/../extra"
 BIN_DIR="$SCRIPTS_DIR/../bin"
-
+WSREP_LOG_DEBUG=""
 
 if [ -x "$BIN_DIR/mysql" ]; then
     MYSQL_CLIENT="$BIN_DIR/mysql"
@@ -148,6 +148,7 @@ WSREP_SST_OPT_LPORT=""
 WSREP_SST_OPT_PARENT=""
 
 
+
 while [ $# -gt 0 ]; do
 case "$1" in
     '--address')
@@ -155,7 +156,7 @@ case "$1" in
         # Doing this next tr only to bypass a limitation in wsrep_sst.c (development only)
         WSREP_SST_OPT_ADDR=`echo $WSREP_SST_OPT_ADDR |tr ] @`
         WSREP_SST_OPT_REMOTE_AUTH=$(echo $WSREP_SST_OPT_ADDR | cut -d '@' -f 1)
-        wsrep_log_info "AAAAAAAAAAAAAAAAAAA $WSREP_SST_OPT_ADDR"
+        wsrep_log_debug "-> $WSREP_SST_OPT_ADDR"
 
         #
         # Break address string into host:port/path parts
@@ -171,7 +172,7 @@ case "$1" in
             ;;
         *)
             readonly WSREP_SST_OPT_HOST=$(echo $WSREP_SST_OPT_ADDR| cut -d "@" -f 2|cut -d ":" -f 1) 
-            wsrep_log_info "AAAAAAAAAAAAAAAAAAA WSREP_SST_OPT_HOST $WSREP_SST_OPT_HOST"  
+            wsrep_log_debug "-> WSREP_SST_OPT_HOST $WSREP_SST_OPT_HOST"  
 #            readonly WSREP_SST_OPT_HOST=${WSREP_SST_OPT_ADDR%%[:/]*}
             readonly WSREP_SST_OPT_HOST_UNESCAPED=$WSREP_SST_OPT_HOST
             readonly WSREP_SST_OPT_HOST_ESCAPED=$WSREP_SST_OPT_HOST
@@ -182,7 +183,7 @@ case "$1" in
 #        readonly WSREP_SST_OPT_ADDR_PORT=${remain%%/*}
         #we take the port
         WSREP_SST_OPT_ADDR_PORT=$(echo $WSREP_SST_OPT_ADDR| cut -d ":" -f 3)
-        wsrep_log_info "AAAAAAAAAAAAAAAAAAA WSREP_SST_OPT_ADDR_PORT  $WSREP_SST_OPT_ADDR_PORT"
+        wsrep_log_debug "-> WSREP_SST_OPT_ADDR_PORT  $WSREP_SST_OPT_ADDR_PORT"
         
         remain=${remain#*/}
         readonly WSREP_SST_OPT_MODULE=${remain%%/*}
@@ -313,13 +314,13 @@ done
 #we save the password for future use
 ORIGINAL_PWD=""
 readonly ORIGINAL_PWD=$WSREP_SST_OPT_PSWD
-wsrep_log_info "AAAAAAAAAAAAAAAAAAA -> original PWD [$WSREP_SST_OPT_PSWD]"
+wsrep_log_debug "-> original PWD [$WSREP_SST_OPT_PSWD]"
 
 
 if [ "$WSREP_SST_OPT_ROLE" == "joiner" ]; then
     WSREP_SST_OPT_ADDR_PORT=""
     WSREP_SST_OPT_ADDR_PORT=$(parse_cnf mysqld port "3306") 
-    wsrep_log_info "AAAAAAAAAAAAAAAAAAA JOINER resetting port WSREP_SST_OPT_ADDR_PORT=$WSREP_SST_OPT_ADDR_PORT"
+    wsrep_log_debug "-> JOINER resetting port WSREP_SST_OPT_ADDR_PORT=$WSREP_SST_OPT_ADDR_PORT"
 fi
 
 # If Local port is empty by default we set as same value of port
@@ -393,8 +394,8 @@ then
 
 fi
 
-wsrep_log_info "AAAAAAAAAAAAAAAAAAA WSREP_SST_OPT_REMOTE_USER  $WSREP_SST_OPT_REMOTE_USER"
-wsrep_log_info "AAAAAAAAAAAAAAAAAAA WSREP_SST_OPT_REMOTE_PSWD  $WSREP_SST_OPT_REMOTE_PSWD"
+wsrep_log_debug "-> WSREP_SST_OPT_REMOTE_USER  $WSREP_SST_OPT_REMOTE_USER"
+wsrep_log_debug "-> WSREP_SST_OPT_REMOTE_PSWD  $WSREP_SST_OPT_REMOTE_PSWD"
 
 
 # Reads incoming data from STDIN and sets the variables
