@@ -24,7 +24,11 @@ constexpr char VAR_TELEMETRY_ROOT_DIR[] = "telemetry_root_dir";
 constexpr char VAR_SCRAPE_INTERVAL[] = "scrape_interval";
 constexpr char VAR_GRACE_INTERVAL[] = "grace_interval";
 constexpr char VAR_HISTORY_KEEP_INTERVAL[] = "history_keep_interval";
+#ifdef WITH_WSREP
+constexpr char TELEMETRY_ROOT_DIR_DEFAULT[] = "/usr/local/percona/telemetry/pxc";
+#else
 constexpr char TELEMETRY_ROOT_DIR_DEFAULT[] = "/usr/local/percona/telemetry/ps";
+#endif
 
 constexpr uint SCRAPE_INTERVAL_DEFAULT = 60 * 60 * 24 * 1;  // 1 day
 constexpr uint SCRAPE_INTERVAL_MIN = 10;
