@@ -121,7 +121,6 @@ BEGIN
                                 'auto_increment_offset',
                                 'auto_increment_increment',
                                 'wsrep_data_home_dir',
-                                'keyring_file_data',
                                 'innodb_thread_sleep_delay')
   ORDER BY VARIABLE_NAME;
 

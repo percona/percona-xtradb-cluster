@@ -83,9 +83,6 @@ innodb_undo.i_s_files_32k                         : BUG#3129 PXC requires 16k In
 # innodb_gis
 innodb_gis.gis_split_nan                          : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
 
-# keyring tests
-keyring_encrypted_file.keyring_migration_bugs @darwin : Bug#31041633
-
 # Tests that run ALTER on the "mysql" database
 innodb.mysql_ts_alter_encrypt_1                 : BUG#29531106 - ATTACHABLE_TRX(): ASSERTION `!M_THD->TRANSACTION_ROLLBACK_REQUEST' FAILED
 component_keyring_file.mysql_ts_alter_encrypt_1 : BUG#29531106 - ATTACHABLE_TRX(): ASSERTION `!M_THD->TRANSACTION_ROLLBACK_REQUEST' FAILED
@@ -94,7 +91,6 @@ component_keyring_file.mysql_ts_alter_encrypt_1 : BUG#29531106 - ATTACHABLE_TRX(
 # main suite tests
 main.initialize                                   : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
 main.ds_mrr-big @solaris                          : BUG#14168107 Test leads to timeout on Solaris on slow sparc servers.
-main.gtid_next_xa_binlog_off                      : BUG#33650776 Failure of XA COMMIT of prepared txn, can result in txn rollback
 main.print_stacktrace                             : Bug#36027494 Add mtr test for my_print_stacktrace
 
 # Disabled due to InnoDB issues

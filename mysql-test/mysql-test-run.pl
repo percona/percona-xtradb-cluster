@@ -4492,6 +4492,7 @@ sub default_mysqld {
                                     user          => $opt_user,
                                     password      => '',
                                     worker        => DEFAULT_WORKER_ID,
+                                    bind_local    => $opt_bind_local
                                   });
 
   my $mysqld = $config->group('mysqld.1') or
@@ -5353,7 +5354,8 @@ sub run_testcase ($) {
                            user                => $opt_user,
                            vardir              => $opt_vardir,
                            worker              => $tinfo->{worker} ||
-                                                    DEFAULT_WORKER_ID
+                                                    DEFAULT_WORKER_ID,
+                           bind_local          => $opt_bind_local
                          });
 
       # Write the new my.cnf

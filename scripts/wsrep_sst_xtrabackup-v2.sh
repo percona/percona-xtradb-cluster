@@ -829,7 +829,6 @@ read_cnf()
     # (These files will not be REMOVED on the joiner node)
     cpat=$(parse_cnf sst cpat '.*\.pem$\|.*init\.ok$\|.*galera\.cache$\|.*sst_in_progress$\|.*sst-xb-tmpdir$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$\|.*component_keyring_.*\.cnf$\|.*mysqld.my$')
 
-    # Keep the KEYRING_FILE_DIR if it is a subdir of the datadir
     # Normalize the datadir for comparison
 
     # Retry the connection 30 times (at 1-second intervals)
@@ -1653,9 +1652,6 @@ function initialize_pxb_commands()
         disver="--no-version-check"
     fi
 
-    # KH: TODO: Just for tests, as we don't have PXB 8.4 yet. Remove it
-    disver+=" --no-server-version-check"
-
     local xb_version=$(${pxb_bin_path} --version 2>&1 | grep -oe ' [0-9]\.[0-9][\.0-9]*' | head -n1)
     xb_version=${xb_version# }
     wsrep_log_debug "pxb-version:$xb_version"
@@ -1789,10 +1785,9 @@ if [[ -z $MYSQL_VERSION ]]; then
 fi
 
 # Verify PXB versions we have
-# KH: temporary
-#verify_pxb_version "${XTRABACKUP_THIS_VER_PATH}" "${XB_THIS_REQUIRED_VERSION}"
-#verify_pxb_version "${XTRABACKUP_PREV_VER_PATH}" "${XB_PREV_REQUIRED_VERSION}"
-#verify_pxb_version "${XTRABACKUP_PREV_LTS_VER_PATH}" "${XB_PREV_LTS_REQUIRED_VERSION}"
+verify_pxb_version "${XTRABACKUP_THIS_VER_PATH}" "${XB_THIS_REQUIRED_VERSION}"
+verify_pxb_version "${XTRABACKUP_PREV_VER_PATH}" "${XB_PREV_REQUIRED_VERSION}"
+verify_pxb_version "${XTRABACKUP_PREV_LTS_VER_PATH}" "${XB_PREV_LTS_REQUIRED_VERSION}"
 
 rm -f "${XB_GTID_INFO_FILE_PATH}"
 
