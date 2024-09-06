@@ -3,6 +3,7 @@
 # sst_garbd_test.sh parameters:
 # sst_garbd_test.sh <port> <ssl_opts> <before_exit_sleep_sec> <exit_code>
 
+--source include/not_parallel.inc
 --source include/galera_cluster.inc
 
 SHOW STATUS LIKE 'wsrep_flow_control_interval';
