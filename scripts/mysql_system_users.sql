@@ -89,8 +89,7 @@ GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER, SHU
 -- See https://www.percona.com/doc/percona-xtrabackup/8.0/using_xtrabackup/privileges.html
 CREATE ROLE 'mysql.pxc.sst.role'@localhost;
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'mysql.pxc.sst.role'@localhost;
-GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER, CLONE_ADMIN,GROUP_REPLICATION_STREAM,SYSTEM_USER, SHUTDOWN,CONNECTION_ADMIN ON *.*
- TO 'mysql.pxc.sst.role'@localhost;
+GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER, CLONE_ADMIN,GROUP_REPLICATION_STREAM,SYSTEM_USER, SHUTDOWN,CONNECTION_ADMIN, CREATE USER ON *.* TO 'mysql.pxc.sst.role'@localhost;
 GRANT ALTER, CREATE, SELECT, INSERT ON PERCONA_SCHEMA.xtrabackup_history
  TO 'mysql.pxc.sst.role'@localhost;
 -- For some reason this is also needed, although the docs say BACKUP_ADMIN is enough
