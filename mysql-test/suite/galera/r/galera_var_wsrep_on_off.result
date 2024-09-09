@@ -135,7 +135,7 @@ insert into t values (2);
 set session wsrep_on = ON;
 insert into t values (3);
 drop table t;
-include/show_binlog_events.inc
+include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	#	Previous_gtids	#	#	
 mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'

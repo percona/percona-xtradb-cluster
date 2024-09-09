@@ -8,6 +8,13 @@
 --source include/xplugin_ssl_warnings_suppression.inc
 --source include/xplugin_create_user.inc
 
+--connection node_1
+--source include/suppress_tls_off.inc
+
+--connection node_2
+--source include/suppress_tls_off.inc
+
+--connection node_1
 SET GLOBAL mysqlx_connect_timeout = 300;
 call mtr.add_suppression("Unsuccessful login attempt");
 

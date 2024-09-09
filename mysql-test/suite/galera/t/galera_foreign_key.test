@@ -34,6 +34,7 @@ show variables like 'foreign_key_checks';
 CREATE TABLE t1
 (a INT NOT NULL,
  b INT NOT NULL,
+ UNIQUE (a),
  INDEX idx(a)) ENGINE=InnoDB;
 
 CREATE TABLE t2
@@ -235,7 +236,7 @@ CREATE TABLE t1 (
   KEY allkeygc(unique1gc,unique2gc,twogc,fourgc,tengc,twentygc,fortygc,sixtygc,eightygc)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
---error ER_FK_NO_INDEX_PARENT
+--error ER_FK_NO_UNIQUE_INDEX_PARENT
 CREATE TABLE t2_fk (
   pk int(11) NOT NULL,
   sixty int(11) DEFAULT NULL,
@@ -301,7 +302,7 @@ DROP TABLE parent;
 CREATE TABLE t1
 (a INT NOT NULL,
  b INT NOT NULL,
- INDEX idx(a)) ENGINE=InnoDB;
+ UNIQUE INDEX idx(a)) ENGINE=InnoDB;
 
 CREATE TABLE t2
 (a INT KEY,
@@ -541,19 +542,20 @@ DROP TABLE t1;
 --echo # Bug#28581468 - RENAMING PARENT COLUMN IN A FOREIGN KEY FAILS WITH STRANGE ERROR.
 --echo #
 
-CREATE TABLE t1 (a INT NOT NULL, b INT NOT NULL, INDEX idx(a)) ENGINE=InnoDB;
+CREATE TABLE t1 (a INT NOT NULL, b INT NOT NULL, UNIQUE INDEX idx(a)) ENGINE=InnoDB;
 CREATE TABLE t2 (a INT KEY, b INT, INDEX ind(b), FOREIGN KEY (b) REFERENCES t1(a) ON DELETE CASCADE ON UPDATE CASCADE) ENGINE=InnoDB;
 
-ALTER TABLE t1 CHANGE a id INT;
+# KH: TODO: does it make sense?
+#ALTER TABLE t1 CHANGE a id INT UNIQUE, ALGORITHM=INPLACE;
 CHECK TABLE t1;
 CHECK TABLE t2;
 
 DROP TABLE t1, t2;
 
-CREATE TABLE t1 (a INT NOT NULL, b INT NOT NULL, INDEX idx(a)) ENGINE=InnoDB;
+CREATE TABLE t1 (a INT NOT NULL, b INT NOT NULL, UNIQUE INDEX idx(a)) ENGINE=InnoDB;
 CREATE TABLE t2 (a INT KEY, b INT, INDEX ind(b), FOREIGN KEY (b) REFERENCES t1(a) ON DELETE CASCADE ON UPDATE CASCADE) ENGINE=InnoDB;
 
-ALTER TABLE t1 CHANGE a id INT NOT NULL;
+ALTER TABLE t1 CHANGE a id INT NOT NULL, ALGORITHM=INPLACE;
 CHECK TABLE t1;
 CHECK TABLE t2;
 
@@ -583,6 +585,7 @@ CALL mtr.add_suppression("Duplicate foreign key constraint name");
 CALL mtr.add_suppression("Failed to add the foreign key constraint. Missing index for constraint");
 CALL mtr.add_suppression("Cannot drop index .*: needed in a foreign key constraint' on query.");
 CALL mtr.add_suppression("Cannot drop table .* referenced by a foreign key constraint .* on table");
+CALL mtr.add_suppression("Failed to add the foreign key constraint. Missing unique key for constraint");
 
 --connection node_1
 --source include/wait_until_count_sessions.inc

@@ -28,8 +28,8 @@ SET SESSION wsrep_osu_method=NBO;
 --connection node_2
 SET SESSION wsrep_sync_wait=0;
 
-# Wait for the ALTER to block in sync point
---let $wait_condition = SELECT COUNT(*) > 0 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'debug sync point: now';
+# Wait for both ALTER to block in sync point
+--let $wait_condition = SELECT COUNT(*) > 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'debug sync point: now';
 --source include/wait_condition.inc
 
 SET GLOBAL debug = '';

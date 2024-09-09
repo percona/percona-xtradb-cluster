@@ -1,5 +1,5 @@
-include/gtid_utils.inc
-include/gtid_step_reset.inc
+include/rpl/gtid_utils.inc
+include/rpl/gtid_step_reset.inc
 DROP DATABASE IF EXISTS db1;
 Warnings:
 Note	1008	Can't drop database 'db1'; database doesn't exist
@@ -12,5 +12,5 @@ Note	1051	Unknown table 'test.v1'
 DROP EVENT IF EXISTS ev1;
 Warnings:
 Note	1305	Event ev1 does not exist
-include/gtid_step_assert.inc [count=4, only_count=0]
-include/gtid_utils_end.inc
+include/rpl/gtid_step_assert.inc [count=4, only_count=0]
+include/rpl/gtid_utils_end.inc

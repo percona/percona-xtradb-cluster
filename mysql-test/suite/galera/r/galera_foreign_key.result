@@ -26,6 +26,7 @@ foreign_key_checks	ON
 CREATE TABLE t1
 (a INT NOT NULL,
 b INT NOT NULL,
+UNIQUE (a),
 INDEX idx(a)) ENGINE=InnoDB;
 CREATE TABLE t2
 (a INT KEY,
@@ -38,6 +39,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `a` int NOT NULL,
   `b` int NOT NULL,
+  UNIQUE KEY `a` (`a`),
   KEY `idx` (`a`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 show create table t2;
@@ -233,7 +235,7 @@ sixty int(11) DEFAULT NULL,
 PRIMARY KEY (pk),
 CONSTRAINT fk6 FOREIGN KEY (sixty) REFERENCES t1(sixty)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-ERROR HY000: Failed to add the foreign key constraint. Missing index for constraint 'fk6' in the referenced table 't1'
+ERROR HY000: Failed to add the foreign key constraint. Missing unique key for constraint 'fk6' in the referenced table 't1'
 DROP TABLE t1;
 #
 # Bug#27014308 - UPGRADING TO 8.0.3 FAILS IF FOREIGN KEYS OF EXACTLY 64 CHARACTERS ARE PRESENT
@@ -283,7 +285,7 @@ DROP TABLE parent;
 CREATE TABLE t1
 (a INT NOT NULL,
 b INT NOT NULL,
-INDEX idx(a)) ENGINE=InnoDB;
+UNIQUE INDEX idx(a)) ENGINE=InnoDB;
 CREATE TABLE t2
 (a INT KEY,
 b INT,
@@ -541,9 +543,8 @@ DROP TABLE t1;
 #
 # Bug#28581468 - RENAMING PARENT COLUMN IN A FOREIGN KEY FAILS WITH STRANGE ERROR.
 #
-CREATE TABLE t1 (a INT NOT NULL, b INT NOT NULL, INDEX idx(a)) ENGINE=InnoDB;
+CREATE TABLE t1 (a INT NOT NULL, b INT NOT NULL, UNIQUE INDEX idx(a)) ENGINE=InnoDB;
 CREATE TABLE t2 (a INT KEY, b INT, INDEX ind(b), FOREIGN KEY (b) REFERENCES t1(a) ON DELETE CASCADE ON UPDATE CASCADE) ENGINE=InnoDB;
-ALTER TABLE t1 CHANGE a id INT;
 CHECK TABLE t1;
 Table	Op	Msg_type	Msg_text
 test.t1	check	status	OK
@@ -551,9 +552,9 @@ CHECK TABLE t2;
 Table	Op	Msg_type	Msg_text
 test.t2	check	status	OK
 DROP TABLE t1, t2;
-CREATE TABLE t1 (a INT NOT NULL, b INT NOT NULL, INDEX idx(a)) ENGINE=InnoDB;
+CREATE TABLE t1 (a INT NOT NULL, b INT NOT NULL, UNIQUE INDEX idx(a)) ENGINE=InnoDB;
 CREATE TABLE t2 (a INT KEY, b INT, INDEX ind(b), FOREIGN KEY (b) REFERENCES t1(a) ON DELETE CASCADE ON UPDATE CASCADE) ENGINE=InnoDB;
-ALTER TABLE t1 CHANGE a id INT NOT NULL;
+ALTER TABLE t1 CHANGE a id INT NOT NULL, ALGORITHM=INPLACE;
 CHECK TABLE t1;
 Table	Op	Msg_type	Msg_text
 test.t1	check	status	OK
@@ -587,3 +588,4 @@ CALL mtr.add_suppression("Duplicate foreign key constraint name");
 CALL mtr.add_suppression("Failed to add the foreign key constraint. Missing index for constraint");
 CALL mtr.add_suppression("Cannot drop index .*: needed in a foreign key constraint' on query.");
 CALL mtr.add_suppression("Cannot drop table .* referenced by a foreign key constraint .* on table");
+CALL mtr.add_suppression("Failed to add the foreign key constraint. Missing unique key for constraint");

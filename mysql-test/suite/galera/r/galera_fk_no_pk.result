@@ -10,6 +10,8 @@ REFERENCES parent(id)
 ON UPDATE CASCADE
 ON DELETE CASCADE
 ) ENGINE=InnoDB;
+Warnings:
+Warning	6124	Foreign key 'child_ibfk_1' refers to non-unique key or partial key. This is deprecated and will be removed in a future release.
 INSERT INTO parent VALUES (1), (1), (2), (2);
 INSERT INTO child VALUES (1,1), (2,2), (1,1), (2,2);
 DELETE FROM parent WHERE id = 1;

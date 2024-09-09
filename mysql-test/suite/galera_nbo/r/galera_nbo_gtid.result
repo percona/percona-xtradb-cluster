@@ -5,16 +5,16 @@ CREATE TABLE t1(i INT PRIMARY KEY);
 SET SESSION wsrep_OSU_method="NBO";
 ALTER TABLE t1 ENGINE=InnoDB;
 SET SESSION wsrep_OSU_method=default;
-include/show_binlog_events.inc
+include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 #	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 #	#	Query	#	#	use `test`; ALTER TABLE t1 ENGINE=InnoDB
-include/assert_binlog_events.inc [Gtid/.*CLUSTER_UUID.* # Query/.*ALTER TABLE.*]
-include/show_binlog_events.inc
+include/rpl/assert_binlog_events.inc [Gtid/.*CLUSTER_UUID.* # Query/.*ALTER TABLE.*]
+include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 #	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 #	#	Query	#	#	use `test`; ALTER TABLE t1 ENGINE=InnoDB
-include/assert_binlog_events.inc [Gtid/.*CLUSTER_UUID.* # Query/.*ALTER TABLE.*]
+include/rpl/assert_binlog_events.inc [Gtid/.*CLUSTER_UUID.* # Query/.*ALTER TABLE.*]
 #
 # Assert that Incremental State Transfer succeeds when the binary log has a DDL logged in NBO.
 #

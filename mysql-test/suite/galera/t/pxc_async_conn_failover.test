@@ -55,13 +55,16 @@
 --source include/have_debug.inc
 --source include/have_debug_sync.inc
 
+call mtr.add_suppression(".*The Monitor IO thread encountered an error.*");
+call mtr.add_suppression(".*Pending to replicate MySQL GTID event.*");
+
 --echo #
 --echo # 1. Create a chain replication between server 1, 2, 3 and 4.
 --echo #.
 --let $rpl_skip_reset_master_and_slave= 1
 --let $rpl_server_count= 4
 --let $rpl_topology= 1->2->3->4
---source include/rpl_init.inc
+--source include/rpl/init.inc
 
 
 --echo #
@@ -69,14 +72,14 @@
 --echo #    chain i.e. server4
 --echo #
 --let $rpl_connection_name= server_1
---source include/rpl_connection.inc
+--source include/connection.inc
 CREATE TABLE t1 (a INT) ENGINE = InnoDB;
 INSERT INTO t1 VALUES (1);
 
---source include/rpl_sync.inc
+--source include/rpl/sync.inc
 
 --let $rpl_connection_name= server_4
---source include/rpl_connection.inc
+--source include/connection.inc
 
 SET @old_debug = @@GLOBAL.DEBUG;
 SET GLOBAL debug = '+d,async_conn_failover_disable_weight_check';
@@ -108,9 +111,9 @@ SET SESSION sql_log_bin = 1;
 --echo #    count and retry time to 2 and verify its enabled in
 --echo #    performance_schema.replication_connection_configuration.
 --echo #
---source include/stop_slave.inc
+--source include/rpl/stop_replica.inc
 CHANGE REPLICATION SOURCE TO SOURCE_CONNECT_RETRY=1, SOURCE_RETRY_COUNT=2, SOURCE_CONNECTION_AUTO_FAILOVER=1;
---source include/start_slave.inc
+--source include/rpl/start_replica.inc
 
 # Verify Asynchronous Replication Connection Failover is enabled.
 --let $assert_text= 'Asynchronous Replication Connection Failover is enabled'
@@ -122,7 +125,7 @@ CHANGE REPLICATION SOURCE TO SOURCE_CONNECT_RETRY=1, SOURCE_RETRY_COUNT=2, SOURC
 --echo # 5. Stop server 3.
 --echo #
 --let $rpl_server_number= 3
---source include/rpl_stop_server.inc
+--source include/rpl/stop_server.inc
 
 
 --echo #
@@ -133,10 +136,10 @@ CHANGE REPLICATION SOURCE TO SOURCE_CONNECT_RETRY=1, SOURCE_RETRY_COUNT=2, SOURC
 --echo #    connect.
 --echo #
 --let $rpl_connection_name= server_4
---source include/rpl_connection.inc
+--source include/connection.inc
 
 --let $slave_io_errno=2003
---source include/wait_for_slave_io_error.inc
+--source include/rpl/wait_for_receiver_error.inc
 
 
 --echo #
@@ -174,7 +177,7 @@ CHANGE REPLICATION SOURCE TO SOURCE_CONNECT_RETRY=1, SOURCE_RETRY_COUNT=2, SOURC
 --echo # 9. Restart replica IO so asynchronous replication connection failover
 --echo #    can execute and connect to new sender/source.
 --echo #
---source include/start_slave_io.inc
+--source include/rpl/start_receiver.inc
 
 
 --echo #
@@ -199,14 +202,14 @@ CHANGE REPLICATION SOURCE TO SOURCE_CONNECT_RETRY=1, SOURCE_RETRY_COUNT=2, SOURC
 --echo #     of chain i.e. server 4.
 --echo #
 --let $rpl_connection_name= server_1
---source include/rpl_connection.inc
+--source include/connection.inc
 
 INSERT INTO t1 VALUES (2);
 
 
 # Check data is synced to server 4
 --let $rpl_connection_name= server_4
---source include/rpl_connection.inc
+--source include/connection.inc
 
 --let $wait_condition= SELECT COUNT(*) = 2 FROM t1
 --source include/wait_condition.inc
@@ -216,7 +219,7 @@ INSERT INTO t1 VALUES (2);
 --echo # 12. Stop server 2.
 --echo #
 --let $rpl_server_number= 2
---source include/rpl_stop_server.inc
+--source include/rpl/stop_server.inc
 
 
 --echo #
@@ -226,7 +229,7 @@ INSERT INTO t1 VALUES (2);
 --echo #
 
 --let $rpl_connection_name= server_4
---source include/rpl_connection.inc
+--source include/connection.inc
 
 --let $wait_condition= SELECT COUNT(*) = 1 FROM performance_schema.replication_connection_configuration WHERE CHANNEL_NAME='' AND PORT=$SERVER_MYPORT_1
 --source include/wait_condition.inc
@@ -246,14 +249,14 @@ INSERT INTO t1 VALUES (2);
 --echo #
 
 --let $rpl_connection_name= server_1
---source include/rpl_connection.inc
+--source include/connection.inc
 
 INSERT INTO t1 VALUES (3);
 
 
 # Check data is synced to server 4
 --let $rpl_connection_name= server_4
---source include/rpl_connection.inc
+--source include/connection.inc
 
 --let $wait_condition= SELECT COUNT(*) = 3 FROM t1
 --source include/wait_condition.inc
@@ -263,7 +266,7 @@ INSERT INTO t1 VALUES (3);
 --echo # 15. Stop server 1.
 --echo #
 --let $rpl_connection_name= server_4
---source include/rpl_connection.inc
+--source include/connection.inc
 
 --let $wait_condition= SELECT COUNT(*) = 1 FROM performance_schema.replication_connection_configuration WHERE CHANNEL_NAME='' AND PORT=$SERVER_MYPORT_1
 --source include/wait_condition.inc
@@ -271,7 +274,7 @@ INSERT INTO t1 VALUES (3);
 SET GLOBAL debug = '+d,replica_retry_count_exceed';
 
 --let $rpl_server_number= 1
---source include/rpl_stop_server.inc
+--source include/rpl/stop_server.inc
 
 
 --echo #
@@ -281,7 +284,7 @@ SET GLOBAL debug = '+d,replica_retry_count_exceed';
 --echo #     table. It tries connecting to server 3, 2, 1, and again 3, 2 1.
 --echo #
 --let $rpl_connection_name= server_4
---source include/rpl_connection.inc
+--source include/connection.inc
 
 SET DEBUG_SYNC = 'now WAIT_FOR wait_for_retry_count_exceed';
 --let $wait_condition= SELECT COUNT(*) = 1 FROM performance_schema.replication_connection_configuration WHERE CHANNEL_NAME='' AND PORT=$SERVER_MYPORT_3
@@ -319,7 +322,7 @@ SET DEBUG_SYNC = 'RESET';
 --echo #
 --echo # 17. Stop replica IO
 --echo #
---source include/stop_slave.inc
+--source include/rpl/stop_replica.inc
 
 
 --echo #
@@ -336,34 +339,34 @@ CHANGE REPLICATION SOURCE TO SOURCE_CONNECTION_AUTO_FAILOVER=0;
 --eval SELECT asynchronous_connection_failover_delete_source('', '127.0.0.1', $SERVER_MYPORT_1, '');
 
 --let $rpl_server_number=1
---source include/rpl_start_server.inc
+--source include/rpl/start_server.inc
 
 --let $_rpl_server= 2
 while ($_rpl_server < $rpl_server_count)
 {
   --let $rpl_connection_name= server_$_rpl_server
-  --source include/rpl_connection.inc
+  --source include/connection.inc
 
   --let $rpl_server_number= $_rpl_server
-  --source include/rpl_start_server.inc
+  --source include/rpl/start_server.inc
 
   --disable_warnings
-  --source include/start_slave.inc
+  --source include/rpl/start_replica.inc
   --enable_warnings
 
   --inc $_rpl_server
 }
 
 --let $rpl_connection_name= server_4
---source include/rpl_connection.inc
---source include/start_slave.inc
+--source include/connection.inc
+--source include/rpl/start_replica.inc
 
 --let $rpl_connection_name= server_1
---source include/rpl_connection.inc
+--source include/connection.inc
 DROP TABLE t1;
 
---source include/rpl_sync.inc
+--source include/rpl/sync.inc
 
 --let $rpl_skip_sync= 1
 --let $rpl_only_running_threads= 1
---source include/rpl_end.inc
+--source include/rpl/deinit.inc

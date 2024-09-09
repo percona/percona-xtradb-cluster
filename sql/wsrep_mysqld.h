@@ -573,4 +573,6 @@ bool wsrep_should_replicate_for_table(Table_ref * table_ref);
 extern LEX_CSTRING PXC_INTERNAL_SESSION_USER;
 extern LEX_CSTRING PXC_INTERNAL_SESSION_HOST;
 
+bool wsrep_keyring_component_loaded();
+
 #endif /* WSREP_MYSQLD_H */

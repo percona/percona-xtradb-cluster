@@ -28,6 +28,7 @@ mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
+mysql.pxc.internal.session	localhost	FLUSH_PRIVILEGES	Y
 mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
 mysql.pxc.internal.session	localhost	FLUSH_TABLES	Y
 mysql.pxc.internal.session	localhost	FLUSH_USER_RESOURCES	Y
@@ -35,6 +36,7 @@ mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	OPTIMIZE_LOCAL_TABLE	Y
 mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	REPLICATION_APPLIER	Y
@@ -80,6 +82,7 @@ root	localhost	CONNECTION_ADMIN	Y
 root	localhost	ENCRYPTION_KEY_ADMIN	Y
 root	localhost	FIREWALL_EXEMPT	Y
 root	localhost	FLUSH_OPTIMIZER_COSTS	Y
+root	localhost	FLUSH_PRIVILEGES	Y
 root	localhost	FLUSH_STATUS	Y
 root	localhost	FLUSH_TABLES	Y
 root	localhost	FLUSH_USER_RESOURCES	Y
@@ -87,6 +90,7 @@ root	localhost	GROUP_REPLICATION_ADMIN	Y
 root	localhost	GROUP_REPLICATION_STREAM	Y
 root	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 root	localhost	INNODB_REDO_LOG_ENABLE	Y
+root	localhost	OPTIMIZE_LOCAL_TABLE	Y
 root	localhost	PASSWORDLESS_USER_ADMIN	Y
 root	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 root	localhost	REPLICATION_APPLIER	Y
@@ -129,6 +133,7 @@ mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
+mysql.pxc.internal.session	localhost	FLUSH_PRIVILEGES	Y
 mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
 mysql.pxc.internal.session	localhost	FLUSH_TABLES	Y
 mysql.pxc.internal.session	localhost	FLUSH_USER_RESOURCES	Y
@@ -136,6 +141,7 @@ mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	OPTIMIZE_LOCAL_TABLE	Y
 mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	REPLICATION_APPLIER	Y
@@ -181,6 +187,7 @@ root	localhost	CONNECTION_ADMIN	Y
 root	localhost	ENCRYPTION_KEY_ADMIN	Y
 root	localhost	FIREWALL_EXEMPT	Y
 root	localhost	FLUSH_OPTIMIZER_COSTS	Y
+root	localhost	FLUSH_PRIVILEGES	Y
 root	localhost	FLUSH_STATUS	Y
 root	localhost	FLUSH_TABLES	Y
 root	localhost	FLUSH_USER_RESOURCES	Y
@@ -188,6 +195,7 @@ root	localhost	GROUP_REPLICATION_ADMIN	Y
 root	localhost	GROUP_REPLICATION_STREAM	Y
 root	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 root	localhost	INNODB_REDO_LOG_ENABLE	Y
+root	localhost	OPTIMIZE_LOCAL_TABLE	Y
 root	localhost	PASSWORDLESS_USER_ADMIN	Y
 root	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 root	localhost	REPLICATION_APPLIER	Y
@@ -229,6 +237,7 @@ mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
+mysql.pxc.internal.session	localhost	FLUSH_PRIVILEGES	Y
 mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
 mysql.pxc.internal.session	localhost	FLUSH_TABLES	Y
 mysql.pxc.internal.session	localhost	FLUSH_USER_RESOURCES	Y
@@ -236,6 +245,7 @@ mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	OPTIMIZE_LOCAL_TABLE	Y
 mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	REPLICATION_APPLIER	Y
@@ -281,6 +291,7 @@ root	localhost	CONNECTION_ADMIN	Y
 root	localhost	ENCRYPTION_KEY_ADMIN	Y
 root	localhost	FIREWALL_EXEMPT	Y
 root	localhost	FLUSH_OPTIMIZER_COSTS	Y
+root	localhost	FLUSH_PRIVILEGES	Y
 root	localhost	FLUSH_STATUS	Y
 root	localhost	FLUSH_TABLES	Y
 root	localhost	FLUSH_USER_RESOURCES	Y
@@ -288,6 +299,7 @@ root	localhost	GROUP_REPLICATION_ADMIN	Y
 root	localhost	GROUP_REPLICATION_STREAM	Y
 root	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 root	localhost	INNODB_REDO_LOG_ENABLE	Y
+root	localhost	OPTIMIZE_LOCAL_TABLE	Y
 root	localhost	PASSWORDLESS_USER_ADMIN	Y
 root	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 root	localhost	REPLICATION_APPLIER	Y
@@ -342,6 +354,7 @@ mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
+mysql.pxc.internal.session	localhost	FLUSH_PRIVILEGES	Y
 mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
 mysql.pxc.internal.session	localhost	FLUSH_TABLES	Y
 mysql.pxc.internal.session	localhost	FLUSH_USER_RESOURCES	Y
@@ -349,6 +362,7 @@ mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	OPTIMIZE_LOCAL_TABLE	Y
 mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	REPLICATION_APPLIER	Y
@@ -394,6 +408,7 @@ root	localhost	CONNECTION_ADMIN	Y
 root	localhost	ENCRYPTION_KEY_ADMIN	Y
 root	localhost	FIREWALL_EXEMPT	Y
 root	localhost	FLUSH_OPTIMIZER_COSTS	Y
+root	localhost	FLUSH_PRIVILEGES	Y
 root	localhost	FLUSH_STATUS	Y
 root	localhost	FLUSH_TABLES	Y
 root	localhost	FLUSH_USER_RESOURCES	Y
@@ -401,6 +416,7 @@ root	localhost	GROUP_REPLICATION_ADMIN	Y
 root	localhost	GROUP_REPLICATION_STREAM	Y
 root	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 root	localhost	INNODB_REDO_LOG_ENABLE	Y
+root	localhost	OPTIMIZE_LOCAL_TABLE	Y
 root	localhost	PASSWORDLESS_USER_ADMIN	Y
 root	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 root	localhost	REPLICATION_APPLIER	Y
@@ -447,6 +463,7 @@ mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
+mysql.pxc.internal.session	localhost	FLUSH_PRIVILEGES	Y
 mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
 mysql.pxc.internal.session	localhost	FLUSH_TABLES	Y
 mysql.pxc.internal.session	localhost	FLUSH_USER_RESOURCES	Y
@@ -454,6 +471,7 @@ mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	OPTIMIZE_LOCAL_TABLE	Y
 mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	REPLICATION_APPLIER	Y
@@ -499,6 +517,7 @@ root	localhost	CONNECTION_ADMIN	Y
 root	localhost	ENCRYPTION_KEY_ADMIN	Y
 root	localhost	FIREWALL_EXEMPT	Y
 root	localhost	FLUSH_OPTIMIZER_COSTS	Y
+root	localhost	FLUSH_PRIVILEGES	Y
 root	localhost	FLUSH_STATUS	Y
 root	localhost	FLUSH_TABLES	Y
 root	localhost	FLUSH_USER_RESOURCES	Y
@@ -506,6 +525,7 @@ root	localhost	GROUP_REPLICATION_ADMIN	Y
 root	localhost	GROUP_REPLICATION_STREAM	Y
 root	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 root	localhost	INNODB_REDO_LOG_ENABLE	Y
+root	localhost	OPTIMIZE_LOCAL_TABLE	Y
 root	localhost	PASSWORDLESS_USER_ADMIN	Y
 root	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 root	localhost	REPLICATION_APPLIER	Y
@@ -547,6 +567,7 @@ mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
+mysql.pxc.internal.session	localhost	FLUSH_PRIVILEGES	Y
 mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
 mysql.pxc.internal.session	localhost	FLUSH_TABLES	Y
 mysql.pxc.internal.session	localhost	FLUSH_USER_RESOURCES	Y
@@ -554,6 +575,7 @@ mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	OPTIMIZE_LOCAL_TABLE	Y
 mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	REPLICATION_APPLIER	Y
@@ -599,6 +621,7 @@ root	localhost	CONNECTION_ADMIN	Y
 root	localhost	ENCRYPTION_KEY_ADMIN	Y
 root	localhost	FIREWALL_EXEMPT	Y
 root	localhost	FLUSH_OPTIMIZER_COSTS	Y
+root	localhost	FLUSH_PRIVILEGES	Y
 root	localhost	FLUSH_STATUS	Y
 root	localhost	FLUSH_TABLES	Y
 root	localhost	FLUSH_USER_RESOURCES	Y
@@ -606,6 +629,7 @@ root	localhost	GROUP_REPLICATION_ADMIN	Y
 root	localhost	GROUP_REPLICATION_STREAM	Y
 root	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 root	localhost	INNODB_REDO_LOG_ENABLE	Y
+root	localhost	OPTIMIZE_LOCAL_TABLE	Y
 root	localhost	PASSWORDLESS_USER_ADMIN	Y
 root	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 root	localhost	REPLICATION_APPLIER	Y
@@ -670,6 +694,7 @@ mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
+mysql.pxc.internal.session	localhost	FLUSH_PRIVILEGES	Y
 mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
 mysql.pxc.internal.session	localhost	FLUSH_TABLES	Y
 mysql.pxc.internal.session	localhost	FLUSH_USER_RESOURCES	Y
@@ -677,6 +702,7 @@ mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	OPTIMIZE_LOCAL_TABLE	Y
 mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	REPLICATION_APPLIER	Y
@@ -722,6 +748,7 @@ root	localhost	CONNECTION_ADMIN	Y
 root	localhost	ENCRYPTION_KEY_ADMIN	Y
 root	localhost	FIREWALL_EXEMPT	Y
 root	localhost	FLUSH_OPTIMIZER_COSTS	Y
+root	localhost	FLUSH_PRIVILEGES	Y
 root	localhost	FLUSH_STATUS	Y
 root	localhost	FLUSH_TABLES	Y
 root	localhost	FLUSH_USER_RESOURCES	Y
@@ -729,6 +756,7 @@ root	localhost	GROUP_REPLICATION_ADMIN	Y
 root	localhost	GROUP_REPLICATION_STREAM	Y
 root	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 root	localhost	INNODB_REDO_LOG_ENABLE	Y
+root	localhost	OPTIMIZE_LOCAL_TABLE	Y
 root	localhost	PASSWORDLESS_USER_ADMIN	Y
 root	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 root	localhost	REPLICATION_APPLIER	Y
@@ -784,6 +812,7 @@ mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
+mysql.pxc.internal.session	localhost	FLUSH_PRIVILEGES	Y
 mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
 mysql.pxc.internal.session	localhost	FLUSH_TABLES	Y
 mysql.pxc.internal.session	localhost	FLUSH_USER_RESOURCES	Y
@@ -791,6 +820,7 @@ mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	OPTIMIZE_LOCAL_TABLE	Y
 mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	REPLICATION_APPLIER	Y
@@ -836,6 +866,7 @@ root	localhost	CONNECTION_ADMIN	Y
 root	localhost	ENCRYPTION_KEY_ADMIN	Y
 root	localhost	FIREWALL_EXEMPT	Y
 root	localhost	FLUSH_OPTIMIZER_COSTS	Y
+root	localhost	FLUSH_PRIVILEGES	Y
 root	localhost	FLUSH_STATUS	Y
 root	localhost	FLUSH_TABLES	Y
 root	localhost	FLUSH_USER_RESOURCES	Y
@@ -843,6 +874,7 @@ root	localhost	GROUP_REPLICATION_ADMIN	Y
 root	localhost	GROUP_REPLICATION_STREAM	Y
 root	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 root	localhost	INNODB_REDO_LOG_ENABLE	Y
+root	localhost	OPTIMIZE_LOCAL_TABLE	Y
 root	localhost	PASSWORDLESS_USER_ADMIN	Y
 root	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 root	localhost	REPLICATION_APPLIER	Y
@@ -906,6 +938,7 @@ mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
+mysql.pxc.internal.session	localhost	FLUSH_PRIVILEGES	Y
 mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
 mysql.pxc.internal.session	localhost	FLUSH_TABLES	Y
 mysql.pxc.internal.session	localhost	FLUSH_USER_RESOURCES	Y
@@ -913,6 +946,7 @@ mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	OPTIMIZE_LOCAL_TABLE	Y
 mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	REPLICATION_APPLIER	Y
@@ -958,6 +992,7 @@ root	localhost	CONNECTION_ADMIN	Y
 root	localhost	ENCRYPTION_KEY_ADMIN	Y
 root	localhost	FIREWALL_EXEMPT	Y
 root	localhost	FLUSH_OPTIMIZER_COSTS	Y
+root	localhost	FLUSH_PRIVILEGES	Y
 root	localhost	FLUSH_STATUS	Y
 root	localhost	FLUSH_TABLES	Y
 root	localhost	FLUSH_USER_RESOURCES	Y
@@ -965,6 +1000,7 @@ root	localhost	GROUP_REPLICATION_ADMIN	Y
 root	localhost	GROUP_REPLICATION_STREAM	Y
 root	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 root	localhost	INNODB_REDO_LOG_ENABLE	Y
+root	localhost	OPTIMIZE_LOCAL_TABLE	Y
 root	localhost	PASSWORDLESS_USER_ADMIN	Y
 root	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 root	localhost	REPLICATION_APPLIER	Y
@@ -1024,70 +1060,6 @@ SHOW GRANTS FOR `u1`@`localhost`;
 ERROR 42000: There is no such grant defined for user 'u1' on host 'localhost'
 DELETE FROM mysql.global_grants;
 FLUSH PRIVILEGES;
-#
-# Additional tests for SET_USER_ID privilege
-#
-SET GLOBAL event_scheduler = 1;
-CREATE DATABASE restricted;
-CREATE TABLE restricted.t1 (c1 int, restricted int);
-INSERT INTO restricted.t1 VALUES (1,2);
-CREATE USER u1@localhost IDENTIFIED BY 'foo';
-GRANT SET_USER_ID, CREATE VIEW, CREATE ROUTINE, EXECUTE, EVENT ON *.* TO u1@localhost;
-Warnings:
-Warning	6016	The privilege 'SET_USER_ID' is deprecated.
-SELECT * from restricted.t1;
-ERROR 42000: SELECT command denied to user 'u1'@'localhost' for table 't1'
-USE test;
-CREATE DEFINER=root@localhost PROCEDURE p1() SELECT * FROM restricted.t1;
-# With the SET_USER_ID privilege we can escalate the authorization
-CALL p1();
-c1	restricted
-1	2
-CREATE TABLE test.t1 (c1 INT);
-CREATE DEFINER=root@localhost TRIGGER test.tr1 BEFORE INSERT ON test.t1
-FOR EACH ROW INSERT INTO restricted.t1 VALUES (1,1);
-# Use trigger to escalate privileges
-INSERT INTO test.t1 VALUES (1);
-SELECT * FROM restricted.t1;
-c1	restricted
-1	2
-1	1
-DROP TRIGGER test.tr1;
-CREATE DEFINER=root@localhost SQL SECURITY DEFINER VIEW v1 AS
-SELECT a.restricted FROM restricted.t1 as a;
-ERROR 42000: ANY command denied to user 'u1'@'localhost' for table 't1'
-# We need some privilege on the column for CREATE VIEW to work
-GRANT INSERT(restricted) ON restricted.t1 TO u1@localhost;
-SHOW GRANTS FOR CURRENT_USER();
-Grants for u1@localhost
-GRANT EXECUTE, CREATE VIEW, CREATE ROUTINE, EVENT ON *.* TO `u1`@`localhost`
-GRANT SET_USER_ID ON *.* TO `u1`@`localhost`
-GRANT INSERT (`restricted`) ON `restricted`.`t1` TO `u1`@`localhost`
-GRANT EXECUTE, ALTER ROUTINE ON PROCEDURE `test`.`p1` TO `u1`@`localhost`
-CREATE DEFINER=root@localhost SQL SECURITY DEFINER VIEW v1 AS
-SELECT a.restricted FROM restricted.t1 as a;
-# Use escalated privileges to read restricted column.
-SELECT * FROM v1;
-restricted
-2
-1
-# Creating events with SET_USER_ID should work too.
-CREATE DEFINER=root@localhost EVENT test.eve1 ON SCHEDULE AT
-CURRENT_TIMESTAMP + INTERVAL 2 SECOND
-DO BEGIN
-INSERT INTO restricted.t1 VALUES (5,5);
-END;//
-SELECT * FROM v1;
-restricted
-2
-1
-5
-DROP PROCEDURE p1;
-DROP DATABASE restricted;
-DROP USER u1@localhost;
-DROP VIEW test.v1;
-DROP TABLE test.t1;
-SET GLOBAL event_scheduler = 0;
 #
 # Bug25555019 DYNAMIC PRIVILEGES CAN BE GRANTED AT TABLE LEVEL
 #
@@ -1297,9 +1269,7 @@ Warnings:
 Note	3162	Authorization ID 'r1'@'%' does not exist.
 Note	3162	Authorization ID 'r2'@'%' does not exist.
 CREATE USER u1, r1, r2;
-GRANT ROLE_ADMIN, BINLOG_ADMIN, SET_USER_ID, CREATE on *.* to r1;
-Warnings:
-Warning	6016	The privilege 'SET_USER_ID' is deprecated.
+GRANT ROLE_ADMIN, BINLOG_ADMIN, CREATE on *.* to r1;
 GRANT ROLE_ADMIN, GROUP_REPLICATION_ADMIN, ENCRYPTION_KEY_ADMIN, ALTER,
 RELOAD on *.* to r2;
 GRANT SYSTEM_VARIABLES_ADMIN, REPLICATION_SLAVE_ADMIN, SELECT ON *.* to u1;
@@ -1307,7 +1277,7 @@ GRANT r1, r2 TO u1;
 SHOW GRANTS FOR u1 using r1;
 Grants for u1@%
 GRANT SELECT, CREATE ON *.* TO `u1`@`%`
-GRANT BINLOG_ADMIN,REPLICATION_SLAVE_ADMIN,ROLE_ADMIN,SET_USER_ID,SYSTEM_VARIABLES_ADMIN ON *.* TO `u1`@`%`
+GRANT BINLOG_ADMIN,REPLICATION_SLAVE_ADMIN,ROLE_ADMIN,SYSTEM_VARIABLES_ADMIN ON *.* TO `u1`@`%`
 GRANT `r1`@`%`,`r2`@`%` TO `u1`@`%`
 SHOW GRANTS FOR u1 using r2;
 Grants for u1@%
@@ -1325,8 +1295,8 @@ GRANT `r2`@`%` TO `u1`@`%`
 GRANT ALL ON *.* to u1;
 SHOW GRANTS FOR u1;
 Grants for u1@%
-GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, SHUTDOWN, PROCESS, FILE, REFERENCES, INDEX, ALTER, SHOW DATABASES, SUPER, CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE, REPLICATION SLAVE, REPLICATION CLIENT, CREATE VIEW, SHOW VIEW, CREATE ROUTINE, ALTER ROUTINE, CREATE USER, EVENT, TRIGGER, CREATE TABLESPACE, CREATE ROLE, DROP ROLE ON *.* TO `u1`@`%`
-GRANT ALLOW_NONEXISTENT_DEFINER,APPLICATION_PASSWORD_ADMIN,AUDIT_ABORT_EXEMPT,AUDIT_ADMIN,AUTHENTICATION_POLICY_ADMIN,BACKUP_ADMIN,BINLOG_ADMIN,BINLOG_ENCRYPTION_ADMIN,CLONE_ADMIN,CONNECTION_ADMIN,ENCRYPTION_KEY_ADMIN,FIREWALL_EXEMPT,FLUSH_OPTIMIZER_COSTS,FLUSH_STATUS,FLUSH_TABLES,FLUSH_USER_RESOURCES,GROUP_REPLICATION_ADMIN,GROUP_REPLICATION_STREAM,HELLOWORLD,INNODB_REDO_LOG_ARCHIVE,INNODB_REDO_LOG_ENABLE,NON_DOCUMENTED_PRIVILEGE,PASSWORDLESS_USER_ADMIN,PERSIST_RO_VARIABLES_ADMIN,REPLICATION_APPLIER,REPLICATION_SLAVE_ADMIN,RESOURCE_GROUP_ADMIN,RESOURCE_GROUP_USER,ROLE_ADMIN,ROUTINE_GRANT,RUBBISH,SENSITIVE_VARIABLES_OBSERVER,SERVICE_CONNECTION_ADMIN,SESSION_VARIABLES_ADMIN,SET_ANY_DEFINER,SHOW_ROUTINE,SYSTEM_USER,SYSTEM_VARIABLES_ADMIN,TABLE_ENCRYPTION_ADMIN,TELEMETRY_LOG_ADMIN,TRANSACTION_GTID_TAG,XA_RECOVER_ADMIN ON *.* TO `u1`@`%`
+GRANT <ALL_STATIC_PRIVILEGES> ON *.* TO `u1`@`%`
+GRANT ALLOW_NONEXISTENT_DEFINER,APPLICATION_PASSWORD_ADMIN,AUDIT_ABORT_EXEMPT,AUDIT_ADMIN,AUTHENTICATION_POLICY_ADMIN,BACKUP_ADMIN,BINLOG_ADMIN,BINLOG_ENCRYPTION_ADMIN,CLONE_ADMIN,CONNECTION_ADMIN,ENCRYPTION_KEY_ADMIN,FIREWALL_EXEMPT,FLUSH_OPTIMIZER_COSTS,FLUSH_PRIVILEGES,FLUSH_STATUS,FLUSH_TABLES,FLUSH_USER_RESOURCES,GROUP_REPLICATION_ADMIN,GROUP_REPLICATION_STREAM,HELLOWORLD,INNODB_REDO_LOG_ARCHIVE,INNODB_REDO_LOG_ENABLE,NON_DOCUMENTED_PRIVILEGE,OPTIMIZE_LOCAL_TABLE,PASSWORDLESS_USER_ADMIN,PERSIST_RO_VARIABLES_ADMIN,REPLICATION_APPLIER,REPLICATION_SLAVE_ADMIN,RESOURCE_GROUP_ADMIN,RESOURCE_GROUP_USER,ROLE_ADMIN,ROUTINE_GRANT,RUBBISH,SENSITIVE_VARIABLES_OBSERVER,SERVICE_CONNECTION_ADMIN,SESSION_VARIABLES_ADMIN,SET_ANY_DEFINER,SHOW_ROUTINE,SYSTEM_USER,SYSTEM_VARIABLES_ADMIN,TABLE_ENCRYPTION_ADMIN,TELEMETRY_LOG_ADMIN,TRANSACTION_GTID_TAG,XA_RECOVER_ADMIN ON *.* TO `u1`@`%`
 GRANT `r2`@`%` TO `u1`@`%`
 # Boundary value test for privilege_id
 INSERT INTO mysql.global_grants VALUES('u1', '%',
@@ -1364,6 +1334,7 @@ Event	Server Admin	To create, alter, drop and execute events
 Execute	Functions,Procedures	To execute stored routines
 FIREWALL_EXEMPT	Server Admin	
 FLUSH_OPTIMIZER_COSTS	Server Admin	
+FLUSH_PRIVILEGES	Server Admin	
 FLUSH_STATUS	Server Admin	
 FLUSH_TABLES	Server Admin	
 FLUSH_USER_RESOURCES	Server Admin	
@@ -1379,6 +1350,7 @@ Insert	Tables	To insert data into tables
 LENGTH_32_ABCDEFGHIJKLMNOPQRSTUX	Server Admin	
 Lock tables	Databases	To use LOCK TABLES (together with SELECT privilege)
 NON_DOCUMENTED_PRIVILEGE	Server Admin	
+OPTIMIZE_LOCAL_TABLE	Server Admin	
 PASSWORDLESS_USER_ADMIN	Server Admin	
 PERSIST_RO_VARIABLES_ADMIN	Server Admin	
 Process	Server Admin	To view the plain text of currently executing queries
@@ -1398,7 +1370,6 @@ SENSITIVE_VARIABLES_OBSERVER	Server Admin
 SERVICE_CONNECTION_ADMIN	Server Admin	
 SESSION_VARIABLES_ADMIN	Server Admin	
 SET_ANY_DEFINER	Server Admin	
-SET_USER_ID	Server Admin	
 SHOW_ROUTINE	Server Admin	
 SYSTEM_USER	Server Admin	
 SYSTEM_VARIABLES_ADMIN	Server Admin	
@@ -1406,7 +1377,7 @@ Select	Tables	To retrieve rows from table
 Show databases	Server Admin	To see all databases with SHOW DATABASES
 Show view	Tables	To see views with SHOW CREATE VIEW
 Shutdown	Server Admin	To shut down the server
-Super	Server Admin	To use KILL thread, SET GLOBAL, CHANGE MASTER, etc.
+Super	Server Admin	To use KILL thread, SET GLOBAL, CHANGE REPLICATION SOURCE, etc.
 TABLE_ENCRYPTION_ADMIN	Server Admin	
 TELEMETRY_LOG_ADMIN	Server Admin	
 TRANSACTION_GTID_TAG	Server Admin	
@@ -1421,14 +1392,14 @@ GRANT ALL ON *.* to root@localhost WITH GRANT OPTION;
 # REPLICATION_SLAVE_ADMIN test
 DROP USER u1@localhost;
 CREATE USER u1@localhost IDENTIFIED BY 'pwd';
-START SLAVE;
+START REPLICA;
 ERROR 42000: Access denied; you need (at least one of) the SUPER or REPLICATION_SLAVE_ADMIN privilege(s) for this operation
-STOP SLAVE;
+STOP REPLICA;
 ERROR 42000: Access denied; you need (at least one of) the SUPER or REPLICATION_SLAVE_ADMIN privilege(s) for this operation
 GRANT REPLICATION_SLAVE_ADMIN ON *.* to u1@localhost;
-START SLAVE;
+START REPLICA;
 ERROR HY000: The server is not configured as replica; fix in config file or with CHANGE REPLICATION SOURCE TO
-START SLAVE;
+START REPLICA;
 ERROR HY000: The server is not configured as replica; fix in config file or with CHANGE REPLICATION SOURCE TO
 #
 # Bad privilege- or auth identifiers shouldn't crash the server
@@ -1528,8 +1499,8 @@ CREATE USER u1@localhost IDENTIFIED BY 'foo';
 GRANT ALL ON *.* TO u1@localhost;
 SHOW GRANTS;
 Grants for u1@localhost
-GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, SHUTDOWN, PROCESS, FILE, REFERENCES, INDEX, ALTER, SHOW DATABASES, SUPER, CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE, REPLICATION SLAVE, REPLICATION CLIENT, CREATE VIEW, SHOW VIEW, CREATE ROUTINE, ALTER ROUTINE, CREATE USER, EVENT, TRIGGER, CREATE TABLESPACE, CREATE ROLE, DROP ROLE ON *.* TO `u1`@`localhost`
-GRANT ALLOW_NONEXISTENT_DEFINER,APPLICATION_PASSWORD_ADMIN,AUDIT_ADMIN,AUTHENTICATION_POLICY_ADMIN,BACKUP_ADMIN,BINLOG_ADMIN,BINLOG_ENCRYPTION_ADMIN,CLONE_ADMIN,CONNECTION_ADMIN,ENCRYPTION_KEY_ADMIN,FLUSH_OPTIMIZER_COSTS,FLUSH_STATUS,FLUSH_TABLES,FLUSH_USER_RESOURCES,GROUP_REPLICATION_ADMIN,GROUP_REPLICATION_STREAM,INNODB_REDO_LOG_ARCHIVE,INNODB_REDO_LOG_ENABLE,PASSWORDLESS_USER_ADMIN,PERSIST_RO_VARIABLES_ADMIN,REPLICATION_APPLIER,REPLICATION_SLAVE_ADMIN,RESOURCE_GROUP_ADMIN,RESOURCE_GROUP_USER,ROLE_ADMIN,SENSITIVE_VARIABLES_OBSERVER,SERVICE_CONNECTION_ADMIN,SESSION_VARIABLES_ADMIN,SET_ANY_DEFINER,SHOW_ROUTINE,SYSTEM_USER,SYSTEM_VARIABLES_ADMIN,TABLE_ENCRYPTION_ADMIN,TELEMETRY_LOG_ADMIN,TRANSACTION_GTID_TAG,XA_RECOVER_ADMIN ON *.* TO `u1`@`localhost`
+GRANT <ALL_STATIC_PRIVILEGES> ON *.* TO `u1`@`localhost`
+GRANT ALLOW_NONEXISTENT_DEFINER,APPLICATION_PASSWORD_ADMIN,AUDIT_ADMIN,AUTHENTICATION_POLICY_ADMIN,BACKUP_ADMIN,BINLOG_ADMIN,BINLOG_ENCRYPTION_ADMIN,CLONE_ADMIN,CONNECTION_ADMIN,ENCRYPTION_KEY_ADMIN,FLUSH_OPTIMIZER_COSTS,FLUSH_PRIVILEGES,FLUSH_STATUS,FLUSH_TABLES,FLUSH_USER_RESOURCES,GROUP_REPLICATION_ADMIN,GROUP_REPLICATION_STREAM,INNODB_REDO_LOG_ARCHIVE,INNODB_REDO_LOG_ENABLE,OPTIMIZE_LOCAL_TABLE,PASSWORDLESS_USER_ADMIN,PERSIST_RO_VARIABLES_ADMIN,REPLICATION_APPLIER,REPLICATION_SLAVE_ADMIN,RESOURCE_GROUP_ADMIN,RESOURCE_GROUP_USER,ROLE_ADMIN,SENSITIVE_VARIABLES_OBSERVER,SERVICE_CONNECTION_ADMIN,SESSION_VARIABLES_ADMIN,SET_ANY_DEFINER,SHOW_ROUTINE,SYSTEM_USER,SYSTEM_VARIABLES_ADMIN,TABLE_ENCRYPTION_ADMIN,TELEMETRY_LOG_ADMIN,TRANSACTION_GTID_TAG,XA_RECOVER_ADMIN ON *.* TO `u1`@`localhost`
 REVOKE ALL ON *.* FROM CURRENT_USER();
 SHOW GRANTS;
 Grants for u1@localhost
@@ -1688,28 +1659,26 @@ u1	%	REPLICATION_SLAVE_ADMIN	N
 u1	%	SYSTEM_VARIABLES_ADMIN	N
 u1	%	XA_RECOVER_ADMIN	N
 RESET BINARY LOGS AND GTIDS;
-include/show_binlog_events.inc
+include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 GRANT SELECT ON *.* TO u1;
-include/show_binlog_events.inc
+include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 binlog.000001	#	Query	#	#	use `test`; GRANT SELECT ON *.* TO 'u1'@'%'
 GRANT PERSIST_RO_VARIABLES_ADMIN, DELETE ON *.* TO u1 WITH GRANT OPTION;
-include/show_binlog_events.inc
+include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 binlog.000001	#	Query	#	#	use `test`; GRANT SELECT ON *.* TO 'u1'@'%'
 binlog.000001	#	Query	#	#	use `test`; GRANT DELETE, PERSIST_RO_VARIABLES_ADMIN ON *.* TO 'u1'@'%' WITH GRANT OPTION
 GRANT GRANT OPTION ON *.* TO u1;
-include/show_binlog_events.inc
+include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 binlog.000001	#	Query	#	#	use `test`; GRANT SELECT ON *.* TO 'u1'@'%'
 binlog.000001	#	Query	#	#	use `test`; GRANT DELETE, PERSIST_RO_VARIABLES_ADMIN ON *.* TO 'u1'@'%' WITH GRANT OPTION
 binlog.000001	#	Query	#	#	use `test`; GRANT GRANT OPTION ON *.* TO 'u1'@'%' WITH GRANT OPTION
 DROP USER u1;
 RESET BINARY LOGS AND GTIDS;
-RESET SLAVE ALL;
-Warnings:
-Warning	1287	'RESET SLAVE' is deprecated and will be removed in a future release. Please use RESET REPLICA instead
+RESET REPLICA ALL;
 #
 # WRITING EMPTY PRIVILEGES INTO GLOBAL_GRANTS TABLE
 #

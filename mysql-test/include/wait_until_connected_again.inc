@@ -39,18 +39,45 @@ if ($MTR_MANUAL_DEBUG) {
 if ($wait_counter) {
   --let $counter= $wait_counter
 }
+
+--let $create_connection= 1
+if ($do_not_create_connection == 1) {
+  --let $create_connection= 0
+}
+
 --let $mysql_errno= 9999
 let $successes= 2;
 while ($successes) {
 while ($mysql_errno)
 {
+  if ($create_connection == 1) {
+    # Strangely enough, the server might return "Too many connections"
+    # while being shutdown, thus 1040 is an "allowed" error
+    # See BUG#36228
+    --error 0,ER_CON_COUNT_ERROR,1047,ER_SERVER_SHUTDOWN,1205,2002,2003,2006,2013,ER_ACCESS_DENIED_ERROR,ER_CANNOT_FIND_KEY_IN_KEYRING,ER_SECURE_TRANSPORT_REQUIRED,2016,2017,ER_CLIENT_INTERACTION_TIMEOUT
+    connect;
+  }
+  if ($create_connection == 0) {
+    # we are already connected, but queries still may be blocked
+    --let $mysql_errno= 0
+  }
 
-  # Strangely enough, the server might return "Too many connections"
-  # while being shutdown, thus 1040 is an "allowed" error
-  # See BUG#36228
-  --error 0,1040,1047,1053,1205,2002,2003,2006,2013,1045,ER_CANNOT_FIND_KEY_IN_KEYRING,ER_SECURE_TRANSPORT_REQUIRED,2016,2017,ER_CLIENT_INTERACTION_TIMEOUT
-  show session status;
-  if ($mysql_errno == 1045){
+  # Even after connection, the query may return CR_SERVER_LOST or ER_LOCK_WAIT_TIMEOUT
+  # Before commit 07277e9b we executed 'show session status' here, instead of connect
+  # so the above problem was handled in this loop.
+  # The 'select 1' below is to test if the server is able to handle queries. If not, continue trying.
+  # (Problem visible in galera_3nodes.galera_ist_only.test)
+  if ($mysql_errno == 0) {
+    # --echo Probably connected. Doing select 1
+    --error 0,1040,1047,1053,1205,2002,2003,2006,2013,1045,ER_CANNOT_FIND_KEY_IN_KEYRING,ER_SECURE_TRANSPORT_REQUIRED,2016,2017,ER_CLIENT_INTERACTION_TIMEOUT
+    select 1;
+    # --echo after select 1. mysql_errno: $mysql_errno
+    if ($mysql_errno == 1045){
+      --let mysql_errno=0
+    }
+  }
+  
+  if ($mysql_errname == ER_ACCESS_DENIED_ERROR){
     --let mysql_errno=0
   }
   if ($mysql_errname == ER_SECURE_TRANSPORT_REQUIRED){
@@ -73,7 +100,7 @@ while ($mysql_errno)
 if ($SECONDARY_ENGINE_TEST) {
   --let $secondary_engine_bootstrap = query_get_value($SECONDARY_ENGINE_BOOTSTRAP_QUERY, Value, 1)
   if ( $secondary_engine_bootstrap == ON ) {
-    --let $counter = 100
+    --let $counter = 300
     --let $secondary_engine_status = OFFLINE
 
     while ($secondary_engine_status == OFFLINE) {

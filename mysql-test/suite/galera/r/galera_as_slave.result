@@ -1,7 +1,6 @@
 # connection node_2
-START SLAVE USER='root';
+START REPLICA USER='root';
 Warnings:
-Warning	1287	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
 # connection node_1
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
@@ -23,16 +22,8 @@ DROP TABLE t1;
 # connection node_3
 # Restarting node 3 ...
 # restart
-SHOW SLAVE STATUS;
-Warnings:
-Level	Warning
-Code	1287
-Message	'SHOW SLAVE STATUS' is deprecated and will be removed in a future release. Please use SHOW REPLICA STATUS instead
+SHOW REPLICA STATUS;
 # connection node_2
-STOP SLAVE;
-Warnings:
-Warning	1287	'STOP SLAVE' is deprecated and will be removed in a future release. Please use STOP REPLICA instead
-RESET SLAVE ALL;
-Warnings:
-Warning	1287	'RESET SLAVE' is deprecated and will be removed in a future release. Please use RESET REPLICA instead
+STOP REPLICA;
+RESET REPLICA ALL;
 RESET BINARY LOGS AND GTIDS;

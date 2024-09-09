@@ -8,6 +8,6 @@ SET SESSION WSREP_ON=ON;
 SHOW BINARY LOGS;
 Log_name	File_size	Encrypted
 mysqld-bin.000001	158	No
-include/show_binlog_events.inc
+include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	#	Previous_gtids	#	#	

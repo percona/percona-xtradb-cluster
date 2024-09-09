@@ -35,7 +35,7 @@ COMMIT;
 --remove_files_wildcard $MYSQLTEST_VARDIR/mysqld.2/data/test *
 --remove_files_wildcard $MYSQLTEST_VARDIR/mysqld.2/data/mysql *
 --remove_files_wildcard $MYSQLTEST_VARDIR/mysqld.2/data/sys *
---remove_files_wildcard $MYSQLTEST_VARDIR/mysqld.2/data *
+--exec find $MYSQLTEST_VARDIR/mysqld.2/data -type f \! \( -name mysqld.my -o -name component_keyring_file.cnf \) -delete
 
 SET AUTOCOMMIT=OFF;
 START TRANSACTION;

@@ -1,15 +1,16 @@
-# Copyright (c) 2010, 2023, Oracle and/or its affiliates.
+# Copyright (c) 2010, 2024, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
 # as published by the Free Software Foundation.
 #
-# This program is also distributed with certain software (including
+# This program is designed to work with certain software (including
 # but not limited to OpenSSL) that is licensed under separate terms,
 # as designated in a particular file or component or in included license
 # documentation.  The authors of MySQL hereby grant you an additional
 # permission to link the program and your derivative works with the
-# separately licensed software that they have included with MySQL.
+# separately licensed software that they have either included with
+# the program or referenced in the documentation.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -133,6 +134,11 @@ IF(MY_COMPILER_IS_CLANG)
   IF(APPLE)
      STRING_APPEND(MY_CXX_WARNING_FLAGS " -Wno-deprecated-declarations")
      STRING_APPEND(MY_CXX_WARNING_FLAGS " -Wno-shorten-64-to-32")
+  ENDIF()
+
+  # Suppress warnings for clang-18 or newer
+  IF(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 18)
+    STRING_APPEND(MY_CXX_WARNING_FLAGS " -Wno-deprecated-declarations")
   ENDIF()
 
   STRING_APPEND(MY_CXX_WARNING_FLAGS " -Wextra-semi")

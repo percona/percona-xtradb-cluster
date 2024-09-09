@@ -18,7 +18,7 @@
 --disable_query_log
 --eval CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1', SOURCE_PORT=$NODE_MYPORT_1;
 --enable_query_log
-START SLAVE USER='root';
+START REPLICA USER='root';
 
 --connection node_1
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
@@ -33,7 +33,7 @@ SHOW BINARY LOGS;
 --let $binlog_file = mysqld-bin.000001
 --let $binlog_start = 125
 --let $keep_gtid_events = 1
---source include/show_binlog_events.inc
+--source include/rpl/deprecated/show_binlog_events.inc
 
 --connection node_2
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
@@ -49,7 +49,7 @@ SHOW BINARY LOGS;
 --let $binlog_file = mysqld-bin.000002
 --let $binlog_start = 125
 --let $keep_gtid_events = 1
---source include/show_binlog_events.inc
+--source include/rpl/deprecated/show_binlog_events.inc
 
 --connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
@@ -67,7 +67,7 @@ SELECT COUNT(*) = 1 FROM t1;
 --let $binlog_file = mysqld-bin.000004
 --let $binlog_start = 125
 --let $keep_gtid_events = 1
---source include/show_binlog_events.inc
+--source include/rpl/deprecated/show_binlog_events.inc
 
 --connection node_1
 DROP TABLE t1;
@@ -88,5 +88,5 @@ DROP TABLE t1;
 --let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 --source include/wait_condition.inc
 
-STOP SLAVE;
-RESET SLAVE ALL;
+STOP REPLICA;
+RESET REPLICA ALL;

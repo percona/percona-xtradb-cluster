@@ -5,7 +5,7 @@
 # The galera/galera_2node_slave.cnf describes the setup of the nodes
 #
 # async master
-# PXC node 2 and async slave
+# PXC node 2 and async replica
 # PXC node 3
 #
 # All nodes are configured the same:
@@ -14,7 +14,7 @@
 #	replicate-do-db=db1
 #
 # We are testing to see that nodes 2 and 3 (which are PXC nodes),
-# maintain consistency when the async slave node is using replication filters.
+# maintain consistency when the async replica node is using replication filters.
 #
 # Database 'db' is allowed by the filters but is meant for tracking the PXC cluster
 # Database 'db1' is allowed by the filter
@@ -51,10 +51,10 @@
 --source include/wait_condition.inc
 
 --disable_query_log
---echo # connection node_2 : starting async slave
+--echo # connection node_2 : starting async replica
 --eval CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1', SOURCE_PORT=$NODE_MYPORT_1;
 --enable_query_log
-START SLAVE USER='root';
+START REPLICA USER='root';
 
 #
 # Create a database called db to hold various test case tracking tables.
@@ -101,7 +101,7 @@ CREATE DATABASE dbx;
 #
 # The tests below involve async replication and galera replication.
 # The intent is to test the affect of replication filters on
-# galera replication (when a PXC node is acting as an async slave).
+# galera replication (when a PXC node is acting as an async replica).
 #
 #==============================================================
 
@@ -2892,7 +2892,7 @@ USE db; CREATE TABLE db1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
 #
 # SUMMARY: node_1:yes  node_2:yes  node_3:yes
 #
-USE db; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+USE db; CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
 
 --eval INSERT INTO db.counter(count) VALUES($test_id)
 
@@ -3292,7 +3292,7 @@ USE db; DROP USER "foo"@"%";
 #
 # SUMMARY: node_1:yes  node_2:no  node_3:no
 #
-USE dbx; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+USE dbx; CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
 
 --eval INSERT INTO db.counter(count) VALUES($test_id)
 
@@ -3328,7 +3328,7 @@ USE dbx; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
 --echo #
 --echo # connection node_2
 --connection node_2
-USE db; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+USE db; CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
 
 --let $assert_text = "User foo is on node_2"
 --let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE USER = "foo";
@@ -5999,7 +5999,7 @@ USE db; CREATE TABLE db1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
 #
 # SUMMARY: node_2:yes  node_3:yes
 #
-USE db; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+USE db; CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
 
 --eval INSERT INTO db.counter(count) VALUES($test_id)
 
@@ -6326,7 +6326,7 @@ USE db; DROP USER "foo"@"%";
 #
 # SUMMARY: node_2:yes  node_3:yes
 #
-USE dbx; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+USE dbx; CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
 
 --eval INSERT INTO db.counter(count) VALUES($test_id)
 
@@ -6655,8 +6655,8 @@ DROP DATABASE db1;
 
 --echo # connection node_2
 --connection node_2
-STOP SLAVE;
-RESET SLAVE ALL;
+STOP REPLICA;
+RESET REPLICA ALL;
 
 --echo # connection node_1
 --connection node_1
@@ -6669,10 +6669,10 @@ RESET BINARY LOGS AND GTIDS;
 CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1' FOR CHANNEL 'wsrep';
 
 --error ER_REPLICA_CHANNEL_OPERATION_NOT_ALLOWED
-START SLAVE FOR CHANNEL 'wsrep';
+START REPLICA FOR CHANNEL 'wsrep';
 
 --error ER_REPLICA_CHANNEL_OPERATION_NOT_ALLOWED
-STOP SLAVE FOR CHANNEL 'wsrep';
+STOP REPLICA FOR CHANNEL 'wsrep';
 
 --error ER_REPLICA_CHANNEL_OPERATION_NOT_ALLOWED
 SHOW RELAYLOG EVENTS FOR CHANNEL 'wsrep';
@@ -6681,10 +6681,10 @@ SHOW RELAYLOG EVENTS FOR CHANNEL 'wsrep';
 FLUSH RELAY LOGS FOR CHANNEL 'wsrep';
 
 --error ER_REPLICA_CHANNEL_OPERATION_NOT_ALLOWED
-SHOW SLAVE STATUS FOR CHANNEL 'wsrep';
+SHOW REPLICA STATUS FOR CHANNEL 'wsrep';
 
 --error ER_REPLICA_CHANNEL_OPERATION_NOT_ALLOWED
-RESET SLAVE FOR CHANNEL 'wsrep';
+RESET REPLICA FOR CHANNEL 'wsrep';
 
 --error ER_REPLICA_CHANNEL_OPERATION_NOT_ALLOWED
 CHANGE REPLICATION FILTER REPLICATE_DO_DB=(db1) FOR CHANNEL 'wsrep';
@@ -6698,10 +6698,10 @@ CHANGE REPLICATION FILTER REPLICATE_DO_DB=(db1) FOR CHANNEL 'wsrep';
 CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1' FOR CHANNEL 'wsrep';
 
 --error ER_REPLICA_CHANNEL_OPERATION_NOT_ALLOWED
-START SLAVE FOR CHANNEL 'wsrep';
+START REPLICA FOR CHANNEL 'wsrep';
 
 --error ER_REPLICA_CHANNEL_OPERATION_NOT_ALLOWED
-STOP SLAVE FOR CHANNEL 'wsrep';
+STOP REPLICA FOR CHANNEL 'wsrep';
 
 --error ER_REPLICA_CHANNEL_OPERATION_NOT_ALLOWED
 SHOW RELAYLOG EVENTS FOR CHANNEL 'wsrep';
@@ -6711,10 +6711,10 @@ SHOW RELAYLOG EVENTS FOR CHANNEL 'wsrep';
 #FLUSH RELAY LOGS FOR CHANNEL 'wsrep';
 
 --error ER_REPLICA_CHANNEL_OPERATION_NOT_ALLOWED
-SHOW SLAVE STATUS FOR CHANNEL 'wsrep';
+SHOW REPLICA STATUS FOR CHANNEL 'wsrep';
 
 --error ER_REPLICA_CHANNEL_OPERATION_NOT_ALLOWED
-RESET SLAVE FOR CHANNEL 'wsrep';
+RESET REPLICA FOR CHANNEL 'wsrep';
 
 #--error ER_REPLICA_CHANNEL_OPERATION_NOT_ALLOWED
 #CHANGE REPLICATION FILTER REPLICATE_DO_DB=(db1) FOR CHANNEL 'wsrep';

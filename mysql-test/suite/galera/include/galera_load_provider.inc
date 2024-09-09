@@ -9,6 +9,5 @@
 
 --enable_query_log
 
---enable_reconnect
 --source include/wait_until_connected_again.inc
 --source include/galera_wait_ready.inc

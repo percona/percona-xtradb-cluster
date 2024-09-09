@@ -20,6 +20,7 @@ class MasterKeyManager {
 
   bool GenerateKey(const std::string &keyId);
   std::string GetKey(const std::string &keyId);
+  bool IsServiceAlive();
 
  private:
   SERVICE_TYPE(keyring_reader_with_status) * keyring_reader_service_{nullptr};

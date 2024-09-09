@@ -36,13 +36,13 @@ GRANT ALL PRIVILEGES ON *.* TO 'user1'@'%' WITH GRANT OPTION;
 --let $binlog_position = 2283
 --let $limit = 1
 --let $event_sequence = .*GRANT ALL PRIVILEGES ON.*TO 'user2'.* WITH GRANT OPTION AS 'user1'.* WITH ROLE NONE.*
---source include/assert_binlog_events.inc
+--source include/rpl/assert_binlog_events.inc
 
 --let $binlog_file = mysqld-bin.000002
 --let $binlog_position = 2548
 --let $limit = 1
 --let $event_sequence = .*GRANT ALL PRIVILEGES ON.*TO 'user1'.* WITH GRANT OPTION AS 'user2'.* WITH ROLE 'writer'.*
---source include/assert_binlog_events.inc
+--source include/rpl/assert_binlog_events.inc
 
 --disconnect node_1b
 
@@ -51,13 +51,13 @@ GRANT ALL PRIVILEGES ON *.* TO 'user1'@'%' WITH GRANT OPTION;
 --let $binlog_position = 2299
 --let $limit = 1
 --let $event_sequence = .*GRANT ALL PRIVILEGES ON.*TO 'user2'.* WITH GRANT OPTION AS 'user1'.* WITH ROLE NONE.*
---source include/assert_binlog_events.inc
+--source include/rpl/assert_binlog_events.inc
 
 --let $binlog_file = mysqld-bin.000004
 --let $binlog_position = 2566
 --let $limit = 1
 --let $event_sequence = .*GRANT ALL PRIVILEGES ON.*TO 'user1'.* WITH GRANT OPTION AS 'user2'.* WITH ROLE 'writer'.*
---source include/assert_binlog_events.inc
+--source include/rpl/assert_binlog_events.inc
 
 --connection node_1
 DROP USER 'user1'@'%';

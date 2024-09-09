@@ -44,7 +44,7 @@ RESET BINARY LOGS AND GTIDS;
 # connection node_2
 SET GLOBAL innodb_lock_wait_timeout = @saved_innodb_lock_wait_timeout;
 SET GLOBAL replica_transaction_retries = @saved_replica_transaction_retries;
-include/stop_slave.inc
+include/rpl/stop_replica.inc
 RESET REPLICA ALL;
 # Add error supressions.
 CALL mtr.add_suppression("Pending to replicate MySQL GTID event");

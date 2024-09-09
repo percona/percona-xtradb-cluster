@@ -98,7 +98,17 @@ Mysqlx.Ok {
   msg: "bye!"
 }
 ok
-Application terminated with expected error: Capability prepare failed for 'tls' (code 5001)
+RUN SELECT CONNECTION_TYPE from performance_schema.threads where processlist_command='Query'
+CONNECTION_TYPE
+SSL/TLS
+0 rows affected
+RUN show status like 'Mysqlx_ssl_version'
+Variable_name	Value
+Mysqlx_ssl_version	TLSv1.3
+0 rows affected
+Mysqlx.Ok {
+  msg: "bye!"
+}
 ok
 RUN SET PASSWORD='set-new-auth'
 

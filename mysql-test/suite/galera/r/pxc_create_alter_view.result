@@ -6,7 +6,7 @@ GRANT SELECT, CREATE VIEW, SHOW VIEW, DROP ON test.* to u2@localhost;
 CREATE TABLE t1(i INT PRIMARY KEY, n VARCHAR(9));
 CREATE OR REPLACE VIEW v AS SELECT * FROM t1;
 ALTER DEFINER=u1@`localhost` VIEW v AS SELECT * FROM t1;
-ERROR 42000: Access denied; you need (at least one of) the SUPER, SET_USER_ID or SET_ANY_DEFINER privilege(s) for this operation
+ERROR 42000: Access denied; you need (at least one of) the SUPER or SET_ANY_DEFINER privilege(s) for this operation
 DROP VIEW v;
 DROP TABLE t1;
 DROP USER u1@localhost;

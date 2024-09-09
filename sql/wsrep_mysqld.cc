@@ -3291,8 +3291,7 @@ int wsrep_ignored_error_code(Log_event *ev, int error) {
 
   if ((wsrep_ignore_apply_errors & WSREP_IGNORE_ERRORS_ON_RECONCILING_DML)) {
     const int ev_type = ev->get_type_code();
-    if ((ev_type == mysql::binlog::event::DELETE_ROWS_EVENT ||
-         ev_type == mysql::binlog::event::DELETE_ROWS_EVENT_V1) &&
+    if (ev_type == mysql::binlog::event::DELETE_ROWS_EVENT &&
         error == ER_KEY_NOT_FOUND)
       goto ignore_error;
   }
@@ -3379,6 +3378,12 @@ bool wsrep_rotate_master_key() {
   return (wsrep::provider::status::success != provider.rotate_gcache_key());
 }
 
+bool wsrep_keyring_component_loaded() {
+  if (masterKeyManager) {
+    return masterKeyManager->IsServiceAlive();
+  }
+  return false;
+}
 bool wsrep_should_replicate_for_table(Table_ref * table_ref) {
   if (!table_ref) return false;
 

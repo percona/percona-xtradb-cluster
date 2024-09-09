@@ -72,7 +72,7 @@ DROP TABLE t1;
 DROP TABLE tpart;
 
 --echo # Scenario 5 : Try to rename a column which is referenced in other table
-CREATE TABLE t1 (c1 INT PRIMARY KEY, c2 INT, c3 INT,  INDEX(c2));
+CREATE TABLE t1 (c1 INT PRIMARY KEY, c2 INT, c3 INT,  UNIQUE INDEX(c2));
 CREATE TABLE t1c (c1 INT PRIMARY KEY, c2 INT,
                   CONSTRAINT t1c1 FOREIGN KEY (c2) REFERENCES t1(c2));
 

@@ -94,7 +94,7 @@ INSERT INTO aliases(name) VALUES
 # 5. wsrep_replicate_myisam
 # 6. wsrep_restart_replica
 --echo
---let $expected = 120
+--let $expected = 119
 --let $assert_text = Expect $expected variables in the table.
 --let $assert_cond = [SELECT COUNT(*) as count FROM rplvars, count, 1] = $expected
 --source include/assert.inc
@@ -139,7 +139,7 @@ while ( $varid <= $countvars )
 # 8. wsrep_applier_UK_checks
 # 9. wsrep_applier_FK_checks
 --echo
---let $expected = 110
+--let $expected = 109
 --let $assert_text = Expect $expected persisted variables in persisted_variables table.
 --let $assert_cond = [SELECT COUNT(*) as count FROM performance_schema.persisted_variables, count, 1] = $expected
 --source include/assert.inc

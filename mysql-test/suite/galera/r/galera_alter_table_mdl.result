@@ -15,7 +15,7 @@ SET DEBUG_SYNC = 'RESET';
 SELECT * FROM t1;
 a
 10
-include/assert_binlog_events.inc [Anonymous_Gtid # Query/.*CREATE TABLE.* # Anonymous_Gtid # Query/.*ALTER TABLE.* # Anonymous_Gtid # Query/.*BEGIN # Table_map # Write_rows # Xid]
+include/rpl/assert_binlog_events.inc [Anonymous_Gtid # Query/.*CREATE TABLE.* # Anonymous_Gtid # Query/.*ALTER TABLE.* # Anonymous_Gtid # Query/.*BEGIN # Table_map # Write_rows # Xid]
 # --------------------------------
 # Test 2: Execute ALTER TABLE on node1 (Local)
 # --------------------------------
@@ -31,7 +31,7 @@ SELECT * FROM t1;
 a
 10
 11
-include/assert_binlog_events.inc [Anonymous_Gtid # Query/.*ALTER TABLE.* # Anonymous_Gtid # Query/.*BEGIN # Table_map # Write_rows # Xid]
+include/rpl/assert_binlog_events.inc [Anonymous_Gtid # Query/.*ALTER TABLE.* # Anonymous_Gtid # Query/.*BEGIN # Table_map # Write_rows # Xid]
 # --------------------------------
 # Test 3: Testing with wsrep_OSU_method = "RSU"
 # --------------------------------

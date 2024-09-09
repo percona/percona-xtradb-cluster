@@ -10,12 +10,18 @@ ssl-dhparams=@ENV.MYSQL_TEST_DIR/std_data/dhparams.pem
 
 [mysqld.1]
 wsrep_provider_options='base_port=@mysqld.1.#galera_port;pc.ignore_sb=true'
-early_plugin_load=@ENV.KEYRING_PLUGIN
-keyring_file_data=@ENV.MYSQL_TMP_DIR/mysqld.1/keyring.1
 server_id=1
+#!run-suite-setup-sh
 
+# Why do we need to set repl.causal_read_timeout?
+# The default timeout is 30s. The test will trigger long IST on node_2.
+# Just after starting node_2 the test will wait for SELECT condition. Because of wsrep_sync_wait=0xF, the select will block with
+# 30s timeout. It is not enough to finish IST. If the SELECT fails, the test fails.
+# It didn't fail before upstream commit 07277e9b, wait_until_connected_again.inc executed 'show session status' in the loop.
+# The statement failed once per 30sec, so the actual wait_until_connected_again.inc timeout was much longer than default 60s
+# so the test worked fine.
 [mysqld.2]
-wsrep_provider_options='base_port=@mysqld.2.#galera_port;pc.ignore_sb=true'
-early_plugin_load=@ENV.KEYRING_PLUGIN
-keyring_file_data=@ENV.MYSQL_TMP_DIR/mysqld.2/keyring.2
+wsrep_provider_options='base_port=@mysqld.2.#galera_port;pc.ignore_sb=true;repl.causal_read_timeout=PT10M'
 server_id=2
+#!run-suite-setup-sh
+

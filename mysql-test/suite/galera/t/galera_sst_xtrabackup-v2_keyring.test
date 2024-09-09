@@ -18,8 +18,8 @@ CALL mtr.add_suppression("Failed to remove page file");
 # Force a restart at the end of the test
 --source include/force_restart.inc
 
---let $assert_text = Keyring plugin requires SST encryption
---let $assert_select = You have enabled keyring plugin. SST encryption is mandatory.
+--let $assert_text = Keyring component requires SST encryption
+--let $assert_select = You have enabled keyring component. SST encryption is mandatory.
 --let $assert_count = 1
 --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
 --let $assert_only_after = CURRENT_TEST
@@ -71,7 +71,7 @@ select * from e1;
 --source include/kill_galera.inc
 
 # Generate a new master key that will be missing on node_2 and simulate a .backup without the new key
---exec mv $MYSQL_TMP_DIR/mysqld.2/keyring.2 $MYSQL_TMP_DIR/mysqld.2/keyring.2.backup
+--exec mv $MYSQL_TMP_DIR/mysqld.2/component_keyring_file $MYSQL_TMP_DIR/mysqld.2/component_keyring_file.backup
 --connection node_1
 
 ALTER INSTANCE ROTATE INNODB MASTER KEY;

@@ -39,7 +39,7 @@ SET wsrep_on=ON;
 
 --connection node_2
 --disable_query_log
---eval CHANGE MASTER TO MASTER_HOST='127.0.0.1', MASTER_PORT=$NODE_MYPORT_1;
+--eval CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1', SOURCE_PORT=$NODE_MYPORT_1;
 CHANGE REPLICATION FILTER REPLICATE_DO_DB=(master_replicated_db);
 --enable_query_log
 START REPLICA USER='root';
@@ -140,7 +140,7 @@ SET wsrep_on=ON;
 
 --connection node_2
 --disable_query_log
---eval CHANGE MASTER TO MASTER_HOST='127.0.0.1', MASTER_PORT=$NODE_MYPORT_1;
+--eval CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1', SOURCE_PORT=$NODE_MYPORT_1;
 # We need to clear REPLICATE_DO_DB
 CHANGE REPLICATION FILTER REPLICATE_DO_DB=(),
                           REPLICATE_DO_TABLE=(test.master_replicated_table);
@@ -237,7 +237,7 @@ SET wsrep_on=ON;
 
 --connection node_2
 --disable_query_log
---eval CHANGE MASTER TO MASTER_HOST='127.0.0.1', MASTER_PORT=$NODE_MYPORT_1;
+--eval CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1', SOURCE_PORT=$NODE_MYPORT_1;
 CHANGE REPLICATION FILTER REPLICATE_DO_DB=(), REPLICATE_DO_TABLE=();
 --enable_query_log
 START REPLICA USER='root';

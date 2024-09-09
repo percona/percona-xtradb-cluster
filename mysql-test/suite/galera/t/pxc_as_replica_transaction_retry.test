@@ -93,7 +93,7 @@ RESET BINARY LOGS AND GTIDS;
 
 SET GLOBAL innodb_lock_wait_timeout = @saved_innodb_lock_wait_timeout;
 SET GLOBAL replica_transaction_retries = @saved_replica_transaction_retries;
---source include/stop_slave.inc
+--source include/rpl/stop_replica.inc
 RESET REPLICA ALL;
 
 --echo # Add error supressions.

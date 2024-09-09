@@ -2,7 +2,8 @@
 
 [mysqld]
 replicate-wild-do-table=db.%
-default-authentication-plugin=mysql_native_password
+# This feeature is deprecated and will be removed in the future -> test will need to be rewritten
+mysql_native_password=ON
 wsrep_mode = IGNORE_NATIVE_REPLICATION_FILTER_RULES
 
 [mysqld.2]

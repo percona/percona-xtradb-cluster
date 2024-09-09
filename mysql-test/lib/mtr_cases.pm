@@ -1,16 +1,17 @@
 # -*- cperl -*-
-# Copyright (c) 2005, 2023, Oracle and/or its affiliates.
+# Copyright (c) 2005, 2024, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
 # as published by the Free Software Foundation.
 #
-# This program is also distributed with certain software (including
+# This program is designed to work with certain software (including
 # but not limited to OpenSSL) that is licensed under separate terms,
 # as designated in a particular file or component or in included license
 # documentation.  The authors of MySQL hereby grant you an additional
 # permission to link the program and your derivative works with the
-# separately licensed software that they have included with MySQL.
+# separately licensed software that they have either included with
+# the program or referenced in the documentation.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -972,7 +973,9 @@ sub collect_one_suite($$$) {
   if (-f $suite_opt_file) {
     $suite_opts = opts_from_file($suite_opt_file);
   }
-
+  # Read suite-setup.sh and suite-teardown.sh
+  my $suite_setup_file = "$testdir/suite-setup.sh";
+  
   if (@$opt_cases) {
     # Collect in specified order
     foreach my $test_name_spec (@$opt_cases) {
@@ -1004,7 +1007,7 @@ sub collect_one_suite($$$) {
            collect_one_test_case($suitedir, $testdir,
                                  $resdir,   $suite,
                                  $tname,    "$tname.$extension",
-                                 $disabled, $suite_opts
+                                 $disabled, $suite_opts, $suite_setup_file
            ));
     }
   } else {
@@ -1020,7 +1023,7 @@ sub collect_one_suite($$$) {
       push(@cases,
            collect_one_test_case($suitedir, $testdir, $resdir,
                                  $suite,    $tname,   $elem,
-                                 $disabled, $suite_opts
+                                 $disabled, $suite_opts, $suite_setup_file
            ));
     }
     closedir TESTDIR;
@@ -1288,6 +1291,7 @@ sub collect_one_test_case {
   my $filename   = shift;
   my $disabled   = shift;
   my $suite_opts = shift;
+  my $suite_setup_file = shift;
 
   # Test file name should consist of only alpha-numeric characters, dash (-)
   # or underscore (_), but should not start with dash or underscore or hash.
@@ -1405,6 +1409,10 @@ sub collect_one_test_case {
     } else {
       $tinfo->{'slave_sh'} = $slave_sh;
     }
+  }
+
+  if (-f $suite_setup_file) {
+    $tinfo->{'suite_setup_sh'} = $suite_setup_file;
   }
 
   # <tname>.slave-mi
@@ -1664,12 +1672,12 @@ my @tags = (
   [ "include/ndb_no_result_file.inc", "ndb_no_result_file_test", 1 ],
 
   # The tests with below four .inc files are considered to be rpl tests.
-  [ "include/rpl_init.inc",    "rpl_test", 1 ],
-  [ "include/rpl_ip_mix.inc",  "rpl_test", 1 ],
-  [ "include/rpl_ip_mix2.inc", "rpl_test", 1 ],
-  [ "include/rpl_ipv6.inc",    "rpl_test", 1 ],
+  [ "include/rpl/init.inc",    "rpl_test", 1 ],
+  [ "common/rpl/ip_mix.inc",  "rpl_test", 1 ],
+  [ "common/rpl/ip_mix2.inc", "rpl_test", 1 ],
+  [ "common/rpl/ipv6.inc",    "rpl_test", 1 ],
 
-  [ "include/ndb_master-slave.inc", "ndb_test",       1 ],
+  [ "include/ndb_rpl_init_source_replica.inc", "ndb_test",       1 ],
   [ "federated.inc",                "federated_test", 1 ],
   [ "include/not_windows.inc",      "not_windows",    1 ],
   [ "include/not_parallel.inc",     "not_parallel",   1 ],

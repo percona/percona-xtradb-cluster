@@ -22,6 +22,7 @@
 
 --source include/have_debug.inc
 --source include/have_debug_sync.inc
+--source include/not_parallel.inc
 
 --echo #
 --echo # 1. Create a two node cluster.
@@ -56,8 +57,11 @@ SHOW STATUS LIKE 'wsrep_flow_control_interval';
 # Set the evs.inactive_timeout to ensure that the node will shutdown 6
 # seconds after it is killed. This is set to 6 seconds because
 # evs.inactive_timeout > evs.suspect_timeout (PT5S)
+--exec `chmod +x "$MYSQLTEST_VARDIR/std_data/sst_garbd_test.sh"`
+--let $ssl_opts=cafile=$MYSQLTEST_VARDIR/std_data/cacert.pem,cert=$MYSQLTEST_VARDIR/std_data/server-cert.pem,key=$MYSQLTEST_VARDIR/std_data/server-key.pem
+
 --let $command = "$GALERA_GARBD"
---let $command_opt = --sst="xtrabackup-v2:127.0.0.1:9999/xtrabackup_sst//1" --donor node1 --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'evs.inactive_timeout=PT6S;base_port=$NODE_GALERAPORT_2' > $GARBD_LOG_FILE 2>&1
+--let $command_opt = --sst="xtrabackup-v2:127.0.0.1:9999/xtrabackup_sst//1" --recv-script="$MYSQLTEST_VARDIR/std_data/sst_garbd_test.sh 9999 $ssl_opts 0 0" --donor node1 --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'evs.inactive_timeout=PT6S;base_port=$NODE_GALERAPORT_2' > $GARBD_LOG_FILE 2>&1
 --source include/start_proc_in_background.inc
 
 --connection node_1
@@ -105,7 +109,7 @@ SET DEBUG_SYNC='now wait_for read_xid';
 
 --echo #
 --echo # 7. Verify that the reason for the shutdown is logged in the garbd log.
---let $assert_select= Transport endpoint is not connected
+--let $assert_select= Donor is no longer in the cluster, interrupting script
 --let $assert_text= Appropriate message has been written to the garbd log explaining the reason for the shutdown.
 --let $assert_count= 1
 --let $assert_file= $GARBD_LOG_FILE

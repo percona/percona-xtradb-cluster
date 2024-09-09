@@ -2,10 +2,6 @@ RESET BINARY LOGS AND GTIDS;
 SET wsrep_on=OFF;
 RESET BINARY LOGS AND GTIDS;
 SET wsrep_on=ON;
-Warnings:
-Warning	1287	'CHANGE MASTER' is deprecated and will be removed in a future release. Please use CHANGE REPLICATION SOURCE instead
-Warning	1287	'MASTER_HOST' is deprecated and will be removed in a future release. Please use SOURCE_HOST instead
-Warning	1287	'MASTER_PORT' is deprecated and will be removed in a future release. Please use SOURCE_PORT instead
 START REPLICA USER='root';
 Warnings:
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
@@ -42,10 +38,6 @@ RESET BINARY LOGS AND GTIDS;
 SET wsrep_on=OFF;
 RESET BINARY LOGS AND GTIDS;
 SET wsrep_on=ON;
-Warnings:
-Warning	1287	'CHANGE MASTER' is deprecated and will be removed in a future release. Please use CHANGE REPLICATION SOURCE instead
-Warning	1287	'MASTER_HOST' is deprecated and will be removed in a future release. Please use SOURCE_HOST instead
-Warning	1287	'MASTER_PORT' is deprecated and will be removed in a future release. Please use SOURCE_PORT instead
 START REPLICA USER='root';
 Warnings:
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
@@ -75,10 +67,6 @@ RESET BINARY LOGS AND GTIDS;
 SET wsrep_on=OFF;
 RESET BINARY LOGS AND GTIDS;
 SET wsrep_on=ON;
-Warnings:
-Warning	1287	'CHANGE MASTER' is deprecated and will be removed in a future release. Please use CHANGE REPLICATION SOURCE instead
-Warning	1287	'MASTER_HOST' is deprecated and will be removed in a future release. Please use SOURCE_HOST instead
-Warning	1287	'MASTER_PORT' is deprecated and will be removed in a future release. Please use SOURCE_PORT instead
 START REPLICA USER='root';
 Warnings:
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.

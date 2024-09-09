@@ -1,6 +1,5 @@
-START SLAVE USER='root';
+START REPLICA USER='root';
 Warnings:
-Warning	1287	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
 SET SESSION binlog_format='STATEMENT';
 Warnings:
@@ -88,12 +87,8 @@ SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM performance_schema.
 @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_index') + 1
 1
 DROP TABLE t1;
-STOP SLAVE;
-Warnings:
-Warning	1287	'STOP SLAVE' is deprecated and will be removed in a future release. Please use STOP REPLICA instead
-RESET SLAVE ALL;
-Warnings:
-Warning	1287	'RESET SLAVE' is deprecated and will be removed in a future release. Please use RESET REPLICA instead
+STOP REPLICA;
+RESET REPLICA ALL;
 SET GLOBAL binlog_format='ROW';
 Warnings:
 Warning	1287	'@@binlog_format' is deprecated and will be removed in a future release.

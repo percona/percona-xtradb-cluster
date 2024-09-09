@@ -1,7 +1,6 @@
-# connection node_2 : starting async slave
-START SLAVE USER='root';
+# connection node_2 : starting async replica
+START REPLICA USER='root';
 Warnings:
-Warning	1287	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
 #
 # Test preparation
@@ -748,7 +747,7 @@ include/assert.inc ['db1.t1 is on node_2']
 #
 # connection node_1
 USE db;
-CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
 INSERT INTO db.counter(count) VALUES(45);
 # connection node_2
 include/assert.inc ["User foo is on node_2"]
@@ -843,7 +842,7 @@ include/assert.inc ["User foo is not on node_3"]
 #
 # connection node_1
 USE dbx;
-CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
 INSERT INTO db.counter(count) VALUES(53);
 include/assert.inc ["User foo is on node_1"]
 # connection node_2
@@ -855,7 +854,7 @@ include/assert.inc ["User foo is not on node_3"]
 #
 # connection node_2
 USE db;
-CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
 include/assert.inc ["User foo is on node_2"]
 # connection node_3
 include/assert.inc ["User foo is on node_3"]
@@ -1568,7 +1567,7 @@ include/assert.inc ['db1.t1 is on node_3']
 #
 # connection node_2
 USE db;
-CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
 INSERT INTO db.counter(count) VALUES(105);
 include/assert.inc ["User foo is on node_2"]
 # connection node_3
@@ -1649,7 +1648,7 @@ include/assert.inc ["User foo is not on node_3"]
 #
 # connection node_2
 USE dbx;
-CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
 INSERT INTO db.counter(count) VALUES(113);
 include/assert.inc ["User foo is on node_2"]
 # connection node_3
@@ -1736,42 +1735,38 @@ include/assert.inc ['db1 is not on node_3']
 # Overall cleanup
 #
 # connection node_2
-STOP SLAVE;
-Warnings:
-Warning	1287	'STOP SLAVE' is deprecated and will be removed in a future release. Please use STOP REPLICA instead
-RESET SLAVE ALL;
-Warnings:
-Warning	1287	'RESET SLAVE' is deprecated and will be removed in a future release. Please use RESET REPLICA instead
+STOP REPLICA;
+RESET REPLICA ALL;
 # connection node_1
 RESET BINARY LOGS AND GTIDS;
 CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1' FOR CHANNEL 'wsrep';
 ERROR HY000: CHANGE MASTER with the given parameters cannot be performed on channel 'wsrep'.
-START SLAVE FOR CHANNEL 'wsrep';
-ERROR HY000: START SLAVE FOR CHANNEL cannot be performed on channel 'wsrep'.
-STOP SLAVE FOR CHANNEL 'wsrep';
-ERROR HY000: STOP SLAVE FOR CHANNEL cannot be performed on channel 'wsrep'.
+START REPLICA FOR CHANNEL 'wsrep';
+ERROR HY000: START REPLICA FOR CHANNEL cannot be performed on channel 'wsrep'.
+STOP REPLICA FOR CHANNEL 'wsrep';
+ERROR HY000: STOP REPLICA FOR CHANNEL cannot be performed on channel 'wsrep'.
 SHOW RELAYLOG EVENTS FOR CHANNEL 'wsrep';
 ERROR HY000: SHOW RELAYLOG EVENTS cannot be performed on channel 'wsrep'.
 FLUSH RELAY LOGS FOR CHANNEL 'wsrep';
 ERROR HY000: FLUSH RELAY LOGS cannot be performed on channel 'wsrep'.
-SHOW SLAVE STATUS FOR CHANNEL 'wsrep';
+SHOW REPLICA STATUS FOR CHANNEL 'wsrep';
 ERROR HY000: SHOW SLAVE STATUS cannot be performed on channel 'wsrep'.
-RESET SLAVE FOR CHANNEL 'wsrep';
+RESET REPLICA FOR CHANNEL 'wsrep';
 ERROR HY000: RESET SLAVE [ALL] FOR CHANNEL cannot be performed on channel 'wsrep'.
 CHANGE REPLICATION FILTER REPLICATE_DO_DB=(db1) FOR CHANNEL 'wsrep';
 ERROR HY000: CHANGE REPLICATION FILTER cannot be performed on channel 'wsrep'.
 #node-2 (cluster node)
 CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1' FOR CHANNEL 'wsrep';
 ERROR HY000: CHANGE MASTER with the given parameters cannot be performed on channel 'wsrep'.
-START SLAVE FOR CHANNEL 'wsrep';
-ERROR HY000: START SLAVE FOR CHANNEL cannot be performed on channel 'wsrep'.
-STOP SLAVE FOR CHANNEL 'wsrep';
-ERROR HY000: STOP SLAVE FOR CHANNEL cannot be performed on channel 'wsrep'.
+START REPLICA FOR CHANNEL 'wsrep';
+ERROR HY000: START REPLICA FOR CHANNEL cannot be performed on channel 'wsrep'.
+STOP REPLICA FOR CHANNEL 'wsrep';
+ERROR HY000: STOP REPLICA FOR CHANNEL cannot be performed on channel 'wsrep'.
 SHOW RELAYLOG EVENTS FOR CHANNEL 'wsrep';
 ERROR HY000: SHOW RELAYLOG EVENTS cannot be performed on channel 'wsrep'.
-SHOW SLAVE STATUS FOR CHANNEL 'wsrep';
+SHOW REPLICA STATUS FOR CHANNEL 'wsrep';
 ERROR HY000: SHOW SLAVE STATUS cannot be performed on channel 'wsrep'.
-RESET SLAVE FOR CHANNEL 'wsrep';
+RESET REPLICA FOR CHANNEL 'wsrep';
 ERROR HY000: RESET SLAVE [ALL] FOR CHANNEL cannot be performed on channel 'wsrep'.
 call mtr.add_suppression("Pending to replicate MySQL GTID event.*");
 call mtr.add_suppression("Pending to replicate MySQL GTID event.*");

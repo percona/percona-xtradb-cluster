@@ -7,10 +7,10 @@
 # Additionally check that such statements generate cluster gtid instead of local gtid.
 
 --source include/galera_cluster.inc
---source include/gtid_utils.inc
+--source include/rpl/gtid_utils.inc
 
 --connection node_1
---source include/gtid_step_reset.inc
+--source include/rpl/gtid_step_reset.inc
 DROP DATABASE IF EXISTS db1;
 DROP TABLE IF EXISTS t1;
 DROP VIEW IF EXISTS v1;
@@ -19,7 +19,7 @@ DROP EVENT IF EXISTS ev1;
 # check that GTID is advanced by 4
 --let $gtid_step_count = 4
 --let $gtid_step_uuid = `SELECT Variable_value FROM performance_schema.global_status WHERE Variable_name='wsrep_cluster_state_uuid'`
---source include/gtid_step_assert.inc
+--source include/rpl/gtid_step_assert.inc
 
 --let $gtid_executed_node_1_end = `SELECT @@global.gtid_executed;`
 
@@ -27,4 +27,4 @@ DROP EVENT IF EXISTS ev1;
 --let $gtid_executed_node_2_end = `SELECT @@global.gtid_executed;`
 --assert($gtid_executed_node_1_end == $gtid_executed_node_2_end)
 
---source include/gtid_utils_end.inc
+--source include/rpl/gtid_utils_end.inc

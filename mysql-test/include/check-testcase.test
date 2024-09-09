@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2013, 2023, Oracle and/or its affiliates.
+# Copyright (c) 2013, 2024, Oracle and/or its affiliates.
 #
 
 # ==== Purpose ====
@@ -11,7 +11,15 @@
 # not have any unwanted side affects.
 
 # ---- WITH_WSREP
+# This tries to open additional connection, but it causes 
+# perfschema.no_threads and main.no-threads tests to hang as mysqltest
+# already opened the connection. We have to ensure that client is able
+# to do queries, so the connection is really established, that's why we
+# inform wait_until_connected_again.inc to skip connecting and only
+# validate if queries can be done.
+--let $do_not_create_connection=1
 --source include/wait_until_connected_again.inc
+--let $do_not_create_connection=0
 
 --disable_query_log
 --let $wsrep_provider_loaded = `SELECT COUNT(*) = 1 FROM performance_schema.global_variables WHERE VARIABLE_NAME LIKE 'wsrep_provider' AND VARIABLE_VALUE NOT LIKE 'none'`

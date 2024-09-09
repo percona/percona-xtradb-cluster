@@ -1,5 +1,3 @@
-START SLAVE USER='root';
+START REPLICA USER='root';
 ERROR HY000: bad configuration no log_slave_updates defined, slave would not replicate further to wsrep cluster
-RESET SLAVE ALL;
-Warnings:
-Warning	1287	'RESET SLAVE' is deprecated and will be removed in a future release. Please use RESET REPLICA instead
+RESET REPLICA ALL;

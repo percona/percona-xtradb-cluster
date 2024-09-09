@@ -13,14 +13,14 @@
 CREATE TABLE t1(i INT PRIMARY KEY);
 
 # Save binlog positions
---let $node1_file= query_get_value(SHOW MASTER STATUS,File,1)
---let $node1_pos= query_get_value(SHOW MASTER STATUS,Position,1)
+--let $node1_file= query_get_value(SHOW BINARY LOG STATUS,File,1)
+--let $node1_pos= query_get_value(SHOW BINARY LOG STATUS,Position,1)
 
 --connection node_2
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 --source include/wait_condition.inc
---let $node2_file= query_get_value(SHOW MASTER STATUS,File,1)
---let $node2_pos= query_get_value(SHOW MASTER STATUS,Position,1)
+--let $node2_file= query_get_value(SHOW BINARY LOG STATUS,File,1)
+--let $node2_pos= query_get_value(SHOW BINARY LOG STATUS,Position,1)
 
 --echo #
 --echo # Run ALTER TABLE in NBO mode and verify that it is logged with a proper GTID.
@@ -34,7 +34,7 @@ SET SESSION wsrep_OSU_method=default;
 --let $binlog_start=$node1_pos
 --let $keep_gtid_events=1
 --let $show_binlog_events_mask_columns=1,2,4,5
---source include/show_binlog_events.inc
+--source include/rpl/deprecated/show_binlog_events.inc
 
 --let $cluster_uuid=`SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='wsrep_cluster_state_uuid'`
 
@@ -42,22 +42,22 @@ SET SESSION wsrep_OSU_method=default;
 --let $event_sequence= Gtid/.*$cluster_uuid.* # Query/.*ALTER TABLE.*
 --let $binlog_position=$node1_pos
 --let $include_silent=1
---source include/assert_binlog_events.inc
---echo include/assert_binlog_events.inc [Gtid/.*CLUSTER_UUID.* # Query/.*ALTER TABLE.*]
+--source include/rpl/assert_binlog_events.inc
+--echo include/rpl/assert_binlog_events.inc [Gtid/.*CLUSTER_UUID.* # Query/.*ALTER TABLE.*]
 --let $include_silent=0
 
 --connection node_2
 --let $binlog_file=$node2_file
 --let $binlog_start=$node2_pos
 --let $keep_gtid_events=1
---source include/show_binlog_events.inc
+--source include/rpl/deprecated/show_binlog_events.inc
 
 # Assert that NBO query is logged as normal DDLs with cluster_uuid gtid on the remote node
 --let $event_sequence= Gtid/.*$cluster_uuid.* # Query/.*ALTER TABLE.*
 --let $binlog_position=$node2_pos
 --let $include_silent=1
---source include/assert_binlog_events.inc
---echo include/assert_binlog_events.inc [Gtid/.*CLUSTER_UUID.* # Query/.*ALTER TABLE.*]
+--source include/rpl/assert_binlog_events.inc
+--echo include/rpl/assert_binlog_events.inc [Gtid/.*CLUSTER_UUID.* # Query/.*ALTER TABLE.*]
 --let $include_silent=0
 
 --echo #
@@ -100,15 +100,15 @@ SET SESSION wsrep_OSU_method=default;
 
 # Assert that binlog rotation was successful
 --connection node_1
---let $node1_file_before= query_get_value(SHOW MASTER STATUS,File,1)
+--let $node1_file_before= query_get_value(SHOW BINARY LOG STATUS,File,1)
 FLUSH BINARY LOGS;
---let $node1_file_after= query_get_value(SHOW MASTER STATUS,File,1)
+--let $node1_file_after= query_get_value(SHOW BINARY LOG STATUS,File,1)
 --assert(`SELECT '$node1_file_before' <> '$node1_file_after'`)
 
 --connection node_2
---let $node2_file_before= query_get_value(SHOW MASTER STATUS,File,1)
+--let $node2_file_before= query_get_value(SHOW BINARY LOG STATUS,File,1)
 FLUSH BINARY LOGS;
---let $node2_file_after= query_get_value(SHOW MASTER STATUS,File,1)
+--let $node2_file_after= query_get_value(SHOW BINARY LOG STATUS,File,1)
 --assert(`SELECT '$node2_file_before' <> '$node2_file_after'`)
 
 # Add test suppressions

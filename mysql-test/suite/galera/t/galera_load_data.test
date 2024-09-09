@@ -43,7 +43,7 @@ RESET BINARY LOGS AND GTIDS;
 --let $binlog_file = mysqld-bin.000001
 --let $binlog_start = 125
 --let $keep_gtid_events = 1
---source include/show_binlog_events.inc
+--source include/rpl/deprecated/show_binlog_events.inc
 
 #
 # One line loaded, so less than the wsrep-load-data-splitting value
@@ -97,13 +97,13 @@ SELECT COUNT(*) = 1 FROM t1;
 --let $binlog_file = mysqld-bin.000001
 --let $binlog_start = 125
 --let $keep_gtid_events = 1
---source include/show_binlog_events.inc
+--source include/rpl/deprecated/show_binlog_events.inc
 
 --connection node_2
 --let $binlog_file = mysqld-bin.000001
 --let $binlog_start = 125
 --let $keep_gtid_events = 1
---source include/show_binlog_events.inc
+--source include/rpl/deprecated/show_binlog_events.inc
 
 --connection node_1
 TRUNCATE TABLE t1;
@@ -143,7 +143,7 @@ SELECT COUNT(*) = 0 FROM t1;
 --let $binlog_file = mysqld-bin.000001
 --let $binlog_start = 125
 --let $keep_gtid_events = 1
---source include/show_binlog_events.inc
+--source include/rpl/deprecated/show_binlog_events.inc
 
 --connection node_1
 DROP TABLE t1;

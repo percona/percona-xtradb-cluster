@@ -9,10 +9,10 @@ GRANT USAGE ON *.* TO 'user2'@'%' WITH GRANT OPTION;
 GRANT ALL PRIVILEGES ON *.* TO 'user2'@'%' WITH GRANT OPTION ;
 SET ROLE 'writer';
 GRANT ALL PRIVILEGES ON *.* TO 'user1'@'%' WITH GRANT OPTION;
-include/assert_binlog_events.inc [.*GRANT ALL PRIVILEGES ON.*TO 'user2'.* WITH GRANT OPTION AS 'user1'.* WITH ROLE NONE.*]
-include/assert_binlog_events.inc [.*GRANT ALL PRIVILEGES ON.*TO 'user1'.* WITH GRANT OPTION AS 'user2'.* WITH ROLE 'writer'.*]
-include/assert_binlog_events.inc [.*GRANT ALL PRIVILEGES ON.*TO 'user2'.* WITH GRANT OPTION AS 'user1'.* WITH ROLE NONE.*]
-include/assert_binlog_events.inc [.*GRANT ALL PRIVILEGES ON.*TO 'user1'.* WITH GRANT OPTION AS 'user2'.* WITH ROLE 'writer'.*]
+include/rpl/assert_binlog_events.inc [.*GRANT ALL PRIVILEGES ON.*TO 'user2'.* WITH GRANT OPTION AS 'user1'.* WITH ROLE NONE.*]
+include/rpl/assert_binlog_events.inc [.*GRANT ALL PRIVILEGES ON.*TO 'user1'.* WITH GRANT OPTION AS 'user2'.* WITH ROLE 'writer'.*]
+include/rpl/assert_binlog_events.inc [.*GRANT ALL PRIVILEGES ON.*TO 'user2'.* WITH GRANT OPTION AS 'user1'.* WITH ROLE NONE.*]
+include/rpl/assert_binlog_events.inc [.*GRANT ALL PRIVILEGES ON.*TO 'user1'.* WITH GRANT OPTION AS 'user2'.* WITH ROLE 'writer'.*]
 DROP USER 'user1'@'%';
 DROP USER 'user2'@'%';
 DROP ROLE 'reader', 'writer';

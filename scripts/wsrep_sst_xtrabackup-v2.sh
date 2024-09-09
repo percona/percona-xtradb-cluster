@@ -68,9 +68,6 @@ uextra=0
 
 # keyring specific variables.
 
-# 8.1.0 supports keyring file plugin, other keyrings are components
-keyring_plugin=0
-
 # Keyring component variables
 keyring_component_type=""
 keyring_component_enabled=0
@@ -82,9 +79,6 @@ keyring_file_data=""
 keyringbackupopt=""
 keyringapplyopt=""
 
-XB_DONOR_KEYRING_FILE="donor-keyring"
-XB_DONOR_KEYRING_FILE_PATH=""
-KEYRING_FILE_DIR=""
 
 # encrpytion options
 transition_key=""
@@ -178,21 +172,21 @@ DATA="${WSREP_SST_OPT_DATA}"
 XTRABACKUP_PATH_PREFIX="$(dirname $0)/pxc_extra/pxb-"
 
 # XB path compatible with the current version of PXC
-XTRABACKUP_THIS_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.3"
+XTRABACKUP_THIS_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.4"
 
 # XB path compatible with prev PXC version. It may be prev Innovative release or LTS
 # if current PXC version is 1st Innovative.
 # Note that this can be the same as XTRABACKUP_PREV_LTS_VER_PATH
-XTRABACKUP_PREV_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.2"
+XTRABACKUP_PREV_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.3"
 
 # XB path compatible previous PXC LTS version
 XTRABACKUP_PREV_LTS_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.0"
 
 # Minimum PXB required versions for this node to work
 # To be able to service this version
-XB_THIS_REQUIRED_VERSION="8.3.0"
+XB_THIS_REQUIRED_VERSION="8.4.0"
 # To be able to service previous version
-XB_PREV_REQUIRED_VERSION="8.2.0"
+XB_PREV_REQUIRED_VERSION="8.3.0"
 # To be able to service previous LTS version
 XB_PREV_LTS_REQUIRED_VERSION="8.0.35"
 
@@ -200,7 +194,7 @@ XB_PREV_LTS_REQUIRED_VERSION="8.0.35"
 REQUIRED_DONOR_MYSQL_LTS_VERSION="8.0"
 # ...or to be this previous version (note that it may be LTS as well if this is
 # 1st innovative)
-REQUIRED_DONOR_MYSQL_PREV_VERSION="8.2"
+REQUIRED_DONOR_MYSQL_PREV_VERSION="8.3"
 
 # These files carry some important information in form of GTID of the data
 # that is being backed up.
@@ -757,16 +751,6 @@ read_cnf()
 
     #------- KEYRING config parsing
 
-    #======================================================================
-    # Parse for keyring plugin. Only 8.1 supports only keyring file plugin.
-    # Keyring vault is the component.
-    keyring_file_data=$(parse_cnf mysqld keyring-file-data "")
-
-    if [[ -n $keyring_file_data ]]; then
-        keyring_plugin=1
-        KEYRING_FILE_DIR=$(dirname "${keyring_file_data}")
-    fi
-
     # Pull the parameters needed for encrypt=4
     ssl_ca=$(parse_cnf sst ssl-ca "")
     if [[ -z "$ssl_ca" ]]; then
@@ -845,22 +829,7 @@ read_cnf()
     # (These files will not be REMOVED on the joiner node)
     cpat=$(parse_cnf sst cpat '.*\.pem$\|.*init\.ok$\|.*galera\.cache$\|.*sst_in_progress$\|.*sst-xb-tmpdir$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$\|.*component_keyring_.*\.cnf$\|.*mysqld.my$')
 
-    # Keep the donor's keyring file
-    cpat+="\|.*/${XB_DONOR_KEYRING_FILE}$"
-
-    # Keep the KEYRING_FILE_DIR if it is a subdir of the datadir
     # Normalize the datadir for comparison
-    local readonly DATA_TEMP=$(dirname "$DATA/xxx")
-    if [[ -n "$KEYRING_FILE_DIR" && "$KEYRING_FILE_DIR" != "$DATA_TEMP" && "$KEYRING_FILE_DIR/" =~ $DATA ]]; then
-
-        # Add the path to each subdirectory, this will ensure that
-        # the path to the keyring is kept
-        local CURRENT_DIR=$(dirname "$KEYRING_FILE_DIR/xx")
-        while [[ $CURRENT_DIR != "." && $CURRENT_DIR != "/" && $CURRENT_DIR != "$DATA_TEMP" ]]; do
-            cpat+="\|${CURRENT_DIR}$"
-            CURRENT_DIR=$(dirname "$CURRENT_DIR")
-        done
-    fi
 
     # Retry the connection 30 times (at 1-second intervals)
     if [[ ! "$sockopt" =~ retry= ]]; then
@@ -979,10 +948,6 @@ sig_joiner_cleanup()
 {
     wsrep_log_error "Removing $XB_GTID_INFO_FILE_PATH file due to signal"
     rm -f "$XB_GTID_INFO_FILE_PATH" 2> /dev/null
-    if [[ -n $XB_DONOR_KEYRING_FILE_PATH ]]; then
-        wsrep_log_error "Removing $XB_DONOR_KEYRING_FILE_PATH file due to signal"
-        rm -f "$XB_DONOR_KEYRING_FILE_PATH" 2> /dev/null || true
-    fi
 }
 
 cleanup_joiner()
@@ -1004,10 +969,6 @@ cleanup_joiner()
     fi
     if [[ -n "${tmpdirbase}" ]]; then
         [[ -d "${tmpdirbase}" ]] && rm -rf "${tmpdirbase}" || true
-    fi
-
-    if [[ -r "${XB_DONOR_KEYRING_FILE_PATH}" ]]; then
-        rm -f "${XB_DONOR_KEYRING_FILE_PATH}"
     fi
 
     if [[ -n ${MYSQL_UPGRADE_TMPDIR} ]]; then
@@ -1068,8 +1029,6 @@ cleanup_donor()
 
     fi
 
-    rm -rf "${KEYRING_FILE_DIR}/${XB_DONOR_KEYRING_FILE}" || true
-
     exit $estatus
 }
 
@@ -1099,6 +1058,7 @@ get_keyring_manifest_and_config()
 
     local manifest_file=""
     local config_file=""
+    local keyring_file=""
 
     local mysqld_dir=$(dirname $MYSQLD_PATH)
     local binary=$(basename $MYSQLD_PATH)
@@ -1134,11 +1094,20 @@ get_keyring_manifest_and_config()
             fi
         fi
 
+        # Get the path of keyring file data
+        # TODO: should we add the condition that it is indeed keyring_file component
+        # (there are several kinds of such component)
+        if [[ -n "$config_file" && -e "$config_file" ]]; then
+            keyring_file=$(get_json_value $config_file "path")
+        fi
+
         wsrep_log_debug "Using manifest file: $manifest_file"
         wsrep_log_debug "Using component: $keyring_component_type"
         wsrep_log_debug "Using config_file: $config_file"
+        wsrep_log_debug "Using keyring_file: $keyring_file"
         keyring_manifest_file=$manifest_file
         keyring_config_file=$config_file
+        keyring_file_data=$keyring_file
     fi
 }
 
@@ -1486,17 +1455,6 @@ recv_data_from_donor_to_joiner()
         wsrep_log_error "****************************************************** "
         wsrep_log_debug "Contents of datadir"
         wsrep_log_debug "$(ls -l ${dir}/*)"
-        exit 32
-    fi
-
-    if [[ $checkf -eq 2 && ! -r "${XB_DONOR_KEYRING_FILE_PATH}" ]]; then
-        wsrep_log_error "******************* FATAL ERROR ********************** "
-        wsrep_log_error "FATAL: xtrabackup could not find '${XB_DONOR_KEYRING_FILE_PATH}'"
-        wsrep_log_error "The joiner is using a keyring file but the donor has not sent"
-        wsrep_log_error "a keyring file.  Please check your configuration to ensure that"
-        wsrep_log_error "both sides are using a keyring file"
-        wsrep_log_error "Line $LINENO"
-        wsrep_log_error "****************************************************** "
         exit 32
     fi
 }
@@ -1997,16 +1955,6 @@ then
         exit 22
     fi
 
-    # raise error if keyring_plugin is enabled but transit encryption is not
-    if [[ $keyring_plugin -eq 1 && $encrypt -le 0 ]]; then
-        wsrep_log_error "******************* FATAL ERROR ********************** "
-        wsrep_log_error "FATAL: keyring plugin is enabled but transit channel" \
-                        "is unencrypted. Enable encryption for SST traffic"
-        wsrep_log_error "Line $LINENO"
-        wsrep_log_error "****************************************************** "
-        exit 22
-    fi
-
     # Create the SST info file
     # This file contains SST information that is passed from the
     # donor to the joiner.
@@ -2021,7 +1969,7 @@ then
     echo "binlog-name=$(basename "$WSREP_SST_OPT_BINLOG")" >> "$sst_info_file_path"
     echo "mysql-version=$MYSQL_VERSION" >> "$sst_info_file_path"
     # append transition_key only if keyring is being used.
-    if [[ $keyring_plugin -eq 1 || $keyring_component_enabled -eq 1 ]]; then
+    if [[ $keyring_component_enabled -eq 1 ]]; then
         echo "transition-key=$transition_key" >> "$sst_info_file_path"
         encrypt_backup_options="--transition-key=$transition_key"
     fi
@@ -2230,9 +2178,6 @@ then
 
     # May need xtrabackup_checkpoints later on
     rm -f ${DATA}/xtrabackup_binary ${DATA}/xtrabackup_galera_info  ${DATA}/xtrabackup_logfile
-    if [[ -n $KEYRING_FILE_DIR ]]; then
-        rm -f "${KEYRING_FILE_DIR}/${XB_DONOR_KEYRING_FILE}"
-    fi
 
     # Note: this is started as a background process
     # So it has to wait for processes that are started by THIS process
@@ -2370,21 +2315,12 @@ then
         # server-id is already part of backup-my.cnf so avoid appending it.
         # server-id is the id of the node that is acting as donor and not joiner node.
 
-        # if keyring_plugin is enabled on JOINER and DONOR failed to send transition_key
-        # this means DONOR is not configured to use keyring_plugin.
+        # if keyring_component is enabled on JOINER, and DONOR failed to send transition_key
+        # this means DONOR is not configured to use keyring_component.
 
-        if [[ $keyring_plugin -eq 1 && -z $transition_key ]]; then
+        if [[ -n $transition_key && $keyring_component_enabled -eq 0 ]]; then
             wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "FATAL: JOINER is configured to use keyring_plugin" \
-                            "(file/vault) but DONOR is not"
-            wsrep_log_error "Line $LINENO"
-            wsrep_log_error "****************************************************** "
-            exit 32
-        fi
-
-        if [[ -n $transition_key && $keyring_plugin -eq 0 && $keyring_component_enabled -eq 0 ]]; then
-            wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "FATAL: DONOR is configured to use keyring component/plugin" \
+            wsrep_log_error "FATAL: DONOR is configured to use keyring component" \
                             "(file/vault) but JOINER is not"
             wsrep_log_error "Line $LINENO"
             wsrep_log_error "****************************************************** "
@@ -2392,13 +2328,8 @@ then
         fi
 
         if [[ -n $transition_key ]]; then
-            if [[ $keyring_component_enabled -eq 1 ]]; then
-                wsrep_log_debug "Joiner will use $keyring_component_type to" \
-                                "generate new master key"
-            else
-                wsrep_log_debug "Joiner will use the specified keyring plugin to" \
-                                "generate new master key"
-            fi
+            wsrep_log_debug "Joiner will use $keyring_component_type to" \
+                            "generate new master key"
         fi
 
         if [[ $keyring_component_enabled -eq 1 ]]; then
@@ -2601,13 +2532,6 @@ then
             cat_file_to_stderr "${DATA}/innobackup.move.log" "ERR" "innobackup.move.log"
             wsrep_log_error "****************************************************** "
             exit 22
-        fi
-
-        # Did we receive a keyring file?
-        if [[ -r "${XB_DONOR_KEYRING_FILE_PATH}" ]]; then
-            wsrep_log_info "Moving sst keyring into place: moving $XB_DONOR_KEYRING_FILE_PATH to $keyring"
-            mv "${XB_DONOR_KEYRING_FILE_PATH}" "$keyring_file_data"
-            wsrep_log_debug "Keyring move successful"
         fi
 
         wsrep_log_debug "Move successful, removing ${DATA}"

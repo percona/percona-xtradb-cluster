@@ -5,7 +5,7 @@
 # The galera/galera_2node_slave.cnf describes the setup of the nodes
 #
 # async master
-# PXC node 2 and async slave
+# PXC node 2 and async replica
 # PXC node 3
 #
 # All nodes are configured the same:
@@ -14,7 +14,7 @@
 #	replicate-wild-do-table=db1.%
 #
 # We are testing to see that nodes 2 and 3 (which are PXC nodes),
-# maintain consistency when the async slave node is using replication filters.
+# maintain consistency when the async replica node is using replication filters.
 #
 # Database 'db' is allowed by the filters but is meant for tracking the PXC cluster
 # Database 'db1' is allowed by the filter
@@ -44,10 +44,10 @@
 --source include/wait_condition.inc
 
 --disable_query_log
---echo # connection node_2 : starting async slave
+--echo # connection node_2 : starting async replica
 --eval CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1', SOURCE_PORT=$NODE_MYPORT_1;
 --enable_query_log
-START SLAVE USER='root';
+START REPLICA USER='root';
 
 #
 # Create a database called db to hold various test case tracking tables.
@@ -94,7 +94,7 @@ CREATE DATABASE dbx;
 #
 # The tests below involve async replication and galera replication.
 # The intent is to test the affect of replication filters on
-# galera replication (when a PXC node is acting as an async slave).
+# galera replication (when a PXC node is acting as an async replica).
 #
 #==============================================================
 
@@ -2267,7 +2267,7 @@ USE db; CREATE TABLE db1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
 #
 # SUMMARY: node_1:yes  node_2:no  node_3:no
 #
-USE db; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+USE db; CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
 
 --eval INSERT INTO db.counter(count) VALUES($test_id)
 
@@ -2307,7 +2307,7 @@ USE db; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
 
 # This will replicate to node_3 because galera replication does
 # not check replication filters for account management.
-USE db; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+USE db; CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
 
 --let $assert_text = "User foo is on node_2"
 --let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE USER = "foo";
@@ -2783,7 +2783,7 @@ USE db; DROP USER "foo";
 #
 # SUMMARY: node_1:yes  node_2:no  node_3:no
 #
-USE dbx; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+USE dbx; CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
 
 --eval INSERT INTO db.counter(count) VALUES($test_id)
 
@@ -2819,7 +2819,7 @@ USE dbx; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
 --echo #
 --echo # connection node_2
 --connection node_2
-USE db; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+USE db; CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
 
 --let $assert_text = "User foo is on node_2"
 --let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE USER = "foo";
@@ -4911,12 +4911,12 @@ USE db; CREATE TABLE db1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
 # For statement-based replication, the galera replication thread
 # will not check with the database filters.
 #
-# NOTE: Since galera replication is not running on the async slave
+# NOTE: Since galera replication is not running on the async replica
 # thread, the table filters will not be checked.
 #
 # SUMMARY: node_2:yes  node_3:yes
 #
-USE db; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+USE db; CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
 
 --eval INSERT INTO db.counter(count) VALUES($test_id)
 
@@ -4954,7 +4954,7 @@ USE db; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
 # For statement-based replication, the galera replication thread
 # will not check with the database filters.
 #
-# NOTE: Since galera replication is not running on the async slave
+# NOTE: Since galera replication is not running on the async replica
 # thread, the table filters will not be checked.
 #
 # SUMMARY: node_2:yes  node_3:yes
@@ -4999,7 +4999,7 @@ USE db; SET PASSWORD FOR "foo"@"%" = "notapassword";
 # For statement-based replication, the galera replication thread
 # will not check with the database filters.
 #
-# NOTE: Since galera replication is not running on the async slave
+# NOTE: Since galera replication is not running on the async replica
 # thread, the table filters will not be checked.
 #
 # SUMMARY: node_2:yes  node_3:yes
@@ -5039,7 +5039,7 @@ USE db; ALTER USER "foo"@"%" PASSWORD EXPIRE;
 # For statement-based replication, the galera replication thread
 # will not check with the database filters.
 #
-# NOTE: Since galera replication is not running on the async slave
+# NOTE: Since galera replication is not running on the async replica
 # thread, the table filters will not be checked.
 #
 # SUMMARY: node_2:yes  node_3:yes
@@ -5079,7 +5079,7 @@ USE db; GRANT SELECT ON db1.t1 TO "foo"@"%";
 # For statement-based replication, the galera replication thread
 # will not check with the database filters.
 #
-# NOTE: Since galera replication is not running on the async slave
+# NOTE: Since galera replication is not running on the async replica
 # thread, the table filters will not be checked.
 #
 # SUMMARY: node_2:yes  node_3:yes
@@ -5119,7 +5119,7 @@ USE db; REVOKE SELECT ON db1.t1 FROM "foo"@"%";
 # For statement-based replication, the galera replication thread
 # will not check with the database filters.
 #
-# NOTE: Since galera replication is not running on the async slave
+# NOTE: Since galera replication is not running on the async replica
 # thread, the table filters will not be checked.
 #
 # SUMMARY: node_2:yes  node_3:yes
@@ -5159,7 +5159,7 @@ USE db; GRANT ALL ON db1.t1 TO "foo"@"%";
 # For statement-based replication, the galera replication thread
 # will not check with the database filters.
 #
-# NOTE: Since galera replication is not running on the async slave
+# NOTE: Since galera replication is not running on the async replica
 # thread, the table filters will not be checked.
 #
 # SUMMARY: node_2:yes  node_3:yes
@@ -5200,7 +5200,7 @@ USE db; REVOKE ALL ON db1.t1 FROM "foo"@"%";
 # For statement-based replication, the galera replication thread
 # will not check with the database filters.
 #
-# NOTE: Since galera replication is not running on the async slave
+# NOTE: Since galera replication is not running on the async replica
 # thread, the table filters will not be checked.
 #
 # SUMMARY: node_2:yes  node_3:yes
@@ -5247,12 +5247,12 @@ USE db; DROP USER "foo"@"%";
 # For statement-based replication, the galera replication thread
 # will not check with the database filters.
 #
-# NOTE: Since galera replication is not running on the async slave
+# NOTE: Since galera replication is not running on the async replica
 # thread, the table filters will not be checked.
 #
 # SUMMARY: node_2:yes  node_3:yes
 #
-USE dbx; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+USE dbx; CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
 
 --eval INSERT INTO db.counter(count) VALUES($test_id)
 
@@ -5291,7 +5291,7 @@ USE dbx; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
 # For statement-based replication, the galera replication thread
 # will not check with the database filters.
 #
-# NOTE: Since galera replication is not running on the async slave
+# NOTE: Since galera replication is not running on the async replica
 # thread, the table filters will not be checked.
 #
 # SUMMARY: node_2:yes  node_3:yes
@@ -5336,7 +5336,7 @@ USE db; SET PASSWORD FOR "foo"@"%" = "notapassword";
 # For statement-based replication, the galera replication thread
 # will not check with the database filters.
 #
-# NOTE: Since galera replication is not running on the async slave
+# NOTE: Since galera replication is not running on the async replica
 # thread, the table filters will not be checked.
 #
 # SUMMARY: node_2:yes  node_3:yes
@@ -5376,7 +5376,7 @@ USE dbx; ALTER USER "foo"@"%" PASSWORD EXPIRE;
 # For statement-based replication, the galera replication thread
 # will not check with the database filters.
 #
-# NOTE: Since galera replication is not running on the async slave
+# NOTE: Since galera replication is not running on the async replica
 # thread, the table filters will not be checked.
 #
 # SUMMARY: node_2:yes  node_3:yes
@@ -5416,7 +5416,7 @@ USE dbx; GRANT SELECT ON db1.t1 TO "foo"@"%";
 # For statement-based replication, the galera replication thread
 # will not check with the database filters.
 #
-# NOTE: Since galera replication is not running on the async slave
+# NOTE: Since galera replication is not running on the async replica
 # thread, the table filters will not be checked.
 #
 # SUMMARY: node_2:yes  node_3:yes
@@ -5456,7 +5456,7 @@ USE dbx; REVOKE SELECT ON db1.t1 FROM "foo"@"%";
 # For statement-based replication, the galera replication thread
 # will not check with the database filters.
 #
-# NOTE: Since galera replication is not running on the async slave
+# NOTE: Since galera replication is not running on the async replica
 # thread, the table filters will not be checked.
 #
 # SUMMARY: node_2:yes  node_3:yes
@@ -5496,7 +5496,7 @@ USE dbx; GRANT ALL ON db1.t1 TO "foo"@"%";
 # For statement-based replication, the galera replication thread
 # will not check with the database filters.
 #
-# NOTE: Since galera replication is not running on the async slave
+# NOTE: Since galera replication is not running on the async replica
 # thread, the table filters will not be checked.
 #
 # SUMMARY: node_2:yes  node_3:yes
@@ -5536,7 +5536,7 @@ USE dbx; REVOKE ALL ON db1.t1 FROM "foo"@"%";
 # For statement-based replication, the galera replication thread
 # will not check with the database filters.
 #
-# NOTE: Since galera replication is not running on the async slave
+# NOTE: Since galera replication is not running on the async replica
 # thread, the table filters will not be checked.
 #
 # SUMMARY: node_2:yes  node_3:yes
@@ -5589,8 +5589,8 @@ DROP DATABASE db1;
 
 --echo # connection node_2
 --connection node_2
-STOP SLAVE;
-RESET SLAVE ALL;
+STOP REPLICA;
+RESET REPLICA ALL;
 
 --echo # connection node_1
 --connection node_1

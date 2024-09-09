@@ -600,7 +600,7 @@ EOF
 #
 # Overview: The basic flow is:
 #   - start up a MySQL server (creates the SST user and upgrades mysql)
-#   - run 'RESET SLAVE ALL' (if needed)
+#   - run 'RESET REPLICA ALL' (if needed)
 #   - shutdown the MySQL Server
 #
 function run_post_processing_steps()
@@ -621,10 +621,10 @@ function run_post_processing_steps()
     #            'yes'  : run mysql_upgrade
     local run_mysql_upgrade
 
-    # A value of 'no'   : do not run 'reset slave all'
-    #            'yes'  : run 'reset slave all'
-    #            'check': check the slave status before running 'reset slave all'
-    local run_reset_slave
+    # A value of 'no'   : do not run 'reset replica all'
+    #            'yes'  : run 'reset replica all'
+    #            'check': check the replica status before running 'reset replica all'
+    local run_reset_replica
 
     # Path to the binary locations
     local mysqld_path=""
@@ -657,7 +657,7 @@ function run_post_processing_steps()
             fi
         else
             # For an IST, skip the upgrade step. Let the normal processing
-            # do the upgrade (since we don't need to do an 'RESET SLAVE ALL',
+            # do the upgrade (since we don't need to do an 'RESET REPLICA ALL',
             # there's no need for us to startup mysqld).
             run_mysql_upgrade='no'
             wsrep_log_info "Skipping mysql_upgrade (ist)"
@@ -667,21 +667,21 @@ function run_post_processing_steps()
         run_mysql_upgrade='no'
     fi
 
-    # If we have received an IST, do NOT reset the async slave info
-    # If we have received an SST, we always try to reset the slave info
+    # If we have received an IST, do NOT reset the async replica info
+    # If we have received an SST, we always try to reset the replica info
     #
     # Side-effect! For an SST, this ensures that the SST user gets removed
     # during the shutdown of the mysqld started to run the commands.
     # We do not need to remove the SST user for an IST, since the datadir
     # is not sent for an IST.
     if [[ $transfer_type == "ist" ]]; then
-        run_reset_slave='no'
+        run_reset_replica='no'
     else
-        run_reset_slave='check'
+        run_reset_replica='check'
     fi
 
     # Check if we have anything to do
-    if [[ $run_reset_slave == 'no' && $run_mysql_upgrade == 'no' ]]; then
+    if [[ $run_reset_replica == 'no' && $run_mysql_upgrade == 'no' ]]; then
         # nothing to do here, just return
         return 0
     fi
@@ -779,8 +779,8 @@ function run_post_processing_steps()
     #   --wsrep-provider=none
     # Disable networking
     #   --skip-networking
-    # Disable slave start (avoid starting slave threads)
-    #   --skip-slave-start
+    # Disable replica start (avoid starting replica threads)
+    #   --skip-replica-start
     # Turn off logging
     #   --log-syslog
     #   --log-output
@@ -794,7 +794,7 @@ function run_post_processing_steps()
     #   --log-error
     #   --datadir
     local mysqld_cmdline="--defaults-file=${WSREP_SST_OPT_CONF} ${use_mysql_upgrade_conf_suffix} \
-        --skip-networking --skip-slave-start \
+        --skip-networking --skip-replica-start \
         --auto_generate_certs=OFF \
         --general-log=0 --slow-query-log=0 \
         --pxc-maint-transition-period=1 \
@@ -849,16 +849,16 @@ EOF
     #-----------------------------------------------------------------------
     # Stop replication activity
 
-    if [[ $run_reset_slave == 'check' ]]; then
-        wsrep_log_debug "Checking slave status"
+    if [[ $run_reset_replica == 'check' ]]; then
+        wsrep_log_debug "Checking replica status"
 
-        local slave_status=""
-        slave_status=$($mysql_client_path \
+        local replica_status=""
+        replica_status=$($mysql_client_path \
                         --defaults-file=/dev/stdin \
                         --socket=$upgrade_socket \
                         --unbuffered --batch --silent --skip-column-names \
-                        -e "SHOW SLAVE STATUS;" \
-                        2> ${mysql_upgrade_dir_path}/show_slave_status.out <<EOF
+                        -e "SHOW REPLICA STATUS;" \
+                        2> ${mysql_upgrade_dir_path}/show_replica_status.out <<EOF
 [client]
 user=${sst_user}
 password="${sst_password}"
@@ -868,29 +868,29 @@ EOF
         if [[ $errcode -ne 0 ]]; then
             kill -9 $mysql_pid
             wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "Failed to execute mysql 'SHOW SLAVE STATUS'. Check the parameters and retry"
+            wsrep_log_error "Failed to execute mysql 'SHOW REPLICA STATUS'. Check the parameters and retry"
             wsrep_log_error "Line $LINENO errcode:${errcode}"
-            cat_file_to_stderr "${mysql_upgrade_dir_path}/show_slave_status.out" "ERR" "show slave status log"
+            cat_file_to_stderr "${mysql_upgrade_dir_path}/show_replica_status.out" "ERR" "show replica status log"
             cat_file_to_stderr "${mysqld_err_log}" "ERR" "mysql error log"
             wsrep_log_error "****************************************   ************** "
             return 3
         fi
-        if [[ -n $slave_status ]]; then
-            run_reset_slave='yes'
+        if [[ -n $replica_status ]]; then
+            run_reset_replica='yes'
         else
-            run_reset_slave='no'
+            run_reset_replica='no'
         fi
     fi
 
-    if [[ $run_reset_slave == 'yes' ]]; then
-        wsrep_log_debug "Resetting Async Slave"
+    if [[ $run_reset_replica == 'yes' ]]; then
+        wsrep_log_debug "Resetting Async Replica"
 
         $mysql_client_path \
             --defaults-file=/dev/stdin \
             --socket=$upgrade_socket \
             --unbuffered --batch --silent \
-            -e "SET sql_log_bin=OFF; RESET SLAVE ALL;" \
-            &> ${mysql_upgrade_dir_path}/reset_slave.out <<EOF
+            -e "SET sql_log_bin=OFF; RESET REPLICA ALL;" \
+            &> ${mysql_upgrade_dir_path}/reset_replica.out <<EOF
 [client]
 user=${sst_user}
 password="${sst_password}"
@@ -899,14 +899,14 @@ EOF
         if [[ $errcode -ne 0 ]]; then
             kill -9 $mysql_pid
             wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "Failed to execute mysql 'RESET SLAVE ALL'. Check the parameters and retry"
+            wsrep_log_error "Failed to execute mysql 'RESET REPLICA ALL'. Check the parameters and retry"
             wsrep_log_error "Line $LINENO errcode:${errcode}"
-            cat_file_to_stderr "${mysql_upgrade_dir_path}/reset_slave.out" "ERR" "reset slave log"
+            cat_file_to_stderr "${mysql_upgrade_dir_path}/reset_replica.out" "ERR" "reset replica log"
             cat_file_to_stderr "${mysqld_err_log}" "ERR" "mysql error log"
             wsrep_log_error "****************************************   ************** "
             return 3
         fi
-        wsrep_log_debug "Async Slave Reset completed"
+        wsrep_log_debug "Async Replica Reset completed"
     fi
 
     #-----------------------------------------------------------------------

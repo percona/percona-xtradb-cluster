@@ -32,7 +32,7 @@ COMMIT;
 --let $binlog_file = mysqld-bin.000001
 --let $binlog_start = 365
 --let $keep_gtid_events = 1
---source include/show_binlog_events.inc
+--source include/rpl/deprecated/show_binlog_events.inc
 
 --connection node_2
 --echo #node-2
@@ -44,7 +44,7 @@ SELECT COUNT(*) = 4 FROM t1;
 --let $binlog_file = mysqld-bin.000001
 --let $binlog_start = 367
 --let $keep_gtid_events = 1
---source include/show_binlog_events.inc
+--source include/rpl/deprecated/show_binlog_events.inc
 
 --connection node_1
 DROP TABLE t1;
