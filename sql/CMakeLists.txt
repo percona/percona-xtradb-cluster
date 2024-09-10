@@ -291,6 +291,11 @@ IF(WITH_WSREP)
    wsrep_thd.cc
  )
  SET(WSREP_LIB wsrep)
+
+ # Suppress warnings for gcc older than gcc-5
+ IF(CMAKE_COMPILER_IS_GNUCXX AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 5.0)
+  ADD_CXX_COMPILE_FLAGS_TO_FILES(-Wno-missing-field-initializers FILES wsrep_mysqld.cc wsrep_binlog.cc)
+ ENDIF()
 ENDIF()
 
 SET(SQL_SOURCE
