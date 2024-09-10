@@ -103,6 +103,7 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 		-DWITH_LIBEVENT=bundled \
 		-DWITH_FIDO=bundled \
 		-DWITH_NUMA=ON \
+		-DWITH_PERCONA_TELEMETRY=ON \
 		-DWITH_EXTRA_CHARSETS=all ..
 endif
 
@@ -154,6 +155,7 @@ endif
 		-DWITH_LIBEVENT=bundled \
 		-DWITH_FIDO=bundled \
 		-DWITH_NUMA=ON \
+		-DWITH_PERCONA_TELEMETRY=ON \
 		-DWITH_EXTRA_CHARSETS=all ..
 
 #	cd $(galeradir) &&  scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) psi=1 libgalera_smm.so $(SCONS_ARGS) && scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) garb/garbd $(SCONS_ARGS)

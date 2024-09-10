@@ -58,8 +58,15 @@ case "$1" in
 	remove)
 
 	set -e
+	PXC_TELEMETRY=/usr/local/percona/telemetry/pxc
 
 	place_upstart_job_back
+
+	# Remove PXC Telemetry directory
+	if [ -d ${PXC_TELEMETRY} ];
+	then
+                rm -rf ${PXC_TELEMETRY}
+        fi
 
 	set +e
 

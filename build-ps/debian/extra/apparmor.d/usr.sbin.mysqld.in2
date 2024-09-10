@@ -1,6 +1,6 @@
 #include <tunables/global>
 
-/usr/sbin/mysqld flags=(complain) {
+/usr/sbin/mysqld flags=(attach_disconnected complain) {
   #include <abstractions/base>
   #include <abstractions/nameservice>
   #include <abstractions/user-tmp>
@@ -40,7 +40,7 @@
   /run/mysqld/mysqlx.sock.lock rw,
 
 # Allow systemd notify messages
-  /{,var/}run/systemd/notify w,
+  /{,var/}run/systemd/notify rw,
 
 # Allow execution of server binary
   /usr/sbin/mysqld mr,
@@ -75,9 +75,19 @@
 # Allow access to openssl config
   /etc/ssl/openssl.cnf r,
 
-# Allow access to PS telemetry directory
-  /usr/local/percona/telemetry/ps/ rw,
-  /usr/local/percona/telemetry/ps/** rw,
+################################################################################
+# Percona XtraDB Cluster specific
+
+  /bin/?ash ix,
+  /bin/sh ix,
+
+  /{,usr/}bin/wsrep_sst_* PUx,
+
+################################################################################
+
+# Allow access to PXC telemetry directory
+  /usr/local/percona/telemetry/pxc/ rw,
+  /usr/local/percona/telemetry/pxc/** rw,
 
   # Site-specific additions and overrides. See local/README for details.
   #include <local/usr.sbin.mysqld>
