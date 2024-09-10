@@ -42,6 +42,9 @@ Prefix: %{_sysconfdir}
 %define rpm_release @@RPM_RELEASE@@
 %define revision @@REVISION@@
 %define distribution  rhel%{redhatversion}  
+%if 0%{?rhel} >= 8
+%global pxc_telemetry          /usr/local/percona/telemetry/pxc
+%endif
 
 %if 0%{?rhel} >= 8
 %global add_fido_plugins 1
@@ -375,6 +378,9 @@ Requires:       %{distro_requires}
 Requires:             percona-xtradb-cluster-client = %{version}-%{release}
 Requires:             percona-xtradb-cluster-shared = %{version}-%{release}
 Requires:             percona-xtradb-cluster-icu-data-files = %{version}-%{release}
+%if 0%{?rhel} >= 8
+Requires:	      percona-telemetry-agent
+%endif
 Requires:             selinux-policy
 Requires:             policycoreutils
 Requires:             curl
@@ -773,6 +779,7 @@ mkdir debug
            -DFEATURE_SET="%{feature_set}" \
            -DCOMPILATION_COMMENT="%{compilation_comment_debug}" \
            -DWITH_WSREP=ON \
+	   -DWITH_PERCONA_TELEMETRY=ON \
            -DWITH_LDAP=system \
            -DWITH_INNODB_DISALLOW_WRITES=ON \
            -DWITH_EMBEDDED_SERVER=0 \
@@ -821,6 +828,7 @@ mkdir release
            -DFEATURE_SET="%{feature_set}" \
            -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
            -DWITH_WSREP=ON \
+	   -DWITH_PERCONA_TELEMETRY=ON \
            -DWITH_LDAP=system \
            -DWITH_INNODB_DISALLOW_WRITES=ON \
            -DWITH_EMBEDDED_SERVER=0 \
@@ -1386,8 +1394,16 @@ fi
   sleep 5
 fi
 
+%if 0%{?rhel} >= 8
+install -d -m 2775 -o mysql -g percona-telemetry %{pxc_telemetry}
+chcon -t mysqld_db_t %{pxc_telemetry} &>/dev/null || :
+chcon -u system_u %{pxc_telemetry} &>/dev/null || :
+%endif
+
 cp %SOURCE999 /tmp/ 2>/dev/null || :
 bash /tmp/call-home.sh -f "PRODUCT_FAMILY_PXC" -v %{mysql_version}-%{percona_server_version}-%{rpm_release} -d "PACKAGE" &>/dev/null || :
+chgrp percona-telemetry /usr/local/percona/telemetry_uuid &>/dev/null || :
+chmod 664 /usr/local/percona/telemetry_uuid &>/dev/null || :
 rm -f /tmp/call-home.sh
 
 echo "Percona XtraDB Cluster is distributed with several useful UDFs from Percona Toolkit."
@@ -1526,6 +1542,9 @@ if [ $1 -ge 1 ]; then
     /sbin/service mysqlrouter condrestart >/dev/null 2>&1 || :
 fi
 %endif # systemd
+%if 0%{?rhel} >= 8
+rm -rf %{pxc_telemetry}
+%endif
 # ----------------------------------------------------------------------
 # Clean up the BuildRoot after build is done
 # ----------------------------------------------------------------------
