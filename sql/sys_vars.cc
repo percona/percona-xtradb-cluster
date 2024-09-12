@@ -7868,6 +7868,14 @@ static Sys_var_bool Sys_persisted_globals_load(
     DEFAULT(true), NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(nullptr),
     ON_UPDATE(nullptr));
 
+static Sys_var_bool Sys_create_server_state_file(
+    "create_server_state_file",
+    "When this option is enabled, server reports its state in server.state "
+    "file located in datadir.",
+    READ_ONLY NON_PERSIST GLOBAL_VAR(create_server_state_file),
+    CMD_LINE(OPT_ARG), DEFAULT(false), NO_MUTEX_GUARD, NOT_IN_BINLOG,
+    ON_CHECK(nullptr), ON_UPDATE(nullptr));
+
 static bool sysvar_check_authid_string(sys_var *, THD *thd, set_var *var) {
   /*
     Since mandatory_roles is similar to a GRANT role statement without a

@@ -55,8 +55,9 @@
 #include "sql/dd/types/tablespace.h"
 #include "sql/dd_sp.h"      // prepare_sp_chistics_from_dd_routine
 #include "sql/sd_notify.h"  // sysd::notify
-#include "sql/sp.h"         // Stored_routine_creation_ctx
-#include "sql/sp_head.h"    // sp_head
+#include "sql/server_status_file.h"
+#include "sql/sp.h"       // Stored_routine_creation_ctx
+#include "sql/sp_head.h"  // sp_head
 #include "sql/sql_base.h"
 #include "sql/sql_prepare.h"
 #include "sql/strfunc.h"
@@ -977,11 +978,14 @@ bool upgrade_system_schemas(THD *thd) {
     LogErr(SYSTEM_LEVEL, ER_SERVER_DOWNGRADE_STATUS, server_version,
            MYSQL_VERSION_ID, "started");
     sysd::notify("STATUS=Server downgrade in progress\n");
+    Server_status_file::set_status(Server_status_file::Status::DOWNGRADING);
+
     /* purecov: end */
   } else {
     LogErr(SYSTEM_LEVEL, ER_SERVER_UPGRADE_STATUS, server_version,
            MYSQL_VERSION_ID, "started");
     sysd::notify("STATUS=Server upgrade in progress\n");
+    Server_status_file::set_status(Server_status_file::Status::UPGRADING);
   }
 
   bootstrap_error_handler.set_log_error(false);

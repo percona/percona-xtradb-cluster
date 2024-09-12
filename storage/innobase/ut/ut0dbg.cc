@@ -40,6 +40,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "sql/log.h"
 #endif /* !UNIV_HOTBACKUP */
 
+#include "sql/server_status_file.h"
 #include "ut0dbg.h"
 
 static std::function<void()> assert_callback;
@@ -78,6 +79,7 @@ void ut_set_assert_callback(std::function<void()> &callback) {
           to_string(std::this_thread::get_id()).c_str());
 #endif /* !UNIV_HOTBACKUP */
 
+  Server_status_file::set_status(Server_status_file::Status::STOPPING);
   fputs(
       "InnoDB: We intentionally generate a memory trap.\n"
       "InnoDB: Submit a detailed bug report"

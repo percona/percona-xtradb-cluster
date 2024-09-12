@@ -441,6 +441,7 @@ extern ulonglong utility_user_privileges;
 extern char *utility_user_dynamic_privileges;
 
 extern bool persisted_globals_load;
+extern bool create_server_state_file;
 extern bool opt_keyring_operations;
 extern bool opt_table_encryption_privilege_check;
 extern char *opt_keyring_migration_user;

@@ -71,6 +71,7 @@
 #include "sql/mdl.h"
 #include "sql/mysqld.h"
 #include "sql/sd_notify.h"  // sysd::notify
+#include "sql/server_status_file.h"
 #include "sql/sql_zip_dict.h"
 #include "sql/thd_raii.h"
 #include "storage/perfschema/pfs_dd_version.h"  // PFS_DD_VERSION
@@ -1408,6 +1409,7 @@ bool initialize_dd_properties(THD *thd) {
     if (bootstrap::DD_bootstrap_ctx::instance().is_dd_upgrade()) {
       LogErr(SYSTEM_LEVEL, ER_DD_UPGRADE, actual_dd_version, dd::DD_VERSION);
       sysd::notify("STATUS=Data Dictionary upgrade in progress\n");
+      Server_status_file::set_status(Server_status_file::Status::UPGRADING);
     }
     if (bootstrap::DD_bootstrap_ctx::instance().is_server_upgrade()) {
       // This condition is hit only if upgrade has been skipped before
