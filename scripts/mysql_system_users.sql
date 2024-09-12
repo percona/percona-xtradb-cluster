@@ -77,7 +77,7 @@ REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'mysql.pxc.internal.session'@localhost;
 
 -- Due to bugs with roles, we need to grant superuser access here
 GRANT ALL PRIVILEGES ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
-GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER, SHUTDOWN,CLONE_ADMIN, SYSTEM_USER,GROUP_REPLICATION_STREAM,  ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
+GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER, SHUTDOWN,CLONE_ADMIN, SYSTEM_USER,GROUP_REPLICATION_STREAM  ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
 -- GRANT CREATE USER ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
 -- GRANT SUPER ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
 -- GRANT RELOAD ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
