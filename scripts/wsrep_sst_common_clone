@@ -156,7 +156,7 @@ case "$1" in
         # Doing this next tr only to bypass a limitation in wsrep_sst.c (development only)
         WSREP_SST_OPT_ADDR=`echo $WSREP_SST_OPT_ADDR |tr ] @`
         WSREP_SST_OPT_REMOTE_AUTH=$(echo $WSREP_SST_OPT_ADDR | cut -d '@' -f 1)
-        wsrep_log_debug "-> $WSREP_SST_OPT_ADDR"
+        wsrep_log_info "-> $WSREP_SST_OPT_ADDR"
 
         #
         # Break address string into host:port/path parts
