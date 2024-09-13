@@ -89,7 +89,9 @@ GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER, SHU
 -- See https://www.percona.com/doc/percona-xtrabackup/8.0/using_xtrabackup/privileges.html
 CREATE ROLE 'mysql.pxc.sst.role'@localhost;
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'mysql.pxc.sst.role'@localhost;
-GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER, CLONE_ADMIN,GROUP_REPLICATION_STREAM,SYSTEM_USER, SHUTDOWN,CONNECTION_ADMIN, CREATE USER ON *.* TO 'mysql.pxc.sst.role'@localhost WITH GRANT OPTION;;
+
+GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER, CLONE_ADMIN,GROUP_REPLICATION_STREAM,SYSTEM_USER, SHUTDOWN,CONNECTION_ADMIN, CREATE USER ON *.* TO 'mysql.pxc.sst.role'@localhost WITH GRANT OPTION;
+
 GRANT INSERT ON mysql.plugin TO 'mysql.pxc.sst.role'@localhost WITH GRANT OPTION;
 
 GRANT ALTER, CREATE, SELECT, INSERT ON PERCONA_SCHEMA.xtrabackup_history TO 'mysql.pxc.sst.role'@localhost;
@@ -98,7 +100,7 @@ GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost;
 -- Need this to create the PERCONA_SCHEMA database if needed
 GRANT CREATE ON PERCONA_SCHEMA.* to 'mysql.pxc.sst.role'@localhost;
 
-GRANT ALL PRIVILEGES ON *.* TO 'mysql.pxc.sst.role'@localhost WITH GRANT OPTION;
+--GRANT ALL PRIVILEGES ON *.* TO 'mysql.pxc.sst.role'@localhost WITH GRANT OPTION;
 
 -- this is a plugin priv that might not be registered
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.infoschema', 'localhost', 'AUDIT_ABORT_EXEMPT', 'N');
