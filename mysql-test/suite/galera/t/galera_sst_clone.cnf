@@ -2,6 +2,7 @@
 
 [mysqld]
 wsrep_sst_method=clone
+wsrep_sst_allowed_methods=clone
 wsrep_debug=1
 
 [mysqld.1]
