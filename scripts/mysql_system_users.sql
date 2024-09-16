@@ -100,7 +100,7 @@ GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost;
 -- Need this to create the PERCONA_SCHEMA database if needed
 GRANT CREATE ON PERCONA_SCHEMA.* to 'mysql.pxc.sst.role'@localhost;
 
---GRANT ALL PRIVILEGES ON *.* TO 'mysql.pxc.sst.role'@localhost WITH GRANT OPTION;
+-- GRANT ALL PRIVILEGES ON *.* TO 'mysql.pxc.sst.role'@localhost WITH GRANT OPTION;
 
 -- this is a plugin priv that might not be registered
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.infoschema', 'localhost', 'AUDIT_ABORT_EXEMPT', 'N');

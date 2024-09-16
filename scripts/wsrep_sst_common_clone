@@ -323,10 +323,10 @@ if [ "$WSREP_SST_OPT_ROLE" == "joiner" ]; then
     wsrep_log_debug "-> JOINER resetting port WSREP_SST_OPT_ADDR_PORT=$WSREP_SST_OPT_ADDR_PORT"
 fi
 
-# If Local port is empty by default we set as same value of port
-if [ -z "$WSREP_SST_OPT_LPORT" ]; then
-   WSREP_SST_OPT_LPORT=$(parse_cnf mysqld port "3306") 
-fi
+
+#if [ -z "$WSREP_SST_OPT_LPORT" ]; then
+#   WSREP_SST_OPT_LPORT=$(parse_cnf mysqld port "3306") 
+#fi
 
 
 readonly WSREP_SST_OPT_BYPASS
