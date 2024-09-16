@@ -31,7 +31,7 @@ function prepare {
         fi
     done
 
-    DIRLIST="bin bin/pxc_extra/pxb-8.0/bin bin/pxc_extra/pxb-8.1/bin bin/pxc_extra/pxb-8.2/bin bin/pxc_extra/pxb-8.3/bin bin/pxc_extra/pxb-2.4/bin lib bin/pxc_extra/pxb-8.0/lib/plugin bin/pxc_extra/pxb-8.1/lib/plugin bin/pxc_extra/pxb-8.2/lib/plugin bin/pxc_extra/pxb-8.3/lib/plugin bin/pxc_extra/pxb-2.4/lib/plugin lib/private lib/plugin lib/mysqlrouter/plugin lib/mysqlrouter/private"
+    DIRLIST="bin bin/pxc_extra/pxb-8.0/bin bin/pxc_extra/pxb-8.3/bin bin/pxc_extra/pxb-8.4/bin bin/pxc_extra/pxb-2.4/bin lib bin/pxc_extra/pxb-8.0/lib/plugin bin/pxc_extra/pxb-8.3/lib/plugin bin/pxc_extra/pxb-8.4/lib/plugin bin/pxc_extra/pxb-2.4/lib/plugin lib/private lib/plugin lib/mysqlrouter/plugin lib/mysqlrouter/private"
 }
 
 function install_deps {
