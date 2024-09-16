@@ -42,9 +42,6 @@ Prefix: %{_sysconfdir}
 %define rpm_release @@RPM_RELEASE@@
 %define revision @@REVISION@@
 %define distribution  rhel%{redhatversion}  
-%if 0%{?rhel} >= 8
-%global pxc_telemetry          /usr/local/percona/telemetry/pxc
-%endif
 
 %if 0%{?rhel} >= 8
 %global add_fido_plugins 1
@@ -378,9 +375,6 @@ Requires:       %{distro_requires}
 Requires:             percona-xtradb-cluster-client = %{version}-%{release}
 Requires:             percona-xtradb-cluster-shared = %{version}-%{release}
 Requires:             percona-xtradb-cluster-icu-data-files = %{version}-%{release}
-%if 0%{?rhel} >= 8
-Requires:	      percona-telemetry-agent
-%endif
 Requires:             selinux-policy
 Requires:             policycoreutils
 Requires:             curl
@@ -675,35 +669,22 @@ fi
 
 mkdir pxc_extra
 pushd pxc_extra
+mkdir pxb-8.4
+pushd pxb-8.4
+yumdownloader percona-xtrabackup-84-8.4.0
+rpm2cpio *.rpm | cpio --extract --make-directories --verbose
+mv usr/bin ./
+mv usr/lib* ./
+mv lib64 lib
+mv lib/xtrabackup/* lib/ || true
+rm -rf lib/xtrabackup
+rm -rf usr
+rm -f *.rpm
+popd
+
 mkdir pxb-8.3
 pushd pxb-8.3
 yumdownloader percona-xtrabackup-83-8.3.0
-rpm2cpio *.rpm | cpio --extract --make-directories --verbose
-mv usr/bin ./
-mv usr/lib* ./
-mv lib64 lib
-mv lib/xtrabackup/* lib/ || true
-rm -rf lib/xtrabackup
-rm -rf usr
-rm -f *.rpm
-popd
-
-mkdir pxb-8.2
-pushd pxb-8.2
-yumdownloader percona-xtrabackup-82-8.2.0
-rpm2cpio *.rpm | cpio --extract --make-directories --verbose
-mv usr/bin ./
-mv usr/lib* ./
-mv lib64 lib
-mv lib/xtrabackup/* lib/ || true
-rm -rf lib/xtrabackup
-rm -rf usr
-rm -f *.rpm
-popd
-
-mkdir pxb-8.1
-pushd pxb-8.1
-yumdownloader percona-xtrabackup-81-8.1.0
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib* ./
@@ -779,7 +760,6 @@ mkdir debug
            -DFEATURE_SET="%{feature_set}" \
            -DCOMPILATION_COMMENT="%{compilation_comment_debug}" \
            -DWITH_WSREP=ON \
-	   -DWITH_PERCONA_TELEMETRY=ON \
            -DWITH_LDAP=system \
            -DWITH_INNODB_DISALLOW_WRITES=ON \
            -DWITH_EMBEDDED_SERVER=0 \
@@ -828,7 +808,6 @@ mkdir release
            -DFEATURE_SET="%{feature_set}" \
            -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
            -DWITH_WSREP=ON \
-	   -DWITH_PERCONA_TELEMETRY=ON \
            -DWITH_LDAP=system \
            -DWITH_INNODB_DISALLOW_WRITES=ON \
            -DWITH_EMBEDDED_SERVER=0 \
@@ -1057,11 +1036,6 @@ install -d $RBR%{_libdir}/mysql
 #%if 0%{?mecab}
 #    mv $RBR%{_libdir}/mecab $RBR%{_libdir}/mysql
 #%endif
-
-# set rpath for plugin to use private/libfido2.so
-%if 0%{?add_fido_plugins}
-patchelf --debug --set-rpath '$ORIGIN/../private' %{buildroot}/%{_libdir}/mysql/plugin/authentication_fido.so
-%endif # add_fido_plugins
 
 ##############################################################################
 #  Post processing actions, i.e. when installed
@@ -1394,16 +1368,8 @@ fi
   sleep 5
 fi
 
-%if 0%{?rhel} >= 8
-install -d -m 2775 -o mysql -g percona-telemetry %{pxc_telemetry}
-chcon -t mysqld_db_t %{pxc_telemetry} &>/dev/null || :
-chcon -u system_u %{pxc_telemetry} &>/dev/null || :
-%endif
-
 cp %SOURCE999 /tmp/ 2>/dev/null || :
 bash /tmp/call-home.sh -f "PRODUCT_FAMILY_PXC" -v %{mysql_version}-%{percona_server_version}-%{rpm_release} -d "PACKAGE" &>/dev/null || :
-chgrp percona-telemetry /usr/local/percona/telemetry_uuid &>/dev/null || :
-chmod 664 /usr/local/percona/telemetry_uuid &>/dev/null || :
 rm -f /tmp/call-home.sh
 
 echo "Percona XtraDB Cluster is distributed with several useful UDFs from Percona Toolkit."
@@ -1542,9 +1508,6 @@ if [ $1 -ge 1 ]; then
     /sbin/service mysqlrouter condrestart >/dev/null 2>&1 || :
 fi
 %endif # systemd
-%if 0%{?rhel} >= 8
-rm -rf %{pxc_telemetry}
-%endif
 # ----------------------------------------------------------------------
 # Clean up the BuildRoot after build is done
 # ----------------------------------------------------------------------
@@ -1583,7 +1546,6 @@ rm -rf %{pxc_telemetry}
 %doc %attr(644, root, man) %{_mandir}/man1/mysqld_safe.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysqldumpslow.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_secure_installation.1*
-%doc %attr(644, root, man) %{_mandir}/man1/mysql_upgrade.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlman.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql.server.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_tzinfo_to_sql.1*
@@ -1592,9 +1554,6 @@ rm -rf %{pxc_telemetry}
 #%doc %attr(644, root, man) %{_mandir}/man1/resolve_stack_dump.1*
 #%doc %attr(644, root, man) %{_mandir}/man1/resolveip.1*
 %doc %attr(644, root, man) %{_mandir}/man8/mysqld.8*
-%doc %attr(644, root, man) %{_mandir}/man1/lz4_decompress.1*
-%doc %attr(644, root, man) %{_mandir}/man1/zlib_decompress.1*
-%doc %attr(644, root, root) %{_mandir}/man1/mysql_ssl_rsa_setup.1*
 
 %attr(755, root, root) %{_bindir}/pxc_extra/*
 %attr(755, root, root) %{_bindir}/clustercheck
@@ -1609,7 +1568,6 @@ rm -rf %{pxc_telemetry}
 %attr(755, root, root) %{_bindir}/myisampack
 %attr(755, root, root) %{_bindir}/mysql_secure_installation
 %attr(755, root, root) %{_bindir}/mysql_tzinfo_to_sql
-%attr(755, root, root) %{_bindir}/mysql_upgrade
 %attr(755, root, root) %{_bindir}/mysqld_safe
 %attr(755, root, root) %{_bindir}/mysqld_multi
 %attr(755, root, root) %{_bindir}/mysqldumpslow
@@ -1624,9 +1582,6 @@ rm -rf %{pxc_telemetry}
 #%attr(755, root, root) %{_bindir}/wsrep_sst_upgrade
 %attr(755, root, root) %{_bindir}/ps_mysqld_helper
 # Explicit %attr() mode not applicaple to symlink
-%attr(755, root, root) %{_bindir}/lz4_decompress
-%attr(755, root, root) %{_bindir}/mysql_ssl_rsa_setup
-%attr(755, root, root) %{_bindir}/zlib_decompress
 %attr(755, root, root) %{_bindir}/mysql_test_event_tracking
 
 %attr(755, root, root) %{_sbindir}/mysqld
@@ -1634,9 +1589,92 @@ rm -rf %{pxc_telemetry}
 %dir %{_libdir}/mysql/private
 %attr(755, root, root) %{_libdir}/mysql/private/libprotobuf-lite.so.*
 %attr(755, root, root) %{_libdir}/mysql/private/libprotobuf.so.*
-%if 0%{?add_fido_plugins}
 %attr(755, root, root) %{_libdir}/mysql/private/libfido2.so.*
-%endif # add_fido_plugins
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_bad_any_cast_impl.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_bad_optional_access.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_bad_variant_access.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_base.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_city.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_civil_time.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_cord_internal.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_cord.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_cordz_functions.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_cordz_handle.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_cordz_info.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_cordz_sample_token.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_crc32c.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_crc_cord_state.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_crc_cpu_detect.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_crc_internal.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_debugging_internal.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_demangle_internal.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_die_if_null.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_examine_stack.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_exponential_biased.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_failure_signal_handler.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_flags_commandlineflag_internal.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_flags_commandlineflag.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_flags_config.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_flags_internal.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_flags_marshalling.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_flags_parse.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_flags_private_handle_accessor.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_flags_program_name.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_flags_reflection.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_flags.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_flags_usage_internal.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_flags_usage.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_graphcycles_internal.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_hash.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_hashtablez_sampler.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_int128.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_kernel_timeout_internal.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_leak_check.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_entry.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_flags.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_globals.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_initialize.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_internal_check_op.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_internal_conditions.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_internal_format.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_internal_globals.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_internal_log_sink_set.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_internal_message.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_internal_nullguard.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_internal_proto.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_severity.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_sink.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_low_level_hash.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_malloc_internal.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_periodic_sampler.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_random_distributions.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_random_internal_distribution_test_util.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_random_internal_platform.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_random_internal_pool_urbg.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_random_internal_randen_hwaes_impl.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_random_internal_randen_hwaes.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_random_internal_randen_slow.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_random_internal_randen.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_random_internal_seed_material.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_random_seed_gen_exception.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_random_seed_sequences.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_raw_hash_set.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_raw_logging_internal.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_scoped_set_env.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_spinlock_wait.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_stacktrace.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_statusor.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_status.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_strerror.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_str_format_internal.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_strings_internal.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_strings.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_string_view.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_symbolize.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_synchronization.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_throw_delegate.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_time.so
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_time_zone.so
 
 %if 0%{?systemd} == 0
 %attr(755, root, root) %{_sbindir}/rcmysql
@@ -1705,7 +1743,6 @@ rm -rf %{pxc_telemetry}
 %attr(755, root, root) %{_bindir}/mysqlshow
 %attr(755, root, root) %{_bindir}/mysqlslap
 %attr(755, root, root) %{_bindir}/mysql_config_editor
-%attr(755, root, root) %{_bindir}/mysqlpump
 
 %doc %attr(644, root, man) %{_mandir}/man1/mysql.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysqladmin.1*
@@ -1716,7 +1753,6 @@ rm -rf %{pxc_telemetry}
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlshow.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlslap.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_config_editor.1*
-%doc %attr(644, root, man) %{_mandir}/man1/mysqlpump.1*
 
 # ----------------------------------------------------------------------------
 %files -n percona-xtradb-cluster-devel
@@ -1889,11 +1925,13 @@ fi
 %{_libdir}/mysqlrouter/private/libmysqlrouter_http_auth_backend.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_http_auth_realm.so.*
 %{_libdir}/mysqlrouter/private/libprotobuf-lite.so.*
+%{_libdir}/mysqlrouter/private/libabsl_*.so
 %{_libdir}/mysqlrouter/private/libmysqlrouter_io_component.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_metadata_cache.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_mysqlxmessages.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_routing.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_destination_status.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_routing_connections.so.*
 %dir %{_libdir}/mysqlrouter
 %dir %{_libdir}/mysqlrouter/private
 %{_libdir}/mysqlrouter/*.so*
