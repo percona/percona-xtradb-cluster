@@ -1786,7 +1786,10 @@ fi
 
 # Verify PXB versions we have
 verify_pxb_version "${XTRABACKUP_THIS_VER_PATH}" "${XB_THIS_REQUIRED_VERSION}"
-verify_pxb_version "${XTRABACKUP_PREV_VER_PATH}" "${XB_PREV_REQUIRED_VERSION}"
+# We intentionally don't check prev PXB version. This is because for public
+# releases we support only LTS -> LTS SST and will not bundle PXC with
+# previous innovative version of PXB.
+# verify_pxb_version "${XTRABACKUP_PREV_VER_PATH}" "${XB_PREV_REQUIRED_VERSION}"
 verify_pxb_version "${XTRABACKUP_PREV_LTS_VER_PATH}" "${XB_PREV_LTS_REQUIRED_VERSION}"
 
 rm -f "${XB_GTID_INFO_FILE_PATH}"
