@@ -500,7 +500,6 @@ install_deps() {
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
         apt-get -y install --download-only percona-xtrabackup-80=8.0.35-31-1.${DIST}
-        apt-get -y install --download-only percona-xtrabackup-83=8.3.0-1-1.${DIST}
         apt-get -y install --download-only percona-xtrabackup-84=8.4.0-1-1.${DIST}
     fi
     return;
@@ -887,13 +886,10 @@ build_deb(){
     # (1) PXB compatible with previous PXC LTS version
     mkdir -p pxb-8.0
     # (2) PXB compatible with this PXC version (LTS or Innovative)
-    mkdir -p pxb-8.3
-    # (4) PXB compatible with this PXC version (LTS or Innovative)
     mkdir -p pxb-8.4
 
 
     dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-80* pxb-8.0
-    dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-83* pxb-8.3
     dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-84* pxb-8.4
 
     #  (1)
@@ -903,12 +899,6 @@ build_deb(){
         rm -rf usr *.deb DEBIAN
 
     # (2)
-    cd ../pxb-8.3 || exit
-        mv usr/bin ./
-        mv usr/lib* ./
-        rm -rf usr *.deb DEBIAN
-
-    # (3)
     cd ../pxb-8.4 || exit
         mv usr/bin ./
         mv usr/lib* ./
@@ -1040,20 +1030,6 @@ build_tarball(){
         popd
 
         # (2)
-        mkdir pxb-8.3
-        pushd pxb-8.3
-        yumdownloader percona-xtrabackup-83-8.3.0
-        rpm2cpio *.rpm | cpio --extract --make-directories --verbose
-        mv usr/bin ./
-        mv usr/lib* ./
-        mv lib64 lib
-        mv lib/xtrabackup/* lib/ || true
-        rm -rf lib/xtrabackup
-        rm -rf usr
-        rm -f *.rpm
-        popd
-
-        # (3)
         mkdir pxb-8.4
         pushd pxb-8.4
         yumdownloader percona-xtrabackup-84-8.4.0
@@ -1068,14 +1044,11 @@ build_tarball(){
         popd
 
         tar -zcvf  percona-xtrabackup-8.0.tar.gz pxb-8.0
-        tar -zcvf  percona-xtrabackup-8.3.tar.gz pxb-8.3
         tar -zcvf  percona-xtrabackup-8.4.tar.gz pxb-8.4
     else
         mkdir pxb-8.0
-        mkdir pxb-8.3
         mkdir pxb-8.4
         dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-80* pxb-8.0
-        dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-83* pxb-8.3
         dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-84* pxb-8.4
         
         # (1)
@@ -1086,13 +1059,6 @@ build_tarball(){
         popd
 
         # (2)
-        pushd pxb-8.3
-            mv usr/bin ./
-            mv usr/lib* ./
-            rm -rf usr *.deb DEBIAN
-        popd
-
-        # (3)
         pushd pxb-8.4
             mv usr/bin ./
             mv usr/lib* ./
@@ -1100,13 +1066,12 @@ build_tarball(){
         popd
         
         tar -zcvf  percona-xtrabackup-8.0.tar.gz pxb-8.0
-        tar -zcvf  percona-xtrabackup-8.3.tar.gz pxb-8.3
         tar -zcvf  percona-xtrabackup-8.4.tar.gz pxb-8.4
     fi
     mkdir -p ${BUILD_ROOT}/target/pxc_extra/
     cp *.tar.gz ${BUILD_ROOT}/target/pxc_extra/
     cp *.tar.gz ${BUILD_ROOT}/target
-    rm -rf pxb-8.0 pxb-8.3 pxb-8.4
+    rm -rf pxb-8.0 pxb-8.4
     cd ${CURDIR} || exit
     rm -rf jemalloc
     wget https://github.com/jemalloc/jemalloc/releases/download/$JVERSION/jemalloc-$JVERSION.tar.bz2
