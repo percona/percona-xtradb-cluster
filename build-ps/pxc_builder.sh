@@ -313,6 +313,9 @@ install_deps() {
         yum install -y perl
         yum install -y https://repo.percona.com/yum/percona-release-latest.noarch.rpm
         percona-release enable tools testing
+	if [ x"$ARCH" = "xaarch64" ]; then
+	    percona-release enable pxb-84-lts testing
+	fi
         if [ "x$RHEL" = "x8" -o "x$RHEL" = "x9" ]; then
             yum -y install dnf-plugins-core epel-release
             yum config-manager --set-enabled powertools
@@ -327,12 +330,18 @@ install_deps() {
             yum -y install readline-devel rpm-build rsync tar time unzip wget zlib-devel selinux-policy-devel
             yum -y install bison boost-devel check-devel cmake libaio-devel libcurl-devel libudev-devel
             yum -y install redhat-rpm-config
-            wget https://downloads.percona.com/downloads/packaging/rpcgen-1.4-2.fc30.x86_64.rpm
-            wget https://downloads.percona.com/downloads/packaging/gperf-3.1-6.fc29.x86_64.rpm
-            yum -y install rpcgen-1.4-2.fc30.x86_64.rpm gperf-3.1-6.fc29.x86_64.rpm
+	    if [ x"$ARCH" = "xx86_64" ]; then
+                wget https://downloads.percona.com/downloads/packaging/rpcgen-1.4-2.fc30.x86_64.rpm
+                wget https://downloads.percona.com/downloads/packaging/gperf-3.1-6.fc29.x86_64.rpm
+                yum -y install rpcgen-1.4-2.fc30.x86_64.rpm gperf-3.1-6.fc29.x86_64.rpm
+	    else
+		yum -y install yum-utils
+		dnf config-manager --enable ol${RHEL}_codeready_builder
+		yum -y install gperf rpcgen
+	    fi
 
             if [ "x${RHEL}" = "x9" ]; then
-                yum install -y https://yum.oracle.com/repo/OracleLinux/OL9/distro/builder/x86_64/getPackage/procps-ng-devel-3.3.17-8.el9.x86_64.rpm
+                yum install -y https://yum.oracle.com/repo/OracleLinux/OL9/distro/builder/${ARCH}/getPackage/procps-ng-devel-3.3.17-8.el9.x86_64.rpm
                 yum -y install dnf-utils
                 dnf config-manager --enable ol9_codeready_builder
                 yum -y install libedit-devel
@@ -430,7 +439,11 @@ install_deps() {
         percona-release enable tools release
         
         # (1) PXB compatible with previous PXC LTS version
-        percona-release enable pxb-80 release
+	if [ x"$ARCH" = "xx86_64" ]; then
+            percona-release enable pxb-80 release
+	else
+	    percona-release enable pxb-80 testing
+	fi
         if [ x"${DIST}" = xnoble ]; then
             percona-release enable pxb-8x-innovation experimental
         else
@@ -643,6 +656,7 @@ build_srpm(){
 }
 
 build_mecab_lib(){
+    ARCH=$(echo $(uname -m) | sed -e 's:i686:i386:g')
     MECAB_TARBAL="mecab-0.996.tar.gz"
     MECAB_LINK="https://downloads.percona.com/downloads/packaging/mecab/${MECAB_TARBAL}"
     MECAB_DIR="${WORKDIR}/${MECAB_TARBAL%.tar.gz}"
@@ -653,6 +667,12 @@ build_mecab_lib(){
     mkdir ${MECAB_INSTALL_DIR}
     wget ${MECAB_LINK}
     tar xf ${MECAB_TARBAL}
+    if [ x"$ARCH" = "xaarch64" ]; then
+        git clone git://git.savannah.gnu.org/config.git
+        unalias cp
+        cp config/config.guess ${MECAB_DIR}
+        cp config/config.sub ${MECAB_DIR}
+    fi
     cd ${MECAB_DIR} || exit
     ./configure --with-pic --prefix=/usr
     make
