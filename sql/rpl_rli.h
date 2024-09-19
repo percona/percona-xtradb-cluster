@@ -64,6 +64,9 @@
 #include "sql/sql_class.h"    // THD
 #include "sql/system_variables.h"
 #include "sql/table.h"
+#ifdef WITH_WSREP
+#include "sql/wsrep_async_monitor.h"
+#endif /* WITH_WSREP */
 
 class Commit_order_manager;
 class Master_info;
@@ -1794,6 +1797,21 @@ class Relay_log_info : public Rpl_info {
     commit_order_mngr = mngr;
   }
 
+#ifdef WITH_WSREP
+  Wsrep_async_monitor* get_wsrep_async_monitor() {
+    return wsrep_async_monitor;
+  }
+  void set_wsrep_async_monitor(Wsrep_async_monitor *monitor) {
+    wsrep_async_monitor = monitor;
+  }
+  void backup_last_position_for_recovery() {
+    wsrep_async_monitor_last_left = wsrep_async_monitor->last_left();
+  }
+  void restore_last_position_for_recovery() {
+    wsrep_async_monitor->reset(wsrep_async_monitor_last_left);
+  }
+#endif /* WITH_WSREP */
+
   /*
     Following set function is required to initialize the 'until_option' during
     MTS relay log recovery process.
@@ -1840,6 +1858,14 @@ class Relay_log_info : public Rpl_info {
     rpl_filter = channel_filter;
   }
 
+#ifdef WITH_WSREP
+  /*
+    Stores Wsrep_async_monitor's last_left seqno.
+    Will be used while resetting the last_left seqno during start replica.
+   */
+  unsigned long long wsrep_async_monitor_last_left;
+#endif /* WITH_WSREP */
+
  protected:
   Format_description_log_event *rli_description_event;
 
@@ -1851,6 +1877,12 @@ class Relay_log_info : public Rpl_info {
    */
   Commit_order_manager *commit_order_mngr;
 
+#ifdef WITH_WSREP
+  /*
+    Wsrep_async_monitor orders DMLs and DDls in galera.
+   */
+  Wsrep_async_monitor *wsrep_async_monitor;
+#endif /* WITH_WSREP */
   /**
     Delay slave SQL thread by this amount of seconds.
     The delay is applied per transaction and based on the immediate master's
