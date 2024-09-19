@@ -1,16 +1,17 @@
 /*
-   Copyright (c) 2000, 2023, Oracle and/or its affiliates.
+   Copyright (c) 2000, 2024, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
    as published by the Free Software Foundation.
 
-   This program is also distributed with certain software (including
+   This program is designed to work with certain software (including
    but not limited to OpenSSL) that is licensed under separate terms,
    as designated in a particular file or component or in included license
    documentation.  The authors of MySQL hereby grant you an additional
    permission to link the program and your derivative works with the
-   separately licensed software that they have included with MySQL.
+   separately licensed software that they have either included with
+   the program or referenced in the documentation.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -1413,7 +1414,8 @@ void warn_on_deprecated_user_defined_collation(
    Tokens from Percona Server 8.0
 */
 %token<lexer.keyword> EFFECTIVE_SYM 1350
-%token  SEQUENCE_TABLE_SYM 1351
+%token<lexer.keyword> SEQUENCE_TABLE_SYM 1351
+%token PERCONA_SEQUENCE_TABLE_SYM 1352
 
 /*
   Precedence rules used to resolve the ambiguity when using keywords as idents
@@ -12226,6 +12228,18 @@ table_function:
                          ER_THD(YYTHD, ER_TF_MUST_HAVE_ALIAS), MYF(0));
               MYSQL_YYABORT;
             }
+            push_deprecated_warn(YYTHD, "SEQUENCE_TABLE", "PERCONA_SEQUENCE_TABLE");
+            $$= NEW_PTN PT_table_sequence_function($3, $5);
+          }
+        | PERCONA_SEQUENCE_TABLE_SYM '(' expr ')' opt_table_alias
+          {
+            // Alias isn't optional, follow derived's behavior
+            if ($5 == NULL_CSTR)
+            {
+              my_message(ER_TF_MUST_HAVE_ALIAS,
+                         ER_THD(YYTHD, ER_TF_MUST_HAVE_ALIAS), MYF(0));
+              MYSQL_YYABORT;
+            }
             $$= NEW_PTN PT_table_sequence_function($3, $5);
           }
         ;
@@ -15756,6 +15770,7 @@ ident_keywords_unambiguous:
         | SECONDARY_UNLOAD_SYM
         | SECOND_SYM
         | SECURITY_SYM
+        | SEQUENCE_TABLE_SYM
         | SERIALIZABLE_SYM
         | SERIAL_SYM
         | SERVER_SYM

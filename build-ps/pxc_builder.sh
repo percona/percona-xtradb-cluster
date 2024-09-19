@@ -269,8 +269,8 @@ get_sources(){
 }
 
 switch_to_vault_repo() {
-    sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-Linux-*
-    sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-Linux-*
+    sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
+    sed -i 's|#\s*baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
 }
 
 get_system(){
@@ -304,7 +304,7 @@ install_deps() {
     CURPLACE=$(pwd)
 
     if [ "x$OS" = "xrpm" ]; then
-        if [ x"$RHEL" = x8 ]; then
+        if [ "x${RHEL}" = "x7" -o x"$RHEL" = x8 ]; then
             switch_to_vault_repo
         fi
         RHEL=$(rpm --eval %rhel)
@@ -369,6 +369,9 @@ install_deps() {
                 echo "waiting"
                 sleep 1
             done
+            if [ "x${RHEL}" = "x7" -o x"$RHEL" = x8 ]; then
+                switch_to_vault_repo
+            fi
             yum -y install  gcc-c++ devtoolset-8-gcc-c++ devtoolset-8-binutils
             source /opt/rh/devtoolset-8/enable
             yum -y install scons check-devel boost-devel cmake3
@@ -386,6 +389,7 @@ install_deps() {
         fi
         if [ "x${RHEL}" = "x8" ]; then
             yum -y install centos-release-stream
+            switch_to_vault_repo
             yum -y install git gcc-toolset-11-gcc gcc-toolset-11-gcc-c++ gcc-toolset-11-annobin-plugin-gcc
             source /opt/rh/gcc-toolset-11/enable
         fi
@@ -425,7 +429,7 @@ install_deps() {
         apt-get -y install dirmngr || true
         apt-get update
         apt-get -y install dirmngr || true
-        wget https://repo.percona.com/apt/percona-release_latest.$(lsb_release -sc)_all.deb && dpkg -i percona-release_latest.$(lsb_release -sc)_all.deb
+        wget https://repo.percona.com/apt/percona-release_latest.$(lsb_release -sc)_all.deb && apt -y install gnupg2 lsb-release ./percona-release_latest.$(lsb_release -sc)_all.deb
         percona-release enable tools release
         percona-release enable pxb-80 testing
         percona-release enable pxb-24 testing
@@ -529,7 +533,7 @@ build_srpm(){
         echo "It is not possible to build src rpm here"
         exit 1
     fi
-    if [ x"$RHEL" = x8 ]; then
+    if [ "x${RHEL}" = "x7" -o x"$RHEL" = x8 ]; then
         switch_to_vault_repo
     fi
     cd $WORKDIR || exit
@@ -677,7 +681,7 @@ build_rpm(){
         echo "It is not possible to build rpm here"
         exit 1
     fi
-    if [ x"$RHEL" = x8 ]; then
+    if [ "x${RHEL}" = "x7" -o x"$RHEL" = x8 ]; then
         switch_to_vault_repo
     fi
     SRC_RPM=$(basename $(find $WORKDIR/srpm -iname 'percona-xtradb-cluster*.src.rpm' | sort | tail -n1))
@@ -903,6 +907,8 @@ build_deb(){
         cat call-home.sh >> percona-xtradb-cluster-server.postinst 
         echo "CALLHOME" >> percona-xtradb-cluster-server.postinst
         echo "bash +x /tmp/call-home.sh -f \"PRODUCT_FAMILY_PXC\" -v \"${MYSQL_VERSION}-${MYSQL_RELEASE}-${DEB_RELEASE}\" -d \"PACKAGE\" &>/dev/null || :" >> percona-xtradb-cluster-server.postinst
+	echo "chgrp percona-telemetry /usr/local/percona/telemetry_uuid &>/dev/null || :" >> percona-xtradb-cluster-server.postinst
+        echo "chmod 664 /usr/local/percona/telemetry_uuid &>/dev/null || :" >> percona-xtradb-cluster-server.postinst
         echo "rm -rf /tmp/call-home.sh" >> percona-xtradb-cluster-server.postinst
         echo "exit 0" >> percona-xtradb-cluster-server.postinst
         rm -f call-home.sh

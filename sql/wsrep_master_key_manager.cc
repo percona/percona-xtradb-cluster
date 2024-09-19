@@ -146,3 +146,21 @@ std::string MasterKeyManager::GetKey(const std::string &keyId) {
 
   return std::string((char *)(secret_v.data()), secret_length);
 }
+
+bool MasterKeyManager::IsServiceAlive() {
+  my_h_keyring_reader_object reader_object = nullptr;
+  bool retval =
+      keyring_reader_service_->init("dummy", nullptr, &reader_object);
+
+  /* Keyring error */
+  if (retval == true) {
+    return false;
+  }
+
+  if (reader_object != nullptr)
+    (void)keyring_reader_service_->deinit(reader_object);
+
+  reader_object = nullptr;
+
+  return true;
+}

@@ -105,7 +105,7 @@ SET DEBUG_SYNC='now wait_for read_xid';
 
 --echo #
 --echo # 7. Verify that the reason for the shutdown is logged in the garbd log.
---let $assert_select= Transport endpoint is not connected
+--let $assert_select= Failed to send SYNC signal.*Not in primary component
 --let $assert_text= Appropriate message has been written to the garbd log explaining the reason for the shutdown.
 --let $assert_count= 1
 --let $assert_file= $GARBD_LOG_FILE

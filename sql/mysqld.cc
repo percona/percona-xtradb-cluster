@@ -1,15 +1,16 @@
-/* Copyright (c) 2000, 2023, Oracle and/or its affiliates.
+/* Copyright (c) 2000, 2024, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
   as published by the Free Software Foundation.
 
-  This program is also distributed with certain software (including
+  This program is designed to work with certain software (including
   but not limited to OpenSSL) that is licensed under separate terms,
   as designated in a particular file or component or in included license
   documentation.  The authors of MySQL hereby grant you an additional
   permission to link the program and your derivative works with the
-  separately licensed software that they have included with MySQL.
+  separately licensed software that they have either included with
+  the program or referenced in the documentation.
 
   This program is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -1227,6 +1228,12 @@ ulong log_error_verbosity = 3;  // have a non-zero value during early start-up
 bool opt_keyring_migration_to_component = false;
 bool opt_libcoredumper, opt_corefile = 0;
 bool opt_persist_sensitive_variables_in_plaintext{true};
+int argc_cached;
+char **argv_cached;
+
+#ifdef HAVE_PERCONA_TELEMETRY
+bool opt_percona_telemetry_disable = false;
+#endif
 
 #if defined(_WIN32)
 /*
@@ -7616,11 +7623,12 @@ static int init_server_components() {
   static const LEX_CSTRING keyring_vault_name = {
       STRING_WITH_LEN("keyring_vault")};
   static const LEX_CSTRING keyring_name = {STRING_WITH_LEN("keyring_file")};
-  if (!pxc_encrypt_cluster_traffic &&
+  if (wsrep_is_wsrep_on() && !pxc_encrypt_cluster_traffic &&
       (plugin_is_ready(keyring_vault_name, MYSQL_KEYRING_PLUGIN) ||
-       plugin_is_ready(keyring_name, MYSQL_KEYRING_PLUGIN))) {
+       plugin_is_ready(keyring_name, MYSQL_KEYRING_PLUGIN) ||
+       wsrep_keyring_component_loaded())) {
     WSREP_WARN(
-        "You have enabled keyring plugin. SST encryption is mandatory. "
+        "You have enabled keyring plugin/component. SST encryption is mandatory. "
         "Please enable pxc_encrypt_cluster_traffic. Check "
         "https://docs.percona.com/percona-xtradb-cluster/%u.%u/"
         "encrypt-traffic.html#encrypt-sst-traffic for more details.",
@@ -7717,6 +7725,19 @@ static int init_server_components() {
       }
     }
   }
+
+#ifdef HAVE_PERCONA_TELEMETRY
+  if (!is_help_or_validate_option() && !opt_initialize) {
+    init_optimizer_cost_module(true);
+    if (bootstrap::run_bootstrap_thread(nullptr, nullptr,
+                                        &dd::upgrade::setup_percona_telemetry,
+                                        SYSTEM_THREAD_SERVER_UPGRADE)) {
+      LogErr(ERROR_LEVEL, ER_SERVER_UPGRADE_FAILED);
+      unireg_abort(MYSQLD_ABORT_EXIT);
+    }
+    delete_optimizer_cost_module();
+  }
+#endif
 
   /*
     Re-create non DD based system views after a) if we upgraded system
@@ -8419,6 +8440,11 @@ int mysqld_main(int argc, char **argv)
     flush_error_log_messages();
     return 1;
   }
+
+  argc_cached = argc;
+  argv_cached = new (&argv_alloc) char *[argc_cached + 1];
+  memcpy(argv_cached, argv, argc_cached * sizeof(char *));
+  argv_cached[argc_cached] = nullptr;
 
   /* Set data dir directory paths */
   strmake(mysql_real_data_home, get_relative_path(MYSQL_DATADIR),
@@ -13366,7 +13392,7 @@ static int fix_secure_path(const char *&opt_path, char *realpath,
   bool force_priv_check = false;
   DBUG_EXECUTE_IF("force_secure_file_priv_check", { force_priv_check = true; });
 
-  if (opt_initialize & !force_priv_check) opt_path = "";
+  if (opt_initialize && !force_priv_check) opt_path = "";
   opt_nonempty = opt_path[0] ? true : false;
 
   if (opt_nonempty && strlen(opt_path) > FN_REFLEN) {

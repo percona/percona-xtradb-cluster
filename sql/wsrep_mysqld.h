@@ -567,4 +567,6 @@ class wsrep_scope_guard {
 extern LEX_CSTRING PXC_INTERNAL_SESSION_USER;
 extern LEX_CSTRING PXC_INTERNAL_SESSION_HOST;
 
+bool wsrep_keyring_component_loaded();
+
 #endif /* WSREP_MYSQLD_H */

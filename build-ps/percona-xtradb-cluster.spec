@@ -42,7 +42,9 @@ Prefix: %{_sysconfdir}
 %define rpm_release @@RPM_RELEASE@@
 %define revision @@REVISION@@
 %define distribution  rhel%{redhatversion}  
-
+%if 0%{?rhel} >= 8
+%global pxc_telemetry          /usr/local/percona/telemetry/pxc
+%endif
 %if 0%{?rhel} >= 8
 %global add_fido_plugins 1
 %else
@@ -378,6 +380,9 @@ Requires:             percona-xtradb-cluster-icu-data-files = %{version}-%{relea
 Requires:             selinux-policy
 Requires:             policycoreutils
 Requires:             curl
+%if 0%{?rhel} >= 8
+Requires:	      percona-telemetry-agent
+%endif
 Requires(pre):        policycoreutils
 Requires(post):       policycoreutils
 Requires(postun):     policycoreutils
@@ -754,6 +759,7 @@ mkdir debug
            -DWITH_EMBEDDED_SHARED_LIBRARY=0 \
            -DWITH_INNODB_MEMCACHED=1 \
            -DWITH_ZSTD=bundled \
+           -DWITH_PERCONA_TELEMETRY=ON \
 %if 0%{?add_fido_plugins}
            -DWITH_FIDO=bundled \
 %else
@@ -802,6 +808,7 @@ mkdir release
            -DWITH_EMBEDDED_SHARED_LIBRARY=0 \
            -DWITH_INNODB_MEMCACHED=1 \
            -DWITH_ZSTD=bundled \
+           -DWITH_PERCONA_TELEMETRY=ON \
 %if 0%{?add_fido_plugins}
            -DWITH_FIDO=bundled \
 %else
@@ -1361,8 +1368,16 @@ fi
   sleep 5
 fi
 
+%if 0%{?rhel} >= 8
+install -d -m 2775 -o mysql -g percona-telemetry %{pxc_telemetry}
+chcon -t mysqld_db_t %{pxc_telemetry} &>/dev/null || :
+chcon -u system_u %{pxc_telemetry} &>/dev/null || :
+%endif
+
 cp %SOURCE999 /tmp/ 2>/dev/null || :
 bash /tmp/call-home.sh -f "PRODUCT_FAMILY_PXC" -v %{mysql_version}-%{percona_server_version}-%{rpm_release} -d "PACKAGE" &>/dev/null || :
+chgrp percona-telemetry /usr/local/percona/telemetry_uuid &>/dev/null || :
+chmod 664 /usr/local/percona/telemetry_uuid &>/dev/null || :
 rm -f /tmp/call-home.sh
 
 echo "Percona XtraDB Cluster is distributed with several useful UDFs from Percona Toolkit."
@@ -1808,6 +1823,9 @@ else
         %systemd_postun_with_restart mysql
     fi
 fi
+%endif
+%if 0%{?rhel} >= 8
+rm -rf %{pxc_telemetry}
 %endif
 
 # ----------------------------------------------------------------------------
