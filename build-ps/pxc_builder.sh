@@ -951,6 +951,8 @@ build_deb(){
         cat call-home.sh >> percona-xtradb-cluster-server.postinst 
         echo "CALLHOME" >> percona-xtradb-cluster-server.postinst
         echo "bash +x /tmp/call-home.sh -f \"PRODUCT_FAMILY_PXC\" -v \"${MYSQL_VERSION}-${MYSQL_RELEASE}-${DEB_RELEASE}\" -d \"PACKAGE\" &>/dev/null || :" >> percona-xtradb-cluster-server.postinst
+	echo "chgrp percona-telemetry /usr/local/percona/telemetry_uuid &>/dev/null || :" >> percona-xtradb-cluster-server.postinst
+        echo "chmod 664 /usr/local/percona/telemetry_uuid &>/dev/null || :" >> percona-xtradb-cluster-server.postinst
         echo "rm -rf /tmp/call-home.sh" >> percona-xtradb-cluster-server.postinst
         echo "exit 0" >> percona-xtradb-cluster-server.postinst
         rm -f call-home.sh
