@@ -477,7 +477,7 @@ EOF
         #we force the signal to be 0 because we KNOW that with clone when using the mysqld directly (not mysqld_safe) the daemon is killed at the end of the clone process. 
         if [ "$RC" -ne 0 ]; then
             RC=0
-            wsrep_log_error " JOINER CLONE ACTION abruptly terminated, but we can continue"
+            wsrep_log_debug " JOINER CLONE ACTION abruptly terminated, but we can continue"
         fi
         
         eval $MYSQL_RCLIENT -e "SHUTDOWN" || :
@@ -733,8 +733,8 @@ then
     fi
     
     # Report clone credentials/address to the caller
-    wsrep_log_debug "-> ready passing string |$CLONE_USER:$CLONE_PSWD]$WSREP_SST_OPT_HOST:$CLONE_PORT|"
-    echo "ready $CLONE_USER:$CLONE_PSWD]$WSREP_SST_OPT_HOST:$CLONE_PORT"
+    wsrep_log_debug "-> ready passing string |$CLONE_USER:$CLONE_PSWD@$WSREP_SST_OPT_HOST:$CLONE_PORT|"
+    echo "ready $CLONE_USER:$CLONE_PSWD@$WSREP_SST_OPT_HOST:$CLONE_PORT"
 
     #WAIT for joiner message
     wsrep_log_debug "-> wait $TIMOUT_WAIT_XST"   
