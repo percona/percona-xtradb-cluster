@@ -817,6 +817,7 @@ MySQL clients support the protocol:
 #include "sql/range_optimizer/range_optimizer.h"    // range_optimizer_init
 #include "sql/replication.h"                        // thd_enter_cond
 #include "sql/resourcegroups/resource_group_mgr.h"  // init, post_init
+#include "sql/server_status_file.h"
 #include "sql/sql_profile.h"
 #ifdef _WIN32
 #include "sql/restart_monitor_win.h"
@@ -1454,6 +1455,8 @@ ulong stored_program_cache_size = 0;
 bool avoid_temporal_upgrade;
 
 bool persisted_globals_load = true;
+
+bool create_server_state_file = false;
 
 bool opt_keyring_operations = true;
 
@@ -2780,6 +2783,7 @@ static void unireg_abort(int exit_code) {
 #endif /* WITH_WSREP */
   DBUG_TRACE;
 
+  Server_status_file::set_status(Server_status_file::Status::STOPPING);
   if (errno) {
     sysd::notify("ERRNO=", errno, "\n");
   }
@@ -2905,6 +2909,8 @@ static void mysqld_exit(int exit_code) {
   if (hEventShutdown) CloseHandle(hEventShutdown);
   close_service_status_pipe_in_mysqld();
 #endif  // _WIN32
+
+  Server_status_file::set_status(Server_status_file::Status::STOPPED);
 
   exit(exit_code); /* purecov: inspected */
 }
@@ -8450,6 +8456,9 @@ int mysqld_main(int argc, char **argv)
   strmake(mysql_real_data_home, get_relative_path(MYSQL_DATADIR),
           sizeof(mysql_real_data_home) - 1);
 
+  Server_status_file::init(&argc, &argv);
+  Server_status_file::set_status(Server_status_file::Status::INITIALIZING);
+
   /* Must be initialized early for comparison of options name */
   system_charset_info = &my_charset_utf8mb3_general_ci;
 
@@ -9494,9 +9503,12 @@ int mysqld_main(int argc, char **argv)
   }
 
   mysqld_socket_acceptor->check_and_spawn_admin_connection_handler_thread();
-  mysqld_socket_acceptor->connection_event_loop();
+  Server_status_file::set_status(Server_status_file::Status::READY);
+  mysqld_socket_acceptor->connection_event_loop();  // KH: end of limbo state
 #endif /* _WIN32 */
   server_operational_state = SERVER_SHUTTING_DOWN;
+  Server_status_file::set_status(Server_status_file::Status::STOPPING);
+
   sysd::notify("STOPPING=1\nSTATUS=Server shutdown in progress\n");
 
   DBUG_PRINT("info", ("No longer listening for incoming connections"));

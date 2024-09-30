@@ -42,6 +42,7 @@
 #include "my_time.h"
 #include "mysql_version.h"
 #include "sql/mysqld.h"
+#include "sql/server_status_file.h"
 #include "sql/sql_class.h"
 #include "sql/sql_const.h"
 
@@ -228,9 +229,11 @@ void print_fatal_signal(int sig) {
 extern "C" void handle_fatal_signal(int sig) {
   if (s_handler_being_processed) {
     my_safe_printf_stderr("Fatal " SIGNAL_FMT " while backtracing\n", sig);
+    Server_status_file::set_status(Server_status_file::Status::STOPPED);
     _exit(MYSQLD_FAILURE_EXIT); /* Quit without running destructors */
   }
 
+  Server_status_file::set_status(Server_status_file::Status::STOPPING);
   s_handler_being_processed = true;
 
 #ifdef WITH_WSREP
@@ -246,6 +249,10 @@ extern "C" void handle_fatal_signal(int sig) {
   }
 
   buffered_error_log.write_to_disk();
+
+  // This is the last chance to report in the file.
+  // Below coredump will exit the process
+  Server_status_file::set_status(Server_status_file::Status::STOPPED);
 
   if ((test_flags & TEST_CORE_ON_SIGNAL) != 0) {
 #if HAVE_LIBCOREDUMPER
@@ -291,6 +298,9 @@ void my_server_abort() {
   static std::atomic_bool abort_processing{false};
   /* Broadcast that this thread wants to print the signal info. */
   aborts_pending++;
+
+  Server_status_file::set_status(Server_status_file::Status::STOPPING);
+
   /*
     Wait for the exclusive right to print the signal info. This assures the
     output is not interleaved.
@@ -320,6 +330,8 @@ void my_server_abort() {
     while (abort_processing.exchange(true)) {
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
+
+    Server_status_file::set_status(Server_status_file::Status::STOPPED);
     abort();
   }
   /*
