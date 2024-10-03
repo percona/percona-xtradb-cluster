@@ -30,7 +30,6 @@ PARENT_PID=""
 CLEANUP_CLONE_PLUGIN=""
 CLEANUP_CLONE_SSL=""
 CLONE_USER=""
-TSST_PORT=4444
 TIMOUT_WAIT_XST=60
 TIMOUT_WAIT_JOINER_CLONE_INSTANCE=90
 NC_PID=""
@@ -46,7 +45,6 @@ OS=$(uname)
 
 . $(dirname "$0")/wsrep_sst_common_clone
 
-
 wsrep_log_info "Running: $CMDLINE"
 
 MYPID=$$
@@ -59,10 +57,17 @@ fi
 wsrep_log_debug "-> MYPID: $MYPID PARENT PID $PARENT_PID"
 
 
+#Reading netcat port if available in config 
+TSST_PORT=$(parse_cnf sst netcat_port "4444") 
 
+#reading clone instance port if available in config
+CLONE_INSTANCE_PORT=$(parse_cnf sst clone_instance_port "6666")
 
 # To not use possible [client] section in my.cnf
 MYSQL_CLIENT="$MYSQL_CLIENT --no-defaults"
+
+
+
 
 cleanup_donor()
 {
@@ -76,9 +81,9 @@ cleanup_donor()
     else
         if [  "$CLEANUP_CLONE_SSL" == "" ]
         then
-            $MYSQL_ACLIENT -e "SET GLOBAL clone_ssl_cert='';
-                               SET GLOBAL clone_ssl_key='';
-                               SET GLOBAL clone_ssl_ca='';" || :
+            $MYSQL_ACLIENT -e "SET GLOBAL loose_clone_ssl_cert='';
+                               SET GLOBAL loose_clone_ssl_key='';
+                               SET GLOBAL loose_clone_ssl_ca='';" || :
         fi
     fi
     if [ ! "$CLONE_USER" == "" ]; then  
@@ -106,13 +111,8 @@ cleanup_joiner()
     
    if [ $CLEANUP_FILES ]
     then
-        rm -rf $CLONE_ERR
-        rm -rf $CLONE_SQL
-#    else
-#        # for easier troubleshooting merge in receiver error log
-#        wsrep_log_info "################# Clone recipient error log ##################"
-#        #cat $CLONE_ERR >> /dev/stderr
-#        wsrep_log_info "################# /Clone recipient error log ##################"
+        rm -rf $CLONE_ERR || :
+        rm -rf $CLONE_SQL || :
     fi
     wsrep_log_info "Joiner cleanup done."
 }
@@ -361,9 +361,9 @@ then
     MYSQL_ACLIENT="$MYSQL_CLIENT -u$ADMIN_USER -S$WSREP_SST_OPT_SOCKET \
                    --batch --skip_column_names --silent"
  
+    export MYSQL_PWD=$ADMIN_PSWD 
     if [ -z "$WSREP_SST_OPT_LPORT" ]; then
-       export MYSQL_PWD=$ADMIN_PSWD
-       readonly WSREP_SST_OPT_LPORT=`MYSQL_ACLIENT -e "select @@port" 2> /dev/null` || : 
+       readonly WSREP_SST_OPT_LPORT=`$MYSQL_ACLIENT -e "select @@port"` 
     fi
  
     wsrep_log_debug "-> WSREP_SST_OPT_LPORT: $WSREP_SST_OPT_LPORT "
@@ -467,6 +467,10 @@ CLONE INSTANCE FROM '$CLONE_USER'@'$LHOST':$WSREP_SST_OPT_LPORT IDENTIFIED BY '$
 EOF
 
         wsrep_log_debug "JOINER CLONE ACTION SQL: $CLONE_EXECUTE_SQL $MYSQL_PWD $MYSQL_RCLIENT"
+        if [[ -n "$WSREP_LOG_DEBUG" ]]; then
+           CLONE_EXECUTE=`cat $CLONE_EXECUTE_SQL` || :
+           wsrep_log_debug $CLONE_EXECUTE
+        fi   
         
         # Actual cloning process
         wsrep_log_info "JOINER CLONE ACTION CLONING: connecting"
@@ -638,7 +642,7 @@ then
     else
         CLONE_PORT=$(parse_cnf mysqld port "3306")
     fi
-    CLONE_PORT=6666
+    CLONE_PORT=$CLONE_INSTANCE_PORT
     
     wsrep_log_debug "-> CLONE_PORT $CLONE_PORT"
     
@@ -733,8 +737,8 @@ then
     fi
     
     # Report clone credentials/address to the caller
-    wsrep_log_debug "-> ready passing string |$CLONE_USER:$CLONE_PSWD@$WSREP_SST_OPT_HOST:$CLONE_PORT|"
-    echo "ready $CLONE_USER:$CLONE_PSWD@$WSREP_SST_OPT_HOST:$CLONE_PORT"
+    wsrep_log_debug "-> ready passing string |$CLONE_USER:$CLONE_PSWD]$WSREP_SST_OPT_HOST:$CLONE_PORT|"
+    echo "ready $CLONE_USER:$CLONE_PSWD]$WSREP_SST_OPT_HOST:$CLONE_PORT"
 
     #WAIT for joiner message
     wsrep_log_debug "-> wait $TIMOUT_WAIT_XST"   
@@ -786,7 +790,7 @@ then
         echo "" > $CLONE_ERR
         eval $CLONE_ENV $CLONE_BINARY $DEFAULT_OPTIONS \
              $SKIP_NETWORKING_OPTIONS \
-             --initialize --wsrep_provider=none --datadir="$tmp_datadir" >> $CLONE_ERR 2>&1 || \
+             --initialize-insecure --wsrep_provider=none --datadir="$tmp_datadir" >> $CLONE_ERR 2>&1 || \
         ( wsrep_log_error "Failed to initialize data directory. Some hints below:"
           grep '[ERROR]' $CLONE_ERR | cut -d ']' -f 4- | while read msg
           do
@@ -806,42 +810,32 @@ then
 
 # Need to create an extra user for 'localhost' because in some installations
 # by default exists user ''@'localhost' and shadows every user with '%'.
-# cat << EOF > "$CLONE_SQL"
-# SET SESSION sql_log_bin=OFF;
-# CREATE USER '$CLONE_USER'@'%' IDENTIFIED $WITH_OPTION BY '$CLONE_PSWD';
-# GRANT SYSTEM_VARIABLES_ADMIN ON *.* TO '$CLONE_USER';
-# GRANT CLONE_ADMIN ON *.* TO '$CLONE_USER';
-# GRANT SUPER ON *.* to '$CLONE_USER';
-# GRANT SHUTDOWN ON *.* TO '$CLONE_USER';
-# GRANT EXECUTE ON *.* to '$CLONE_USER';
-# GRANT INSERT ON mysql.plugin to '$CLONE_USER';
-# GRANT SELECT ON performance_schema.* TO '$CLONE_USER';
-# GRANT UPDATE ON performance_schema.setup_instruments TO '$CLONE_USER';
-# GRANT UPDATE ON performance_schema.setup_consumers TO '$CLONE_USER';
-# CREATE USER '$CLONE_USER'@'localhost' IDENTIFIED $WITH_OPTION BY '$CLONE_PSWD';
-# GRANT SYSTEM_VARIABLES_ADMIN ON *.* TO '$CLONE_USER'@'localhost';
-# GRANT CLONE_ADMIN ON *.* TO '$CLONE_USER'@'localhost';
-# GRANT SUPER ON *.* to '$CLONE_USER'@'localhost';
-# GRANT SHUTDOWN ON *.* TO '$CLONE_USER'@'localhost';
-# GRANT EXECUTE ON *.* to '$CLONE_USER'@'localhost';
-# GRANT INSERT ON mysql.plugin to '$CLONE_USER'@'localhost';
-# GRANT SELECT ON performance_schema.* TO '$CLONE_USER'@'localhost';
-# GRANT UPDATE ON performance_schema.setup_instruments TO '$CLONE_USER'@'localhost';
-# GRANT UPDATE ON performance_schema.setup_consumers TO '$CLONE_USER'@'localhost';
-# EOF
-
-cat << EOF > "$CLONE_SQL"
-SET SESSION sql_log_bin=OFF;
-DROP USER IF EXISTS '$CLONE_USER'@'%';
-DROP USER IF EXISTS '$CLONE_USER'@'localhost';
-CREATE USER '$CLONE_USER'@'%' IDENTIFIED $WITH_OPTION BY '$CLONE_PSWD';
-GRANT all ON *.* TO '$CLONE_USER';
-CREATE USER '$CLONE_USER'@'localhost' IDENTIFIED $WITH_OPTION BY '$CLONE_PSWD';
-GRANT all ON *.* TO '$CLONE_USER'@'localhost';
+ cat << EOF > "$CLONE_SQL"
+ SET SESSION sql_log_bin=OFF;
+ CREATE USER '$CLONE_USER'@'%' IDENTIFIED $WITH_OPTION BY '$CLONE_PSWD';
+ GRANT CLONE_ADMIN, SYSTEM_VARIABLES_ADMIN, SUPER, SHUTDOWN, EXECUTE ON *.* to '$CLONE_USER'@'%';
+ GRANT INSERT ON mysql.plugin to '$CLONE_USER';
+ GRANT SELECT,UPDATE,INSERT ON performance_schema.* TO '$CLONE_USER';
+ CREATE USER '$CLONE_USER'@'localhost' IDENTIFIED $WITH_OPTION BY '$CLONE_PSWD';
+ GRANT CLONE_ADMIN, SYSTEM_VARIABLES_ADMIN, SUPER, SHUTDOWN, EXECUTE ON *.* TO '$CLONE_USER'@'localhost';
+ GRANT EXECUTE ON *.* to '$CLONE_USER'@'localhost';
+ GRANT INSERT ON mysql.plugin to '$CLONE_USER'@'localhost';
+ GRANT SELECT,UPDATE,INSERT ON performance_schema.* TO '$CLONE_USER'@'localhost';
 EOF
 
+#cat << EOF > "$CLONE_SQL"
+#SET SESSION sql_log_bin=OFF;
+#DROP USER IF EXISTS '$CLONE_USER'@'%';
+#DROP USER IF EXISTS '$CLONE_USER'@'localhost';
+#CREATE USER '$CLONE_USER'@'%' IDENTIFIED $WITH_OPTION BY '$CLONE_PSWD';
+#GRANT all ON *.* TO '$CLONE_USER'@'%';
+#CREATE USER '$CLONE_USER'@'localhost' IDENTIFIED $WITH_OPTION BY '$CLONE_PSWD';
+#GRANT all ON *.* TO '$CLONE_USER'@'localhost';
+#EOF
+
+
     wsrep_log_info "Launching clone recipient daemon"
-    wsrep_log_debug "-> using: $CLONE_ENV $CLONE_BINARY_SAFE $DEFAULT_OPTIONS "
+    wsrep_log_info "-> using: $CLONE_ENV $CLONE_BINARY_SAFE $DEFAULT_OPTIONS "
     wsrep_log_debug "-> Test connection as: -u$CLONE_USER -p$CLONE_PSWD -h $CLONE_HOST -P $CLONE_PORT"
     
     #Define client
@@ -852,7 +846,9 @@ EOF
     eval WSREP_SST_CLONE=1 $CLONE_ENV $CLONE_BINARY $DEFAULT_OPTIONS \
         --wsrep_provider=none --init_file="$CLONE_SQL" >> $CLONE_ERR &
     
-    if [ "$?" == "0" ]; then
+    wsrep_log_info "-> Initialization user returned $?"
+     
+    if [ ! "$?" == "0" ]; then
         wsrep_log_error "-> User Creation on Joiner node failed, possible permission denied. Check permissions for "
         #we will try to silently shutdown the instance
         `$MYSQL_ACLIENT -e "SHUTDOWN" 2> /dev/null` || : 
@@ -865,7 +861,12 @@ EOF
         sleep 0.2
     done
     CLONE_REAL_PID=`cat $CLONE_PID_FILE`
-
+    
+    if [[ -n "$WSREP_LOG_DEBUG" ]]; then
+        GRANTS=`$MYSQL_ACLIENT -uroot -NB -e "show grants for '$CLONE_USER'@'localhost'"` 
+        wsrep_log_debug "-> Clone user grants: $GRANTS"
+    fi
+    
 #    trap "exit 32" HUP PIPE
 #    trap "exit 3"  INT TERM ABRT
     trap cleanup_joiner EXIT

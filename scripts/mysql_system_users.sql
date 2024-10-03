@@ -91,8 +91,12 @@ CREATE ROLE 'mysql.pxc.sst.role'@localhost;
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'mysql.pxc.sst.role'@localhost;
 
 GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER, CLONE_ADMIN,GROUP_REPLICATION_STREAM,SYSTEM_USER, SHUTDOWN,CONNECTION_ADMIN, CREATE USER ON *.* TO 'mysql.pxc.sst.role'@localhost WITH GRANT OPTION;
-
 GRANT INSERT ON mysql.plugin TO 'mysql.pxc.sst.role'@localhost WITH GRANT OPTION;
+GRANT CLONE_ADMIN, SYSTEM_VARIABLES_ADMIN, SUPER, SHUTDOWN, EXECUTE ON *.* to 'mysql.pxc.sst.role'@localhost WITH GRANT OPTION;
+GRANT INSERT ON mysql.plugin to 'mysql.pxc.sst.role'@localhost WITH GRANT OPTION;
+GRANT SELECT,UPDATE,INSERT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost WITH GRANT OPTION;
+
+
 
 GRANT ALTER, CREATE, SELECT, INSERT ON PERCONA_SCHEMA.xtrabackup_history TO 'mysql.pxc.sst.role'@localhost;
 -- For some reason this is also needed, although the docs say BACKUP_ADMIN is enough
