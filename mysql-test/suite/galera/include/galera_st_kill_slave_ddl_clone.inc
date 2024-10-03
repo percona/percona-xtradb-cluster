@@ -22,10 +22,6 @@ INSERT INTO t1 VALUES ('node2_committed_before');
 INSERT INTO t1 VALUES ('node2_committed_before');
 COMMIT;
 
-# Suspend the applier as it applies the ALTER TABLE
---let $debug_orig = `SELECT @@debug`
-SET GLOBAL debug = 'd,sync.alter_opened_table';
-
 --connection node_1
 ALTER TABLE t1 ADD COLUMN f2 INTEGER;
 
