@@ -15,8 +15,62 @@
 # along with this program; see the file COPYING. If not, write to the
 # Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston
 # MA  02110-1301  USA.
-
 # This is a reference script for clone-based state snapshot tansfer
+#
+
+#############################################################################
+# While this script is based on clone script from Codership, we have
+# done many changes to adapt it to PXC
+#===========================================================================
+#              ┌──────────────────┐                      
+#              │  Joiner starts   │                      
+#              └────────┬─────────┘                      
+#              ┌────────▼─────────┐                      
+#              │open NetCat listnr│                      
+#              └────────┬─────────┘                      
+#              ┌────────▼─────────┐                      
+#              │Send message to Dn│                      
+#              └────────┬─────────┘                      
+#              ┌────────▼─────────┐                      
+#              │Donor decide IST  │                      
+#              │or SST. Send msg  │                      
+#              │through NC and    │                      
+#              │waits for Joiner  │                      
+#              │Clone instance    │                      
+#              └────────┬─────────┘                      
+#              ┌────────▼─────────┐                      
+#              │Joiner get IST    │                      
+#              │or SST.If IST     │                      
+#              │Bypass all and    │                      
+#              │Wait for IST.     │                      
+#              │SST Start clone   │                      
+#              │Instance and wait │                      
+#              │for donor to clone│                      
+#              └─────────┬────────┘                      
+#              ┌─────────▼─────────────┐                 
+#              │Clone process is       │                 
+#              │reported.              │                 
+#              │When done Dn waits     │                 
+#              │Joiner close instance  │                 
+#              │And performs 3 restarts│                 
+#              └──────────┬────────────┘                 
+#              ┌──────────▼──────────────┐               
+#              │1) To fix dictionary     │               
+#              │2) To recover position   │               
+#              │3) Final cleanup         │               
+#              └──────────┬──────────────┘               
+#              ┌──────────▼──────────────┐               
+#              │Send final ready signal  │               
+#              │Waits for IST            │               
+#              └─────────────────────────┘               
+#----------------------------------------------------------------------------
+# Config variables:
+#[sst]
+#netcat_port=4442
+#wsrep-debug=true
+#clone_instance_port=4444
+#
+#############################################################################
 
 CMDLINE="$0 $*"
 
@@ -31,7 +85,7 @@ CLEANUP_CLONE_PLUGIN=""
 CLEANUP_CLONE_SSL=""
 CLONE_USER=""
 TIMOUT_WAIT_XST=60
-TIMOUT_WAIT_JOINER_CLONE_INSTANCE=90
+TIMOUT_WAIT_JOINER_CLONE_INSTANCE=200
 NC_PID=""
 RP_PURGED_EMERGENCY=""
 
@@ -290,6 +344,7 @@ setup_clone_plugin()
         CLEANUP_CLONE_SSL=
         REQUIRE_SSL=
     fi
+    # for now we force no SSL in the clone operations
     CLEANUP_CLONE_SSL=
     REQUIRE_SSL=
     wsrep_log_info "SSL Not supported yet."
