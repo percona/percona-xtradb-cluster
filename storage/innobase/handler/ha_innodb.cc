@@ -2065,11 +2065,21 @@ static inline dberr_t innobase_srv_conc_enter_innodb(row_prebuilt_t *prebuilt) {
   }
 
 #ifdef WITH_WSREP
-  // innodb_thread_concurreny limit how many thread can work in innodb
-  // at any given time. This limit is not applicable to wsrep-applier
-  // threads given they are high priority threads.
-  if (wsrep_on(prebuilt->trx->mysql_thd) &&
-      wsrep_thd_is_BF(prebuilt->trx->mysql_thd, false))
+  /*
+   innodb_thread_concurreny limit how many thread can work in innodb
+   at any given time. This limit is not applicable to:
+   1. wsrep-applier threads given they are high priority threads.
+   2. Actions executed from the sst_donor thread should not be blocked as well.
+      sst_donor thread runs with Galera LocalMonitor acquired.
+      If we have user threads entered innodb and about to commit, they will try
+      to acquire LocalMonitor as well, but will block. So without letting
+      sst_donor thread to move on here, we would end up in deadlock.
+   3. TOI, RSU, NBO threads only if they have wsrep_on enabled
+  */
+  THD *thd = prebuilt->trx->mysql_thd;
+  if (thd && WSREP_ON &&
+      (wsrep_thd_is_applying(thd) || thd->wsrep_applier ||
+       thd->wsrep_sst_donor || wsrep_thd_is_BF(thd, false)))
     return DB_SUCCESS;
 #endif /* WITH_WSREP */
 
@@ -2108,8 +2118,10 @@ static inline void innobase_srv_conc_exit_innodb(row_prebuilt_t *prebuilt) {
   // innodb_thread_concurreny limit how many thread can work in innodb
   // at any given time. This limit is not applicable to wsrep-applier
   // threads given they are high priority threads.
-  if (wsrep_on(prebuilt->trx->mysql_thd) &&
-      wsrep_thd_is_BF(prebuilt->trx->mysql_thd, false))
+  THD *thd = prebuilt->trx->mysql_thd;
+  if (thd && WSREP_ON &&
+      (wsrep_thd_is_applying(thd) || thd->wsrep_applier ||
+       thd->wsrep_sst_donor || wsrep_thd_is_BF(thd, false)))
     return;
 #endif /* WITH_WSREP */
 
