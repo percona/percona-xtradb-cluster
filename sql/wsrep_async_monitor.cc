@@ -6,21 +6,23 @@
 void Wsrep_async_monitor::enter(seqno_t seqno) {
   std::unique_lock<std::mutex> lock(m_mutex);
 
+  // Return if it has already entered the monitor
+  if (seqno == m_last_entered) return;
+
   // Wait for its turn before entering
   m_cond.wait(lock, [this, seqno]() { return seqno == m_last_left + 1; });
-  m_last_entered = (seqno > m_last_entered) ? seqno : m_last_entered;
+  m_last_entered = seqno;
   fprintf(stderr, "Entered the monitor with seqno: %llu\n", seqno);
 }
 
 void Wsrep_async_monitor::leave(seqno_t seqno) {
-  // Wait for its turn before leaving
   std::unique_lock<std::mutex> lock(m_mutex);
-  m_cond.wait(lock, [this, seqno]() { return seqno == m_last_left + 1; });
+  assert(seqno == m_last_left + 1);
   m_last_left = seqno;
 
-  fprintf(stderr, "Left the monitor seqno: %llu\n", seqno);
   // Notify all waiting threads
   m_cond.notify_all();
+  fprintf(stderr, "Left the monitor seqno: %llu\n", seqno);
 }
 
 void Wsrep_async_monitor::reset(seqno_t seqno) {

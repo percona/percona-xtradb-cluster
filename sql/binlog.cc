@@ -8942,14 +8942,14 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all) {
          trans_commit_stmt()) the following call to my_error() will allow
          overwriting the error */
       my_error(ER_TRANSACTION_ROLLBACK_DURING_COMMIT, MYF(0));
-      thd_leave_apply_monitor(thd);
+      thd_leave_async_monitor(thd);
       return RESULT_ABORTED;
     }
 
     int rc = ordered_commit(thd, all, skip_commit);
 
     if (run_wsrep_hooks) {
-      thd_leave_apply_monitor(thd);
+      thd_leave_async_monitor(thd);
       wsrep_after_commit(thd, all);
     }
 

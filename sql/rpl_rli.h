@@ -1804,12 +1804,6 @@ class Relay_log_info : public Rpl_info {
   void set_wsrep_async_monitor(Wsrep_async_monitor *monitor) {
     wsrep_async_monitor = monitor;
   }
-  void backup_last_position_for_recovery() {
-    wsrep_async_monitor_last_left = wsrep_async_monitor->last_left();
-  }
-  void restore_last_position_for_recovery() {
-    wsrep_async_monitor->reset(wsrep_async_monitor_last_left);
-  }
 #endif /* WITH_WSREP */
 
   /*
@@ -1857,14 +1851,6 @@ class Relay_log_info : public Rpl_info {
   inline void set_filter(Rpl_filter *channel_filter) {
     rpl_filter = channel_filter;
   }
-
-#ifdef WITH_WSREP
-  /*
-    Stores Wsrep_async_monitor's last_left seqno.
-    Will be used while resetting the last_left seqno during start replica.
-   */
-  unsigned long long wsrep_async_monitor_last_left;
-#endif /* WITH_WSREP */
 
  protected:
   Format_description_log_event *rli_description_event;

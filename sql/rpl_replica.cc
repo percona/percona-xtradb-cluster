@@ -5088,8 +5088,11 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
       return 1;
     }
 
+    // Initialize the monitor only when it finds the first GTID log event.
+    // Note: This stage must be skipped for MTS recovery.
     if (WSREP_ON && (ev->get_type_code() == binary_log::GTID_LOG_EVENT ||
-        ev->get_type_code() == binary_log::ANONYMOUS_GTID_LOG_EVENT)) {
+        ev->get_type_code() == binary_log::ANONYMOUS_GTID_LOG_EVENT) &&
+        !rli->is_mts_recovery()) {
 
         static bool async_monitor_init_done = false;
 
@@ -7303,9 +7306,6 @@ wsrep_restart_point :
       && rli->opt_replica_parallel_workers > 1) {
     wsrep_async_monitor = new Wsrep_async_monitor();
     rli->set_wsrep_async_monitor(wsrep_async_monitor);
-    if (rli->wsrep_async_monitor_last_left != 0) {
-      rli->restore_last_position_for_recovery();
-    }
   }
 #endif /* WITH_WSREP */
 
@@ -7744,7 +7744,6 @@ err:
 
 #ifdef WITH_WSREP
   if (wsrep_async_monitor) {
-    rli->backup_last_position_for_recovery();
     rli->set_wsrep_async_monitor(nullptr);
     delete wsrep_async_monitor;
   }
