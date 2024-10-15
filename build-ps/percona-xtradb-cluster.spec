@@ -1214,7 +1214,7 @@ fi
   %systemd_post mysql
 %endif
 
-if [ -d /etc/percona-xtradb-clister.conf.d ]; then
+if [ -d /etc/percona-xtradb-cluster.conf.d ]; then
     CONF_EXISTS=$(grep "percona-xtradb-cluster.conf.d" /etc/my.cnf | wc -l)
     if [ ${CONF_EXISTS} = 0 ]; then
         echo "!includedir /etc/percona-xtradb-cluster.conf.d/" >> /etc/my.cnf
