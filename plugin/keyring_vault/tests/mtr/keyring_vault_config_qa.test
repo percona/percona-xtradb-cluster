@@ -51,14 +51,13 @@ call mtr.add_suppression("for being a mount point successful - identified kv-v2 
 --enable_query_log
 
 # Installing keyring plugin.
---replace_regex /\.dll/.so/
-eval INSTALL PLUGIN keyring_vault SONAME '$KEYRING_VAULT_PLUGIN';
+--let $restart_parameters = restart: $KEYRING_VAULT_PLUGIN_OPT $KEYRING_VAULT_PLUGIN_EARLY_LOAD --keyring_vault_config=$conf_file1
+--let $do_not_echo_parameters = 1
+--source include/restart_mysqld.inc
+
 # Check keyring plugin
 query_vertical SELECT PLUGIN_NAME,PLUGIN_VERSION,PLUGIN_STATUS
 FROM INFORMATION_SCHEMA.PLUGINS WHERE plugin_name='keyring_vault';
---echo
---replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
-eval SET @@global.keyring_vault_config='$conf_file1';
 --replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
 SELECT @@global.keyring_vault_config;
 # Creating table with encryption.

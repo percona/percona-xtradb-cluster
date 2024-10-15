@@ -35,12 +35,9 @@ call mtr.add_suppression("for being a mount point unsuccessful - skipped.");
 call mtr.add_suppression("for being a mount point successful - identified kv-v2 secret engine.");
 --enable_query_log
 
---replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
---error ER_UNKNOWN_SYSTEM_VARIABLE
-eval SET @@global.keyring_vault_config='$conf_file1';
-
---replace_regex /\.dll/.so/
-eval INSTALL PLUGIN keyring_vault SONAME '$KEYRING_VAULT_PLUGIN';
+--let $restart_parameters = restart: $KEYRING_VAULT_PLUGIN_OPT $KEYRING_VAULT_PLUGIN_EARLY_LOAD --keyring_vault_config=$conf_file1
+--let $do_not_echo_parameters = 1
+--source include/restart_mysqld.inc
 
 --replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
 eval SET @@global.keyring_vault_config='$conf_file2';
