@@ -717,6 +717,7 @@ THD::THD(bool enable_plugins)
       wsrep_prepared_statement_TOI_started(false),
       wsrep_bin_log_flag_save(0),
       wsrep_applier(is_applier),
+      wsrep_sst_donor(false),
       wsrep_applier_closing(false),
       wsrep_client_thread(false),
       wsrep_allow_mdl_conflict(false),

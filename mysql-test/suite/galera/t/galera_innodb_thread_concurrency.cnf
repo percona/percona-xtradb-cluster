@@ -1,0 +1,3 @@
+!include ../galera_2nodes.cnf
+[mysqld.1]
+innodb_thread_concurrency=2

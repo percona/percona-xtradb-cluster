@@ -3191,6 +3191,7 @@ class THD : public MDL_context_owner,
   bool wsrep_prepared_statement_TOI_started;
   ulonglong wsrep_bin_log_flag_save;
   bool wsrep_applier;         /* dedicated slave applier thread */
+  bool wsrep_sst_donor;       /* SST donor thread */
   bool wsrep_applier_closing; /* applier marked to close */
   bool wsrep_client_thread;   /* to identify client threads */
   bool wsrep_allow_mdl_conflict;
