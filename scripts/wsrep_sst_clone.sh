@@ -467,7 +467,7 @@ EOF
         echo "SST@$WSREP_SST_OPT_GTID" | nc -w 0 $WSREP_SST_OPT_HOST $TSST_PORT || :
         
         # we stay on hold now, waiting for the Joiner to expose the service
-        wsrep_log_info "-> WAIT for Joiner MySQL to be available nc -w 0.5 -i 0.5 $SST_HOST_STRIPPED $WSREP_SST_OPT_PORT"
+        wsrep_log_info "-> WAIT for Joiner MySQL to be available nc -w 1 -i 1 $SST_HOST_STRIPPED $WSREP_SST_OPT_PORT"
         while [ 1 == 1 ]; do
         	NCPING=`nc -w 1 -i 1 $SST_HOST_STRIPPED $WSREP_SST_OPT_PORT 2> /dev/null` || : 
             if [ "$NCPING" == "" ]; then
