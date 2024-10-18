@@ -405,7 +405,7 @@ IF(WIN32)
 
 ELSE()
   IF(WITH_WSREP)
-    SET(WSREP_BINARIES wsrep_sst_common wsrep_sst_xtrabackup-v2 clustercheck pyclustercheck)
+    SET(WSREP_BINARIES wsrep_sst_common wsrep_sst_xtrabackup-v2 clustercheck pyclustercheck wsrep_sst_common_clone wsrep_sst_clone)
   ENDIF()
 
   SET(PKGCONFIG_FILE ${LIBMYSQL_OS_OUTPUT_NAME}.pc)
@@ -458,6 +458,8 @@ ELSE()
       ${BIN_SCRIPTS}
       wsrep_sst_common
       wsrep_sst_xtrabackup-v2
+      wsrep_sst_common_clone
+      wsrep_sst_clone
       )
   ENDIF()
 
