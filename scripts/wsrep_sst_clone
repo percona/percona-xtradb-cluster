@@ -463,13 +463,13 @@ EOF
             exit $RC
         fi
         #Before waiting for the Joiner Clone mysql we send out the message this is a SST
-        wsrep_log_debug "-> NETCAT signal to nc $WSREP_SST_OPT_HOST $TSST_PORT"
-        echo "SST@$WSREP_SST_OPT_GTID" | nc $WSREP_SST_OPT_HOST $TSST_PORT || :
+        wsrep_log_debug "-> NETCAT signal to nc -w 0 $WSREP_SST_OPT_HOST $TSST_PORT"
+        echo "SST@$WSREP_SST_OPT_GTID" | nc -w 0 $WSREP_SST_OPT_HOST $TSST_PORT || :
         
         # we stay on hold now, waiting for the Joiner to expose the service
         wsrep_log_info "-> WAIT for Joiner MySQL to be available nc -w 0.5 -i 0.5 $SST_HOST_STRIPPED $WSREP_SST_OPT_PORT"
         while [ 1 == 1 ]; do
-        	NCPING=`nc -w 0.5 -i 0.5 $SST_HOST_STRIPPED $WSREP_SST_OPT_PORT 2> /dev/null` || : 
+        	NCPING=`nc -w 1 -i 1 $SST_HOST_STRIPPED $WSREP_SST_OPT_PORT 2> /dev/null` || : 
             if [ "$NCPING" == "" ]; then
                 wsrep_log_info "[second(s) to timeout: $TIMOUT_WAIT_JOINER_CLONE_INSTANCE]"
             else 
