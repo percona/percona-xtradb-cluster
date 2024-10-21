@@ -296,6 +296,10 @@ static inline int wsrep_before_commit(THD *thd, bool all) {
   WSREP_DEBUG("wsrep_before_commit: %d, %lld", wsrep_is_real(thd, all),
               (long long)wsrep_thd_trx_seqno(thd));
   int ret = 0;
+
+  /* Enter the async monitor */
+  thd_enter_async_monitor(thd);
+
   assert(wsrep_run_commit_hook(thd, all));
   if ((ret = thd->wsrep_cs().before_commit()) == 0) {
     assert(!thd->wsrep_trx().ws_meta().gtid().is_undefined());

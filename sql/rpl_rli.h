@@ -64,6 +64,9 @@
 #include "sql/sql_class.h"    // THD
 #include "sql/system_variables.h"
 #include "sql/table.h"
+#ifdef WITH_WSREP
+#include "sql/wsrep_async_monitor.h"
+#endif /* WITH_WSREP */
 
 class Commit_order_manager;
 class Master_info;
@@ -1794,6 +1797,15 @@ class Relay_log_info : public Rpl_info {
     commit_order_mngr = mngr;
   }
 
+#ifdef WITH_WSREP
+  Wsrep_async_monitor* get_wsrep_async_monitor() {
+    return wsrep_async_monitor;
+  }
+  void set_wsrep_async_monitor(Wsrep_async_monitor *monitor) {
+    wsrep_async_monitor = monitor;
+  }
+#endif /* WITH_WSREP */
+
   /*
     Following set function is required to initialize the 'until_option' during
     MTS relay log recovery process.
@@ -1851,6 +1863,12 @@ class Relay_log_info : public Rpl_info {
    */
   Commit_order_manager *commit_order_mngr;
 
+#ifdef WITH_WSREP
+  /*
+    Wsrep_async_monitor orders DMLs and DDls in galera.
+   */
+  Wsrep_async_monitor *wsrep_async_monitor;
+#endif /* WITH_WSREP */
   /**
     Delay slave SQL thread by this amount of seconds.
     The delay is applied per transaction and based on the immediate master's

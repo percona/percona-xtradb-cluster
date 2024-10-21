@@ -443,6 +443,9 @@ extern PSI_thread_key key_THREAD_wsrep_post_rollbacker;
 extern PSI_file_key key_file_wsrep_gra_log;
 #endif /* HAVE_PSI_INTERFACE */
 
+void thd_enter_async_monitor(THD* thd);
+void thd_leave_async_monitor(THD* thd);
+
 class Alter_info;
 int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
                              const Table_ref *table_list,

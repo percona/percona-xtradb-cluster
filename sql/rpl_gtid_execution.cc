@@ -355,6 +355,13 @@ static inline void skip_statement(THD *thd) {
     to notify that its session ticket was consumed.
   */
   Commit_stage_manager::get_instance().finish_session_ticket(thd);
+#ifdef WITH_WSREP
+  /* Despite the transaction was skipped, it needs to be updated in the Wsrep_async_monitor */
+  if (thd->slave_thread) {
+    thd_enter_async_monitor(thd);
+    thd_leave_async_monitor(thd);
+  }
+#endif /* WITH_WSREP */
 
 #ifndef NDEBUG
   const Gtid_set *executed_gtids = gtid_state->get_executed_gtids();

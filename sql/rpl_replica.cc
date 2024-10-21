@@ -172,6 +172,10 @@
 #endif
 #include "scope_guard.h"
 
+#ifdef WITH_WSREP
+#include "sql/wsrep_async_monitor.h"
+#endif /* WITH_WSREP */
+
 struct mysql_cond_t;
 struct mysql_mutex_t;
 
@@ -5083,6 +5087,28 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
       WSREP_INFO("Wsrep before statement error");
       return 1;
     }
+
+    // Initialize the monitor only when it finds the first GTID log event.
+    // Note: This stage must be skipped for MTS recovery.
+    if (WSREP_ON && (ev->get_type_code() == binary_log::GTID_LOG_EVENT ||
+        ev->get_type_code() == binary_log::ANONYMOUS_GTID_LOG_EVENT) &&
+        !rli->is_mts_recovery()) {
+
+        static bool async_monitor_init_done = false;
+
+        // Set the last_entered_ if we are starting applier thread post server
+        // shutdown.
+        if (!async_monitor_init_done) {
+          Wsrep_async_monitor *async_monitor=rli->get_wsrep_async_monitor();
+          if (async_monitor && async_monitor->last_left() == 0) {
+            const Gtid_log_event* gtid_ev = static_cast<Gtid_log_event *>(ev);
+            unsigned long long seqno = gtid_ev->sequence_number;
+            assert (seqno != 0);
+            async_monitor->reset(seqno - 1);
+            async_monitor_init_done = true;
+          }
+        }
+    }
 #endif /* WITH_WSREP */
 
     enum enum_slave_apply_event_and_update_pos_retval exec_res;
@@ -7225,6 +7251,9 @@ extern "C" void *handle_slave_sql(void *arg) {
   bool mts_inited = false;
   Global_THD_manager *thd_manager = Global_THD_manager::get_instance();
   Commit_order_manager *commit_order_mngr = nullptr;
+#ifdef WITH_WSREP
+  Wsrep_async_monitor *wsrep_async_monitor = nullptr;
+#endif /* WITH_WSREP */
   Rpl_applier_reader applier_reader(rli);
   Relay_log_info::enum_priv_checks_status priv_check_status =
       Relay_log_info::enum_priv_checks_status::SUCCESS;
@@ -7269,6 +7298,16 @@ wsrep_restart_point :
         new Commit_order_manager(rli->opt_replica_parallel_workers);
 
   rli->set_commit_order_manager(commit_order_mngr);
+
+#ifdef WITH_WSREP
+  // Restore the last executed seqno
+  if (WSREP_ON && opt_replica_preserve_commit_order
+      && !rli->is_parallel_exec()
+      && rli->opt_replica_parallel_workers > 1) {
+    wsrep_async_monitor = new Wsrep_async_monitor();
+    rli->set_wsrep_async_monitor(wsrep_async_monitor);
+  }
+#endif /* WITH_WSREP */
 
   if (channel_map.is_group_replication_channel_name(rli->get_channel())) {
     if (channel_map.is_group_replication_channel_name(rli->get_channel(),
@@ -7702,6 +7741,13 @@ err:
     rli->set_commit_order_manager(nullptr);
     delete commit_order_mngr;
   }
+
+#ifdef WITH_WSREP
+  if (wsrep_async_monitor) {
+    rli->set_wsrep_async_monitor(nullptr);
+    delete wsrep_async_monitor;
+  }
+#endif /* WITH_WSREP */
 
   mysql_mutex_unlock(&rli->info_thd_lock);
   set_thd_in_use_temporary_tables(

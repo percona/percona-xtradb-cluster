@@ -2870,6 +2870,61 @@ static void wsrep_RSU_end(THD *thd) {
   thd->disable_binlog_guard.reset();
 }
 
+void thd_enter_async_monitor(THD* thd) {
+
+  // Only replica threads are allowed to enter
+  if (thd->slave_thread) {
+
+    // If the thread is already killed, leave it to the called to handle it.
+    if (thd->killed != THD::NOT_KILLED) {
+      return;
+    }
+    Slave_worker * sw = dynamic_cast<Slave_worker*>(thd->rli_slave);
+    Wsrep_async_monitor *wsrep_async_monitor {sw->get_wsrep_async_monitor()};
+    if (wsrep_async_monitor) {
+      auto seqno = sw->sequence_number();
+      assert(seqno > 0);
+      // TODO: If requied, we must set current_mutex and current_cond here
+      // i.e, thd->enter_cond();
+      wsrep_async_monitor->enter(seqno);
+    } else {
+      // Error out and exit if we have more than one parallel worker and async monitor
+      // is not set yet.
+      if (opt_replica_preserve_commit_order && opt_mts_replica_parallel_workers > 1) {
+        WSREP_ERROR("Async replica thread %u is not monitored by wsrep async monitor",
+                     thd->thread_id());
+        exit(1);
+      }
+    }
+  }
+}
+
+void thd_leave_async_monitor(THD* thd) {
+  if (thd->slave_thread) {
+    Slave_worker * sw = dynamic_cast<Slave_worker*>(thd->rli_slave);
+    Wsrep_async_monitor *wsrep_async_monitor {sw->get_wsrep_async_monitor()};
+    if (wsrep_async_monitor) {
+      auto seqno = sw->sequence_number();
+      assert(seqno > 0);
+      wsrep_async_monitor->leave(seqno);
+      {
+        if (thd->wsrep_skip_wsrep_hton == true)
+          fprintf(stderr, "DDL: thd_leave_apply_monitor: seqno=%llu\n", seqno);
+        else
+          fprintf(stderr, "DML: thd_leave_apply_monitor: seqno=%llu\n", seqno);
+      }
+    } else {
+      // Error out and exit if we have more than one parallel worker and async monitor
+      // is not set yet.
+      if (opt_replica_preserve_commit_order && opt_mts_replica_parallel_workers > 1) {
+        WSREP_ERROR("Async replica thread %u is not monitored by wsrep async monitor",
+                     thd->thread_id());
+        exit(1);
+      }
+    }
+  }
+}
+
 int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
                              const Table_ref *table_list,
                              dd::Tablespace_table_ref_vec *trefs,
@@ -2966,6 +3021,8 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
     thd->variables.auto_increment_increment = 1;
   }
 
+  thd_enter_async_monitor(thd);
+
   DEBUG_SYNC(thd, "wsrep_to_isolation_begin_before_replication");
 
   if (thd->variables.wsrep_on && wsrep_thd_is_local(thd)) {
@@ -3038,6 +3095,8 @@ void wsrep_to_isolation_end(THD *thd) {
     assert(0);
   }
   if (wsrep_emulate_bin_log) wsrep_thd_binlog_trx_reset(thd);
+
+  thd_leave_async_monitor(thd);
 
   DEBUG_SYNC(thd, "wsrep_to_isolation_end_before_wsrep_skip_wsrep_hton");
   mysql_mutex_lock(&thd->LOCK_thd_data);
