@@ -1123,6 +1123,7 @@ static MYSQL_SESSION setup_server_session(bool initialize_thread) {
   }
   // Turn wsrep off here (because the server session has it's own THD object)
   session->get_thd()->variables.wsrep_on = false;
+  session->get_thd()->wsrep_sst_donor = true;
   return session;
 }
 
@@ -1277,6 +1278,7 @@ static void *sst_donor_thread(void *a) {
   wsp::thd thd(false);  // we turn off wsrep_on for this THD so that it can
                         // operate with wsrep_ready == OFF
 
+  thd.ptr->wsrep_sst_donor = true;
   // Create the SST auth user
   err = wsrep_create_sst_user(true, password.c_str());
 
