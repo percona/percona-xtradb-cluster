@@ -209,9 +209,8 @@ int replace_table_table(THD *thd, GRANT_TABLE *grant_table,
                         Access_bitmask col_rights, bool revoke_grant);
 int replace_routine_table(THD *thd, GRANT_NAME *grant_name, TABLE *table,
                           const LEX_USER &combo, const char *db,
-<<<<<<< HEAD
-                          const char *routine_name, bool is_proc, ulong rights,
-                          bool revoke_grant);
+                          const char *routine_name, bool is_proc,
+                          Access_bitmask rights, bool revoke_grant);
 #ifdef WITH_WSREP
 int open_grant_tables(THD *thd, Table_ref *tables, bool *transactional_tables,
                       const char *db = WSREP_MYSQL_DB,
@@ -219,15 +218,6 @@ int open_grant_tables(THD *thd, Table_ref *tables, bool *transactional_tables,
 #else
 int open_grant_tables(THD *thd, TABLE_LIST *tables, bool *transactional_tables);
 #endif /* WITH_WSREP */
-||||||| 30dc4e71fd6
-                          const char *routine_name, bool is_proc, ulong rights,
-                          bool revoke_grant);
-int open_grant_tables(THD *thd, Table_ref *tables, bool *transactional_tables);
-=======
-                          const char *routine_name, bool is_proc,
-                          Access_bitmask rights, bool revoke_grant);
-int open_grant_tables(THD *thd, Table_ref *tables, bool *transactional_tables);
->>>>>>> ps/Percona-Server-8.0.39-30
 void acl_tables_setup_for_read(Table_ref *tables);
 
 void acl_print_ha_error(int handler_error);

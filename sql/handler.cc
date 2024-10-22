@@ -2209,31 +2209,10 @@ int ha_rollback_low(THD *thd, bool all) {
 
   (void)RUN_HOOK(transaction, before_rollback, (thd, all));
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   (void)wsrep_before_rollback(thd, all);
 #endif /* WITH_WSREP */
 
-  if (ha_list) {
-    bool restore_backup_ha_data = false;
-    /*
-      Similarly to the commit case, the binlog or slave applier
-      reattaches the engine ha_data to THD.
-    */
-    if (all && thd->is_engine_ha_data_detached()) {
-      assert(trn_ctx->xid_state()->get_state() != XID_STATE::XA_NOTR ||
-             thd->killed == THD::KILL_CONNECTION);
-||||||| 30dc4e71fd6
-  if (ha_list) {
-    bool restore_backup_ha_data = false;
-    /*
-      Similarly to the commit case, the binlog or slave applier
-      reattaches the engine ha_data to THD.
-    */
-    if (all && thd->is_engine_ha_data_detached()) {
-      assert(trn_ctx->xid_state()->get_state() != XID_STATE::XA_NOTR ||
-             thd->killed == THD::KILL_CONNECTION);
-=======
   /*
     Similar to the commit case, the binlog or slave applier reattaches the
     engine ha_data to THD, previously saved at XA START.
@@ -2242,23 +2221,11 @@ int ha_rollback_low(THD *thd, bool all) {
       all && thd->is_engine_ha_data_detached() &&
       (trn_ctx->xid_state()->get_state() != XID_STATE::XA_NOTR ||
        thd->killed == THD::KILL_CONNECTION);
->>>>>>> ps/Percona-Server-8.0.39-30
 
   for (auto &ha_info : ha_list) {
     int err;
     auto ht = ha_info.ht();
     if ((err = ht->rollback(ht, thd, all))) {  // cannot happen
-      char errbuf[MYSQL_ERRMSG_SIZE];
-      my_error(ER_ERROR_DURING_ROLLBACK, MYF(0), err,
-               my_strerror(errbuf, MYSQL_ERRMSG_SIZE, err));
-      error = 1;
-    }
-<<<<<<< HEAD
-
-    for (auto &ha_info : ha_list) {
-      int err;
-      auto ht = ha_info.ht();
-      if ((err = ht->rollback(ht, thd, all))) {  // cannot happen
 
 #ifdef WITH_WSREP
         WSREP_INFO(
@@ -2272,42 +2239,17 @@ int ha_rollback_low(THD *thd, bool all) {
         }
 #endif /* WITH_WSREP */
 
-        char errbuf[MYSQL_ERRMSG_SIZE];
-        my_error(ER_ERROR_DURING_ROLLBACK, MYF(0), err,
-                 my_strerror(errbuf, MYSQL_ERRMSG_SIZE, err));
-        error = 1;
-      }
-      assert(!thd->status_var_aggregated);
-      thd->status_var.ha_rollback_count++;
-      ha_info.reset(); /* keep it conveniently zero-filled */
-#ifdef WITH_WSREP
-      DEBUG_SYNC(thd, "ha_rollback_low_after_ha_reset");
-#endif
+      char errbuf[MYSQL_ERRMSG_SIZE];
+      my_error(ER_ERROR_DURING_ROLLBACK, MYF(0), err,
+               my_strerror(errbuf, MYSQL_ERRMSG_SIZE, err));
+      error = 1;
     }
-    if (restore_backup_ha_data) thd->rpl_reattach_engine_ha_data();
-    trn_ctx->reset_scope(trx_scope);
-||||||| 30dc4e71fd6
-
-    for (auto &ha_info : ha_list) {
-      int err;
-      auto ht = ha_info.ht();
-      if ((err = ht->rollback(ht, thd, all))) {  // cannot happen
-        char errbuf[MYSQL_ERRMSG_SIZE];
-        my_error(ER_ERROR_DURING_ROLLBACK, MYF(0), err,
-                 my_strerror(errbuf, MYSQL_ERRMSG_SIZE, err));
-        error = 1;
-      }
-      assert(!thd->status_var_aggregated);
-      thd->status_var.ha_rollback_count++;
-      ha_info.reset(); /* keep it conveniently zero-filled */
-    }
-    if (restore_backup_ha_data) thd->rpl_reattach_engine_ha_data();
-    trn_ctx->reset_scope(trx_scope);
-=======
     assert(!thd->status_var_aggregated);
     thd->status_var.ha_rollback_count++;
     ha_info.reset(); /* keep it conveniently zero-filled */
->>>>>>> ps/Percona-Server-8.0.39-30
+#ifdef WITH_WSREP
+    DEBUG_SYNC(thd, "ha_rollback_low_after_ha_reset");
+#endif
   }
 
   if (need_restore_backup_ha_data) thd->rpl_reattach_engine_ha_data();
