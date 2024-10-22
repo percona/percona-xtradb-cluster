@@ -1344,7 +1344,7 @@ h	test	u1	t1	a	Select,Insert,Update,References
 h	test	u1	t2	a	Insert
 SELECT host, db, user, table_name, grantor, table_priv, column_priv FROM mysql.tables_priv
 WHERE NOT (user = 'mysql.session'
-AND table_name IN ('component', 'replication_group_members'));
+AND table_name IN ('component', 'replication_group_members', 'wsrep_cluster', 'wsrep_cluster_members'));
 host	db	user	table_name	grantor	table_priv	column_priv
 h	test	u1	t1	root@localhost		Select,Insert,Update,References
 h	test	u1	t2	root@localhost		Insert
@@ -1359,7 +1359,7 @@ SELECT host, db, user, table_name, column_name, column_priv FROM mysql.columns_p
 host	db	user	table_name	column_name	column_priv
 SELECT host, db, user, table_name, grantor, table_priv, column_priv FROM mysql.tables_priv
 WHERE NOT (user = 'mysql.session'
-AND table_name IN ('component', 'replication_group_members'));
+AND table_name IN ('component', 'replication_group_members', 'wsrep_cluster', 'wsrep_cluster_members'));
 host	db	user	table_name	grantor	table_priv	column_priv
 localhost	PERCONA_SCHEMA	mysql.pxc.sst.role	xtrabackup_history	boot@	Select,Insert,Create,Alter	
 localhost	mysql	mysql.session	user	root@localhost	Select	

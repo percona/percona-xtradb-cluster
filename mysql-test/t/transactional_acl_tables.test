@@ -1831,7 +1831,7 @@ GRANT INSERT(a) ON t2 TO u1@h;
 SELECT host, db, user, table_name, column_name, column_priv FROM mysql.columns_priv;
 SELECT host, db, user, table_name, grantor, table_priv, column_priv FROM mysql.tables_priv
 WHERE NOT (user = 'mysql.session'
-AND table_name IN ('component', 'replication_group_members'));
+AND table_name IN ('component', 'replication_group_members', 'wsrep_cluster', 'wsrep_cluster_members'));
 DELETE FROM mysql.columns_priv WHERE host = 'h' AND user = 'u1'
 AND table_name = 't1';
 COMMIT;
@@ -1840,7 +1840,7 @@ REVOKE ALL PRIVILEGES, GRANT OPTION FROM u1@h;
 SELECT host, db, user, table_name, column_name, column_priv FROM mysql.columns_priv;
 SELECT host, db, user, table_name, grantor, table_priv, column_priv FROM mysql.tables_priv
 WHERE NOT (user = 'mysql.session'
-AND table_name IN ('component', 'replication_group_members'));
+AND table_name IN ('component', 'replication_group_members', 'wsrep_cluster', 'wsrep_cluster_members'));
 SHOW GRANTS FOR u1@h;
 
 # Check whether on FLUSH PRIVILEGES the GRANT_TABLE::init handles OUT OF MEMORY

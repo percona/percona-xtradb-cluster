@@ -1077,6 +1077,14 @@ static const char *percona_telemetry_install[] = {
     "INSERT IGNORE INTO mysql.tables_priv VALUES ('localhost', "
     "'performance_schema', 'mysql.session', 'replication_group_members', "
     "'root@localhost', NOW(), 'Select', '');\n",
+#ifdef WITH_WSREP
+    "INSERT IGNORE INTO mysql.tables_priv VALUES ('localhost', 'mysql', "
+    "'mysql.session', 'wsrep_cluster_members', 'root@localhost', NOW(), "
+    "'Select', '');\n",
+    "INSERT IGNORE INTO mysql.tables_priv VALUES ('localhost', 'mysql', "
+    "'mysql.session', 'wsrep_cluster', 'root@localhost', NOW(), 'Select', "
+    "'');\n",
+#endif
     NULL};
 
 static const char *percona_telemetry_uninstall[] = {

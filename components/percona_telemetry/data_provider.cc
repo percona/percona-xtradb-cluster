@@ -15,6 +15,7 @@
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA */
 
 #include <mysqld_error.h>
+#include <regex>
 #include <sstream>
 
 #include "data_provider.h"
@@ -121,7 +122,9 @@ DataProvider::DataProvider(
       command_error_info_service_(command_error_info_service),
       command_thread_service_(command_thread_service),
       logger_(logger),
-      db_replication_id_solver_(std::make_shared<DbReplicationIdSolver>()) {}
+      db_replication_id_solver_(std::make_shared<DbReplicationIdSolver>()),
+      gcache_encryption_enabled_cache_(-1),
+      ws_cache_encryption_enabled_cache_(-1) {}
 
 void DataProvider::thread_access_begin() { command_thread_service_.init(); }
 
@@ -149,9 +152,8 @@ bool DataProvider::do_query(const std::string &query, QueryResult *result,
     is safe, because internally it checks if provided pointer is valid
   */
   std::shared_ptr<MYSQL_H> mysql_h_close_guard(
-      &mysql_h, [&srv = command_factory_service_](MYSQL_H *ptr) {
-        srv.close(*ptr);
-      });
+      &mysql_h,
+      [&srv = command_factory_service_](MYSQL_H *ptr) { srv.close(*ptr); });
 
   mysql_service_status_t sstatus = command_factory_service_.init(&mysql_h);
 
@@ -530,11 +532,43 @@ bool DataProvider::collect_async_replication_info(
 }
 
 #ifdef WITH_WSREP
+/* The following two methods detect if the option is enabled according to
+   string -> bool conversion rules in Galera gu_str2bool() */
+static const std::string galera_true = "1|y|on|yes|yep|true|sure|yeah";
+
+/* 'gcache.encryption' is read-only Galera option.
+   'options' string is always finished with the semicolon. */
+bool DataProvider::get_gcache_encryption_enabled(const std::string &options) {
+  static std::regex enabled_regex(
+      "gcache\\.encryption\\s*=\\s*(" + galera_true + ");",
+      std::regex_constants::icase);
+
+  if (gcache_encryption_enabled_cache_ == -1 && options.length() > 0) {
+    gcache_encryption_enabled_cache_ =
+        std::regex_search(options, enabled_regex) ? 1 : 0;
+  }
+  return gcache_encryption_enabled_cache_ == 1;
+}
+
+/* 'allocator.disk_pages_encryption' is read-only Galera option.
+   'options' string is always finished with the semicolon. */
+bool DataProvider::get_ws_cache_encryption_enabled(const std::string &options) {
+  static std::regex enabled_regex(
+      "allocator\\.disk_pages_encryption\\s*=\\s*(" + galera_true + ");",
+      std::regex_constants::icase);
+
+  if (ws_cache_encryption_enabled_cache_ == -1 && options.length() > 0) {
+    ws_cache_encryption_enabled_cache_ =
+        std::regex_search(options, enabled_regex) ? 1 : 0;
+  }
+  return ws_cache_encryption_enabled_cache_ == 1;
+}
+
 bool DataProvider::collect_galera_replication_info(
     rapidjson::Document *document) {
   // Do fast check if there is anything to learn about PXC
   QueryResult result;
-  if (do_query("SELECT @@global.wsrep_provider", &result, nullptr, true)) {
+  if (do_query("SELECT @@global.wsrep_provider", &result, nullptr)) {
     return true;
   }
 
@@ -551,7 +585,8 @@ bool DataProvider::collect_galera_replication_info(
   }
 
   // cluster size
-  if (do_query("SELECT COUNT(*) FROM mysql.wsrep_cluster_members", &result, nullptr, true)) {
+  if (do_query("SELECT COUNT(*) FROM mysql.wsrep_cluster_members", &result,
+               nullptr)) {
     return true;
   }
 
@@ -566,7 +601,8 @@ bool DataProvider::collect_galera_replication_info(
 
 
   // collect wsrep cluster_uuid and store it in replication_id_solver
-  if (do_query("SELECT cluster_uuid FROM mysql.wsrep_cluster", &result, nullptr, true)) {
+  if (do_query("SELECT cluster_uuid FROM mysql.wsrep_cluster", &result,
+               nullptr)) {
     return true;
   }
   db_replication_id_solver_->vote(
@@ -574,13 +610,14 @@ bool DataProvider::collect_galera_replication_info(
 
 
   /* things we can learn from wsrep_provider_options */
-  if (do_query("SELECT @@global.wsrep_provider_options", &result, nullptr, true)) {
+  if (do_query("SELECT @@global.wsrep_provider_options", &result, nullptr)) {
     return true;
   }
 
   /* gcache/writeset cache encryption */
-  bool gcache_encryption_enabled = (result[0][0].find("gcache.encryption = yes") != std::string::npos);
-  bool ws_cache_encryption_enabled = (result[0][0].find("allocator.disk_pages_encryption = yes") != std::string::npos);
+  bool gcache_encryption_enabled = get_gcache_encryption_enabled(result[0][0]);
+  bool ws_cache_encryption_enabled =
+      get_ws_cache_encryption_enabled(result[0][0]);
 
   if (gcache_encryption_enabled) {
     rapidjson::Value gcache_encryption_enabled_json;
