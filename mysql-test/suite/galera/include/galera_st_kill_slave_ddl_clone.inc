@@ -22,17 +22,11 @@ INSERT INTO t1 VALUES ('node2_committed_before');
 INSERT INTO t1 VALUES ('node2_committed_before');
 COMMIT;
 
-# Suspend the applier as it applies the ALTER TABLE
---let $debug_orig = `SELECT @@debug`
-SET GLOBAL debug = 'd,sync.alter_opened_table';
-
 --connection node_1
 ALTER TABLE t1 ADD COLUMN f2 INTEGER;
 
 --connection node_2
 SET wsrep_sync_wait = 0;
---let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'debug sync point: now'
---source include/wait_condition.inc
 
 --source include/kill_galera.inc
 

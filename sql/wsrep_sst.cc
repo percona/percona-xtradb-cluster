@@ -1540,7 +1540,7 @@ static bool is_sst_request_valid(const std::string &msg) {
       Instead of this we will just allow alpha-num + a few special characters
       (colon, slash, dot, underscore, square brackets, hyphen). */
     std::string data = msg.substr(method_len + 1, data_len);
-    static const std::regex allowed_chars_regex("[\\w:/.[\\]-]+");
+    static const std::regex allowed_chars_regex("[\\w:/.[\\]@-]+");
     if (!std::regex_match(data, allowed_chars_regex)) {
       return false;
     }

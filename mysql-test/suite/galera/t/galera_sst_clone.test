@@ -1,0 +1,25 @@
+# run it with --only-combinations=enc_off
+
+--source include/big_test.inc
+--source include/galera_cluster.inc
+
+--disable_query_log
+--connection node_1
+CALL mtr.add_suppression("Failed to remove page file");
+--connection node_2
+CALL mtr.add_suppression("Failed to remove page file");
+--enable_query_log
+
+
+CALL mtr.add_suppression("Found an entry in the 'role_edges' table with unknown authorization ID '`mysql.pxc.sst.user`@`localhost`'" );
+CALL mtr.add_suppression("Found an entry in the 'default_roles' table with unknown authorization ID '`mysql.pxc.sst.user`@`localhost`'");
+
+--source suite/galera/include/galera_st_kill_slave.inc
+
+CALL mtr.add_suppression("Found an entry in the 'role_edges' table with unknown authorization ID '`mysql.pxc.sst.user`@`localhost`'" );
+CALL mtr.add_suppression("Found an entry in the 'default_roles' table with unknown authorization ID '`mysql.pxc.sst.user`@`localhost`'");
+
+--source suite/galera/include/galera_st_kill_slave_ddl_clone.inc
+
+
+--remove_file $MYSQL_TMP_DIR/galera_wsrep_recover.log
