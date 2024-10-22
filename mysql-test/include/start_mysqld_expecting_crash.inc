@@ -63,9 +63,15 @@
 --let $wait_timeout=0
 --source include/wait_for_wait_in_expect_file.inc
 
-# We use --exec echo instead of simple "--echo" because
-# replace_result works on --exec
---exec echo "# restart_abort: $restart_parameters"
+if (!$do_not_echo_parameters) {
+  # We use --exec echo instead of simple "--echo" because
+  # replace_result works on --exec
+  --exec echo "# restart_abort: $restart_parameters"
+}
+if ($do_not_echo_parameters) {
+  --echo # restart_abort: <hidden args>
+  --let $do_not_echo_parameters=
+}
 
 # Write file to make mysql-test-run.pl start up the server again
 --exec echo "restart_abort: $restart_parameters" > $_expect_file_name
