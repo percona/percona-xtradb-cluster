@@ -945,7 +945,7 @@ thd::thd(bool won) : ptr(new THD) {
     ptr->variables.option_bits &= ~OPTION_BIN_LOG;  // disable binlog
     ptr->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
     ptr->variables.wsrep_on = won;
-    ptr->m_security_ctx->set_master_access(~(ulong)0);
+    ptr->m_security_ctx->set_master_access(~(Access_bitmask)0);
     lex_start(ptr);
   }
 }

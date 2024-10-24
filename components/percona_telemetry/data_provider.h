@@ -94,6 +94,8 @@ class DataProvider {
 #endif
 
   const std::string &get_database_instance_id();
+  bool get_gcache_encryption_enabled(const std::string &options);
+  bool get_ws_cache_encryption_enabled(const std::string &options);
 
   SERVICE_TYPE(mysql_command_factory) & command_factory_service_;
   SERVICE_TYPE(mysql_command_options) & command_options_service_;
@@ -108,6 +110,8 @@ class DataProvider {
 
   std::string database_instance_id_cache_;
   std::string version_cache_;
+  int gcache_encryption_enabled_cache_;
+  int ws_cache_encryption_enabled_cache_;
 };
 
 #endif /* PERCONA_TELEMETRY_DATA_PROVIDER_H */

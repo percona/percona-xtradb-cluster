@@ -492,6 +492,14 @@ INSERT INTO global_suppressions VALUES
 
  ("'mysql_native_password' is deprecated and will be removed in a future release."),
 
+ /*
+   Valgring may issue some warning which are mixed with MySql warnings
+   resulting in lines like:
+   2024-10-01T12:42:38.064630Z 0 [Warning] [MY-010068] [Server] CA certificate /tmp/results/PXC/mysql-test/std_data/cacert.pem is s--26323-- WARNING: unhandled amd64-linux syscall: 333
+   This will not be handled by suppressions above as the string is cut in the middle.
+ */
+ (".*WARNING: unhandled amd64-linux syscall:.*"),
+
  ("THE_LAST_SUPPRESSION");
 
 
