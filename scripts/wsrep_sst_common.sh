@@ -28,7 +28,8 @@ WSREP_SST_OPT_USER=""
 WSREP_SST_OPT_PSWD=""
 WSREP_SST_OPT_VERSION=""
 WSREP_SST_OPT_DEBUG=""
-
+WSREP_SST_OPT_REMOTE_USER=""
+WSREP_SST_OPT_REMOTE_PSWD=""
 WSREP_LOG_DEBUG=""
 
 # These are the 'names' of the commands
@@ -1004,7 +1005,7 @@ function exec_sql() {
 #
 # Parameters:
 #   None
-#
+# 
 function read_variables_from_stdin()
 {
     while read line; do
@@ -1018,6 +1019,12 @@ function read_variables_from_stdin()
             'sst_password')
                 WSREP_SST_OPT_PSWD="$value"
                 ;;
+            'sst_remote_user')
+                WSREP_SST_OPT_REMOTE_USER="$value"
+                ;;
+            'sst_remote_password')
+                WSREP_SST_OPT_REMOTE_PSWD="$value"
+                ;;                
             *)
                 wsrep_log_warning "Unrecognized input: $line"
         esac
