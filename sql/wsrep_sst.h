@@ -30,6 +30,7 @@
 extern const char *wsrep_sst_method;
 extern const char *wsrep_sst_receive_address;
 extern const char *wsrep_sst_donor;
+extern const char* wsrep_sst_auth;
 extern bool wsrep_sst_donor_rejects_queries;
 extern const char *wsrep_sst_allowed_methods;
 

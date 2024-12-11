@@ -470,18 +470,21 @@ WITH_OPTION="WITH caching_sha2_password"
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
 then
-    WSREP_SST_OPT_REMOTE_JOINER_USER=""
-    WSREP_SST_OPT_REMOTE_JOINER_PSWD=""
+    WSREP_SST_OPT_REMOTE_JOINER_USER=$WSREP_SST_OPT_REMOTE_USER
+    WSREP_SST_OPT_REMOTE_JOINER_PSWD=$WSREP_SST_OPT_REMOTE_PSWD
 
     echo "continue" # donor can resume updating data
-    WSREP_SST_OPT_REMOTE_AUTH=$(echo $WSREP_SST_OPT_ADDR_LOCAL | cut -d '@' -f 1)
-    WSREP_SST_OPT_REMOTE_HOST_WITH_PORT=$(echo $WSREP_SST_OPT_ADDR_LOCAL | cut -d '@' -f 2)
+    #Dead code ;) 
+    #WSREP_SST_OPT_REMOTE_AUTH=$(echo $WSREP_SST_OPT_ADDR_LOCAL | cut -d '@' -f 1)
+    #WSREP_SST_OPT_REMOTE_HOST_WITH_PORT=$(echo $WSREP_SST_OPT_ADDR_LOCAL | cut -d '@' -f 2) 
+    
+    WSREP_SST_OPT_REMOTE_HOST_WITH_PORT=$WSREP_SST_OPT_ADDR_LOCAL
     WSREP_SST_OPT_REMOTE_HOST=$(echo $WSREP_SST_OPT_REMOTE_HOST_WITH_PORT | cut -d ':' -f 1)
     WSREP_SST_OPT_REMOTE_HOSTPORT=$(echo $WSREP_SST_OPT_REMOTE_HOST_WITH_PORT | cut -d ':' -f 2)
     
     SST_HOST_STRIPPED=$(echo $WSREP_SST_OPT_REMOTE_HOST | sed 's/^\[//' | sed 's/\]$//')
 
-    wsrep_log_debug "-> WSREP_SST_OPT_REMOTE_AUTH = $WSREP_SST_OPT_REMOTE_AUTH "
+    wsrep_log_debug "-> WSREP_SST_OPT_REMOTE_JOINER_USER = $WSREP_SST_OPT_REMOTE_JOINER_USER "
     wsrep_log_debug "-> WSREP_SST_OPT_REMOTE_HOST_WITH_PORT = $WSREP_SST_OPT_REMOTE_HOST_WITH_PORT "
     wsrep_log_debug "-> WSREP_SST_OPT_REMOTE_HOST = $WSREP_SST_OPT_REMOTE_HOST "
     wsrep_log_debug "-> WSREP_SST_OPT_REMOTE_HOSTPORT = $WSREP_SST_OPT_REMOTE_HOSTPORT "
@@ -491,11 +494,12 @@ then
 
 
     # Split auth string at the last ':'
-    readonly WSREP_SST_OPT_REMOTE_JOINER_USER=$( echo $WSREP_SST_OPT_REMOTE_AUTH| cut -d ":" -f 1)
-    readonly WSREP_SST_OPT_REMOTE_JOINER_PSWD=$( echo $WSREP_SST_OPT_REMOTE_AUTH| cut -d ":" -f 2)
+    #Dead code ;) 
+    #readonly WSREP_SST_OPT_REMOTE_JOINER_USER=$( echo $WSREP_SST_OPT_REMOTE_AUTH| cut -d ":" -f 1)
+    #readonly WSREP_SST_OPT_REMOTE_JOINER_PSWD=$( echo $WSREP_SST_OPT_REMOTE_AUTH| cut -d ":" -f 2)
 
     if test -z "$WSREP_SST_OPT_USER";   then wsrep_log_error "USER cannot be empty";   exit $EINVAL; fi
-    if test -z "$WSREP_SST_OPT_REMOTE_AUTH"; then wsrep_log_error "REMOTE_USER cannot be empty"; exit $EINVAL; fi
+    if test -z "$WSREP_SST_OPT_REMOTE_JOINER_USER"; then wsrep_log_error "REMOTE_USER cannot be empty"; exit $EINVAL; fi
     if test -z "$WSREP_SST_OPT_PORT";   then wsrep_log_error "PORT cannot be empty";   exit $EINVAL; fi
     if test -z "$WSREP_SST_OPT_SOCKET"; then wsrep_log_error "SOCKET cannot be empty"; exit $EINVAL; fi
 
@@ -886,12 +890,12 @@ then
     fi
 
     # Report clone credentials/address to the caller
-    wsrep_log_debug "-> ready passing string |$CLONE_USER:$CLONE_PSWD]$JOINER_CLONE_HOST:$JOINER_CLONE_PORT|"
-    echo "ready $CLONE_USER:$CLONE_PSWD]$JOINER_CLONE_HOST:$JOINER_CLONE_PORT"
+    wsrep_log_debug "-> ready passing string |$CLONE_USER:$CLONE_PSWD@$JOINER_CLONE_HOST:$JOINER_CLONE_PORT|"
+    echo "ready $CLONE_USER:$CLONE_PSWD@$JOINER_CLONE_HOST:$JOINER_CLONE_PORT"
 
     # WAIT for Donor message
     wsrep_log_debug "-> wait $JOINER_TIMEOUT_WAIT_XST"
-#    while [ ! -s  $WSREP_SST_OPT_DATA/XST_FILE.txt ];do
+
     until grep -q ".*<EOF>$" "$WSREP_SST_OPT_DATA/XST_FILE.txt" &> /dev/null
     do
          if [ "$JOINER_TIMEOUT_WAIT_XST" == "0" ]; then

@@ -276,17 +276,25 @@ static char *my_fgets(char *buf, size_t buf_len, FILE *stream) {
   return ret;
 }
 
+// New strucutre to host user info
+struct sst_auth
+{
+  std::string remote_name_;
+  std::string remote_pswd_;
+};
+
 struct sst_thread_arg {
   const char *cmd;
   char **env;
+  const sst_auth& auth_;
   char *ret_str;
   int err;
 
   mysql_mutex_t LOCK_wsrep_sst_thread;
   mysql_cond_t COND_wsrep_sst_thread;
 
-  sst_thread_arg(const char *c, char **e)
-      : cmd(c), env(e), ret_str(0), err(-1) {
+  sst_thread_arg(const char *c, char **e, sst_auth& auth)
+      : cmd(c), env(e), auth_(auth), ret_str(0), err(-1) {
     mysql_mutex_init(key_LOCK_wsrep_sst_thread, &LOCK_wsrep_sst_thread,
                      MY_MUTEX_INIT_FAST);
     mysql_cond_init(key_COND_wsrep_sst_thread, &COND_wsrep_sst_thread);
@@ -310,6 +318,8 @@ struct sst_logger_thread_arg {
     err_pipe = NULL;
   }
 };
+
+
 
 static enum loglevel string_to_loglevel(const char *s) {
   if (strncmp(s, "ERR:", 4) == 0)
@@ -700,7 +710,8 @@ static void *sst_joiner_thread(void *a) {
 static void reset_ld_preload(wsp::env &env) { env.append("LD_PRELOAD="); }
 #endif
 
-static ssize_t sst_prepare_other(const char *method, const char *addr_in,
+static ssize_t sst_prepare_other(const char *method,
+                                 const char *addr_in,
                                  const char **addr_out) {
   int const cmd_len = 4096;
   wsp::string cmd_str(cmd_len);
@@ -754,8 +765,11 @@ static ssize_t sst_prepare_other(const char *method, const char *addr_in,
   reset_ld_preload(env);
 #endif
 
+  // We define the auth here to pass it to the thread args
+  sst_auth auth;
+
   pthread_t tmp;
-  sst_thread_arg arg(cmd_str(), env());
+  sst_thread_arg arg(cmd_str(), env(), auth);
   mysql_mutex_lock(&arg.LOCK_wsrep_sst_thread);
   ret = pthread_create(&tmp, NULL, sst_joiner_thread, &arg);
   if (ret) {
@@ -1231,7 +1245,7 @@ int wsrep_remove_sst_user(bool initialize_thread) {
                         "SET SESSION lock_wait_timeout = 1;",
                         nullptr,
                         "REVOKE mysql.pxc.sst.role FROM 'mysql.pxc.sst.user'@'localhost';",
-                        nullptr,                        
+                        nullptr,
                         "DROP USER IF EXISTS 'mysql.pxc.sst.user'@localhost;",
                         nullptr,
                         nullptr,
@@ -1256,6 +1270,7 @@ int wsrep_remove_sst_user(bool initialize_thread) {
 
 static void *sst_donor_thread(void *a) {
   sst_thread_arg *arg = (sst_thread_arg *)a;
+  sst_auth const auth(arg->auth_);
 
 #ifdef HAVE_PSI_INTERFACE
   wsrep_pfs_register_thread(key_THREAD_wsrep_sst_donor);
@@ -1318,6 +1333,21 @@ static void *sst_donor_thread(void *a) {
     if (ret < 0) {
       WSREP_ERROR("sst_donor_thread(): fprintf() failed: %d", ret);
       err = (ret < 0 ? ret : -EMSGSIZE);
+    }
+
+    // if remote user is defined we will pass the user-name/password pair
+    if (auth.remote_name_.length())
+    {
+      ret= fprintf(proc.write_pipe(),
+                   "sst_remote_user=%s\n"
+                   "sst_remote_password=%s\n",
+                   auth.remote_name_.c_str(),
+                   auth.remote_pswd_.c_str());
+      if (ret < 0)
+      {
+        WSREP_ERROR("sst_donor_thread(): fprintf(2) failed: %d", ret);
+        err= (ret < 0 ? ret : -EMSGSIZE);
+      }
     }
 
     // Close the pipe, so that the other side gets an EOF
@@ -1425,8 +1455,11 @@ static void *sst_donor_thread(void *a) {
   return NULL;
 }
 
-static int sst_donate_other(const char *method, const char *addr,
-                            const wsrep::gtid &gtid, bool bypass,
+static int sst_donate_other(const char *method,
+                            const char *addr,
+                            const wsrep::gtid &gtid,
+                            bool bypass,
+                            sst_auth&auth,
                             char **env)  // carries auth info
 {
   int const cmd_len = 4096;
@@ -1485,7 +1518,7 @@ static int sst_donate_other(const char *method, const char *addr,
   if (!bypass && wsrep_sst_donor_rejects_queries) sst_reject_queries(false);
 
   pthread_t tmp;
-  sst_thread_arg arg(cmd_str(), env);
+  sst_thread_arg arg(cmd_str(), env, auth);
   mysql_mutex_lock(&arg.LOCK_wsrep_sst_thread);
   ret = pthread_create(&tmp, NULL, sst_donor_thread, &arg);
   if (ret) {
@@ -1550,7 +1583,8 @@ static bool is_sst_request_valid(const std::string &msg) {
   return true;
 }
 
-int wsrep_sst_donate(const std::string &msg, const wsrep::gtid &current_gtid,
+int wsrep_sst_donate(const std::string &msg,
+                     const wsrep::gtid &current_gtid,
                      const bool bypass) {
   /* This will be reset when sync callback is called.
    * Should we set wsrep_ready to false here too? */
@@ -1580,6 +1614,37 @@ int wsrep_sst_donate(const std::string &msg, const wsrep::gtid &current_gtid,
     return WSREP_CB_FAILURE;
   }
 
+
+  /*
+  [start]
+  section to support clone user/pw
+  check for auth@addr separator
+  */
+  const char* addr= strrchr(data, '@');
+  wsp::string remote_auth;
+  if (addr)
+  {
+    remote_auth.set(strndup(data, addr - data));
+    addr++;
+  }
+  else
+  {
+    // no auth part
+    addr= data;
+  }
+
+  /* Set up auth info (from <user>:<password> strings) */
+  sst_auth auth;
+  if (remote_auth())
+  {
+    /* wsp::string is just a dynamically allocated char* underneath
+     * so we can safely do all that arithmetics */
+    const char* col= strchrnul(remote_auth(), ':');
+    auth.remote_name_ = std::string(remote_auth(), col - remote_auth());
+    auth.remote_pswd_ = std::string(':' == *col ? col + 1 : "");
+  }
+  /* [END] */
+
 #if defined(HAVE_ASAN)
   reset_ld_preload(env);
 #endif
@@ -1601,7 +1666,7 @@ int wsrep_sst_donate(const std::string &msg, const wsrep::gtid &current_gtid,
   };);
 
   int ret;
-  ret = sst_donate_other(method, data, current_gtid, bypass, env());
+  ret = sst_donate_other(method, addr, current_gtid, bypass,auth, env());
 
   /* Above methods should return 0 in case of success and negative value
    * in case of failure. If we have any positive value here it means that we
@@ -1609,3 +1674,4 @@ int wsrep_sst_donate(const std::string &msg, const wsrep::gtid &current_gtid,
   assert(ret <= 0);
   return (ret >= 0 ? WSREP_CB_SUCCESS : WSREP_CB_FAILURE);
 }
+
