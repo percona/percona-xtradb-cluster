@@ -286,7 +286,7 @@ struct sst_auth
 struct sst_thread_arg {
   const char *cmd;
   char **env;
-  const sst_auth& auth_;
+  const sst_auth& auth_container;
   char *ret_str;
   int err;
 
@@ -294,7 +294,7 @@ struct sst_thread_arg {
   mysql_cond_t COND_wsrep_sst_thread;
 
   sst_thread_arg(const char *c, char **e, sst_auth& auth)
-      : cmd(c), env(e), auth_(auth), ret_str(0), err(-1) {
+      : cmd(c), env(e), auth_container(auth), ret_str(0), err(-1) {
     mysql_mutex_init(key_LOCK_wsrep_sst_thread, &LOCK_wsrep_sst_thread,
                      MY_MUTEX_INIT_FAST);
     mysql_cond_init(key_COND_wsrep_sst_thread, &COND_wsrep_sst_thread);
@@ -710,9 +710,7 @@ static void *sst_joiner_thread(void *a) {
 static void reset_ld_preload(wsp::env &env) { env.append("LD_PRELOAD="); }
 #endif
 
-static ssize_t sst_prepare_other(const char *method,
-                                 const char *addr_in,
-                                 const char **addr_out) {
+static ssize_t sst_prepare_other(const char *method, const char *addr_in, const char **addr_out) {
   int const cmd_len = 4096;
   wsp::string cmd_str(cmd_len);
 
@@ -1270,7 +1268,7 @@ int wsrep_remove_sst_user(bool initialize_thread) {
 
 static void *sst_donor_thread(void *a) {
   sst_thread_arg *arg = (sst_thread_arg *)a;
-  sst_auth const auth(arg->auth_);
+  sst_auth const auth(arg->auth_container);
 
 #ifdef HAVE_PSI_INTERFACE
   wsrep_pfs_register_thread(key_THREAD_wsrep_sst_donor);
@@ -1583,9 +1581,7 @@ static bool is_sst_request_valid(const std::string &msg) {
   return true;
 }
 
-int wsrep_sst_donate(const std::string &msg,
-                     const wsrep::gtid &current_gtid,
-                     const bool bypass) {
+int wsrep_sst_donate(const std::string &msg, const wsrep::gtid &current_gtid, const bool bypass) {
   /* This will be reset when sync callback is called.
    * Should we set wsrep_ready to false here too? */
   local_status.set(wsrep::server_state::s_donor);
@@ -1622,21 +1618,18 @@ int wsrep_sst_donate(const std::string &msg,
   */
   const char* addr= strrchr(data, '@');
   wsp::string remote_auth;
-  if (addr)
-  {
+  if (addr){
     remote_auth.set(strndup(data, addr - data));
     addr++;
   }
-  else
-  {
+  else {
     // no auth part
     addr= data;
   }
 
   /* Set up auth info (from <user>:<password> strings) */
   sst_auth auth;
-  if (remote_auth())
-  {
+  if (remote_auth()) {
     /* wsp::string is just a dynamically allocated char* underneath
      * so we can safely do all that arithmetics */
     const char* col= strchrnul(remote_auth(), ':');
