@@ -1322,6 +1322,17 @@ g   codership/mysql-wsrep/issues#176
 }
 
 {
+   dummy_init
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:_Z10wsrep_initv
+   fun:_Z18wsrep_init_startupb
+   fun:_Z11mysqld_mainiPPc
+   fun:main
+}
+
+{
    General protobuf globals
    Memcheck:Leak
    fun:_Znwm
