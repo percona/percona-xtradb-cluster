@@ -7280,11 +7280,11 @@ wsrep_restart_point :
   rli->set_commit_order_manager(commit_order_mngr);
 
 #ifdef WITH_WSREP
-  if (WSREP_ON && wsrep_use_async_monitor
-      && opt_replica_preserve_commit_order
-      && !rli->is_parallel_exec()
-      && rli->opt_replica_parallel_workers > 1) {
-    wsrep_async_monitor = new Wsrep_async_monitor(rli->opt_replica_parallel_workers);
+  if (WSREP_ON && wsrep_use_async_monitor &&
+      opt_replica_preserve_commit_order && !rli->is_parallel_exec() &&
+      rli->opt_replica_parallel_workers > 1) {
+    wsrep_async_monitor =
+        new Wsrep_async_monitor(rli->opt_replica_parallel_workers);
     rli->set_wsrep_async_monitor(wsrep_async_monitor);
   }
 #endif /* WITH_WSREP */
