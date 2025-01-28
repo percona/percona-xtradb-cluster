@@ -1369,7 +1369,7 @@ INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'lo
 #  GRANT ALTER, CREATE, SELECT, INSERT ON PERCONA_SCHEMA.xtrabackup_history TO 'mysql.pxc.sst.role'@localhost;
 #  GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost;
 #  GRANT CREATE ON PERCONA_SCHEMA.* to 'mysql.pxc.sst.role'@localhost;
-INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.sst.role','N','N','N','N','N','N','Y','N','Y','N','N','N','N','N','N','Y','N','Y','N','N','Y','N','N','N','N','N','N','N','N','','','','',0,0,0,0,'caching_sha2_password','','Y',CURRENT_TIMESTAMP,NULL,'Y','N','N',NULL,NULL,NULL,NULL);
+INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.sst.role','N','N','N','N','N','N','Y','N','Y','N','N','N','N','N','N','Y','N','Y','N','N','Y','N','N','N','N','N','N','N','N','','','','',0,0,0,0,'caching_sha2_password','','Y',CURRENT_TIMESTAMP,NULL,'Y','Y','Y',NULL,NULL,NULL,NULL);
 
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'BACKUP_ADMIN', 'N');
 INSERT IGNORE INTO mysql.tables_priv VALUES ('localhost', 'PERCONA_SCHEMA', 'mysql.pxc.sst.role', 'xtrabackup_history', 'root\@localhost', CURRENT_TIMESTAMP, 'Alter,Select,Insert,Create', '');
