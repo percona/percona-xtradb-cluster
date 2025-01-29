@@ -968,7 +968,22 @@ enum_sp_return_code sp_drop_routine(THD *thd, enum_sp_type type,
         name->m_db.str, name->m_name.str, &routine);
   if (error) return SP_INTERNAL_ERROR;
 
+#ifdef WITH_WSREP
+  if (routine == nullptr) {
+    if (thd->lex->drop_if_exists) {
+      /* If 'IF EXISTS' clause is present, we replicate always.
+         In such a case binlogging part is done on the caller level. */
+      if (WSREP(thd) &&
+          wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL)) {
+        return SP_INTERNAL_ERROR;
+      }
+    }
+    return SP_DOES_NOT_EXISTS;
+  }
+#else
   if (routine == nullptr) return SP_DOES_NOT_EXISTS;
+#endif
+
   /*
     If definer has the SYSTEM_USER privilege then invoker can drop procedure
     only if latter also has same privilege.

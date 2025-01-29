@@ -1,5 +1,6 @@
 # Check that the following requirement is fulfiled
-# The DROP DATABASE IF EXISTS, DROP TABLE IF EXISTS, DROP VIEW IF EXISTS and DROP EVENT IF EXISTS statements are always replicated,
+# The DROP DATABASE IF EXISTS, DROP TABLE IF EXISTS, DROP VIEW IF EXISTS, DROP EVENT IF EXISTS,
+# DROP PROCEDURE IF EXISTS and DROP FUNCTION IF EXISTS statements are always replicated,
 # even if the database, table, or view to be dropped does not exist on the source.
 # This is to ensure that the object to be dropped no longer exists on either the source or the replica,
 # once the replica has caught up with the source.
@@ -15,9 +16,11 @@ DROP DATABASE IF EXISTS db1;
 DROP TABLE IF EXISTS t1;
 DROP VIEW IF EXISTS v1;
 DROP EVENT IF EXISTS ev1;
+DROP PROCEDURE IF EXISTS pr1;
+DROP FUNCTION IF EXISTS fn1;
 
-# check that GTID is advanced by 4
---let $gtid_step_count = 4
+# check that GTID is advanced by 6
+--let $gtid_step_count = 6
 --let $gtid_step_uuid = `SELECT Variable_value FROM performance_schema.global_status WHERE Variable_name='wsrep_cluster_state_uuid'`
 --source include/rpl/gtid_step_assert.inc
 
