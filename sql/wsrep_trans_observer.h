@@ -309,16 +309,6 @@ static inline int wsrep_before_commit(THD *thd, bool all) {
                    thd->wsrep_cs().toi_meta().gtid());
 #endif
 
-    if (thd->run_wsrep_commit_hooks) {
-      /* If the transaction is running as one-phase then register
-      THD in wsrep group commit queue at this stage.
-      If the transaction is running as 2-phase then THD is registered
-      in ordered_commit to ensure thd registration order is same as
-      mysql group commit queue order.
-      It will be unregistered in ha_commit_low() during SE commit. */
-      wsrep_register_for_group_commit(thd);
-    }
-
     /* If the transaction doesn't go through prepare phase */
     wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
                    thd->wsrep_trx().ws_meta().gtid());
@@ -354,17 +344,6 @@ static inline int wsrep_ordered_commit(THD *thd, bool all) {
   WSREP_DEBUG("wsrep_ordered_commit: %d", wsrep_is_real(thd, all));
   assert(wsrep_run_commit_hook(thd, all));
 
-  /* Register thread handler in wsrep group commit queue.
-  Note: thread handler executing 2 phase commit transaction is registered
-  as part of ordered_commit (and not part of before_commit) as wsrep group
-  commit sequence should be same as mysql group commit queue sequence.
-  In most cases it will be unregistered as part of ha_commit_low() during
-  SE commit, however there are rare cases when it will unregistered directly
-  from ha_commit_low() if SE is not involved in the commit (for more detailed
-  explanation of this case see the comment in ha_commit_low())
-  */
-  wsrep_register_for_group_commit(thd);
-
   DBUG_RETURN(thd->wsrep_cs().ordered_commit());
 }
 
@@ -379,17 +358,6 @@ static inline int wsrep_after_commit(THD *thd, bool all) {
               wsrep_is_active(thd), (long long)wsrep_thd_trx_seqno(thd),
               wsrep_has_changes(thd));
   assert(wsrep_run_commit_hook(thd, all));
-
-  /* It has to be already unregistered from wsrep_group_commit_queue either
-  during SE commit or directly in ha_commit_low if unregistration during
-  SE commit hasn't happened for any reason. */
-  if (thd->wsrep_enforce_group_commit) {
-    WSREP_WARN("%s",
-               "This thread has still not unregistered from "
-               "the wsrep group commit queue, may be because "
-               "of the storage engine commit. Server hang is expected.")
-  }
-  assert(!thd->wsrep_enforce_group_commit);
 
   int ret = 0;
   if (thd->wsrep_trx().state() == wsrep::transaction::s_committing) {

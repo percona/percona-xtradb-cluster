@@ -56,8 +56,10 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #ifdef WITH_WSREP
 #include "ha_prototypes.h" /* wsrep_is_wsrep_xid() */
+#include "service_wsrep.h"
 #include "wsrep_binlog.h"
 #include "wsrep_mysqld.h"
+#include "wsrep_xid.h"
 #endif /* WITH_WSREP */
 
 /** The transaction system */
@@ -387,19 +389,141 @@ page_no_t trx_sysf_rseg_find_page_no(ulint rseg_id) {
 
 #ifdef WITH_WSREP
 
+#define WSREP_UUID_SIZE 16
 static long long trx_sys_cur_xid_seqno = -1;
-static unsigned char trx_sys_cur_xid_uuid[16];
+static unsigned char trx_sys_cur_xid_uuid[WSREP_UUID_SIZE];
 
-long long read_wsrep_xid_seqno(const XID *xid) {
-  // TODO: replace this with XID provided functions.
-  long long seqno;
-  memcpy(&seqno, xid->get_data() + 24, sizeof(long long));
-  return seqno;
+static long long read_wsrep_xid_seqno(const XID *xid) {
+  return wsrep_xid_seqno(xid);
 }
 
-void read_wsrep_xid_uuid(const XID *xid, unsigned char *buf) {
-  // TODO: replace this with XID provided functions.
-  memcpy(buf, xid->get_data() + 8, 16);
+static void read_wsrep_xid_uuid(const XID *xid, unsigned char *buf) {
+  memcpy(buf, wsrep_xid_uuid(xid), WSREP_UUID_SIZE);
+}
+
+#ifdef UNIV_DEBUG
+/* Check that seqno is monotonically increasing. */
+static void wsrep_xid_sanity_check(const XID *xid) {
+  unsigned char xid_uuid[WSREP_UUID_SIZE];
+  long long xid_seqno = read_wsrep_xid_seqno(xid);
+  read_wsrep_xid_uuid(xid, xid_uuid);
+  if (!memcmp(xid_uuid, trx_sys_cur_xid_uuid, WSREP_UUID_SIZE) &&
+      xid_seqno != -1) {
+    /* When the following assert makes sense:
+
+    Case 1:
+    DDL transactions are executed as TOI.
+    With 8.0, DDL are atomic and will cause commit of transaction
+    in InnoDB world that will cause xid to persist.
+    Same xid is re-persisted when TOI ends.
+    Latter call is still needed for DDL transaction that non-atomic.
+    So condition check is now >= and not just >
+
+    Case 2:
+    We have the case when REPLACE INTO ... SELECT or
+    INSERT INTO ... SELECT is executed as TOI. This is done by
+    pt-table-checksum tool. In such case statement execution causes InnoDB
+    commit and storing of xid_seqno (wsrep_apply_cb) and then because of
+    TOI, storing of xid_seqno is requested again from wsrep_commit_cb with
+    the same xid_seqno.
+    Allow current and new values be the same, without introducing new flags
+    and logic to prevent double storing of the same value
+
+    Case 3:
+    NBO allows interleaving of non-conflicting transactions. This allows
+    other transactions to be committed in InnoDB while there is an
+    ongoing NBO update. This is possible when the NBO thread has
+    finished phase one but is yet to start its phase two. Before adding
+    the below NBO condition, the other transactions updated its XID
+    there by resulting in the NBO thread to hit the below assertion as
+    it finds that the current thread no more has the latest xid in
+    InnoDB since NBO phase_two() calls this funcation with seqno X, the
+    one we got during phase one of the NBO. Please note that we do not
+    persist X+1+N+1 in SE upon completion on NBO even though it is only
+    incremented in galera.
+
+    i.e,
+    Seqno X       - Assigned during NBO begin
+    Seqno X+1     - Reserved for NBO end, but never used. Yes, this is a
+                    bug. TODO: Check why this happens.
+    Seqno X+1+N   - N Other transactions while NBO is in progress and
+                    the latest xid persisted in InnoDB
+    Seqno X+1+N+1 - Assigned during NBO end. It is incremented in
+                    galera, but never persisted in SE.
+                    TODO: Check why this happens.
+
+    As a result, the assertion evaluated to
+      "X" >= "X+1+N"
+
+    Case 4:
+    When all transactions go through group commit logic. In such a case
+    the order is enforced by group commit logic itself.
+    */
+
+    /* When the condition
+      xid_seqno >= trx_sys_cur_xid_seqno
+      doesn't make sense:
+      Q: What enforces seqno to monotonically increase?
+      If all transactions go through group commit, their order in group commit
+      is the same as enforced by Galera CommitOrder monitor.
+      Then the commit phase is done under LOCK_commit, all transactions are
+      commited in order. No problem here.
+      But what if we have a transaction that does not follow group commit path?
+      Such a transaction can be:
+      1. partial commit to wsrep_streaming_log table during
+      the streaming replication.
+      2. Applier thread on the server with 'log_replica_updates=OFF'
+      Let's say we have T1 that goes through group commit and T2 that is
+      SR partial commit. There is nothing that enforces T1 to write
+      the checkpoint before T2.
+    */
+
+    //    ut_ad((current_thd && wsrep_thd_is_in_nbo(current_thd)) ||
+    //          xid_seqno >= trx_sys_cur_xid_seqno);
+  } else {
+    memcpy(trx_sys_cur_xid_uuid, xid_uuid, 16);
+  }
+  trx_sys_cur_xid_seqno = xid_seqno;
+
+  char uuid_str[40] = {
+      0,
+  };
+  wsrep_uuid_print((const wsrep_uuid_t *)xid_uuid, uuid_str, sizeof(uuid_str));
+  WSREP_DEBUG("Updating WSREPXid: %s:%lld", uuid_str, xid_seqno);
+}
+#endif /* UNIV_DEBUG */
+
+static bool should_store_recovery_xid(const XID *xid) {
+  /* When recovery happens prepare transactions
+  are revived based on undo-log entries in InnoDB.
+  This order may not match with the commit order
+  logged to binlog.
+  Sequence matching is not needed for MySQL
+  as standalone. Aim is to just ensure that all
+  prepare stage transaction are marked as committed.
+  But in PXC the commit order of recover transaction
+  should be same as it would be if transaction are running
+  normally or we need to ensure that only the latest seen
+  xid is updated and persisted as wsrep recover position
+  co-ordinates. */
+  unsigned char xid_uuid[WSREP_UUID_SIZE];
+  long long xid_seqno = read_wsrep_xid_seqno(xid);
+  read_wsrep_xid_uuid(xid, xid_uuid);
+
+  bool xid_uuid_changed =
+      (0 != memcmp(xid_uuid, trx_sys_cur_xid_uuid, WSREP_UUID_SIZE));
+
+  if (xid_seqno != -1 && !xid_uuid_changed) {
+    if (xid_seqno > trx_sys_cur_xid_seqno) {
+      trx_sys_cur_xid_seqno = xid_seqno;
+      return true;
+    }
+  } else if (xid_seqno != -1) {
+    memcpy(trx_sys_cur_xid_uuid, xid_uuid, WSREP_UUID_SIZE);
+    trx_sys_cur_xid_seqno = xid_seqno;
+    return true;
+  }
+  return false;
 }
 
 void trx_sys_update_wsrep_checkpoint(
@@ -408,122 +532,17 @@ void trx_sys_update_wsrep_checkpoint(
     mtr_t *mtr,             /*!< in: mtr */
     bool recovery)          /*!< in: running recovery */
 {
-#if 0
-  /* Said check for increasing seqno is now enforced even in optimized
-  build as the said logic ensures wait of thread handler. */
-#ifndef UNIV_DEBUG
-  /* Said check for xid seqno is ignored while running with optimized
-  build. It is presumed that xid are being persisted in proper order.
-  PXC too disables the said flow during optimized build but enforces
-  it during recovery so the conditional if statement below. */
-  if (recovery)
-#endif /* !UNIV_DEBUG */
-#endif
-  {
-    if (wsrep_implicit_transaction(current_thd)) return;
+  if (wsrep_implicit_transaction(current_thd)) return;
 
-    /* Check that seqno is monotonically increasing */
-    unsigned char xid_uuid[16];
-    long long xid_seqno = read_wsrep_xid_seqno(xid);
-    read_wsrep_xid_uuid(xid, xid_uuid);
-
-    char uuid_str[40] = {
-        0,
-    };
-    wsrep_uuid_print((const wsrep_uuid_t *)xid_uuid, uuid_str,
-                     sizeof(uuid_str));
-    WSREP_DEBUG("Updating WSREPXid: %s:%lld", uuid_str, xid_seqno);
-
-    if (xid_seqno != -1 && !memcmp(xid_uuid, trx_sys_cur_xid_uuid, 8)) {
-      if (recovery) {
-        /* When recovery happens prepare transactions
-        are revived based on undo-log entries in InnoDB.
-        This order may not match with the commit order
-        logged to binlog.
-        Sequence matching is not needed for MySQL
-        as standalone. Aim is to just ensure that all
-        prepare stage transaction are marked as committed.
-        But in PXC the commit order of recover transaction
-        should be same as it would be if transaction are running
-        normally or we need to ensure that only the latest seen
-        xid is updated and persisted as wsrep recover position
-        co-ordinates. */
-        if (xid_seqno > trx_sys_cur_xid_seqno)
-          trx_sys_cur_xid_seqno = xid_seqno;
-        else
-          return;
-      } else {
-        /* Wait and unregister from wsrep group commit */
-        wsrep_wait_for_turn_in_group_commit(current_thd);
-
-        /* Case 1:
-        DDL transactions are executed as TOI.
-        With 8.0, DDL are atomic and will cause commit of transaction
-        in InnoDB world that will cause xid to persist.
-        Same xid is re-persisted when TOI ends.
-        Latter call is still needed for DDL transaction that non-atomic.
-        So condition check is now >= and not just > */
-
-        /* Case 2:
-        We have the case when REPLACE INTO ... SELECT or
-        INSERT INTO ... SELECT is executed as TOI. This is done by
-        pt-table-checksum tool. In such case statement execution causes InnoDB
-        commit and storing of xid_seqno (wsrep_apply_cb) and then because of
-        TOI, storing of xid_seqno is requested again from wsrep_commit_cb with
-        the same xid_seqno.
-        Allow current and new values be the same, without introducing new flags
-        and logic to prevent double storing of the same value */
-
-        /* Case 3:
-
-           NBO allows interleaving of non-conflicting transactions. This allows
-           other transactions to be committed in InnoDB while there is an
-           ongoing NBO update. This is possible when the NBO thread has
-           finished phase one but is yet to start its phase two. Before adding
-           the below NBO condition, the other transactions updated its XID
-           there by resulting in the NBO thread to hit the below assertion as
-           it finds that the current thread no more has the latest xid in
-           InnoDB since NBO phase_two() calls this funcation with seqno X, the
-           one we got during phase one of the NBO. Please note that we do not
-           persist X+1+N+1 in SE upon completion on NBO even though it is only
-           incremented in galera.
-
-           i.e,
-           Seqno X       - Assigned during NBO begin
-           Seqno X+1     - Reserved for NBO end, but never used. Yes, this is a
-                           bug. TODO: Check why this happens.
-           Seqno X+1+N   - N Other transactions while NBO is in progress and
-                           the latest xid persisted in InnoDB
-           Seqno X+1+N+1 - Assigned during NBO end. It is incremented in
-                           galera, but never persisted in SE.
-                           TODO: Check why this happens.
-
-           As a result, the assertion evaluated to
-              "X" >= "X+1+N"
-        */
-        ut_ad((current_thd && wsrep_thd_is_in_nbo(current_thd)) ||
-              xid_seqno >= trx_sys_cur_xid_seqno);
-        trx_sys_cur_xid_seqno = xid_seqno;
-
-        /* Mark as done */
-        wsrep_unregister_from_group_commit(current_thd);
-      }
-    } else {
-      /* Wait and unregister from wsrep group commit */
-      wsrep_wait_for_turn_in_group_commit(current_thd);
-
-      memcpy(trx_sys_cur_xid_uuid, xid_uuid, 16);
-      trx_sys_cur_xid_seqno = xid_seqno;
-
-      /* Mark as done and unregister */
-      wsrep_unregister_from_group_commit(current_thd);
-    }
+  if (recovery && !should_store_recovery_xid(xid)) {
+    return;
+  } else {
+#ifdef UNIV_DEBUG
+    wsrep_xid_sanity_check(xid);
+#endif /* UNIV_DEBUG */
   }
 
-  if (sys_header == NULL) {
-    sys_header = trx_sysf_get(mtr);
-  }
-
+  // sys_header has to be locked, so we are in critical section
   ut_ad(xid && mtr && sys_header);
   ut_a(xid->get_format_id() == -1 || wsrep_is_wsrep_xid(xid));
 
@@ -586,7 +605,6 @@ void trx_sys_read_wsrep_checkpoint(XID *xid) {
 
   mtr_commit(&mtr);
 }
-
 #endif /* WITH_WSREP */
 
 /** Look for a free slot for a rollback segment in the trx system file copy.

@@ -1609,10 +1609,6 @@ static bool trx_write_serialisation_history(
     trx_t *trx, /*!< in/out: transaction */
     mtr_t *mtr) /*!< in/out: mini-transaction */
 {
-#ifdef WITH_WSREP
-  trx_sysf_t *sys_header = NULL;
-#endif /* WITH_WSREP */
-
   /* Change the undo log segment states from TRX_UNDO_ACTIVE to some
   other state: these modifications to the file data structure define
   the transaction as committed in the file based domain, at the
@@ -1736,6 +1732,7 @@ static bool trx_write_serialisation_history(
     skip updating wsrep co-ordinates.
   - Also, if half-cooked transaction is begin rolled back
     skip updating wsrep co-ordinates. */
+
   if (wsrep_is_wsrep_xid(trx->xid) && trx->mysql_thd &&
       wsrep_safe_to_persist_xid(trx->mysql_thd)) {
     if (trx->lock.was_chosen_as_wsrep_victim)
@@ -1747,6 +1744,8 @@ static bool trx_write_serialisation_history(
     }
     else
     {
+      // Gain the exclusive access to sys_header. Start critical section.
+      trx_sysf_t *sys_header = trx_sysf_get(mtr);
       trx_sys_update_wsrep_checkpoint(trx->xid, sys_header, mtr);
     }
   } else if (trx->wsrep_recover_xid &&
@@ -1760,6 +1759,8 @@ static bool trx_write_serialisation_history(
     }
     else
     {
+      // Gain the exclusive access to sys_header. Start critical section.
+      trx_sysf_t *sys_header = trx_sysf_get(mtr);
       trx_sys_update_wsrep_checkpoint(trx->wsrep_recover_xid, sys_header, mtr,
                                     true);
     }
@@ -1767,7 +1768,8 @@ static bool trx_write_serialisation_history(
 
   trx->wsrep_recover_xid = NULL;
 
-  sys_header = trx_sysf_get(mtr);
+  // Note that trx_sys_update_mysql_binlog_offset locks sys_header internally
+  // if not locked yet
 #endif /* WITH_WSREP */
 
   /* Update the latest MySQL binlog name and offset information

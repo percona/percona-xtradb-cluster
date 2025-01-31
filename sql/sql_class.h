@@ -3298,21 +3298,6 @@ class THD : public MDL_context_owner,
   bool run_wsrep_ordered_commit;
 
   /**
-    Force group commit protocol for transactions that logs fragments
-    to wsrep_streaming_log as these transactions runs with binlog disabled
-    even though system wide setting may enforce binlog enabled.
-    (this special setting is done to ensure update to wsrep_streaming_log
-     is not replicated across the cluster).
-
-    Given binlog is disabled for some internal transactions and external/user
-    transactions continue to work with binlog enabled (following group commit),
-    a co-ordination needs to be worked out to ensure wsrep co-ordinates
-    are updated as per the seqno.
-    Variable is set to true as part of this co-ordination framework.
-  */
-  bool wsrep_enforce_group_commit;
-
-  /**
     Set to true if there is error post insert action.
     for example: say trigger action.
     Case depict a scenario where-in transaction may fail (due to trigger
