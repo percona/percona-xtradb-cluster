@@ -1362,19 +1362,44 @@ INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'lo
 
 #
 # mysql.pxc.sst.role
-#   See the comments in mysql_system_tables.sql
+#   See the comments in mysql_system_users.sql
+#   Below we try to restore mysql.pxc.sst.role if someone deleted it
 
-# These are the values for
+# These are the values for sst_xtrabackup
+#  (needed by sst_xtrabackup):
 #  GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.* TO 'mysql.pxc.sst.role'@localhost;
 #  GRANT ALTER, CREATE, SELECT, INSERT ON PERCONA_SCHEMA.xtrabackup_history TO 'mysql.pxc.sst.role'@localhost;
 #  GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost;
 #  GRANT CREATE ON PERCONA_SCHEMA.* to 'mysql.pxc.sst.role'@localhost;
-INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.sst.role','N','N','N','N','N','N','Y','N','Y','N','N','N','N','N','N','Y','N','Y','N','N','Y','N','N','N','N','N','N','N','N','','','','',0,0,0,0,'caching_sha2_password','','Y',CURRENT_TIMESTAMP,NULL,'Y','N','N',NULL,NULL,NULL,NULL);
 
-INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'BACKUP_ADMIN', 'N');
+#
+#  (additionally needed by sst_clone):
+#  GRANT BACKUP_ADMIN, EXECUTE ON *.* TO 'mysql.pxc.sst.role'@localhost WITH GRANT OPTION;
+#  GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost WITH GRANT OPTION;
+#
+#  Note: CREATE USER enables CREATE_ROLE and DROP_ROLE
+#  GRANT CLONE_ADMIN, GROUP_REPLICATION_STREAM, SYSTEM_USER, SHUTDOWN, CONNECTION_ADMIN, CREATE USER, CREATE ROLE, DROP ROLE, SYSTEM_VARIABLES_ADMIN ON *.* TO 'mysql.pxc.sst.role'@localhost;
+#  GRANT INSERT, DELETE ON mysql.plugin TO 'mysql.pxc.sst.role'@localhost;
+#  GRANT UPDATE, INSERT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost;
+
+# common
+INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.sst.role','N','N','N','N','N','N','Y','Y','Y','N','Y','N','N','N','N','Y','N','Y','Y','N','Y','N','N','N','N','Y','N','N','N','','','','',0,0,0,0,'caching_sha2_password','','Y',CURRENT_TIMESTAMP,NULL,'Y','Y','Y',NULL,NULL,NULL,NULL);
+
+#  pxb-sst
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'BACKUP_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.tables_priv VALUES ('localhost', 'PERCONA_SCHEMA', 'mysql.pxc.sst.role', 'xtrabackup_history', 'root\@localhost', CURRENT_TIMESTAMP, 'Alter,Select,Insert,Create', '');
-INSERT IGNORE INTO mysql.db VALUES ('localhost', 'performance_schema', 'mysql.pxc.sst.role','Y','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N');
 INSERT IGNORE INTO mysql.db VALUES ('localhost', 'PERCONA_SCHEMA', 'mysql.pxc.sst.role','N','N','N','N','Y','N','N','N','N','N','N','N','N','N','N','N','N','N','N');
+
+#  common
+INSERT IGNORE INTO mysql.db VALUES ('localhost', 'performance_schema', 'mysql.pxc.sst.role','Y','Y','Y','N','N','N','Y','N','N','N','N','N','N','N','N','N','N','N','N');
+
+#  clone-sst
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'CLONE_ADMIN', 'N');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'GROUP_REPLICATION_STREAM', 'N');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'SYSTEM_USER', 'N');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'CONNECTION_ADMIN', 'N');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'SYSTEM_VARIABLES_ADMIN', 'N');
+INSERT IGNORE INTO mysql.tables_priv VALUES ('localhost', 'mysql', 'mysql.pxc.sst.role', 'plugin', 'root\@localhost', CURRENT_TIMESTAMP, 'Insert,Delete', '');
 
 #! PXC_SECTION::END
 # flush privileges at this stage can cause problem with upgrade from 57 -> 80

@@ -78,7 +78,10 @@ REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'mysql.pxc.internal.session'@localhost;
 
 -- Due to bugs with roles, we need to grant superuser access here
 GRANT ALL PRIVILEGES ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
-GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER, SHUTDOWN,CLONE_ADMIN, SYSTEM_USER,GROUP_REPLICATION_STREAM  ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
+-- Needed by sst_xtrabackup
+GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
+-- Additionally needed by sst_clone
+GRANT SHUTDOWN,CLONE_ADMIN, SYSTEM_USER,GROUP_REPLICATION_STREAM  ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
 -- GRANT CREATE USER ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
 -- GRANT SUPER ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
 -- GRANT RELOAD ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
@@ -91,12 +94,23 @@ GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER, SHU
 CREATE ROLE 'mysql.pxc.sst.role'@localhost;
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'mysql.pxc.sst.role'@localhost;
 
-GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER, CLONE_ADMIN,GROUP_REPLICATION_STREAM,SYSTEM_USER, SHUTDOWN,CONNECTION_ADMIN, CREATE USER ON *.* TO 'mysql.pxc.sst.role'@localhost WITH GRANT OPTION;
-GRANT INSERT,DELETE ON mysql.plugin TO 'mysql.pxc.sst.role'@localhost WITH GRANT OPTION;
-GRANT CLONE_ADMIN, SYSTEM_VARIABLES_ADMIN, SUPER, SHUTDOWN, EXECUTE ON *.* to 'mysql.pxc.sst.role'@localhost WITH GRANT OPTION;
-GRANT SELECT,UPDATE,INSERT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost WITH GRANT OPTION;
-
+-- Needed by sst_xtrabackup-v2
+GRANT LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.* TO 'mysql.pxc.sst.role'@localhost;
 GRANT ALTER, CREATE, SELECT, INSERT ON PERCONA_SCHEMA.xtrabackup_history TO 'mysql.pxc.sst.role'@localhost;
+
+-- Common. WITH GRANT OPTION is needed by clone-sst script
+GRANT BACKUP_ADMIN, EXECUTE ON *.* TO 'mysql.pxc.sst.role'@localhost WITH GRANT OPTION;
+GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost WITH GRANT OPTION;
+
+-- Additional grants needed by sst_clone
+-- Together with CREATE USER, grant CREATE/DROP ROLE, because during the server upgrade
+-- they will be set anyway (and it affects mtr_check)
+-- See mysql_system_tables_fix.sql:
+-- UPDATE user SET Create_role_priv= 'Y', Drop_role_priv= 'Y' WHERE Create_user_priv = 'Y';
+GRANT CLONE_ADMIN, GROUP_REPLICATION_STREAM, SYSTEM_USER, SHUTDOWN, CONNECTION_ADMIN, CREATE USER, CREATE ROLE, DROP ROLE, SYSTEM_VARIABLES_ADMIN ON *.* TO 'mysql.pxc.sst.role'@localhost;
+GRANT INSERT, DELETE ON mysql.plugin TO 'mysql.pxc.sst.role'@localhost;
+GRANT UPDATE, INSERT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost;
+
 -- For some reason this is also needed, although the docs say BACKUP_ADMIN is enough
 GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost;
 -- Need this to create the PERCONA_SCHEMA database if needed
