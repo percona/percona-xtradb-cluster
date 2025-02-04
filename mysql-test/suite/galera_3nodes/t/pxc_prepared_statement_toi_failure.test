@@ -62,48 +62,50 @@ INSERT INTO pxc4341 VALUES(1,1),(2,2),(3,3);
 --let $assert_cond = COUNT(*) = 3 FROM test.pxc4341
 --source include/assert.inc
 
+# Commit 920f373b caused the following part of the test to be not relevant anymore
+# CREATE TABLE is always reprepared before the execution
 #
 # Simulate the case of exhausted retries on node3
 #
---connection node_3
-PREPARE stmt1 FROM "CREATE TABLE IF NOT EXISTS temp (id INT PRIMARY KEY AUTO_INCREMENT, a INT)";
-EXECUTE stmt1;
-FLUSH TABLES;
-
---let $debug_point=simulate_max_reprepare_attempts_hit_case
---source include/add_debug_point.inc
-
---error ER_NEED_REPREPARE
-EXECUTE stmt1;
-
-# Assert that cluster node3 became inconsistent with the group
---connection node_1
---let $assert_only_after = CURRENT_TEST
---let $assert_count = 1
---let $assert_text = Node 3 inconsistent message was found in the error log
---let $assert_select = Prepared statement needs to be re-prepared
---let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.3.err
---source include/assert_grep.inc
-
---let $assert_only_after = CURRENT_TEST
---let $assert_count = 1
---let $assert_text = Node 3 inconsistent message was found in the error log
---let $assert_select = Inconsistency detected: Inconsistent by consensus
---let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.3.err
---source include/assert_grep.inc
-
-# Restart node3
---connection node_3
-SET SESSION wsrep_sync_wait=0;
---source include/shutdown_mysqld.inc
---source include/start_mysqld.inc
-
-# Test suppressions
---connection node_3
-CALL mtr.add_suppression("Inconsistency detected: Inconsistent by consensus on");
+# --connection node_3
+# PREPARE stmt1 FROM "CREATE TABLE IF NOT EXISTS temp (id INT PRIMARY KEY AUTO_INCREMENT, a INT)";
+# EXECUTE stmt1;
+# FLUSH TABLES;
+#
+# --let $debug_point=simulate_max_reprepare_attempts_hit_case
+# --source include/add_debug_point.inc
+#
+# --error ER_NEED_REPREPARE
+# EXECUTE stmt1;
+#
+# # Assert that cluster node3 became inconsistent with the group
+# --connection node_1
+# --let $assert_only_after = CURRENT_TEST
+# --let $assert_count = 1
+# --let $assert_text = Node 3 inconsistent message was found in the error log
+# --let $assert_select = Prepared statement needs to be re-prepared
+# --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.3.err
+# --source include/assert_grep.inc
+#
+# --let $assert_only_after = CURRENT_TEST
+# --let $assert_count = 1
+# --let $assert_text = Node 3 inconsistent message was found in the error log
+# --let $assert_select = Inconsistency detected: Inconsistent by consensus
+# --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.3.err
+# --source include/assert_grep.inc
+#
+# # Restart node3
+# --connection node_3
+# SET SESSION wsrep_sync_wait=0;
+# --source include/shutdown_mysqld.inc
+# --source include/start_mysqld.inc
+#
+# # Test suppressions
+# --connection node_3
+# CALL mtr.add_suppression("Inconsistency detected: Inconsistent by consensus on");
 
 # Cleanup
 --disconnect node_3
 --connection node_1
-DROP TABLE temp;
+# DROP TABLE temp;
 DROP TABLE pxc4341;

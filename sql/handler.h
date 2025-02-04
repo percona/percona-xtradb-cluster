@@ -3002,8 +3002,8 @@ constexpr const decltype(handlerton::flags) HTON_SUPPORTS_ENGINE_ATTRIBUTE{
     1 << 17};
 
 /** Engine supports Generated invisible primary key. */
-constexpr const decltype(
-    handlerton::flags) HTON_SUPPORTS_GENERATED_INVISIBLE_PK{1 << 18};
+constexpr const decltype(handlerton::flags)
+    HTON_SUPPORTS_GENERATED_INVISIBLE_PK{1 << 18};
 
 /** Whether the secondary engine supports DDLs. No meaning if the engine is not
  * secondary. */
@@ -4150,9 +4150,7 @@ class Ft_hints {
 
      @return pointer to ft_hints struct
    */
-  struct ft_hints *get_hints() {
-    return &hints;
-  }
+  struct ft_hints *get_hints() { return &hints; }
 };
 
 /**
@@ -5315,10 +5313,9 @@ class handler {
   double estimate_in_memory_buffer(ulonglong table_index_size) const;
 
  public:
-  virtual ha_rows multi_range_read_info_const(uint keyno, RANGE_SEQ_IF *seq,
-                                              void *seq_init_param,
-                                              uint n_ranges, uint *bufsz,
-                                              uint *flags, Cost_estimate *cost);
+  virtual ha_rows multi_range_read_info_const(
+      uint keyno, RANGE_SEQ_IF *seq, void *seq_init_param, uint n_ranges,
+      uint *bufsz, uint *flags, bool *force_default_mrr, Cost_estimate *cost);
   virtual ha_rows multi_range_read_info(uint keyno, uint n_ranges, uint keys,
                                         uint *bufsz, uint *flags,
                                         Cost_estimate *cost);

@@ -77,7 +77,7 @@ ELSEIF(APPLE)
   # We must postpone the version test until we have called 'uname -r' below.
 ELSEIF(UNIX)
   # This is currently minimum version on all supported platforms.
-  IF(CMAKE_VERSION VERSION_LESS 3.5.1)
+  IF(CMAKE_VERSION VERSION_LESS 3.11.2)
     # Default cmake is 2.8.12.2 on RedHat
     IF(EXISTS "/etc/redhat-release")
       MESSAGE(WARNING "Please use cmake3 rather than cmake on this platform")
@@ -246,8 +246,8 @@ IF(APPLE)
 ENDIF()
 
 # Add all policies *after* CMAKE_MINIMUM_REQUIRED
-# Repeating CMAKE_MINIMUM_REQUIRED here will load defaults for 3.5.1
-CMAKE_MINIMUM_REQUIRED(VERSION 3.5.1)
+# Repeating CMAKE_MINIMUM_REQUIRED here will load defaults for 3.11.2
+CMAKE_MINIMUM_REQUIRED(VERSION 3.11.2)
 INCLUDE(cmake_policies NO_POLICY_SCOPE)
 
 MACRO(STRING_APPEND STRING_VAR INPUT)
@@ -478,16 +478,16 @@ IF(CMAKE_HOST_UNIX AND NOT FORCE_UNSUPPORTED_COMPILER
           NO_DEFAULT_PATH
           PATHS "/usr/bin")
       ELSEIF(LINUX_SUSE_15)
-        FIND_PROGRAM(ALTERNATIVE_GCC gcc-9
+        FIND_PROGRAM(ALTERNATIVE_GCC gcc-13
           NO_DEFAULT_PATH
           PATHS "/usr/bin")
-        FIND_PROGRAM(ALTERNATIVE_GPP g++-9
+        FIND_PROGRAM(ALTERNATIVE_GPP g++-13
           NO_DEFAULT_PATH
           PATHS "/usr/bin")
-        FIND_PROGRAM(GCC_AR_EXECUTABLE gcc-ar-9
+        FIND_PROGRAM(GCC_AR_EXECUTABLE gcc-ar-13
           NO_DEFAULT_PATH
           PATHS "/usr/bin")
-        FIND_PROGRAM(GCC_RANLIB_EXECUTABLE gcc-ranlib-9
+        FIND_PROGRAM(GCC_RANLIB_EXECUTABLE gcc-ranlib-13
           NO_DEFAULT_PATH
           PATHS "/usr/bin")
       ENDIF()
@@ -515,7 +515,7 @@ IF(CMAKE_HOST_UNIX AND NOT FORCE_UNSUPPORTED_COMPILER
           MESSAGE(FATAL_ERROR "Please do zypper install gcc10 gcc10-c++\n"
             "or set CMAKE_C_COMPILER and CMAKE_CXX_COMPILER explicitly.")
         ELSE()
-          MESSAGE(FATAL_ERROR "Please do zypper install gcc9 gcc9-c++\n"
+          MESSAGE(FATAL_ERROR "Please do zypper install gcc13 gcc13-c++\n"
             "or set CMAKE_C_COMPILER and CMAKE_CXX_COMPILER explicitly.")
         ENDIF()
       ENDIF()
@@ -603,6 +603,31 @@ MESSAGE(STATUS "CMAKE_MODULE_PATH is ${CMAKE_MODULE_PATH}")
 INCLUDE(mysql_version)
 PROJECT(${MYSQL_PROJECT_NAME}
   VERSION ${MAJOR_VERSION}.${MINOR_VERSION}.${PATCH_VERSION})
+
+# Various 3rd party libraries have this option.
+# Some have it ON, other OFF, by default.
+# https://cmake.org/cmake/help/latest/variable/BUILD_SHARED_LIBS.html:
+# "the top level project must also call option(BUILD_SHARED_LIBS ...)
+#  before bringing in its dependencies."
+# We want all libraries to be explicitly STATIC or SHARED.
+OPTION(BUILD_SHARED_LIBS "Build shared libraries by default" OFF)
+IF(BUILD_SHARED_LIBS)
+  MESSAGE(WARNING "Do not set BUILD_SHARED_LIBS to ON/TRUE")
+  SET(BUILD_SHARED_LIBS OFF)
+  SET(BUILD_SHARED_LIBS OFF CACHE INTERNAL "" FORCE)
+ENDIF()
+
+# https://cmake.org/cmake/help/latest/variable/CMAKE_SKIP_INSTALL_ALL_DEPENDENCY.html
+OPTION(CMAKE_SKIP_INSTALL_ALL_DEPENDENCY
+  "Target 'install' does not depend on 'all'" OFF)
+IF(CMAKE_SKIP_INSTALL_ALL_DEPENDENCY)
+  MESSAGE(WARNING "Do not set CMAKE_SKIP_INSTALL_ALL_DEPENDENCY to ON/TRUE")
+  SET(CMAKE_SKIP_INSTALL_ALL_DEPENDENCY OFF)
+  SET(CMAKE_SKIP_INSTALL_ALL_DEPENDENCY OFF CACHE INTERNAL "" FORCE)
+ENDIF()
+
+# Ninja only: List of available pools.
+SET_PROPERTY(GLOBAL PROPERTY JOB_POOLS one_job=1)
 
 GET_FILENAME_COMPONENT(REALPATH_CMAKE_SOURCE_DIR ${CMAKE_SOURCE_DIR} REALPATH)
 GET_FILENAME_COMPONENT(REALPATH_CMAKE_BINARY_DIR ${CMAKE_BINARY_DIR} REALPATH)
@@ -1298,7 +1323,7 @@ IF(USE_LD_LLD)
 ENDIF()
 SET(USING_LD_LLD ${USING_LD_LLD} CACHE INTERNAL "")
 
-IF(LINUX_STANDALONE)
+IF(LINUX_STANDALONE OR SOLARIS)
   # ON by default in pushbuild, but only for standalone builds.
   # The comression does not play well with some RPM/DEB packaging.
   # Developers can set default in environment.
@@ -1333,12 +1358,16 @@ ENDIF()
 IF(UNIX AND MY_COMPILER_IS_GNU_OR_CLANG)
   # By default, do this for STANDALONE and tarball builds.
   # Off by default for sanitizer or valgrind builds.
+  # Off by default in pushbuild.
   # Off by default for Apple Clang.
-  IF((INSTALL_LAYOUT MATCHES "STANDALONE" OR
-        INSTALL_LAYOUT MATCHES "TARGZ" OR
-        INSTALL_LAYOUT MATCHES "SVR4"
+  # ON by default for SOLARIS (also in PB2), to reduce package sizes.
+  IF(SOLARIS)
+    SET(MINIMAL_RELWITHDEBINFO_DEFAULT ON)
+  ELSEIF((INSTALL_LAYOUT MATCHES "STANDALONE" OR
+          INSTALL_LAYOUT MATCHES "TARGZ"
         )
       AND NOT CMAKE_COMPILER_FLAG_WITH_SANITIZE AND NOT WITH_VALGRIND
+      AND NOT DEFINED ENV{PB2WORKDIR}
       AND NOT APPLE)
     SET(MINIMAL_RELWITHDEBINFO_DEFAULT ON)
   ELSE()
@@ -1638,7 +1667,6 @@ ENDIF()
 INCLUDE(configure.cmake)
 
 # Common defines and includes
-ADD_DEFINITIONS(-DHAVE_CONFIG_H)
 ADD_DEFINITIONS(-D__STDC_LIMIT_MACROS)     # Enable C99 limit macros
 ADD_DEFINITIONS(-D__STDC_FORMAT_MACROS)    # Enable C99 printf format macros
 ADD_DEFINITIONS(-D_USE_MATH_DEFINES)       # Get access to M_PI, M_E, etc. in math.h
@@ -2104,9 +2132,8 @@ ENDIF()
 IF(WITH_SSL_PATH AND (LINUX_RHEL8 OR LINUX_RHEL9))
   SET(WITH_TIRPC "bundled")
 ENDIF()
-
-IF(WITH_TIRPC STREQUAL "bundled")
-  ADD_SUBDIRECTORY(extra/tirpc)
+IF(LINUX)
+  MYSQL_CHECK_RPC()
 ENDIF()
 
 IF(WITH_PROTOBUF STREQUAL "bundled" OR WITH_FIDO STREQUAL "bundled")
@@ -2132,8 +2159,8 @@ IF(WITH_PROTOBUF STREQUAL "bundled" OR WITH_FIDO STREQUAL "bundled")
       # Silence warning about CMP0075
       CMAKE_PUSH_CHECK_STATE()
       SET(CMAKE_REQUIRED_LIBRARIES)
-      ADD_SUBDIRECTORY(${CMAKE_SOURCE_DIR}/${CBOR_BUNDLE_SRC_PATH})
-      ADD_SUBDIRECTORY(${CMAKE_SOURCE_DIR}/${FIDO_BUNDLE_SRC_PATH})
+      ADD_SUBDIRECTORY(${CMAKE_SOURCE_DIR}/extra/libcbor)
+      ADD_SUBDIRECTORY(${CMAKE_SOURCE_DIR}/extra/libfido2)
       CMAKE_POP_CHECK_STATE()
     ENDIF()
   ENDIF()

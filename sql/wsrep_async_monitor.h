@@ -52,7 +52,6 @@ class Wsrep_async_monitor {
   std::set<seqno_t> skipped_seqnos;      // Tracks skipped sequence numbers
   std::queue<seqno_t> scheduled_seqnos;  // Queue to track scheduled seqnos
 };
-;
 
 #endif /* WITH_WSREP */
 #endif /* WSREP_ASYNC_MONITOR_H */

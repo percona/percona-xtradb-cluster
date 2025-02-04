@@ -111,7 +111,7 @@ class unexpected {
   template <
       class... Args,
       std::enable_if_t<std::is_constructible_v<E, Args &&...>> * = nullptr>
-  constexpr explicit unexpected(std::in_place_t, Args &&... args) {
+  constexpr explicit unexpected(std::in_place_t, Args &&...args) {
     error_(std::forward<Args>(args)...);
   }
 
@@ -169,7 +169,7 @@ union storage_t {
   template <class... Args,
             std::enable_if_t<std::is_constructible_v<T, Args &&...>, void *> =
                 nullptr>
-  void construct_value(std::in_place_t, Args &&... args) {
+  void construct_value(std::in_place_t, Args &&...args) {
     new (&value_) value_type(std::forward<Args>(args)...);
   }
 
@@ -178,7 +178,7 @@ union storage_t {
                                  T, std::initializer_list<U> &, Args &&...>,
                              void *> = nullptr>
   void construct_value(std::in_place_t, std::initializer_list<U> il,
-                       Args &&... args) {
+                       Args &&...args) {
     new (&value_) value_type(il, std::forward<Args>(args)...);
   }
 
@@ -193,7 +193,7 @@ union storage_t {
   template <
       class... Args,
       std::enable_if_t<std::is_constructible_v<E, Args &&...>> * = nullptr>
-  void construct_error(std::in_place_t, Args &&... args) {
+  void construct_error(std::in_place_t, Args &&...args) {
     new (&error_) error_type(std::forward<Args>(args)...);
   }
 
@@ -241,7 +241,7 @@ union storage_t<void, E> {
   template <
       class... Args,
       std::enable_if_t<std::is_constructible_v<E, Args &&...>> * = nullptr>
-  void construct_error(std::in_place_t, Args &&... args) {
+  void construct_error(std::in_place_t, Args &&...args) {
     new (&error_) error_type(std::forward<Args>(args)...);
   }
 
@@ -567,7 +567,7 @@ class ExpectedImpl : public ExpectedImplBase {
   template <
       class... Args,
       std::enable_if_t<std::is_constructible_v<T, Args &&...>> * = nullptr>
-  constexpr ExpectedImpl(std::in_place_t, Args &&... args)
+  constexpr ExpectedImpl(std::in_place_t, Args &&...args)
       : ExpectedImplBase{true} {
     storage_.construct_value(std::in_place, std::forward<Args>(args)...);
   }
@@ -576,7 +576,7 @@ class ExpectedImpl : public ExpectedImplBase {
   template <
       class... Args,
       std::enable_if_t<std::is_constructible_v<E, Args &&...>> * = nullptr>
-  constexpr ExpectedImpl(stdx::unexpect_t, Args &&... args)
+  constexpr ExpectedImpl(stdx::unexpect_t, Args &&...args)
       : ExpectedImplBase{false} {
     storage_.construct_error(std::in_place, std::forward<Args>(args)...);
   }
@@ -778,7 +778,7 @@ class ExpectedImpl<void, E> : public ExpectedImplBase {
   template <
       class... Args,
       std::enable_if_t<std::is_constructible_v<E, Args &&...>> * = nullptr>
-  constexpr ExpectedImpl(stdx::unexpect_t, Args &&... args)
+  constexpr ExpectedImpl(stdx::unexpect_t, Args &&...args)
       : ExpectedImplBase{false} {
     storage_.construct_error(std::in_place, std::forward<Args>(args)...);
   }

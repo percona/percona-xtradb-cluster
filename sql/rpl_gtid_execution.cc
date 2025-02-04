@@ -43,7 +43,7 @@
 #include "sql/sql_parse.h"  // stmt_causes_implicit_commit
 #include "sql/system_variables.h"
 #ifdef WITH_WSREP
-#include "sql/rpl_rli_pdb.h" // Slave_worker
+#include "sql/rpl_rli_pdb.h"  // Slave_worker
 #include "sql/wsrep_async_monitor.h"
 #endif /* WITH_WSREP */
 
@@ -360,10 +360,11 @@ static inline void skip_statement(THD *thd) {
   */
   Commit_stage_manager::get_instance().finish_session_ticket(thd);
 #ifdef WITH_WSREP
-  /* Despite the transaction was skipped, it needs to be updated in the Wsrep_async_monitor */
+  /* Despite the transaction was skipped, it needs to be updated in the
+   * Wsrep_async_monitor */
   if (thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER) {
-    Slave_worker *sw = dynamic_cast<Slave_worker*>(thd->rli_slave);
-    Wsrep_async_monitor *wsrep_async_monitor {sw->get_wsrep_async_monitor()};
+    Slave_worker *sw = dynamic_cast<Slave_worker *>(thd->rli_slave);
+    Wsrep_async_monitor *wsrep_async_monitor{sw->get_wsrep_async_monitor()};
     if (wsrep_async_monitor) {
       auto seqno = sw->sequence_number();
       assert(seqno > 0);

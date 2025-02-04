@@ -1783,9 +1783,7 @@ class Relay_log_info : public Rpl_info {
   }
 
 #ifdef WITH_WSREP
-  Wsrep_async_monitor* get_wsrep_async_monitor() {
-    return wsrep_async_monitor;
-  }
+  Wsrep_async_monitor *get_wsrep_async_monitor() { return wsrep_async_monitor; }
   void set_wsrep_async_monitor(Wsrep_async_monitor *monitor) {
     wsrep_async_monitor = monitor;
   }

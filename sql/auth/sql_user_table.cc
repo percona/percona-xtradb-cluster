@@ -1978,8 +1978,7 @@ int open_grant_tables(THD *thd, Table_ref *tables, bool *transactional_tables,
                       const char *db [[maybe_unused]],
                       const char *table [[maybe_unused]]) {
 #else
-int open_grant_tables(THD *thd, TABLE_LIST *tables,
-                      bool *transactional_tables) {
+int open_grant_tables(THD *thd, Table_ref *tables, bool *transactional_tables) {
 #endif /* WITH_WSREP */
   DBUG_TRACE;
 

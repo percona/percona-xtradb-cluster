@@ -216,7 +216,7 @@ int open_grant_tables(THD *thd, Table_ref *tables, bool *transactional_tables,
                       const char *db = WSREP_MYSQL_DB,
                       const char *table = nullptr);
 #else
-int open_grant_tables(THD *thd, TABLE_LIST *tables, bool *transactional_tables);
+int open_grant_tables(THD *thd, Table_ref *tables, bool *transactional_tables);
 #endif /* WITH_WSREP */
 void acl_tables_setup_for_read(Table_ref *tables);
 

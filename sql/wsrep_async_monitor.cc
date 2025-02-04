@@ -15,9 +15,9 @@
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA */
 
 #ifdef WITH_WSREP
-#include "sql/mysqld.h"
 #include "sql/wsrep_async_monitor.h"
 #include <cassert>
+#include "sql/mysqld.h"
 
 // Method for main thread to add scheduled seqnos
 void Wsrep_async_monitor::schedule(seqno_t seqno) {
@@ -34,16 +34,17 @@ void Wsrep_async_monitor::enter(seqno_t seqno) {
 
   // Wait until this transaction is at the head of the scheduled queue
   m_cond.wait(lock, [this, seqno] {
-
     // Here we need to remove skipped transactions
 
-    // Imagine a scenario where scheduled seqnos is 1,2(skip),3 and threads enter in
-    // an out of order manner.
+    // Imagine a scenario where scheduled seqnos is 1,2(skip),3 and threads
+    // enter in an out of order manner.
     //
-    // - 3 enters the monitor first, since it is not in the front of the queue, it
+    // - 3 enters the monitor first, since it is not in the front of the queue,
+    // it
     //   goes to cond_wait
     // - 2 enters the monitor, adds 2 to skipped_seqnos
-    // - 1 enters the monitor, since it is in the front, it acquires the monitor,
+    // - 1 enters the monitor, since it is in the front, it acquires the
+    // monitor,
     //   does its job and leaves the monitor by removing itself from the
     //   scheduled_seqnos and signals 3.
     // - 3 wakes up, but it will see that 2 in the front of the
@@ -80,7 +81,9 @@ void Wsrep_async_monitor::leave(seqno_t seqno) {
     //                   : std::to_string(scheduled_seqnos.front()))
     //           << " but got " << seqno << "." << std::endl;
     assert(false && "Sequence number mismatch in leave()");
+#ifndef EXTRA_CODE_FOR_UNIT_TESTING
     unireg_abort(1);
+#endif
   }
 
   // Remove seqnos from skipped_seqnos.

@@ -2541,7 +2541,7 @@ bool MDL_lock::can_grant_lock(enum_mdl_type type_arg,
           other context.
 
           If we are trying to acquire "unobtrusive" type of lock then the
-          conflicting lock must be from "obtrusive" set, therefore it should
+          confliciting lock must be from "obtrusive" set, therefore it should
           have been acquired using "slow path" and should be present in
           m_granted list.
 

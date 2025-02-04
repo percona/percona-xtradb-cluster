@@ -61,7 +61,7 @@ class DataProvider {
       SERVICE_TYPE(mysql_command_thread) & command_thread_service,
       Logger &logger);
 
-  ~DataProvider() = default;
+  virtual ~DataProvider() = default;
 
   DataProvider(const DataProvider &rhs) = delete;
   DataProvider(DataProvider &&rhs) = delete;
@@ -73,9 +73,9 @@ class DataProvider {
   std::string get_report();
 
  private:
-  bool do_query(const std::string &query, QueryResult *result,
-                unsigned int *err_no = nullptr,
-                bool suppress_query_error_log = false);
+  virtual bool do_query(const std::string &query, QueryResult *result,
+                        unsigned int *err_no = nullptr,
+                        bool suppress_query_error_log = false);
   bool collect_db_instance_id_info(rapidjson::Document *document);
   bool collect_product_version_info(rapidjson::Document *document);
   bool collect_plugins_info(rapidjson::Document *document);
@@ -91,11 +91,11 @@ class DataProvider {
 
 #ifdef WITH_WSREP
   bool collect_galera_replication_info(rapidjson::Document *document);
+  bool get_gcache_encryption_enabled(const std::string &options);
+  bool get_ws_cache_encryption_enabled(const std::string &options);
 #endif
 
   const std::string &get_database_instance_id();
-  bool get_gcache_encryption_enabled(const std::string &options);
-  bool get_ws_cache_encryption_enabled(const std::string &options);
 
   SERVICE_TYPE(mysql_command_factory) & command_factory_service_;
   SERVICE_TYPE(mysql_command_options) & command_options_service_;
@@ -110,8 +110,10 @@ class DataProvider {
 
   std::string database_instance_id_cache_;
   std::string version_cache_;
+#ifdef WITH_WSREP
   int gcache_encryption_enabled_cache_;
   int ws_cache_encryption_enabled_cache_;
+#endif
 };
 
 #endif /* PERCONA_TELEMETRY_DATA_PROVIDER_H */

@@ -71,7 +71,7 @@ class Protocol_classic : public Protocol {
 #ifdef WITH_WSREP
   std::shared_ptr<enum_field_types> field_types_ptr;
 #endif
-  enum_field_types *field_types;
+  enum enum_field_types *field_types;
   uint count;
 #endif
   uint field_count;

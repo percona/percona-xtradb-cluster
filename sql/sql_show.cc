@@ -2927,9 +2927,9 @@ class List_process_list : public Do_THD_Impl {
         thd_info->host = host;
       } else
         thd_info->host = m_client_thd->mem_strdup(
-            inspect_sctx_host_or_ip.str[0]
-                ? inspect_sctx_host_or_ip.str
-                : inspect_sctx_host.length ? inspect_sctx_host.str : "");
+            inspect_sctx_host_or_ip.str[0] ? inspect_sctx_host_or_ip.str
+            : inspect_sctx_host.length     ? inspect_sctx_host.str
+                                           : "");
     }  // We've copied the security context, so release the lock.
 
     DBUG_EXECUTE_IF("processlist_acquiring_dump_threads_LOCK_thd_data", {
@@ -3942,8 +3942,8 @@ static int fill_schema_user_stats(THD *thd, Table_ref *tables,
   1 - error
 */
 
-static int fill_schema_client_stats(
-    THD *thd, Table_ref *tables, Item *cond [[maybe_unused]]) noexcept {
+static int fill_schema_client_stats(THD *thd, Table_ref *tables,
+                                    Item *cond [[maybe_unused]]) noexcept {
   DBUG_ENTER("fill_schema_client_stats");
 
   if (check_global_access(thd, SUPER_ACL | PROCESS_ACL)) DBUG_RETURN(1);
@@ -3961,8 +3961,8 @@ static int fill_schema_client_stats(
   DBUG_RETURN(result);
 }
 
-static int fill_schema_thread_stats(
-    THD *thd, Table_ref *tables, Item *cond [[maybe_unused]]) noexcept {
+static int fill_schema_thread_stats(THD *thd, Table_ref *tables,
+                                    Item *cond [[maybe_unused]]) noexcept {
   DBUG_ENTER("fill_schema_thread_stats");
 
   if (check_global_access(thd, SUPER_ACL | PROCESS_ACL)) DBUG_RETURN(1);
@@ -4615,7 +4615,8 @@ static int fill_temporary_tables(THD *thd, Table_ref *tables, Item *cond) {
 
   for (tmp = thd->temporary_tables; tmp; tmp = tmp->next) {
     if (store_temporary_table_record(thd, tables->table, tmp,
-                                     thd->lex->query_block->db, thd->mem_root)) {
+                                     thd->lex->query_block->db,
+                                     thd->mem_root)) {
       DBUG_RETURN(1);
     }
   }
@@ -4704,13 +4705,11 @@ static int get_schema_tmp_table_columns_record(THD *thd, Table_ref *tables,
 
     // COLUMN_KEY
     pos = pointer_cast<const uchar *>(
-        field->is_flag_set(PRI_KEY_FLAG)
-            ? "PRI"
-            : field->is_flag_set(UNIQUE_KEY_FLAG)
-                  ? "UNI"
-                  : (field->is_flag_set(MULTIPLE_KEY_FLAG))
-                        ? "MUL"
-                        : (field->is_flag_set(CLUSTERING_FLAG)) ? "CLU" : "");
+        field->is_flag_set(PRI_KEY_FLAG)          ? "PRI"
+        : field->is_flag_set(UNIQUE_KEY_FLAG)     ? "UNI"
+        : (field->is_flag_set(MULTIPLE_KEY_FLAG)) ? "MUL"
+        : (field->is_flag_set(CLUSTERING_FLAG))   ? "CLU"
+                                                  : "");
     table->field[TMP_TABLE_COLUMNS_COLUMN_KEY]->store(
         (const char *)pos, strlen((const char *)pos), cs);
 
@@ -5024,7 +5023,7 @@ static int get_schema_tmp_table_keys_record(THD *thd, Table_ref *tables,
       // Expression for functional key parts
       if (key_part->field != nullptr &&
           key_part->field->is_field_for_functional_index()) {
-        Value_generator *gcol = key_info->key_part->field->gcol_info;
+        Value_generator *gcol = key_part->field->gcol_info;
 
         table->field[TMP_TABLE_KEYS_EXPRESSION]->store(
             gcol->expr_str.str, gcol->expr_str.length, cs);
@@ -5638,7 +5637,7 @@ ST_FIELD_INFO tmp_table_keys_fields_info[] = {
     {"INDEX_SCHEMA", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, nullptr, 0},
     {"INDEX_NAME", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, "Key_name", 0},
     {"SEQ_IN_INDEX", 2, MYSQL_TYPE_LONGLONG, 0, 0, "Seq_in_index", 0},
-    {"COLUMN_NAME", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, "Column_name", 0},
+    {"COLUMN_NAME", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 1, "Column_name", 0},
     {"COLLATION", 1, MYSQL_TYPE_STRING, 0, 1, "Collation", 0},
     {"CARDINALITY", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONGLONG, 0, 1,
      "Cardinality", 0},

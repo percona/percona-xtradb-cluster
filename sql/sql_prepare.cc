@@ -773,11 +773,10 @@ bool Prepared_statement::insert_parameters(THD *thd, String *query,
       param->set_data_type_actual(MYSQL_TYPE_VARCHAR);
       // see Item_param::set_str() for explanation
       param->set_collation_actual(
-          param->collation_source() == &my_charset_bin
-              ? &my_charset_bin
-              : param->collation.collation != &my_charset_bin
-                    ? param->collation.collation
-                    : current_thd->variables.collation_connection);
+          param->collation_source() == &my_charset_bin ? &my_charset_bin
+          : param->collation.collation != &my_charset_bin
+              ? param->collation.collation
+              : current_thd->variables.collation_connection);
 
     } else if (parameters[i].null_bit) {
       param->set_null();
@@ -3032,6 +3031,13 @@ bool Prepared_statement::execute_loop(THD *thd, String *expanded_query,
     if (reprepare(thd)) return true;
   }
 
+  // Some SQL commands need re-preparation, such as Sql_cmd_create_table
+  // when the keys involve an expression.
+  if (!m_first_execution && m_lex->m_sql_cmd &&
+      m_lex->m_sql_cmd->reprepare_on_execute_required()) {
+    if (reprepare(thd)) return true;
+  }
+
 reexecute:
   /*
     If the item_list is not empty, we'll wrongly free some externally
@@ -3167,7 +3173,7 @@ reexecute:
           thd->secondary_engine_optimization() ==
               Secondary_engine_optimization::SECONDARY &&
           !m_lex->unit->is_executed()) {
-        if (has_external_table(m_lex->query_tables)) {
+        if (m_lex->has_external_tables()) {
           set_external_engine_fail_reason(m_lex,
                                           thd->get_stmt_da()->message_text());
         }
@@ -3198,6 +3204,7 @@ reexecute:
 #endif
   }
   reset_stmt_parameters(this);
+  m_first_execution = false;
 
   // Re-enable the general log if it was temporarily disabled while repreparing
   // and executing a statement for a secondary engine.
@@ -3334,7 +3341,7 @@ bool Prepared_statement::reprepare(THD *thd) {
   */
   thd->get_stmt_da()->reset_condition_info(thd);
 
-  copy_guard.commit();
+  copy_guard.release();
 
   return false;
 }

@@ -29,6 +29,7 @@
 
 #include <initializer_list>
 #include <iterator>
+#include <limits>
 #include <memory>
 #include <regex>
 #include <string>
@@ -6508,14 +6509,13 @@ struct CountingReceiver {
     return false;
   }
 
-#if defined(__GNUC__) && (__GNUC__ >= 14)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Warray-bounds"
+  size_t count(NodeMap map) const {
+#if defined(__GNUC__) && __GNUC__ >= 14
+    // Silence -Warray-bounds warning in GCC 14.
+    [[assume(map != std::numeric_limits<uint64_t>::max())]];
 #endif
-  size_t count(NodeMap map) const { return m_num_subplans[map]; }
-#if defined(__GNUC__) && (__GNUC__ >= 14)
-#pragma GCC diagnostic pop
-#endif
+    return m_num_subplans[map];
+  }
 
   const JoinHypergraph &m_graph;
   std::unique_ptr<size_t[]> m_num_subplans;

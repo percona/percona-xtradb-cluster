@@ -2096,13 +2096,22 @@ then
             wsrep_log_error "****************************************************** "
             do_exit=1
         fi
-        if [[ ${RC[$(( ${#RC[@]}-1 ))]} -eq 1 ]]; then
-            wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "$tcmd finished with error: ${RC[1]}"
-            wsrep_log_error "Line $LINENO"
-            wsrep_log_error "****************************************************** "
-            do_exit=1
-        fi
+
+        # Now let's go through the rest of return codes and see if there were
+        # any errors in tcmd (it may be a pipeline of several commands)
+        for ecode in "${RC[@]:1}"; do
+            if [[ $ecode -ne 0 ]]; then
+                wsrep_log_error "******************* FATAL ERROR ********************** "
+                wsrep_log_error "${tcmd} finished with error codes: ${RC[@]:1}"
+                wsrep_log_error "Line $LINENO"
+                wsrep_log_error "****************************************************** "
+                do_exit=1
+
+                # All exit codes already printed out, no need to iterate more
+                break
+            fi
+        done
+
         if [[ $do_exit -eq 1 ]]; then
             exit 22
         fi

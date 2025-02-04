@@ -8764,9 +8764,10 @@ static Sys_var_ulonglong Sys_wsrep_trx_fragment_size(
     "wsrep_trx_fragment_size",
     "Size of transaction fragments for streaming replication (measured in "
     "units of 'wsrep_trx_fragment_unit')",
-    HINT_UPDATEABLE SESSION_VAR(wsrep_trx_fragment_size), CMD_LINE(REQUIRED_ARG),
-    VALID_RANGE(0, WSREP_MAX_WS_SIZE), DEFAULT(0), BLOCK_SIZE(1),
-    NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(wsrep_trx_fragment_size_check),
+    HINT_UPDATEABLE SESSION_VAR(wsrep_trx_fragment_size),
+    CMD_LINE(REQUIRED_ARG), VALID_RANGE(0, WSREP_MAX_WS_SIZE), DEFAULT(0),
+    BLOCK_SIZE(1), NO_MUTEX_GUARD, NOT_IN_BINLOG,
+    ON_CHECK(wsrep_trx_fragment_size_check),
     ON_UPDATE(wsrep_trx_fragment_size_update));
 
 extern const char *wsrep_fragment_units[];
@@ -8775,9 +8776,10 @@ static Sys_var_enum Sys_wsrep_trx_fragment_unit(
     "wsrep_trx_fragment_unit",
     "Unit for streaming replication transaction fragments' size: bytes, "
     "rows, statements",
-    HINT_UPDATEABLE SESSION_VAR(wsrep_trx_fragment_unit), CMD_LINE(REQUIRED_ARG),
-    wsrep_fragment_units, DEFAULT(WSREP_FRAG_BYTES), NO_MUTEX_GUARD,
-    NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(wsrep_trx_fragment_unit_update));
+    HINT_UPDATEABLE SESSION_VAR(wsrep_trx_fragment_unit),
+    CMD_LINE(REQUIRED_ARG), wsrep_fragment_units, DEFAULT(WSREP_FRAG_BYTES),
+    NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
+    ON_UPDATE(wsrep_trx_fragment_unit_update));
 
 extern const char *wsrep_SR_store_types[];
 static Sys_var_enum Sys_wsrep_SR_store(
@@ -8787,8 +8789,8 @@ static Sys_var_enum Sys_wsrep_SR_store(
 
 static Sys_var_bool Sys_wsrep_dirty_reads(
     "wsrep_dirty_reads", "Allow reads from a node is not in primary component",
-    HINT_UPDATEABLE SESSION_VAR(wsrep_dirty_reads), CMD_LINE(OPT_ARG), DEFAULT(false),
-    NO_MUTEX_GUARD, NOT_IN_BINLOG);
+    HINT_UPDATEABLE SESSION_VAR(wsrep_dirty_reads), CMD_LINE(OPT_ARG),
+    DEFAULT(false), NO_MUTEX_GUARD, NOT_IN_BINLOG);
 
 static Sys_var_uint Sys_wsrep_ignore_apply_errors(
     "wsrep_ignore_apply_errors", "Ignore replication errors",
@@ -8832,25 +8834,31 @@ static Sys_var_bool Sys_pxc_encrypt_cluster_traffic(
     READ_ONLY GLOBAL_VAR(pxc_encrypt_cluster_traffic), CMD_LINE(OPT_ARG),
     DEFAULT(true), NO_MUTEX_GUARD, NOT_IN_BINLOG);
 
-static const char *wsrep_encrypt_modes[] = {"OFF", "ON", "NONE",
-                                        NullS};
+static const char *wsrep_encrypt_modes[] = {"OFF", "ON", "NONE", NullS};
 static Sys_var_enum Sys_wsrep_gcache_encrypt(
-    "wsrep_gcache_encrypt", "Encrypt GCache. This variable is solely for testing purposes. "
+    "wsrep_gcache_encrypt",
+    "Encrypt GCache. This variable is solely for testing purposes. "
     "wsrep_provider_options should be used in production.",
-    READ_ONLY GLOBAL_VAR(wsrep_gcache_encrypt), CMD_LINE(OPT_ARG), wsrep_encrypt_modes,
-    DEFAULT(WSREP_ENCRYPT_MODE_NONE), NO_MUTEX_GUARD, NOT_IN_BINLOG);
+    READ_ONLY GLOBAL_VAR(wsrep_gcache_encrypt), CMD_LINE(OPT_ARG),
+    wsrep_encrypt_modes, DEFAULT(WSREP_ENCRYPT_MODE_NONE), NO_MUTEX_GUARD,
+    NOT_IN_BINLOG);
 
 static Sys_var_enum Sys_wsrep_disk_pages_encrypt(
-    "wsrep_disk_pages_encrypt", "Encrypt WriteSet cache. This variable is solely for testing purposes. "
+    "wsrep_disk_pages_encrypt",
+    "Encrypt WriteSet cache. This variable is solely for testing purposes. "
     "wsrep_provider_options should be used in production.",
-    READ_ONLY GLOBAL_VAR(wsrep_disk_pages_encrypt), CMD_LINE(OPT_ARG), wsrep_encrypt_modes,
-    DEFAULT(WSREP_ENCRYPT_MODE_NONE), NO_MUTEX_GUARD, NOT_IN_BINLOG);
+    READ_ONLY GLOBAL_VAR(wsrep_disk_pages_encrypt), CMD_LINE(OPT_ARG),
+    wsrep_encrypt_modes, DEFAULT(WSREP_ENCRYPT_MODE_NONE), NO_MUTEX_GUARD,
+    NOT_IN_BINLOG);
 
 static Sys_var_bool Sys_wsrep_async_monitor(
     "wsrep_use_async_monitor",
-    "Use Async Monitors to avoid deadlock of replicated transactions in a multi-threaded replica. "
-    "Deadlock is possible when the PXC replica tries to commit the replicated transactions in galera "
-    "in a different order than its order in the relay log. Use 'wsrep_use_async_monitor' to avoid "
+    "Use Async Monitors to avoid deadlock of replicated transactions in a "
+    "multi-threaded replica. "
+    "Deadlock is possible when the PXC replica tries to commit the replicated "
+    "transactions in galera "
+    "in a different order than its order in the relay log. Use "
+    "'wsrep_use_async_monitor' to avoid "
     "such deadlocks."
     "This variable is only allowed to be changed through command line.",
     READ_ONLY GLOBAL_VAR(wsrep_use_async_monitor), CMD_LINE(OPT_ARG),

@@ -286,7 +286,7 @@ BEGIN
 SET @A= 20;
 SELECT 1;
 SELECT 2, 3 UNION SELECT 4, 5;
-SELECT 6, 7, 8; 
+SELECT 6, 7, 8;
 END ;|
 CREATE DEFINER = u1@localhost FUNCTION f1 () RETURNS int
 BEGIN
@@ -328,7 +328,7 @@ BEGIN
 SET @A= 20;
 SELECT 1;
 SELECT 2, 3 UNION SELECT 4, 5;
-SELECT 6, 7, 8; 
+SELECT 6, 7, 8;
 END	utf8mb4	utf8mb4_0900_ai_ci	utf8mb4_0900_ai_ci
 SHOW CREATE PROCEDURE db1_extended.p2;
 Procedure	sql_mode	Create Procedure	character_set_client	collation_connection	Database Collation
@@ -359,7 +359,7 @@ BEGIN
 SET @A= 20;
 SELECT 1;
 SELECT 2, 3 UNION SELECT 4, 5;
-SELECT 6, 7, 8; 
+SELECT 6, 7, 8;
 END	utf8mb4	utf8mb4_0900_ai_ci	utf8mb4_0900_ai_ci
 SHOW CREATE PROCEDURE db1_extended.p2;
 Procedure	sql_mode	Create Procedure	character_set_client	collation_connection	Database Collation

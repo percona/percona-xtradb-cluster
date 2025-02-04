@@ -166,9 +166,9 @@
 
 #ifdef WITH_WSREP
 #include "service_wsrep.h"
+#include "sql/wsrep_async_monitor.h"
 #include "wsrep_mysqld.h"
 #include "wsrep_xid.h"
-#include "sql/wsrep_async_monitor.h"
 #endif /* WITH_WSREP */
 
 #define window_size Log_throttle::LOG_THROTTLE_WINDOW_SIZE
@@ -2295,9 +2295,9 @@ void Rows_log_event::print_verbose(IO_CACHE *file,
   enum_row_image_type row_image_type =
       get_general_type_code() == binary_log::WRITE_ROWS_EVENT
           ? enum_row_image_type::WRITE_AI
-          : get_general_type_code() == binary_log::DELETE_ROWS_EVENT
-                ? enum_row_image_type::DELETE_BI
-                : enum_row_image_type::UPDATE_BI;
+      : get_general_type_code() == binary_log::DELETE_ROWS_EVENT
+          ? enum_row_image_type::DELETE_BI
+          : enum_row_image_type::UPDATE_BI;
 
   if (m_extra_row_info.have_ndb_info() ||
       DBUG_EVALUATE_IF("simulate_error_in_ndb_info_print", 1, 0)) {
@@ -2714,7 +2714,8 @@ Slave_worker *Log_event::get_slave_worker(Relay_log_info *rli) {
           Gtid_log_event *gtid_log_ev = static_cast<Gtid_log_event *>(this);
           rli->started_processing(gtid_log_ev);
 #ifdef WITH_WSREP
-          Wsrep_async_monitor *wsrep_async_monitor {rli->get_wsrep_async_monitor()};
+          Wsrep_async_monitor *wsrep_async_monitor{
+              rli->get_wsrep_async_monitor()};
           if (wsrep_async_monitor) {
             auto seqno = gtid_log_ev->sequence_number;
             wsrep_async_monitor->schedule(seqno);
@@ -11244,10 +11245,12 @@ static enum_tbl_map_status check_table_map(Relay_log_info const *rli,
 #ifdef WITH_WSREP
   // This transaction is anyways going to be skipped. So skip the transaction
   // in the async monitor as well
-  if (WSREP(rli->info_thd) && rli->info_thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER
-      && !thd_is_wsrep_applier && res == FILTERED_OUT) {
-    Slave_worker *sw = static_cast<Slave_worker *>(const_cast<Relay_log_info *>(rli));
-    Wsrep_async_monitor *wsrep_async_monitor {sw->get_wsrep_async_monitor()};
+  if (WSREP(rli->info_thd) &&
+      rli->info_thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER &&
+      !thd_is_wsrep_applier && res == FILTERED_OUT) {
+    Slave_worker *sw =
+        static_cast<Slave_worker *>(const_cast<Relay_log_info *>(rli));
+    Wsrep_async_monitor *wsrep_async_monitor{sw->get_wsrep_async_monitor()};
     if (wsrep_async_monitor) {
       auto seqno = sw->sequence_number();
       assert(seqno > 0);

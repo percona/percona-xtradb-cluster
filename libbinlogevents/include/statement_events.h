@@ -672,13 +672,13 @@ class Query_event : public Binary_log_event {
 
   uint8_t default_table_encryption;
 
+  // #ifdef WITH_WSREP
   /**
     This class is used by server and mysqldump.
     The server is compiled with WITH_WSREP defined, but mysqldump is not.
     This causes compilation error -Werror=odr if we compile with
     MYSQL_MAINTAINER_MODE=ON. Let the following two members be declared always.
   */
-// #ifdef WITH_WSREP
   uint8_t ddl_skip_rewrite;
   uint8_t wsrep_applier_skip_readonly_checks;
 // #endif /* WITH_WSREP */

@@ -42,6 +42,10 @@ Prefix: %{_sysconfdir}
 %define rpm_release @@RPM_RELEASE@@
 %define revision @@REVISION@@
 %define distribution  rhel%{redhatversion}  
+
+# By default a build will be done in normal mode
+%{?enable_fipsmode: %global enable_fipsmode 1}
+
 %if 0%{?rhel} >= 8
 %global pxc_telemetry          /usr/local/percona/telemetry/pxc
 %endif
@@ -84,7 +88,7 @@ Prefix: %{_sysconfdir}
 
 #Placeholder should be replaced on preparation stage
 %if %{undefined galera_version}
- %define galera_version 4.16
+ %define galera_version 4.21
 %endif
 
 %if %{undefined galera_revision}
@@ -165,10 +169,18 @@ Prefix: %{_sysconfdir}
 %endif
 
 %if %{undefined compilation_comment_debug}
+%if 0%{?enable_fipsmode}
+    %define compilation_comment_debug       Percona XtraDB Cluster Pro - Debug (GPL), Release rel%{percona_server_version}, Revision %{revision}, WSREP version %{wsrep_version}
+%else
     %define compilation_comment_debug       Percona XtraDB Cluster - Debug (GPL), Release rel%{percona_server_version}, Revision %{revision}, WSREP version %{wsrep_version}
 %endif
+%endif
 %if %{undefined compilation_comment_release}
+%if 0%{?enable_fipsmode}
+    %define compilation_comment_release     Percona XtraDB Cluster Pro (GPL), Release rel%{percona_server_version}, Revision %{revision}, WSREP version %{wsrep_version}
+%else
     %define compilation_comment_release     Percona XtraDB Cluster (GPL), Release rel%{percona_server_version}, Revision %{revision}, WSREP version %{wsrep_version}
+%endif
 %endif
 
 #%define server_suffix -80
@@ -358,12 +370,13 @@ This is a meta-package which installs server, client and galera-3.
 Summary:        Percona XtraDB Cluster - full package
 Group:          Applications/Databases
 Requires:       %{distro_requires}
-Requires:             percona-xtradb-cluster-server = %{version}-%{release}
-Requires:             percona-xtradb-cluster-client = %{version}-%{release}
-Requires:             percona-xtradb-cluster-devel = %{version}-%{release}
-Requires:             percona-xtradb-cluster-test = %{version}-%{release}
-Requires:             percona-xtradb-cluster-debuginfo = %{version}-%{release}
-Requires:             percona-xtradb-cluster-garbd = %{version}-%{release}
+Requires:       percona-xtradb-cluster-server = %{version}-%{release}
+Requires:       percona-xtradb-cluster-client = %{version}-%{release}
+Requires:       percona-xtradb-cluster-devel = %{version}-%{release}
+Requires:       percona-xtradb-cluster-test = %{version}-%{release}
+Requires:       percona-xtradb-cluster-debuginfo = %{version}-%{release}
+Requires:       percona-xtradb-cluster-garbd = %{version}-%{release}
+Conflicts:      percona-xtradb-cluster-pro-full
 
 %description -n percona-xtradb-cluster-full
 This is a meta-package which provides the full suite of Percona XtraDB
@@ -403,7 +416,9 @@ BuildRequires: 		selinux-policy
 BuildRequires: 		selinux-policy-devel
 %endif
 %if 0%{?compatlib}
+%if 0%{?rhel} == 7
 Requires:             percona-xtradb-cluster-shared-compat = %{version}-%{release}
+%endif
 %endif
 Requires:             socat iproute perl-DBI perl-DBD-MySQL
 Requires:       perl(Data::Dumper) which qpress
@@ -421,6 +436,7 @@ Provides:       mysql-server MySQL-server
 Obsoletes:      mariadb-connector-c-config
 %endif
 Conflicts:      Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56 Percona-Server-server-57
+Conflicts:      percona-xtradb-cluster-server-pro
 
 %description -n percona-xtradb-cluster-server
 Percona XtraDB Cluster is based on the Percona Server database server and
@@ -445,6 +461,7 @@ Summary:        Percona XtraDB Cluster - client package
 Group:          Applications/Databases
 Provides:       mysql-client MySQL-client MySQL Percona-XtraDB-Cluster-client mysql
 Conflicts:      Percona-SQL-client-50 Percona-Server-client-51 Percona-Server-client-55 Percona-XtraDB-Cluster-client-55
+Conflicts:      percona-xtradb-cluster-client-pro
 Requires:       perl-DBI
 
 %description -n percona-xtradb-cluster-client
@@ -471,6 +488,7 @@ Group:          Applications/Databases
 Provides:       mysql-test
 Requires:       perl(Socket), perl(Time::HiRes), perl(Data::Dumper), perl(Test::More), perl(Env)
 Conflicts:      Percona-SQL-test-50 Percona-Server-test-51 Percona-Server-test-55 Percona-XtraDB-Cluster-test-55
+Conflicts:      percona-xtradb-cluster-test-pro
 AutoReqProv:    no
 
 %description -n percona-xtradb-cluster-test
@@ -499,6 +517,7 @@ Conflicts:      Percona-SQL-devel-50 Percona-Server-devel-51 Percona-Server-deve
 %else
 Conflicts:      Percona-SQL-devel-50 Percona-Server-devel-51 Percona-Server-devel-55 Percona-XtraDB-Cluster-devel-55
 %endif
+Conflicts:      percona-xtradb-cluster-devel-pro
 
 %description -n percona-xtradb-cluster-devel
 Percona XtraDB Cluster is based on the Percona Server database server and
@@ -524,6 +543,7 @@ Group:          Applications/Databases
 Provides:       mysql-shared >= %{mysql_version} mysql-libs >= %{mysql_version}
 Conflicts:      Percona-Server-shared-56
 Conflicts:      Percona-Server-shared-57
+Conflicts:      percona-xtradb-cluster-shared-pro
 %if "%rhel" > "6"
 #Provides:       mariadb-libs >= 5.5.37
 Obsoletes:      mariadb-libs >= 5.5.37
@@ -584,6 +604,7 @@ Requires(preun):  /sbin/chkconfig
 Requires(preun):  /sbin/service
 %endif
 Obsoletes:      galera-57-debuginfo galera-garbd-57
+Conflicts:      percona-xtradb-cluster-garbd-pro
 
 %description -n percona-xtradb-cluster-garbd
 This package contains the garb binary and init scripts.
@@ -595,6 +616,7 @@ Provides:      percona-xtradb-cluster-mysql-router = %{version}-%{release}
 Obsoletes:     percona-xtradb-cluster-mysql-router < %{version}-%{release}
 Obsoletes:     percona-mysql-router
 Provides:      mysql-router
+Conflicts:     percona-xtradb-cluster-mysql-router-pro
 
 %description -n percona-xtradb-cluster-mysql-router
 The Percona MySQL Router software delivers a fast, multi-threaded way of
@@ -605,6 +627,7 @@ Summary:        Development header files and libraries for Percona MySQL Router
 Group:          Applications/Databases
 Provides:       percona-xtradb-cluster-mysql-router-devel = %{version}-%{release}
 Obsoletes:      mysql-router-devel percona-mysql-router-devel
+Conflicts:      percona-xtradb-cluster-mysql-router-devel-pro
 
 %description -n percona-xtradb-cluster-mysql-router-devel
 This package contains the development header files and libraries
@@ -768,9 +791,11 @@ mkdir debug
            -DWITH_UNIT_TESTS=0 \
            -DWITH_SCALABILITY_METRICS=ON \
            -DMYSQL_SERVER_SUFFIX=".%{rel}" \
+%if 0%{?enable_fipsmode}
+           -DPROBUILD=1 \
+%endif
            %{?mecab_option} \
            -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_ON} %{ROCKSDB_FLAGS}
-  echo BEGIN_DEBUG_CONFIG ; egrep '^#define' include/config.h ; echo END_DEBUG_CONFIG
   make %{?_smp_mflags}
 )
 # Build full release
@@ -816,10 +841,12 @@ mkdir release
 %endif
            -DWITH_UNIT_TESTS=0 \
            -DWITH_SCALABILITY_METRICS=ON \
+%if 0%{?enable_fipsmode}
+           -DPROBUILD=1 \
+%endif
            %{?mecab_option} \
            -DMYSQL_SERVER_SUFFIX=".%{rel}" \
            -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_OFF} %{ROCKSDB_FLAGS}
-  echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
   make %{?_smp_mflags}
 )
 
