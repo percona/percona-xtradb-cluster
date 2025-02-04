@@ -1331,32 +1331,51 @@ DROP PREPARE stmt;
 #
 #INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.internal.session','N','N','N','N','N','N','Y','N','N','N','Y','N','N','N','N','Y','N','N','N','N','N','N','N','N','N','Y','N','N','N','','','','',0,0,0,0,'caching_sha2_password','$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED','N',CURRENT_TIMESTAMP, NULL,'Y','N','N',NULL,NULL,NULL,NULL);
 
+# The above commented INSERT IGNORE INTO should be enough, but check the comment about
+# 'bugs with roles' in mysql_system_users.sql where we create mysql.pxc.internal.session.
+# This is why below we do what 'GRANT ALL PRIVILEGES ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;'
+# does.
+#
 # (Use this since the CREATE DATABASE doesn't work when the grant is in a role)
 # So we assign the mysql.pxc.internal.session root privileges with grant option
 # These are the values for
 #  GRANT ALL PRIVILEGES ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
-#  GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
 #
 INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.internal.session','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','','','','',0,0,0,0,'caching_sha2_password','$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED','N',CURRENT_TIMESTAMP,NULL,'Y','Y','Y',NULL,NULL,NULL,NULL);
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'AUDIT_ABORT_EXEMPT', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'AUDIT_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'AUTHENTICATION_POLICY_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'BACKUP_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'BINLOG_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'BINLOG_ENCRYPTION_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'CLONE_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'CONNECTION_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'ENCRYPTION_KEY_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'FIREWALL_EXEMPT', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'FLUSH_OPTIMIZER_COSTS', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'FLUSH_STATUS', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'FLUSH_TABLES', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'FLUSH_USER_RESOURCES', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'GROUP_REPLICATION_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'GROUP_REPLICATION_STREAM', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'INNODB_REDO_LOG_ARCHIVE', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'INNODB_REDO_LOG_ENABLE', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'PASSWORDLESS_USER_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'PERSIST_RO_VARIABLES_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'REPLICATION_APPLIER', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'REPLICATION_SLAVE_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'RESOURCE_GROUP_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'RESOURCE_GROUP_USER', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'ROLE_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'SENSITIVE_VARIABLES_OBSERVER', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'SERVICE_CONNECTION_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'SESSION_VARIABLES_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'SET_USER_ID', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'SHOW_ROUTINE', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'SYSTEM_USER', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'SYSTEM_VARIABLES_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'TABLE_ENCRYPTION_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'TELEMETRY_LOG_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'XA_RECOVER_ADMIN', 'Y');
 
 
@@ -1378,7 +1397,7 @@ INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'lo
 #  GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost WITH GRANT OPTION;
 #
 #  Note: CREATE USER enables CREATE_ROLE and DROP_ROLE
-#  GRANT CLONE_ADMIN, GROUP_REPLICATION_STREAM, SYSTEM_USER, SHUTDOWN, CONNECTION_ADMIN, CREATE USER, CREATE ROLE, DROP ROLE, SYSTEM_VARIABLES_ADMIN ON *.* TO 'mysql.pxc.sst.role'@localhost;
+#  GRANT CLONE_ADMIN, SYSTEM_USER, SHUTDOWN, CONNECTION_ADMIN, CREATE USER, CREATE ROLE, DROP ROLE, SYSTEM_VARIABLES_ADMIN ON *.* TO 'mysql.pxc.sst.role'@localhost;
 #  GRANT INSERT, DELETE ON mysql.plugin TO 'mysql.pxc.sst.role'@localhost;
 #  GRANT UPDATE, INSERT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost;
 
@@ -1395,7 +1414,6 @@ INSERT IGNORE INTO mysql.db VALUES ('localhost', 'performance_schema', 'mysql.px
 
 #  clone-sst
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'CLONE_ADMIN', 'N');
-INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'GROUP_REPLICATION_STREAM', 'N');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'SYSTEM_USER', 'N');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'CONNECTION_ADMIN', 'N');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'SYSTEM_VARIABLES_ADMIN', 'N');
