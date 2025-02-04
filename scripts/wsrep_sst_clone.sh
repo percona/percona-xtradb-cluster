@@ -1000,7 +1000,7 @@ EOF
 
     wsrep_log_info "Launching clone recipient daemon"
     wsrep_log_info "-> using: $CLONE_ENV $CLONE_BINARY_SAFE $DEFAULT_OPTIONS "
-    wsrep_log_debug "-> Test connection as: -u$CLONE_USER -pCLONE_PSWD -h $JOINER_CLONE_HOST -P $JOINER_CLONE_PORT"
+    wsrep_log_debug "-> Test connection as: -u$CLONE_USER -pxxxxx -h $JOINER_CLONE_HOST -P $JOINER_CLONE_PORT"
 
     # Define client to be used on the Joiner side
     MYSQL_ACLIENT="$MYSQL_CLIENT -u$CLONE_USER -S$CLONE_SOCK --batch --skip_column_names --silent"
