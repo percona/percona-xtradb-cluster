@@ -91,7 +91,7 @@ class DbReplicationIdSolver {
     if (voter > id_voter_) {
       db_replication_id_ = id;
       id_voter_ = voter;
-      fprintf(stderr, "KH345");
+      fprintf(stderr, "KH3456");
     }
   }
 
