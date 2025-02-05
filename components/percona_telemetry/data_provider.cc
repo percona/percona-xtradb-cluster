@@ -88,9 +88,9 @@ class DbReplicationIdSolver {
 #endif
 
   void vote(const std::string &id, Voter voter) {
-    if (voter > id_voter_){
-      db_replication_id_ =id;
-      id_voter_ =  voter;
+    if (voter > id_voter_) {
+      db_replication_id_ = id;
+      id_voter_ = voter;
     }
   }
 
