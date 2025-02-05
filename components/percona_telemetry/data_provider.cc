@@ -77,8 +77,8 @@ class DbReplicationIdSolver {
     }
   }
 
-  const std::string &get_db_replication_id() const {
-    return db_replication_id_;
+  const std::string & get_db_replication_id() const {
+    return   db_replication_id_  ;
   }
 
   void reset() {
