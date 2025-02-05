@@ -77,6 +77,8 @@ CREATE USER 'mysql.pxc.internal.session'@localhost IDENTIFIED WITH caching_sha2_
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'mysql.pxc.internal.session'@localhost;
 
 -- Due to bugs with roles, we need to grant superuser access here
+-- If the new dynamic privilege is introduced, remember to include it in the corresponding
+-- part in mysql_syste_tables_fix.sql
 GRANT ALL PRIVILEGES ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
 
 -- TODO: Investigate why commit 7e467c54 claims that there is a "bug with roles"
