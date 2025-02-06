@@ -94,11 +94,13 @@ set -o nounset -o errexit
 readonly EINVAL=22
 readonly EPIPE=32
 readonly ETIMEDOUT=110
-PARENT_PID=""
 CLEANUP_CLONE_PLUGIN=""
 CLEANUP_CLONE_SSL=""
 CLONE_USER=""
+PARENT_PID=""
 NC_PID=""
+CLONE_INSTANCE_PID=""
+
 # The following variable will store the position (GTID:POS) coming from the donor in the message exchange. 
 # It will be used ONLY in emergency as last measure if for any reason the position recovery (at the end) will fail 
 RP_PURGED_EMERGENCY=""
@@ -242,14 +244,19 @@ cleanup_donor()
     wsrep_log_info "Cleanup DONOR DONE."
 }
 
-cleanup_joiner()
+sig_cleanup_joiner()
 {
-    wsrep_log_info "Joiner cleanup. SST daemon PID: $CLONE_REAL_PID"
+    if [ -n "$CLONE_INSTANCE_PID" ]; then
+        kill -SIGKILL $CLONE_INSTANCE_PID /dev/null 2>&1 ||:
+    fi
+
+    if [ -n "$NC_PID" ]; then
+        kill -SIGKILL $NC_PID /dev/null 2>&1 ||:
+    fi
+
     rm -rf $CLONE_SOCK_DIR || :
     rm -rf $CLONE_PID_FILE || :
     rm -fr $tmp_datadir || :
-#    wsrep_log_debug "NetCat PID $NC_PID"
-#    kill -15 $NC_PID > /dev/null 2>&1 || :
     rm -f $WSREP_SST_OPT_DATA/XST_FILE.txt > /dev/null 2>&1 || :
 
 
@@ -258,6 +265,12 @@ cleanup_joiner()
         rm -rf $CLONE_ERR || :
         rm -rf $CLONE_SQL || :
     fi
+}
+
+cleanup_joiner()
+{
+    wsrep_log_info "Joiner cleanup. SST daemon PID: $CLONE_INSTANCE_PID"
+    sig_cleanup_joiner
     wsrep_log_info "Joiner cleanup done."
 }
 
@@ -266,17 +279,6 @@ check_pid_file()
 {
     local pid_file=$1
     [ -r "$pid_file" ] && ps -p $(cat $pid_file) >/dev/null 2>&1
-}
-
-check_parent()
-{
-    local parent_pid=$1
-    if ! ps -p $parent_pid >/dev/null
-    then
-        wsrep_log_error \
-        "Parent mysqld process (PID:$parent_pid) terminated unexpectedly."
-        exit $EPIPE
-    fi
 }
 
 # Check client version
@@ -456,6 +458,80 @@ setup_clone_plugin()
         REQUIRE_SSL=""
     fi
     wsrep_log_debug "-> ############## SSL SECTION [END] ($ROLE)############"
+}
+
+# Let's use the simple approach to detect if the transfer is running or not.
+# Monitor p_s.clone_progress table. If anything changes there, it means something
+# is happening.
+# One of the columns is DATA: The amount of data transferred in current state, in bytes,
+# so we should be good.
+# Allow transfer stuck for sst-idle-timeout
+monitor_sst_progress() {
+  local progress_monitor_command=$1
+  local timeout=$2
+  local clone_instance_pid=$3
+  local parent_process_pid=$4
+
+  local current_timeout=0
+  local previous_command_output=
+  local sleep=5
+  local previous_progress=
+
+  wsrep_log_debug "progress_monitor_command: ${progress_monitor_command}"
+  wsrep_log_debug "timeout: ${timeout}"
+  wsrep_log_debug "clone_instance_pid: ${clone_instance_pid}"
+  wsrep_log_debug "parent_process_pid: ${parent_process_pid}"
+
+  if [ ${timeout} -eq 0 ]; then
+    return 2;
+  fi
+
+  while true; do
+    # check if parent process is still alive
+    # Is it needed? If parent process dies, SST script dies as well
+    # and will cleanup clone instance in cleanup_joiner() trap.
+    kill -0 $parent_process_pid 2> /dev/null
+    if [ $? -ne 0 ]; then
+      return 1;
+    fi
+
+    # check if clone instance process is still alive
+    kill -0 $clone_instance_pid 2> /dev/null
+    if [ $? -ne 0 ]; then
+      # Clone instance is done with its job
+      return 0;
+    fi
+
+    # check if there is any SST progress
+    command_output=$(eval "$progress_monitor_command" 2> /dev/null ||:)
+    if [ "${command_output}" != "${previous_command_output}" ]; then
+        current_timeout=0
+        previous_command_output=${command_output}
+        # if the transfer is ongoing, keep checking once per 5 seconds
+        sleep=5
+    else
+        current_timeout=$((current_timeout + 1))
+        wsrep_log_debug "sst idle for ${current_timeout} sec"
+        # if we detected transfer stall, start checking more often (1 sec)
+        sleep=1
+    fi
+
+    if [ ${current_timeout} -eq  ${timeout} ]; then
+      return 2
+    fi
+
+    # Report the current progress
+    current_progress=`$MYSQL_ACLIENT -NB -e "select format(((data/estimate)*100),2) 'completed%' from performance_schema.clone_progress where stage like 'FILE_COPY';" 2> /dev/null` || :
+    if [ "$previous_progress" != "$current_progress" ]; then
+        wsrep_log_info "SST progress: ${current_progress}%"
+        previous_progress=$current_progress
+    fi
+
+    sleep ${sleep};
+  done
+
+  wsrep_log_debug "We should never get here"
+  return 0
 }
 
 wsrep_log_debug "-> In the wsrep_sst_clone "
@@ -668,6 +744,10 @@ then
     JOINER_CLONE_PORT=""
 
     CLEANUP_FILES=""
+
+    trap sig_cleanup_joiner HUP PIPE INT TERM
+    trap cleanup_joiner EXIT
+
     wsrep_check_programs grep
     wsrep_check_programs ps
     wsrep_check_programs find
@@ -888,7 +968,7 @@ then
     nc -l $JOINER_CLONE_HOST $JOINER_CLONE_PORT > $WSREP_SST_OPT_DATA/XST_FILE.txt &
     NC_PID=$!
     wsrep_log_info "-> NETCAT PID $NC_PID"
-    if [ "$NC_PID" == "" ];then
+    if [ $NC_PID == "" ];then
         wsrep_log_error "-> Cannot open Netcat at given port $JOINER_CLONE_HOST $JOINER_CLONE_PORT check if the port is already taken"
         exit 1
     fi
@@ -918,14 +998,13 @@ then
 
     wsrep_log_debug "-> WAIT DIR DONOR MESSAGE DONE"
 
-    if [[ ! `cat $WSREP_SST_OPT_DATA/XST_FILE.txt` =~ "SST@" ]];then
+    if ! grep -q "SST@" "$WSREP_SST_OPT_DATA/XST_FILE.txt"; then
         wsrep_log_info "DONOR SAY IST"
         wsrep_log_debug "-> RECOVER POSITION TO SEND OUT DONOR IST"
          RP_PURGED=`cat $WSREP_SST_OPT_DATA/XST_FILE.txt`
          RP_PURGED=${RP_PURGED%"<EOF>"}
          wsrep_log_debug "-> POSITION: $RP_PURGED"
          rm -f  $WSREP_SST_OPT_DATA/XST_FILE.txt || :
-#         kill -15 $NC_PID || : > /dev/null 2>&1
 
          echo $RP_PURGED
          exit 0
@@ -954,6 +1033,8 @@ then
             wsrep_log_debug "-> Cannot kill the existing NetCat process PID $NETCAT_KILL"
         fi
     fi
+
+    NC_PID=""
 
     # No data dir, need to initialize one first, to make connections to
     # this node possible.
@@ -1024,14 +1105,12 @@ EOF
     do
         sleep 0.2
     done
-    CLONE_REAL_PID=`cat $CLONE_PID_FILE`
+    CLONE_INSTANCE_PID=`cat $CLONE_PID_FILE`
 
-    if [[ -n "$WSREP_LOG_DEBUG" ]]; then
+    if [ -n "$WSREP_LOG_DEBUG" ]; then
         GRANTS=`$MYSQL_ACLIENT -uroot -NB -e "show grants for '$CLONE_USER'@'localhost'"`
         wsrep_log_debug "-> Clone user grants: $GRANTS"
     fi
-
-    trap cleanup_joiner EXIT
 
     export MYSQL_PWD=$CLONE_PSWD
     wsrep_log_debug "-> Exported MySQL password $MYSQL_PWD"
@@ -1045,7 +1124,6 @@ EOF
         if [ $to_wait -eq 0 ]
         then
             wsrep_log_error "Timeout waiting for clone recipient daemon"
-            kill -9 $CLONE_REAL_PID || :
             exit $ETIMEDOUT
         fi
         to_wait=$(( $to_wait - 1 ))
@@ -1057,34 +1135,39 @@ EOF
 
     wsrep_log_info "Waiting for clone recipient daemon to finish"
 
-   # Getting clone process status report
-    OLD_STATUS=""
-    while check_pid_file "$CLONE_PID_FILE"
-    do
-        STATUS=`$MYSQL_ACLIENT -NB -e "select format(((data/estimate)*100),2) 'completed%' from performance_schema.clone_progress where stage like 'FILE_COPY';" 2> /dev/null` || :
-        if [ "$OLD_STATUS" != "$STATUS" ]; then
-            wsrep_log_info "Copy at: ${STATUS}%"
-            OLD_STATUS=$STATUS
-        fi
-        #wsrep_log_debug "Checking parent: $WSREP_SST_OPT_PARENT"
-        check_parent $WSREP_SST_OPT_PARENT
-        sleep 1 # Should this be in the config as well?
-    done
+    set +e
+    monitor_sst_progress "${MYSQL_ACLIENT} -NB -e 'SELECT * FROM performance_schema.clone_progress;'" ${WSREP_SST_IDLE_TIMEOUT} ${CLONE_INSTANCE_PID} ${PARENT_PID}
+    status=$?
+    set -e
 
-    CLONE_REAL_PID=0
+    if [ $status -eq 1 ]; then
+        # parent process died, we need to exit as well
+        wsrep_log_error "Parent mysqld process (PID:$WSREP_SST_OPT_PARENT) terminated unexpectedly."
+        exit $EPIPE
+    fi
+    if [ $status -eq 2 ]; then
+        # Stale SST, no progress
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "Killing SST ($CLONE_INSTANCE_PID) with SIGKILL after stalling for ${WSREP_SST_IDLE_TIMEOUT} seconds."
+        wsrep_log_error "Within the last ${WSREP_SST_IDLE_TIMEOUT} seconds (defined by the sst-idle-timeout variable),"
+        wsrep_log_error "the SST process on the joiner (this node) has not received any data from the donor."
+        wsrep_log_error "This error could be caused by broken network connectivity between"
+        wsrep_log_error "the donor and the joiner (this node)."
+        wsrep_log_error "Check the network connection and restart the joiner node."
+        wsrep_log_error "Line $LINENO"
+        wsrep_log_error "****************************************************** "
+        exit $ETIMEDOUT
+    fi
+
     wsrep_log_info "clone recepient daemon finished"
+
+    CLONE_INSTANCE_PID=""
 
     # Execute first restart for
     wsrep_log_info "FIRST RESTART to fix the dictionary"
     wsrep_log_info "Performing data recovery"
     wsrep_log_debug "-> RECOVERY COMMAND LINE: $CLONE_ENV $CLONE_BINARY $DEFAULT_OPTIONS --wsrep_provider=none"
 
-    # Instance should been gone, but we check the pid
-    if [ -s "$CLONE_PID_FILE" ]; then
-        wsrep_log_debug "Cleaning leftover from previous mysqld run $CLONE_PID_FILE"
-        kill -9 `cat $CLONE_PID_FILE` || true
-        rm -f $CLONE_PID_FILE || true
-    fi
 
     # Remove created clone user and SST pxc user
     wsrep_log_debug "-> CLEAN OR NOT? $CLEANUP_CLONE_PLUGIN"
@@ -1141,7 +1224,7 @@ EOF
          wsrep_log_debug "Failed to recover position from $CLONE_ERR";
      else
          CLEANUP_FILES=1
-         cleanup_joiner || true
+         cleanup_joiner ||:
          wsrep_log_debug "->SENDING MESSAGE: $RP_PURGED "
          wsrep_log_debug "->out code: $? "
          echo $RP_PURGED >&2
