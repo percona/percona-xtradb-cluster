@@ -223,15 +223,15 @@ cleanup_donor()
     then
         CLEANUP_CLONE_PLUGIN="UNINSTALL PLUGIN CLONE;"
     else
-        CLEANUP_CLONE_PLUGIN=""
         if [  "$CLEANUP_CLONE_SSL" == "yes" ]
         then
-            wsrep_log_debug "-> SSL DONOR reset clone_ssl variables [CLEANUP_CLONE_SSL: $CLEANUP_CLONE_SSL]"
+            wsrep_log_debug "-> SSL DONOR reset clone_ssl variables [CLEANUP_CLONE_SSL: $CLEANUP_CLONE_SSL CLEANUP_CLONE_PLUGIN: $CLEANUP_CLONE_PLUGIN ]"
             $MYSQL_ACLIENT -e "SET wsrep_on=OFF;
                                SET GLOBAL clone_ssl_cert='';
                                SET GLOBAL clone_ssl_key='';
                                SET GLOBAL clone_ssl_ca='';" || :
         fi
+        CLEANUP_CLONE_PLUGIN=""
     fi
     if [ ! "$WSREP_SST_OPT_REMOTE_JOINER_USER" == "" ]; then
         $MYSQL_ACLIENT -e "SET wsrep_on=OFF; DROP USER IF EXISTS '$WSREP_SST_OPT_REMOTE_JOINER_USER'@'%'; $CLEANUP_CLONE_PLUGIN" || :
@@ -358,12 +358,14 @@ setup_clone_plugin()
             WSREP_OFF="" # joiner does not have replication enabled
         fi
         $MYSQL_ACLIENT -e "${WSREP_OFF}INSTALL PLUGIN CLONE SONAME 'mysql_clone.so';"
-        CLEANUP_CLONE_PLUGIN="yes"
+        if [ "$ROLE" == "donor" ]; then
+            CLEANUP_CLONE_PLUGIN="yes"
+        fi
         CLONE_SSL_CERT="NULL"
         CLONE_SSL_KEY="NULL"
         CLONE_SSL_CA="NULL"
     else
-        CLEANUP_CLONE_PLUGIN=""
+        CLEANUP_CLONE_PLUGIN="no"
         CLONE_SSL_CERT=`$MYSQL_ACLIENT -e "SELECT @@clone_ssl_cert"`
         CLONE_SSL_KEY=`$MYSQL_ACLIENT -e "SELECT @@clone_ssl_key"`
         CLONE_SSL_CA=`$MYSQL_ACLIENT -e "SELECT @@clone_ssl_ca"`
@@ -376,7 +378,7 @@ setup_clone_plugin()
     local CLIENT_SSL_CA=$(parse_cnf sst ssl_ca "")
     local CLIENT_SSL_MODE=$(parse_cnf sst ssl_mode "")
 
-    if [ -z "$CLIENT_SSL_CERT" -o -z "$CLIENT_SSL_KEY" ]
+    if [ -z "$CLIENT_SSL_CERT" -o "$CLIENT_SSL_CERT" == "" ]
     then
         CLIENT_SSL_CERT=$(parse_cnf client ssl_cert "")
         CLIENT_SSL_KEY=$(parse_cnf client ssl_key "")
@@ -392,7 +394,7 @@ setup_clone_plugin()
     [ "$SERVER_SSL_KEY" = "NULL" ] && SERVER_SSL_KEY=
     [ "$SERVER_SSL_CA" = "NULL" ] && SERVER_SSL_CA=
 
-    if [ "$CLONE_SSL_CERT" = "NULL" -o "$CLONE_SSL_KEY" = "NULL" ]
+    if [ "$CLONE_SSL_CERT" == "NULL" -o "$CLONE_SSL_CERT" = "" ]
     then
         wsrep_log_info "CLONE SSL not configured. Checking general MySQL SSL settings."
 
@@ -413,7 +415,9 @@ setup_clone_plugin()
             $MYSQL_ACLIENT -e "SET GLOBAL clone_ssl_cert='$CLONE_SSL_CERT'"
             $MYSQL_ACLIENT -e "SET GLOBAL clone_ssl_key='$CLONE_SSL_KEY'"
             $MYSQL_ACLIENT -e "SET GLOBAL clone_ssl_ca='$CLONE_SSL_CA'"
-            CLEANUP_CLONE_SSL="yes"
+            if [ "$CLEANUP_CLONE_PLUGIN" == "yes" ]; then
+                CLEANUP_CLONE_SSL="yes"
+            fi
         fi
     else
         if [ -n "$CLONE_SSL_CERT" -a -n "$CLONE_SSL_KEY" ]
@@ -451,10 +455,6 @@ setup_clone_plugin()
         CLEANUP_CLONE_SSL=
         REQUIRE_SSL=""
     fi
-    # for now we force no SSL in the clone operations
-#    CLEANUP_CLONE_SSL=
-#    REQUIRE_SSL=
-#    wsrep_log_info "SSL Not supported yet."
     wsrep_log_debug "-> ############## SSL SECTION [END] ($ROLE)############"
 }
 
@@ -542,7 +542,7 @@ then
         setup_clone_plugin "donor"
 
 #        wsrep_log_info "REQUIRE_SSL=$REQUIRE_SSL, CLIENT_SSL_OPTIONS=$CLIENT_SSL_OPTIONS"
-        wsrep_log_debug "-> PREPARED DONE"
+        wsrep_log_debug "-> PREPARE DONE"
 
 cat << EOF > "$CLONE_PREPARE_SQL"
 SET wsrep_on=OFF;
@@ -565,7 +565,8 @@ EOF
         fi
         # Before waiting for the Joiner Clone mysql we send out the message this is a SST
         wsrep_log_debug "-> NETCAT signal to nc -w 1 $SST_HOST_STRIPPED $WSREP_SST_OPT_REMOTE_HOSTPORT"
-        echo "SST@$WSREP_SST_OPT_GTID<EOF>" | nc -w 1 $SST_HOST_STRIPPED $WSREP_SST_OPT_REMOTE_HOSTPORT || :
+        wsrep_log_debug "-> Signal for CLONE Plugin CLEANUP_CLONE_PLUGIN=$CLEANUP_CLONE_PLUGIN"
+        echo "$CLEANUP_CLONE_PLUGIN|SST@$WSREP_SST_OPT_GTID<EOF>" | nc -w 1 $SST_HOST_STRIPPED $WSREP_SST_OPT_REMOTE_HOSTPORT || :
 
         # We stay on hold now, waiting for the Joiner to expose the service
         wsrep_log_info "-> WAIT for Joiner MySQL to be available nc -w 1 -i 1 $SST_HOST_STRIPPED $WSREP_SST_OPT_REMOTE_HOSTPORT"
@@ -610,9 +611,9 @@ EOF
         wsrep_log_debug "-> $CLONE_EXECUTE"
         
         # Actual cloning process
-        wsrep_log_info "JOINER CLONE ACTION CLONING: cloning"
+        wsrep_log_info "JOINER CLONE ACTION: cloning"
         LOCALOUTPUT=`$MYSQL_RCLIENT --connect-timeout=60 $CLIENT_SSL_OPTIONS < $CLONE_EXECUTE_SQL  2>&1 || RC=$?` 
-        wsrep_log_info "JOINER CLONE ACTION  CLONING: done $RC"
+        wsrep_log_info "JOINER CLONE ACTION: cloning done $RC"
         wsrep_log_debug "-> LOCALOUTPUT: $LOCALOUTPUT"
 
 
@@ -642,6 +643,7 @@ EOF
             esac
             exit $RC
         fi
+        CLEANUP_CLONE_SSL="yes"
         cleanup_donor
     else # BYPASS
         wsrep_log_info "Bypassing state dump."
@@ -928,10 +930,12 @@ then
          echo $RP_PURGED
          exit 0
     else
-         wsrep_log_info "DONOR SAY SST"
          RP_PURGED=`cat $WSREP_SST_OPT_DATA/XST_FILE.txt`
-         RP_PURGED_EMERGENCY=${RP_PURGED#"SST@"}
+         wsrep_log_info "DONOR SAY SST ($RP_PURGED)"
+         readonly CLEANUP_CLONE_PLUGIN=${RP_PURGED%|SST*}
+         RP_PURGED_EMERGENCY=${RP_PURGED#*SST@}
          RP_PURGED_EMERGENCY=${RP_PURGED_EMERGENCY%"<EOF>"}
+         wsrep_log_debug "-> CLONE Plugin to remove? (yes/no) = $CLEANUP_CLONE_PLUGIN"
          wsrep_log_debug "-> recovered position from DONOR: $RP_PURGED_EMERGENCY"
     fi
 
@@ -1075,19 +1079,25 @@ EOF
     wsrep_log_info "Performing data recovery"
     wsrep_log_debug "-> RECOVERY COMMAND LINE: $CLONE_ENV $CLONE_BINARY $DEFAULT_OPTIONS --wsrep_provider=none"
 
-    # Instance should have been gone, but we check the p
+    # Instance should been gone, but we check the pid
     if [ -s "$CLONE_PID_FILE" ]; then
         wsrep_log_debug "Cleaning leftover from previous mysqld run $CLONE_PID_FILE"
         kill -9 `cat $CLONE_PID_FILE` || true
         rm -f $CLONE_PID_FILE || true
     fi
 
-# Remove created clone user and SST pxc user
+    # Remove created clone user and SST pxc user
+    wsrep_log_debug "-> CLEAN OR NOT? $CLEANUP_CLONE_PLUGIN"
+    CLEANUP_CLONE_PLUGIN_SQL=""
+    if [ "${CLEANUP_CLONE_PLUGIN}" == "yes" ]; then
+            CLEANUP_CLONE_PLUGIN_SQL="UNINSTALL PLUGIN CLONE;"
+    fi
 cat << EOF > "$CLONE_SQL"
 SET SESSION sql_log_bin=OFF;
 DROP USER IF EXISTS $CLONE_USER;
 DROP USER IF EXISTS $CLONE_USER@'localhost';
 DROP USER IF EXISTS 'mysql.pxc.sst.user'@'localhost';
+$CLEANUP_CLONE_PLUGIN_SQL
 SHUTDOWN;
 EOF
     
@@ -1140,8 +1150,8 @@ EOF
          sleep 1
          exit 0
      fi
-     # Forcing restart of parent
-     CLEAN FILES=1
+     # We terminate but save the log for inspections given the failure
+     CLEANUP_FILES=0
      wsrep_cleanup_progress_file
      cleanup_joiner
        wsrep_log_debug "-> Invalid Recovery position. Exiting with error 61 (No data available )"
