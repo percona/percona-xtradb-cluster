@@ -15,11 +15,14 @@
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA */
 
 #include <mysqld_error.h>
-#include <regex>
 #include <sstream>
 
 #include "data_provider.h"
 #include "logger.h"
+
+#ifdef WITH_WSREP
+#include <regex>
+#endif
 
 namespace {
 inline const char *b2s(bool val) { return val ? "1" : "0"; }
@@ -121,9 +124,14 @@ DataProvider::DataProvider(
       command_error_info_service_(command_error_info_service),
       command_thread_service_(command_thread_service),
       logger_(logger),
+#ifdef WITH_WSREP
       db_replication_id_solver_(std::make_shared<DbReplicationIdSolver>()),
       gcache_encryption_enabled_cache_(-1),
-      ws_cache_encryption_enabled_cache_(-1) {}
+      ws_cache_encryption_enabled_cache_(-1) {
+}
+#else
+      db_replication_id_solver_(std::make_shared<DbReplicationIdSolver>()) {}
+#endif
 
 void DataProvider::thread_access_begin() { command_thread_service_.init(); }
 
@@ -151,8 +159,9 @@ bool DataProvider::do_query(const std::string &query, QueryResult *result,
     is safe, because internally it checks if provided pointer is valid
   */
   std::shared_ptr<MYSQL_H> mysql_h_close_guard(
-      &mysql_h,
-      [&srv = command_factory_service_](MYSQL_H *ptr) { srv.close(*ptr); });
+      &mysql_h, [&srv = command_factory_service_](MYSQL_H *ptr) {
+        srv.close(*ptr);
+      });
 
   mysql_service_status_t sstatus = command_factory_service_.init(&mysql_h);
 

@@ -32,8 +32,9 @@
    of the log; if it is the 3rd then there is this combination:
    Format_desc_of_slave, Rotate_of_master, Format_desc_of_master.
 */
-
+#ifdef WITH_WSREP
 #undef WITH_WSREP
+#endif
 
 #include "client/mysqlbinlog.h"
 
@@ -2273,8 +2274,10 @@ extern "C" bool get_one_option(int optid, const struct my_option *opt,
                                          "--read-from-remote-source"));
       [[fallthrough]];
     case OPT_REMOTE_PROTO:
-      opt_remote_proto = (enum_remote_proto)(
-          find_type_or_exit(argument, &remote_proto_typelib, opt->name) - 1);
+      opt_remote_proto =
+          (enum_remote_proto)(find_type_or_exit(argument, &remote_proto_typelib,
+                                                opt->name) -
+                              1);
       break;
     case OPT_MYSQL_PROTOCOL:
       opt_protocol =
@@ -2287,9 +2290,11 @@ extern "C" bool get_one_option(int optid, const struct my_option *opt,
       stop_datetime = convert_str_to_timestamp(stop_datetime_str);
       break;
     case OPT_BASE64_OUTPUT_MODE:
-      opt_base64_output_mode = (enum_base64_output_mode)(
-          find_type_or_exit(argument, &base64_output_mode_typelib, opt->name) -
-          1);
+      opt_base64_output_mode =
+          (enum_base64_output_mode)(find_type_or_exit(
+                                        argument, &base64_output_mode_typelib,
+                                        opt->name) -
+                                    1);
       break;
     case 'v':
       if (argument == disabled_my_option)

@@ -243,9 +243,9 @@ static const char *get_ip_allowlist() {
 
   return allowlist.compare("automatic")
              ? ov.ip_allowlist_var  // ip_allowlist_var is set
-             : whitelist.compare("automatic")
-                   ? ov.ip_whitelist_var   // ip_whitelist_var is set
-                   : ov.ip_allowlist_var;  // both are not set
+         : whitelist.compare("automatic")
+             ? ov.ip_whitelist_var   // ip_whitelist_var is set
+             : ov.ip_allowlist_var;  // both are not set
 }
 /*
   Auxiliary public functions.
@@ -3151,9 +3151,9 @@ static int check_flow_control_min_quota(MYSQL_THD, SYS_VAR *, void *save,
   if (check_flow_control_min_quota_long(in_val, true)) return 1;
 
   *(longlong *)save = (in_val < 0) ? 0
-                                   : (in_val < MAX_FLOW_CONTROL_THRESHOLD)
-                                         ? in_val
-                                         : MAX_FLOW_CONTROL_THRESHOLD;
+                      : (in_val < MAX_FLOW_CONTROL_THRESHOLD)
+                          ? in_val
+                          : MAX_FLOW_CONTROL_THRESHOLD;
 
   return 0;
 }
@@ -3169,9 +3169,9 @@ static int check_flow_control_min_recovery_quota(MYSQL_THD, SYS_VAR *,
   if (check_flow_control_min_recovery_quota_long(in_val, true)) return 1;
 
   *(longlong *)save = (in_val < 0) ? 0
-                                   : (in_val < MAX_FLOW_CONTROL_THRESHOLD)
-                                         ? in_val
-                                         : MAX_FLOW_CONTROL_THRESHOLD;
+                      : (in_val < MAX_FLOW_CONTROL_THRESHOLD)
+                          ? in_val
+                          : MAX_FLOW_CONTROL_THRESHOLD;
   return 0;
 }
 
@@ -3185,9 +3185,9 @@ static int check_flow_control_max_quota(MYSQL_THD, SYS_VAR *, void *save,
   if (check_flow_control_max_quota_long(in_val, true)) return 1;
 
   *(longlong *)save = (in_val < 0) ? 0
-                                   : (in_val < MAX_FLOW_CONTROL_THRESHOLD)
-                                         ? in_val
-                                         : MAX_FLOW_CONTROL_THRESHOLD;
+                      : (in_val < MAX_FLOW_CONTROL_THRESHOLD)
+                          ? in_val
+                          : MAX_FLOW_CONTROL_THRESHOLD;
 
   return 0;
 }
@@ -3211,11 +3211,10 @@ static int check_sysvar_ulong_timeout(MYSQL_THD, SYS_VAR *var, void *save,
   longlong in_val;
   value->val_int(value, &in_val);
 
-  *(longlong *)save = (in_val < minimum)
-                          ? minimum
-                          : (static_cast<ulonglong>(in_val) < LONG_TIMEOUT)
-                                ? in_val
-                                : LONG_TIMEOUT;
+  *(longlong *)save = (in_val < minimum) ? minimum
+                      : (static_cast<ulonglong>(in_val) < LONG_TIMEOUT)
+                          ? in_val
+                          : LONG_TIMEOUT;
 
   return 0;
 }
@@ -3999,10 +3998,9 @@ static int check_member_weight(MYSQL_THD, SYS_VAR *, void *save,
     }
   }
 
-  *(uint *)save =
-      (in_val < MIN_MEMBER_WEIGHT)
-          ? MIN_MEMBER_WEIGHT
-          : (in_val < MAX_MEMBER_WEIGHT) ? in_val : MAX_MEMBER_WEIGHT;
+  *(uint *)save = (in_val < MIN_MEMBER_WEIGHT)   ? MIN_MEMBER_WEIGHT
+                  : (in_val < MAX_MEMBER_WEIGHT) ? in_val
+                                                 : MAX_MEMBER_WEIGHT;
 
   return 0;
 }

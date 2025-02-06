@@ -11,6 +11,7 @@
 
 # bail out on errors, be strict
 set -ue
+FIPSMODE=0
 
 #-------------------------------------------------------------------------------
 #
@@ -87,7 +88,7 @@ fi
 if ! getopt --test
 then
     go_out="$(getopt --options=iqGadvjmt: \
-        --longoptions=i686,verbose,copygalera,asan,debug,valgrind,with-jemalloc:,with-mecab:,with-yassl,keep-build,with-ssl:,tag: \
+        --longoptions=i686,verbose,copygalera,asan,debug,valgrind,with-jemalloc:,enable-fipsmode,with-mecab:,with-yassl,keep-build,with-ssl:,tag: \
         --name="$(basename "$0")" -- "$@")"
     test $? -eq 0 || exit 1
     eval set -- $go_out
@@ -166,6 +167,12 @@ do
             echo >&2 "Cannot find libssl.a in $WITH_SSL"
             exit 3
         fi
+        ;;
+    --enable-fipsmode )
+        shift
+        FIPSMODE=1
+        WITH_SSL="OFF"
+        BUILD_COMMENT="${BUILD_COMMENT:-}-pro"
         ;;
     -t | --tag )
         shift
@@ -276,7 +283,11 @@ fi
 TOKUDB_BACKUP_VERSION="${MYSQL_VERSION}${MYSQL_VERSION_EXTRA}"
 
 RELEASE_TAG=''
-PRODUCT_NAME="Percona-XtraDB-Cluster_$MYSQL_VERSION$MYSQL_VERSION_EXTRA"
+if [[ "x${FIPSMODE}" == "x1" ]]; then
+   PRODUCT_NAME="Percona-XtraDB-Cluster-Pro_$MYSQL_VERSION$MYSQL_VERSION_EXTRA"
+else
+   PRODUCT_NAME="Percona-XtraDB-Cluster_$MYSQL_VERSION$MYSQL_VERSION_EXTRA"
+fi
 PRODUCT_FULL_NAME="${PRODUCT_NAME}.${TAG}_$(uname -s)${DIST_NAME:-}.$MACHINE_SPECS${GLIBC_VER:-}${TARBALL_SUFFIX:-}"
 
 #
@@ -291,10 +302,17 @@ then
 else
     REVISION=""
 fi
-PRODUCT_FULL="Percona-XtraDB-Cluster_${MYSQL_VERSION}${MYSQL_VERSION_EXTRA}"
-PRODUCT_FULL="${PRODUCT_FULL}.${TAG}${BUILD_COMMENT:+_}${BUILD_COMMENT}$(uname -s)${DIST_NAME:-}.$TARGET${GLIBC_VER:-}"
-COMMENT="Percona XtraDB Cluster binary (GPL) $MYSQL_VERSION"
-COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}, WSREP version $WSREP_VERSION"
+if [[ "x${FIPSMODE}" == "x1" ]]; then
+    PRODUCT_FULL="Percona-XtraDB-Cluster-Pro_${MYSQL_VERSION}${MYSQL_VERSION_EXTRA}"
+    PRODUCT_FULL="${PRODUCT_FULL}.${TAG}${BUILD_COMMENT:+_}${BUILD_COMMENT}$(uname -s)${DIST_NAME:-}.$TARGET${GLIBC_VER:-}"
+    COMMENT="Percona XtraDB Cluster Pro binary (GPL) $MYSQL_VERSION"
+    COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}, WSREP version $WSREP_VERSION"
+else
+    PRODUCT_FULL="Percona-XtraDB-Cluster_${MYSQL_VERSION}${MYSQL_VERSION_EXTRA}"
+    PRODUCT_FULL="${PRODUCT_FULL}.${TAG}${BUILD_COMMENT:+_}${BUILD_COMMENT}$(uname -s)${DIST_NAME:-}.$TARGET${GLIBC_VER:-}"
+    COMMENT="Percona XtraDB Cluster binary (GPL) $MYSQL_VERSION"
+    COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}, WSREP version $WSREP_VERSION"
+fi
 
 #-------------------------------------------------------------------------------
 #
@@ -331,6 +349,11 @@ then
 
     JEMALLOCDIR="$(cd "$WITH_JEMALLOC"; pwd)"
 
+fi
+
+BUILD_PARAMETER=""
+if [[ "x${FIPSMODE}" == "x1" ]]; then
+    BUILD_PARAMETER="-DPROBUILD=1"
 fi
 
 #-------------------------------------------------------------------------------
@@ -447,7 +470,7 @@ fi
             -DWITH_UNIT_TESTS=0 \
             -DWITH_DEBUG=ON \
             -DWITH_PERCONA_TELEMETRY=ON \
-            $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
+            ${BUILD_PARAMETER} $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
         (make $MAKE_JFLAG $QUIET) || exit 1
         (make install) || exit 1
@@ -485,17 +508,12 @@ fi
             -DWITH_WSREP=ON \
             -DWITH_UNIT_TESTS=0 \
             -DWITH_PERCONA_TELEMETRY=ON \
-            $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
+            ${BUILD_PARAMETER} $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
         (make $MAKE_JFLAG $QUIET) || exit 1
         (make install) || exit 1
         echo "mysqld in build in release mode"
     fi
-
-    (
-       echo "Packaging the test files"
-       cp -R $SOURCEDIR/percona-xtradb-cluster-tests $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/
-    ) || exit 1
 
     # Build jemalloc
     if test "x$WITH_JEMALLOC" != x

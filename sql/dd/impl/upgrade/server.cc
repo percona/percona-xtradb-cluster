@@ -1048,6 +1048,15 @@ bool upgrade_system_schemas(THD *thd) {
         3. REPLICATION CLIENT
       CREATE USER and GRANT do not work yet as ACL is not initialized yet.
       Use INSERT and UPDATES.
+      This is the same approach as for creation of mysql.user in
+      mysql_system_tables_fix.sql. First we create the user, then update grants.
+      The reasons for this approach are:
+      1. When the user is created, it is granted SHUTDOWN, SUPER, CREATE ROLE,
+         DROP ROLE privileges. percona.telemetry user do not need them, so we
+         drop
+      2. We grant SELECT, REPLICATION SLAVE, REPLICATION CLIENT explicitly.
+         It is for clarity, but also automatically fixes privileges in case
+         someone manually drops them.
 */
 static const char *percona_telemetry_install[] = {
     "USE mysql;\n",

@@ -576,7 +576,7 @@ static int fill_innodb_trx_from_cache(
     /* trx_wait_started */
     if (row->trx_wait_started != std::chrono::system_clock::time_point{}) {
       OK(field_store_string(fields[IDX_TRX_REQUESTED_LOCK_ID],
-                            trx_i_s_create_lock_id(row->requested_lock_row,
+                            trx_i_s_create_lock_id(*row->requested_lock_row,
                                                    lock_id, sizeof(lock_id))));
       /* field_store_string() sets it no notnull */
 
@@ -1242,6 +1242,7 @@ static int i_s_cmp_per_index_fill_low(
     inconsistent, but it is an acceptable compromise. */
     if (i % 1000 == 0) {
       dict_sys_mutex_exit();
+      std::this_thread::yield();
       dict_sys_mutex_enter();
     }
   }
@@ -4435,10 +4436,11 @@ static void i_s_innodb_set_page_type(
       page_info->page_type = I_S_PAGE_TYPE_INDEX;
     }
 
-    page_info->data_size = (ulint)(
-        page_header_get_field(page, PAGE_HEAP_TOP) -
-        (page_is_comp(page) ? PAGE_NEW_SUPREMUM_END : PAGE_OLD_SUPREMUM_END) -
-        page_header_get_field(page, PAGE_GARBAGE));
+    page_info->data_size =
+        (ulint)(page_header_get_field(page, PAGE_HEAP_TOP) -
+                (page_is_comp(page) ? PAGE_NEW_SUPREMUM_END
+                                    : PAGE_OLD_SUPREMUM_END) -
+                page_header_get_field(page, PAGE_GARBAGE));
 
     page_info->num_recs = page_get_n_recs(page);
   } else if (page_type > FIL_PAGE_TYPE_LAST) {

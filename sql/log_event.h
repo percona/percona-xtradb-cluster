@@ -1142,9 +1142,9 @@ class Log_event {
     DBUG_TRACE;
     enum_skip_reason ret = do_shall_skip(rli);
     DBUG_PRINT("info", ("skip reason=%d=%s", ret,
-                        ret == EVENT_SKIP_NOT
-                            ? "NOT"
-                            : ret == EVENT_SKIP_IGNORE ? "IGNORE" : "COUNT"));
+                        ret == EVENT_SKIP_NOT      ? "NOT"
+                        : ret == EVENT_SKIP_IGNORE ? "IGNORE"
+                                                   : "COUNT"));
     return ret;
   }
 
@@ -1655,10 +1655,12 @@ class Intvar_log_event : public binary_log::Intvar_event, public Log_event {
     common_header->set_is_valid(true);
   }
 #ifdef WITH_WSREP
-  Intvar_log_event(uchar type_arg, ulonglong val_arg)
+  Intvar_log_event(THD *thd_arg, uchar type_arg, ulonglong val_arg)
       : binary_log::Intvar_event(type_arg, val_arg),
         Log_event(header(), footer()) {
     common_header->set_is_valid(true);
+    server_id = thd_arg->server_id;
+    common_header->unmasked_server_id = server_id;
   }
 #endif /* WITH_WSREP */
   int pack_info(Protocol *protocol) override;

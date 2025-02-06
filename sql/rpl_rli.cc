@@ -187,6 +187,9 @@ Relay_log_info::Relay_log_info(bool is_slave_recovery,
       reported_unsafe_warning(false),
       rli_description_event(nullptr),
       commit_order_mngr(nullptr),
+#ifdef WITH_WSREP
+      wsrep_async_monitor(nullptr),
+#endif /* WITH_WSREP */
       sql_delay(0),
       sql_delay_end(0),
       m_flags(0),

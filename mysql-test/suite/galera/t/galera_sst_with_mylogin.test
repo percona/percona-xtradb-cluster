@@ -1,0 +1,23 @@
+# The existance of .mylogin.cnf file containing host parameter
+# should not affect SST
+
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+# Stop node 2 and force SST
+--connection node_2
+--source include/shutdown_mysqld.inc
+
+# Remove the grastate.dat file to force an SST
+--remove_file $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
+
+# create .mylogin.cnf file
+--exec $MYSQL_CONFIG_EDITOR set --host=127.0.0.1
+
+# Start node_2. It should join with SST
+--connection node_2
+--source include/start_mysqld.inc
+
+# cleanup
+--remove_file $MYSQL_TEST_LOGIN_FILE
+

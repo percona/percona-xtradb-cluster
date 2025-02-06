@@ -278,8 +278,8 @@ static inline int wsrep_after_prepare(THD *thd, bool all) {
   assert(wsrep_run_commit_hook(thd, all));
   int ret = thd->wsrep_cs().after_prepare();
   assert(ret == 0 || thd->wsrep_cs().current_error() ||
-              thd->wsrep_cs().transaction().state() ==
-                  wsrep::transaction::s_must_replay);
+         thd->wsrep_cs().transaction().state() ==
+             wsrep::transaction::s_must_replay);
   DBUG_RETURN(ret);
 }
 
@@ -296,6 +296,10 @@ static inline int wsrep_before_commit(THD *thd, bool all) {
   WSREP_DEBUG("wsrep_before_commit: %d, %lld", wsrep_is_real(thd, all),
               (long long)wsrep_thd_trx_seqno(thd));
   int ret = 0;
+
+  /* Enter the async monitor */
+  thd_enter_async_monitor(thd);
+
   assert(wsrep_run_commit_hook(thd, all));
   if ((ret = thd->wsrep_cs().before_commit()) == 0) {
     assert(!thd->wsrep_trx().ws_meta().gtid().is_undefined());
@@ -555,14 +559,26 @@ static inline void wsrep_commit_empty(THD *thd, bool all) {
     /* @todo CTAS with STATEMENT binlog format and empty result set
        seems to be committing empty. Figure out why and try to fix
        elsewhere. */
-    assert(!wsrep_has_changes(thd) ||
-                thd->wsrep_stmt_transaction_rolled_back ||
-                (thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
-                 !thd->is_current_stmt_binlog_format_row()) ||
-                thd->wsrep_post_insert_error);
+    assert(!wsrep_has_changes(thd) || thd->wsrep_stmt_transaction_rolled_back ||
+           (thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
+            !thd->is_current_stmt_binlog_format_row()) ||
+           thd->wsrep_post_insert_error);
     bool have_error = wsrep_current_error(thd);
     int ret = wsrep_before_rollback(thd, all) ||
               wsrep_after_rollback(thd, all) || wsrep_after_statement(thd);
+
+    /* Update empty commits in Async monitor if required.
+     *
+     * If the replicated transaction is transactional, we call the
+     * thd_enter_async_monitor() as part of wsrep_before_commit().
+     *
+     * But non transactional statements (MyISAM) wont call the
+     * wsrep_before_commit() hook. So, we might end up in a deadlock if we dont
+     * remove its seqno from the Async monitor.
+     *
+     * So we remove the seqno of the empty commit here. */
+    thd_enter_async_monitor(thd);
+    thd_leave_async_monitor(thd);
     /* The committing transaction was empty but it held some locks and
        got BF aborted. As there were no certified changes in the
        data, we ignore the deadlock error and rely on error reporting

@@ -190,6 +190,7 @@
 #endif /* WITH_LOCK_ORDER */
 
 #ifdef WITH_WSREP
+#include "wsrep_async_monitor.h"
 #include "wsrep_binlog.h"
 #include "wsrep_mysqld.h"
 #include "wsrep_sst.h"
@@ -307,10 +308,30 @@ bool all_tables_not_ok(THD *thd, Table_ref *tables) {
   if (WSREP(thd) && thd->wsrep_applier &&
       wsrep_check_mode(WSREP_MODE_IGNORE_NATIVE_REPLICATION_FILTER_RULES))
     return false;
-#endif
+
+  if (!rpl_filter->is_on()) return false;
+
+  bool ret = tables && !thd->sp_runtime_ctx &&
+             !rpl_filter->tables_ok(thd->db().str, tables);
+
+  // If this transaction is anyways going to be skipped, then skip the
+  // transaction in the async monitor as well
+  if (!ret && WSREP(thd) && thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER &&
+      !thd->wsrep_applier) {
+    Slave_worker *sw = dynamic_cast<Slave_worker *>(thd->rli_slave);
+    Wsrep_async_monitor *wsrep_async_monitor{sw->get_wsrep_async_monitor()};
+    if (wsrep_async_monitor) {
+      auto seqno = sw->sequence_number();
+      assert(seqno > 0);
+      wsrep_async_monitor->skip(seqno);
+    }
+  }
+  return ret;
+#else
 
   return rpl_filter->is_on() && tables && !thd->sp_runtime_ctx &&
          !rpl_filter->tables_ok(thd->db().str, tables);
+#endif
 }
 
 bool is_normal_transaction_boundary_stmt(enum_sql_command sql_cmd) {
@@ -394,6 +415,21 @@ inline bool check_database_filters(THD *thd, const char *db,
         break;
     }
   }
+
+#ifdef WITH_WSREP
+  // This transaction is anyways going to be skipped. So skip the transaction
+  // in the async monitor as well
+  if (WSREP(thd) && thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER &&
+      !thd->wsrep_applier && !db_ok) {
+    Slave_worker *sw = dynamic_cast<Slave_worker *>(thd->rli_slave);
+    Wsrep_async_monitor *wsrep_async_monitor{sw->get_wsrep_async_monitor()};
+    if (wsrep_async_monitor) {
+      auto seqno = sw->sequence_number();
+      assert(seqno > 0);
+      wsrep_async_monitor->skip(seqno);
+    }
+  }
+#endif /* WITH_WSREP */
   return db_ok;
 }
 
@@ -1805,14 +1841,14 @@ static bool block_write_while_in_rolling_upgrade(THD *thd) {
         would not block writes, but for clear flow, let's check if server state
         is initialized, and if it is not yet, do not block writes.
      2. Background wsrep applier (like slave thread) */
-  if (!thd->wsrep_cs().server_state().is_initialized() || (WSREP(thd) && thd->wsrep_applier))
+  if (!thd->wsrep_cs().server_state().is_initialized() ||
+      (WSREP(thd) && thd->wsrep_applier))
     return false;
 
   bool block = false;
   LEX *lex = thd->lex;
   if (sql_command_flags[lex->sql_command] & CF_CHANGES_DATA) {
-    bool multi_version_cluster =
-        wsrep_protocol_version < WsrepVersion::V4;
+    bool multi_version_cluster = wsrep_protocol_version < WsrepVersion::V4;
     if (multi_version_cluster ||
         DBUG_EVALUATE_IF("simulate_wsrep_multiple_major_versions", true,
                          false)) {
@@ -5129,9 +5165,8 @@ int mysql_execute_command(THD *thd, bool first_level) {
            REFRESH_USER_RESOURCES | REFRESH_ERROR_LOG | REFRESH_SLOW_LOG |
            REFRESH_GENERAL_LOG | REFRESH_ENGINE_LOG | REFRESH_RELAY_LOG |
            /* Percona Server specific */
-           REFRESH_TABLE_STATS |
-           REFRESH_INDEX_STATS | REFRESH_USER_STATS | REFRESH_CLIENT_STATS |
-           REFRESH_THREAD_STATS)) {
+           REFRESH_TABLE_STATS | REFRESH_INDEX_STATS | REFRESH_USER_STATS |
+           REFRESH_CLIENT_STATS | REFRESH_THREAD_STATS)) {
         WSREP_TO_ISOLATION_BEGIN_WRTCHK(WSREP_MYSQL_DB, NULL, NULL)
       }
 #endif /* WITH_WSREP */

@@ -1919,7 +1919,7 @@ bool MYSQL_BIN_LOG::write_transaction(THD *thd, binlog_cache_data *cache_data,
     goto end;
 
   ret = DBUG_EVALUATE_IF("simulate_write_trans_without_gtid", false,
-                              gtid_event.write(writer));
+                         gtid_event.write(writer));
 #else
   bool ret = DBUG_EVALUATE_IF("simulate_write_trans_without_gtid", false,
                               gtid_event.write(writer));
@@ -7685,8 +7685,8 @@ bool MYSQL_BIN_LOG::write_event(Log_event *event_info) {
             thd->first_successful_insert_id_in_prev_stmt_for_binlog,
             event_info->event_cache_type, event_info->event_logging_type);
         if (cache_data->write_event(&e)) goto err;
-          if (event_info->is_using_immediate_logging())
-            thd->binlog_bytes_written += e.header()->data_written;
+        if (event_info->is_using_immediate_logging())
+          thd->binlog_bytes_written += e.header()->data_written;
       }
       if (thd->auto_inc_intervals_in_cur_stmt_for_binlog.nb_elements() > 0) {
         DBUG_PRINT(
@@ -7698,16 +7698,16 @@ bool MYSQL_BIN_LOG::write_event(Log_event *event_info) {
             thd->auto_inc_intervals_in_cur_stmt_for_binlog.minimum(),
             event_info->event_cache_type, event_info->event_logging_type);
         if (cache_data->write_event(&e)) goto err;
-          if (event_info->is_using_immediate_logging())
-            thd->binlog_bytes_written += e.header()->data_written;
+        if (event_info->is_using_immediate_logging())
+          thd->binlog_bytes_written += e.header()->data_written;
       }
       if (thd->rand_used) {
         Rand_log_event e(thd, thd->rand_saved_seed1, thd->rand_saved_seed2,
                          event_info->event_cache_type,
                          event_info->event_logging_type);
         if (cache_data->write_event(&e)) goto err;
-          if (event_info->is_using_immediate_logging())
-            thd->binlog_bytes_written += e.header()->data_written;
+        if (event_info->is_using_immediate_logging())
+          thd->binlog_bytes_written += e.header()->data_written;
       }
       if (!thd->user_var_events.empty()) {
         for (size_t i = 0; i < thd->user_var_events.size(); i++) {
@@ -7725,8 +7725,8 @@ bool MYSQL_BIN_LOG::write_event(Log_event *event_info) {
               user_var_event->type, user_var_event->charset_number, flags,
               event_info->event_cache_type, event_info->event_logging_type);
           if (cache_data->write_event(&e)) goto err;
-            if (event_info->is_using_immediate_logging())
-              thd->binlog_bytes_written += e.header()->data_written;
+          if (event_info->is_using_immediate_logging())
+            thd->binlog_bytes_written += e.header()->data_written;
         }
       }
     }
@@ -8864,12 +8864,14 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all) {
          trans_commit_stmt()) the following call to my_error() will allow
          overwriting the error */
       my_error(ER_TRANSACTION_ROLLBACK_DURING_COMMIT, MYF(0));
+      thd_leave_async_monitor(thd);
       return RESULT_ABORTED;
     }
 
     int rc = ordered_commit(thd, all, skip_commit);
 
     if (run_wsrep_hooks) {
+      thd_leave_async_monitor(thd);
       wsrep_after_commit(thd, all);
     }
 
@@ -9836,10 +9838,8 @@ static void set_binlog_snapshot_file(const char *src) {
           sizeof(binlog_snapshot_file) - 1);
 }
 
-
-
 void MYSQL_BIN_LOG::report_missing_purged_gtids(
-  const Gtid_set *slave_executed_gtid_set, std::string &errmsg) {
+    const Gtid_set *slave_executed_gtid_set, std::string &errmsg) {
   DBUG_TRACE;
   THD *thd = current_thd;
   Gtid_set gtid_missing(gtid_state->get_lost_gtids()->get_sid_map());
@@ -10053,6 +10053,26 @@ int THD::binlog_setup_trx_data() {
   thd_set_ha_data(this, binlog_hton, cache_mngr);
 
   return 0;
+}
+
+bool THD::binlog_configure_trx_cache_size(ulong new_size) {
+  // Check expected block size.
+  assert((new_size % IO_SIZE) == 0);
+
+  binlog_cache_mngr *const cache_mngr = thd_get_cache_mngr(this);
+  if (cache_mngr == nullptr || !cache_mngr->is_binlog_empty()) {
+    // Must exist and be empty
+    return true;
+  }
+
+  // Close and reopen with new value
+  Binlog_cache_storage *const cache = cache_mngr->get_trx_cache();
+  cache->close();
+#ifdef WITH_WSREP
+  return cache->open((my_off_t)new_size, max_binlog_cache_size);
+#else
+  return cache->open(new_size, max_binlog_cache_size);
+#endif
 }
 
 /**
@@ -12381,7 +12401,8 @@ int prepend_binlog_control_event(THD *const thd) {
     return ER_ERROR_ON_WRITE;
 
   int ret = 0;
-  Intvar_log_event ev((uchar)binary_log::Intvar_event::BINLOG_CONTROL_EVENT, 0);
+  Intvar_log_event ev(thd,
+                      (uchar)binary_log::Intvar_event::BINLOG_CONTROL_EVENT, 0);
   if (ev.write(&tmp_io_cache)) {
     ret = ER_ERROR_ON_WRITE;
     goto cleanup;
@@ -12462,8 +12483,9 @@ TC_LOG::enum_result wsrep_thd_binlog_commit(THD *thd, bool all) {
     if (all) {
       CONDITIONAL_SYNC_POINT_FOR_TIMESTAMP("before_commit_in_tc");
     }
-    return trx_coordinator::commit_in_engines(thd, all) ? TC_LOG::RESULT_ABORTED
-                                                        : TC_LOG::RESULT_SUCCESS;
+    return trx_coordinator::commit_in_engines(thd, all)
+               ? TC_LOG::RESULT_ABORTED
+               : TC_LOG::RESULT_SUCCESS;
   }
 }
 

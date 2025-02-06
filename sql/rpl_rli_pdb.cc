@@ -327,6 +327,9 @@ int Slave_worker::init_worker(Relay_log_info *rli, ulong i) {
   this->set_require_row_format(rli->is_row_format_required());
 
   set_commit_order_manager(c_rli->get_commit_order_manager());
+#ifdef WITH_WSREP
+  set_wsrep_async_monitor(c_rli->get_wsrep_async_monitor());
+#endif /* WITH_WSREP */
 
   if (rli_init_info(false) ||
       DBUG_EVALUATE_IF("inject_init_worker_init_info_fault", true, false))

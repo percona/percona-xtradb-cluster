@@ -1,7 +1,5 @@
 Killing server ...
 Killing server ...
-include/wait_for_wait_in_expect_file.inc
 # restart_abort: <hidden args>
-include/wait_for_wait_in_expect_file.inc
 # restart:<hidden args>
 # restart:<hidden args>

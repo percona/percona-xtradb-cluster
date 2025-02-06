@@ -105,10 +105,6 @@ MACRO(MYSQL_ADD_COMPONENT component_arg)
 
     # To hide the component symbols in the shared object
     IF(UNIX)
-      IF(MY_COMPILER_IS_CLANG AND WITH_UBSAN)
-        # nothing, clang/ubsan gets confused
-        UNSET(COMPONENT_COMPILE_VISIBILITY CACHE)
-      ELSE()
         # Use this also for component libraries and tests.
         SET(COMPONENT_COMPILE_VISIBILITY
           "-fvisibility=hidden" CACHE INTERNAL
@@ -136,7 +132,6 @@ MACRO(MYSQL_ADD_COMPONENT component_arg)
           CXX_VISIBILITY_PRESET hidden
           VISIBILITY_INLINES_HIDDEN YES
         )
-      ENDIF()
     ENDIF()
 
     IF(NOT ARG_SKIP_INSTALL)

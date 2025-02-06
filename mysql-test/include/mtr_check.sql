@@ -206,7 +206,7 @@ BEGIN
   -- Check for number of active connections before & after the test run.
 
 
-  -- disabling it for PXC/WSREP for now
+  -- disabling it for PXC/WSREP for now // KH: enable it
   -- mysql.session is used internally by plugins to access the server. We may
   -- not find consistent result in information_schema.processlist, hence
   -- excluding it from check-testcase. Similar reasoning applies to the event
@@ -218,7 +218,7 @@ BEGIN
   -- not give consistent result either.
   --
   -- SELECT /*+SET_VAR(use_secondary_engine=OFF)*/ USER, HOST, DB, COMMAND, INFO FROM INFORMATION_SCHEMA.PROCESSLIST
-  --  WHERE COMMAND NOT IN ('Sleep', 'Daemon')
+  --  WHERE COMMAND NOT IN ('Sleep', 'Daemon', 'Killed')
   --    AND USER NOT IN ('unauthenticated user','mysql.session', 'event_scheduler')
   --      ORDER BY COMMAND;
 
@@ -244,6 +244,24 @@ BEGIN
   DELETE FROM mysql.global_grants WHERE user = 'mysql.pxc.sst.user';
   COMMIT;
   SET SESSION wsrep_on = ON;
+
+  -- During the installation of Percona Telemetry Component we create 'percona.telemetry'.
+  -- It happens during the server startup, so servers started during the test will have the same user
+  -- with different password_last_changed timestamps.
+  -- Some tests (e.g. clone plugin related) restore the clone instance state by cloning the donor. In such a case restored
+  -- instance will have different timestamps at the beginning and the end of the test and MTR check will complain because of
+  -- different tables checksums.
+  -- Workaround this problem by excluding mysql.user from checksum calculation. 
+  -- Instead, dump the table but without password_last_changed column.
+  -- This is the same approach as for INFORMATION_SCHEMA.ROUTINES above.
+  SELECT /*+SET_VAR(use_secondary_engine=OFF)*/ Host, User, Select_priv, Insert_priv, Update_priv, Delete_priv, Create_priv,
+    Drop_priv, Reload_priv, Shutdown_priv, Process_priv, File_priv, Grant_priv, References_priv, Index_priv, Alter_priv,
+    Show_db_priv, Super_priv, Create_tmp_table_priv, Lock_tables_priv, Execute_priv, Repl_slave_priv, Repl_client_priv,
+    Create_view_priv, Show_view_priv, Create_routine_priv, Alter_routine_priv, Create_user_priv, Event_priv, Trigger_priv,
+    Create_tablespace_priv, ssl_type, ssl_cipher, x509_issuer, x509_subject, max_questions, max_updates, max_connections,
+    max_user_connections, plugin, authentication_string, password_expired, password_lifetime, account_locked, Create_role_priv,
+    Drop_role_priv, Password_reuse_history, Password_reuse_time, Password_require_current, User_attributes 
+  FROM mysql.user ORDER BY Host, User;
 
   -- During the installation of Percona Telemetry Component we create 'percona.telemetry'.
   -- It happens during the server startup, so servers started during the test will have the same user

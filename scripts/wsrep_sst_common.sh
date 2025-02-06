@@ -181,6 +181,17 @@ else
     SST_PROGRESS_FILE=""
 fi
 
+# If the user has .mylogin.cnf file, mysqladmin, mysql, xtrabackup will
+# use it for login information. This is especially dangerous if we try to
+# connect to the post-SST instance, which has networking disabled. The only way
+# to connect to it is through the socket, however, if .mylogin.cnf has host
+# specified, mysql client/mysqladmin will use it and fail.
+# That's why we rely on locally generated configs in SST script.
+# Specifying --protocol=SOCKET explicitly to the mysql client, does not solve
+# the issue - if .mylogin.cnf contains host, the client claims that SOCKET
+# is the unknown protocol
+export MYSQL_TEST_LOGIN_FILE=/dev/null
+
 #
 # user can specify xtrabackup specific settings that will be used during sst
 # process like encryption, etc.....
@@ -314,6 +325,17 @@ get_mysqld_path()
     if [[ -z $MYSQLD_PATH ]]; then
         # We don't have readlink, so look for mysqld in the path
         MYSQLD_PATH=$(which ${MYSQLD_NAME})
+    fi
+
+    if [[ $MYSQLD_PATH == *"memcheck"* ]]; then
+      wsrep_log_debug "Detected valgrind, adjusting mysqld path accordingly"
+      while read -r line
+      do
+        if [[ ${line::1} != "-" ]]; then
+          MYSQLD_PATH=$line
+          wsrep_log_debug "Adjusted mysqld to $line"
+        fi
+      done < <(cat /proc/${WSREP_SST_OPT_PARENT}/cmdline | strings -1)
     fi
 
     if [[ -z $MYSQLD_PATH ]]; then
@@ -704,16 +726,6 @@ function run_post_processing_steps()
     fi
 
     local mysqld_path=$MYSQLD_PATH
-    if [[ $mysqld_path == *"memcheck"* ]]; then
-      wsrep_log_debug "Detected valgrind, adjusting mysqld path accordingly"
-      while read -r line
-      do
-        if [[ ${line::1} != "-" ]]; then
-          mysqld_path=$line
-          wsrep_log_debug "Adjusted mysqld to $line"
-        fi
-      done < <(cat /proc/${WSREP_SST_OPT_PARENT}/cmdline | strings -1)
-    fi
 
     # Verify any other needed programs
     wsrep_check_program "${MYSQLADMIN_NAME}"

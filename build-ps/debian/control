@@ -103,7 +103,8 @@ Section: database
 Architecture: any
 Pre-depends: debconf (>= 0.2.17), debsums, ${misc:Pre-Depends}
 Provides: mysql-common, mariadb-common
-Replaces: mysql-common, mariadb-common
+Replaces: mysql-common, mariadb-common, percona-xtradb-cluster-pro-common
+Conflicts: percona-xtradb-cluster-pro-common
 Multi-Arch: foreign
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Percona XtraDB Cluster database common files (e.g. /etc/mysql/my.cnf)
@@ -172,7 +173,9 @@ Replaces: mysql-client-5.0,
            mariadb-client-core-5.5,
            mariadb-client-5.5,
            virtual-mysql-client,
-           virtual-mysql-client-core
+           virtual-mysql-client-core,
+           percona-xtradb-cluster-client-pro
+Conflicts: percona-xtradb-cluster-client-pro
 Description: Percona XtraDB Cluster database client binaries
  Percona XtraDB Cluster is based on the Percona Server database
  server and provides a High Availability solution.
@@ -264,7 +267,9 @@ Replaces: mysql-server-5.0,
 	  galera-57-3.x,
 	  percona-xtradb-cluster-galera-3.x,
 	  galera-garbd-57-3.x,
-	  galera-garbd-57
+	  galera-garbd-57,
+	  percona-xtradb-cluster-server-pro
+Conflicts: percona-xtradb-cluster-server-pro
 Description: Percona XtraDB Cluster database server binaries
  Percona XtraDB Cluster is based on the Percona Server database
  server and provides a High Availability solution.
@@ -294,6 +299,8 @@ Depends: percona-xtradb-cluster-client (>= ${binary:Version}),
          qpress,
          iproute
 Provides: mysql-server-debug
+Replaces: percona-xtradb-cluster-server-pro-debug
+Conflicts: percona-xtradb-cluster-server-pro-debug
 Description: Percona XtraDB Cluster database server UNIV_DEBUG binaries
  Percona XtraDB Cluster is based on the Percona Server database
  server and provides a High Availability solution.
@@ -307,6 +314,8 @@ Package: percona-xtradb-cluster
 Section: database
 Architecture: any
 Depends: percona-xtradb-cluster-server (>= ${binary:Version}), percona-xtradb-cluster-client (>= ${binary:Version}), ${misc:Depends}
+Replaces: percona-xtradb-cluster-pro
+Conflicts: percona-xtradb-cluster-pro
 Description: Percona XtraDB Cluster with Galera
  This is a meta-package providing PXC80 server, client.
 
@@ -314,12 +323,16 @@ Package: percona-xtradb-cluster-full
 Section: database
 Architecture: any
 Depends: percona-xtradb-cluster-server (>= ${binary:Version}), percona-xtradb-cluster-client (>= ${binary:Version}), percona-xtradb-cluster-test (>= ${binary:Version}), percona-xtradb-cluster-dbg (>= ${binary:Version}),  percona-xtradb-cluster-server-debug, percona-xtradb-cluster-garbd (>= ${binary:Version}), ${misc:Depends}, percona-xtradb-cluster-garbd-debug (>= ${binary:Version})
+Replaces: percona-xtradb-cluster-pro-full
+Conflicts: percona-xtradb-cluster-pro-full
 Description: Percona XtraDB Cluster with Galera
  This is a meta-package providing PXC80 server, client, test and debug packages.
 
 Package: percona-xtradb-cluster-test
 Architecture: any
 Depends: percona-xtradb-cluster-client (>= ${binary:Version}), percona-xtradb-cluster-server (>= ${binary:Version})
+Replaces: percona-xtradb-cluster-test-pro
+Conflicts: percona-xtradb-cluster-test-pro
 Description: Percona XtraDB Cluster database test suite
  This package includes the Percona XtraDB Cluster test framework that provides
  a means for verifying that Percona XtraDB Cluster and its client programs
@@ -329,6 +342,8 @@ Package: percona-xtradb-cluster-dbg
 Architecture: any
 Section: debug
 Depends: percona-xtradb-cluster-server (= ${binary:Version}), ${misc:Depends}
+Replaces: percona-xtradb-cluster-pro-dbg
+Conflicts: percona-xtradb-cluster-pro-dbg
 Description: Debugging package for Percona XtraDB Cluster
  Percona XtraDB Cluster is based on the Percona Server database
  server and provides a High Availability solution.
@@ -341,14 +356,16 @@ Description: Debugging package for Percona XtraDB Cluster
 Package: percona-xtradb-cluster-source
 Architecture: any
 Depends: ${misc:Depends}, ${shlibs:Depends}
+Replaces: percona-xtradb-cluster-pro-source
+Conflicts: percona-xtradb-cluster-pro-source
 Description: Percona XtraDB Cluster source
  This package includes the source code to Percona XtraDB Cluster as configured before building.
 
 Package: percona-xtradb-cluster-garbd
 Architecture: any
 Provides: garbd-3, garbd3
-Conflicts: garbd-2, percona-xtradb-cluster-garbd-2.x, garbd2, percona-galera-arbitrator-3, percona-xtradb-cluster-garbd-3.x
-Replaces: percona-galera-arbitrator-3, galera-garbd-57-3.x, percona-xtradb-cluster-garbd-3.x
+Conflicts: garbd-2, percona-xtradb-cluster-garbd-2.x, garbd2, percona-galera-arbitrator-3, percona-xtradb-cluster-garbd-3.x, percona-xtradb-cluster-garbd-pro
+Replaces: percona-galera-arbitrator-3, galera-garbd-57-3.x, percona-xtradb-cluster-garbd-3.x, percona-xtradb-cluster-garbd-pro
 Depends: ${shlibs:Depends}, ${misc:Depends}, netcat-openbsd
 Description: Garbd components of Percona XtraDB Cluster
  This package contains the garbd of Percona XtraDB Cluster.
@@ -356,8 +373,8 @@ Description: Garbd components of Percona XtraDB Cluster
 Package: percona-xtradb-cluster-garbd-debug
 Architecture: any
 Section: debug
-Conflicts: percona-galera-arbitrator-3-dbg
-Replaces: percona-galera-arbitrator-3-dbg
+Conflicts: percona-galera-arbitrator-3-dbg, percona-xtradb-cluster-garbd-pro-debug
+Replaces: percona-galera-arbitrator-3-dbg, percona-xtradb-cluster-garbd-pro-debug
 Depends: percona-xtradb-cluster-garbd (= ${binary:Version}), ${misc:Depends}
 Description: Debugging package for Percona XtraDB Cluster Garbd.
 
