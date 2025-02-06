@@ -1096,7 +1096,8 @@ cat << EOF > "$CLONE_SQL"
 SET SESSION sql_log_bin=OFF;
 DROP USER IF EXISTS $CLONE_USER;
 DROP USER IF EXISTS $CLONE_USER@'localhost';
-DROP USER IF EXISTS 'mysql.pxc.sst.user'@'localhost'; $CLEANUP_CLONE_PLUGIN_SQL
+DROP USER IF EXISTS 'mysql.pxc.sst.user'@'localhost';
+$CLEANUP_CLONE_PLUGIN_SQL
 SHUTDOWN;
 EOF
     
