@@ -13,6 +13,11 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA */
 
+#include <cstdio>
+#include <cstdlib>
+#include <regex>
+#include <sstream>
+#include <string>
 #include "debug_sync.h"
 #include "log_event.h"
 #include "my_rnd.h"
@@ -37,11 +42,7 @@
 #include "wsrep_utils.h"
 #include "wsrep_var.h"
 #include "wsrep_xid.h"
-#include <cstdio>
-#include <cstdlib>
-#include <regex>
-#include <sstream>
-#include <string>
+
 
 extern const char wsrep_defaults_file[];
 extern const char *wsrep_defaults_group_suffix;
