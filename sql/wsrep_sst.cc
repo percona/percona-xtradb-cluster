@@ -13,11 +13,6 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA */
 
-#include "wsrep_sst.h"
-#include <cstdio>
-#include <cstdlib>
-#include <regex>
-#include <sstream>
 #include "debug_sync.h"
 #include "log_event.h"
 #include "my_rnd.h"
@@ -37,11 +32,15 @@
 #include "wsrep_binlog.h"
 #include "wsrep_priv.h"
 #include "wsrep_service.h"
+#include "wsrep_sst.h"
 #include "wsrep_thd.h"
 #include "wsrep_utils.h"
 #include "wsrep_var.h"
 #include "wsrep_xid.h"
-#include <iostream>
+#include <cstdio>
+#include <cstdlib>
+#include <regex>
+#include <sstream>
 #include <string>
 
 extern const char wsrep_defaults_file[];
@@ -896,7 +895,7 @@ std::string wsrep_sst_prepare() {
   */
   std::string addr_str = addr_ptr;
   size_t atPosition = addr_str.find("@");
-  if( atPosition > 0 ) {
+  if (atPosition > 0) {
     addr_str = addr_str.substr(atPosition + 1);
   }
 
