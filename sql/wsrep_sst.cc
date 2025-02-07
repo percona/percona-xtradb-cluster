@@ -891,7 +891,7 @@ std::string wsrep_sst_prepare() {
      address part if not present we do not filter it We decide to do not mask
      the PWD but to remove compeletely the information user:pwd to keep
      consistency with the already deployed solution for XB. This in case a user
-     had implemented any kind of log traking     
+     had implemented any kind of log traking
   */
   std::string addr_str = addr_ptr;
   size_t atPosition = addr_str.find("@");
