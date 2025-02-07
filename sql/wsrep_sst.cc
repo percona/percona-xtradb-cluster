@@ -41,6 +41,8 @@
 #include "wsrep_utils.h"
 #include "wsrep_var.h"
 #include "wsrep_xid.h"
+#include <iostream>
+#include <string>
 
 extern const char wsrep_defaults_file[];
 extern const char *wsrep_defaults_group_suffix;
@@ -886,7 +888,19 @@ std::string wsrep_sst_prepare() {
 
   const char *method_ptr(ret.data());
   const char *addr_ptr(ret.data() + strlen(method_ptr) + 1);
-  WSREP_INFO("Prepared SST request: %s|%s", method_ptr, addr_ptr);
+  /* we check for @ as separator in user:pw@address format and return only the address part
+     if not present we do not filter it
+     We decide to do not mask the PWD but to remove compeletely the information user:pwd 
+     to keep consistency with the already deployed solution for XB. 
+     This in case a user had implemented any kind of log traking
+  */
+  std::string addr_str = addr_ptr;
+  size_t atPosition = addr_str.find("@");
+  if( atPosition > 0 ) {
+    addr_str = addr_str.substr(atPosition + 1);
+  }
+
+  WSREP_INFO("Prepared SST request: %s|%s", method_ptr, addr_str.c_str());
 
   if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
   sst_awaiting_callback = true;

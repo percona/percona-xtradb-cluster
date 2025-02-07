@@ -139,7 +139,7 @@ readonly WSREP_SST_OPT_ADDR_LOCAL=`echo $WSREP_SST_OPT_ADDR |tr ] @`
 wsrep_log_debug "-> MYPID: $MYPID PARENT PID $PARENT_PID"
 wsrep_log_debug "-> WSREP_SST_OPT_HOST: $WSREP_SST_OPT_HOST"
 wsrep_log_debug "-> WSREP_SST_OPT_USER: $WSREP_SST_OPT_USER"
-wsrep_log_debug "-> WSREP_SST_OPT_PSWD: $WSREP_SST_OPT_PSWD"
+#wsrep_log_debug "-> WSREP_SST_OPT_PSWD: $WSREP_SST_OPT_PSWD"
 wsrep_log_debug "-> WSREP_SST_OPT_ADDR: $WSREP_SST_OPT_ADDR"
 wsrep_log_debug "-> WSREP_SST_OPT_ADDR_LOCAL: $WSREP_SST_OPT_ADDR_LOCAL"
 wsrep_log_debug "-> WSREP_SST_OPT_LPORT: $WSREP_SST_OPT_LPORT"
@@ -216,7 +216,7 @@ wsrep_sst_normalize_state_string()
 cleanup_donor()
 {
     wsrep_log_info "Cleanup DONOR."
-    wsrep_log_debug "Cleanup MySQL ADMIN_PSWD: $ADMIN_PSWD"
+#    wsrep_log_debug "Cleanup MySQL ADMIN_PSWD: $ADMIN_PSWD"
     wsrep_log_debug "Cleanup MySQL MYSQL_ACLIENT: $MYSQL_ACLIENT"
     export MYSQL_PWD=$ADMIN_PSWD
     if [ "$CLEANUP_CLONE_PLUGIN" == "yes" ]
@@ -520,9 +520,9 @@ then
 
     wsrep_log_debug "-> WSREP_SST_OPT_LPORT: $WSREP_SST_OPT_LPORT "
     wsrep_log_debug "-> MYSQL_ACLIENT: $MYSQL_ACLIENT "
-    wsrep_log_debug "-> MYSQL_ACLIENT ADMIN_PSWD: $ADMIN_PSWD"
+    #wsrep_log_debug "-> MYSQL_ACLIENT ADMIN_PSWD: $ADMIN_PSWD"
     wsrep_log_debug "-> MYSQL_RCLIENT: $MYSQL_RCLIENT "
-    wsrep_log_debug "-> MYSQL_RUSER: $WSREP_SST_OPT_REMOTE_JOINER_USER | PWD  $WSREP_SST_OPT_REMOTE_JOINER_PSWD"
+    #wsrep_log_debug "-> MYSQL_RUSER: $WSREP_SST_OPT_REMOTE_JOINER_USER | PWD  $WSREP_SST_OPT_REMOTE_JOINER_PSWD"
 
 
     if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
@@ -553,7 +553,7 @@ GRANT EXECUTE ON *.* TO "$WSREP_SST_OPT_REMOTE_JOINER_USER"@"%";
 EOF
         RC=0
         export MYSQL_PWD=$ADMIN_PSWD
-        wsrep_log_debug "-> connecting to donor: $CLONE_PREPARE_SQL $MYSQL_PWD $MYSQL_ACLIENT"
+#        wsrep_log_debug "-> connecting to donor: $CLONE_PREPARE_SQL $MYSQL_PWD $MYSQL_ACLIENT"
         $MYSQL_ACLIENT --connect-timeout=60 < $CLONE_PREPARE_SQL || RC=$?
         wsrep_log_debug "-> $RC connect to donor done"
 
@@ -593,7 +593,7 @@ EOF
         export MYSQL_PWD="$WSREP_SST_OPT_REMOTE_JOINER_PSWD"
         export MYSQL_USER="$WSREP_SST_OPT_REMOTE_JOINER_USER"
         # Find own address (from which we connected)
-        wsrep_log_debug "-> Connecting to JOINER to get exact IP of donor: $MYSQL_RCLIENT $MYSQL_PWD"
+        wsrep_log_debug "-> Connecting to JOINER to get exact IP of donor: $MYSQL_RCLIENT" # $MYSQL_PWD"
         USER=`$MYSQL_RCLIENT --skip-column-names -e 'SELECT USER()'`
         LHOST=${USER##*@}
         DONOR=$LHOST:$WSREP_SST_OPT_LPORT
@@ -608,7 +608,7 @@ EOF
 
         wsrep_log_debug "JOINER CLONE ACTION SQL: $CLONE_EXECUTE_SQL $MYSQL_PWD $MYSQL_RCLIENT"
         CLONE_EXECUTE=`cat $CLONE_EXECUTE_SQL` || :
-        wsrep_log_debug "-> $CLONE_EXECUTE"
+#        wsrep_log_debug "-> $CLONE_EXECUTE"
         
         # Actual cloning process
         wsrep_log_info "JOINER CLONE ACTION: cloning"
@@ -656,7 +656,7 @@ EOF
         wsrep_log_debug "-> Exiting with gtid: $WSREP_SST_OPT_GTID"
     fi
 
-    wsrep_log_debug "-> SENDING DONE $ADMIN_PSWD | $MYSQL_PWD | $WSREP_SST_OPT_GTID"
+    wsrep_log_debug "-> SENDING DONE_MESSAGE $WSREP_SST_OPT_GTID"
     # DONOR must be clean BEFORE exit given user is removed on DONE
 
     echo "done $WSREP_SST_OPT_GTID"
@@ -894,7 +894,7 @@ then
     fi
 
     # Report clone credentials/address to the caller
-    wsrep_log_debug "-> ready passing string |$CLONE_USER:$CLONE_PSWD@$JOINER_CLONE_HOST:$JOINER_CLONE_PORT|"
+    wsrep_log_debug "-> ready passing string |$CLONE_USER:CLONE_PSWD@$JOINER_CLONE_HOST:$JOINER_CLONE_PORT|"
     echo "ready $CLONE_USER:$CLONE_PSWD@$JOINER_CLONE_HOST:$JOINER_CLONE_PORT"
 
     # WAIT for Donor message
@@ -1000,7 +1000,7 @@ EOF
 
     wsrep_log_info "Launching clone recipient daemon"
     wsrep_log_info "-> using: $CLONE_ENV $CLONE_BINARY_SAFE $DEFAULT_OPTIONS "
-    wsrep_log_debug "-> Test connection as: -u$CLONE_USER -p$CLONE_PSWD -h $JOINER_CLONE_HOST -P $JOINER_CLONE_PORT"
+    wsrep_log_debug "-> Test connection as: -u$CLONE_USER -pCLONE_PSWD -h $JOINER_CLONE_HOST -P $JOINER_CLONE_PORT"
 
     # Define client to be used on the Joiner side
     MYSQL_ACLIENT="$MYSQL_CLIENT -u$CLONE_USER -S$CLONE_SOCK --batch --skip_column_names --silent"
@@ -1034,7 +1034,7 @@ EOF
     trap cleanup_joiner EXIT
 
     export MYSQL_PWD=$CLONE_PSWD
-    wsrep_log_debug "-> Exported MySQL password $MYSQL_PWD"
+#    wsrep_log_debug "-> Exported MySQL password $MYSQL_PWD"
 
     wsrep_log_info "Waiting for clone recipient daemon to be ready for connections at port $JOINER_CLONE_PORT"
     wsrep_log_debug "-> connecting as: $MYSQL_CLIENT -u$CLONE_USER -h$JOINER_CLONE_HOST -P$JOINER_CLONE_PORT"
