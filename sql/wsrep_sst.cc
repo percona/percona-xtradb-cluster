@@ -13,6 +13,7 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA */
 
+#include "wsrep_sst.h"
 #include <cstdio>
 #include <cstdlib>
 #include <regex>
@@ -37,12 +38,10 @@
 #include "wsrep_binlog.h"
 #include "wsrep_priv.h"
 #include "wsrep_service.h"
-#include "wsrep_sst.h"
 #include "wsrep_thd.h"
 #include "wsrep_utils.h"
 #include "wsrep_var.h"
 #include "wsrep_xid.h"
-
 
 extern const char wsrep_defaults_file[];
 extern const char *wsrep_defaults_group_suffix;
