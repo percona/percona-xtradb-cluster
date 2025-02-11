@@ -1370,13 +1370,14 @@ INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'lo
 #   See the comments in mysql_system_tables.sql
 
 # These are the values for
-#  GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.* TO 'mysql.pxc.sst.role'@localhost;
+#  GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER, INNODB_REDO_LOG_ARCHIVE ON *.* TO 'mysql.pxc.sst.role'@localhost;
 #  GRANT ALTER, CREATE, SELECT, INSERT ON PERCONA_SCHEMA.xtrabackup_history TO 'mysql.pxc.sst.role'@localhost;
 #  GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost;
 #  GRANT CREATE ON PERCONA_SCHEMA.* to 'mysql.pxc.sst.role'@localhost;
 INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.sst.role','N','N','N','N','N','N','Y','N','Y','N','N','N','N','N','N','Y','N','Y','N','N','Y','N','N','N','N','N','N','N','N','','','','',0,0,0,0,'caching_sha2_password','','Y',CURRENT_TIMESTAMP,NULL,'Y','N','N',NULL,NULL,NULL,NULL);
 
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'BACKUP_ADMIN', 'N');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'INNODB_REDO_LOG_ARCHIVE', 'N');
 INSERT IGNORE INTO mysql.tables_priv VALUES ('localhost', 'PERCONA_SCHEMA', 'mysql.pxc.sst.role', 'xtrabackup_history', 'root\@localhost', CURRENT_TIMESTAMP, 'Alter,Select,Insert,Create', '');
 INSERT IGNORE INTO mysql.db VALUES ('localhost', 'performance_schema', 'mysql.pxc.sst.role','Y','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N');
 INSERT IGNORE INTO mysql.db VALUES ('localhost', 'PERCONA_SCHEMA', 'mysql.pxc.sst.role','N','N','N','N','Y','N','N','N','N','N','N','N','N','N','N','N','N','N','N');
