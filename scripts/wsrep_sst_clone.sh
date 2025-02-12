@@ -137,7 +137,6 @@ wsrep_log_debug "-> WSREP_SST_OPT_ADDR: $WSREP_SST_OPT_ADDR"
 wsrep_log_debug "-> WSREP_SST_OPT_ADDR_LOCAL: $WSREP_SST_OPT_ADDR_LOCAL"
 wsrep_log_debug "-> WSREP_SST_OPT_LPORT: $WSREP_SST_OPT_LPORT"
 
-
 # To not use possible [client] section in my.cnf
 MYSQL_CLIENT="$MYSQL_CLIENT --no-defaults"
 
@@ -702,7 +701,15 @@ then
     JOINER_CLONE_HOST=""
     JOINER_CLONE_PORT=""
 
+    # These variables are used in sig_clean_joiner. Create here to avoid
+    # potential unbound variable.
     CLEANUP_FILES=""
+    CLONE_SOCK_DIR=""
+    CLONE_PID_FILE=""
+    tmp_datadir=""
+    CLONE_ERR=""
+    CLONE_SQL=""
+
 
     trap sig_cleanup_joiner HUP PIPE INT TERM
     trap cleanup_joiner EXIT
@@ -716,31 +723,16 @@ then
 
     #
     #  Find binary to run
-    #
-    PARENT_PROC=(`ps -hup $WSREP_SST_OPT_PARENT`)
-    CLONE_BINARY=${PARENT_PROC[10]}
-    CLONE_BINARY_SAFE="${CLONE_BINARY}_safe"
+    #  get_mysqld_path stores the path in MYSQLD_PATH variable. Later in
+    #  the script we use CLONE_BINARY variable.
+    MYSQLD_PATH=""
+    get_mysqld_path
+    CLONE_BINARY="${MYSQLD_PATH}"
 
     if [ ! -x "$CLONE_BINARY" ]
     then
-        # Not always ps shows full path to the executable
-        # Look for it in the tree with a common ancestor
-        basedir=$0
-        while [ "/" != "$basedir" ]
-        do
-            basedir=$(dirname "$basedir")
-            res=$(find "$basedir" -mount -type f -executable -name "$CLONE_BINARY" 2>/dev/null);
-            if [ -x "$res" ]
-            then
-                CLONE_BINARY="$res"
-                break
-            fi
-        done
-        if [ ! -x "$CLONE_BINARY" ]
-        then
-            wsrep_log_error "Could not determine binary to run: $CLONE_BINARY"
-            exit $EINVAL
-        fi
+        wsrep_log_error "Could not determine binary to run: $CLONE_BINARY"
+        exit $EINVAL
     fi
 
     #
@@ -980,7 +972,7 @@ then
     ib_log_dir=$(parse_cnf mysqld innodb-log-group-home-dir "")
     ib_undo_dir=$(parse_cnf mysqld innodb-undo-directory "")
 
-    cpat=$(parse_cnf sst cpat '.*\.pem$\|.*init\.ok$\|.*galera\.cache$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$\|.*component_keyring_.*\.cnf$\|.*mysqld.my$')
+    cpat=$(parse_cnf sst cpat '.*\.pem$\|.*init\.ok$\|.*galera\.cache$\|.*gvwstate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$\|.*component_keyring_.*\.cnf$\|.*mysqld.my$')
     find $ib_home_dir $ib_log_dir $ib_undo_dir $WSREP_SST_OPT_DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>/dev/null \+
 
     # Before starting let us be sure we remove Netcat given it is using same MySQL port
@@ -1038,7 +1030,7 @@ then
 EOF
 
     wsrep_log_info "Launching clone recipient daemon"
-    wsrep_log_debug "-> using: $CLONE_ENV $CLONE_BINARY_SAFE $DEFAULT_OPTIONS "
+    wsrep_log_debug "-> using: $CLONE_ENV $CLONE_BINARY $DEFAULT_OPTIONS "
     wsrep_log_debug "-> Test connection as: -u$CLONE_USER -pxxxxxx -h $JOINER_CLONE_HOST -P $JOINER_CLONE_PORT"
 
     # Define client to be used on the Joiner side
@@ -1148,8 +1140,8 @@ EOF
 
     wsrep_log_info "CLEANUP and SHUTDOWN done"
     wsrep_log_info "Second restart for recovery position"
-    wsrep_log_debug "-> Second restart: $CLONE_BINARY $DEFAULT_OPTIONS $SKIP_NETWORKING_OPTIONS --wsrep_recover"
-    eval $CLONE_ENV $CLONE_BINARY $DEFAULT_OPTIONS $SKIP_NETWORKING_OPTIONS --wsrep_recover >> $CLONE_ERR 2>&1
+    wsrep_log_debug "-> Second restart: $CLONE_BINARY $DEFAULT_OPTIONS $SKIP_NETWORKING_OPTIONS --wsrep_provider=none --wsrep_recover"
+    eval $CLONE_ENV $CLONE_BINARY $DEFAULT_OPTIONS $SKIP_NETWORKING_OPTIONS --wsrep_provider=none --wsrep_recover >> $CLONE_ERR 2>&1
 
     RP="$(grep -a '\[WSREP\] Recovered position:' $CLONE_ERR || :)"
     RP_PURGED=$(echo "$RP" | sed 's/.*WSREP\]\ Recovered\ position://' | sed 's/^[ \t]*//')
