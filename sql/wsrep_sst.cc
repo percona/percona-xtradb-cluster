@@ -204,10 +204,10 @@ bool wsrep_setup_allowed_sst_methods() {
 static bool sst_awaiting_callback = false;
 
 bool wsrep_sst_in_progress() {
-    if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
-    bool in_progress = sst_awaiting_callback;
-    mysql_mutex_unlock (&LOCK_wsrep_sst);
-    return in_progress;
+  if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
+  bool in_progress = sst_awaiting_callback;
+  mysql_mutex_unlock(&LOCK_wsrep_sst);
+  return in_progress;
 }
 
 // Signal end of SST
@@ -278,8 +278,7 @@ static char *my_fgets(char *buf, size_t buf_len, FILE *stream) {
 }
 
 // New strucutre to host user info
-struct sst_auth
-{
+struct sst_auth {
   std::string remote_name_;
   std::string remote_pswd_;
 };
@@ -287,14 +286,14 @@ struct sst_auth
 struct sst_thread_arg {
   const char *cmd;
   char **env;
-  const sst_auth& auth_container;
+  const sst_auth &auth_container;
   char *ret_str;
   int err;
 
   mysql_mutex_t LOCK_wsrep_sst_thread;
   mysql_cond_t COND_wsrep_sst_thread;
 
-  sst_thread_arg(const char *c, char **e, sst_auth& auth)
+  sst_thread_arg(const char *c, char **e, sst_auth &auth)
       : cmd(c), env(e), auth_container(auth), ret_str(0), err(-1) {
     mysql_mutex_init(key_LOCK_wsrep_sst_thread, &LOCK_wsrep_sst_thread,
                      MY_MUTEX_INIT_FAST);
@@ -319,8 +318,6 @@ struct sst_logger_thread_arg {
     err_pipe = NULL;
   }
 };
-
-
 
 static enum loglevel string_to_loglevel(const char *s) {
   if (strncmp(s, "ERR:", 4) == 0)
@@ -711,7 +708,8 @@ static void *sst_joiner_thread(void *a) {
 static void reset_ld_preload(wsp::env &env) { env.append("LD_PRELOAD="); }
 #endif
 
-static ssize_t sst_prepare_other(const char *method, const char *addr_in, const char **addr_out) {
+static ssize_t sst_prepare_other(const char *method, const char *addr_in,
+                                 const char **addr_out) {
   int const cmd_len = 4096;
   wsp::string cmd_str(cmd_len);
 
@@ -805,12 +803,14 @@ std::string wsrep_sst_prepare() {
     /* Inform Galera that we are done with SST and it can proceed with IST.
     In fact the following call will wait until the server is fully initialized
     and then inform Galera about two things:
-    1. call sst_received() - so from Galera's point of view it looks like we are done with
-                             sst
-    2. return empty string from this function - informs Galera that only IST should
-       be processed.*/
-    WSREP_WARN("State Transfer via SST was prohibited by setting wsrep_sst_method=ist_only. "
-               "The node will try to join the cluster using only IST.");
+    1. call sst_received() - so from Galera's point of view it looks like we are
+    done with sst
+    2. return empty string from this function - informs Galera that only IST
+    should be processed.*/
+    WSREP_WARN(
+        "State Transfer via SST was prohibited by setting "
+        "wsrep_sst_method=ist_only. "
+        "The node will try to join the cluster using only IST.");
     wsrep_sst_complete(current_thd, 0);
     return WSREP_STATE_TRANSFER_NO_SST;
   }
@@ -1195,20 +1195,22 @@ static int wsrep_create_sst_user(bool initialize_thread, const char *password) {
   // The second entry is the string to be displayed if the query fails
   //  (this can be NULL, in which case the actual query will be used)
   const char *cmds[] = {
-    "SET SESSION sql_log_bin = OFF;",
-    nullptr,
-    "DROP USER IF EXISTS 'mysql.pxc.sst.user'@localhost;",
-    nullptr,
-    "CREATE USER 'mysql.pxc.sst.user'@localhost "
-    " IDENTIFIED BY '%s' ACCOUNT LOCK;",
-    "CREATE USER mysql.pxc.sst.user IDENTIFIED WITH * BY * ACCOUNT LOCK",
-    "GRANT 'mysql.pxc.sst.role'@localhost TO 'mysql.pxc.sst.user'@localhost;", nullptr,
-    "SET DEFAULT ROLE 'mysql.pxc.sst.role'@localhost to 'mysql.pxc.sst.user'@localhost;", nullptr,
-    "ALTER USER 'mysql.pxc.sst.user'@localhost ACCOUNT UNLOCK;",
-    nullptr,
-    nullptr,
-    nullptr
-  };
+      "SET SESSION sql_log_bin = OFF;",
+      nullptr,
+      "DROP USER IF EXISTS 'mysql.pxc.sst.user'@localhost;",
+      nullptr,
+      "CREATE USER 'mysql.pxc.sst.user'@localhost "
+      " IDENTIFIED BY '%s' ACCOUNT LOCK;",
+      "CREATE USER mysql.pxc.sst.user IDENTIFIED WITH * BY * ACCOUNT LOCK",
+      "GRANT 'mysql.pxc.sst.role'@localhost TO 'mysql.pxc.sst.user'@localhost;",
+      nullptr,
+      "SET DEFAULT ROLE 'mysql.pxc.sst.role'@localhost to "
+      "'mysql.pxc.sst.user'@localhost;",
+      nullptr,
+      "ALTER USER 'mysql.pxc.sst.user'@localhost ACCOUNT UNLOCK;",
+      nullptr,
+      nullptr,
+      nullptr};
 
   wsrep_allow_server_session = true;
   session = setup_server_session(initialize_thread);
@@ -1345,17 +1347,14 @@ static void *sst_donor_thread(void *a) {
     }
 
     // if remote user is defined we will pass the user-name/password pair
-    if (auth.remote_name_.length())
-    {
-      ret= fprintf(proc.write_pipe(),
-                   "sst_remote_user=%s\n"
-                   "sst_remote_password=%s\n",
-                   auth.remote_name_.c_str(),
-                   auth.remote_pswd_.c_str());
-      if (ret < 0)
-      {
+    if (auth.remote_name_.length()) {
+      ret = fprintf(proc.write_pipe(),
+                    "sst_remote_user=%s\n"
+                    "sst_remote_password=%s\n",
+                    auth.remote_name_.c_str(), auth.remote_pswd_.c_str());
+      if (ret < 0) {
         WSREP_ERROR("sst_donor_thread(): fprintf(2) failed: %d", ret);
-        err= (ret < 0 ? ret : -EMSGSIZE);
+        err = (ret < 0 ? ret : -EMSGSIZE);
       }
     }
 
@@ -1466,7 +1465,7 @@ static void *sst_donor_thread(void *a) {
 
 static int sst_donate_other(const char *method, const char *addr,
                             const wsrep::gtid &gtid, bool bypass,
-                            sst_auth&auth, char **env)  // carries auth info
+                            sst_auth &auth, char **env)  // carries auth info
 {
   int const cmd_len = 4096;
   wsp::string cmd_str(cmd_len);
@@ -1589,7 +1588,8 @@ static bool is_sst_request_valid(const std::string &msg) {
   return true;
 }
 
-int wsrep_sst_donate(const std::string &msg, const wsrep::gtid &current_gtid, const bool bypass) {
+int wsrep_sst_donate(const std::string &msg, const wsrep::gtid &current_gtid,
+                     const bool bypass) {
   /* This will be reset when sync callback is called.
    * Should we set wsrep_ready to false here too? */
   local_status.set(wsrep::server_state::s_donor);
@@ -1618,21 +1618,19 @@ int wsrep_sst_donate(const std::string &msg, const wsrep::gtid &current_gtid, co
     return WSREP_CB_FAILURE;
   }
 
-
   /*
   [start]
   section to support clone user/pw
   check for auth@addr separator
   */
-  const char* addr= strrchr(data, '@');
+  const char *addr = strrchr(data, '@');
   wsp::string remote_auth;
   if (addr) {
     remote_auth.set(strndup(data, addr - data));
     addr++;
-  }
-  else {
+  } else {
     // no auth part
-    addr= data;
+    addr = data;
   }
 
   /* Set up auth info (from <user>:<password> strings) */
@@ -1640,7 +1638,7 @@ int wsrep_sst_donate(const std::string &msg, const wsrep::gtid &current_gtid, co
   if (remote_auth()) {
     /* wsp::string is just a dynamically allocated char* underneath
      * so we can safely do all that arithmetics */
-    const char* col= strchrnul(remote_auth(), ':');
+    const char *col = strchrnul(remote_auth(), ':');
     auth.remote_name_ = std::string(remote_auth(), col - remote_auth());
     auth.remote_pswd_ = std::string(':' == *col ? col + 1 : "");
   }
@@ -1675,4 +1673,3 @@ int wsrep_sst_donate(const std::string &msg, const wsrep::gtid &current_gtid, co
   assert(ret <= 0);
   return (ret >= 0 ? WSREP_CB_SUCCESS : WSREP_CB_FAILURE);
 }
-
