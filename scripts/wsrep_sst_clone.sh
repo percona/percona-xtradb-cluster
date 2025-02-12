@@ -64,13 +64,12 @@
 #----------------------------------------------------------------------------
 # Config variables:
 # [sst]
-# netcat_port=4442
 # wsrep-debug=true
 #
 # NOTE for SSL usage
 # When using clone SSL certificates MUST be manually (or by automation) placed in a location on both servers DONOR/RECEIVER
 # this location better not be the data directory given it is manipulated by the clone process.
-# It is reccomended to explicitly set the ssl certificates in the my.cnf as:
+# It is recommended to explicitly set the ssl certificates in the my.cnf as:
 # [client]
 #   ssl-ca = /<path>/ca.pem
 #   ssl-cert = /<path>/client-cert.pem
@@ -165,30 +164,6 @@ wsrep_mktemp_in_dir()
     else
         echo $(export TMPDIR="$tmpdir"; mktemp $*)
     fi
-}
-
-wsrep_check_program()
-{
-    local prog=$1
-
-    if ! command -v $prog >/dev/null
-    then
-        echo "'$prog' not found in PATH"
-        return 2 # ENOENT no such file or directory
-    fi
-}
-
-wsrep_check_programs()
-{
-    local ret=0
-
-    while [ $# -gt 0 ]
-    do
-        wsrep_check_program $1 || ret=$?
-        shift
-    done
-
-    return $ret
 }
 
 # Generate a string equivalent to 16 random bytes
