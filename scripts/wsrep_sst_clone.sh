@@ -97,7 +97,6 @@ readonly ENODATA=61
 CLEANUP_CLONE_PLUGIN=""
 CLEANUP_CLONE_SSL=""
 CLONE_USER=""
-PARENT_PID=""
 NC_PID=""
 CLONE_INSTANCE_PID=""
 
@@ -130,15 +129,7 @@ wsrep_log_info "Running: $CMDLINE"
 # READ user/pw from stdin
 read_variables_from_stdin
 
-MYPID=$$
-
-if [ "$WSREP_SST_OPT_PARENT" == "" ]; then
-        PARENT_PID=$(cat /proc/$MYPID/status | grep PPid)
-    else
-        PARENT_PID=$WSREP_SST_OPT_PARENT
-fi
 readonly WSREP_SST_OPT_ADDR_LOCAL=`echo $WSREP_SST_OPT_ADDR |tr ] @`
-wsrep_log_debug "-> MYPID: $MYPID PARENT PID $PARENT_PID"
 wsrep_log_debug "-> WSREP_SST_OPT_HOST: $WSREP_SST_OPT_HOST"
 wsrep_log_debug "-> WSREP_SST_OPT_USER: $WSREP_SST_OPT_USER"
 #wsrep_log_debug "-> WSREP_SST_OPT_PSWD: $WSREP_SST_OPT_PSWD"
@@ -985,7 +976,12 @@ then
     ##################################################################################################
     # If we need to SST in any case we must remove the data, so let us do it here and be sure we work on a clean directory
     wsrep_log_info "Cleaning Data directory $WSREP_SST_OPT_DATA"
-    rm -fr "${WSREP_SST_OPT_DATA:?}"/*
+    ib_home_dir=$(parse_cnf mysqld innodb-data-home-dir "")
+    ib_log_dir=$(parse_cnf mysqld innodb-log-group-home-dir "")
+    ib_undo_dir=$(parse_cnf mysqld innodb-undo-directory "")
+
+    cpat=$(parse_cnf sst cpat '.*\.pem$\|.*init\.ok$\|.*galera\.cache$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$\|.*component_keyring_.*\.cnf$\|.*mysqld.my$')
+    find $ib_home_dir $ib_log_dir $ib_undo_dir $WSREP_SST_OPT_DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>/dev/null \+
 
     # Before starting let us be sure we remove Netcat given it is using same MySQL port
     # check if there is another netcat process on the IP port we need and try to kill it.
@@ -1019,7 +1015,7 @@ then
       exit 1 )
 
     # Move initialized data directory structure to real datadir and cleanup
-    mv --force "$tmp_datadir"/* "$WSREP_SST_OPT_DATA/"
+    mv -n "$tmp_datadir"/* "$WSREP_SST_OPT_DATA/"
     sleep 2
     wsrep_log_debug "-> REMOVE $tmp_datadir"
     rm -rf "$tmp_datadir"
@@ -1096,7 +1092,7 @@ EOF
     wsrep_log_info "Waiting for clone recipient daemon to finish"
 
     set +e
-    monitor_sst_progress "${MYSQL_ACLIENT} -NB -e 'SELECT * FROM performance_schema.clone_progress;'" ${WSREP_SST_IDLE_TIMEOUT} ${CLONE_INSTANCE_PID} ${PARENT_PID}
+    monitor_sst_progress "${MYSQL_ACLIENT} -NB -e 'SELECT * FROM performance_schema.clone_progress;'" ${WSREP_SST_IDLE_TIMEOUT} ${CLONE_INSTANCE_PID} ${WSREP_SST_OPT_PARENT}
     status=$?
     set -e
 
@@ -1199,7 +1195,6 @@ EOF
         wsrep_log_debug "->SENDING MESSAGE: $RP_PURGED"
         echo $RP_PURGED >&2
         echo $RP_PURGED
-        exit 0
         # exit 0 is at the end of the script, after printing the message
 else
     wsrep_log_error "Unrecognized role: '$WSREP_SST_OPT_ROLE'"
