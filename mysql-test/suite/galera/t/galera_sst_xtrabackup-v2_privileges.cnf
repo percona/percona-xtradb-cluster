@@ -1,0 +1,9 @@
+!include ../galera_2nodes.cnf
+
+[mysqld]
+wsrep_sst_method=xtrabackup-v2
+wsrep_debug=1
+
+[xtrabackup]
+redo-log-arch-dir='backup1:@ENV.MYSQL_TMP_DIR/mysqld.1/redo-log-arch-dir'
+
