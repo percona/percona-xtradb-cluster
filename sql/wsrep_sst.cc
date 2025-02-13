@@ -1588,6 +1588,11 @@ static bool is_sst_request_valid(const std::string &msg) {
   return true;
 }
 
+static std::string mask_password_in_string(const std::string &str) {
+  static std::regex password_regex(R"(:[^@]+@)");
+  return std::regex_replace(str, password_regex, ":********@");
+}
+
 int wsrep_sst_donate(const std::string &msg, const wsrep::gtid &current_gtid,
                      const bool bypass) {
   /* This will be reset when sync callback is called.
@@ -1602,7 +1607,8 @@ int wsrep_sst_donate(const std::string &msg, const wsrep::gtid &current_gtid,
       else
         ss << "<nullptr>";
     });
-    WSREP_ERROR("Invalid sst_request: %s", ss.str().c_str());
+    WSREP_ERROR("Invalid sst_request: %s",
+                mask_password_in_string(ss.str()).c_str());
     return WSREP_CB_FAILURE;
   }
 
