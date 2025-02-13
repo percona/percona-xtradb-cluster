@@ -100,8 +100,8 @@ CLONE_USER=""
 NC_PID=""
 CLONE_INSTANCE_PID=""
 
-# The following variable will store the position (GTID:POS) coming from the donor in the message exchange. 
-# It will be used ONLY in emergency as last measure if for any reason the position recovery (at the end) will fail 
+# The following variable will store the position (GTID:POS) coming from the donor in the message exchange.
+# It will be used ONLY in emergency as last measure if for any reason the position recovery (at the end) will fail
 RP_PURGED_EMERGENCY=""
 WSREP_SST_OPT_LPORT=""
 WSREP_SST_OPT_PARENT=""
@@ -652,8 +652,8 @@ EOF
 
 
         # We force the signal to be 0 because we KNOW that with clone when using the mysqld directly (not mysqld_safe) the daemon is shutdown at the end of the clone process.
-        # However an error is returned because server cannot be restarted 
-        # This error does not indicate a cloning failure. It means that the recipient MySQL server instance must be started again manually after the data is cloned. 
+        # However an error is returned because server cannot be restarted
+        # This error does not indicate a cloning failure. It means that the recipient MySQL server instance must be started again manually after the data is cloned.
         if [ "$RC" -ne 0 ]; then
             RC=0
             wsrep_log_debug " JOINER CLONE ACTION abruptly terminated, but we can continue"
@@ -948,24 +948,50 @@ then
     if ! grep -q "SST@" "$WSREP_SST_OPT_DATA/XST_FILE.txt"; then
         wsrep_log_info "DONOR SAY IST"
         wsrep_log_debug "-> RECOVER POSITION TO SEND OUT DONOR IST"
-         RP_PURGED=`cat $WSREP_SST_OPT_DATA/XST_FILE.txt`
-         RP_PURGED=${RP_PURGED%"<EOF>"}
-         wsrep_log_debug "-> POSITION: $RP_PURGED"
-         rm -f  $WSREP_SST_OPT_DATA/XST_FILE.txt || :
+        RP_PURGED=`cat $WSREP_SST_OPT_DATA/XST_FILE.txt`
+        RP_PURGED=${RP_PURGED%"<EOF>"}
+        wsrep_log_debug "-> POSITION: $RP_PURGED"
+        rm -f  $WSREP_SST_OPT_DATA/XST_FILE.txt || :
 
-         echo $RP_PURGED
-         exit 0
+        echo $RP_PURGED
+        exit 0
     else
-         RP_PURGED=`cat $WSREP_SST_OPT_DATA/XST_FILE.txt`
-         wsrep_log_info "DONOR SAY SST ($RP_PURGED)"
-         readonly CLEANUP_CLONE_PLUGIN=${RP_PURGED%|SST*}
-         RP_PURGED_EMERGENCY=${RP_PURGED#*SST@}
-         RP_PURGED_EMERGENCY=${RP_PURGED_EMERGENCY%"<EOF>"}
-         wsrep_log_debug "-> CLONE Plugin to remove? (yes/no) = $CLEANUP_CLONE_PLUGIN"
-         wsrep_log_debug "-> recovered position from DONOR: $RP_PURGED_EMERGENCY"
+        RP_PURGED=`cat $WSREP_SST_OPT_DATA/XST_FILE.txt`
+        wsrep_log_info "DONOR SAY SST ($RP_PURGED)"
+        readonly CLEANUP_CLONE_PLUGIN=${RP_PURGED%|SST*}
+        RP_PURGED_EMERGENCY=${RP_PURGED#*SST@}
+        RP_PURGED_EMERGENCY=${RP_PURGED_EMERGENCY%"<EOF>"}
+        wsrep_log_debug "-> CLONE Plugin to remove? (yes/no) = $CLEANUP_CLONE_PLUGIN"
+        wsrep_log_debug "-> recovered position from DONOR: $RP_PURGED_EMERGENCY"
     fi
 
     ##################################################################################################
+    # innodb_sys_tablespace_encrypt=1 requires keyring to be loaded at bootstrap
+    # and it will work only with global manifest. So if it is enabled, and we use
+    # local manifest/keyring config, we need to exit with error
+    sys_tbl_enc_enabled=$(parse_cnf mysqld innodb_sys_tablespace_encrypt "off")
+    sys_tbl_enc_enabled=$(normalize_boolean "$sys_tbl_enc_enabled" "off")
+    if [ "$sys_tbl_enc_enabled" = "on" ]; then
+        # sys_tablespace_encrypt will work only if we have global manifest and global config
+        mainfest_config_type=$(get_keyring_manifest_and_config_types $WSREP_SST_OPT_DATA $WSREP_SST_OPT_PLUGINDIR $CLONE_BINARY)
+        wsrep_log_debug "mainfest_config_type: $mainfest_config_type"
+        if [ "$mainfest_config_type" != "manifest=global;config=global" ]; then
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "Joiner is configured to use system tablespace encryption."
+            wsrep_log_error "Joiner is also configured to use local manifest"
+            wsrep_log_error "or local keyring config file or to not use keyring at all."
+            wsrep_log_error "These options are not compatible. Either disable system"
+            wsrep_log_error "tablespace encryption or configure joiner to use global"
+            wsrep_log_error "manifest and keyring component config."
+            wsrep_log_error "Current config:"
+            wsrep_log_error "innodb_sys_tablespace_encrypt=$sys_tbl_enc_enabled"
+            wsrep_log_error "$mainfest_config_type"
+            wsrep_log_error "Line $LINENO"
+            wsrep_log_error "****************************************************** "
+            exit 1
+        fi
+    fi
+
     # If we need to SST in any case we must remove the data, so let us do it here and be sure we work on a clean directory
     wsrep_log_info "Cleaning Data directory $WSREP_SST_OPT_DATA"
     ib_home_dir=$(parse_cnf mysqld innodb-data-home-dir "")
@@ -994,9 +1020,19 @@ then
     # actual datadir may already contain some wsrep-related files
     wsrep_log_info "Initializing data directory at $tmp_datadir"
 
+    # Disable any option that would reqiure keyring component.
+    # All of them can be safely disabled during the initialization and enabled
+    # later. We disable them, to handle the case when joiner has local manifest
+    # or keyring component config. In such a case it won't be possible to initialize
+    # the datadir, because mysqld expects an empty dir (no manifest, no config)
+    # The case when my.cnf has innodb_sys_tablespace_encrypt=1 is checked above,
+    # so at this point there is innodb_sys_tablespace_encrypt=0 or manifest and
+    # config are both global.
+    CLONE_BOOTSTRAP_EXTRA=" --innodb-undo-log-encrypt=0 --innodb-redo-log-encrypt=0 --innodb-temp-tablespace-encrypt=0 --default-table-encryption=0 --innodb-encrypt-online-alter-logs=0 --binlog-encryption=0"
+
     echo "" > $CLONE_ERR
     eval $CLONE_ENV $CLONE_BINARY $DEFAULT_OPTIONS \
-         $SKIP_NETWORKING_OPTIONS \
+         $SKIP_NETWORKING_OPTIONS $CLONE_BOOTSTRAP_EXTRA \
          --initialize-insecure --wsrep_provider=none --datadir="$tmp_datadir" >> $CLONE_ERR 2>&1 || \
     ( wsrep_log_error "Failed to initialize data directory. Some hints below:"
       grep '[ERROR]' $CLONE_ERR | cut -d ']' -f 4- | while read msg
