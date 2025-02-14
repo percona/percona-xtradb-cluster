@@ -56,6 +56,7 @@ mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	Y
 mysql.pxc.sst.role	localhost	CLONE_ADMIN	N
 mysql.pxc.sst.role	localhost	CONNECTION_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
 mysql.pxc.sst.role	localhost	SYSTEM_USER	N
 mysql.pxc.sst.role	localhost	SYSTEM_VARIABLES_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
@@ -159,6 +160,7 @@ mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	Y
 mysql.pxc.sst.role	localhost	CLONE_ADMIN	N
 mysql.pxc.sst.role	localhost	CONNECTION_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
 mysql.pxc.sst.role	localhost	SYSTEM_USER	N
 mysql.pxc.sst.role	localhost	SYSTEM_VARIABLES_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
@@ -261,6 +263,7 @@ mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	Y
 mysql.pxc.sst.role	localhost	CLONE_ADMIN	N
 mysql.pxc.sst.role	localhost	CONNECTION_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
 mysql.pxc.sst.role	localhost	SYSTEM_USER	N
 mysql.pxc.sst.role	localhost	SYSTEM_VARIABLES_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
@@ -376,6 +379,7 @@ mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	Y
 mysql.pxc.sst.role	localhost	CLONE_ADMIN	N
 mysql.pxc.sst.role	localhost	CONNECTION_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
 mysql.pxc.sst.role	localhost	SYSTEM_USER	N
 mysql.pxc.sst.role	localhost	SYSTEM_VARIABLES_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
@@ -483,6 +487,7 @@ mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	Y
 mysql.pxc.sst.role	localhost	CLONE_ADMIN	N
 mysql.pxc.sst.role	localhost	CONNECTION_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
 mysql.pxc.sst.role	localhost	SYSTEM_USER	N
 mysql.pxc.sst.role	localhost	SYSTEM_VARIABLES_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
@@ -585,6 +590,7 @@ mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	Y
 mysql.pxc.sst.role	localhost	CLONE_ADMIN	N
 mysql.pxc.sst.role	localhost	CONNECTION_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
 mysql.pxc.sst.role	localhost	SYSTEM_USER	N
 mysql.pxc.sst.role	localhost	SYSTEM_VARIABLES_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
@@ -710,6 +716,7 @@ mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	Y
 mysql.pxc.sst.role	localhost	CLONE_ADMIN	N
 mysql.pxc.sst.role	localhost	CONNECTION_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
 mysql.pxc.sst.role	localhost	SYSTEM_USER	N
 mysql.pxc.sst.role	localhost	SYSTEM_VARIABLES_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
@@ -826,6 +833,7 @@ mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	Y
 mysql.pxc.sst.role	localhost	CLONE_ADMIN	N
 mysql.pxc.sst.role	localhost	CONNECTION_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
 mysql.pxc.sst.role	localhost	SYSTEM_USER	N
 mysql.pxc.sst.role	localhost	SYSTEM_VARIABLES_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
@@ -950,6 +958,7 @@ mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	Y
 mysql.pxc.sst.role	localhost	CLONE_ADMIN	N
 mysql.pxc.sst.role	localhost	CONNECTION_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
 mysql.pxc.sst.role	localhost	SYSTEM_USER	N
 mysql.pxc.sst.role	localhost	SYSTEM_VARIABLES_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
