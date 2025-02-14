@@ -129,7 +129,7 @@ wsrep_log_info "Running: $CMDLINE"
 
 # READ user/pw from stdin
 read_variables_from_stdin
-readonly WSREP_SST_OPT_ADDR_LOCAL=$(echo "$WSREP_SST_OPT_ADDR" |tr ] @)
+readonly WSREP_SST_OPT_ADDR_LOCAL=$WSREP_SST_OPT_ADDR
 wsrep_log_debug "-> WSREP_SST_OPT_HOST: $WSREP_SST_OPT_HOST"
 wsrep_log_debug "-> WSREP_SST_OPT_USER: $WSREP_SST_OPT_USER"
 #wsrep_log_debug "-> WSREP_SST_OPT_PSWD: $WSREP_SST_OPT_PSWD"
@@ -339,6 +339,7 @@ setup_clone_plugin()
     CLIENT_SSL_VALID="no"
     SERVER_SSL_VALID="no"
 
+    # Checking CLient certificates
     wsrep_log_debug ":->(PRE) CLIENT_SSL_VALID=$CLIENT_SSL_VALID SERVER_SSL_VALID=$SERVER_SSL_VALID"
     # Client information must check on both side to allow connection from Donor to Joiner
     wsrep_log_debug "-> CLONE_SSL_CERT: $CLONE_SSL_CERT; CLONE_SSL_KEY: $CLONE_SSL_KEY; CLONE_SSL_CA: $CLONE_SSL_CA"
@@ -373,62 +374,57 @@ setup_clone_plugin()
             $MYSQL_ACLIENT -e "SET GLOBAL clone_ssl_cert='$CLONE_SSL_CERT'"
             $MYSQL_ACLIENT -e "SET GLOBAL clone_ssl_key='$CLONE_SSL_KEY'"
             $MYSQL_ACLIENT -e "SET GLOBAL clone_ssl_ca='$CLONE_SSL_CA'"
-            # For the joiner if the client certificates are valid that is enough
-            # we set the SERVER_SSL_VALID as true
-            SERVER_SSL_VALID="yes"
-        fi
+         fi
         # We set that client certificates are valid
         CLIENT_SSL_VALID="yes"
     else
         wsrep_log_info "CLONE SSL variables and SSL client are not correctly set: @@clone_ssl_cert='$CLONE_SSL_CERT', @@clone_ssl_key='$CLONE_SSL_KEY'"
     fi
 
-    if [ "$ROLE" == "donor" ]
-    then
-        # Check that we have all the files
-        # If they have not been explicitly specified, check the datadir
-        if [ -z "$SERVER_SSL_CA" ]; then
-            if [ -r "$DATA/ca.pem" ]; then
-                SERVER_SSL_CA="$DATA/ca.pem"
-            else
-                wsrep_log_error "******************* FATAL ERROR ********************** "
-                wsrep_log_error "* Could not find a CA (Certificate Authority) file.  "
-                wsrep_log_error "* Please specify a CA file with the 'ssl-ca' option. "
-                wsrep_log_error "* Line $LINENO"
-                wsrep_log_error "**************************************************** "
-                return 2
-            fi
-        fi
-        if [ -z "$SERVER_SSL_CERT" ]; then
-            if [ -r "$DATA/server-cert.pem" ]; then
-                SERVER_SSL_CERT="$DATA/server-cert.pem"
-            else
-                wsrep_log_error "******************* FATAL ERROR ********************** "
-                wsrep_log_error "* Could not find a certificate file.                            "
-                wsrep_log_error "* Please specify a certificate file with the 'ssl-cert' option. "
-                wsrep_log_error "* Line $LINENO"
-                wsrep_log_error "****************************************************** "
-                return 2
-            fi
-        fi
-        if [ -z "$SERVER_SSL_KEY" ]; then
-            if [ -r "$DATA/server-key.pem" ]; then
-                SERVER_SSL_KEY="$DATA/server-key.pem"
-            else
-                wsrep_log_error "******************* FATAL ERROR ********************** "
-                wsrep_log_error "* Could not find a key file.                           "
-                wsrep_log_error "* Please specify a key file with the 'ssl-key' option. "
-                wsrep_log_error "* Line $LINENO"
-                wsrep_log_error "****************************************************** "
-                return 2
-            fi
-        fi
-        if [ -n "$SERVER_SSL_CA" ] && [ -n "$SERVER_SSL_CERT" ] && [ -n "$SERVER_SSL_KEY" ]
-        then
-            SERVER_SSL_VALID="yes"
+    # Checking Server certificates
+    # Check that we have all the files
+    # If they have not been explicitly specified, check the datadir
+    if [ -z "$SERVER_SSL_CA" ]; then
+        if [ -r "$DATA/ca.pem" ]; then
+            SERVER_SSL_CA="$DATA/ca.pem"
         else
-            SERVER_SSL_VALID="no"
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "* Could not find a CA (Certificate Authority) file.  "
+            wsrep_log_error "* Please specify a CA file with the 'ssl-ca' option. "
+            wsrep_log_error "* Line $LINENO"
+            wsrep_log_error "**************************************************** "
+            return 2
         fi
+    fi
+    if [ -z "$SERVER_SSL_CERT" ]; then
+        if [ -r "$DATA/server-cert.pem" ]; then
+            SERVER_SSL_CERT="$DATA/server-cert.pem"
+        else
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "* Could not find a certificate file.                            "
+            wsrep_log_error "* Please specify a certificate file with the 'ssl-cert' option. "
+            wsrep_log_error "* Line $LINENO"
+            wsrep_log_error "****************************************************** "
+            return 2
+        fi
+    fi
+    if [ -z "$SERVER_SSL_KEY" ]; then
+        if [ -r "$DATA/server-key.pem" ]; then
+            SERVER_SSL_KEY="$DATA/server-key.pem"
+        else
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "* Could not find a key file.                           "
+            wsrep_log_error "* Please specify a key file with the 'ssl-key' option. "
+            wsrep_log_error "* Line $LINENO"
+            wsrep_log_error "****************************************************** "
+            return 2
+        fi
+    fi
+    if [ -n "$SERVER_SSL_CA" ] && [ -n "$SERVER_SSL_CERT" ] && [ -n "$SERVER_SSL_KEY" ]
+    then
+        SERVER_SSL_VALID="yes"
+    else
+        SERVER_SSL_VALID="no"
     fi
 
     # We reset the variable to pass ssl information and will fill it only if both SERVER and CLIENT 
