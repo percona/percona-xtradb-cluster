@@ -1394,7 +1394,7 @@ INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'lo
 
 # These are the values for sst_xtrabackup
 #  (needed by sst_xtrabackup):
-#  GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.* TO 'mysql.pxc.sst.role'@localhost;
+#  GRANT BACKUP_ADMIN, INNODB_REDO_LOG_ARCHIVE, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.* TO 'mysql.pxc.sst.role'@localhost;
 #  GRANT ALTER, CREATE, SELECT, INSERT ON PERCONA_SCHEMA.xtrabackup_history TO 'mysql.pxc.sst.role'@localhost;
 #  GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost;
 #  GRANT CREATE ON PERCONA_SCHEMA.* to 'mysql.pxc.sst.role'@localhost;
@@ -1414,6 +1414,7 @@ INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.sst.role','N','N','
 
 #  pxb-sst
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'BACKUP_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'INNODB_REDO_LOG_ARCHIVE', 'N');
 INSERT IGNORE INTO mysql.tables_priv VALUES ('localhost', 'PERCONA_SCHEMA', 'mysql.pxc.sst.role', 'xtrabackup_history', 'root\@localhost', CURRENT_TIMESTAMP, 'Alter,Select,Insert,Create', '');
 INSERT IGNORE INTO mysql.db VALUES ('localhost', 'PERCONA_SCHEMA', 'mysql.pxc.sst.role','N','N','N','N','Y','N','N','N','N','N','N','N','N','N','N','N','N','N','N');
 

@@ -98,7 +98,7 @@ CREATE ROLE 'mysql.pxc.sst.role'@localhost;
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'mysql.pxc.sst.role'@localhost;
 
 -- Needed by sst_xtrabackup-v2
-GRANT LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.* TO 'mysql.pxc.sst.role'@localhost;
+GRANT LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER, INNODB_REDO_LOG_ARCHIVE ON *.* TO 'mysql.pxc.sst.role'@localhost;
 GRANT ALTER, CREATE, SELECT, INSERT ON PERCONA_SCHEMA.xtrabackup_history TO 'mysql.pxc.sst.role'@localhost;
 
 -- Common. WITH GRANT OPTION is needed by clone-sst script
