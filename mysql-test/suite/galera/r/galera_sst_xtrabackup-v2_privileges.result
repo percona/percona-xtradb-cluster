@@ -1,0 +1,2 @@
+# restart
+include/assert_grep.inc [Check that innobackup.backup.log doesn't contain privilege-related errors]

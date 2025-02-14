@@ -1678,8 +1678,6 @@ mysql_mutex_t LOCK_wsrep_slave_threads;
 mysql_cond_t COND_wsrep_slave_threads;
 mysql_mutex_t LOCK_wsrep_cluster_config;
 mysql_mutex_t LOCK_wsrep_desync;
-mysql_mutex_t LOCK_wsrep_group_commit;
-mysql_cond_t COND_wsrep_group_commit;
 mysql_mutex_t LOCK_wsrep_SR_pool;
 mysql_mutex_t LOCK_wsrep_SR_store;
 mysql_mutex_t LOCK_wsrep_alter_tablespace;
@@ -3202,8 +3200,6 @@ static void clean_up_mutexes() {
   mysql_cond_destroy(&COND_wsrep_slave_threads);
   mysql_mutex_destroy(&LOCK_wsrep_cluster_config);
   mysql_mutex_destroy(&LOCK_wsrep_desync);
-  mysql_mutex_destroy(&LOCK_wsrep_group_commit);
-  mysql_cond_destroy(&COND_wsrep_group_commit);
   mysql_mutex_destroy(&LOCK_wsrep_SR_pool);
   mysql_mutex_destroy(&LOCK_wsrep_SR_store);
   mysql_mutex_destroy(&LOCK_wsrep_alter_tablespace);
@@ -6205,9 +6201,6 @@ static int init_thread_environment() {
                    MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_wsrep_desync, &LOCK_wsrep_desync,
                    MY_MUTEX_INIT_FAST);
-  mysql_mutex_init(key_LOCK_wsrep_group_commit, &LOCK_wsrep_group_commit,
-                   MY_MUTEX_INIT_FAST);
-  mysql_cond_init(key_COND_wsrep_group_commit, &COND_wsrep_group_commit);
   mysql_mutex_init(key_LOCK_wsrep_SR_pool, &LOCK_wsrep_SR_pool,
                    MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_wsrep_SR_store, &LOCK_wsrep_SR_store,
@@ -13806,7 +13799,6 @@ PSI_mutex_key key_LOCK_wsrep_slave_threads;
 PSI_mutex_key key_LOCK_wsrep_cluster_config;
 PSI_mutex_key key_LOCK_wsrep_desync;
 
-PSI_mutex_key key_LOCK_wsrep_group_commit;
 PSI_mutex_key key_LOCK_wsrep_SR_pool;
 PSI_mutex_key key_LOCK_wsrep_SR_store;
 
@@ -13931,7 +13923,6 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOCK_wsrep_cluster_config, "LOCK_wsrep_cluster_config", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_wsrep_desync, "LOCK_wsrep_desync", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
 
-  { &key_LOCK_wsrep_group_commit, "LOCK_wsrep_group_commit", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_wsrep_SR_pool, "LOCK_wsrep_SR_pool", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_wsrep_SR_store, "LOCK_wsrep_SR_store", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
 
@@ -14019,7 +14010,6 @@ PSI_cond_key key_COND_wsrep_thd;
 PSI_cond_key key_COND_wsrep_sst_thread;
 
 PSI_cond_key key_COND_wsrep_thd_queue;
-PSI_cond_key key_COND_wsrep_group_commit;
 #endif /* WITH_WSREP */
 
 PSI_cond_key key_RELAYLOG_update_cond;
@@ -14086,7 +14076,6 @@ static PSI_cond_info all_server_conds[]=
   { &key_COND_wsrep_sst_thread, "COND_wsrep_sst_thread", 0, 0, PSI_DOCUMENT_ME},
 
   { &key_COND_wsrep_thd_queue, "COND_wsrep_thd_queue", 0, 0, PSI_DOCUMENT_ME},
-  { &key_COND_wsrep_group_commit, "COND_wsrep_group_commit", 0, 0, PSI_DOCUMENT_ME}
 #endif /* WITH_WSREP */
 };
 /* clang-format on */
