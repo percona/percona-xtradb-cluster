@@ -323,7 +323,7 @@ setup_clone_plugin()
     CLIENT_SSL_CA=$(parse_cnf sst ssl_ca "")
     CLIENT_SSL_MODE=$(parse_cnf sst ssl_mode "")
 
-    if [ -z "$CLIENT_SSL_CERT" ] || [ "$CLIENT_SSL_CERT" == "" ]
+    if [ -z "$CLIENT_SSL_CERT" ] || [ -z "$CLIENT_SSL_KEY" ] || [ -z "$CLIENT_SSL_CA" ]
     then
         CLIENT_SSL_CERT=$(parse_cnf client ssl_cert "")
         CLIENT_SSL_KEY=$(parse_cnf client ssl_key "")
@@ -339,14 +339,14 @@ setup_clone_plugin()
     CLIENT_SSL_VALID="no"
     SERVER_SSL_VALID="no"
 
-    # Checking CLient certificates
+    # Checking client certificates
     wsrep_log_debug ":->(PRE) CLIENT_SSL_VALID=$CLIENT_SSL_VALID SERVER_SSL_VALID=$SERVER_SSL_VALID"
     # Client information must check on both side to allow connection from Donor to Joiner
     wsrep_log_debug "-> CLONE_SSL_CERT: $CLONE_SSL_CERT; CLONE_SSL_KEY: $CLONE_SSL_KEY; CLONE_SSL_CA: $CLONE_SSL_CA"
 
     # We check if ssl certificates for clone are available. These certificates are for the clone
     # process to connect to source. So they are client certificates.
-    if [ "$CLONE_SSL_CERT" == "NULL" ] || [ "$CLONE_SSL_CERT" = "" ]
+    if [ -z "$CLONE_SSL_CERT" ] || [ -z "$CLONE_SSL_KEY" ] || [ -z "$CLONE_SSL_CA" ]
     then
         CLONE_SSL_CERT=$(parse_cnf mysqld clone_ssl_cert "")
         CLONE_SSL_KEY=$(parse_cnf mysqld clone_ssl_key "")
@@ -354,7 +354,7 @@ setup_clone_plugin()
     fi
 
     # If no clone_ssl certificate is found we use the default client ones.
-    if [ "$CLONE_SSL_CERT" == "NULL" ] || [ "$CLONE_SSL_CERT" = "" ] 
+    if [ -z "$CLONE_SSL_CERT" ] || [ -z "$CLONE_SSL_KEY" ] || [ -z "$CLONE_SSL_CA" ]
     then
         wsrep_log_info "CLONE SSL not configured. We assign client SSL certificates"
         CLONE_SSL_CERT=$CLIENT_SSL_CERT
@@ -362,64 +362,32 @@ setup_clone_plugin()
         CLONE_SSL_CA=$CLIENT_SSL_CA
     fi
 
-    # We actually modify the variables only if we are on the Joiner
+    # We actually check and modify the CLONE_ variables only if we are on the Joiner
     # and if they are not empty or set to null
-    if [ -n "$CLONE_SSL_CERT" ] && [ -n "$CLONE_SSL_KEY" ] && [ -n "$CLONE_SSL_CA" ]
+    if [ -n "$CLONE_SSL_CERT" ] && [ -n "$CLONE_SSL_KEY" ] && [ -n "$CLONE_SSL_CA" ] && [ "$ROLE" == "recipient" ]
     then
         wsrep_log_info "Using SSL configuration from MySQL Server (client certificates)."
         # We change the variables in the server only if we are on the joiner.
         # There is no need to modify them in Donor
-        if [ "$ROLE" == "recipient" ]
-        then
-            $MYSQL_ACLIENT -e "SET GLOBAL clone_ssl_cert='$CLONE_SSL_CERT'"
-            $MYSQL_ACLIENT -e "SET GLOBAL clone_ssl_key='$CLONE_SSL_KEY'"
-            $MYSQL_ACLIENT -e "SET GLOBAL clone_ssl_ca='$CLONE_SSL_CA'"
-         fi
+        $MYSQL_ACLIENT -e "SET GLOBAL clone_ssl_cert='$CLONE_SSL_CERT'"
+        $MYSQL_ACLIENT -e "SET GLOBAL clone_ssl_key='$CLONE_SSL_KEY'"
+        $MYSQL_ACLIENT -e "SET GLOBAL clone_ssl_ca='$CLONE_SSL_CA'"
         # We set that client certificates are valid
         CLIENT_SSL_VALID="yes"
     else
-        wsrep_log_info "CLONE SSL variables and SSL client are not correctly set: @@clone_ssl_cert='$CLONE_SSL_CERT', @@clone_ssl_key='$CLONE_SSL_KEY'"
+        if [ "$ROLE" == "recipient" ]
+        then
+            wsrep_log_info "CLONE SSL variables and SSL client are not correctly set: @@clone_ssl_cert='$CLONE_SSL_CERT', @@clone_ssl_key='$CLONE_SSL_KEY'"
+        fi
     fi
 
-    # Checking Server certificates
-    # Check that we have all the files
-    # If they have not been explicitly specified, check the datadir
-    if [ -z "$SERVER_SSL_CA" ]; then
-        if [ -r "$DATA/ca.pem" ]; then
-            SERVER_SSL_CA="$DATA/ca.pem"
-        else
-            wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "* Could not find a CA (Certificate Authority) file.  "
-            wsrep_log_error "* Please specify a CA file with the 'ssl-ca' option. "
-            wsrep_log_error "* Line $LINENO"
-            wsrep_log_error "**************************************************** "
-            return 2
-        fi
+    # For donor we check the CLIENT_ certificates that will be used to connect to Joiner
+    if [ -n "$CLIENT_SSL_CA" ] && [ -n "$CLIENT_SSL_CERT" ] && [ -n "$CLIENT_SSL_KEY" ] && [ "$ROLE" == "donor" ]
+    then
+         CLIENT_SSL_VALID="yes"
     fi
-    if [ -z "$SERVER_SSL_CERT" ]; then
-        if [ -r "$DATA/server-cert.pem" ]; then
-            SERVER_SSL_CERT="$DATA/server-cert.pem"
-        else
-            wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "* Could not find a certificate file.                            "
-            wsrep_log_error "* Please specify a certificate file with the 'ssl-cert' option. "
-            wsrep_log_error "* Line $LINENO"
-            wsrep_log_error "****************************************************** "
-            return 2
-        fi
-    fi
-    if [ -z "$SERVER_SSL_KEY" ]; then
-        if [ -r "$DATA/server-key.pem" ]; then
-            SERVER_SSL_KEY="$DATA/server-key.pem"
-        else
-            wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "* Could not find a key file.                           "
-            wsrep_log_error "* Please specify a key file with the 'ssl-key' option. "
-            wsrep_log_error "* Line $LINENO"
-            wsrep_log_error "****************************************************** "
-            return 2
-        fi
-    fi
+
+    # For server we check on both side
     if [ -n "$SERVER_SSL_CA" ] && [ -n "$SERVER_SSL_CERT" ] && [ -n "$SERVER_SSL_KEY" ]
     then
         SERVER_SSL_VALID="yes"
@@ -430,12 +398,10 @@ setup_clone_plugin()
     # We reset the variable to pass ssl information and will fill it only if both SERVER and CLIENT 
     CLIENT_SSL_OPTIONS=""
     wsrep_log_debug ":->(POST) CLIENT_SSL_VALID=$CLIENT_SSL_VALID SERVER_SSL_VALID=$SERVER_SSL_VALID"
-    if [ "$CLIENT_SSL_VALID" == "yes" ] && [ "$SERVER_SSL_VALID" == "yes" ]
+    if [ "$CLIENT_SSL_VALID" == "yes" ]
     then
-        wsrep_log_info "Server SSL settings on $ROLE: CERT=$SERVER_SSL_CERT, KEY=$SERVER_SSL_KEY, CA=$SERVER_SSL_CA"
         wsrep_log_info "Client SSL settings on $ROLE: CERT=$CLIENT_SSL_CERT, KEY=$CLIENT_SSL_KEY, CA=$CLIENT_SSL_CA"
         wsrep_log_info "Clone SSL settings on $ROLE: CERT=$CLONE_SSL_CERT, KEY=$CLONE_SSL_KEY, CA=$CLONE_SSL_CA"
-        REQUIRE_SSL="REQUIRE SSL"
 
         if [ -n "$CLIENT_SSL_CERT" ] && [ -n "$CLIENT_SSL_KEY" ]
         then
@@ -451,6 +417,15 @@ setup_clone_plugin()
                 CLIENT_SSL_OPTIONS+=" --ssl-mode=REQUIRED"
             fi
         fi
+    else
+        wsrep_log_info "No suitable SSL configuration found. Not using SSL for SST."
+        CLIENT_SSL_OPTIONS=" --ssl-mode=DISABLED"
+    fi
+
+    if [ "$SERVER_SSL_VALID" == "yes" ]
+    then
+        wsrep_log_info "Server SSL settings on $ROLE: CERT=$SERVER_SSL_CERT, KEY=$SERVER_SSL_KEY, CA=$SERVER_SSL_CA"
+        REQUIRE_SSL="REQUIRE SSL"
     else
         wsrep_log_info "No suitable SSL configuration found. Not using SSL for SST."
         REQUIRE_SSL=""
