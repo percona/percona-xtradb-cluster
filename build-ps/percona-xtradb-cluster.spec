@@ -187,7 +187,7 @@ Prefix: %{_sysconfdir}
 #%define server_suffix -80
 
 %if 0%{?rhel} > 6
-    %define distro_req           chkconfig nmap
+    %define distro_req           chkconfig nmap nc
 %else
     %define distro_req           chkconfig nc
 %endif
