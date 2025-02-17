@@ -3639,13 +3639,8 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
       return true;
     }
 
-<<<<<<< HEAD
-||||||| 49317865a2f
-
-=======
     Lock_state_list modified_user_lock_state_list;
 
->>>>>>> percona/ps/release-8.0.41-32
     if (check_system_user_privilege(thd, list)) {
       commit_and_close_mysql_tables(thd);
       return true;
