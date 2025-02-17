@@ -5573,7 +5573,7 @@ class handler {
   */
 
   virtual bool is_ignorable_error(int error);
-  MY_NODISCARD virtual bool continue_partition_copying_on_error(
+  [[nodiscard]] virtual bool continue_partition_copying_on_error(
       int error [[maybe_unused]]) {
     return false;
   }
@@ -6798,7 +6798,7 @@ class handler {
     @brief Offload an update to the storage engine. See handler::fast_update()
     for details.
   */
-  MY_NODISCARD int ha_fast_update(THD *thd,
+  [[nodiscard]] int ha_fast_update(THD *thd,
                                   mem_root_deque<Item *> &update_fields,
                                   mem_root_deque<Item *> &update_values,
                                   Item *conds);
@@ -6807,7 +6807,7 @@ class handler {
     @brief Offload an upsert to the storage engine. See handler::upsert()
     for details.
   */
-  MY_NODISCARD int ha_upsert(THD *thd, mem_root_deque<Item *> &update_fields,
+  [[nodiscard]] int ha_upsert(THD *thd, mem_root_deque<Item *> &update_fields,
                              mem_root_deque<Item *> &update_values);
 
  private:
@@ -6830,7 +6830,7 @@ class handler {
     @note HA_READ_BEFORE_WRITE_REMOVAL flag doesn not fit there because
     handler::ha_update_row(...) does not accept conditions.
   */
-  MY_NODISCARD virtual int fast_update(THD *thd [[maybe_unused]],
+  [[nodiscard]] virtual int fast_update(THD *thd [[maybe_unused]],
                                        mem_root_deque<Item *> &update_fields
                                        [[maybe_unused]],
                                        mem_root_deque<Item *> &update_values
@@ -6855,7 +6855,7 @@ class handler {
 
     @return an error if the insert should be terminated.
   */
-  MY_NODISCARD virtual int upsert(THD *thd [[maybe_unused]],
+  [[nodiscard]] virtual int upsert(THD *thd [[maybe_unused]],
                                   mem_root_deque<Item *> &update_fields
                                   [[maybe_unused]],
                                   mem_root_deque<Item *> &update_values

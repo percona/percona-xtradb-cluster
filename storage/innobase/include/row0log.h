@@ -212,7 +212,7 @@ ulint row_log_estimate_work(const dict_index_t *index);
 
 /** Find out if temporary log files encrypted.
 @return true if temporary log file should be encrypted, false if not */
-MY_NODISCARD
+[[nodiscard]]
 bool log_tmp_is_encrypted() noexcept;
 
 /** Check the row log encryption is enabled or not.
@@ -226,7 +226,7 @@ void log_tmp_enable_encryption_if_set();
 @param[in]	offs		offset to block
 @param[in]	space_id	tablespace id
 @return whether the operation succeeded */
-MY_NODISCARD
+[[nodiscard]]
 bool log_tmp_block_encrypt(const byte *src_block, ulint size, byte *dst_block,
                            os_offset_t offs, space_id_t space_id);
 
@@ -237,7 +237,7 @@ bool log_tmp_block_encrypt(const byte *src_block, ulint size, byte *dst_block,
 @param[in]	offs		offset to block
 @param[in]	space_id	tablespace id
 @return whether the operation succeeded */
-MY_NODISCARD
+[[nodiscard]]
 bool log_tmp_block_decrypt(const byte *src_block, ulint size, byte *dst_block,
                            os_offset_t offs, space_id_t space_id);
 

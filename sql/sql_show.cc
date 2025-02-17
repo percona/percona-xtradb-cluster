@@ -3948,8 +3948,8 @@ static int fill_schema_user_stats(THD *thd, Table_ref *tables,
   1 - error
 */
 
-static int fill_schema_client_stats(
-    THD *thd, Table_ref *tables, Item *cond [[maybe_unused]]) noexcept {
+static int fill_schema_client_stats(THD *thd, Table_ref *tables,
+                                    Item *cond [[maybe_unused]]) noexcept {
   DBUG_ENTER("fill_schema_client_stats");
 
   if (check_global_access(thd, SUPER_ACL | PROCESS_ACL)) DBUG_RETURN(1);
@@ -3967,8 +3967,8 @@ static int fill_schema_client_stats(
   DBUG_RETURN(result);
 }
 
-static int fill_schema_thread_stats(
-    THD *thd, Table_ref *tables, Item *cond [[maybe_unused]]) noexcept {
+static int fill_schema_thread_stats(THD *thd, Table_ref *tables,
+                                    Item *cond [[maybe_unused]]) noexcept {
   DBUG_ENTER("fill_schema_thread_stats");
 
   if (check_global_access(thd, SUPER_ACL | PROCESS_ACL)) DBUG_RETURN(1);
@@ -4619,7 +4619,8 @@ static int fill_temporary_tables(THD *thd, Table_ref *tables, Item *cond) {
 
   for (tmp = thd->temporary_tables; tmp; tmp = tmp->next) {
     if (store_temporary_table_record(thd, tables->table, tmp,
-                                     thd->lex->query_block->db, thd->mem_root)) {
+                                     thd->lex->query_block->db,
+                                     thd->mem_root)) {
       DBUG_RETURN(1);
     }
   }
