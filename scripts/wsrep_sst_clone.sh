@@ -257,6 +257,131 @@ check_client_version()
     done
 }
 
+# This function is common for Donor and Joiner.
+# Installs clone plugin if necessary.
+# If donor does not have clone plugin installed by default, it sets CLEANUP_CLONE_PLUGIN=yes
+# This flag is sent to Joiner, to inform the Joiner that it should uninstall clone plugin after SST.
+# Flag is also used on Donor side to decide if clone plugin should be uninstalled after SST.
+install_clone_plugin()
+{
+    local -r role=$1
+    if [ "$role" == "donor" ]
+    then
+        CLEANUP_CLONE_PLUGIN="no"
+    fi
+    CLONE_PLUGIN_LOADED=$($MYSQL_ACLIENT -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.PLUGINS WHERE PLUGIN_TYPE = 'CLONE';")
+    if [ "$CLONE_PLUGIN_LOADED" -eq 0 ]
+    then
+        wsrep_log_info "Installing CLONE plugin"
+
+        # INSTALL PLUGIN is replicated by default, so we need to switch off
+        # session replication on donor
+        if [ "$role" = "donor" ]
+        then
+            WSREP_OFF="SET SESSION wsrep_on=OFF; "
+            CLEANUP_CLONE_PLUGIN="yes"
+        else
+            WSREP_OFF="" # joiner does not have replication enabled
+        fi
+        $MYSQL_ACLIENT -e "${WSREP_OFF}INSTALL PLUGIN CLONE SONAME 'mysql_clone.so';"
+    fi
+}
+
+# Setup certificates on Donor instance
+# 1. If Donor has server certificates set, it means it accepts only secure connections.
+#    Before SST, we create a dedicated clone user that will be used by Recipient instance
+#    for cloning. In such a case this user with 'REQUIRE SSL' to enforce SSL during clone.
+#    This affects 'REQUIRE_SSL' global variable.
+# 2. Donor needs to connect to Recipient instance to trigger cloning.
+#    if [sst] (with fallback to [client]) certificates are present - use them.
+#    This affects CLIENT_SSL_OPTIONS global variable.
+setup_certificates_for_donor()
+{
+    # CLIENT_SSL_* is used by Donor to connect to Joiner's clone (aka Recipient) instance
+    local client_ssl_cert=""
+    local client_ssl_key=""
+    local client_ssl_ca=""
+    local client_ssl_mode=""
+
+    client_ssl_cert=$(parse_cnf client ssl_cert "")
+    client_ssl_key=$(parse_cnf client ssl_key "")
+    client_ssl_ca=$(parse_cnf client ssl_ca "")
+    client_ssl_mode=$(parse_cnf client ssl_mode "")
+
+    wsrep_log_debug "SSL Client settings on $role from client section:  CERT=$client_ssl_cert, KEY=$client_ssl_key, CA=$client_ssl_ca, ssl-mode=$client_ssl_mode "
+    
+    # Server info
+    # If donor certificates are set, we require all connections to donor
+    # to be SSL-protected. That means connection from Recipient instance
+    # to Donor instance will have to be over SSL.
+    SERVER_SSL_CERT=$($MYSQL_ACLIENT -e "SELECT @@ssl_cert")
+    SERVER_SSL_KEY=$($MYSQL_ACLIENT -e "SELECT @@ssl_key")
+    SERVER_SSL_CA=$($MYSQL_ACLIENT -e "SELECT @@ssl_ca")
+
+    # REQUIRE_SSL is used during clone user creation on Donor server
+    REQUIRE_SSL=""
+    if [ -n "$SERVER_SSL_CA" ] && [ -n "$SERVER_SSL_CERT" ] && [ -n "$SERVER_SSL_KEY" ]; then
+        REQUIRE_SSL="REQUIRE SSL"
+    fi
+    wsrep_log_debug "Clone SSL Server settings on $role from runtime:  CERT=$SERVER_SSL_CERT, KEY=$SERVER_SSL_KEY, CA=$SERVER_SSL_CA"
+
+    # CLIENT_SSL_OPTIONS is used when Donor connects to the Recipient instance to trigger clone
+    CLIENT_SSL_OPTIONS=""
+    if [ -n "$client_ssl_ca" ] && [ -n "$client_ssl_cert" ] && [ -n "$client_ssl_key" ]
+    then
+        CLIENT_SSL_OPTIONS="--ssl-cert=$client_ssl_cert --ssl-key=$client_ssl_key"
+        if [ -n "$client_ssl_ca" ]
+        then
+            CLIENT_SSL_OPTIONS+=" --ssl-ca=$client_ssl_ca"
+            if [ -n "$client_ssl_mode" ]
+            then
+                CLIENT_SSL_OPTIONS+=" --ssl-mode=$client_ssl_mode"
+# debugging something here
+#            else
+#                CLIENT_SSL_OPTIONS+=" --ssl-mode=REQUIRED"
+            fi
+        fi
+    else
+        CLIENT_SSL_OPTIONS+=" --ssl-mode=DISABLED"
+    fi
+    wsrep_log_debug "SSL Client settings on $role for connection CLIENT_SSL_OPTIONS=${CLIENT_SSL_OPTIONS}"
+}        
+setup_certificates_for_recipient()
+{
+    local clone_ssl_cert=$($MYSQL_ACLIENT -e "SELECT @@clone_ssl_cert")
+    local clone_ssl_key=$($MYSQL_ACLIENT -e "SELECT @@clone_ssl_key")
+    local clone_ssl_ca=$($MYSQL_ACLIENT -e "SELECT @@clone_ssl_ca")
+    wsrep_log_debug "Clone SSL settings on $role from runtime:  CERT=$clone_ssl_cert, KEY=$clone_ssl_key, CA=$clone_ssl_ca"
+
+    # We check if ssl certificates for clone are available.
+    # If not we try from cnf 
+    if [ -z "$clone_ssl_cert" ] || [ "$clone_ssl_cert" == "NULL" ]
+    then
+        clone_ssl_cert=$(parse_cnf mysqld clone_ssl_cert "")
+        clone_ssl_key=$(parse_cnf mysqld clone_ssl_key "")
+        clone_ssl_ca=$(parse_cnf mysqld clone_ssl_ca "")
+        wsrep_log_debug "Clone SSL settings on $role from mysqld section:  CERT=$clone_ssl_cert, KEY=$clone_ssl_key, CA=$clone_ssl_ca"
+    fi
+    # If not we try from client section
+    if [ -z "$clone_ssl_cert" ] || [ "$clone_ssl_cert" == "NULL" ]
+    then
+        clone_ssl_cert=$(parse_cnf client ssl_cert "")
+        clone_ssl_key=$(parse_cnf client ssl_key "")
+        clone_ssl_ca=$(parse_cnf client ssl_ca "")
+        wsrep_log_debug "Clone SSL settings on $role from client section:  CERT=$clone_ssl_cert, KEY=$clone_ssl_key, CA=$clone_ssl_ca"
+    fi
+
+    # Even if certificates were set at the beginning, setting them again will not hurt
+    if [ -n "$clone_ssl_cert" ] && [ -n "$clone_ssl_key" ] && [ -n "$clone_ssl_ca" ]
+    then
+        wsrep_log_info "Clone SSL settings on $role we will use:  CERT=$clone_ssl_cert, KEY=$clone_ssl_key, CA=$clone_ssl_ca"
+
+        $MYSQL_ACLIENT -e "SET GLOBAL clone_ssl_cert='$clone_ssl_cert'"
+        $MYSQL_ACLIENT -e "SET GLOBAL clone_ssl_key='$clone_ssl_key'"
+        $MYSQL_ACLIENT -e "SET GLOBAL clone_ssl_ca='$clone_ssl_ca'"
+    fi
+}
+
 # The following function:
 # 1. checks if CLONE plugin is loaded. If not loads it.
 # 2. checks if SSL cert and key are configured for any of and in that order:
@@ -274,163 +399,18 @@ check_client_version()
 setup_clone_plugin()
 {
     # Either donor or recipient
-    local -r ROLE=$1
-    CLONE_SSL_CERT=""
-    CLONE_SSL_KEY=""
-    CLONE_SSL_CA=""
+    local -r role=$1
 
-    CLONE_PLUGIN_LOADED=$($MYSQL_ACLIENT -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.PLUGINS WHERE PLUGIN_TYPE = 'CLONE';")
+    install_clone_plugin "$role"
 
-    wsrep_log_debug "->CLONE_PLUGIN_LOADED: $CLONE_PLUGIN_LOADED"
-
-    if [ "$CLONE_PLUGIN_LOADED" -eq 0 ]
+    wsrep_log_debug "-> ############## SSL SECTION [START] ($role)############"
+    if [ "$role" == "donor" ]
     then
-        wsrep_log_info "Installing CLONE plugin"
-
-        # INSTALL PLUGIN is replicated by default, so we need to switch off
-        # session replication on donor
-        if [ "$ROLE" = "donor" ]
-        then
-            WSREP_OFF="SET SESSION wsrep_on=OFF; "
-        else
-            WSREP_OFF="" # joiner does not have replication enabled
-        fi
-        $MYSQL_ACLIENT -e "${WSREP_OFF}INSTALL PLUGIN CLONE SONAME 'mysql_clone.so';"
-        if [ "$ROLE" == "donor" ]; then
-            CLEANUP_CLONE_PLUGIN="yes"
-        fi
+        setup_certificates_for_donor
     else
-        CLEANUP_CLONE_PLUGIN="no"
-        if [ "$ROLE" == "recipient" ]
-        then
-            CLONE_SSL_CERT=$($MYSQL_ACLIENT -e "SELECT @@clone_ssl_cert")
-            CLONE_SSL_KEY=$($MYSQL_ACLIENT -e "SELECT @@clone_ssl_key")
-            CLONE_SSL_CA=$($MYSQL_ACLIENT -e "SELECT @@clone_ssl_ca")
-        fi
+        setup_certificates_for_recipient
     fi
-
-    wsrep_log_debug "-> ############## SSL SECTION [START] ($ROLE)############"
-    # Once identify and configured the CLONE plugin we need to check if the Donor and the 
-    # Joiner have the SSL certificates set. 
-    # For DONOR we will check the ssl_% variables and client SSL certificates for the remote connection to joiner. 
-    # For Joiner we will check first if any value is set for the clone_ssl global variables, then for ssl_% in [sst]
-    # and as last resource in the [client] section.
-
-    # We retrieve common information first.
-    # Client info
-    CLIENT_SSL_CERT=$(parse_cnf sst ssl_cert "")
-    CLIENT_SSL_KEY=$(parse_cnf sst ssl_key "")
-    CLIENT_SSL_CA=$(parse_cnf sst ssl_ca "")
-    CLIENT_SSL_MODE=$(parse_cnf sst ssl_mode "")
-
-    if [ -z "$CLIENT_SSL_CERT" ] || [ -z "$CLIENT_SSL_KEY" ] || [ -z "$CLIENT_SSL_CA" ]
-    then
-        CLIENT_SSL_CERT=$(parse_cnf client ssl_cert "")
-        CLIENT_SSL_KEY=$(parse_cnf client ssl_key "")
-        CLIENT_SSL_CA=$(parse_cnf client ssl_ca "")
-        CLIENT_SSL_MODE=$(parse_cnf client ssl_mode "")
-    fi
-
-    # Server info
-    SERVER_SSL_CERT=$($MYSQL_ACLIENT -e "SELECT @@ssl_cert")
-    SERVER_SSL_KEY=$($MYSQL_ACLIENT -e "SELECT @@ssl_key")
-    SERVER_SSL_CA=$($MYSQL_ACLIENT -e "SELECT @@ssl_ca")
-    DATA=$($MYSQL_ACLIENT -e "SELECT @@datadir")
-    CLIENT_SSL_VALID="no"
-    SERVER_SSL_VALID="no"
-
-    # Checking client certificates
-    wsrep_log_debug ":->(PRE) CLIENT_SSL_VALID=$CLIENT_SSL_VALID SERVER_SSL_VALID=$SERVER_SSL_VALID"
-    # Client information must check on both side to allow connection from Donor to Joiner
-    wsrep_log_debug "-> CLONE_SSL_CERT: $CLONE_SSL_CERT; CLONE_SSL_KEY: $CLONE_SSL_KEY; CLONE_SSL_CA: $CLONE_SSL_CA"
-
-    # We check if ssl certificates for clone are available. These certificates are for the clone
-    # process to connect to source. So they are client certificates.
-    if [ -z "$CLONE_SSL_CERT" ] || [ -z "$CLONE_SSL_KEY" ] || [ -z "$CLONE_SSL_CA" ]
-    then
-        CLONE_SSL_CERT=$(parse_cnf mysqld clone_ssl_cert "")
-        CLONE_SSL_KEY=$(parse_cnf mysqld clone_ssl_key "")
-        CLONE_SSL_CA=$(parse_cnf mysqld clone_ssl_ca "")
-    fi
-
-    # If no clone_ssl certificate is found we use the default client ones.
-    if [ -z "$CLONE_SSL_CERT" ] || [ -z "$CLONE_SSL_KEY" ] || [ -z "$CLONE_SSL_CA" ]
-    then
-        wsrep_log_info "CLONE SSL not configured. We assign client SSL certificates"
-        CLONE_SSL_CERT=$CLIENT_SSL_CERT
-        CLONE_SSL_KEY=$CLIENT_SSL_KEY
-        CLONE_SSL_CA=$CLIENT_SSL_CA
-    fi
-
-    # We actually check and modify the CLONE_ variables only if we are on the Joiner
-    # and if they are not empty or set to null
-    if [ -n "$CLONE_SSL_CERT" ] && [ -n "$CLONE_SSL_KEY" ] && [ -n "$CLONE_SSL_CA" ] && [ "$ROLE" == "recipient" ]
-    then
-        wsrep_log_info "Using SSL configuration from MySQL Server (client certificates)."
-        # We change the variables in the server only if we are on the joiner.
-        # There is no need to modify them in Donor
-        $MYSQL_ACLIENT -e "SET GLOBAL clone_ssl_cert='$CLONE_SSL_CERT'"
-        $MYSQL_ACLIENT -e "SET GLOBAL clone_ssl_key='$CLONE_SSL_KEY'"
-        $MYSQL_ACLIENT -e "SET GLOBAL clone_ssl_ca='$CLONE_SSL_CA'"
-        # We set that client certificates are valid
-        CLIENT_SSL_VALID="yes"
-    else
-        if [ "$ROLE" == "recipient" ]
-        then
-            wsrep_log_info "CLONE SSL variables and SSL client are not correctly set: @@clone_ssl_cert='$CLONE_SSL_CERT', @@clone_ssl_key='$CLONE_SSL_KEY'"
-        fi
-    fi
-
-    # For donor we check the CLIENT_ certificates that will be used to connect to Joiner
-    if [ -n "$CLIENT_SSL_CA" ] && [ -n "$CLIENT_SSL_CERT" ] && [ -n "$CLIENT_SSL_KEY" ] && [ "$ROLE" == "donor" ]
-    then
-         CLIENT_SSL_VALID="yes"
-    fi
-
-    # For server we check on both side
-    if [ -n "$SERVER_SSL_CA" ] && [ -n "$SERVER_SSL_CERT" ] && [ -n "$SERVER_SSL_KEY" ]
-    then
-        SERVER_SSL_VALID="yes"
-    else
-        SERVER_SSL_VALID="no"
-    fi
-
-    # We reset the variable to pass ssl information and will fill it only if both SERVER and CLIENT 
-    CLIENT_SSL_OPTIONS=""
-    wsrep_log_debug ":->(POST) CLIENT_SSL_VALID=$CLIENT_SSL_VALID SERVER_SSL_VALID=$SERVER_SSL_VALID"
-    if [ "$CLIENT_SSL_VALID" == "yes" ]
-    then
-        wsrep_log_info "Client SSL settings on $ROLE: CERT=$CLIENT_SSL_CERT, KEY=$CLIENT_SSL_KEY, CA=$CLIENT_SSL_CA"
-        wsrep_log_info "Clone SSL settings on $ROLE: CERT=$CLONE_SSL_CERT, KEY=$CLONE_SSL_KEY, CA=$CLONE_SSL_CA"
-
-        if [ -n "$CLIENT_SSL_CERT" ] && [ -n "$CLIENT_SSL_KEY" ]
-        then
-            CLIENT_SSL_OPTIONS="--ssl-cert=$CLIENT_SSL_CERT --ssl-key=$CLIENT_SSL_KEY"
-            if [ -n "$CLIENT_SSL_CA"   ]
-            then
-                CLIENT_SSL_OPTIONS+=" --ssl-ca=$CLIENT_SSL_CA"
-                if [ -n "$CLIENT_SSL_MODE" ]
-                then  
-                    CLIENT_SSL_OPTIONS+=" --ssl-mode=$CLIENT_SSL_MODE"
-                fi
-            else
-                CLIENT_SSL_OPTIONS+=" --ssl-mode=REQUIRED"
-            fi
-        fi
-    else
-        wsrep_log_info "No suitable SSL configuration found. Not using SSL for SST."
-        CLIENT_SSL_OPTIONS=" --ssl-mode=DISABLED"
-    fi
-
-    if [ "$SERVER_SSL_VALID" == "yes" ]
-    then
-        wsrep_log_info "Server SSL settings on $ROLE: CERT=$SERVER_SSL_CERT, KEY=$SERVER_SSL_KEY, CA=$SERVER_SSL_CA"
-        REQUIRE_SSL="REQUIRE SSL"
-    else
-        wsrep_log_info "No suitable SSL configuration found. Not using SSL for SST."
-        REQUIRE_SSL=""
-    fi
-    wsrep_log_debug "-> ############## SSL SECTION [END] ($ROLE)############"
+    wsrep_log_debug "-> ############## SSL SECTION [END] ($role)############"
 }
 
 # Let's use the simple approach to detect if the transfer is running or not.
@@ -584,7 +564,7 @@ then
         wsrep_log_debug "-> PREPARE DONOR"
         setup_clone_plugin "donor"
 
-#        wsrep_log_info "REQUIRE_SSL=$REQUIRE_SSL, CLIENT_SSL_OPTIONS=$CLIENT_SSL_OPTIONS"
+        wsrep_log_info "REQUIRE_SSL=$REQUIRE_SSL, CLIENT_SSL_OPTIONS=$CLIENT_SSL_OPTIONS"
         wsrep_log_debug "-> PREPARE DONE"
 
 cat << EOF > "$CLONE_PREPARE_SQL"
@@ -636,7 +616,7 @@ EOF
         export MYSQL_USER="$WSREP_SST_OPT_REMOTE_JOINER_USER"
         # Find own address (from which we connected)
         wsrep_log_debug "-> Connecting to JOINER to get exact IP of donor: $MYSQL_RCLIENT" # $MYSQL_PWD"
-        USER=`$MYSQL_RCLIENT --skip-column-names -e 'SELECT USER()'`
+        USER=`$MYSQL_RCLIENT --skip-column-names $CLIENT_SSL_OPTIONS -e 'SELECT USER()'`
         LHOST=${USER##*@}
         DONOR=$LHOST:$WSREP_SST_OPT_LPORT
 
@@ -668,7 +648,7 @@ EOF
         fi
 
         # If still there we will manually shutdown
-        LOCALOUTPUT=`$MYSQL_RCLIENT -e "SHUTDOWN"  2>&1 || :`
+        LOCALOUTPUT=`$MYSQL_RCLIENT $CLIENT_SSL_OPTIONS -e "SHUTDOWN"  2>&1 || :`
         wsrep_log_debug "-> LOCALOUTPUT: $LOCALOUTPUT"
 
         if [ "$RC" -ne 0 ]
