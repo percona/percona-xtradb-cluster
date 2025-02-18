@@ -345,7 +345,7 @@ setup_certificates_for_donor()
         CLIENT_SSL_OPTIONS+=" --ssl-mode=DISABLED"
     fi
     wsrep_log_debug "SSL Client settings on $role for connection CLIENT_SSL_OPTIONS=${CLIENT_SSL_OPTIONS}"
-}        
+}
 setup_certificates_for_recipient()
 {
     local clone_ssl_cert=$($MYSQL_ACLIENT -e "SELECT @@clone_ssl_cert")
