@@ -336,9 +336,6 @@ setup_certificates_for_donor()
             if [ -n "$client_ssl_mode" ]
             then
                 CLIENT_SSL_OPTIONS+=" --ssl-mode=$client_ssl_mode"
-# debugging something here
-#            else
-#                CLIENT_SSL_OPTIONS+=" --ssl-mode=REQUIRED"
             fi
         fi
     else
