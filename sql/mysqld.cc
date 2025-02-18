@@ -10763,9 +10763,14 @@ static int init_wsrep_thread(THD *thd) {
   PSI_THREAD_CALL(set_thread_id)(psi, thd->thread_id());
   /*
     perfshema table_processlist::index_init() filters out threads which
-    do not have set user_name set.
-    If it detects thd marked as system thread, and the user_name is "root"
-    it converts it to "system_user".
+    do not have set user_name set (background threads).
+    If it detects thd marked as system thread, and the thread IS NOT
+    a singleton, it converts it to "system_user".
+    If it detects thd marked as system thread, and the thread IS
+    a singleton, it leaves the username unchanged.
+    Note that there is logical error in table_processlist::make_row(). First it
+    returns if username is empty, but then it has additional logic basing on
+    empty username.
     Q: Why we set it explicitly here?
     A: If wsrep thread is created by 'set global wsrep_applier_threads=30;'
        pfs descriptor inherits the user_name from the parrent thread, which
@@ -10774,7 +10779,8 @@ static int init_wsrep_thread(THD *thd) {
        the main server thread which does not have user set. As the result
        P_S filters this thred out from processlist table as described above.
   */
-  PSI_THREAD_CALL(set_thread_account)("root", strlen("root"), nullptr, 0);
+  PSI_THREAD_CALL(set_thread_account)
+  ("system user", strlen("system user"), nullptr, 0);
 #endif /* HAVE_PSI_INTERFACE */
 
   DBUG_EXECUTE_IF("simulate_wsrep_slave_error_on_init", simulate_error |= 1;);
@@ -14129,7 +14135,7 @@ PSI_FLAG_USER | PSI_FLAG_NO_SEQNUM, 0, PSI_DOCUMENT_ME},
   { &key_THREAD_wsrep_sst_joiner, "THREAD_wsrep_sst_joiner", "sst_joiner", PSI_FLAG_SINGLETON | PSI_FLAG_THREAD_SYSTEM, 0, PSI_DOCUMENT_ME},
   { &key_THREAD_wsrep_sst_donor, "THREAD_wsrep_sst_donor", "sst_donor", PSI_FLAG_SINGLETON | PSI_FLAG_THREAD_SYSTEM, 0, PSI_DOCUMENT_ME},
   { &key_THREAD_wsrep_sst_logger, "THREAD_wsrep_sst_logger", "sst_logger", PSI_FLAG_SINGLETON | PSI_FLAG_THREAD_SYSTEM, 0, PSI_DOCUMENT_ME},
-  { &key_THREAD_wsrep_applier, "THREAD_wsrep_applier", "applier", PSI_FLAG_SINGLETON | PSI_FLAG_THREAD_SYSTEM, 0, PSI_DOCUMENT_ME},
+  { &key_THREAD_wsrep_applier, "THREAD_wsrep_applier", "applier", PSI_FLAG_THREAD_SYSTEM, 0, PSI_DOCUMENT_ME},
   { &key_THREAD_wsrep_rollbacker, "THREAD_wsrep_rollbacker", "rlb", PSI_FLAG_SINGLETON | PSI_FLAG_THREAD_SYSTEM, 0, PSI_DOCUMENT_ME},
   { &key_THREAD_wsrep_post_rollbacker, "THREAD_wsrep_post_rollbacker", "postrlb", PSI_FLAG_SINGLETON | PSI_FLAG_THREAD_SYSTEM, 0, PSI_DOCUMENT_ME}
 #endif /* WITH_WSREP */
