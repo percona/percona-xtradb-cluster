@@ -185,7 +185,7 @@ Description: Percona XtraDB Cluster database client binaries
 
 Package: percona-xtradb-cluster-server
 Architecture: any
-Suggests: tinyca, netcat-openbsd, pv 
+Suggests: tinyca, pv
 Pre-Depends: percona-xtradb-cluster-common (= ${binary:Version}),
              adduser,
              libdbd-mysql-perl,
@@ -202,6 +202,7 @@ Depends: percona-xtradb-cluster-client (>= ${binary:Version}),
          socat,
          qpress,
          iproute,
+         netcat-openbsd,
          curl,
          stunnel
 Provides: mysql-server,
@@ -278,7 +279,7 @@ Description: Percona XtraDB Cluster database server binaries
 
 Package: percona-xtradb-cluster-server-debug
 Architecture: any
-Suggests: tinyca, netcat-openbsd, pv
+Suggests: tinyca, pv
 Pre-Depends: percona-xtradb-cluster-common (>= ${binary:Version}),
              adduser (>= 3.4.0),
              debconf
@@ -293,6 +294,7 @@ Depends: percona-xtradb-cluster-client (>= ${binary:Version}),
          lsb-base (>= 3.0-10),
          socat,
          qpress,
+         netcat-openbsd,
          iproute
 Provides: mysql-server-debug
 Description: Percona XtraDB Cluster database server UNIV_DEBUG binaries
