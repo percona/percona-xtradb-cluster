@@ -780,7 +780,6 @@ read_cnf()
 
     ssl_dhparams=$(parse_cnf sst ssl-dhparams "")
 
-    uextra=$(parse_cnf sst use-extra 0)
     iopts=$(parse_cnf sst inno-backup-opts "")
     iapts=$(parse_cnf sst inno-apply-opts "")
     impts=$(parse_cnf sst inno-move-opts "")
@@ -1326,28 +1325,10 @@ wait_for_listen()
 
 #
 # check if there are any extra options to parse.
-# Note: if port is specified socket is not used.
+# This function is executed only on the donor side.
 check_extra()
 {
-    local use_socket=1
-    if [[ $uextra -eq 1 ]]; then
-        if $MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF mysqld | tr '_' '-' | grep -- "--thread-handling=" | grep -q 'pool-of-threads'; then
-            local eport=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF mysqld | tr '_' '-' | grep -- "--extra-port=" | cut -d= -f2)
-            if [[ -n $eport ]]; then
-                # Xtrabackup works only locally.
-                # Hence, setting host to 127.0.0.1 unconditionally.
-                wsrep_log_debug "SST through extra_port $eport"
-                INNOEXTRA+=" --host=127.0.0.1 --port=$eport "
-                use_socket=0
-            else
-                wsrep_log_error "Extra port $eport null, failing"
-                exit 1
-            fi
-        else
-            wsrep_log_warning "Thread pool not set, ignore the option use_extra"
-        fi
-    fi
-    if [[ $use_socket -eq 1 ]] && [[ -n "${WSREP_SST_OPT_SOCKET}" ]]; then
+    if [[ -n "${WSREP_SST_OPT_SOCKET}" ]]; then
         INNOEXTRA+=" --socket=${WSREP_SST_OPT_SOCKET}"
     fi
 }
