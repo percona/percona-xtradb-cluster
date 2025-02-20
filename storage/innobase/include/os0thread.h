@@ -47,6 +47,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "my_compiler.h"
 #include "ut0dbg.h"
+#include "ut0math.h"
 
 class IB_thread {
  public:
@@ -142,7 +143,7 @@ class Atomic_xor_of_things {
 
  private:
   static constexpr size_t digits_count =
-      (sizeof(T_thing) + sizeof(T_digit) - 1) / sizeof(T_digit);
+      ut::div_ceil(sizeof(T_thing), sizeof(T_digit));
   /* initial value must be all zeros, as opposed to the representation of
   thing{}, because we care about "neutral element of the XOR operation", and not
   "default value of a thing". */
@@ -194,14 +195,14 @@ using Atomic_xor_of_thread_id =
 thread. On Linux, returns tid. On other systems currently returns
 os_thread_get_curr_id().
 @return current thread identifier */
-MY_NODISCARD os_tid_t os_thread_get_tid() noexcept;
+[[nodiscard]] os_tid_t os_thread_get_tid() noexcept;
 
 /** Set relative scheduling priority for a given thread on
 Linux. Currently a no-op on other systems.
 @param[in]	thread_id	thread id
 @param[in]	relative_priority	system-specific priority value
 @return An actual thread priority after the update  */
-MY_NODISCARD
+[[nodiscard]]
 unsigned long int os_thread_set_priority(
     os_tid_t thread_id, unsigned long int relative_priority) noexcept;
 

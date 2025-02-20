@@ -231,8 +231,8 @@ class Table_trigger_dispatcher : public Table_trigger_field_support {
   Field **m_old_field;
 
   /**
-    Error which occurred while parsing one of the triggers for the table,
-    nullptr - if there was no error for any of its triggers.
+    Error which occurred while parsing one of the triggers for the table;
+    nullptr if there was no error for any of its triggers.
 
     Non-nullptr value indicates that as a precaution the object has entered
     the state where all trigger operations result in errors (referencing

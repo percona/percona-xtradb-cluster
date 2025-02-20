@@ -77,9 +77,28 @@ while ($itr > 0)
     --let $rpl_connection_name = $curr_server
     --source include/connection.inc
 
+<<<<<<< HEAD
     --exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.$itr.expect
     --shutdown_server 0
     --source include/wait_until_disconnected.inc
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+    --let $no_wait_for_reconnect = 1
+    --source include/kill_and_restart_mysqld.inc
+||||||||| merged common ancestors
+    --enable_reconnect
+    --exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.$itr.expect
+    --shutdown_server 0
+    --source include/wait_until_disconnected.inc
+=========
+    --exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.$itr.expect
+    --shutdown_server 0
+    --source include/wait_until_disconnected.inc
+>>>>>>>>> Temporary merge branch 2
+=======
+    --let $no_wait_for_reconnect = 1
+    --source include/kill_and_restart_mysqld.inc
+>>>>>>> Percona-Server-9.1.0-1
   }
 
   --dec $itr

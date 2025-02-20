@@ -1,5 +1,39 @@
+<<<<<<< HEAD
 MYSQL_VERSION_MAJOR=8
 MYSQL_VERSION_MINOR=4
+||||||| merged common ancestors
+MYSQL_VERSION_MAJOR=8
+<<<<<<<<< Temporary merge branch 1
+MYSQL_VERSION_MINOR=0
+MYSQL_VERSION_PATCH=37
+MYSQL_VERSION_EXTRA=-29
+MYSQL_VERSION_STABILITY="LTS"
+||||||||| merged common ancestors
+MYSQL_VERSION_MINOR=0
+<<<<<<<<<<< Temporary merge branch 1
+MYSQL_VERSION_PATCH=37
+MYSQL_VERSION_EXTRA=
+||||||||||| 41a53abd556
+MYSQL_VERSION_PATCH=36
+MYSQL_VERSION_EXTRA=
+===========
+MYSQL_VERSION_PATCH=36
+MYSQL_VERSION_EXTRA=-28
+>>>>>>>>>>> Temporary merge branch 2
+MYSQL_VERSION_STABILITY="LTS"
+=========
+MYSQL_VERSION_MINOR=4
+=======
+MYSQL_VERSION_MAJOR=9
+MYSQL_VERSION_MINOR=1
+>>>>>>> Percona-Server-9.1.0-1
 MYSQL_VERSION_PATCH=0
 MYSQL_VERSION_EXTRA=-1
+<<<<<<< HEAD
 MYSQL_VERSION_MATURITY="LTS"
+||||||| merged common ancestors
+MYSQL_VERSION_MATURITY="LTS"
+>>>>>>>>> Temporary merge branch 2
+=======
+MYSQL_VERSION_MATURITY="INNOVATION"
+>>>>>>> Percona-Server-9.1.0-1

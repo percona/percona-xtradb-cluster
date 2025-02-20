@@ -48,10 +48,20 @@ SET SESSION sql_log_bin = 1;
 # Crash server 2
 --let $rpl_connection_name= server2
 --source include/connection.inc
+<<<<<<< HEAD
 --exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
 --shutdown_server 0
 --source include/wait_until_disconnected.inc
 --source include/wait_until_connected_again.inc
+||||||| merged common ancestors
+--exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
+--shutdown_server 0
+--source include/wait_until_disconnected.inc
+--source include/wait_until_connected_again.inc
+>>>>>>>>> Temporary merge branch 2
+=======
+--source include/kill_and_restart_mysqld.inc
+>>>>>>> Percona-Server-9.1.0-1
 
 --let $rpl_server_number= 2
 --source include/rpl/reconnect.inc

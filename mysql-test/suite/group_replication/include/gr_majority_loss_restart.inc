@@ -52,11 +52,38 @@ SET SESSION sql_log_bin= 1;
 --echo ############################################################
 --echo # 1. Crash server 2.
 --let $rpl_connection_name= server2
+<<<<<<< HEAD
 --source include/connection.inc
 --exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
 --shutdown_server 0
 --source include/wait_until_disconnected.inc
 --source include/wait_until_connected_again.inc
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+--source include/rpl_connection.inc
+
+--source include/kill_and_restart_mysqld.inc
+--source include/rpl_reconnect.inc
+||||||||| merged common ancestors
+--source include/rpl_connection.inc
+--enable_reconnect
+--exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
+--shutdown_server 0
+--source include/wait_until_disconnected.inc
+--source include/wait_until_connected_again.inc
+--disable_reconnect
+--source include/rpl_reconnect.inc
+=========
+--source include/connection.inc
+--exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
+--shutdown_server 0
+--source include/wait_until_disconnected.inc
+--source include/wait_until_connected_again.inc
+=======
+--source include/connection.inc
+
+--source include/kill_and_restart_mysqld.inc
+>>>>>>> Percona-Server-9.1.0-1
 --source include/rpl/reconnect.inc
 
 --let $rpl_connection_name= server1

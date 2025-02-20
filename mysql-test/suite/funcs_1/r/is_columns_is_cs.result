@@ -237,24 +237,25 @@ def	information_schema	PARTITIONS	PARTITION_NAME	4	NULL	YES	varchar	64	192	NULL	
 def	information_schema	PARTITIONS	SUBPARTITION_NAME	5	NULL	YES	varchar	64	192	NULL	NULL	NULL	utf8mb3	utf8mb3_bin	varchar(64)			select			NULL
 def	information_schema	PARTITIONS	PARTITION_ORDINAL_POSITION	6	NULL	YES	int	NULL	NULL	10	0	NULL	NULL	NULL	int unsigned			select			NULL
 def	information_schema	PARTITIONS	SUBPARTITION_ORDINAL_POSITION	7	NULL	YES	int	NULL	NULL	10	0	NULL	NULL	NULL	int unsigned			select			NULL
-def	information_schema	PARTITIONS	PARTITION_METHOD	8	NULL	YES	varchar	13	39	NULL	NULL	NULL	utf8mb3	utf8mb3_general_ci	varchar(13)			select			NULL
-def	information_schema	PARTITIONS	SUBPARTITION_METHOD	9	NULL	YES	varchar	13	39	NULL	NULL	NULL	utf8mb3	utf8mb3_general_ci	varchar(13)			select			NULL
-def	information_schema	PARTITIONS	PARTITION_EXPRESSION	10	NULL	YES	varchar	2048	6144	NULL	NULL	NULL	utf8mb3	utf8mb3_bin	varchar(2048)			select			NULL
-def	information_schema	PARTITIONS	SUBPARTITION_EXPRESSION	11	NULL	YES	varchar	2048	6144	NULL	NULL	NULL	utf8mb3	utf8mb3_bin	varchar(2048)			select			NULL
-def	information_schema	PARTITIONS	PARTITION_DESCRIPTION	12	NULL	YES	text	65535	65535	NULL	NULL	NULL	utf8mb3	utf8mb3_bin	text			select			NULL
-def	information_schema	PARTITIONS	TABLE_ROWS	13	NULL	YES	bigint	NULL	NULL	20	0	NULL	NULL	NULL	bigint unsigned			select			NULL
-def	information_schema	PARTITIONS	AVG_ROW_LENGTH	14	NULL	YES	bigint	NULL	NULL	20	0	NULL	NULL	NULL	bigint unsigned			select			NULL
-def	information_schema	PARTITIONS	DATA_LENGTH	15	NULL	YES	bigint	NULL	NULL	20	0	NULL	NULL	NULL	bigint unsigned			select			NULL
-def	information_schema	PARTITIONS	MAX_DATA_LENGTH	16	NULL	YES	bigint	NULL	NULL	20	0	NULL	NULL	NULL	bigint unsigned			select			NULL
-def	information_schema	PARTITIONS	INDEX_LENGTH	17	NULL	YES	bigint	NULL	NULL	20	0	NULL	NULL	NULL	bigint unsigned			select			NULL
-def	information_schema	PARTITIONS	DATA_FREE	18	NULL	YES	bigint	NULL	NULL	20	0	NULL	NULL	NULL	bigint unsigned			select			NULL
-def	information_schema	PARTITIONS	CREATE_TIME	19	NULL	NO	timestamp	NULL	NULL	NULL	NULL	0	NULL	NULL	timestamp			select			NULL
-def	information_schema	PARTITIONS	UPDATE_TIME	20	NULL	YES	datetime	NULL	NULL	NULL	NULL	0	NULL	NULL	datetime			select			NULL
-def	information_schema	PARTITIONS	CHECK_TIME	21	NULL	YES	datetime	NULL	NULL	NULL	NULL	0	NULL	NULL	datetime			select			NULL
-def	information_schema	PARTITIONS	CHECKSUM	22	NULL	YES	bigint	NULL	NULL	19	0	NULL	NULL	NULL	bigint			select			NULL
-def	information_schema	PARTITIONS	PARTITION_COMMENT	23	NULL	NO	text	65535	65535	NULL	NULL	NULL	utf8mb3	utf8mb3_bin	text			select			NULL
-def	information_schema	PARTITIONS	NODEGROUP	24	NULL	YES	varchar	256	768	NULL	NULL	NULL	utf8mb3	utf8mb3_general_ci	varchar(256)			select			NULL
-def	information_schema	PARTITIONS	TABLESPACE_NAME	25	NULL	YES	varchar	268	804	NULL	NULL	NULL	utf8mb3	utf8mb3_bin	varchar(268)			select			NULL
+def	information_schema	PARTITIONS	SECONDARY_LOAD	8	NULL	YES	varchar	1	3	NULL	NULL	NULL	utf8mb3	utf8mb3_bin	varchar(1)			select			NULL
+def	information_schema	PARTITIONS	PARTITION_METHOD	9	NULL	YES	varchar	13	39	NULL	NULL	NULL	utf8mb3	utf8mb3_general_ci	varchar(13)			select			NULL
+def	information_schema	PARTITIONS	SUBPARTITION_METHOD	10	NULL	YES	varchar	13	39	NULL	NULL	NULL	utf8mb3	utf8mb3_general_ci	varchar(13)			select			NULL
+def	information_schema	PARTITIONS	PARTITION_EXPRESSION	11	NULL	YES	varchar	2048	6144	NULL	NULL	NULL	utf8mb3	utf8mb3_bin	varchar(2048)			select			NULL
+def	information_schema	PARTITIONS	SUBPARTITION_EXPRESSION	12	NULL	YES	varchar	2048	6144	NULL	NULL	NULL	utf8mb3	utf8mb3_bin	varchar(2048)			select			NULL
+def	information_schema	PARTITIONS	PARTITION_DESCRIPTION	13	NULL	YES	text	65535	65535	NULL	NULL	NULL	utf8mb3	utf8mb3_bin	text			select			NULL
+def	information_schema	PARTITIONS	TABLE_ROWS	14	NULL	YES	bigint	NULL	NULL	20	0	NULL	NULL	NULL	bigint unsigned			select			NULL
+def	information_schema	PARTITIONS	AVG_ROW_LENGTH	15	NULL	YES	bigint	NULL	NULL	20	0	NULL	NULL	NULL	bigint unsigned			select			NULL
+def	information_schema	PARTITIONS	DATA_LENGTH	16	NULL	YES	bigint	NULL	NULL	20	0	NULL	NULL	NULL	bigint unsigned			select			NULL
+def	information_schema	PARTITIONS	MAX_DATA_LENGTH	17	NULL	YES	bigint	NULL	NULL	20	0	NULL	NULL	NULL	bigint unsigned			select			NULL
+def	information_schema	PARTITIONS	INDEX_LENGTH	18	NULL	YES	bigint	NULL	NULL	20	0	NULL	NULL	NULL	bigint unsigned			select			NULL
+def	information_schema	PARTITIONS	DATA_FREE	19	NULL	YES	bigint	NULL	NULL	20	0	NULL	NULL	NULL	bigint unsigned			select			NULL
+def	information_schema	PARTITIONS	CREATE_TIME	20	NULL	NO	timestamp	NULL	NULL	NULL	NULL	0	NULL	NULL	timestamp			select			NULL
+def	information_schema	PARTITIONS	UPDATE_TIME	21	NULL	YES	datetime	NULL	NULL	NULL	NULL	0	NULL	NULL	datetime			select			NULL
+def	information_schema	PARTITIONS	CHECK_TIME	22	NULL	YES	datetime	NULL	NULL	NULL	NULL	0	NULL	NULL	datetime			select			NULL
+def	information_schema	PARTITIONS	CHECKSUM	23	NULL	YES	bigint	NULL	NULL	19	0	NULL	NULL	NULL	bigint			select			NULL
+def	information_schema	PARTITIONS	PARTITION_COMMENT	24	NULL	NO	text	65535	65535	NULL	NULL	NULL	utf8mb3	utf8mb3_bin	text			select			NULL
+def	information_schema	PARTITIONS	NODEGROUP	25	NULL	YES	varchar	256	768	NULL	NULL	NULL	utf8mb3	utf8mb3_general_ci	varchar(256)			select			NULL
+def	information_schema	PARTITIONS	TABLESPACE_NAME	26	NULL	YES	varchar	268	804	NULL	NULL	NULL	utf8mb3	utf8mb3_bin	varchar(268)			select			NULL
 def	information_schema	PLUGINS	PLUGIN_NAME	1		NO	varchar	21	64	NULL	NULL	NULL	utf8mb3	utf8mb3_general_ci	varchar(64)			select			NULL
 def	information_schema	PLUGINS	PLUGIN_VERSION	2		NO	varchar	6	20	NULL	NULL	NULL	utf8mb3	utf8mb3_general_ci	varchar(20)			select			NULL
 def	information_schema	PLUGINS	PLUGIN_STATUS	3		NO	varchar	3	10	NULL	NULL	NULL	utf8mb3	utf8mb3_general_ci	varchar(10)			select			NULL
@@ -878,6 +879,7 @@ NULL	information_schema	PARAMETERS	DATETIME_PRECISION	int	NULL	NULL	NULL	NULL	in
 3.0000	information_schema	PARTITIONS	SUBPARTITION_NAME	varchar	64	192	utf8mb3	utf8mb3_bin	varchar(64)
 NULL	information_schema	PARTITIONS	PARTITION_ORDINAL_POSITION	int	NULL	NULL	NULL	NULL	int unsigned
 NULL	information_schema	PARTITIONS	SUBPARTITION_ORDINAL_POSITION	int	NULL	NULL	NULL	NULL	int unsigned
+3.0000	information_schema	PARTITIONS	SECONDARY_LOAD	varchar	1	3	utf8mb3	utf8mb3_bin	varchar(1)
 3.0000	information_schema	PARTITIONS	PARTITION_METHOD	varchar	13	39	utf8mb3	utf8mb3_general_ci	varchar(13)
 3.0000	information_schema	PARTITIONS	SUBPARTITION_METHOD	varchar	13	39	utf8mb3	utf8mb3_general_ci	varchar(13)
 3.0000	information_schema	PARTITIONS	PARTITION_EXPRESSION	varchar	2048	6144	utf8mb3	utf8mb3_bin	varchar(2048)

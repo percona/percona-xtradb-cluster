@@ -27,8 +27,11 @@ MYSQL_ADD_PLUGIN(connection_control
   security_context_wrapper.cc
   connection_delay.cc
   log_rate_limiter.cc
+  option_usage.cc
   MODULE_ONLY
-  LINK_LIBRARIES extra::rapidjson
+  LINK_LIBRARIES
+    extra::rapidjson
+    library_mysys
   )
 
 ADD_DEFINITIONS(-DMYSQL_SERVER)

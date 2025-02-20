@@ -126,6 +126,7 @@ class Table_cache {
   /**
     LRU-organized list containing all TABLE instances with fully-loaded
     triggers in this table cache which are not in use by any thread.
+    Tail is LRU TABLE.
   */
   I_P_List<TABLE,
            I_P_List_adapter<TABLE, &TABLE::triggers_lru_next,
@@ -183,8 +184,8 @@ class Table_cache {
   void free_all_unused_tables();
 
   /**
-    Notify the table cache that for one of its TABLE objects we have
-    finalized loading and parsing triggers.
+    Notify the table cache that we have finalized loading and parsing
+    triggers for one of its TABLE objects.
 
     @note We use atomic to make it MT-safe without introducing overhead
           from lock()/unlock() pair.
@@ -275,9 +276,10 @@ class Table_cache_element {
 
   TABLE_list used_tables;
   /**
-    List of unused TABLE objects for tables without triggers or unused TABLE
-    objects for which triggers were not fully-loaded, so they can only can be
-    used by read-only statements.
+    List of unused TABLE objects that do not have fully-loaded triggers;
+    either because there were no triggers, or because the triggers were
+    not previously loaded as they were not needed for read-only statements.
+    (This distinction is why our nomenclature is not just full <-> lazy.)
   */
   TABLE_list free_tables_slim;
   /** List of unused TABLE objects with fully-loaded triggers. */
@@ -396,6 +398,8 @@ void Table_cache::free_unused_tables_if_necessary(THD *thd) {
       remove_table(table_to_free);
       intern_close_table(table_to_free);
       thd->status_var.table_open_cache_triggers_overflows++;
+      DBUG_PRINT("info", ("table_open_cache_triggers_overflows: %llu",
+                          thd->status_var.table_open_cache_triggers_overflows));
     }
     mysql_mutex_unlock(&LOCK_open);
   }
@@ -505,8 +509,8 @@ void Table_cache::remove_table(TABLE *table) {
   @param      key         Key identifying table.
   @param      key_length  Length of key for the table.
   @param      is_update   Indicates whether statement is going to use
-                          TABLE object for updating the table, so it
-                          is better to obtain TABLE instance with
+                          TABLE object for updating the table; if so,
+                          it is better to obtain a TABLE instance with
                           fully-loaded triggers.
   @param[out] share       NULL - if table cache doesn't contain any
                           information about the table (i.e. doesn't have
@@ -545,19 +549,21 @@ TABLE *Table_cache::get_table(THD *thd, const char *key, size_t key_length,
   if (!is_update) {
     /*
       For read-only statements we prefer TABLE objects which don't have
-      triggers fully-loaded. If successful this should leave unused TABLEs
+      triggers fully-loaded. If successful, this should leave unused TABLEs
       with fully-loaded triggers for read-write statements.
-      If there are no TABLE instances sans fully-loaded triggers available
-      we will resort to using one with them. It is still better than
+      If there are no TABLE instances without fully-loaded triggers available,
+      we will resort to using one that has them. That's still better than
       doing full-blown TABLE construction process.
     */
     table = el->free_tables_slim.pop_front();
     if (!table) table = el->free_tables_full_triggers.pop_front();
   } else {
     /*
-      For read-write statements try to get TABLE object with fully-loaded
-      triggers. If there is no such object try to use sans them.
-      If necessary trigger load will be finalized later.
+      For read-write statements try to get a TABLE object with fully-loaded
+      triggers.
+      If there is no such object, try to obtain a TABLE object without
+      fully-loaded triggers. (If necessary trigger loading will be finalized
+      later.)
     */
     table = el->free_tables_full_triggers.pop_front();
     if (!table) table = el->free_tables_slim.pop_front();

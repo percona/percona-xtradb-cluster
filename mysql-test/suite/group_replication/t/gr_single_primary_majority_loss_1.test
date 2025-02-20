@@ -63,22 +63,81 @@
 # the group.
 
 --let $rpl_connection_name= server2
+<<<<<<< HEAD
 --source include/connection.inc
 --exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
 --shutdown_server 0
 --source include/wait_until_disconnected.inc
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+--source include/rpl_connection.inc
+--source include/kill_mysqld.inc
+--let $server2_expect_file_name= $_expect_file_name
+||||||||| merged common ancestors
+--source include/rpl_connection.inc
+--enable_reconnect
+--exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
+--shutdown_server 0
+--source include/wait_until_disconnected.inc
+=========
+--source include/connection.inc
+--exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
+--shutdown_server 0
+--source include/wait_until_disconnected.inc
+>>>>>>>>> Temporary merge branch 2
+=======
+--source include/connection.inc
+--source include/kill_mysqld.inc
+--let $server2_expect_file_name= $_expect_file_name
+>>>>>>> Percona-Server-9.1.0-1
 
 --let $rpl_connection_name= server3
 --source include/connection.inc
+<<<<<<< HEAD
 --exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.3.expect
 --shutdown_server 0
 --source include/wait_until_disconnected.inc
+||||||| merged common ancestors
+--exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.3.expect
+--shutdown_server 0
+--source include/wait_until_disconnected.inc
+>>>>>>>>> Temporary merge branch 2
+=======
+--source include/kill_and_restart_mysqld.inc
+>>>>>>> Percona-Server-9.1.0-1
 
+<<<<<<< HEAD
 --source include/wait_until_connected_again.inc
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+||||||||| merged common ancestors
+--source include/wait_until_connected_again.inc
+--disable_reconnect
+=========
+--source include/wait_until_connected_again.inc
+>>>>>>>>> Temporary merge branch 2
+=======
+>>>>>>> Percona-Server-9.1.0-1
 
 # reset the group_replication_id var
 --let $group_replication_member_id= $member1_uuid
 
+<<<<<<< HEAD
+||||||| merged common ancestors
+# Start server 2 now after server 3 was killed.
+--let $rpl_connection_name= server2
+--source include/rpl_connection.inc
+--let $_expect_file_name= $server2_expect_file_name
+--source include/start_mysqld.inc
+
+=======
+# Start server 2 now after server 3 was killed.
+--let $rpl_connection_name= server2
+--source include/connection.inc
+--let $_expect_file_name= $server2_expect_file_name
+--source include/start_mysqld.inc
+
+>>>>>>> Percona-Server-9.1.0-1
 --let $rpl_server_number= 2
 --source include/rpl/reconnect.inc
 

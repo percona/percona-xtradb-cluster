@@ -72,11 +72,14 @@ SET(KEYRING_FILE_SOURCE
 
   # Component callbacks
   component_callbacks.cc
+
+  option_usage.cc
 )
 
 SET(KEYRING_FILE_LIBRARIES
   keyring_common
   OpenSSL::SSL OpenSSL::Crypto
+  library_mysys
 )
 
 MYSQL_ADD_COMPONENT(keyring_file
@@ -84,6 +87,9 @@ MYSQL_ADD_COMPONENT(keyring_file
   LINK_LIBRARIES ${KEYRING_FILE_LIBRARIES}
   MODULE_ONLY
 )
+
+DOWNGRADE_STRINGOP_WARNINGS(component_keyring_file)
+
 IF(APPLE)
   SET_TARGET_PROPERTIES(component_keyring_file PROPERTIES
     LINK_FLAGS "-undefined dynamic_lookup")

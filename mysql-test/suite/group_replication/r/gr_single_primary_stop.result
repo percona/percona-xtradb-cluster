@@ -12,6 +12,17 @@ include/start_group_replication.inc
 # Crash the primary server
 [connection server1]
 include/gr_wait_primary_member_uuid.inc
+<<<<<<< HEAD
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+# Kill and restart
+include/rpl_reconnect.inc
+||||||||| merged common ancestors
+include/rpl_reconnect.inc
+=========
+=======
+# Kill and restart
+>>>>>>> Percona-Server-9.1.0-1
 include/rpl/reconnect.inc
 [connection server_2]
 # wait for number of alive members to be 2

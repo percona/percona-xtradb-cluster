@@ -217,10 +217,11 @@ Item *convert_charset_partition_constant(Item *item, const CHARSET_INFO *cs) {
   Table_ref *save_list = context->table_list;
   const char *save_where = thd->where;
 
-  item = item->safe_charset_converter(thd, cs);
+  item = item->convert_charset(thd, cs);
+  if (item == nullptr) return nullptr;
   context->table_list = nullptr;
   thd->where = "convert character set partition constant";
-  if (!item || item->fix_fields(thd, (Item **)nullptr)) item = nullptr;
+  if (item->fix_fields(thd, nullptr)) return nullptr;
   thd->where = save_where;
   context->table_list = save_list;
   return item;
@@ -265,7 +266,7 @@ static bool is_name_in_list(const char *name, List<String> list_names) {
     false                         Success
 */
 
-MY_NODISCARD
+[[nodiscard]]
 static bool partition_default_handling(Partition_handler *part_handler,
                                        partition_info *part_info,
                                        bool is_create_table_ind,
@@ -433,7 +434,7 @@ static bool set_up_field_array(TABLE *table, bool is_sub_part) {
   uint i = 0;
   uint inx;
   partition_info *part_info = table->part_info;
-  int result = false;
+  bool result = false;
   DBUG_TRACE;
 
   ptr = table->field;
@@ -503,6 +504,13 @@ static bool set_up_field_array(TABLE *table, bool is_sub_part) {
             A BLOB takes too long time to evaluate so we don't want it for
             performance reasons.
         */
+
+        if (field->real_type() == MYSQL_TYPE_VECTOR) {
+          /* vector column as partition key is not supported */
+          my_error(ER_FIELD_TYPE_NOT_ALLOWED_AS_PARTITION_FIELD, MYF(0),
+                   field->field_name);
+          result = true;
+        }
 
         if (field->is_flag_set(BLOB_FLAG)) {
           my_error(ER_BLOB_FIELD_IN_PART_FUNC_ERROR, MYF(0));
@@ -1473,7 +1481,7 @@ bool fix_partition_func(THD *thd, TABLE *table, bool is_create_table_ind) {
   partition_info *part_info = table->part_info;
   const enum_mark_columns save_mark_used_columns = thd->mark_used_columns;
   Partition_handler *part_handler;
-  const ulong save_want_privilege = thd->want_privilege;
+  const Access_bitmask save_want_privilege = thd->want_privilege;
   DBUG_TRACE;
 
   if (part_info->fixed) {
@@ -1950,6 +1958,13 @@ static int check_part_field(enum_field_types sql_type, const char *field_name,
   if (sql_type >= MYSQL_TYPE_TINY_BLOB && sql_type <= MYSQL_TYPE_BLOB) {
     my_error(ER_BLOB_FIELD_IN_PART_FUNC_ERROR, MYF(0));
     return true;
+  }
+  if (sql_type == MYSQL_TYPE_VECTOR) {
+    /* vector column as partition key is not supported */
+    /* LCOV_EXCL_START */
+    my_error(ER_FIELD_TYPE_NOT_ALLOWED_AS_PARTITION_FIELD, MYF(0), field_name);
+    return true;
+    /* LCOV_EXCL_STOP */
   }
   switch (sql_type) {
     case MYSQL_TYPE_TINY:

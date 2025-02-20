@@ -999,8 +999,7 @@ bool fsp_enable_encryption(fil_space_t *space) {
   byte encrypt_info[Encryption::INFO_SIZE];
 
   memset(encrypt_info, 0, Encryption::INFO_SIZE);
-  if (!Encryption::fill_encryption_info(space->m_encryption_metadata,
-                                        true,
+  if (!Encryption::fill_encryption_info(space->m_encryption_metadata, true,
                                         encrypt_info)) {
     return (false);
   }
@@ -1900,7 +1899,7 @@ static void fsp_free_page(const page_id_t &page_id,
       /* We put here some fault tolerance: if the page
       is already free, return without doing anything! */
 
-      ut_o(return );
+      ut_o(return);
     }
 
     ut_error;
@@ -1920,7 +1919,7 @@ static void fsp_free_page(const page_id_t &page_id,
     /* We put here some fault tolerance: if the page
     is already free, return without doing anything! */
 
-    ut_o(return );
+    ut_o(return);
   }
 
   const page_no_t bit = page_id.page_no() % FSP_EXTENT_SIZE;

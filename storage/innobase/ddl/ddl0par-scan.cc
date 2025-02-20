@@ -237,16 +237,13 @@ dberr_t Parallel_cursor::scan(Builders &builders) noexcept {
             thread_ctx->get_state() != Parallel_reader::State::THREAD) {
           thread_ctx->savepoint();
           latches_released = true;
+          DEBUG_SYNC_C("ddl_bulk_inserter_latches_released");
         }
         return DB_SUCCESS;
       });
 
       if (err != DB_SUCCESS && err != DB_END_OF_INDEX) {
         return err;
-      }
-
-      if (builder->stage() != nullptr) {
-        builder->stage()->end_phase_read_pk();
       }
     }
 
@@ -390,6 +387,13 @@ dberr_t Parallel_cursor::scan(Builders &builders) noexcept {
     }
   }
 
+  /* We completed reading the PK, now we can call its end
+  in order to calculate metrics based on it. */
+  for (auto &builder : builders) {
+    if (builder->stage() != nullptr) {
+      builder->stage()->end_phase_read_pk();
+    }
+  }
   return cleanup(m_heaps, err);
 }
 

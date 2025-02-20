@@ -114,11 +114,41 @@ SET DEBUG_SYNC= 'RESET';
 # the group.
 --let $member2_uuid= query_get_value(SELECT @@SERVER_UUID, @@SERVER_UUID, 1)
 
+<<<<<<< HEAD
 --exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
 --shutdown_server 0
 --source include/wait_until_disconnected.inc
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+||||||||| merged common ancestors
+--enable_reconnect
+--exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
+--shutdown_server 0
+--source include/wait_until_disconnected.inc
+=========
+--exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
+--shutdown_server 0
+--source include/wait_until_disconnected.inc
+>>>>>>>>> Temporary merge branch 2
+=======
+>>>>>>> Percona-Server-9.1.0-1
 
+<<<<<<< HEAD
 --source include/wait_until_connected_again.inc
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+
+--source include/kill_and_restart_mysqld.inc
+||||||||| merged common ancestors
+--source include/wait_until_connected_again.inc
+--disable_reconnect
+=========
+--source include/wait_until_connected_again.inc
+>>>>>>>>> Temporary merge branch 2
+=======
+
+--source include/kill_and_restart_mysqld.inc
+>>>>>>> Percona-Server-9.1.0-1
 
 # Wait for the member state be unreachable.
 --let $rpl_connection_name= server_1
@@ -149,11 +179,33 @@ SELECT group_replication_get_communication_protocol();
 
 --let $member3_uuid= query_get_value(SELECT @@SERVER_UUID, @@SERVER_UUID, 1)
 
+<<<<<<< HEAD
 --exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.3.expect
 --shutdown_server 0
 --source include/wait_until_disconnected.inc
 
 --source include/wait_until_connected_again.inc
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+--source include/kill_and_restart_mysqld.inc
+||||||||| merged common ancestors
+--enable_reconnect
+--exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.3.expect
+--shutdown_server 0
+--source include/wait_until_disconnected.inc
+
+--source include/wait_until_connected_again.inc
+--disable_reconnect
+=========
+--exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.3.expect
+--shutdown_server 0
+--source include/wait_until_disconnected.inc
+
+--source include/wait_until_connected_again.inc
+>>>>>>>>> Temporary merge branch 2
+=======
+--source include/kill_and_restart_mysqld.inc
+>>>>>>> Percona-Server-9.1.0-1
 
 # Wait for the member state be unreachable.
 --let $rpl_connection_name= server_1

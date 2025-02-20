@@ -34,7 +34,7 @@
 # include/assert.inc [Expected table cache open tables with triggers increment : 0]
 #
 
-# If missing, create helper scripts to iterate through bellow JSON array.
+# If missing, create helper scripts to iterate through below JSON array.
 --let $has_json_functions = `SELECT INSTR('$json_function_files','sv_check_inc')`
 if (!$has_json_functions) {
   --let $json_label = sv_check_inc
@@ -42,7 +42,7 @@ if (!$has_json_functions) {
   --source include/create_json_unpacking_iterator.inc
 }
 
-# Array describing each status variable to be checked, what is the name
+# Array describing each status variable to be checked -- what is the name
 # of the corresponding script parameter with expected increment, what
 # is name of variable to remember its value for future executions, and
 # what is assertion text to be used for this variable.
