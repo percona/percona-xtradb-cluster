@@ -11,24 +11,11 @@ include/start_group_replication.inc
 include/start_group_replication.inc
 # Crash two secondary members to cause majority loss.
 [connection server2]
+# Kill the server
 [connection server3]
-<<<<<<< HEAD
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
 # Kill and restart
 [connection server2]
 # restart
-include/rpl_reconnect.inc
-include/rpl_reconnect.inc
-||||||||| merged common ancestors
-include/rpl_reconnect.inc
-include/rpl_reconnect.inc
-=========
-=======
-# Kill and restart
-[connection server2]
-# restart
->>>>>>> Percona-Server-9.1.0-1
 include/rpl/reconnect.inc
 include/rpl/reconnect.inc
 [connection server2]

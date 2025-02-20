@@ -1343,10 +1343,6 @@ GROUP BY CUBE(f2);
 
 DROP VIEW v1;
 DROP TABLE t1;
-<<<<<<< HEAD
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-=======
 
 --echo #
 --echo # Bug#36514339 ROLLUP misses a summary NULL
@@ -1393,7 +1389,6 @@ SET timestamp=UNIX_TIMESTAMP('2009-04-16 12:46:00');
 SELECT SUM(UTC_DATE()) OVER() FROM t1 GROUP BY UTC_DATE() WITH ROLLUP;
 SET timestamp=default;
 DROP TABLE t1;
->>>>>>> Percona-Server-9.1.0-1
 
 --echo #
 --echo # PS-8328: MySQL 8 Crash when using group_concat with group by with

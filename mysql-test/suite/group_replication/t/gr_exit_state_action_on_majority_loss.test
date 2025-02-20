@@ -73,49 +73,12 @@ SET @@GLOBAL.group_replication_exit_state_action = READ_ONLY;
 --let $rpl_connection_name= server2
 --source include/connection.inc
 
-<<<<<<< HEAD
---exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
---shutdown_server 0
---source include/wait_until_disconnected.inc
---source include/wait_until_connected_again.inc
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
 --source include/kill_and_restart_mysqld.inc
 
-||||||||| merged common ancestors
---enable_reconnect
---exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
---shutdown_server 0
---source include/wait_until_disconnected.inc
---source include/wait_until_connected_again.inc
---disable_reconnect
-=========
---exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
---shutdown_server 0
---source include/wait_until_disconnected.inc
---source include/wait_until_connected_again.inc
->>>>>>>>> Temporary merge branch 2
-=======
---source include/kill_and_restart_mysqld.inc
-
->>>>>>> Percona-Server-9.1.0-1
 # Crash server 3
 --let $rpl_connection_name= server3
 --source include/connection.inc
-<<<<<<< HEAD
---exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.3.expect
---shutdown_server 0
---source include/wait_until_disconnected.inc
---source include/wait_until_connected_again.inc
-||||||| merged common ancestors
---exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.3.expect
---shutdown_server 0
---source include/wait_until_disconnected.inc
---source include/wait_until_connected_again.inc
->>>>>>>>> Temporary merge branch 2
-=======
 --source include/kill_and_restart_mysqld.inc
->>>>>>> Percona-Server-9.1.0-1
 
 --echo
 --echo #########################################################################
@@ -179,37 +142,11 @@ SET @@GLOBAL.group_replication_exit_state_action = ABORT_SERVER;
 # Crash server 2
 --let $rpl_connection_name= server2
 --source include/connection.inc
-<<<<<<< HEAD
---exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
---shutdown_server 0
---source include/wait_until_disconnected.inc
---source include/wait_until_connected_again.inc
-||||||| merged common ancestors
---exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
---shutdown_server 0
---source include/wait_until_disconnected.inc
---source include/wait_until_connected_again.inc
->>>>>>>>> Temporary merge branch 2
-=======
 --source include/kill_and_restart_mysqld.inc
->>>>>>> Percona-Server-9.1.0-1
 # Crash server 3
 --let $rpl_connection_name= server3
 --source include/connection.inc
-<<<<<<< HEAD
---exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.3.expect
---shutdown_server 0
---source include/wait_until_disconnected.inc
---source include/wait_until_connected_again.inc
-||||||| merged common ancestors
---exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.3.expect
---shutdown_server 0
---source include/wait_until_disconnected.inc
---source include/wait_until_connected_again.inc
->>>>>>>>> Temporary merge branch 2
-=======
 --source include/kill_and_restart_mysqld.inc
->>>>>>> Percona-Server-9.1.0-1
 
 --echo
 --echo #########################################################################

@@ -304,13 +304,7 @@ INSERT INTO I_S_published_schema
         '06bdff30a209ee9b41bf1b654048010e0ca67399ccca594600659816fb3ee036');  
 INSERT INTO I_S_published_schema
   VALUES ('80030', '80030', 0,
-<<<<<<< HEAD
-        'b4cad25af8b970d7d41208b749f648719f7015080964562738e95aaccd47768b');  
-||||||| merged common ancestors
-        'b4cad25af8b970d7d41208b749f648719f7015080964562738e95aaccd47768b');
-=======
         'f2f9eac78a7fe69de079bd55831bb4451236c492a76f9195e43051db44e84510');  
->>>>>>> Percona-Server-9.1.0-1
 INSERT INTO I_S_published_schema
   VALUES ('80030', '80030', 1,
         '4399948df993b3a2084c4a6dd80d76e38b2ff874e68b7e33a16b907eeb090ff0');

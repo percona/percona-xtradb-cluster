@@ -113,7 +113,7 @@ SET @@GLOBAL.group_replication_allow_local_lower_version_join=1;
 --let $wait_condition=SELECT COUNT(*)=1 FROM performance_schema.replication_group_members where MEMBER_STATE="ONLINE" AND MEMBER_ID = '$server3_uuid'
 --source include/wait_condition.inc
 
---let $assert_text= The super_read_only mode should be 0 on server1.
+--let $assert_text= The super_read_only mode should be 0 on server3.
 --let $assert_cond= "[SELECT @@GLOBAL.super_read_only]" = 0;
 --source include/assert.inc
 

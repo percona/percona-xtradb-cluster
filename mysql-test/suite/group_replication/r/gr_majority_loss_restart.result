@@ -18,17 +18,7 @@ SET SESSION sql_log_bin= 1;
 ############################################################
 # 1. Crash server 2.
 [connection server2]
-<<<<<<< HEAD
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
 # Kill and restart
-include/rpl_reconnect.inc
-||||||||| merged common ancestors
-include/rpl_reconnect.inc
-=========
-=======
-# Kill and restart
->>>>>>> Percona-Server-9.1.0-1
 include/rpl/reconnect.inc
 [connection server1]
 include/gr_wait_for_member_state.inc
