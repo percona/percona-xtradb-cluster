@@ -1879,9 +1879,11 @@ bool MYSQL_BIN_LOG::write_transaction(THD *thd, binlog_cache_data *cache_data,
       !(thd->variables.option_bits & OPTION_BIN_LOG))
     goto end;
 
-  ret = gtid_event.write(writer);
+  ret = DBUG_EVALUATE_IF("simulate_write_trans_without_gtid", false,
+                         gtid_event.write(writer));
 #else
-  bool ret = gtid_event.write(writer);
+  bool ret = DBUG_EVALUATE_IF("simulate_write_trans_without_gtid", false,
+                              gtid_event.write(writer));
 #endif
   if (ret) goto end;
 
@@ -8987,6 +8989,7 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all) {
          trans_commit_stmt()) the following call to my_error() will allow
          overwriting the error */
       my_error(ER_TRANSACTION_ROLLBACK_DURING_COMMIT, MYF(0));
+      thd_leave_async_monitor(thd);
       return RESULT_ABORTED;
     }
 
@@ -8997,6 +9000,7 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all) {
     rc = rc ? rc : ordered_commit(thd, all, skip_commit);
 
     if (run_wsrep_hooks) {
+      thd_leave_async_monitor(thd);
       wsrep_after_commit(thd, all);
     }
 
@@ -12597,8 +12601,9 @@ TC_LOG::enum_result wsrep_thd_binlog_commit(THD *thd, bool all) {
     if (all) {
       CONDITIONAL_SYNC_POINT_FOR_TIMESTAMP("before_commit_in_tc");
     }
-    return trx_coordinator::commit_in_engines(thd, all) ? TC_LOG::RESULT_ABORTED
-                                                        : TC_LOG::RESULT_SUCCESS;
+    return trx_coordinator::commit_in_engines(thd, all)
+               ? TC_LOG::RESULT_ABORTED
+               : TC_LOG::RESULT_SUCCESS;
   }
 }
 

@@ -455,6 +455,18 @@ MYSQL_ADD_EXECUTABLE(rpl_event_ctx-t rpl_event_ctx-t.cc
   LINK_LIBRARIES rpl_event_ctx_lib gunit_small
 )
 
+# WITH_WSREP
+ADD_LIBRARY(wsrep_async_monitor_lib STATIC
+  ${CMAKE_SOURCE_DIR}/sql/wsrep_async_monitor.cc
+)
+TARGET_LINK_LIBRARIES(wsrep_async_monitor_lib)
+
+MYSQL_ADD_EXECUTABLE(wsrep_async_monitor-t wsrep_async_monitor-t.cc
+  ENABLE_EXPORTS
+  ADD_TEST wsrep_async_monitor
+  LINK_LIBRARIES wsrep_async_monitor_lib gunit_small
+)
+
 ADD_SUBDIRECTORY(ddl_rewriter)
 ADD_SUBDIRECTORY(innodb)
 ADD_SUBDIRECTORY(components/mysql_server)

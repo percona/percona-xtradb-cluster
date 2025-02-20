@@ -1863,6 +1863,16 @@ The following options may be given as the first argument:
  --wsrep-trx-fragment-unit=name 
  Unit for streaming replication transaction fragments'
  size: bytes, rows, statements
+ --wsrep-use-async-monitor 
+ Use Async Monitors to avoid deadlock of replicated
+ transactions in a multi-threaded replica. Deadlock is
+ possible when the PXC replica tries to commit the
+ replicated transactions in galera in a different order
+ than its order in the relay log. Use
+ 'wsrep_use_async_monitor' to avoid such deadlocks.This
+ variable is only allowed to be changed through command
+ line.
+ (Defaults to on; use --skip-wsrep-use-async-monitor to disable.)
  --xa-detach-on-prepare 
  When set, XA transactions will be detached (AKA
  dissociated or disconnected) from connection as part of
@@ -2373,6 +2383,7 @@ wsrep-start-position 00000000-0000-0000-0000-000000000000:-1
 wsrep-sync-wait 0
 wsrep-trx-fragment-size 0
 wsrep-trx-fragment-unit bytes
+wsrep-use-async-monitor TRUE
 xa-detach-on-prepare TRUE
 
 To see what values a running MySQL server is using, type

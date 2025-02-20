@@ -176,6 +176,10 @@
 #endif
 #include "scope_guard.h"
 
+#ifdef WITH_WSREP
+#include "sql/wsrep_async_monitor.h"
+#endif /* WITH_WSREP */
+
 struct mysql_cond_t;
 struct mysql_mutex_t;
 
@@ -7216,6 +7220,9 @@ extern "C" void *handle_slave_sql(void *arg) {
   bool mts_inited = false;
   Global_THD_manager *thd_manager = Global_THD_manager::get_instance();
   Commit_order_manager *commit_order_mngr = nullptr;
+#ifdef WITH_WSREP
+  Wsrep_async_monitor *wsrep_async_monitor = nullptr;
+#endif /* WITH_WSREP */
   Rpl_applier_reader applier_reader(rli);
   Relay_log_info::enum_priv_checks_status priv_check_status =
       Relay_log_info::enum_priv_checks_status::SUCCESS;
@@ -7257,6 +7264,16 @@ wsrep_restart_point :
           new Commit_order_manager(rli->opt_replica_parallel_workers);
 
     rli->set_commit_order_manager(commit_order_mngr);
+
+#ifdef WITH_WSREP
+    if (WSREP_ON && wsrep_use_async_monitor &&
+        opt_replica_preserve_commit_order && !rli->is_parallel_exec() &&
+        rli->opt_replica_parallel_workers > 1) {
+      wsrep_async_monitor =
+          new Wsrep_async_monitor(rli->opt_replica_parallel_workers);
+      rli->set_wsrep_async_monitor(wsrep_async_monitor);
+    }
+#endif /* WITH_WSREP */
 
     if (channel_map.is_group_replication_applier_channel_name(
             rli->get_channel())) {
@@ -7691,6 +7708,13 @@ wsrep_restart_point :
       rli->set_commit_order_manager(nullptr);
       delete commit_order_mngr;
     }
+
+#ifdef WITH_WSREP
+    if (wsrep_async_monitor) {
+      rli->set_wsrep_async_monitor(nullptr);
+      delete wsrep_async_monitor;
+    }
+#endif /* WITH_WSREP */
 
     mysql_mutex_unlock(&rli->info_thd_lock);
     set_thd_in_use_temporary_tables(
