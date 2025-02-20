@@ -180,6 +180,17 @@ else
     SST_PROGRESS_FILE=""
 fi
 
+# If the user has .mylogin.cnf file, mysqladmin, mysql, xtrabackup will
+# use it for login information. This is especially dangerous if we try to
+# connect to the post-SST instance, which has networking disabled. The only way
+# to connect to it is through the socket, however, if .mylogin.cnf has host
+# specified, mysql client/mysqladmin will use it and fail.
+# That's why we rely on locally generated configs in SST script.
+# Specifying --protocol=SOCKET explicitly to the mysql client, does not solve
+# the issue - if .mylogin.cnf contains host, the client claims that SOCKET
+# is the unknown protocol
+export MYSQL_TEST_LOGIN_FILE=/dev/null
+
 #
 # user can specify xtrabackup specific settings that will be used during sst
 # process like encryption, etc.....
