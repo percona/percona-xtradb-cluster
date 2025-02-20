@@ -90,7 +90,7 @@ GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *
 -- See https://www.percona.com/doc/percona-xtrabackup/8.0/using_xtrabackup/privileges.html
 CREATE ROLE 'mysql.pxc.sst.role'@localhost;
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'mysql.pxc.sst.role'@localhost;
-GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.*
+GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER, INNODB_REDO_LOG_ARCHIVE ON *.*
  TO 'mysql.pxc.sst.role'@localhost;
 GRANT ALTER, CREATE, SELECT, INSERT ON PERCONA_SCHEMA.xtrabackup_history
  TO 'mysql.pxc.sst.role'@localhost;
