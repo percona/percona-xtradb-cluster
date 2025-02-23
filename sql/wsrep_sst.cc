@@ -1437,8 +1437,6 @@ static void *sst_donor_thread(void *a) {
                 strerror(err));
   }
 
-  wsrep_remove_sst_user(true);
-
   if (locked)  // don't forget to unlock server before return
   {
     sst_disallow_writes(thd.ptr, false);
@@ -1455,6 +1453,9 @@ static void *sst_donor_thread(void *a) {
   // The process has exited, so the logger thread should
   // also have exited
   if (logger_thd) pthread_join(logger_thd, NULL);
+
+  // The process has exited, so sst user is no longer needed
+  wsrep_remove_sst_user(true);
 
 #ifdef HAVE_PSI_INTERFACE
   wsrep_pfs_delete_thread();

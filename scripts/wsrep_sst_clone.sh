@@ -170,17 +170,6 @@ wsrep_gen_secret()
     fi
 }
 
-# Convert old space-separated string to new /-separated form
-wsrep_sst_normalize_state_string()
-{
-    local wsrep_gtid=$1
-    local local_gtid=$2
-    local server_id=$3
-    local server_uuid=$4
-    local local_seqno="${local_gtid##*:}"
-    echo $wsrep_gtid/$local_seqno/$server_id/$server_uuid
-}
-
 cleanup_donor()
 {
     wsrep_log_info "Cleanup DONOR."
@@ -262,14 +251,21 @@ check_client_version()
 # If donor does not have clone plugin installed by default, it sets CLEANUP_CLONE_PLUGIN=yes
 # This flag is sent to Joiner, to inform the Joiner that it should uninstall clone plugin after SST.
 # Flag is also used on Donor side to decide if clone plugin should be uninstalled after SST.
+# Sets the following environment variables: CLEANUP_CLONE_PLUGIN_ON_DONOR
 install_clone_plugin()
 {
     local -r role=$1
+
+    # Note that install_clone_plugin() is called on Joiner side after Joiner receives
+    # info that clone plugin should be uninstalled after SST. Joiner stores this info
+    # in CLEANUP_CLONE_PLUGIN variable, so we don't want to override it here.
     if [ "$role" == "donor" ]
     then
         CLEANUP_CLONE_PLUGIN="no"
     fi
+
     CLONE_PLUGIN_LOADED=$($MYSQL_ACLIENT -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.PLUGINS WHERE PLUGIN_TYPE = 'CLONE';")
+
     if [ "$CLONE_PLUGIN_LOADED" -eq 0 ]
     then
         wsrep_log_info "Installing CLONE plugin"
@@ -295,35 +291,39 @@ install_clone_plugin()
 # 2. Donor needs to connect to Recipient instance to trigger cloning.
 #    if [sst] (with fallback to [client]) certificates are present - use them.
 #    This affects CLIENT_SSL_OPTIONS global variable.
+# Sets the following environment variables: REQUIRE_SSL, CLIENT_SSL_OPTIONS
 setup_certificates_for_donor()
 {
-    # CLIENT_SSL_* is used by Donor to connect to Joiner's clone (aka Recipient) instance
-    local client_ssl_cert=""
-    local client_ssl_key=""
-    local client_ssl_ca=""
-    local client_ssl_mode=""
+    local client_ssl_cert
+    local client_ssl_key
+    local client_ssl_ca
+    local client_ssl_mode
+    local server_ssl_cert
+    local server_ssl_key
+    local server_ssl_ca
 
+    # client_ssl_* is used by Donor to connect to Joiner's clone (aka Recipient) instance
     client_ssl_cert=$(parse_cnf client ssl_cert "")
     client_ssl_key=$(parse_cnf client ssl_key "")
     client_ssl_ca=$(parse_cnf client ssl_ca "")
     client_ssl_mode=$(parse_cnf client ssl_mode "")
 
     wsrep_log_debug "SSL Client settings on $role from client section:  CERT=$client_ssl_cert, KEY=$client_ssl_key, CA=$client_ssl_ca, ssl-mode=$client_ssl_mode "
-    
+
     # Server info
     # If donor certificates are set, we require all connections to donor
     # to be SSL-protected. That means connection from Recipient instance
     # to Donor instance will have to be over SSL.
-    SERVER_SSL_CERT=$($MYSQL_ACLIENT -e "SELECT @@ssl_cert")
-    SERVER_SSL_KEY=$($MYSQL_ACLIENT -e "SELECT @@ssl_key")
-    SERVER_SSL_CA=$($MYSQL_ACLIENT -e "SELECT @@ssl_ca")
+    server_ssl_cert=$($MYSQL_ACLIENT -e "SELECT @@ssl_cert")
+    server_ssl_key=$($MYSQL_ACLIENT -e "SELECT @@ssl_key")
+    server_ssl_ca=$($MYSQL_ACLIENT -e "SELECT @@ssl_ca")
 
     # REQUIRE_SSL is used during clone user creation on Donor server
     REQUIRE_SSL=""
-    if [ -n "$SERVER_SSL_CA" ] && [ -n "$SERVER_SSL_CERT" ] && [ -n "$SERVER_SSL_KEY" ]; then
+    if [ -n "$server_ssl_ca" ] && [ -n "$server_ssl_cert" ] && [ -n "$server_ssl_key" ]; then
         REQUIRE_SSL="REQUIRE SSL"
     fi
-    wsrep_log_debug "Clone SSL Server settings on $role from runtime:  CERT=$SERVER_SSL_CERT, KEY=$SERVER_SSL_KEY, CA=$SERVER_SSL_CA"
+    wsrep_log_debug "Clone SSL Server settings on $role from runtime:  CERT=$server_ssl_cert, KEY=$server_ssl_key, CA=$server_ssl_ca"
 
     # CLIENT_SSL_OPTIONS is used when Donor connects to the Recipient instance to trigger clone
     CLIENT_SSL_OPTIONS=""
@@ -343,11 +343,23 @@ setup_certificates_for_donor()
     fi
     wsrep_log_debug "SSL Client settings on $role for connection CLIENT_SSL_OPTIONS=${CLIENT_SSL_OPTIONS}"
 }
+
+# Setup certificates for Joiner's clone instance (aka "Recipient")
+# Recipient instance potentially needs clone_ssl_* certificates to be set.
+# If they are specified in Joiner's my.cnf, they should be set automatically
+# after we install clone plugin in Recipient instance. If not, let's try
+# to set them manually. If still not present, Recipient instance will use
+# not encrypted connection. Note that if Donor requires encrypted connection, clone
+# will fail, but it is a configuration problem.
 setup_certificates_for_recipient()
 {
-    local clone_ssl_cert=$($MYSQL_ACLIENT -e "SELECT @@clone_ssl_cert")
-    local clone_ssl_key=$($MYSQL_ACLIENT -e "SELECT @@clone_ssl_key")
-    local clone_ssl_ca=$($MYSQL_ACLIENT -e "SELECT @@clone_ssl_ca")
+    local clone_ssl_cert
+    local clone_ssl_key
+    local clone_ssl_ca
+
+    clone_ssl_cert=$($MYSQL_ACLIENT -e "SELECT @@clone_ssl_cert")
+    clone_ssl_key=$($MYSQL_ACLIENT -e "SELECT @@clone_ssl_key")
+    clone_ssl_ca=$($MYSQL_ACLIENT -e "SELECT @@clone_ssl_ca")
     wsrep_log_debug "Clone SSL settings on $role from runtime:  CERT=$clone_ssl_cert, KEY=$clone_ssl_key, CA=$clone_ssl_ca"
 
     # We check if ssl certificates for clone are available.
@@ -379,20 +391,7 @@ setup_certificates_for_recipient()
     fi
 }
 
-# The following function:
-# 1. checks if CLONE plugin is loaded. If not loads it.
-# 2. checks if SSL cert and key are configured for any of and in that order:
-#    a. CLONE plugin
-#    b. MySQL in general
-#    c. in [sst] section of my.cnf
-# 3. If SSL is configured, but not for the CLONE plugin explicitly, sets up
-#    corresponging CLONE plugin variables
-#
-# Requires environment variables: MYSQL_ACLIENT, MYSQL_PWD
-# Sets the following environment variables:
-# CLEANUP_PLUGIN, REQUIRE_SSL, CLONE_SSL_CERT,
-# CLONE_SSL_KEY, CLONE_SSL_CA, CLIENT_SSL_OPTIONS, CLEANUP_SSL
-#
+# Install clone plugin and setup needed certificates
 setup_clone_plugin()
 {
     # Either donor or recipient
@@ -400,14 +399,14 @@ setup_clone_plugin()
 
     install_clone_plugin "$role"
 
-    wsrep_log_debug "-> ############## SSL SECTION [START] ($role)############"
+    wsrep_log_debug "-> ############## SSL SECTION [START] ($role) ############"
     if [ "$role" == "donor" ]
     then
         setup_certificates_for_donor
     else
         setup_certificates_for_recipient
     fi
-    wsrep_log_debug "-> ############## SSL SECTION [END] ($role)############"
+    wsrep_log_debug "-> ############## SSL SECTION [END] ($role) ############"
 }
 
 # Let's use the simple approach to detect if the transfer is running or not.
@@ -487,7 +486,7 @@ monitor_sst_progress() {
 
 # This is the script execution start point
 
-if test -z "$WSREP_SST_OPT_HOST"; then wsrep_log_error "HOST cannot be nil"; exit $EINVAL; fi
+if test -z "$WSREP_SST_OPT_HOST"; then wsrep_log_error "HOST cannot be empty"; exit $EINVAL; fi
 
 # MySQL client does not seem to agree to [] around IPv6 addresses
 wsrep_check_programs sed
@@ -515,9 +514,6 @@ then
     wsrep_log_debug "-> WSREP_SST_OPT_REMOTE_HOSTPORT = $WSREP_SST_OPT_REMOTE_HOSTPORT "
     wsrep_log_debug "-> SST_HOST_STRIPPED = $SST_HOST_STRIPPED "
 
-
-
-
     # Split auth string at the last ':'
     if test -z "$WSREP_SST_OPT_USER";   then wsrep_log_error "USER cannot be empty";   exit $EINVAL; fi
     if test -z "$WSREP_SST_OPT_REMOTE_JOINER_USER"; then wsrep_log_error "REMOTE_USER cannot be empty"; exit $EINVAL; fi
@@ -544,7 +540,6 @@ then
     wsrep_log_debug "-> MYSQL_RCLIENT: $MYSQL_RCLIENT "
     #wsrep_log_debug "-> MYSQL_RUSER: $WSREP_SST_OPT_REMOTE_JOINER_USER | PWD  $WSREP_SST_OPT_REMOTE_JOINER_PSWD"
 
-
     if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
     then
         #
@@ -562,7 +557,10 @@ then
         setup_clone_plugin "donor"
 
         wsrep_log_info "REQUIRE_SSL=$REQUIRE_SSL, CLIENT_SSL_OPTIONS=$CLIENT_SSL_OPTIONS"
-        wsrep_log_debug "-> PREPARE DONE"
+
+        # Server configuration might have changed, make sure it is restored
+        # on exit
+        trap cleanup_donor EXIT
 
 cat << EOF > "$CLONE_PREPARE_SQL"
 SET wsrep_on=OFF;
@@ -583,6 +581,7 @@ EOF
             cat $CLONE_PREPARE_SQL >> /dev/stderr
             exit $RC
         fi
+
         # Before waiting for the Joiner Clone mysql we send out the message this is a SST
         wsrep_log_debug "-> NETCAT signal to nc -w 1 $SST_HOST_STRIPPED $WSREP_SST_OPT_REMOTE_HOSTPORT"
         wsrep_log_debug "-> Signal for CLONE Plugin CLEANUP_CLONE_PLUGIN=$CLEANUP_CLONE_PLUGIN"
@@ -626,15 +625,12 @@ CLONE INSTANCE FROM '$WSREP_SST_OPT_REMOTE_JOINER_USER'@'$LHOST':$WSREP_SST_OPT_
 EOF
 
         wsrep_log_debug "JOINER CLONE ACTION SQL: $CLONE_EXECUTE_SQL $MYSQL_PWD $MYSQL_RCLIENT"
-        CLONE_EXECUTE=`cat $CLONE_EXECUTE_SQL` || :
-#        wsrep_log_debug "-> $CLONE_EXECUTE"
 
         # Actual cloning process
         wsrep_log_info "JOINER CLONE ACTION: cloning"
         LOCALOUTPUT=`$MYSQL_RCLIENT --connect-timeout=60 $CLIENT_SSL_OPTIONS < $CLONE_EXECUTE_SQL  2>&1 || RC=$?`
         wsrep_log_info "JOINER CLONE ACTION: cloning done $RC"
         wsrep_log_debug "-> LOCALOUTPUT: $LOCALOUTPUT"
-
 
         # We force the signal to be 0 because we KNOW that with clone when using the mysqld directly (not mysqld_safe) the daemon is shutdown at the end of the clone process.
         # However an error is returned because server cannot be restarted
@@ -662,7 +658,6 @@ EOF
             esac
             exit $RC
         fi
-        cleanup_donor
     else # BYPASS
         wsrep_log_info "Bypassing state dump."
 
@@ -670,7 +665,6 @@ EOF
         # export MYSQL_PWD="$WSREP_SST_OPT_REMOTE_JOINER_PSWD"
         wsrep_log_info "BYPASS SENDING IST_FILE TO JOINER NetCat: nc -w 1 $SST_HOST_STRIPPED $WSREP_SST_OPT_REMOTE_HOSTPORT"
         echo "$WSREP_SST_OPT_GTID<EOF>" | nc -w 1 $SST_HOST_STRIPPED $WSREP_SST_OPT_REMOTE_HOSTPORT || :
-        sleep 2
         wsrep_log_debug "-> Exiting with gtid: $WSREP_SST_OPT_GTID"
     fi
 
@@ -681,7 +675,6 @@ EOF
 
 elif [ "$WSREP_SST_OPT_ROLE" = "joiner" ]
 then
-
     JOINER_CLONE_HOST=""
     JOINER_CLONE_PORT=""
 
@@ -694,7 +687,6 @@ then
     CLONE_ERR=""
     CLONE_SQL=""
 
-
     trap sig_cleanup_joiner HUP PIPE INT TERM
     trap cleanup_joiner EXIT
 
@@ -702,8 +694,8 @@ then
     wsrep_check_programs ps
     wsrep_check_programs find
 
-    if test -z "$WSREP_SST_OPT_DATA";   then wsrep_log_error "DATA cannot be nil";   exit $EINVAL; fi
-    if test -z "$WSREP_SST_OPT_PARENT"; then wsrep_log_error "PARENT cannot be nil"; exit $EINVAL; fi
+    if test -z "$WSREP_SST_OPT_DATA";   then wsrep_log_error "DATA cannot be empty";   exit $EINVAL; fi
+    if test -z "$WSREP_SST_OPT_PARENT"; then wsrep_log_error "PARENT cannot be empty"; exit $EINVAL; fi
 
     #
     #  Find binary to run
@@ -815,14 +807,11 @@ then
         JOINER_CLONE_PORT=$CLONE_INSTANCE_PORT
     fi
 
-
     wsrep_log_debug "-> JOINER_CLONE_HOST $JOINER_CLONE_HOST"
     wsrep_log_debug "-> JOINER_CLONE_PORT $JOINER_CLONE_PORT"
 
-
     # Define the tmp directory
     tmp_datadir=$(wsrep_mktemp_in_dir "$WSREP_SST_OPT_DATA" -d)
-
 
     CLONE_ERR="$WSREP_SST_OPT_DATA/$MODULE.err"
     CLONE_SQL="$WSREP_SST_OPT_DATA/$MODULE.sql"
@@ -853,7 +842,6 @@ then
 
     wsrep_log_debug "-> CLONE_SOCK $CLONE_SOCK "
     wsrep_log_debug "-> CLONE_LIBS $CLONE_LIBS "
-
 
     DEFAULT_OPTIONS=" \
      $DEFAULTS_FILE_OPTION \
@@ -1029,7 +1017,6 @@ then
 
     # Move initialized data directory structure to real datadir and cleanup
     mv -n "$tmp_datadir"/* "$WSREP_SST_OPT_DATA/"
-    sleep 2
     wsrep_log_debug "-> REMOVE $tmp_datadir"
     rm -rf "$tmp_datadir"
 
@@ -1137,7 +1124,6 @@ EOF
     wsrep_log_info "Performing data recovery"
     wsrep_log_debug "-> RECOVERY COMMAND LINE: $CLONE_ENV $CLONE_BINARY $DEFAULT_OPTIONS --wsrep_provider=none"
 
-
     # Remove created clone user and SST pxc user
     wsrep_log_debug "-> CLEAN OR NOT? $CLEANUP_CLONE_PLUGIN"
     CLEANUP_CLONE_PLUGIN_SQL=""
@@ -1146,7 +1132,7 @@ EOF
     fi
 cat << EOF > "$CLONE_SQL"
 SET SESSION sql_log_bin=OFF;
-DROP USER IF EXISTS $CLONE_USER;
+DROP USER IF EXISTS $CLONE_USER@'%';
 DROP USER IF EXISTS $CLONE_USER@'localhost';
 DROP USER IF EXISTS 'mysql.pxc.sst.user'@'localhost';
 $CLEANUP_CLONE_PLUGIN_SQL
@@ -1172,8 +1158,8 @@ EOF
     if [ "$RP_PURGED" == "00000000-0000-0000-0000-000000000000:-1" ]; then
         RP_PURGED=$RP_PURGED_EMERGENCY
     fi
-    if [ ! "$RP_PURGED" == "" ]; then
 
+    if [ -n "$RP_PURGED" ]; then
         ORIG_IFS=$IFS
         IFS=':'
         read -ra gtid_arr <<< "$RP_PURGED"
@@ -1189,26 +1175,19 @@ seqno:   $position
 safe_to_bootstrap: 0
 EOF
 
+    else
+        # $RP_PURGED empty
+        wsrep_cleanup_progress_file
+        wsrep_log_debug "Failed to recover position from $CLONE_ERR";
+        wsrep_log_debug "Invalid Recovery position. Exiting with error $ENODATA (No data available)"
+        # We terminate but save the log for inspections given the failure
+        CLEANUP_FILES=0
+        exit $ENODATA
     fi
 
-        wsrep_log_info "CLEAN UP DONE"
-        if [ -z "$RP_PURGED" ]
-        then
-            # We terminate but save the log for inspections given the failure
-            CLEANUP_FILES=0
-            wsrep_cleanup_progress_file
-            cleanup_joiner
-            wsrep_log_debug "Failed to recover position from $CLONE_ERR";
-            wsrep_log_debug "Invalid Recovery position. Exiting with error $ENODATA (No data available)"
-            exit $ENODATA
-        fi
-
-        CLEANUP_FILES=1
-        cleanup_joiner ||:
-        wsrep_log_debug "->SENDING MESSAGE: $RP_PURGED"
-        echo $RP_PURGED >&2
-        echo $RP_PURGED
-        # exit 0 is at the end of the script, after printing the message
+    echo $RP_PURGED
+    CLEANUP_FILES=1
+    # exit 0 is at the end of the script, after printing the message
 else
     wsrep_log_error "Unrecognized role: '$WSREP_SST_OPT_ROLE'"
     exit $EINVAL
