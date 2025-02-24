@@ -235,15 +235,18 @@ check_client_version()
     local readonly client_version=${1%%[-/]*} # take only a.b.c from a.b.c-d.e
     IFS="." read -ra client_vers <<< $client_version
 
+    set +e
     for i in ${!min_vers[@]}
     do
-        if [ "${client_vers[$i]}" -lt "${min_vers[$i]}" ]
+        if compare_versions "${client_vers[$i]}" "<" "${min_vers[$i]}"
         then
             wsrep_log_error "this operation requires MySQL client version $min_version," \
                             " this client is '$client_version'"
+            set -e
             return $EINVAL
         fi
     done
+    set -e
 }
 
 # This function is common for Donor and Joiner.
