@@ -28,7 +28,8 @@ WSREP_SST_OPT_USER=""
 WSREP_SST_OPT_PSWD=""
 WSREP_SST_OPT_VERSION=""
 WSREP_SST_OPT_DEBUG=""
-
+WSREP_SST_OPT_REMOTE_USER=""
+WSREP_SST_OPT_REMOTE_PSWD=""
 WSREP_LOG_DEBUG=""
 
 # These are the 'names' of the commands
@@ -1014,6 +1015,12 @@ function read_variables_from_stdin()
             'sst_password')
                 WSREP_SST_OPT_PSWD="$value"
                 ;;
+            'sst_remote_user')
+                WSREP_SST_OPT_REMOTE_USER="$value"
+                ;;
+            'sst_remote_password')
+                WSREP_SST_OPT_REMOTE_PSWD="$value"
+                ;;
             *)
                 wsrep_log_warning "Unrecognized input: $line"
         esac
@@ -1072,6 +1079,79 @@ function get_absolute_path()
     printf "%s/%s" "${abs_path}" "${filename}"
     return 0
 }
+
+#
+# Get the value assosciated with the key in a json file
+#
+# 1st param: json file path
+# 2nd param: key to be searched
+#
+get_json_value() {
+    local json_file="$1"
+    local key="$2"
+    local value=$(cat $json_file | tr -d "\n" | grep -E -o "$key\" *: *(true|false)" | cut -d: -f2 | tr -d ' ')
+    echo $value
+}
+
+#
+# Get the keyring manifest and config file types (none/local/global)
+# Note: this file is similar to get_keyring_manifest_and_config
+# in wsrep_sst_xtrabackup-v2.sh. Consider refactoring.
+#
+# 1st param: Datadir
+# 2nd param: Plugin dir
+# 3rd param: mysqld binary path
+get_keyring_manifest_and_config_types()
+{
+    local datadir=$1
+    local plugin_dir=$2
+    local mysqld_path=$3
+
+    local manifest_file=""
+
+    local manifest_type="manifest=none"
+    local config_type="config=none"
+
+    local mysqld_dir=$(dirname $mysqld_path)
+    local binary=$(basename $mysqld_path)
+
+    # Get keyring manifest file path
+
+    if [ -e $mysqld_dir/$binary.my ]; then
+        local local_manifest=$(get_json_value $mysqld_dir/$binary.my "read_local_manifest")
+        if [[ $local_manifest == "true" ]]; then
+          # Handle local manifest file
+          if [ -e $datadir/$binary.my ]; then
+              manifest_file=$datadir/$binary.my
+              manifest_type="manifest=local"
+          fi
+        else
+          # Handle global manifest file
+           manifest_file=$mysqld_dir/$binary.my
+           manifest_type="manifest=global"
+        fi
+    fi
+
+    if [ -e $manifest_file ]; then
+        # Get the type of the component
+        keyring_component_type=$(grep -o "component_keyring_[a-z]*" $manifest_file | head -n 1)
+
+        # Get keyring config path
+        if [ -e $plugin_dir/$keyring_component_type.cnf ]; then
+            local local_config=$(get_json_value $plugin_dir/$keyring_component_type.cnf "read_local_config")
+            if [[ $local_config == "true" ]]; then
+              config_type="config=local"
+            else
+              config_type="config=global"
+            fi
+        fi
+    fi
+    wsrep_log_debug "Manifest type: $manifest_type"
+    wsrep_log_debug "Config type: $config_type"
+
+    echo "$manifest_type;$config_type"
+}
+
 
 # timeout for donor to connect to joiner (seconds)
 readonly WSREP_SST_DONOR_TIMEOUT=$(parse_cnf sst donor-timeout 10)
