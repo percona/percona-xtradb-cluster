@@ -21,7 +21,7 @@ SELECT GRANTEE, PRIVILEGE_TYPE, IS_GRANTABLE FROM INFORMATION_SCHEMA.USER_PRIVIL
 WHERE PRIVILEGE_TYPE = 'RELOAD' ORDER BY 1,2,3;
 GRANTEE	PRIVILEGE_TYPE	IS_GRANTABLE
 'mysql.pxc.internal.session'@'localhost'	RELOAD	YES
-'mysql.pxc.sst.role'@'localhost'	RELOAD	NO
+'mysql.pxc.sst.role'@'localhost'	RELOAD	YES
 'root'@'localhost'	RELOAD	YES
 'test'@'localhost'	RELOAD	NO
 # restart:--upgrade=FORCE
