@@ -74,6 +74,7 @@ extern const char *wsrep_defaults_group_suffix;
 #define WSREP_SST_ONLY_IST "ist_only"
 #define WSREP_SST_XTRABACKUP "xtrabackup"
 #define WSREP_SST_XTRABACKUP_V2 "xtrabackup-v2"
+#define WSREP_SST_CLONE "clone"
 #define WSREP_SST_DEFAULT WSREP_SST_XTRABACKUP_V2
 #define WSREP_SST_ADDRESS_AUTO "AUTO"
 
@@ -83,7 +84,7 @@ const char *wsrep_sst_method = WSREP_SST_DEFAULT;
 const char *wsrep_sst_receive_address = WSREP_SST_ADDRESS_AUTO;
 const char *wsrep_sst_donor = "";
 
-#define WSREP_SST_ALLOWED_METHODS_DEFAULT WSREP_SST_XTRABACKUP_V2
+#define WSREP_SST_ALLOWED_METHODS_DEFAULT WSREP_SST_XTRABACKUP_V2  "," WSREP_SST_CLONE
 const char *wsrep_sst_allowed_methods = WSREP_SST_ALLOWED_METHODS_DEFAULT;
 static std::vector<std::string> allowed_sst_methods;
 
