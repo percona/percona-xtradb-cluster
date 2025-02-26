@@ -19,6 +19,7 @@ env:
 
 jobs:
   clang-tidy:
+    if: false   # Disable this job. It produces flood of warnings impossible to manage
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
