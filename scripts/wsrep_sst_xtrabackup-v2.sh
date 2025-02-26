@@ -780,7 +780,6 @@ read_cnf()
 
     ssl_dhparams=$(parse_cnf sst ssl-dhparams "")
 
-    uextra=$(parse_cnf sst use-extra 0)
     iopts=$(parse_cnf sst inno-backup-opts "")
     iapts=$(parse_cnf sst inno-apply-opts "")
     impts=$(parse_cnf sst inno-move-opts "")
@@ -1326,28 +1325,10 @@ wait_for_listen()
 
 #
 # check if there are any extra options to parse.
-# Note: if port is specified socket is not used.
+# This function is executed only on the donor side.
 check_extra()
 {
-    local use_socket=1
-    if [[ $uextra -eq 1 ]]; then
-        if $MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF mysqld | tr '_' '-' | grep -- "--thread-handling=" | grep -q 'pool-of-threads'; then
-            local eport=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF mysqld | tr '_' '-' | grep -- "--extra-port=" | cut -d= -f2)
-            if [[ -n $eport ]]; then
-                # Xtrabackup works only locally.
-                # Hence, setting host to 127.0.0.1 unconditionally.
-                wsrep_log_debug "SST through extra_port $eport"
-                INNOEXTRA+=" --host=127.0.0.1 --port=$eport "
-                use_socket=0
-            else
-                wsrep_log_error "Extra port $eport null, failing"
-                exit 1
-            fi
-        else
-            wsrep_log_warning "Thread pool not set, ignore the option use_extra"
-        fi
-    fi
-    if [[ $use_socket -eq 1 ]] && [[ -n "${WSREP_SST_OPT_SOCKET}" ]]; then
+    if [[ -n "${WSREP_SST_OPT_SOCKET}" ]]; then
         INNOEXTRA+=" --socket=${WSREP_SST_OPT_SOCKET}"
     fi
 }
@@ -2118,13 +2099,22 @@ then
             wsrep_log_error "****************************************************** "
             do_exit=1
         fi
-        if [[ ${RC[$(( ${#RC[@]}-1 ))]} -eq 1 ]]; then
-            wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "$tcmd finished with error: ${RC[1]}"
-            wsrep_log_error "Line $LINENO"
-            wsrep_log_error "****************************************************** "
-            do_exit=1
-        fi
+
+        # Now let's go through the rest of return codes and see if there were
+        # any errors in tcmd (it may be a pipeline of several commands)
+        for ecode in "${RC[@]:1}"; do
+            if [[ $ecode -ne 0 ]]; then
+                wsrep_log_error "******************* FATAL ERROR ********************** "
+                wsrep_log_error "${tcmd} finished with error codes: ${RC[@]:1}"
+                wsrep_log_error "Line $LINENO"
+                wsrep_log_error "****************************************************** "
+                do_exit=1
+
+                # All exit codes already printed out, no need to iterate more
+                break
+            fi
+        done
+
         if [[ $do_exit -eq 1 ]]; then
             exit 22
         fi

@@ -19,16 +19,16 @@
 #include <mysql/plugin.h>
 
 #include <vector>
+#include "mysql/components/services/log_builtins.h"  // LogEvent
 #include "mysqld.h"
 #include "rpl_gtid.h"
+#include "service_wsrep.h"
 #include "sql/dd/types/tablespace.h"  // dd::fetch_tablespace_table_refs
+#include "sql/system_variables.h"  // struct System_variables. Needed by WSREP_ON
 #include "wsrep/provider.hpp"
 #include "wsrep/streaming_context.hpp"
 #include "wsrep_api.h"
-#include "service_wsrep.h"
 #include "wsrep_server_state.h"
-#include "mysql/components/services/log_builtins.h"  // LogEvent
-#include "sql/system_variables.h"  // struct System_variables. Needed by WSREP_ON
 
 #define WSREP_UNDEFINED_TRX_ID ULLONG_MAX
 
@@ -167,6 +167,7 @@ enum enump_wsrep_encrypt_modes {
 };
 extern ulong wsrep_gcache_encrypt;
 extern ulong wsrep_disk_pages_encrypt;
+extern bool wsrep_use_async_monitor;
 
 extern bool pxc_force_flush_error_message;
 
@@ -392,8 +393,6 @@ extern mysql_mutex_t LOCK_wsrep_slave_threads;
 extern mysql_cond_t COND_wsrep_slave_threads;
 extern mysql_mutex_t LOCK_wsrep_cluster_config;
 extern mysql_mutex_t LOCK_wsrep_desync;
-extern mysql_mutex_t LOCK_wsrep_group_commit;
-extern mysql_cond_t COND_wsrep_group_commit;
 extern mysql_mutex_t LOCK_wsrep_SR_pool;
 extern mysql_mutex_t LOCK_wsrep_SR_store;
 extern mysql_mutex_t LOCK_wsrep_alter_tablespace;
@@ -419,8 +418,6 @@ extern PSI_mutex_key key_LOCK_wsrep_slave_threads;
 extern PSI_cond_key key_COND_wsrep_slave_threads;
 extern PSI_mutex_key key_LOCK_wsrep_cluster_config;
 extern PSI_mutex_key key_LOCK_wsrep_desync;
-extern PSI_mutex_key key_LOCK_wsrep_group_commit;
-extern PSI_cond_key key_COND_wsrep_group_commit;
 extern PSI_mutex_key key_LOCK_wsrep_SR_pool;
 extern PSI_mutex_key key_LOCK_wsrep_SR_store;
 
@@ -442,6 +439,9 @@ extern PSI_thread_key key_THREAD_wsrep_post_rollbacker;
 
 extern PSI_file_key key_file_wsrep_gra_log;
 #endif /* HAVE_PSI_INTERFACE */
+
+void thd_enter_async_monitor(THD *thd);
+void thd_leave_async_monitor(THD *thd);
 
 class Alter_info;
 int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,

@@ -278,8 +278,8 @@ static inline int wsrep_after_prepare(THD *thd, bool all) {
   assert(wsrep_run_commit_hook(thd, all));
   int ret = thd->wsrep_cs().after_prepare();
   assert(ret == 0 || thd->wsrep_cs().current_error() ||
-              thd->wsrep_cs().transaction().state() ==
-                  wsrep::transaction::s_must_replay);
+         thd->wsrep_cs().transaction().state() ==
+             wsrep::transaction::s_must_replay);
   DBUG_RETURN(ret);
 }
 
@@ -296,6 +296,10 @@ static inline int wsrep_before_commit(THD *thd, bool all) {
   WSREP_DEBUG("wsrep_before_commit: %d, %lld", wsrep_is_real(thd, all),
               (long long)wsrep_thd_trx_seqno(thd));
   int ret = 0;
+
+  /* Enter the async monitor */
+  thd_enter_async_monitor(thd);
+
   assert(wsrep_run_commit_hook(thd, all));
   if ((ret = thd->wsrep_cs().before_commit()) == 0) {
     assert(!thd->wsrep_trx().ws_meta().gtid().is_undefined());
@@ -304,16 +308,6 @@ static inline int wsrep_before_commit(THD *thd, bool all) {
     wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
                    thd->wsrep_cs().toi_meta().gtid());
 #endif
-
-    if (thd->run_wsrep_commit_hooks) {
-      /* If the transaction is running as one-phase then register
-      THD in wsrep group commit queue at this stage.
-      If the transaction is running as 2-phase then THD is registered
-      in ordered_commit to ensure thd registration order is same as
-      mysql group commit queue order.
-      It will be unregistered in ha_commit_low() during SE commit. */
-      wsrep_register_for_group_commit(thd);
-    }
 
     /* If the transaction doesn't go through prepare phase */
     wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
@@ -350,17 +344,6 @@ static inline int wsrep_ordered_commit(THD *thd, bool all) {
   WSREP_DEBUG("wsrep_ordered_commit: %d", wsrep_is_real(thd, all));
   assert(wsrep_run_commit_hook(thd, all));
 
-  /* Register thread handler in wsrep group commit queue.
-  Note: thread handler executing 2 phase commit transaction is registered
-  as part of ordered_commit (and not part of before_commit) as wsrep group
-  commit sequence should be same as mysql group commit queue sequence.
-  In most cases it will be unregistered as part of ha_commit_low() during
-  SE commit, however there are rare cases when it will unregistered directly
-  from ha_commit_low() if SE is not involved in the commit (for more detailed
-  explanation of this case see the comment in ha_commit_low())
-  */
-  wsrep_register_for_group_commit(thd);
-
   DBUG_RETURN(thd->wsrep_cs().ordered_commit());
 }
 
@@ -375,17 +358,6 @@ static inline int wsrep_after_commit(THD *thd, bool all) {
               wsrep_is_active(thd), (long long)wsrep_thd_trx_seqno(thd),
               wsrep_has_changes(thd));
   assert(wsrep_run_commit_hook(thd, all));
-
-  /* It has to be already unregistered from wsrep_group_commit_queue either
-  during SE commit or directly in ha_commit_low if unregistration during
-  SE commit hasn't happened for any reason. */
-  if (thd->wsrep_enforce_group_commit) {
-    WSREP_WARN("%s",
-               "This thread has still not unregistered from "
-               "the wsrep group commit queue, may be because "
-               "of the storage engine commit. Server hang is expected.")
-  }
-  assert(!thd->wsrep_enforce_group_commit);
 
   int ret = 0;
   if (thd->wsrep_trx().state() == wsrep::transaction::s_committing) {
@@ -555,14 +527,26 @@ static inline void wsrep_commit_empty(THD *thd, bool all) {
     /* @todo CTAS with STATEMENT binlog format and empty result set
        seems to be committing empty. Figure out why and try to fix
        elsewhere. */
-    assert(!wsrep_has_changes(thd) ||
-                thd->wsrep_stmt_transaction_rolled_back ||
-                (thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
-                 !thd->is_current_stmt_binlog_format_row()) ||
-                thd->wsrep_post_insert_error);
+    assert(!wsrep_has_changes(thd) || thd->wsrep_stmt_transaction_rolled_back ||
+           (thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
+            !thd->is_current_stmt_binlog_format_row()) ||
+           thd->wsrep_post_insert_error);
     bool have_error = wsrep_current_error(thd);
     int ret = wsrep_before_rollback(thd, all) ||
               wsrep_after_rollback(thd, all) || wsrep_after_statement(thd);
+
+    /* Update empty commits in Async monitor if required.
+     *
+     * If the replicated transaction is transactional, we call the
+     * thd_enter_async_monitor() as part of wsrep_before_commit().
+     *
+     * But non transactional statements (MyISAM) wont call the
+     * wsrep_before_commit() hook. So, we might end up in a deadlock if we dont
+     * remove its seqno from the Async monitor.
+     *
+     * So we remove the seqno of the empty commit here. */
+    thd_enter_async_monitor(thd);
+    thd_leave_async_monitor(thd);
     /* The committing transaction was empty but it held some locks and
        got BF aborted. As there were no certified changes in the
        data, we ignore the deadlock error and rely on error reporting

@@ -75,6 +75,10 @@ class String;
 struct LEX_SOURCE_INFO;
 struct db_worker_hash_entry;
 
+#ifdef WITH_WSREP
+class Wsrep_async_monitor;
+#endif /* WITH_WSREP */
+
 extern uint sql_replica_skip_counter;
 
 typedef Prealloced_array<Slave_worker *, 4> Slave_worker_array;
@@ -1802,6 +1806,13 @@ class Relay_log_info : public Rpl_info {
     commit_order_mngr = mngr;
   }
 
+#ifdef WITH_WSREP
+  Wsrep_async_monitor *get_wsrep_async_monitor() { return wsrep_async_monitor; }
+  void set_wsrep_async_monitor(Wsrep_async_monitor *monitor) {
+    wsrep_async_monitor = monitor;
+  }
+#endif /* WITH_WSREP */
+
   /*
     Following set function is required to initialize the 'until_option' during
     MTS relay log recovery process.
@@ -1859,6 +1870,12 @@ class Relay_log_info : public Rpl_info {
    */
   Commit_order_manager *commit_order_mngr;
 
+#ifdef WITH_WSREP
+  /*
+    Wsrep_async_monitor orders DMLs and DDls in galera.
+   */
+  Wsrep_async_monitor *wsrep_async_monitor;
+#endif /* WITH_WSREP */
   /**
     Delay slave SQL thread by this amount of seconds.
     The delay is applied per transaction and based on the immediate master's
