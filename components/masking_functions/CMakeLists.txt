@@ -26,27 +26,56 @@ endif()
 set(DATAMASKING_SOURCES
   src/component.cpp
 
+  src/masking_functions/bookshelf.cpp
   src/masking_functions/charset_string.cpp
   src/masking_functions/charset_string_operations.cpp
+  src/masking_functions/default_sql_context_builder.cpp
+  src/masking_functions/dictionary.cpp
+  src/masking_functions/dictionary_flusher_thread.cpp
   src/masking_functions/query_builder.cpp
+  src/masking_functions/term_cache.cpp
+  src/masking_functions/term_cache_core.cpp
   src/masking_functions/random_string_generators.cpp
   src/masking_functions/registration_routines.cpp
+  src/masking_functions/server_helpers.cpp
   src/masking_functions/sql_context.cpp
   src/masking_functions/sql_escape_functions.cpp
+  src/masking_functions/static_sql_context_builder.cpp
+  src/masking_functions/sys_vars.cpp
 
+  include/masking_functions/abstract_sql_context_builder_fwd.hpp
+  include/masking_functions/abstract_sql_context_builder.hpp
+  include/masking_functions/bookshelf_fwd.hpp
+  include/masking_functions/bookshelf.hpp
   include/masking_functions/charset_string_fwd.hpp
   include/masking_functions/charset_string.hpp
   include/masking_functions/charset_string_operations.hpp
   include/masking_functions/command_service_tuple_fwd.hpp
   include/masking_functions/command_service_tuple.hpp
+  include/masking_functions/component_sys_variable_service_tuple_fwd.hpp
+  include/masking_functions/component_sys_variable_service_tuple.hpp
+  include/masking_functions/default_sql_context_builder.hpp
+  include/masking_functions/dictionary_fwd.hpp
+  include/masking_functions/dictionary.hpp
+  include/masking_functions/dictionary_flusher_thread_fwd.hpp
+  include/masking_functions/dictionary_flusher_thread.hpp
   include/masking_functions/primitive_singleton.hpp
+  include/masking_functions/query_builder_fwd.hpp
   include/masking_functions/query_builder.hpp
+  include/masking_functions/term_cache_fwd.hpp
+  include/masking_functions/term_cache.hpp
+  include/masking_functions/term_cache_core_fwd.hpp
+  include/masking_functions/term_cache_core.hpp
   include/masking_functions/random_string_generators.hpp
   include/masking_functions/registration_routines.hpp
+  include/masking_functions/server_helpers.hpp
+  include/masking_functions/sql_context_fwd.hpp
   include/masking_functions/sql_context.hpp
   include/masking_functions/sql_escape_functions.hpp
+  include/masking_functions/static_sql_context_builder.hpp
   include/masking_functions/string_service_tuple_fwd.hpp
   include/masking_functions/string_service_tuple.hpp
+  include/masking_functions/sys_vars.hpp
 )
 
 ### Configuration ###
@@ -57,6 +86,16 @@ MYSQL_ADD_COMPONENT(masking_functions
   ${DATAMASKING_SOURCES}
   MODULE_ONLY
 )
+
+# This is needed by PXC, because server_helper.cpp has a hack, that directly includes sql_class.h
+# This causes compilation error
+# In file included from percona-xtradb-cluster/sql/dd/types/tablespace.h:32,
+#                  from percona-xtradb-cluster/sql/wsrep_mysqld.h:26,
+#                  from percona-xtradb-cluster/sql/sql_class.h:167,
+#                  from percona-xtradb-cluster/components/masking_functions/src/masking_functions/server_helpers.cpp:21:
+# percona-xtradb-cluster/sql/dd/sdi_fwd.h:27:10: fatal error: rapidjson/fwd.h: No such file or directory
+#    27 | #include <rapidjson/fwd.h>
+target_link_libraries(component_masking_functions PRIVATE extra::rapidjson)
 
 target_compile_definitions(component_masking_functions PRIVATE LOG_COMPONENT_TAG="component_masking_functions")
 target_include_directories(component_masking_functions PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)

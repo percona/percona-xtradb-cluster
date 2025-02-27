@@ -59,6 +59,8 @@ def	PERCONA_SCHEMA	xtrabackup_history	ALTER
 def	PERCONA_SCHEMA	xtrabackup_history	CREATE
 def	PERCONA_SCHEMA	xtrabackup_history	INSERT
 def	PERCONA_SCHEMA	xtrabackup_history	SELECT
+def	mysql	plugin	DELETE
+def	mysql	plugin	INSERT
 def	mysql	user	SELECT
 def	sys	sys_config	SELECT
 ######################################################################

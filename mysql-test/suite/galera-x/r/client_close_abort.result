@@ -7,8 +7,8 @@ SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM performance_schema.proce
 user	host	db	command	state	info
 event_scheduler	localhost	NULL	Daemon	Waiting on empty queue	NULL
 root	localhost	test	Query	executing	SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM performance_schema.processlist WHERE `state` != 'cleaning up' ORDER BY `user`, `state`
-system user	NULL	NULL	Connect		DELETE FROM mysql.wsrep_cluster_members
-system user	NULL	NULL	Sleep	wsrep: aborter idle	NULL
+system user		NULL	Connect		DELETE FROM mysql.wsrep_cluster_members
+system user		NULL	Sleep	wsrep: aborter idle	NULL
 
 Close in a pipeline and try to do something after close
 -------------------------------------------------------
@@ -65,5 +65,5 @@ SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM performance_schema.proce
 user	host	db	command	state	info
 event_scheduler	localhost	NULL	Daemon	Waiting on empty queue	NULL
 root	localhost	test	Query	executing	SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM performance_schema.processlist WHERE `state` != 'cleaning up' ORDER BY `user`, `state`
-system user	NULL	NULL	Connect		DELETE FROM mysql.wsrep_cluster_members
-system user	NULL	NULL	Sleep	wsrep: aborter idle	NULL
+system user		NULL	Connect		DELETE FROM mysql.wsrep_cluster_members
+system user		NULL	Sleep	wsrep: aborter idle	NULL
