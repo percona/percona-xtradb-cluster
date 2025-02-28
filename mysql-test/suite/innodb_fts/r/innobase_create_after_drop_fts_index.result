@@ -1,0 +1,22 @@
+CREATE TABLE documents (
+FTS_DOC_ID BIGINT UNSIGNED AUTO_INCREMENT NOT NULL PRIMARY KEY,
+id INT,
+title TEXT,
+body TEXT,
+summary TEXT
+) ENGINE=InnoDB;
+CREATE FULLTEXT INDEX idx1 ON documents (title);
+CREATE FULLTEXT INDEX idx2 ON documents (body);
+INSERT INTO documents (id, title, body, summary) VALUES
+(1, 'Title 1', 'This is the body of document 1', 'Summary of document 1'),
+(2, 'Title 2', 'This is the body of document 2', 'Summary of document 2'),
+(3, 'Title 3', 'This is the body of document 3', 'Summary of document 3'),
+(4, 'Title 4', 'This is the body of document 4', 'Summary of document 4'),
+(5, 'Title 5', 'This is the body of document 5', 'Summary of document 5'),
+(6, 'Title 6', 'This is the body of document 6', 'Summary of document 6'),
+(7, 'Title 7', 'This is the body of document 7', 'Summary of document 7'),
+(8, 'Title 8', 'This is the body of document 8', 'Summary of document 8'),
+(9, 'Title 9', 'This is the body of document 9', 'Summary of document 9'),
+(10, 'Title 10', 'This is the body of document 10', 'Summary of document 10');
+ALTER TABLE documents DROP INDEX idx1, DROP INDEX idx2, ADD FULLTEXT INDEX idx3(summary), ALGORITHM=INPLACE;
+DROP TABLE documents;

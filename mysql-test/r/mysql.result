@@ -537,5 +537,13 @@ mysql: [Warning] Using a password on the command line interface can be insecure.
 user()
 bug21464621@localhost
 DROP USER bug21464621;
+#
+# Bug # 36377685: mysqldump blindly trusting SHOW CREATE TABLE leads to
+#   arbitrary code execution.
+#
+# Test "system": Must return an error
+ERROR at line 1: 'system' command received, but the --system-command option is off. Skipping.
+# Test "!": Must return an error
+ERROR at line 1: 'system' command received, but the --system-command option is off. Skipping.
 
 End of tests

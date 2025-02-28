@@ -1028,7 +1028,7 @@ static char simpletok[128]=
 /*
     ! " # $ % & ' ( ) * + , - . / 0 1 2 3 4 5 6 7 8 9 : ; < = > ?
   @ A B C D E F G H I J K L M N O P Q R S T U V W X Y Z [ \ ] ^ _
-  ` a b c d e f g h i j k l m n o p q r s t u v w x y z { | } ~ €
+  ` a b c d e f g h i j k l m n o p q r s t u v w x y z { | } ~ ï¿½
 */
   0,1,0,0,1,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,0,1,1,1,0,
   1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,
@@ -2909,14 +2909,15 @@ String *Item_func_xml_update::val_str(String *str)
 
   nodebeg+= fltbeg->num;
 
-  if (!nodebeg->level)
+  if (nodebeg->level == 0)
   {
     /*
       Root element, without NameTest:
       UpdateXML(xml, '/', 'replacement');
       Just return the replacement string.
     */
-    return rep;
+    tmp_value.copy(*rep);
+    return &tmp_value;
   }
 
   tmp_value.length(0);
