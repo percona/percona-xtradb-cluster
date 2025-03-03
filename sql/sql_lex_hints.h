@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2014, 2023, Oracle and/or its affiliates.
+   Copyright (c) 2014, 2024, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -259,7 +259,11 @@ protected:
     case HINT_CHR_IDENT:
     case HINT_CHR_DIGIT:
     case HINT_CHR_MB:
-      return scan_ident() == HINT_ARG_IDENT ? HINT_ARG_QB_NAME : HINT_ERROR;
+      if (scan_ident() == HINT_ARG_IDENT) {
+        yytext = thd->strmake(yytext, yyleng);
+        return HINT_ARG_QB_NAME;
+      } else
+        return HINT_ERROR;
     case HINT_CHR_BACKQUOTE:
       return scan_quoted_ident<HINT_CHR_BACKQUOTE>() == HINT_ARG_IDENT ?
           HINT_ARG_QB_NAME : HINT_ERROR;

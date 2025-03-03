@@ -923,8 +923,8 @@ static void wsrep_synced_cb(void* app_ctx)
 static void wsrep_init_position()
 {
   /* read XIDs from storage engines */
-  wsrep_uuid_t uuid;
-  wsrep_seqno_t seqno;
+  wsrep_uuid_t uuid= WSREP_UUID_UNDEFINED;
+  wsrep_seqno_t seqno= WSREP_SEQNO_UNDEFINED;
   wsrep_get_SE_checkpoint(uuid, seqno);
 
   if (!memcmp(&uuid, &WSREP_UUID_UNDEFINED, sizeof(wsrep_uuid_t)))

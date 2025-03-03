@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2000, 2023, Oracle and/or its affiliates.
+   Copyright (c) 2000, 2024, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -372,7 +372,7 @@ static COMMANDS commands[] = {
     "Execute an SQL script file. Takes a file name as an argument."},
   { "status", 's', com_status, 0, "Get status information from the server."},
 #ifdef USE_POPEN
-  { "system", '!', com_shell,  1, "Execute a system shell command."},
+  { "system", '!', com_shell,  1, "Execute a system shell command, if enabled."},
 #endif
   { "tee",    'T', com_tee,    1, 
     "Set outfile [to_outfile]. Append everything into given outfile." },
@@ -1635,6 +1635,10 @@ unsigned short get_terminal_width()
   return 80;
 }
 
+#ifdef USE_POPEN
+static bool opt_system_command = true;
+#endif
+
 static struct my_option my_long_options[] =
 {
   {"help", '?', "Display this help and exit.", 0, 0, 0, GET_NO_ARG, NO_ARG, 0,
@@ -1893,6 +1897,12 @@ static struct my_option my_long_options[] =
    "test purpose, so it is just built when DEBUG is on.",
    &opt_build_completion_hash, &opt_build_completion_hash, 0, GET_BOOL,
    NO_ARG, 0, 0, 0, 0, 0, 0},
+#endif
+#ifdef USE_POPEN
+  {"system-command", 0,
+   "Enable (by default) or disable the system mysql command.",
+   &opt_system_command, &opt_system_command, 0, GET_BOOL, NO_ARG,
+   1, 0, 0, 0, 0, 0},
 #endif
   { 0, 0, 0, 0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0}
 };
@@ -3946,8 +3956,6 @@ print_table_data(MYSQL_RES *result)
   bool		*num_flag;
   size_t        sz;
 
-  sz= sizeof(bool) * mysql_num_fields(result);
-  num_flag= (bool *) my_safe_alloca(sz, MAX_ALLOCA_SIZE);
   if (column_types_flag)
   {
     print_field_types(result);
@@ -3955,6 +3963,8 @@ print_table_data(MYSQL_RES *result)
       return;
     mysql_field_seek(result,0);
   }
+  sz= sizeof(bool) * mysql_num_fields(result);
+  num_flag= (bool *) my_safe_alloca(sz, MAX_ALLOCA_SIZE);
   separator.copy("+",1,charset_info);
   while ((field = mysql_fetch_field(result)))
   {
@@ -4583,6 +4593,14 @@ com_shell(String *buffer MY_ATTRIBUTE((unused)),
     put_info("Usage: \\! shell-command", INFO_ERROR);
     return -1;
   }
+
+  if (!opt_system_command) {
+    return put_info(
+        "'system' command received, but the --system-command option is off. "
+        "Skipping.",
+        INFO_ERROR);
+  }
+
   /*
     The output of the shell command does not
     get directed to the pager or the outfile
