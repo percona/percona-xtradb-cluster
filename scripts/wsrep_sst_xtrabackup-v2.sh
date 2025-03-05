@@ -1004,19 +1004,6 @@ cleanup_donor()
 }
 
 #
-# Get the value assosciated with the key in a json file
-#
-# 1st param: json file path
-# 2nd param: key to be searched
-#
-get_json_value() {
-  local json_file="$1"
-  local key="$2"
-  local value=$(cat $json_file | tr -d "\n" | grep -E -o "$key\" *: *(true|false)" | cut -d: -f2 | tr -d ' ')
-  echo $value
-}
-
-#
 # Get the keyring manifest and config file paths
 #
 # 1st param: Datadir
@@ -1037,7 +1024,7 @@ get_keyring_manifest_and_config()
     # Get keyring manifest file path
 
     if [ -e $mysqld_dir/$binary.my ]; then
-        local local_manifest=$(get_json_value $mysqld_dir/mysqld.my "read_local_manifest")
+        local local_manifest=$(get_json_value $mysqld_dir/$binary.my "read_local_manifest")
         if [[ $local_manifest == "true" ]]; then
             # Handle local manifest file
             if [ -e $datadir/$binary.my ]; then

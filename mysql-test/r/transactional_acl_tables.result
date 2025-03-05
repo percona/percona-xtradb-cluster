@@ -1347,6 +1347,7 @@ host	db	user	table_name	grantor	table_priv	column_priv
 h	test	u1	t1	root@localhost		Select,Insert,Update,References
 h	test	u1	t2	root@localhost		Insert
 localhost	PERCONA_SCHEMA	mysql.pxc.sst.role	xtrabackup_history	boot@	Select,Insert,Create,Alter	
+localhost	mysql	mysql.pxc.sst.role	plugin	boot@	Insert,Delete	
 localhost	mysql	mysql.session	user	root@localhost	Select	
 localhost	sys	mysql.sys	sys_config	root@localhost	Select	
 DELETE FROM mysql.columns_priv WHERE host = 'h' AND user = 'u1'
@@ -1358,6 +1359,7 @@ host	db	user	table_name	column_name	column_priv
 SELECT host, db, user, table_name, grantor, table_priv, column_priv FROM mysql.tables_priv;
 host	db	user	table_name	grantor	table_priv	column_priv
 localhost	PERCONA_SCHEMA	mysql.pxc.sst.role	xtrabackup_history	boot@	Select,Insert,Create,Alter	
+localhost	mysql	mysql.pxc.sst.role	plugin	boot@	Insert,Delete	
 localhost	mysql	mysql.session	user	root@localhost	Select	
 localhost	sys	mysql.sys	sys_config	root@localhost	Select	
 SHOW GRANTS FOR u1@h;

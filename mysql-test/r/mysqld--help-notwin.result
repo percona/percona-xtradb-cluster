@@ -2378,7 +2378,7 @@ wsrep-retry-autocommit 1
 wsrep-slave-FK-checks TRUE
 wsrep-slave-UK-checks FALSE
 wsrep-slave-threads 1
-wsrep-sst-allowed-methods xtrabackup-v2
+wsrep-sst-allowed-methods xtrabackup-v2,clone
 wsrep-sst-donor 
 wsrep-sst-donor-rejects-queries FALSE
 wsrep-sst-method xtrabackup-v2

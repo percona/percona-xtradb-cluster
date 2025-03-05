@@ -210,6 +210,7 @@ MODIFY User char(16) NOT NULL default '',
 MODIFY Grantor char(77) DEFAULT '' NOT NULL;
 Warnings:
 Warning	1265	Data truncated for column 'User' at row 1
+Warning	1265	Data truncated for column 'User' at row 2
 ALTER TABLE mysql.columns_priv
 MODIFY User char(16) NOT NULL default '';
 ALTER TABLE mysql.user
