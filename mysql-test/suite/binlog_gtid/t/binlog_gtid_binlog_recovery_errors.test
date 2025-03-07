@@ -277,6 +277,8 @@ XA START 'x';
 INSERT INTO t1 VALUES (1);
 XA END 'x';
 XA PREPARE 'x';
+# KH: Very ugly hack that allows undo log events to flush to file. Unfortunatelly XA PREPARE skips explicit flush, so we need to rely on background flush 
+--sleep 10
 --source common/binlog/recovery/kill_copy_malformed_restart.inc
 
 --let $grep_pattern = .*between positions 157 and 273: XA_prepare_log_event outside the boundary of a sequence of events representing an active transaction.*
