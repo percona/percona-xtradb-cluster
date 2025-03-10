@@ -15,8 +15,14 @@ CREATE ROLE 'reader', 'writer';
 GRANT SELECT ON *.* TO 'reader';
 GRANT INSERT, UPDATE, DELETE ON *.* TO 'writer';
 
-CREATE USER 'user1'@'%' IDENTIFIED WITH mysql_native_password BY 'passwd';
-CREATE USER 'user2'@'%' IDENTIFIED WITH mysql_native_password BY 'passwd';
+CREATE USER 'user1'@'%' IDENTIFIED BY 'passwd';
+CREATE USER 'user2'@'%' IDENTIFIED BY 'passwd';
+
+# Rotate binlogs to have the following events at fixed positions
+FLUSH BINARY LOGS;
+--connection node_2
+FLUSH BINARY LOGS;
+--connection node_1
 
 GRANT ALL PRIVILEGES ON *.* TO 'user1'@'%' WITH GRANT OPTION ;
 GRANT 'reader', 'writer' TO 'user2'@'%';
@@ -32,14 +38,14 @@ GRANT ALL PRIVILEGES ON *.* TO 'user2'@'%' WITH GRANT OPTION ;
 SET ROLE 'writer';
 GRANT ALL PRIVILEGES ON *.* TO 'user1'@'%' WITH GRANT OPTION;
 
---let $binlog_file = mysqld-bin.000002
---let $binlog_position = 2283
+--let $binlog_file = mysqld-bin.000003
+--let $binlog_position = 989
 --let $limit = 1
 --let $event_sequence = .*GRANT ALL PRIVILEGES ON.*TO 'user2'.* WITH GRANT OPTION AS 'user1'.* WITH ROLE NONE.*
 --source include/rpl/assert_binlog_events.inc
 
---let $binlog_file = mysqld-bin.000002
---let $binlog_position = 2548
+--let $binlog_file = mysqld-bin.000003
+--let $binlog_position = 1254
 --let $limit = 1
 --let $event_sequence = .*GRANT ALL PRIVILEGES ON.*TO 'user1'.* WITH GRANT OPTION AS 'user2'.* WITH ROLE 'writer'.*
 --source include/rpl/assert_binlog_events.inc
@@ -47,14 +53,14 @@ GRANT ALL PRIVILEGES ON *.* TO 'user1'@'%' WITH GRANT OPTION;
 --disconnect node_1b
 
 --connection node_2
---let $binlog_file = mysqld-bin.000004
---let $binlog_position = 2299
+--let $binlog_file = mysqld-bin.000005
+--let $binlog_position = 995
 --let $limit = 1
 --let $event_sequence = .*GRANT ALL PRIVILEGES ON.*TO 'user2'.* WITH GRANT OPTION AS 'user1'.* WITH ROLE NONE.*
 --source include/rpl/assert_binlog_events.inc
 
---let $binlog_file = mysqld-bin.000004
---let $binlog_position = 2566
+--let $binlog_file = mysqld-bin.000005
+--let $binlog_position = 1262
 --let $limit = 1
 --let $event_sequence = .*GRANT ALL PRIVILEGES ON.*TO 'user1'.* WITH GRANT OPTION AS 'user2'.* WITH ROLE 'writer'.*
 --source include/rpl/assert_binlog_events.inc

@@ -6,6 +6,7 @@
 --source include/force_restart.inc
 
 --source include/have_mysqlx_plugin.inc
+--source include/xplugin_preamble.inc
 --source include/xplugin_create_user.inc
 
 # Setup the tables for the test

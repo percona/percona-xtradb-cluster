@@ -2892,7 +2892,7 @@ USE db; CREATE TABLE db1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
 #
 # SUMMARY: node_1:yes  node_2:yes  node_3:yes
 #
-USE db; CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
+USE db; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
 
 --eval INSERT INTO db.counter(count) VALUES($test_id)
 
@@ -2916,56 +2916,56 @@ USE db; CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
 --source include/assert.inc
 
 
+#   #
+#   # Test async.acct.mgmt.1.2 : CHANGE PASSWORD
+#   #	The default database is allowed.
+#   #
+#   --inc $test_id
 #
-# Test async.acct.mgmt.1.2 : CHANGE PASSWORD
-#	The default database is allowed.
+#   --echo #
+#   --echo # Test async.acct.mgmt.1.2 : CHANGE PASSWORD
+#   --echo #
 #
---inc $test_id
-
---echo #
---echo # Test async.acct.mgmt.1.2 : CHANGE PASSWORD
---echo #
-
---echo # connection node_1
---connection node_1
-
---let $user_password = `SELECT AUTHENTICATION_STRING FROM mysql.user WHERE USER = "foo"`
-
-# EXPECTED: This will replicate to node_2 and node_3 because
-# the default database, db1, is allowed, so the operations will
-# replicate.
+#   --echo # connection node_1
+#   --connection node_1
 #
-# NOTE: The default database decides whether or not the statement
-# is accepted by the async thread. Table filters will also apply.
+#   --let $user_password = `SELECT AUTHENTICATION_STRING FROM mysql.user WHERE USER = "foo"`
 #
-# SUMMARY: node_1:yes  node_2:yes  node_3:yes
+#   # EXPECTED: This will replicate to node_2 and node_3 because
+#   # the default database, db1, is allowed, so the operations will
+#   # replicate.
+#   #
+#   # NOTE: The default database decides whether or not the statement
+#   # is accepted by the async thread. Table filters will also apply.
+#   #
+#   # SUMMARY: node_1:yes  node_2:yes  node_3:yes
+#   #
+#   USE db; SET PASSWORD FOR "foo"@"%" = "notapassword";
 #
-USE db; SET PASSWORD FOR "foo"@"%" = "notapassword";
-
---eval INSERT INTO db.counter(count) VALUES($test_id)
-
---let $assert_text = "User foo is altered on node_1"
---let $assert_cond = AUTHENTICATION_STRING != "$user_password" FROM mysql.user WHERE user = "foo"
---let $assert_debug = SELECT USER,HOST,AUTHENTICATION_STRING FROM mysql.user
---source include/assert.inc
-
---echo # connection node_2
---connection node_2
---let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
---source include/wait_condition.inc
-
---let $assert_text = "User foo is altered on node_2"
---let $assert_cond = AUTHENTICATION_STRING != "$user_password" FROM mysql.user WHERE user = "foo"
---source include/assert.inc
-
---echo # connection node_3
---connection node_3
---let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
---source include/wait_condition.inc
-
---let $assert_text = "User foo is altered on node_3"
---let $assert_cond = AUTHENTICATION_STRING != "$user_password" FROM mysql.user WHERE user = "foo"
---source include/assert.inc
+#   --eval INSERT INTO db.counter(count) VALUES($test_id)
+#
+#   --let $assert_text = "User foo is altered on node_1"
+#   --let $assert_cond = AUTHENTICATION_STRING != "$user_password" FROM mysql.user WHERE user = "foo"
+#   --let $assert_debug = SELECT USER,HOST,AUTHENTICATION_STRING FROM mysql.user
+#   --source include/assert.inc
+#
+#   --echo # connection node_2
+#   --connection node_2
+#   --let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+#   --source include/wait_condition.inc
+#
+#   --let $assert_text = "User foo is altered on node_2"
+#   --let $assert_cond = AUTHENTICATION_STRING != "$user_password" FROM mysql.user WHERE user = "foo"
+#   --source include/assert.inc
+#
+#   --echo # connection node_3
+#   --connection node_3
+#   --let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+#   --source include/wait_condition.inc
+#
+#   --let $assert_text = "User foo is altered on node_3"
+#   --let $assert_cond = AUTHENTICATION_STRING != "$user_password" FROM mysql.user WHERE user = "foo"
+#   --source include/assert.inc
 
 
 #
@@ -3292,7 +3292,7 @@ USE db; DROP USER "foo"@"%";
 #
 # SUMMARY: node_1:yes  node_2:no  node_3:no
 #
-USE dbx; CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
+USE dbx; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
 
 --eval INSERT INTO db.counter(count) VALUES($test_id)
 
@@ -3328,7 +3328,7 @@ USE dbx; CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
 --echo #
 --echo # connection node_2
 --connection node_2
-USE db; CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
+USE db; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
 
 --let $assert_text = "User foo is on node_2"
 --let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE USER = "foo";
@@ -3345,56 +3345,56 @@ USE db; CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
 
 
 
+#  #
+#  # Test async.acct.mgmt.2.2 : CHANGE PASSWORD
+#  #	The default database is allowed.
+#  #
+#  --inc $test_id
 #
-# Test async.acct.mgmt.2.2 : CHANGE PASSWORD
-#	The default database is allowed.
+#  --echo #
+#  --echo # Test async.acct.mgmt.2.2 : CHANGE PASSWORD
+#  --echo #
 #
---inc $test_id
-
---echo #
---echo # Test async.acct.mgmt.2.2 : CHANGE PASSWORD
---echo #
-
---echo # connection node_1
---connection node_1
-
---let $user_password = `SELECT AUTHENTICATION_STRING FROM mysql.user WHERE USER = "foo"`
-
-# EXPECTED: This will not replicate to node_2 or node_3 because
-# the default database, dbx, is not allowed, so the operations will
-# replicate.
+#  --echo # connection node_1
+#  --connection node_1
 #
-# NOTE: The default database decides whether or not the statement
-# is accepted by the async thread. Table filters will also apply.
+#  --let $user_password = `SELECT AUTHENTICATION_STRING FROM mysql.user WHERE USER = "foo"`
 #
-# SUMMARY: node_1:yes  node_2:no  node_3:no
+#  # EXPECTED: This will not replicate to node_2 or node_3 because
+#  # the default database, dbx, is not allowed, so the operations will
+#  # replicate.
+#  #
+#  # NOTE: The default database decides whether or not the statement
+#  # is accepted by the async thread. Table filters will also apply.
+#  #
+#  # SUMMARY: node_1:yes  node_2:no  node_3:no
+#  #
+#  USE dbx; SET PASSWORD FOR "foo"@"%" = "notapassword";
 #
-USE dbx; SET PASSWORD FOR "foo"@"%" = "notapassword";
-
---eval INSERT INTO db.counter(count) VALUES($test_id)
-
---let $assert_text = "User foo is altered on node_1"
---let $assert_cond = AUTHENTICATION_STRING != "$user_password" FROM mysql.user WHERE user = "foo"
---let $assert_debug = SELECT USER,HOST,AUTHENTICATION_STRING FROM mysql.user
---source include/assert.inc
-
---echo # connection node_2
---connection node_2
---let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
---source include/wait_condition.inc
-
---let $assert_text = "User foo is not altered on node_2"
---let $assert_cond = AUTHENTICATION_STRING = "$user_password" FROM mysql.user WHERE user = "foo"
---source include/assert.inc
-
---echo # connection node_3
---connection node_3
---let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
---source include/wait_condition.inc
-
---let $assert_text = "User foo is not altered on node_3"
---let $assert_cond = AUTHENTICATION_STRING = "$user_password" FROM mysql.user WHERE user = "foo"
---source include/assert.inc
+#  --eval INSERT INTO db.counter(count) VALUES($test_id)
+#
+#  --let $assert_text = "User foo is altered on node_1"
+#  --let $assert_cond = AUTHENTICATION_STRING != "$user_password" FROM mysql.user WHERE user = "foo"
+#  --let $assert_debug = SELECT USER,HOST,AUTHENTICATION_STRING FROM mysql.user
+#  --source include/assert.inc
+#
+#  --echo # connection node_2
+#  --connection node_2
+#  --let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+#  --source include/wait_condition.inc
+#
+#  --let $assert_text = "User foo is not altered on node_2"
+#  --let $assert_cond = AUTHENTICATION_STRING = "$user_password" FROM mysql.user WHERE user = "foo"
+#  --source include/assert.inc
+#
+#  --echo # connection node_3
+#  --connection node_3
+#  --let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+#  --source include/wait_condition.inc
+#
+#  --let $assert_text = "User foo is not altered on node_3"
+#  --let $assert_cond = AUTHENTICATION_STRING = "$user_password" FROM mysql.user WHERE user = "foo"
+#  --source include/assert.inc
 
 
 
@@ -5999,7 +5999,7 @@ USE db; CREATE TABLE db1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
 #
 # SUMMARY: node_2:yes  node_3:yes
 #
-USE db; CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
+USE db; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
 
 --eval INSERT INTO db.counter(count) VALUES($test_id)
 
@@ -6018,45 +6018,45 @@ USE db; CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
 --source include/assert.inc
 
 
+#  #
+#  # Test galera.acct.mgmt.1.2 : CHANGE PASSWORD
+#  #	The default database is allowed.
+#  #
+#  --inc $test_id
 #
-# Test galera.acct.mgmt.1.2 : CHANGE PASSWORD
-#	The default database is allowed.
+#  --echo #
+#  --echo # Test galera.acct.mgmt.1.2 : CHANGE PASSWORD
+#  --echo #
 #
---inc $test_id
-
---echo #
---echo # Test galera.acct.mgmt.1.2 : CHANGE PASSWORD
---echo #
-
---echo # connection node_2
---connection node_2
-
---let $user_password = `SELECT AUTHENTICATION_STRING FROM mysql.user WHERE USER = "foo"`
-
-# EXPECTED: This will replicate to node_3 via galera replication.
-# For statement-based replication, the galera replication thread
-# will not check with the database filters.
+#  --echo # connection node_2
+#  --connection node_2
 #
-# NOTE: The account management code will also check the table filters.
+#  --let $user_password = `SELECT AUTHENTICATION_STRING FROM mysql.user WHERE USER = "foo"`
 #
-# SUMMARY: node_2:yes  node_3:yes
+#  # EXPECTED: This will replicate to node_3 via galera replication.
+#  # For statement-based replication, the galera replication thread
+#  # will not check with the database filters.
+#  #
+#  # NOTE: The account management code will also check the table filters.
+#  #
+#  # SUMMARY: node_2:yes  node_3:yes
+#  #
+#  USE db; SET PASSWORD FOR "foo"@"%" = "notapassword";
 #
-USE db; SET PASSWORD FOR "foo"@"%" = "notapassword";
-
---eval INSERT INTO db.counter(count) VALUES($test_id)
-
---let $assert_text = "User foo is altered on node_2"
---let $assert_cond = AUTHENTICATION_STRING != "$user_password" FROM mysql.user WHERE user = "foo"
---source include/assert.inc
-
---echo # connection node_3
---connection node_3
---let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
---source include/wait_condition.inc
-
---let $assert_text = "User foo is altered on node_3"
---let $assert_cond = AUTHENTICATION_STRING != "$user_password" FROM mysql.user WHERE user = "foo"
---source include/assert.inc
+#  --eval INSERT INTO db.counter(count) VALUES($test_id)
+#
+#  --let $assert_text = "User foo is altered on node_2"
+#  --let $assert_cond = AUTHENTICATION_STRING != "$user_password" FROM mysql.user WHERE user = "foo"
+#  --source include/assert.inc
+#
+#  --echo # connection node_3
+#  --connection node_3
+#  --let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+#  --source include/wait_condition.inc
+#
+#  --let $assert_text = "User foo is altered on node_3"
+#  --let $assert_cond = AUTHENTICATION_STRING != "$user_password" FROM mysql.user WHERE user = "foo"
+#  --source include/assert.inc
 
 
 #
@@ -6326,7 +6326,7 @@ USE db; DROP USER "foo"@"%";
 #
 # SUMMARY: node_2:yes  node_3:yes
 #
-USE dbx; CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
+USE dbx; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
 
 --eval INSERT INTO db.counter(count) VALUES($test_id)
 
@@ -6346,45 +6346,45 @@ USE dbx; CREATE USER "foo"@"%" IDENTIFIED WITH 'mysql_native_password' BY "bar";
 --source include/assert.inc
 
 
+#  #
+#  # Test galera.acct.mgmt.2.2 : CHANGE PASSWORD
+#  #	The default database is allowed.
+#  #
+#  --inc $test_id
 #
-# Test galera.acct.mgmt.2.2 : CHANGE PASSWORD
-#	The default database is allowed.
+#  --echo #
+#  --echo # Test galera.acct.mgmt.2.2 : CHANGE PASSWORD
+#  --echo #
 #
---inc $test_id
-
---echo #
---echo # Test galera.acct.mgmt.2.2 : CHANGE PASSWORD
---echo #
-
---echo # connection node_2
---connection node_2
-
---let $user_password = `SELECT AUTHENTICATION_STRING FROM mysql.user WHERE USER = "foo"`
-
-# EXPECTED: This will replicate to node_3 via galera replication.
-# For statement-based replication, the galera replication thread
-# will not check with the database filters.
+#  --echo # connection node_2
+#  --connection node_2
 #
-# NOTE: The account management code will also check the table filters.
+#  --let $user_password = `SELECT AUTHENTICATION_STRING FROM mysql.user WHERE USER = "foo"`
 #
-# SUMMARY: node_2:yes  node_3:yes
+#  # EXPECTED: This will replicate to node_3 via galera replication.
+#  # For statement-based replication, the galera replication thread
+#  # will not check with the database filters.
+#  #
+#  # NOTE: The account management code will also check the table filters.
+#  #
+#  # SUMMARY: node_2:yes  node_3:yes
+#  #
+#  USE db; SET PASSWORD FOR "foo"@"%" = "notapassword";
 #
-USE db; SET PASSWORD FOR "foo"@"%" = "notapassword";
-
---eval INSERT INTO db.counter(count) VALUES($test_id)
-
---let $assert_text = "User foo is altered on node_2"
---let $assert_cond = AUTHENTICATION_STRING != "$user_password" FROM mysql.user WHERE user = "foo"
---source include/assert.inc
-
---echo # connection node_3
---connection node_3
---let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
---source include/wait_condition.inc
-
---let $assert_text = "User foo is altered on node_3"
---let $assert_cond = AUTHENTICATION_STRING != "$user_password" FROM mysql.user WHERE user = "foo"
---source include/assert.inc
+#  --eval INSERT INTO db.counter(count) VALUES($test_id)
+#
+#  --let $assert_text = "User foo is altered on node_2"
+#  --let $assert_cond = AUTHENTICATION_STRING != "$user_password" FROM mysql.user WHERE user = "foo"
+#  --source include/assert.inc
+#
+#  --echo # connection node_3
+#  --connection node_3
+#  --let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+#  --source include/wait_condition.inc
+#
+#  --let $assert_text = "User foo is altered on node_3"
+#  --let $assert_cond = AUTHENTICATION_STRING != "$user_password" FROM mysql.user WHERE user = "foo"
+#  --source include/assert.inc
 
 
 #
