@@ -46,6 +46,7 @@ call mtr.add_suppression("The transaction owned GTID is already in the "
                          "explicit modifying from user client.");
 INSERT INTO mysql.gtid_executed VALUES ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 1, 1, '');
 Warnings:
+Warning	6414	Combining the storage engines InnoDB and MyISAM is deprecated, but the statement or transaction updates both the InnoDB table mysql.gtid_executed and the MyISAM table mtr.test_suppressions.
 Warning	3129	Please do not modify the gtid_executed table. This is a mysql internal system table to store GTIDs for committed transactions. Modifying it can lead to an inconsistent GTID state.
 #
 # Verify that the GTID is inserted into table, but

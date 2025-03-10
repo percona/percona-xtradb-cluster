@@ -585,11 +585,11 @@ BEGIN
     TRUNCATE test_ignored_global_suppressions;
     TRUNCATE asserted_test_suppressions;
     SET wsrep_on = 1;
-  ELSE 
+  ELSE
     TRUNCATE test_suppressions;
     TRUNCATE test_ignored_global_suppressions;
     TRUNCATE asserted_test_suppressions;
-  END IF;    
+  END IF;
 
   DROP TABLE error_log;
 

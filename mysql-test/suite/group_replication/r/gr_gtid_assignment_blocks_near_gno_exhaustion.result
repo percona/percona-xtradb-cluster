@@ -16,6 +16,8 @@ SET SESSION sql_log_bin = 1;
 # 1. Start server 1.
 [connection server1]
 SET GLOBAL GTID_PURGED= "297aeabb-1ef1-11e6-97b4-00212844d44e:1-9223372036854775800";
+Warnings:
+Warning	6414	Combining the storage engines InnoDB and MyISAM is deprecated, but the statement or transaction updates both the InnoDB table mysql.gtid_executed and the MyISAM table mtr.test_suppressions.
 include/assert.inc [GTID_EXECUTED must be UUID:1-9223372036854775800]
 SET @@GLOBAL.DEBUG= '+d,group_replication_version_with_vcle';
 include/start_and_bootstrap_group_replication.inc
@@ -25,6 +27,8 @@ include/assert.inc [GTID_EXECUTED must be UUID:1-9223372036854775801]
 # 2. Start server 2.
 [connection server2]
 SET GLOBAL GTID_PURGED= "297aeabb-1ef1-11e6-97b4-00212844d44e:1-9223372036854775800";
+Warnings:
+Warning	6414	Combining the storage engines InnoDB and MyISAM is deprecated, but the statement or transaction updates both the InnoDB table mysql.gtid_executed and the MyISAM table mtr.test_suppressions.
 include/assert.inc [GTID_EXECUTED must be UUID:1-9223372036854775800]
 SET @@GLOBAL.DEBUG= '+d,group_replication_version_with_vcle';
 include/start_group_replication.inc

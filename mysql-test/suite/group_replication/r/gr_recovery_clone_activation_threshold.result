@@ -11,6 +11,8 @@ SET SESSION sql_log_bin = 1;
 # Start server1
 [connection server1]
 SET GLOBAL gtid_purged = CONCAT('cccccccc-cccc-cccc-cccc-cccccccccccc:1-', (1 << 63) - 10);
+Warnings:
+Warning	6414	Combining the storage engines InnoDB and MyISAM is deprecated, but the statement or transaction updates both the InnoDB table mysql.gtid_executed and the MyISAM table mtr.test_suppressions.
 SET GLOBAL gtid_purged = CONCAT('+dddddddd-dddd-dddd-dddd-dddddddddddd:1-', (1 << 63) - 10);
 SET GLOBAL gtid_purged = CONCAT('+eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee:1-25');
 include/start_and_bootstrap_group_replication.inc

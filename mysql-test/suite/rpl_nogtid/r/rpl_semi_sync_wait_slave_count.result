@@ -21,6 +21,8 @@ SET GLOBAL rpl_semi_sync_source_trace_level= 255;
 ####################################################################
 SET GLOBAL rpl_semi_sync_source_timeout=3000;
 INSERT INTO t1 VALUES(1);
+Warnings:
+Warning	6414	Combining the storage engines InnoDB and MyISAM is deprecated, but the statement or transaction updates both the InnoDB table test.t1 and the MyISAM table mtr.test_suppressions.
 include/assert.inc [rpl_semi_sync_source_yes_tx should be 0 + 0]
 include/assert.inc [rpl_semi_sync_source_no_tx should be 0 + 1]
 ###################################################################
@@ -31,6 +33,8 @@ include/rpl/install_semisync_replica.inc
 [connection server_1]
 SET GLOBAL rpl_semi_sync_source_timeout=100000;
 INSERT INTO t1 VALUES(3);
+Warnings:
+Warning	6414	Combining the storage engines InnoDB and MyISAM is deprecated, but the statement or transaction updates both the InnoDB table test.t1 and the MyISAM table mtr.test_suppressions.
 INSERT INTO t1 VALUES(4);
 include/assert.inc [rpl_semi_sync_source_yes_tx should be 0 + 2]
 include/assert.inc [rpl_semi_sync_source_no_tx should be 1 + 0]
@@ -50,6 +54,8 @@ include/rpl/install_semisync_replica.inc
 [connection server_1]
 SET GLOBAL rpl_semi_sync_source_timeout = 100000;
 INSERT INTO t1 VALUES(102);
+Warnings:
+Warning	6414	Combining the storage engines InnoDB and MyISAM is deprecated, but the statement or transaction updates both the InnoDB table test.t1 and the MyISAM table mtr.test_suppressions.
 INSERT INTO t1 VALUES(103);
 include/assert.inc [rpl_semi_sync_source_yes_tx should be 2 + 2]
 include/assert.inc [rpl_semi_sync_source_no_tx should be 2 + 0]
@@ -70,6 +76,8 @@ include/rpl/install_semisync_replica.inc
 [connection server_1]
 SET GLOBAL rpl_semi_sync_source_timeout = 100000;
 INSERT INTO t1 VALUES(102);
+Warnings:
+Warning	6414	Combining the storage engines InnoDB and MyISAM is deprecated, but the statement or transaction updates both the InnoDB table test.t1 and the MyISAM table mtr.test_suppressions.
 INSERT INTO t1 VALUES(103);
 include/assert.inc [rpl_semi_sync_source_yes_tx should be 4 + 2]
 include/assert.inc [rpl_semi_sync_source_no_tx should be 4 + 0]
@@ -90,6 +98,8 @@ INSERT INTO t1 VALUES(105);
 [connection server_4]
 SET DEBUG_SYNC = 'now SIGNAL continue';
 [connection default]
+Warnings:
+Warning	6414	Combining the storage engines InnoDB and MyISAM is deprecated, but the statement or transaction updates both the InnoDB table test.t1 and the MyISAM table mtr.test_suppressions.
 include/assert.inc [rpl_semi_sync_source_yes_tx should be 6 + 1]
 include/assert.inc [rpl_semi_sync_source_no_tx should be 4 + 0]
 [connection server_4]
