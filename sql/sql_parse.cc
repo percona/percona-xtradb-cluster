@@ -5071,9 +5071,9 @@ int mysql_execute_command(THD *thd, bool first_level) {
 
       /* REFRESH_TABLES is taken care inside handle_reload_request */
       if (lex->type &
-          (REFRESH_GRANT | REFRESH_STATUS |
-           REFRESH_USER_RESOURCES | REFRESH_ERROR_LOG | REFRESH_SLOW_LOG |
-           REFRESH_GENERAL_LOG | REFRESH_ENGINE_LOG | REFRESH_RELAY_LOG |
+          (REFRESH_GRANT | REFRESH_STATUS | REFRESH_USER_RESOURCES |
+           REFRESH_ERROR_LOG | REFRESH_SLOW_LOG | REFRESH_GENERAL_LOG |
+           REFRESH_ENGINE_LOG | REFRESH_RELAY_LOG |
            /* Percona Server specific */
            REFRESH_TABLE_STATS | REFRESH_INDEX_STATS | REFRESH_USER_STATS |
            REFRESH_CLIENT_STATS | REFRESH_THREAD_STATS)) {
