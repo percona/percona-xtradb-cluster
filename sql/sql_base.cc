@@ -6237,7 +6237,6 @@ restart:
       }
     }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
     bool is_dml_stmt = (thd->lex->sql_command == SQLCOM_INSERT ||
                         thd->lex->sql_command == SQLCOM_INSERT_SELECT ||
@@ -6380,8 +6379,6 @@ restart:
     }
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-=======
     // Remember if an external table has been opened in this statement.
     if (tbl != nullptr && tbl->s->has_secondary_engine() &&
         ha_check_storage_engine_flag(tbl->s->db_type(),
@@ -6389,7 +6386,6 @@ restart:
       thd->lex->set_has_external_tables();
     }
 
->>>>>>> Percona-Server-9.1.0-1
     /*
       Access to ACL table in a SELECT ... LOCK IN SHARE MODE are required
       to skip acquiring row locks. So, we use TL_READ_DEFAULT lock on ACL

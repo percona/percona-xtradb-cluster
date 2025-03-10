@@ -195,16 +195,10 @@ BEGIN
     FROM INFORMATION_SCHEMA.ROUTINES WHERE ROUTINE_SCHEMA != 'sys' ORDER BY ROUTINE_SCHEMA, ROUTINE_NAME, ROUTINE_TYPE;
 
   -- Dump all views, only those in the sys schema should exist
-<<<<<<< HEAD
-  SELECT /*+SET_VAR(use_secondary_engine=OFF)*/ * FROM INFORMATION_SCHEMA.VIEWS WHERE TABLE_SCHEMA != 'sys'
-||||||| merged common ancestors
-  SELECT /*+SET_VAR(use_secondary_engine=OFF)*/ * FROM INFORMATION_SCHEMA.VIEWS
-=======
   -- Always use the old optimizer until bug#36553075 is fixed.
   SELECT /*+SET_VAR(use_secondary_engine=OFF)
             SET_VAR(optimizer_switch='hypergraph_optimizer=off')*/
-         * FROM INFORMATION_SCHEMA.VIEWS
->>>>>>> Percona-Server-9.1.0-1
+         * FROM INFORMATION_SCHEMA.VIEWS WHERE TABLE_SCHEMA != 'sys'
     ORDER BY TABLE_SCHEMA, TABLE_NAME;
 
   -- Dump all plugins, loaded with plugin-loading options or through
@@ -234,7 +228,6 @@ BEGIN
   -- Also (in similar fashion as above) exclude all 'Daemon' threads, they will
   -- not give consistent result either.
   --
-<<<<<<< HEAD
   -- SELECT /*+SET_VAR(use_secondary_engine=OFF)*/ USER, HOST, DB, COMMAND, INFO FROM INFORMATION_SCHEMA.PROCESSLIST
   --  WHERE COMMAND NOT IN ('Sleep', 'Daemon', 'Killed')
   --    AND USER NOT IN ('unauthenticated user','mysql.session', 'event_scheduler')
@@ -245,10 +238,10 @@ BEGIN
 
   -- Drop the sst user, as it's a PXC internal
   -- check testcase runs on a separate session,
-  -- but is affected by the testcase's autocommit setting 
+  -- but is affected by the testcase's autocommit setting
   -- (e.g. galera.galera_var_persist).
   -- As this SP is called twice - before and after the test we don't want to
-  -- modify 'autocommit' here, as the test might have requested it to be 'off' 
+  -- modify 'autocommit' here, as the test might have requested it to be 'off'
   -- in opt file. Setting it to 1 and then restoring is not good as well,
   -- because it will affect variable source visible in PS (tests like
   -- perfschema.variables_info_autocommit rely on this value).
@@ -269,7 +262,7 @@ BEGIN
   -- Some tests (e.g. clone plugin related) restore the clone instance state by cloning the donor. In such a case restored
   -- instance will have different timestamps at the beginning and the end of the test and MTR check will complain because of
   -- different tables checksums.
-  -- Workaround this problem by excluding mysql.user from checksum calculation. 
+  -- Workaround this problem by excluding mysql.user from checksum calculation.
   -- Instead, dump the table but without password_last_changed column.
   -- This is the same approach as for INFORMATION_SCHEMA.ROUTINES above.
   SELECT /*+SET_VAR(use_secondary_engine=OFF)*/ Host, User, Select_priv, Insert_priv, Update_priv, Delete_priv, Create_priv,
@@ -278,19 +271,8 @@ BEGIN
     Create_view_priv, Show_view_priv, Create_routine_priv, Alter_routine_priv, Create_user_priv, Event_priv, Trigger_priv,
     Create_tablespace_priv, ssl_type, ssl_cipher, x509_issuer, x509_subject, max_questions, max_updates, max_connections,
     max_user_connections, plugin, authentication_string, password_expired, password_lifetime, account_locked, Create_role_priv,
-    Drop_role_priv, Password_reuse_history, Password_reuse_time, Password_require_current, User_attributes 
+    Drop_role_priv, Password_reuse_history, Password_reuse_time, Password_require_current, User_attributes
   FROM mysql.user ORDER BY Host, User;
-||||||| merged common ancestors
-  SELECT /*+SET_VAR(use_secondary_engine=OFF)*/ USER, HOST, DB, COMMAND, INFO FROM INFORMATION_SCHEMA.PROCESSLIST
-    WHERE COMMAND NOT IN ('Sleep', 'Daemon')
-      AND USER NOT IN ('unauthenticated user','mysql.session', 'event_scheduler')
-        ORDER BY COMMAND;
-=======
-  SELECT /*+SET_VAR(use_secondary_engine=OFF)*/ USER, HOST, DB, COMMAND, INFO FROM INFORMATION_SCHEMA.PROCESSLIST
-    WHERE COMMAND NOT IN ('Sleep', 'Daemon', 'Killed')
-      AND USER NOT IN ('unauthenticated user','mysql.session', 'event_scheduler')
-        ORDER BY COMMAND;
->>>>>>> Percona-Server-9.1.0-1
 
   -- During the installation of Percona Telemetry Component we create 'percona.telemetry'.
   -- It happens during the server startup, so servers started during the test will have the same user
@@ -298,7 +280,7 @@ BEGIN
   -- Some tests (e.g. clone plugin related) restore the clone instance state by cloning the donor. In such a case restored
   -- instance will have different timestamps at the beginning and the end of the test and MTR check will complain because of
   -- different tables checksums.
-  -- Workaround this problem by excluding mysql.user from checksum calculation. 
+  -- Workaround this problem by excluding mysql.user from checksum calculation.
   -- Instead, dump the table but without password_last_changed column.
   -- This is the same approach as for INFORMATION_SCHEMA.ROUTINES above.
   SELECT /*+SET_VAR(use_secondary_engine=OFF)*/ Host, User, Select_priv, Insert_priv, Update_priv, Delete_priv, Create_priv,
@@ -307,7 +289,7 @@ BEGIN
     Create_view_priv, Show_view_priv, Create_routine_priv, Alter_routine_priv, Create_user_priv, Event_priv, Trigger_priv,
     Create_tablespace_priv, ssl_type, ssl_cipher, x509_issuer, x509_subject, max_questions, max_updates, max_connections,
     max_user_connections, plugin, authentication_string, password_expired, password_lifetime, account_locked, Create_role_priv,
-    Drop_role_priv, Password_reuse_history, Password_reuse_time, Password_require_current, User_attributes 
+    Drop_role_priv, Password_reuse_history, Password_reuse_time, Password_require_current, User_attributes
   FROM mysql.user ORDER BY Host, User;
 
   -- Checksum system tables to make sure they have been properly

@@ -444,44 +444,16 @@ dberr_t lock_prdt_insert_check_and_lock(
     /* If another transaction has an explicit lock request which locks
     the predicate, waiting or granted, the insert has to wait.
 
-<<<<<<< HEAD
-      /* If another transaction has an explicit lock request which locks
-      the predicate, waiting or granted, on the successor, the insert
-      has to wait.
-      Similar to GAP lock, we do not consider lock from inserts conflicts
-      with each other */
-||||||| merged common ancestors
-      /* If another transaction has an explicit lock request which locks
-      the predicate, waiting or granted, on the successor, the insert
-      has to wait.
-
-      Similar to GAP lock, we do not consider lock from inserts conflicts
-      with each other */
-=======
     Similar to GAP lock, we do not consider lock from inserts conflicts
     with each other */
 
     const ulint mode = LOCK_X | LOCK_PREDICATE | LOCK_INSERT_INTENTION;
->>>>>>> Percona-Server-9.1.0-1
 
     const lock_t *wait_for =
         lock_prdt_other_has_conflicting(mode, block, prdt, trx);
 
-<<<<<<< HEAD
-#ifdef WITH_WSREP
-  lock_t *const wait_for =
-      (lock_t *)lock_prdt_other_has_conflicting(mode, block, prdt, trx);
-#else
-  const lock_t *wait_for =
-      lock_prdt_other_has_conflicting(mode, block, prdt, trx);
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-      const lock_t *wait_for =
-          lock_prdt_other_has_conflicting(mode, block, prdt, trx);
-=======
     if (wait_for != nullptr) {
       rtr_mbr_t *mbr = prdt_get_mbr_from_prdt(prdt);
->>>>>>> Percona-Server-9.1.0-1
 
       trx_mutex_enter(trx);
 
@@ -683,57 +655,8 @@ void lock_prdt_lock(buf_block_t *block, lock_prdt_t *prdt, dict_index_t *index,
         lock_rec_get_n_bits(lock) == 0 ||
         ((!lock_prdt_consistent(lock_get_prdt_from_lock(lock), prdt, 0,
                                 lock->index->rtr_srs.get())))) {
-<<<<<<< HEAD
-      lock = lock_prdt_has_lock(mode, type_mode, block, prdt, trx);
-
-      if (lock == nullptr) {
-#ifdef WITH_WSREP
-        lock_t *wait_for;
-
-        wait_for = (lock_t *)lock_prdt_other_has_conflicting(prdt_mode, block,
-                                                             prdt, trx);
-#else
-        const lock_t *wait_for;
-
-        wait_for = lock_prdt_other_has_conflicting(prdt_mode, block, prdt, trx);
-#endif /* WITH_WSREP */
-
-        if (wait_for != nullptr) {
-          RecLock rec_lock(thr, index, block, PRDT_HEAPNO, prdt_mode);
-
-          trx_mutex_enter(trx);
-          err = rec_lock.add_to_waitq(wait_for);
-          trx_mutex_exit(trx);
-
-        } else {
-          lock_prdt_add_to_queue(prdt_mode, block, index, trx, prdt);
-
-          status = LOCK_REC_SUCCESS;
-        }
-||||||| merged common ancestors
-      lock = lock_prdt_has_lock(mode, type_mode, block, prdt, trx);
-
-      if (lock == nullptr) {
-        const lock_t *wait_for;
-
-        wait_for = lock_prdt_other_has_conflicting(prdt_mode, block, prdt, trx);
-
-        if (wait_for != nullptr) {
-          RecLock rec_lock(thr, index, block, PRDT_HEAPNO, prdt_mode);
-
-          trx_mutex_enter(trx);
-          err = rec_lock.add_to_waitq(wait_for);
-          trx_mutex_exit(trx);
-
-        } else {
-          lock_prdt_add_to_queue(prdt_mode, block, index, trx, prdt);
-
-          status = LOCK_REC_SUCCESS;
-        }
-=======
       if (!lock_prdt_has_lock(LOCK_S, LOCK_PREDICATE, block, prdt, trx)) {
         lock_prdt_add_to_queue(prdt_mode, block, index, trx, prdt);
->>>>>>> Percona-Server-9.1.0-1
       }
 
     } else {

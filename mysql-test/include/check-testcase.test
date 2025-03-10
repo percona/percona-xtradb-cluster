@@ -22,7 +22,6 @@
 --let $do_not_create_connection=0
 
 --disable_query_log
-<<<<<<< HEAD
 --let $wsrep_provider_loaded = `SELECT COUNT(*) = 1 FROM performance_schema.global_variables WHERE VARIABLE_NAME LIKE 'wsrep_provider' AND VARIABLE_VALUE NOT LIKE 'none'`
 
 if ($wsrep_provider_loaded)
@@ -30,8 +29,7 @@ if ($wsrep_provider_loaded)
   --source include/galera_wait_ready.inc
 }
 # ---- WITH_WSREP
-||||||| merged common ancestors
-=======
+
 --let $_server_id = `SELECT @@server_id`
 # There should be no expect file before nor after the test, because
 # existence of this file means author expects the server to be off,
@@ -52,7 +50,6 @@ if (!$have_windows)
 {
   --list_files $MYSQLTEST_VARDIR/tmp mysqld.$_server_id.expect
 }
->>>>>>> Percona-Server-9.1.0-1
 
 # Wait for any connections opened by a previous testcase (or the testcase
 # warning checker) to finish closing. Exclude binlog dump threads as these may

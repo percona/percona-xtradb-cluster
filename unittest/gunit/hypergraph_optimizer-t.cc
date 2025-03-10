@@ -7803,18 +7803,6 @@ struct CountingReceiver {
     return false;
   }
 
-<<<<<<< HEAD
-  size_t count(NodeMap map) const { return m_num_subplans[map]; }
-||||||| merged common ancestors
-#if defined(__GNUC__) && (__GNUC__ >= 14)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Warray-bounds"
-#endif
-  size_t count(NodeMap map) const { return m_num_subplans[map]; }
-#if defined(__GNUC__) && (__GNUC__ >= 14)
-#pragma GCC diagnostic pop
-#endif
-=======
   size_t count(NodeMap map) const {
 #if defined(__GNUC__) && __GNUC__ >= 14
     // Silence -Warray-bounds warning in GCC 14.
@@ -7822,7 +7810,6 @@ struct CountingReceiver {
 #endif
     return m_num_subplans[map];
   }
->>>>>>> Percona-Server-9.1.0-1
 
   const JoinHypergraph &m_graph;
   std::unique_ptr<size_t[]> m_num_subplans;

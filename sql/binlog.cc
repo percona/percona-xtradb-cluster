@@ -1863,7 +1863,6 @@ bool MYSQL_BIN_LOG::write_transaction(THD *thd, binlog_cache_data *cache_data,
                        static_cast<ulong>(gtid_event.get_event_length())));
   DBUG_PRINT("info", ("transaction_length= %llu", gtid_event.get_trx_length()));
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   bool ret = 0;
 
@@ -1877,12 +1876,6 @@ bool MYSQL_BIN_LOG::write_transaction(THD *thd, binlog_cache_data *cache_data,
   bool ret = DBUG_EVALUATE_IF("simulate_write_trans_without_gtid", false,
                               gtid_event.write(writer));
 #endif
-||||||| merged common ancestors
-  bool ret = gtid_event.write(writer);
-=======
-  bool ret = DBUG_EVALUATE_IF("simulate_write_trans_without_gtid", false,
-                              gtid_event.write(writer));
->>>>>>> Percona-Server-9.1.0-1
   if (ret) goto end;
 
   /*
@@ -3112,20 +3105,16 @@ int MYSQL_BIN_LOG::rollback(THD *thd, bool all) {
       (void)RUN_HOOK(transaction, after_commit, (thd, all));
   }
 
-<<<<<<< HEAD
-#ifdef WITH_WSREP
-  if (!WSREP_EMULATE_BINLOG(thd) && check_write_error(thd)) {
-#else
-||||||| merged common ancestors
-=======
-  /*
+    /*
     It should be impossible to have an incident here as all sessions with
     incident will call ordered_commit() and handle the incident during
     BGC. If that fails, error is handled by handle_binlog_flush_or_sync_error().
    */
   assert(!cache_mngr->has_incident());
 
->>>>>>> Percona-Server-9.1.0-1
+#ifdef WITH_WSREP
+  if (!WSREP_EMULATE_BINLOG(thd) && check_write_error(thd)) {
+#else
   if (check_write_error(thd)) {
 #endif /* WITH_WSREP */
     /*
@@ -9037,13 +9026,7 @@ bool THD::is_binlog_cache_empty(bool is_transactional) const {
 #ifdef WITH_WSREP
 #else
   assert(opt_bin_log);
-<<<<<<< HEAD
 #endif /* WITH_WSREP */
-  binlog_cache_mngr *cache_mngr = thd_get_cache_mngr(this);
-||||||| merged common ancestors
-  binlog_cache_mngr *cache_mngr = thd_get_cache_mngr(this);
-=======
->>>>>>> Percona-Server-9.1.0-1
 
   binlog_cache_mngr *const cache_mngr = thd_get_cache_mngr(this);
   if (cache_mngr == nullptr) {
@@ -9115,7 +9098,11 @@ bool THD::binlog_configure_trx_cache_size(ulong new_size) {
   // Close and reopen with new value
   Binlog_cache_storage *const cache = cache_mngr->get_trx_cache();
   cache->close();
+#ifdef WITH_WSREP
+  return cache->open((my_off_t)new_size, max_binlog_cache_size);
+#else
   return cache->open(new_size, max_binlog_cache_size);
+#endif
 }
 
 /**

@@ -8198,17 +8198,11 @@ alter_event_stmt:
             */
 
             Lex->sql_command= SQLCOM_ALTER_EVENT;
-<<<<<<< HEAD
 #ifdef WITH_WSREP
             Lex->stmt_definition_begin= @3.cpp.start;
 #endif /* WITH_WSREP */
-            MAKE_CMD_DDL_DUMMY();
-||||||| merged common ancestors
-            MAKE_CMD_DDL_DUMMY();
-=======
             Lex->m_sql_cmd = make_alter_event_sql_cmd(YYTHD, $4);
             if (Lex->m_sql_cmd == nullptr) { YYABORT; }
->>>>>>> Percona-Server-9.1.0-1
           }
           ev_alter_on_schedule_completion
           opt_ev_rename_to

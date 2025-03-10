@@ -668,7 +668,6 @@ bool mysql_create_view(THD *thd, Table_ref *views, enum_view_create_mode mode) {
     }
   }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (WSREP(thd)) {
     // We need the view to be the 1st table because of
@@ -684,13 +683,8 @@ bool mysql_create_view(THD *thd, Table_ref *views, enum_view_create_mode mode) {
   }
 #endif /* WITH_WSREP */
 
-  if ((res = mysql_register_view(thd, view, mode))) goto err_with_rollback;
-||||||| merged common ancestors
-  if ((res = mysql_register_view(thd, view, mode))) goto err_with_rollback;
-=======
   if ((res = mysql_register_view(thd, view, mode, &use_existing_view)))
     goto err_with_rollback;
->>>>>>> Percona-Server-9.1.0-1
 
   if (!use_existing_view) {
     /*

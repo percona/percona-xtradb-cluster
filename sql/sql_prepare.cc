@@ -2992,59 +2992,8 @@ bool Prepared_statement::execute_loop(THD *thd, String *expanded_query,
 
     thd->push_reprepare_observer(stmt_reprepare_observer);
 
-<<<<<<< HEAD
-#ifdef WITH_WSREP
-  bool observer_popped = false;
-#if 0
-  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-  switch (thd->wsrep_conflict_state) {
-    case CERT_FAILURE:
-      WSREP_DEBUG(
-          "Prepare Statement execution fail with Certification Failure"
-          " thd: %u err: %d",
-          thd->thread_id(), thd->get_stmt_da()->mysql_errno());
-      thd->wsrep_conflict_state = NO_CONFLICT;
-      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-      break;
-
-    case MUST_REPLAY:
-      thd->pop_reprepare_observer();
-      observer_popped = true;
-      (void)wsrep_replay_transaction(thd);
-      // This extra state was added as a workaround fix to help skip
-      // lex->unit->cleanup. While writing this commit-message, commenting
-      // the said conflict_state doesn't cause galera_transaction_replay
-      // test-case to fail which was suppose to fail and so the fix was
-      // added.
-      // Why it is wrong to set the conflict_state at this point ?
-      // As part of replay transaction flow, conflict_state is already reset
-      // to NO_CONFLICT on completion. Resetting it to REPLAYED will not cause
-      // it to clear-up if prepare statement is executed through
-      // COM_STMT_EXECUTE mysql direct api call. Of-course the block of
-      // COM_STMT_EXECUTE can reset it as it is being done by
-      // mysql_execute_command block but this vary logic of setting REPLAYED
-      // state is questionable. Leaving the original code block as is for now
-      // just commenting the existing conflict_state setting.
-      // thd->wsrep_conflict_state= REPLAYED;
-      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-      break;
-
-    default:
-      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-      break;
-  }
-#endif
-  if (!observer_popped)
-    thd->pop_reprepare_observer();
-#else
-  thd->pop_reprepare_observer();
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-  thd->pop_reprepare_observer();
-=======
     DEBUG_SYNC(thd, "before_statement_execute");
     error = execute(thd, expanded_query, open_cursor);
->>>>>>> Percona-Server-9.1.0-1
 
     assert(error == thd->is_error());
 
@@ -3115,25 +3064,6 @@ bool Prepared_statement::execute_loop(THD *thd, String *expanded_query,
       thd->set_secondary_engine_optimization(
           Secondary_engine_optimization::PRIMARY_ONLY);
     }
-<<<<<<< HEAD
-
-#ifdef WITH_WSREP
-    if (!error) { /* Success */
-      // We are going to retry the statement, so clean up first.
-      if (!thd->wsrep_prepared_statement_TOI_started) {
-        wsrep_after_statement(thd);
-      }
-      goto reexecute;
-    }
-#else
-    if (!error) /* Success */
-      goto reexecute;
-#endif
-||||||| merged common ancestors
-
-    if (!error) /* Success */
-      goto reexecute;
-=======
     /*
       Disable the general log. The query was written to the general log in
       the first attempt to execute it. No need to write it twice.
@@ -3155,7 +3085,13 @@ bool Prepared_statement::execute_loop(THD *thd, String *expanded_query,
     thd->free_items();
     cleanup_items(m_arena.item_list());
     need_reprepare = true;
->>>>>>> Percona-Server-9.1.0-1
+
+#ifdef WITH_WSREP
+    // We are going to retry the statement, so clean up first.
+    if (!thd->wsrep_prepared_statement_TOI_started) {
+      wsrep_after_statement(thd);
+    }
+#endif
   }
 
   reset_stmt_parameters(this);

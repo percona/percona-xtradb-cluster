@@ -29,7 +29,6 @@ filter='\.cpp$\|\.cc$\|\.c$\|\.h$\|sql_yacc\.yy$\|\.hpp$\|\.ic$'
 list="find . -type f"
 git rev-parse >/dev/null 2>/dev/null && list="git ls-files"
 
-<<<<<<< HEAD
 $list |grep $filter |while read f; 
 do
 	 etags -o TAGS --append $f
@@ -38,12 +37,3 @@ done
 do
 	etags -o TAGS --append storage/galera/$f
 done 
-||||||| merged common ancestors
-ctags $tagopt -o $tagfile $( $list | grep $filter )
-
-echo "wrote file `pwd`/$tagfile"
-=======
-ctags $tagopt -o $tagfile $( $list | grep $filter | grep -v internal/extra)
-
-echo "wrote file `pwd`/$tagfile"
->>>>>>> Percona-Server-9.1.0-1

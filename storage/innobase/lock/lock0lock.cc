@@ -2080,23 +2080,7 @@ static const lock_t *lock_rec_has_to_wait_in_queue(
     const trx_t *blocking_trx = nullptr) {
 #else
     const lock_t *wait_lock, const trx_t *blocking_trx = nullptr) {
-<<<<<<< HEAD
 #endif /* WITH_WSREP */
-  const lock_t *lock;
-  ulint heap_no;
-  ulint bit_mask;
-  ulint bit_offset;
-  hash_table_t *hash;
-
-||||||| merged common ancestors
-  const lock_t *lock;
-  ulint heap_no;
-  ulint bit_mask;
-  ulint bit_offset;
-  hash_table_t *hash;
-
-=======
->>>>>>> Percona-Server-9.1.0-1
   ut_ad(lock_get_type_low(wait_lock) == LOCK_REC);
   const auto page_id = wait_lock->rec_lock.page_id;
   ut_ad(locksys::owns_page_shard(page_id));
@@ -2105,70 +2089,54 @@ static const lock_t *lock_rec_has_to_wait_in_queue(
   const auto heap_no = (uint16_t)lock_rec_find_set_bit(wait_lock);
 
   locksys::Trx_locks_cache wait_lock_cache{};
-<<<<<<< HEAD
-  for (lock = lock_rec_get_first_on_page_addr(hash, page_id); lock != wait_lock;
-       lock = lock_rec_get_next_on_page_const(lock)) {
-    const byte *p = (const byte *)&lock[1];
+  #ifdef WITH_WSREP
+  /* As per parallel applying algorithm of the wsrep slave threads
+  locks are not considered conflicting and so if requesting and waiting
+  threads both are applier/slave threads then modified check for wsrep
+  return NULL that will allow requesting thread to be obtain the
+  needed lock. For detailed comments check the git-commit:#0b256a223924.
 
-    if ((blocking_trx == nullptr || blocking_trx == lock->trx) &&
-        heap_no < lock_rec_get_n_bits(lock) && (p[bit_offset] & bit_mask) &&
-        locksys::rec_lock_has_to_wait(wait_lock, lock, wait_lock_cache)) {
-#ifdef WITH_WSREP
-      /* As per parallel applying algorithm of the wsrep slave threads
-      locks are not considered conflicting and so if requesting and waiting
-      threads both are applier/slave threads then modified check for wsrep
-      return NULL that will allow requesting thread to be obtain the
-      needed lock. For detailed comments check the git-commit:#0b256a223924.
+  Said check is also used to validate if the requesting lock that is added
+  to wait queue has a real waiting lock.
+  Scenario highlighted in galera_FK_duplicate_client_insert causes original
+  update on parent table to get bf-aborted due to insert on child table
+  originating from other cluster node. This insert takes S-lock on parent.
+  Aborted insert can get replayed that works as slave thread action
+  and try to add X-lock but needs to enter wait queue given presence of
+  the existing S-lock. Post add, flow validate if the record has conflicting
+  lock. In theory validation should pass as there is S-lock that is blocking
+  X-lock but given special handling wsrep flow function returns NULL
+  that indicate there is no conflicting lock. Caller asserts on this
+  condition as it just detected presence of conflicting lock and so added
+  its own lock to wait-q.
+  Said special flow make sense when the said function is being used to
+  detect presence of conflicting lock and proceed with lock_grant. */
 
-      Said check is also used to validate if the requesting lock that is added
-      to wait queue has a real waiting lock.
-      Scenario highlighted in galera_FK_duplicate_client_insert causes original
-      update on parent table to get bf-aborted due to insert on child table
-      originating from other cluster node. This insert takes S-lock on parent.
-      Aborted insert can get replayed that works as slave thread action
-      and try to add X-lock but needs to enter wait queue given presence of
-      the existing S-lock. Post add, flow validate if the record has conflicting
-      lock. In theory validation should pass as there is S-lock that is blocking
-      X-lock but given special handling wsrep flow function returns NULL
-      that indicate there is no conflicting lock. Caller asserts on this
-      condition as it just detected presence of conflicting lock and so added
-      its own lock to wait-q.
-      Said special flow make sense when the said function is being used to
-      detect presence of conflicting lock and proceed with lock_grant. */
-      if (!validation_check &&
-          wsrep_thd_is_BF(wait_lock->trx->mysql_thd, false) &&
-          wsrep_thd_is_BF(lock->trx->mysql_thd, true)) {
-        if (wsrep_debug) {
-          ib::info() << "WSREP: waiting BF trx: " << wait_lock->trx->id;
-          lock_rec_print(stderr, wait_lock);
-          ib::info() << "WSREP: waiting for lock held by trx: "
-                     << lock->trx->id;
-          lock_rec_print(stderr, lock);
-        }
-        /* don't wait for another BF lock */
-        continue;
+  lock_t *stopped_at = wait_lock->hash_table().find_on_record(
+      RecID{page_id, heap_no}, [&](lock_t *lock) {
+        if (lock == wait_lock) return true;
+
+        bool res =
+            (((blocking_trx == nullptr || blocking_trx == lock->trx) &&
+              locksys::rec_lock_has_to_wait(wait_lock, lock, wait_lock_cache)));
+        if (res) {
+          if (!validation_check &&
+              wsrep_thd_is_BF(wait_lock->trx->mysql_thd, false) &&
+              wsrep_thd_is_BF(lock->trx->mysql_thd, true)) {
+            if (wsrep_debug) {
+              ib::info() << "WSREP: waiting BF trx: " << wait_lock->trx->id;
+              lock_rec_print(stderr, wait_lock);
+              ib::info() << "WSREP: waiting for lock held by trx: "
+                         << lock->trx->id;
+              lock_rec_print(stderr, lock);
+            }
+            /* don't wait for another BF lock */
+            res = false;
+          }
       }
-#endif /* WITH_WSREP */
-
-      return (lock);
-    }
-  }
-
-  return (nullptr);
-||||||| merged common ancestors
-  for (lock = lock_rec_get_first_on_page_addr(hash, page_id); lock != wait_lock;
-       lock = lock_rec_get_next_on_page_const(lock)) {
-    const byte *p = (const byte *)&lock[1];
-
-    if ((blocking_trx == nullptr || blocking_trx == lock->trx) &&
-        heap_no < lock_rec_get_n_bits(lock) && (p[bit_offset] & bit_mask) &&
-        locksys::rec_lock_has_to_wait(wait_lock, lock, wait_lock_cache)) {
-      return (lock);
-    }
-  }
-
-  return (nullptr);
-=======
+      return res;
+      });
+#else
   lock_t *stopped_at = wait_lock->hash_table().find_on_record(
       RecID{page_id, heap_no}, [&](lock_t *lock) {
         return lock == wait_lock ||
@@ -2176,8 +2144,8 @@ static const lock_t *lock_rec_has_to_wait_in_queue(
                 locksys::rec_lock_has_to_wait(wait_lock, lock,
                                               wait_lock_cache));
       });
+#endif
   return stopped_at == wait_lock ? nullptr : stopped_at;
->>>>>>> Percona-Server-9.1.0-1
 }
 
 /** Grants a lock to a waiting lock request and releases the waiting

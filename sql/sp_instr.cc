@@ -889,7 +889,13 @@ bool sp_lex_instr::validate_lex_and_execute_core(THD *thd, uint *nextp,
     thd->clear_error();
     error = false;
     invalidate();
-<<<<<<< HEAD
+    m_lex->sphead = nullptr;
+    lex_end(m_lex);
+    cleanup_items(thd->item_list());
+    thd->free_items();
+    cleanup_items(m_arena.item_list());
+    need_reprepare = true;
+
 #ifdef WITH_WSREP
     /*
       The regular flow is that wsrep_after_statement is called afer the SP
@@ -899,15 +905,6 @@ bool sp_lex_instr::validate_lex_and_execute_core(THD *thd, uint *nextp,
     */
     wsrep_after_statement(thd);
 #endif
-||||||| merged common ancestors
-=======
-    m_lex->sphead = nullptr;
-    lex_end(m_lex);
-    cleanup_items(thd->item_list());
-    thd->free_items();
-    cleanup_items(m_arena.item_list());
-    need_reprepare = true;
->>>>>>> Percona-Server-9.1.0-1
   }
   thd->set_secondary_engine_statement_context(nullptr);
 

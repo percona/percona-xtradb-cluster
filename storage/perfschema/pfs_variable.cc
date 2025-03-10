@@ -91,15 +91,6 @@ bool PFS_system_variable_cache::init_show_var_array(enum_var_type scope,
   m_query_scope = scope;
 
 #ifndef NDEBUG
-<<<<<<< HEAD
-#ifdef WITH_WSREP
-  [[maybe_unused]]
-#endif /* WITH_WSREP */
-  extern mysql_mutex_t LOCK_plugin;
-||||||| merged common ancestors
-  extern mysql_mutex_t LOCK_plugin;
-=======
->>>>>>> Percona-Server-9.1.0-1
   mysql_mutex_assert_not_owner(&LOCK_plugin);
 #endif
   mysql_rwlock_rdlock(&LOCK_system_variables_hash);

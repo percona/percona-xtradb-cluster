@@ -1147,17 +1147,9 @@ struct PFS_variable_value_row {
   char m_str[WSREP_PS_VAR_VALUE_BUFF_SIZE];
 #else
   char m_str[1024];
-<<<<<<< HEAD
 #endif /* WITH_WSREP */
-  uint m_length;
-  const CHARSET_INFO *m_charset;
-||||||| merged common ancestors
-  uint m_length;
-  const CHARSET_INFO *m_charset;
-=======
   uint m_length{0};
   const CHARSET_INFO *m_charset{nullptr};
->>>>>>> Percona-Server-9.1.0-1
 };
 
 struct PFS_user_variable_value_row {

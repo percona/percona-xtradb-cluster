@@ -197,10 +197,6 @@ int wsrep_apply_events(THD *thd, Relay_log_info *rli __attribute__((unused)),
       my_micro_time_to_timeval(my_micro_time(), &ev->common_header->when);
     ev->thd = thd;  // because up to this point, ev->thd == 0
 
-    set_timespec_nsec(&thd->wsrep_rli->ts_exec[0], 0);
-    thd->wsrep_rli->stats_read_time +=
-        diff_timespec(&thd->wsrep_rli->ts_exec[0], &thd->wsrep_rli->ts_exec[1]);
-
     exec_res = ev->apply_event(thd->wsrep_rli);
     DBUG_PRINT("info", ("exec_event result: %d", exec_res));
 
@@ -213,10 +209,6 @@ int wsrep_apply_events(THD *thd, Relay_log_info *rli __attribute__((unused)),
       delete ev;
       goto error;
     }
-
-    set_timespec_nsec(&thd->wsrep_rli->ts_exec[1], 0);
-    thd->wsrep_rli->stats_exec_time +=
-        diff_timespec(&thd->wsrep_rli->ts_exec[1], &thd->wsrep_rli->ts_exec[0]);
 
     DBUG_PRINT("info", ("wsrep apply_event error = %d", exec_res));
     event++;
