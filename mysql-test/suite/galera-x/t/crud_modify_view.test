@@ -2,6 +2,8 @@
 
 ## Preamble
 --source include/galera_cluster.inc
+--let $xplugin_disable_ssl_for_x_at_client_side=1
+--let $xplugin_cache_x_root=1
 --source include/xplugin_preamble.inc
 --source include/xplugin_create_user.inc
 
@@ -12,7 +14,7 @@ call mtr.add_suppression("Query apply failed");
 
 ## Test data
 ## Test starts here
---let $xtest_file= $MYSQL_TMP_DIR/create_view.tmp
+--let $xtest_file= $MYSQL_TMP_DIR/create_view.xpl
 --write_file $xtest_file
 -->quiet
 
@@ -100,7 +102,7 @@ SHOW CREATE VIEW xtest.xview;
 --source include/assert.inc
 
 ## Cleanup
-DROP SCHEMA IF EXISTS xtest;
+--source ../include/xplugin_cleanup.inc
+# `xuser` is definer of a view, thus must be called after
+# dropping the view (drop of xtest schema, done by xplugin_cleanup)
 DROP USER xuser@localhost;
---remove_file $xtest_file
---source include/xplugin_drop_user.inc

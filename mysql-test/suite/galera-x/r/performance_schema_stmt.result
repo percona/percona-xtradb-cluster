@@ -108,6 +108,25 @@ SELECT COUNT(*) AS cnt,COUNT(CASE WHEN (column_name = 'doc' AND data_type = 'jso
 SELECT @@lower_case_table_names
 ALTER TABLE `xtest`.`test2` MODIFY COLUMN _json_schema JSON GENERATED ALWAYS AS ('{"type":"object"}') VIRTUAL, ALTER CHECK `$val_strict_7CEB3FDE5F7A9C4CE5FBE610D7D8EDA62EBE5F4E` NOT ENFORCED
 0 rows affected
+######### get validation error when working with collections #########
+
+command ok
+Got expected error:
+Mysqlx.Error {
+  severity: ERROR
+  code: 5180
+  msg: "Document is not valid according to the schema assigned to collection. The JSON document location \'#/value\' failed requirement \'maximum\' at JSON Schema location \'#/properties/value\'."
+  sql_state: "HY000"
+}
+
+Query
+SELECT @@mysqlx_document_id_unique_prefix,@@auto_increment_offset,@@auto_increment_increment
+INSERT INTO `xtest`.`test3` (doc) VALUES ('{\"_id\": \"one\", \"value\": 100}')
+GET DIAGNOSTICS CONDITION 1 @$internal_validation_error_message = MESSAGE_TEXT
+SELECT @$internal_validation_error_message
+0 rows affected
+
+command ok
 ######### create_collection_index #########
 
 command ok
@@ -191,10 +210,12 @@ connecting...
 active session is now 'x_root'
 
 command ok
+Server disconnected
+closing session unpriv
+switched to session default
 
 0 rows affected
 Query
-/* xplugin authentication */ SELECT /*+ SET_VAR(SQL_MODE = 'TRADITIONAL') */ @@require_secure_transport, `authentication_string`, `plugin`, (`account_locked`='Y') as is_account_locked, (`password_expired`!='N') as `is_password_expired`, @@disconnect_on_expired_password as `disconnect_on_expired_password`, @@offline_mode and (`Super_priv`='N') as `is_offline_mode_and_not_super_user`, `ssl_type`, `ssl_cipher`, `x509_issuer`, `x509_subject` FROM mysql.user WHERE 'unpriv' = `user` AND 'localhost' = `host`
 /* xplugin authentication */ SELECT /*+ SET_VAR(SQL_MODE = 'TRADITIONAL') */ @@require_secure_transport, `authentication_string`, `plugin`, (`account_locked`='Y') as is_account_locked, (`password_expired`!='N') as `is_password_expired`, @@disconnect_on_expired_password as `disconnect_on_expired_password`, @@offline_mode and (`Super_priv`='N') as `is_offline_mode_and_not_super_user`, `ssl_type`, `ssl_cipher`, `x509_issuer`, `x509_subject` FROM mysql.user WHERE 'x_root' = `user` AND 'localhost' = `host`
 KILL
 drop user unpriv@localhost
@@ -244,4 +265,3 @@ Mysqlx.Ok {
   msg: "bye!"
 }
 ok
-DROP SCHEMA IF EXISTS xtest;

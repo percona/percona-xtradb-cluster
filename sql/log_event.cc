@@ -3860,9 +3860,16 @@ bool is_atomic_ddl(THD *thd, bool using_trans_arg) {
         clause is used in the statement or if call is from the slave applier.
       */
 #ifdef WITH_WSREP
+      /* We can get here from wsrep_to_buf_helper() so using_trans_arg can be
+         false. See above comment about thd->wsrep_skip_wsrep_hton.
+         Commit 8466cdf5 moved SQLCOM_CREATE_VIEW to this part. lex->create_info
+         is nullptr in such a case, but for normal flow using_trans_arg==true.
+         As we get here with using_trans_arg==false, we need to check
+         wsrep_skip_wsrep_hton before dereferencing lex->create_info.
+      */
       assert(using_trans_arg || thd->slave_thread ||
-             (lex->create_info->options & HA_LEX_CREATE_IF_NOT_EXISTS) ||
-             thd->wsrep_skip_wsrep_hton);
+             thd->wsrep_skip_wsrep_hton ||
+             (lex->create_info->options & HA_LEX_CREATE_IF_NOT_EXISTS));
 #else
       assert(using_trans_arg || thd->slave_thread ||
              (lex->create_info->options & HA_LEX_CREATE_IF_NOT_EXISTS));
