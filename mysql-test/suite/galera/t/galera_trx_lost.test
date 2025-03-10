@@ -32,6 +32,7 @@ create table t1 (i int, primary key pk(i)) engine=innodb;
 insert into t1 values (1);
 insert into t1 values (2);
 insert into t1 values (3);
+--source include/expect_crash.inc
 set debug="+d,crash_before_trx_commit_in_memory";
 --error 2013
 insert into t1 values (4);
@@ -41,8 +42,6 @@ insert into t1 values (4);
 --echo #waiting to restart node-1
 --sleep 3
 
---let $restart_parameters="restart:"
---let $_expect_file_name = $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 --source include/start_mysqld.inc
 
 --let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
@@ -53,6 +52,7 @@ insert into t1 values (4);
 # continue with same table but this time insert some rows with wsrep_on=off
 # this transfer will not be committed as it is operating with sql_log_bin = 0
 set session wsrep_on=0;
+--source include/expect_crash.inc
 set debug="+d,crash_before_trx_commit_in_memory";
 --error 2013
 insert into t1 values (40);
@@ -62,8 +62,6 @@ insert into t1 values (40);
 --echo #waiting to restart node-1
 --sleep 3
 
---let $restart_parameters="restart:"
---let $_expect_file_name = $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 --source include/start_mysqld.inc
 
 --let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'

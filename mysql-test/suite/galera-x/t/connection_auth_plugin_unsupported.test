@@ -2,6 +2,8 @@
 
 --source include/galera_cluster.inc
 --let $dont_reset_global_status_variables= 1
+--let $xplugin_disable_ssl_for_x_at_client_side=1
+--let $xplugin_cache_x_root=1
 --source include/xplugin_preamble.inc
 --source include/have_mysql_no_login_plugin.inc
 --source include/xplugin_create_user.inc
@@ -11,7 +13,7 @@ call mtr.add_suppression("Access denied for user .*");
 
 ## Test starts here
 
---let $xtest_file= $MYSQL_TMP_DIR/connection_auth_plugin_unsupported.tmp
+--let $xtest_file= $MYSQL_TMP_DIR/connection_auth_plugin_unsupported.xpl
 --write_file $xtest_file
 -->quiet
 -->sql
@@ -39,7 +41,7 @@ SELECT user, plugin FROM mysql.user WHERE user LIKE 'xuser%';
 
 
 --let $XBASIC= --file=$xtest_file 2>&1
---let $XSSLPARAM= --ssl-cipher='DHE-RSA-AES256-SHA' $XBASIC
+--let $XSSLPARAM= --ssl-cipher='ECDHE-RSA-AES128-GCM-SHA256' $XBASIC
 
 --exec $MYSQLXTEST -ux_root          $XBASIC
 --exec $MYSQLXTEST -ux_root          $XSSLPARAM
@@ -61,5 +63,4 @@ DROP USER xuser_test@localhost;
 DROP USER xuser_nologin@localhost;
 UNINSTALL PLUGIN test_plugin_server;
 UNINSTALL PLUGIN mysql_no_login;
---remove_file $xtest_file
---source include/xplugin_drop_user.inc
+--source ../include/xplugin_cleanup.inc
