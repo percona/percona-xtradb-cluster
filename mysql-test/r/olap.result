@@ -2406,10 +2406,6 @@ GROUP BY CUBE(f2);
 ERROR HY000: Secondary engine operation failed. Reason: "You have not defined the secondary engine for at least one of the query tables [test.t1].".
 DROP VIEW v1;
 DROP TABLE t1;
-<<<<<<< HEAD
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-=======
 #
 # Bug#36514339 ROLLUP misses a summary NULL
 #
@@ -2462,7 +2458,6 @@ SUM(UTC_DATE()) OVER()
 20090416
 SET timestamp=default;
 DROP TABLE t1;
->>>>>>> Percona-Server-9.1.0-1
 #
 # PS-8328: MySQL 8 Crash when using group_concat with group by with
 #          rollup.

@@ -56,6 +56,7 @@ mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
@@ -161,6 +162,7 @@ mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
@@ -265,6 +267,7 @@ mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
@@ -382,6 +385,7 @@ mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
@@ -491,6 +495,7 @@ mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
@@ -595,6 +600,7 @@ mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
@@ -722,6 +728,7 @@ mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
@@ -840,6 +847,7 @@ mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
@@ -966,6 +974,7 @@ mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N

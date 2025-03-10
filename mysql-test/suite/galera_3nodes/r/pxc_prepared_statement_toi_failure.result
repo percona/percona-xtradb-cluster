@@ -13,16 +13,4 @@ include/assert.inc [Table pxc4341 was created on node2.]
 include/assert.inc [Node 2 is up, running and replicating.]
 include/assert.inc [Table pxc4341 was created on node3.]
 include/assert.inc [Node 2 is up, running and replicating.]
-PREPARE stmt1 FROM "CREATE TABLE IF NOT EXISTS temp (id INT PRIMARY KEY AUTO_INCREMENT, a INT)";
-EXECUTE stmt1;
-FLUSH TABLES;
-# Adding debug point 'simulate_max_reprepare_attempts_hit_case' to @@GLOBAL.debug
-EXECUTE stmt1;
-ERROR HY000: Prepared statement needs to be re-prepared
-include/assert_grep.inc [Node 3 inconsistent message was found in the error log]
-include/assert_grep.inc [Node 3 inconsistent message was found in the error log]
-SET SESSION wsrep_sync_wait=0;
-# restart
-CALL mtr.add_suppression("Inconsistency detected: Inconsistent by consensus on");
-DROP TABLE temp;
 DROP TABLE pxc4341;

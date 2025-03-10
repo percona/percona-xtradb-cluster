@@ -610,4 +610,3 @@ END
 DELIMITER ;
 
 
-

@@ -74,18 +74,8 @@ COMMIT;
 SET GTID_NEXT='AUTOMATIC';
 # Trigger compression explicitly
 FLUSH LOGS;
-<<<<<<< HEAD
-SET DEBUG_SYNC='now WAIT_FOR complete_compression';
-SET GLOBAL DEBUG= @debug_save;
-SELECT * FROM mysql.gtid_executed ORDER BY interval_start;
-||||||| merged common ancestors
-SET DEBUG_SYNC='now WAIT_FOR complete_compression';
-SET GLOBAL DEBUG= @debug_save;
-SELECT * FROM mysql.gtid_executed;
-=======
 # Wait until compression completes
-SELECT * FROM mysql.gtid_executed;
->>>>>>> Percona-Server-9.1.0-1
+SELECT * FROM mysql.gtid_executed ORDER BY interval_start;
 source_uuid	interval_start	interval_end	gtid_tag
 SOURCE_UUID	1	6	
 SOURCE_UUID	17	20	
@@ -172,18 +162,8 @@ COMMIT;
 SET GTID_NEXT='AUTOMATIC';
 # Trigger compression explicitly
 FLUSH LOGS;
-<<<<<<< HEAD
-SET DEBUG_SYNC='now WAIT_FOR complete_compression';
-SET GLOBAL DEBUG= @debug_save;
-SELECT * FROM mysql.gtid_executed ORDER BY interval_start;
-||||||| merged common ancestors
-SET DEBUG_SYNC='now WAIT_FOR complete_compression';
-SET GLOBAL DEBUG= @debug_save;
-SELECT * FROM mysql.gtid_executed;
-=======
 # Wait until compression completes
-SELECT * FROM mysql.gtid_executed;
->>>>>>> Percona-Server-9.1.0-1
+SELECT * FROM mysql.gtid_executed ORDER BY interval_start;
 source_uuid	interval_start	interval_end	gtid_tag
 SOURCE_UUID	1	15	
 SOURCE_UUID	17	23	

@@ -25,13 +25,7 @@ SELECT * FROM t1 ORDER BY 1;
 END |
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 17
-||||||| merged common ancestors
--- 13
-=======
--- 16
->>>>>>> Percona-Server-9.1.0-1
+-- 20
 
 CALL t1_sel();
 a
@@ -39,13 +33,7 @@ a
 2
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 20
-||||||| merged common ancestors
--- 16
-=======
--- 19
->>>>>>> Percona-Server-9.1.0-1
+-- 23
 
 -- Tracker : SESSION_TRACK_STATE_CHANGE
 -- 1
@@ -59,13 +47,7 @@ SELECT "session state sent as part of above SELECT" AS col_heading;
 END |
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 21
-||||||| merged common ancestors
--- 17
-=======
--- 20
->>>>>>> Percona-Server-9.1.0-1
+-- 24
 
 CALL t1_inssel();
 a
@@ -75,13 +57,7 @@ a
 4
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 25
-||||||| merged common ancestors
--- 21
-=======
--- 24
->>>>>>> Percona-Server-9.1.0-1
+-- 28
 
 -- Tracker : SESSION_TRACK_STATE_CHANGE
 -- 1
@@ -96,13 +72,7 @@ SELECT "no session state exists" AS col_heading;
 END |
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 27
-||||||| merged common ancestors
--- 23
-=======
--- 26
->>>>>>> Percona-Server-9.1.0-1
+-- 30
 
 CALL t1_selins();
 a
@@ -112,13 +82,7 @@ a
 4
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 29
-||||||| merged common ancestors
--- 25
-=======
--- 28
->>>>>>> Percona-Server-9.1.0-1
+-- 32
 
 col_heading
 no session state exists
@@ -131,13 +95,7 @@ SELECT MAX(2) FROM t1;
 END |
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 32
-||||||| merged common ancestors
--- 28
-=======
--- 31
->>>>>>> Percona-Server-9.1.0-1
+-- 35
 
 session state sent for both SELECT statement
 CALL t2t1_sel();
@@ -145,13 +103,7 @@ MIN(a)
 1
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 35
-||||||| merged common ancestors
--- 31
-=======
--- 34
->>>>>>> Percona-Server-9.1.0-1
+-- 38
 
 -- Tracker : SESSION_TRACK_STATE_CHANGE
 -- 1
@@ -173,13 +125,7 @@ SELECT "session state sent for SELECT inside t1_sel()" AS col_heading;
 END |
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 38
-||||||| merged common ancestors
--- 34
-=======
--- 37
->>>>>>> Percona-Server-9.1.0-1
+-- 41
 
 CALL t1_call();
 a
@@ -191,13 +137,7 @@ a
 6
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 43
-||||||| merged common ancestors
--- 39
-=======
--- 42
->>>>>>> Percona-Server-9.1.0-1
+-- 46
 
 -- Tracker : SESSION_TRACK_STATE_CHANGE
 -- 1
@@ -233,13 +173,7 @@ SELECT * FROM t2;
 END |
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 45
-||||||| merged common ancestors
--- 41
-=======
--- 44
->>>>>>> Percona-Server-9.1.0-1
+-- 48
 
 Warnings:
 Warning	1681	Specifying number of digits for floating point data types is deprecated and will be removed in a future release.
@@ -254,13 +188,7 @@ a
 6
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 59
-||||||| merged common ancestors
--- 55
-=======
--- 58
->>>>>>> Percona-Server-9.1.0-1
+-- 62
 -- time_zone
 -- Europe/Moscow
 
@@ -282,13 +210,7 @@ SELECT @a,@b,@c,@d,@e,@f,@g,@h,@i,@j;
 20	test_1	12.34	567.891	2345	NULL	test_2	67.891	234.6789	6789
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 62
-||||||| merged common ancestors
--- 58
-=======
--- 61
->>>>>>> Percona-Server-9.1.0-1
+-- 65
 
 
 #CASE2: SELECT FUNCTIONs
@@ -300,55 +222,7 @@ RETURN (SELECT COUNT(*) FROM t1);
 END |
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 63
-||||||| merged common ancestors
--- 59
-
-SELECT f1();
-f1()
-6
--- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
--- character_set_client
--- utf8mb4
--- character_set_connection
--- utf8mb4
--- character_set_results
--- big5
--- statement_id
--- 60
-
--- Tracker : SESSION_TRACK_STATE_CHANGE
--- 1
-
-CREATE VIEW v1 AS SELECT f1();
--- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
--- statement_id
--- 63
-=======
--- 62
-
-SELECT f1();
-f1()
-6
--- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
--- character_set_client
--- utf8mb4
--- character_set_connection
--- utf8mb4
--- character_set_results
--- big5
--- statement_id
--- 63
-
--- Tracker : SESSION_TRACK_STATE_CHANGE
--- 1
-
-CREATE VIEW v1 AS SELECT f1();
--- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
--- statement_id
 -- 66
->>>>>>> Percona-Server-9.1.0-1
 
 SELECT f1();
 f1()
@@ -369,7 +243,7 @@ f1()
 CREATE VIEW v1 AS SELECT f1();
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
--- 67
+-- 70
 
 SELECT * FROM v1;
 f1()
@@ -382,7 +256,7 @@ f1()
 -- character_set_results
 -- big5
 -- statement_id
--- 68
+-- 71
 
 -- Tracker : SESSION_TRACK_STATE_CHANGE
 -- 1
@@ -393,13 +267,7 @@ SELECT MIN(a) INTO x FROM t1;
 END |
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 71
-||||||| merged common ancestors
--- 67
-=======
--- 70
->>>>>>> Percona-Server-9.1.0-1
+-- 74
 
 CREATE FUNCTION f2() RETURNS int
 BEGIN
@@ -410,26 +278,14 @@ RETURN a;
 END |
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 72
-||||||| merged common ancestors
--- 68
-=======
--- 71
->>>>>>> Percona-Server-9.1.0-1
+-- 75
 
 SELECT f2();
 f2()
 1
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 73
-||||||| merged common ancestors
--- 69
-=======
--- 72
->>>>>>> Percona-Server-9.1.0-1
+-- 76
 
 -- Tracker : SESSION_TRACK_STATE_CHANGE
 -- 1
@@ -446,26 +302,14 @@ RETURN a + b;
 END |
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 79
-||||||| merged common ancestors
--- 75
-=======
--- 78
->>>>>>> Percona-Server-9.1.0-1
+-- 82
 
 SELECT f3();
 f3()
 6
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 80
-||||||| merged common ancestors
--- 76
-=======
--- 79
->>>>>>> Percona-Server-9.1.0-1
+-- 83
 
 -- Tracker : SESSION_TRACK_STATE_CHANGE
 -- 1
@@ -483,13 +327,7 @@ RETURN x;
 END |
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 89
-||||||| merged common ancestors
--- 85
-=======
--- 88
->>>>>>> Percona-Server-9.1.0-1
+-- 92
 
 Warnings:
 Warning	1287	'utf8mb3' is deprecated and will be removed in a future release. Please use utf8mb4 instead
@@ -504,13 +342,7 @@ f4()
 -- character_set_results
 -- utf8mb3
 -- statement_id
-<<<<<<< HEAD
--- 91
-||||||| merged common ancestors
--- 87
-=======
--- 90
->>>>>>> Percona-Server-9.1.0-1
+-- 94
 
 -- Tracker : SESSION_TRACK_STATE_CHANGE
 -- 1
@@ -537,26 +369,14 @@ CLOSE cur1;
 END |
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 97
-||||||| merged common ancestors
--- 93
-=======
--- 96
->>>>>>> Percona-Server-9.1.0-1
+-- 100
 
 CALL cursor1();
 v1
 6
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 111
-||||||| merged common ancestors
--- 107
-=======
--- 110
->>>>>>> Percona-Server-9.1.0-1
+-- 114
 -- transaction_isolation
 -- READ-COMMITTED
 
@@ -581,26 +401,14 @@ CLOSE c2;
 END |
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 112
-||||||| merged common ancestors
--- 108
-=======
--- 111
->>>>>>> Percona-Server-9.1.0-1
+-- 115
 
 CALL cursor2();
 (x+y)
 2
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 119
-||||||| merged common ancestors
--- 115
-=======
--- 118
->>>>>>> Percona-Server-9.1.0-1
+-- 122
 -- transaction_isolation
 -- READ-COMMITTED
 
@@ -612,13 +420,7 @@ session state sent as part of above SELECT
 DROP DATABASE wl7766;
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 121
-||||||| merged common ancestors
--- 117
-=======
--- 120
->>>>>>> Percona-Server-9.1.0-1
+-- 124
 
 -- Tracker : SESSION_TRACK_SCHEMA
 -- 
@@ -632,35 +434,17 @@ SET @@session.session_track_state_change=ON;
 -- session_track_state_change
 -- ON
 -- statement_id
-<<<<<<< HEAD
--- 122
-||||||| merged common ancestors
--- 118
-=======
--- 121
->>>>>>> Percona-Server-9.1.0-1
+-- 125
 
 CREATE DATABASE bug19550875;
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 123
-||||||| merged common ancestors
--- 119
-=======
--- 122
->>>>>>> Percona-Server-9.1.0-1
+-- 126
 
 USE bug19550875;
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 124
-||||||| merged common ancestors
--- 120
-=======
--- 123
->>>>>>> Percona-Server-9.1.0-1
+-- 127
 
 -- Tracker : SESSION_TRACK_SCHEMA
 -- bug19550875
@@ -671,24 +455,12 @@ USE bug19550875;
 CREATE TABLE t1 (a int);
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 125
-||||||| merged common ancestors
--- 121
-=======
--- 124
->>>>>>> Percona-Server-9.1.0-1
+-- 128
 
 INSERT INTO t1 VALUES (1), (2);
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 126
-||||||| merged common ancestors
--- 122
-=======
--- 125
->>>>>>> Percona-Server-9.1.0-1
+-- 129
 
 CREATE PROCEDURE t_cache()
 BEGIN
@@ -701,13 +473,7 @@ SELECT * FROM t1;
 END |
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 127
-||||||| merged common ancestors
--- 123
-=======
--- 126
->>>>>>> Percona-Server-9.1.0-1
+-- 130
 
 CALL t_cache();
 a
@@ -715,13 +481,7 @@ a
 2
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 130
-||||||| merged common ancestors
--- 126
-=======
--- 129
->>>>>>> Percona-Server-9.1.0-1
+-- 133
 
 -- Tracker : SESSION_TRACK_STATE_CHANGE
 -- 1
@@ -745,13 +505,7 @@ SELECT * FROM t1 ORDER BY 1;
 END |
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 135
-||||||| merged common ancestors
--- 131
-=======
--- 134
->>>>>>> Percona-Server-9.1.0-1
+-- 138
 
 CREATE PROCEDURE sel_with_no_session()
 BEGIN
@@ -759,25 +513,13 @@ SELECT * FROM t1 ORDER BY 1;
 END |
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 136
-||||||| merged common ancestors
--- 132
-=======
--- 135
->>>>>>> Percona-Server-9.1.0-1
+-- 139
 
 #cleanup
 DROP DATABASE bug19550875;
 -- Tracker : SESSION_TRACK_SYSTEM_VARIABLES
 -- statement_id
-<<<<<<< HEAD
--- 137
-||||||| merged common ancestors
--- 133
-=======
--- 136
->>>>>>> Percona-Server-9.1.0-1
+-- 140
 
 -- Tracker : SESSION_TRACK_SCHEMA
 -- 

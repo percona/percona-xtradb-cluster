@@ -2152,14 +2152,8 @@ performance-schema-events-waits-history-long-size -1
 performance-schema-events-waits-history-size -1
 performance-schema-hosts-size -1
 performance-schema-instrument 
-<<<<<<< HEAD
-performance-schema-max-cond-classes 177
-||||||| merged common ancestors
-performance-schema-max-cond-classes 150
-=======
 performance-schema-logger 
-performance-schema-max-cond-classes 150
->>>>>>> Percona-Server-9.1.0-1
+performance-schema-max-cond-classes 177
 performance-schema-max-cond-instances -1
 performance-schema-max-digest-length 1024
 performance-schema-max-digest-sample-age 60
@@ -2181,16 +2175,8 @@ performance-schema-max-rwlock-instances -1
 performance-schema-max-socket-classes 10
 performance-schema-max-socket-instances -1
 performance-schema-max-sql-text-length 1024
-<<<<<<< HEAD
 performance-schema-max-stage-classes 199
-performance-schema-max-statement-classes 228
-||||||| merged common ancestors
-performance-schema-max-stage-classes 175
-performance-schema-max-statement-classes 228
-=======
-performance-schema-max-stage-classes 175
 performance-schema-max-statement-classes 234
->>>>>>> Percona-Server-9.1.0-1
 performance-schema-max-statement-stack 10
 performance-schema-max-table-handles -1
 performance-schema-max-table-instances -1
