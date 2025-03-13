@@ -366,30 +366,6 @@ bool handle_reload_request(THD *thd, unsigned long options, Table_ref *tables,
       }
 
 #ifdef WITH_WSREP
-      if (WSREP(thd) && !thd->lex->no_write_to_binlog &&
-          (options & REFRESH_TABLES) &&
-          !(options & (REFRESH_FOR_EXPORT | REFRESH_READ_LOCK))) {
-        /*
-          This is done here because LOCK TABLES is not replicated in galera,
-          the upgrade of which is checked above.  Hence, done after/if we
-          are able to upgrade locks.
-
-          Also, note that, in error log with debug you may see
-          'thread holds MDL locks at TI' but since this is a flush
-          tables and is required for LOCK TABLE WRITE
-          it can be ignored there.
-        */
-        if (tables) {
-          if (wsrep_to_isolation_begin(thd, NULL, NULL, tables)) {
-            result = 1;
-            goto cleanup;
-          }
-        } else if (wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL)) {
-          result = 1;
-          goto cleanup;
-        }
-      }
-
       if (thd && (thd->wsrep_applier || thd->slave_thread)) {
         /*
           In case of wsrep-applier/mysql-slave thread, do not wait for table
@@ -427,9 +403,6 @@ bool handle_reload_request(THD *thd, unsigned long options, Table_ref *tables,
       }
     }
   }
-#ifdef WITH_WSREP
-cleanup:
-#endif /* WITH_WSREP */
   if (options & REFRESH_HOSTS) hostname_cache_refresh();
   if (thd && (options & REFRESH_STATUS)) refresh_status();
   if (options & REFRESH_THREADS)
