@@ -889,7 +889,7 @@ bool Trx_locks_cache::has_granted_blocker(const trx_t *trx,
 #ifdef UNIV_DEBUG
 /** Checks if some other transaction has a lock request in the queue.
  @return lock or NULL */
-MY_NODISCARD static const lock_t *lock_rec_other_has_expl_req(
+[[nodiscard]] static const lock_t *lock_rec_other_has_expl_req(
     lock_mode mode,           /*!< in: LOCK_S or LOCK_X */
     const buf_block_t *block, /*!< in: buffer block containing
                               the record */
@@ -3685,17 +3685,6 @@ static inline void lock_table_remove_autoinc_lock(
 lock_guid_t::lock_guid_t(const lock_t &lock)
     : m_trx_guid(*(lock.trx)),
       m_immutable_id(reinterpret_cast<uint64_t>(&lock)) {}
-
-const lock_t *lock_find_table_lock_by_guid(const dict_table_t *table,
-                                           const lock_guid_t &guid) {
-  ut_ad(locksys::owns_table_shard(*table));
-  for (const lock_t *lock : table->locks) {
-    if (lock_guid_t(*lock) == guid) {
-      return lock;
-    }
-  }
-  return nullptr;
-}
 
 /** Removes a table lock request from the queue and the trx list of locks;
  this is a low-level function which does NOT check if waiting requests

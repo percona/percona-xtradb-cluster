@@ -21,7 +21,6 @@ Usage: $0 [OPTIONS]
         --rpm_release       RPM version( default = 1)
         --deb_release       DEB version( default = 1)
         --bin_release       BIN version( default = 1)
-        --enable_fipsmode   Build gated PXC
         --debug             Build debug tarball
         --help) usage ;;
 Example $0 --builddir=/tmp/PXC80 --get_sources=1 --build_src_rpm=1 --build_rpm=1
@@ -60,7 +59,6 @@ parse_arguments() {
             --bin_release=*) BIN_RELEASE="$val" ;;
             --no_clone=*) NO_CLONE="$val" ;;
             --debug=*) DEBUG="$val" ;;
-            --enable_fipsmode=*) FIPSMODE="$val" ;;
             --help) usage ;;      
             *)
               if test -n "$pick_args"
@@ -160,6 +158,7 @@ get_sources(){
         pushd percona-xtradb-cluster-galera
            GALERA_REVISION=$(git rev-parse --short HEAD)
            echo ${GALERA_REVISION} > GALERA-REVISION
+           sed -i "s/XXXX/${GALERA_REVISION}/g" cmake/version.cmake
         popd
         GALERA_REVNO="$(test -r percona-xtradb-cluster-galera/GALERA-REVISION && cat percona-xtradb-cluster-galera/GALERA-REVISION)"
     fi
@@ -577,44 +576,7 @@ build_srpm(){
     sed -i "s:@@WSREP_VERSION@@:${WSREP_VERSION}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
     sed -i "s:@@REVISION@@:${REVISION}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
     sed -i "s:@@RPM_RELEASE@@:${RPM_RELEASE}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
-
     #
-
-    if [[ "x${FIPSMODE}" == "x1" ]]; then
-        sed -i -e "s:percona-xtradb-cluster$:percona-xtradb-cluster-pro:g" \
-        -e "s:percona-xtradb-cluster-full$:percona-xtradb-cluster-pro-full:g" \
-        -e "s:percona-xtradb-cluster-server$:percona-xtradb-cluster-server-pro:g" \
-        -e "s:percona-xtradb-cluster-server =:percona-xtradb-cluster-server-pro =:g" \
-        -e "s:percona-xtradb-cluster-server --:percona-xtradb-cluster-server-pro --:g" \
-        -e "s:percona-xtradb-cluster-client$:percona-xtradb-cluster-client-pro:g" \
-        -e "s:percona-xtradb-cluster-client :percona-xtradb-cluster-client-pro :g" \
-        -e "s:percona-xtradb-cluster-devel$:percona-xtradb-cluster-devel-pro:g" \
-        -e "s:percona-xtradb-cluster-devel =:percona-xtradb-cluster-devel-pro =:g" \
-        -e "s:percona-xtradb-cluster-test$:percona-xtradb-cluster-test-pro:g" \
-        -e "s:percona-xtradb-cluster-test =:percona-xtradb-cluster-test-pro =:g" \
-        -e "s:percona-xtradb-cluster-debuginfo$:percona-xtradb-cluster-pro-debuginfo:g" \
-        -e "s:percona-xtradb-cluster-debuginfo =:percona-xtradb-cluster-pro-debuginfo =:g" \
-        -e "s:percona-xtradb-cluster-garbd$:percona-xtradb-cluster-garbd-pro:g" \
-        -e "s:percona-xtradb-cluster-garbd =:percona-xtradb-cluster-garbd-pro =:g" \
-        -e "s:percona-xtradb-cluster-mysql-router$:percona-xtradb-cluster-mysql-router-pro:g" \
-        -e "s:percona-xtradb-cluster-mysql-router :percona-xtradb-cluster-mysql-router-pro :g" \
-        -e "s:percona-xtradb-cluster-mysql-router-devel$:percona-xtradb-cluster-mysql-router-devel-pro:g" \
-        -e "s:percona-xtradb-cluster-mysql-router-devel =:percona-xtradb-cluster-mysql-router-devel-pro =:g" \
-        -e "s:percona-xtradb-cluster-shared$:percona-xtradb-cluster-shared-pro:g" \
-        -e "s:percona-xtradb-cluster-shared :percona-xtradb-cluster-shared-pro :g" \
-        -e "s:Conflicts\:      percona-xtradb-cluster-server-pro:Conflicts\:      percona-xtradb-cluster-server:g" \
-        -e "s:Conflicts\:      percona-xtradb-cluster-client-pro:Conflicts\:      percona-xtradb-cluster-client:g" \
-        -e "s:Conflicts\:      percona-xtradb-cluster-test-pro:Conflicts\:      percona-xtradb-cluster-test:g" \
-        -e "s:Conflicts\:      percona-xtradb-cluster-devel-pro:Conflicts\:      percona-xtradb-cluster-devel:g" \
-        -e "s:Conflicts\:     percona-xtradb-cluster-mysql-router-pro:Conflicts\:     percona-xtradb-cluster-mysql-router:g" \
-        -e "s:Conflicts\:      percona-xtradb-cluster-mysql-router-devel-pro:Conflicts\:      percona-xtradb-cluster-mysql-router-devel:g" \
-        -e "s:Conflicts\:      percona-xtradb-cluster-test-pro:Conflicts\:      percona-xtradb-cluster-test:g" \
-        -e "s:Conflicts\:      percona-xtradb-cluster-shared-pro:Conflicts\:      percona-xtradb-cluster-shared:g" \
-        -e "s:Conflicts\:      percona-xtradb-cluster-garbd-pro:Conflicts\:      percona-xtradb-cluster-garbd:g" \
-        -e "s:Conflicts\:      percona-xtradb-cluster-pro-full:Conflicts\:      percona-xtradb-cluster-full:g" \
-       rpmbuild/SPECS/percona-xtradb-cluster.spec
-    fi
-
     SRCRPM=$(find . -name *.src.rpm)
     RHEL=$(rpm --eval %rhel)
     #
@@ -782,17 +744,9 @@ build_rpm(){
     source ${CURDIR}/srpm/pxc-80.properties
     #
     if [ ${ARCH} = x86_64 ]; then
-        if [[ "x${FIPSMODE}" == "x1" ]]; then
-            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "enable_fipsmode 1" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
-        else
-            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
-        fi
+        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
     else
-        if [[ "x${FIPSMODE}" == "x1" ]]; then
-            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "enable_fipsmode 1" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
-        else
-            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
-        fi
+        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
     fi
     return_code=$?
     if [ $return_code != 0 ]; then
@@ -831,11 +785,7 @@ build_source_deb(){
     rm -fr ${HNAME}-${VERSION}
 
     #
-    if [[ "x${FIPSMODE}" == "x1" ]]; then
-        NEWTAR=${NAME}-pro_${VERSION}-${RELEASE}.orig.tar.gz
-    else
-        NEWTAR=${NAME}_${VERSION}-${RELEASE}.orig.tar.gz
-    fi
+    NEWTAR=${NAME}_${VERSION}-${RELEASE}.orig.tar.gz
     mv ${TARFILE} ${NEWTAR}
 
     DEBIAN_VERSION="$(lsb_release -sc)"
@@ -844,107 +794,6 @@ build_source_deb(){
     tar xzf ${NEWTAR}
     cd ${HNAME}-${VERSION}-${MYSQL_RELEASE} || exit
     cp -ap build-ps/debian/ .
-    if [ x"${FIPSMODE}" == x1 ]; then
-        sed -i "s:FIPSFLAGS=:FIPSFLAGS=-DPROBUILD=1:g" debian/rules
-        sed -i "s:percona-xtradb-cluster-server:percona-xtradb-cluster-server-pro:g" debian/rules
-        sed -i "s:percona-xtradb-cluster-dbg:percona-xtradb-cluster-pro-dbg:g" debian/rules
-
-        sed -i "s:percona-xtradb-cluster:percona-xtradb-cluster-pro:g" debian/changelog
-
-        sed -i "s:Source\: percona-xtradb-cluster:Source\: percona-xtradb-cluster-pro:g" debian/control
-
-        sed -i "s:Package\: percona-xtradb-cluster-common:Package\: percona-xtradb-cluster-pro-common:g" debian/control
-        sed -i "s:, percona-xtradb-cluster-pro-common:, percona-xtradb-cluster-common:g" debian/control
-        sed -i "s:Conflicts\: percona-xtradb-cluster-pro-common:Conflicts\: percona-xtradb-cluster-common:g" debian/control
-        sed -i "s:Depends\: percona-xtradb-cluster-common:Depends\: percona-xtradb-cluster-pro-common:g" debian/control
-
-        sed -i "s:Package\: percona-xtradb-cluster-client:Package\: percona-xtradb-cluster-client-pro:g" debian/control
-        sed -i "s:Conflicts\: percona-xtradb-cluster-client-pro:Conflicts\: percona-xtradb-cluster-client:g" debian/control
-        sed -i "s:  percona-xtradb-cluster-client-pro:  percona-xtradb-cluster-client:g" debian/control
-        sed -i "s:percona-xtradb-cluster-client (:percona-xtradb-cluster-client-pro (:g" debian/control
-
-        sed -i "s:Package\: percona-xtradb-cluster-server:Package\: percona-xtradb-cluster-server-pro:g" debian/control
-        sed -i "s:Conflicts\: percona-xtradb-cluster-server-pro:Conflicts\: percona-xtradb-cluster-server:g" debian/control
-        sed -i "s:  percona-xtradb-cluster-server-pro:  percona-xtradb-cluster-server:g" debian/control
-        sed -i "s:percona-xtradb-cluster-server (:percona-xtradb-cluster-server-pro (:g" debian/control
-
-        sed -i "s:Package\: percona-xtradb-cluster-server-debug:Package\: percona-xtradb-cluster-server-pro-debug:g" debian/control
-        sed -i "s:Replaces\: percona-xtradb-cluster-server-pro-debug:Replaces\: percona-xtradb-cluster-server-debug:g" debian/control
-        sed -i "s:Conflicts\: percona-xtradb-cluster-server-pro-debug:Conflicts\: percona-xtradb-cluster-server-debug:g" debian/control
-        sed -i "s:percona-xtradb-cluster-server-debug ,:percona-xtradb-cluster-server-pro-debug ,:g" debian/control
-
-        sed -i "s:Package\: percona-xtradb-cluster$:Package\: percona-xtradb-cluster-pro:g" debian/control
-        sed -i "s:Replaces\: percona-xtradb-cluster-pro:Replaces\: percona-xtradb-cluster:g" debian/control
-        sed -i "s:Conflicts\: percona-xtradb-cluster-pro:Conflicts\: percona-xtradb-cluster:g" debian/control
-
-        sed -i "s:Package\: percona-xtradb-cluster-full:Package\: percona-xtradb-cluster-pro-full:g" debian/control
-        sed -i "s:Replaces\: percona-xtradb-cluster-pro-full:Replaces\: percona-xtradb-cluster-full:g" debian/control
-        sed -i "s:Conflicts\: percona-xtradb-cluster-pro-full:Conflicts\: percona-xtradb-cluster-full:g" debian/control
-        sed -i "s:percona-xtradb-cluster-test (:percona-xtradb-cluster-test-pro (:g" debian/control
-        sed -i "s:percona-xtradb-cluster-dbg (:percona-xtradb-cluster-pro-dbg (:g" debian/control
-        sed -i "s:percona-xtradb-cluster-server-debug,:percona-xtradb-cluster-server-pro-debug,:g" debian/control
-        sed -i "s:percona-xtradb-cluster-garbd (:percona-xtradb-cluster-garbd-pro (:g" debian/control
-        sed -i "s:percona-xtradb-cluster-garbd-debug (:percona-xtradb-cluster-garbd-pro-debug (:g" debian/control
-
-        sed -i "s:Package\: percona-xtradb-cluster-test:Package\: percona-xtradb-cluster-test-pro:g" debian/control
-        sed -i "s:Replaces\: percona-xtradb-cluster-test-pro:Replaces\: percona-xtradb-cluster-test:g" debian/control
-        sed -i "s:Conflicts\: percona-xtradb-cluster-test-pro:Conflicts\: percona-xtradb-cluster-test:g" debian/control
-
-        sed -i "s:Package\: percona-xtradb-cluster-dbg:Package\: percona-xtradb-cluster-pro-dbg:g" debian/control
-        sed -i "s:Replaces\: percona-xtradb-cluster-pro-dbg:Replaces\: percona-xtradb-cluster-dbg:g" debian/control
-        sed -i "s:Conflicts\: percona-xtradb-cluster-pro-dbg:Conflicts\: percona-xtradb-cluster-dbg:g" debian/control
-
-        sed -i "s:Package\: percona-xtradb-cluster-source:Package\: percona-xtradb-cluster-pro-source:g" debian/control
-        sed -i "s:Replaces\: percona-xtradb-cluster-pro-source:Replaces\: percona-xtradb-cluster-source:g" debian/control
-        sed -i "s:Conflicts\: percona-xtradb-cluster-pro-source:Conflicts\: percona-xtradb-cluster-source:g" debian/control
-
-        sed -i "s:Package\: percona-xtradb-cluster-garbd:Package\: percona-xtradb-cluster-garbd-pro:g" debian/control
-        sed -i "s:, percona-xtradb-cluster-garbd-pro$:, percona-xtradb-cluster-garbd:g" debian/control
-
-        sed -i "s:Package\: percona-xtradb-cluster-garbd-debug:Package\: percona-xtradb-cluster-garbd-pro-debug:g" debian/control
-        sed -i "s:, percona-xtradb-cluster-garbd-pro-debug$:, percona-xtradb-cluster-garbd-debug:g" debian/control
-
-        cp debian/percona-xtradb-cluster-client.README.Debian debian/percona-xtradb-cluster-client-pro.README.Debian
-        cp debian/percona-xtradb-cluster-client.dirs debian/percona-xtradb-cluster-client-pro.dirs
-        cp debian/percona-xtradb-cluster-client.docs debian/percona-xtradb-cluster-client-pro.docs
-        cp debian/percona-xtradb-cluster-client.install debian/percona-xtradb-cluster-client-pro.install
-        cp debian/percona-xtradb-cluster-client.links debian/percona-xtradb-cluster-client-pro.links
-        cp debian/percona-xtradb-cluster-client.lintian-overrides debian/percona-xtradb-cluster-client-pro.lintian-overrides
-        cp debian/percona-xtradb-cluster-common.dirs debian/percona-xtradb-cluster-pro-common.dirs
-        cp debian/percona-xtradb-cluster-common.install debian/percona-xtradb-cluster-pro-common.install
-        cp debian/percona-xtradb-cluster-common.lintian-overrides debian/percona-xtradb-cluster-pro-common.lintian-overrides
-        cp debian/percona-xtradb-cluster-common.postinst debian/percona-xtradb-cluster-pro-common.postinst
-        cp debian/percona-xtradb-cluster-common.postrm debian/percona-xtradb-cluster-pro-common.postrm
-        cp debian/percona-xtradb-cluster-garbd-debug.install debian/percona-xtradb-cluster-garbd-pro-debug.install
-        cp debian/percona-xtradb-cluster-garbd.docs debian/percona-xtradb-cluster-garbd-pro.docs
-        cp debian/percona-xtradb-cluster-garbd.garbd.default debian/percona-xtradb-cluster-garbd-pro.garbd.default
-        cp debian/percona-xtradb-cluster-garbd.garbd.init debian/percona-xtradb-cluster-garbd-pro.garbd.init
-        cp debian/percona-xtradb-cluster-garbd.install debian/percona-xtradb-cluster-garbd-pro.install
-        cp debian/percona-xtradb-cluster-garbd.postinst debian/percona-xtradb-cluster-garbd-pro.postinst
-        cp debian/percona-xtradb-cluster-garbd.preinst debian/percona-xtradb-cluster-garbd-pro.preinst
-        cp debian/percona-xtradb-cluster-garbd.prerm debian/percona-xtradb-cluster-garbd-pro.prerm
-        cp debian/percona-xtradb-cluster-server-debug.install debian/percona-xtradb-cluster-server-pro-debug.install
-        cp debian/percona-xtradb-cluster-server.README.Debian debian/percona-xtradb-cluster-server-pro.README.Debian
-        cp debian/percona-xtradb-cluster-server.config debian/percona-xtradb-cluster-server-pro.config
-        cp debian/percona-xtradb-cluster-server.dirs debian/percona-xtradb-cluster-server-pro.dirs
-        cp debian/percona-xtradb-cluster-server.docs debian/percona-xtradb-cluster-server-pro.docs
-        cp debian/percona-xtradb-cluster-server.install debian/percona-xtradb-cluster-server-pro.install
-        cp debian/percona-xtradb-cluster-server.links debian/percona-xtradb-cluster-server-pro.links
-        cp debian/percona-xtradb-cluster-server.lintian-overrides debian/percona-xtradb-cluster-server-pro.lintian-overrides
-        cp debian/percona-xtradb-cluster-server.logcheck.ignore.paranoid debian/percona-xtradb-cluster-server-pro.logcheck.ignore.paranoid
-        cp debian/percona-xtradb-cluster-server.logcheck.ignore.server debian/percona-xtradb-cluster-server-pro.logcheck.ignore.server
-        cp debian/percona-xtradb-cluster-server.logcheck.ignore.workstation debian/percona-xtradb-cluster-server-pro.logcheck.ignore.workstation
-        cp debian/percona-xtradb-cluster-server.mysql.init debian/percona-xtradb-cluster-server-pro.mysql.init
-        cp debian/percona-xtradb-cluster-server.postinst debian/percona-xtradb-cluster-server-pro.postinst
-        cp debian/percona-xtradb-cluster-server.postrm debian/percona-xtradb-cluster-server-pro.postrm
-        cp debian/percona-xtradb-cluster-server.preinst debian/percona-xtradb-cluster-server-pro.preinst
-        cp debian/percona-xtradb-cluster-server.prerm debian/percona-xtradb-cluster-server-pro.prerm
-        cp debian/percona-xtradb-cluster-server.templates debian/percona-xtradb-cluster-server-pro.templates
-        cp debian/percona-xtradb-cluster-source.install debian/percona-xtradb-cluster-pro-source.install
-        cp debian/percona-xtradb-cluster-test.install debian/percona-xtradb-cluster-test-pro.install
-        cp debian/percona-xtradb-cluster-test.links debian/percona-xtradb-cluster-test-pro.links
-        cp debian/percona-xtradb-cluster-test.lintian-overrides debian/percona-xtradb-cluster-test-pro.lintian-overrides
-    fi
     sed -i "s:@@MYSQL_VERSION@@:${VERSION}:g" debian/changelog
     sed -i "s:@@PERCONA_VERSION@@:${RELEASE}:g" debian/changelog
 
@@ -1010,11 +859,7 @@ build_deb(){
     export CXXFLAGS=" $COMMON_FLAGS -Wno-virtual-move-assign  ${CXXFLAGS:-}"
 
     DSC=$(basename $(find . -name '*.dsc' | sort | tail -n 1))
-    if [[ "x${FIPSMODE}" == "x1" ]]; then
-        DIRNAME=$(echo ${DSC} | sed -e 's:_:-:g' | awk -F'-' '{print $1"-"$2"-"$3"-"$4"-"$5"-"$6}' | sed -e s:.dsc::)
-    else
-        DIRNAME=$(echo ${DSC} | sed -e 's:_:-:g' | awk -F'-' '{print $1"-"$2"-"$3"-"$4"-"$5}' | sed -e s:.dsc::)
-    fi
+    DIRNAME=$(echo ${DSC} | sed -e 's:_:-:g' | awk -F'-' '{print $1"-"$2"-"$3"-"$4"-"$5}' | sed -e s:.dsc::)
     rm -rf $DIRNAME
 
     #
@@ -1058,10 +903,6 @@ build_deb(){
     #
 
     postfix=""
-    if [ x"${FIPSMODE}" == x1 ]; then
-        postfix="-pro"
-    fi
-
     cd debian/
         wget https://raw.githubusercontent.com/Percona-Lab/telemetry-agent/phase-0/call-home.sh
         sed -i 's:exit 0::' percona-xtradb-cluster-server"${postfix}".postinst
@@ -1082,13 +923,8 @@ build_deb(){
     fi
 
     if [ ${DEBIAN_VERSION} = "noble" -a ${ARCH} = "aarch64" ]; then
-        if [ x"${FIPSMODE}" == x1 ]; then
-            sed -i 's:dh_strip --dbg-package=percona-xtradb-cluster-pro-dbg:mv debian/percona-xtradb-cluster-server-pro/usr/lib/mysql/plugin/authentication_fido.so /tmp\n\tdh_strip --dbg-package=percona-xtradb-cluster-pro-dbg\n\tmv /tmp/authentication_fido.so debian/percona-xtradb-cluster-server-pro/usr/lib/mysql/plugin/authentication_fido.so:' debian/rules
-            sed -i 's:dh_strip -Xlibprotobuf-lite:dh_strip -Xlibprotobuf-lite --exclude=debian/percona-xtradb-cluster-server-pro/usr/lib/mysql/plugin/authentication_fido.so:' debian/rules
-        else
-            sed -i 's:dh_strip --dbg-package=percona-xtradb-cluster-dbg:mv debian/percona-xtradb-cluster-server/usr/lib/mysql/plugin/authentication_fido.so /tmp\n\tdh_strip --dbg-package=percona-xtradb-cluster-dbg\n\tmv /tmp/authentication_fido.so debian/percona-xtradb-cluster-server/usr/lib/mysql/plugin/authentication_fido.so:' debian/rules
-            sed -i 's:dh_strip -Xlibprotobuf-lite:dh_strip -Xlibprotobuf-lite --exclude=debian/percona-xtradb-cluster-server/usr/lib/mysql/plugin/authentication_fido.so:' debian/rules
-        fi
+        sed -i 's:dh_strip --dbg-package=percona-xtradb-cluster-dbg:mv debian/percona-xtradb-cluster-server/usr/lib/mysql/plugin/authentication_fido.so /tmp\n\tdh_strip --dbg-package=percona-xtradb-cluster-dbg\n\tmv /tmp/authentication_fido.so debian/percona-xtradb-cluster-server/usr/lib/mysql/plugin/authentication_fido.so:' debian/rules
+        sed -i 's:dh_strip -Xlibprotobuf-lite:dh_strip -Xlibprotobuf-lite --exclude=debian/percona-xtradb-cluster-server/usr/lib/mysql/plugin/authentication_fido.so:' debian/rules
         cat debian/rules
     fi
 
@@ -1156,10 +992,6 @@ build_tarball(){
     rm -f $TARFILE
     #
     cd ${NAME}-${VERSION}-${MYSQL_RELEASE} || exit
-
-    if [[ "x${FIPSMODE}" == "x1" ]]; then
-        sed -i "s/FIPSMODE=0/FIPSMODE=1/g" build-ps/build-binary.sh
-    fi
 
     BUILD_NUMBER=$(date "+%Y%m%d-%H%M%S")
     mkdir -p $BUILD_NUMBER

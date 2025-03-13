@@ -11,7 +11,6 @@
 
 # bail out on errors, be strict
 set -ue
-FIPSMODE=0
 
 #-------------------------------------------------------------------------------
 #
@@ -168,12 +167,6 @@ do
             exit 3
         fi
         ;;
-    --enable-fipsmode )
-        shift
-        FIPSMODE=1
-        WITH_SSL="OFF"
-        BUILD_COMMENT="${BUILD_COMMENT:-}-pro"
-        ;;
     -t | --tag )
         shift
         TAG="$1"
@@ -283,11 +276,7 @@ fi
 TOKUDB_BACKUP_VERSION="${MYSQL_VERSION}${MYSQL_VERSION_EXTRA}"
 
 RELEASE_TAG=''
-if [[ "x${FIPSMODE}" == "x1" ]]; then
-   PRODUCT_NAME="Percona-XtraDB-Cluster-Pro_$MYSQL_VERSION$MYSQL_VERSION_EXTRA"
-else
-   PRODUCT_NAME="Percona-XtraDB-Cluster_$MYSQL_VERSION$MYSQL_VERSION_EXTRA"
-fi
+PRODUCT_NAME="Percona-XtraDB-Cluster_$MYSQL_VERSION$MYSQL_VERSION_EXTRA"
 PRODUCT_FULL_NAME="${PRODUCT_NAME}.${TAG}_$(uname -s)${DIST_NAME:-}.$MACHINE_SPECS${GLIBC_VER:-}${TARBALL_SUFFIX:-}"
 
 #
@@ -302,17 +291,10 @@ then
 else
     REVISION=""
 fi
-if [[ "x${FIPSMODE}" == "x1" ]]; then
-    PRODUCT_FULL="Percona-XtraDB-Cluster-Pro_${MYSQL_VERSION}${MYSQL_VERSION_EXTRA}"
-    PRODUCT_FULL="${PRODUCT_FULL}.${TAG}${BUILD_COMMENT:+_}${BUILD_COMMENT}$(uname -s)${DIST_NAME:-}.$TARGET${GLIBC_VER:-}"
-    COMMENT="Percona XtraDB Cluster Pro binary (GPL) $MYSQL_VERSION"
-    COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}, WSREP version $WSREP_VERSION"
-else
-    PRODUCT_FULL="Percona-XtraDB-Cluster_${MYSQL_VERSION}${MYSQL_VERSION_EXTRA}"
-    PRODUCT_FULL="${PRODUCT_FULL}.${TAG}${BUILD_COMMENT:+_}${BUILD_COMMENT}$(uname -s)${DIST_NAME:-}.$TARGET${GLIBC_VER:-}"
-    COMMENT="Percona XtraDB Cluster binary (GPL) $MYSQL_VERSION"
-    COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}, WSREP version $WSREP_VERSION"
-fi
+PRODUCT_FULL="Percona-XtraDB-Cluster_${MYSQL_VERSION}${MYSQL_VERSION_EXTRA}"
+PRODUCT_FULL="${PRODUCT_FULL}.${TAG}${BUILD_COMMENT:+_}${BUILD_COMMENT}$(uname -s)${DIST_NAME:-}.$TARGET${GLIBC_VER:-}"
+COMMENT="Percona XtraDB Cluster binary (GPL) $MYSQL_VERSION"
+COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}, WSREP version $WSREP_VERSION"
 
 #-------------------------------------------------------------------------------
 #
@@ -352,9 +334,6 @@ then
 fi
 
 BUILD_PARAMETER=""
-if [[ "x${FIPSMODE}" == "x1" ]]; then
-    BUILD_PARAMETER="-DPROBUILD=1"
-fi
 
 #-------------------------------------------------------------------------------
 #
