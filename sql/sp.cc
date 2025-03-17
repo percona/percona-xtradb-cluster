@@ -849,8 +849,9 @@ bool sp_create_routine(THD *thd, sp_head *sp, const LEX_USER *definer,
     return false;
   }
 
-#ifndef WITH_WSREP
+#ifdef WITH_WSREP
   // For WITH_WSREP we do this check at the beginning, before starting TOI
+#else
   if (create_routine_precheck(thd, sp)) {
     /* If this happens, an error should have been reported. */
     return true;

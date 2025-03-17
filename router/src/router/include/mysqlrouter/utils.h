@@ -28,6 +28,8 @@
 
 #include "mysqlrouter/router_utils_export.h"
 
+#include <sys/stat.h>  // mode_t
+
 #include <chrono>
 #include <cstdint>
 #include <functional>

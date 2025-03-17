@@ -2051,7 +2051,9 @@ bool Sql_cmd_analyze_table::execute(THD *thd) {
                             &handler::ha_analyze, 0, m_alter_info, true);
   }
 
+#ifdef WITH_WSREP
   WSREP_NBO_1ST_PHASE_END;
+#endif
 
   /* ! we write after unlocking the table */
   if (!res && !thd->lex->no_write_to_binlog) {
