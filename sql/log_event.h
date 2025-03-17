@@ -1632,7 +1632,7 @@ class Intvar_log_event : public mysql::binlog::event::Intvar_event,
   }
 #ifdef WITH_WSREP
   Intvar_log_event(uchar type_arg, ulonglong val_arg)
-      : binary_log::Intvar_event(type_arg, val_arg),
+      : mysql::binlog::event::Intvar_event(type_arg, val_arg),
         Log_event(header(), footer()) {
     common_header->set_is_valid(true);
   }
