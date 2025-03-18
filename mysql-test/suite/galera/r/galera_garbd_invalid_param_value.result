@@ -1,0 +1,46 @@
+#
+# 1. Create a two node cluster.
+#
+# 2. Shutdown node2 and use its ports for garbd.
+SHOW STATUS LIKE 'wsrep_flow_control_interval';
+Variable_name	Value
+wsrep_flow_control_interval	[ 100, 100 ]
+#
+# 3 & 4. Start garbd with an invalid parameter and verify logs.
+
+# Testing with invalid option: name
+include/assert_grep.inc [Appropriate message has been written to the garbd log explaining the reason for the shutdown.]
+
+# Testing with invalid option: address
+include/assert_grep.inc [Appropriate message has been written to the garbd log explaining the reason for the shutdown.]
+
+# Testing with invalid option: group
+include/assert_grep.inc [Appropriate message has been written to the garbd log explaining the reason for the shutdown.]
+
+# Testing with invalid option: sst
+include/assert_grep.inc [Appropriate message has been written to the garbd log explaining the reason for the shutdown.]
+
+# Testing with invalid option: donor
+include/assert_grep.inc [Appropriate message has been written to the garbd log explaining the reason for the shutdown.]
+
+# Testing with invalid option: options
+include/assert_grep.inc [Appropriate message has been written to the garbd log explaining the reason for the shutdown.]
+
+# Testing with invalid option: log
+include/assert_grep.inc [Appropriate message has been written to the garbd log explaining the reason for the shutdown.]
+
+# Testing with invalid option: recv-script
+include/assert_grep.inc [Appropriate message has been written to the garbd log explaining the reason for the shutdown.]
+
+# Testing with invalid option: post-recv-script
+include/assert_grep.inc [Appropriate message has been written to the garbd log explaining the reason for the shutdown.]
+
+# Testing with invalid option: workdir
+include/assert_grep.inc [Appropriate message has been written to the garbd log explaining the reason for the shutdown.]
+
+# Testing with invalid option: cfg
+include/assert_grep.inc [Appropriate message has been written to the garbd log explaining the reason for the shutdown.]
+#
+# 5. Restart node2
+[connection node_2]
+# restart
