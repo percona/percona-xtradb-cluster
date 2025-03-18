@@ -110,7 +110,7 @@ CREATE TABLE T1 (
           S5(8), S6(8), S7(8), S8(8),
           S9(8), S10(8), S11(8), S12(8),
           S13(8), S14(8), S15(8), S16(8))
-) ENGINE=rocksdb CHARACTER SET UTF8 COLLATE UTF8_BIN;
+) ENGINE=rocksdb CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
 
 INSERT INTO T1 VALUES (10000000,
                        '50000000', '60000000', '70000000', '80000000',
@@ -156,7 +156,7 @@ CREATE TABLE T1 (
           S5(8), S6(8), S7(8), S8(8),
           S9(8), S10(8), S11(8), S12(8),
           S13(8), S14(8), S15(8), S16(8))
-) ENGINE=rocksdb CHARACTER SET UTF8 COLLATE UTF8_BIN;
+) ENGINE=rocksdb CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
 
 INSERT INTO T1 VALUES (10000000,
                        '50000000', '60000000', '70000000', '80000000',

@@ -11,7 +11,7 @@ call mtr.add_suppression("Query apply failed");
 --connection node_1
 
 ## Test data
---let $xtest_file= $MYSQL_TMP_DIR/crud_view_sundries.tmp
+--let $xtest_file= $MYSQL_TMP_DIR/crud_view_sundries.xpl
 --write_file $xtest_file
 -->quiet
 
@@ -116,7 +116,7 @@ Mysqlx.Crud.CreateView {
 -->recvresult
 -->sql
 SELECT table_name,check_option,is_updatable,definer,security_type,view_definition
-FROM information_schema.views WHERE table_schema = 'xtest';
+FROM information_schema.views WHERE table_schema = 'xtest' ORDER BY view_definition;
 -->endsql
 EOF
 
@@ -129,7 +129,5 @@ CREATE USER xuser;
 --exec $MYSQLXTEST -ux_root --password='' --file=$xtest_file 2>&1
 
 ## Cleanup
-DROP SCHEMA IF EXISTS xtest;
 DROP USER xuser;
---remove_file $xtest_file
---source include/xplugin_drop_user.inc
+--source ../include/xplugin_cleanup.inc

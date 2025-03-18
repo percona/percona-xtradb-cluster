@@ -89,7 +89,8 @@
 #include "sql/error_handler.h"               // Internal_error_handler
 #include "sql/field.h"
 #include "sql/item.h"
-#include "sql/lock.h"  // MYSQL_LOCK
+#include "sql/join_optimizer/cost_model.h"  // EstimateIndexRangeScanCost
+#include "sql/lock.h"                       // MYSQL_LOCK
 #include "sql/log.h"
 #include "sql/log_event.h"  // Write_rows_log_event
 #include "sql/mdl.h"
@@ -968,6 +969,47 @@ static bool dropdb_handlerton(THD *, plugin_ref plugin, void *path) {
 
 void ha_drop_database(char *path) {
   plugin_foreach(nullptr, dropdb_handlerton, MYSQL_STORAGE_ENGINE_PLUGIN, path);
+}
+
+static bool log_ddl_drop_schema_handletron(THD *, plugin_ref plugin,
+                                           void *schema_name) {
+  handlerton *hton = plugin_data<handlerton *>(plugin);
+  if (hton->state == SHOW_OPTION_YES &&
+      (hton->log_ddl_drop_schema && hton->post_ddl && hton->is_dict_readonly)) {
+    if (hton->is_dict_readonly()) {
+      my_error(ER_READ_ONLY_MODE, MYF(0));
+      return true;
+    }
+    return hton->log_ddl_drop_schema(hton, static_cast<char *>(schema_name));
+  }
+  return false;
+}
+
+bool ha_log_ddl_drop_schema(const char *schema_name) {
+  return plugin_foreach(nullptr, log_ddl_drop_schema_handletron,
+                        MYSQL_STORAGE_ENGINE_PLUGIN,
+                        const_cast<char *>(schema_name));
+}
+
+static bool log_ddl_create_schema_handletron(THD *, plugin_ref plugin,
+                                             void *schema_name) {
+  handlerton *hton = plugin_data<handlerton *>(plugin);
+  if (hton->state == SHOW_OPTION_YES &&
+      (hton->log_ddl_create_schema && hton->post_ddl &&
+       hton->is_dict_readonly)) {
+    if (hton->is_dict_readonly()) {
+      my_error(ER_READ_ONLY_MODE, MYF(0));
+      return true;
+    }
+    return hton->log_ddl_create_schema(hton, static_cast<char *>(schema_name));
+  }
+  return false;
+}
+
+bool ha_log_ddl_create_schema(const char *schema_name) {
+  return plugin_foreach(nullptr, log_ddl_create_schema_handletron,
+                        MYSQL_STORAGE_ENGINE_PLUGIN,
+                        const_cast<char *>(schema_name));
 }
 
 static bool closecon_handlerton(THD *thd, plugin_ref plugin, void *) {
@@ -2070,6 +2112,16 @@ int ha_commit_low(THD *thd, bool all, bool run_after_commit) {
       all ? Transaction_ctx::SESSION : Transaction_ctx::STMT;
   auto ha_list = trn_ctx->ha_trx_info(trx_scope);
 
+  /*
+    At execution of XA COMMIT .. ONE PHASE binlog or slave applier reattaches
+    the engine ha_data to THD, previously saved at XA START.
+  */
+  const bool need_restore_backup_ha_data =
+      all && thd->is_engine_ha_data_detached() &&
+      thd->lex->sql_command == SQLCOM_XA_COMMIT &&
+      static_cast<Sql_cmd_xa_commit *>(thd->lex->m_sql_cmd)->get_xa_opt() ==
+          XA_ONE_PHASE;
+
   DBUG_TRACE;
 
 #ifdef WITH_WSREP
@@ -2080,18 +2132,8 @@ int ha_commit_low(THD *thd, bool all, bool run_after_commit) {
 #endif /* WITH_WSREP */
 
   if (ha_list) {
-    bool restore_backup_ha_data = false;
-    /*
-      At execution of XA COMMIT ONE PHASE binlog or slave applier
-      reattaches the engine ha_data to THD, previously saved at XA START.
-    */
-    if (all && thd->is_engine_ha_data_detached()) {
+    if (need_restore_backup_ha_data) {
       DBUG_PRINT("info", ("query='%s'", thd->query().str));
-      assert(thd->lex->sql_command == SQLCOM_XA_COMMIT);
-      assert(
-          static_cast<Sql_cmd_xa_commit *>(thd->lex->m_sql_cmd)->get_xa_opt() ==
-          XA_ONE_PHASE);
-      restore_backup_ha_data = true;
     }
 
     bool is_applier_wait_enabled = false;
@@ -2124,7 +2166,7 @@ int ha_commit_low(THD *thd, bool all, bool run_after_commit) {
       global_aggregated_stats.get_shard(thd->thread_id()).ha_commit_count++;
       ha_info.reset(); /* keep it conveniently zero-filled */
     }
-    if (restore_backup_ha_data) thd->rpl_reattach_engine_ha_data();
+    if (need_restore_backup_ha_data) thd->rpl_reattach_engine_ha_data();
     trn_ctx->reset_scope(trx_scope);
 
     /*
@@ -2143,6 +2185,8 @@ int ha_commit_low(THD *thd, bool all, bool run_after_commit) {
         Commit_order_manager::wait_and_finish(thd, error);
       }
     }
+  } else if (need_restore_backup_ha_data) {
+    thd->rpl_reattach_engine_ha_data();
   }
 
 err:
@@ -2167,60 +2211,10 @@ err:
   }
 
 #ifdef WITH_WSREP
-  /* This function is common for group commit flow and the flow that skips
-  group commit. We register the thread in wsrep_group_commit_queue always.
-  For group commit it is done during binlog flush stage, for 1-phase commit
-  it is done in wsrep_before_commit() called at the beginning of ha_commit_low()
-  (this function).
-
-  Ideally, for one-phase (without binlog involved) or two-phase
-  (with binlog involved), this step would be executed when transaction commits
-  in InnoDB.
-
-  However, there are cases when the flow does not reach unregistration
-  during InnoDB commit:
-
-  Case 1:
-  If Galera node is acting as async slave and replicated action from async
-  master results in empty changes on slave (slave directly applied the said
-  changes and has skipped error through skip-slave-error configuration) it
-  can result in said situation. In this case slave protocol directly commits
-  gtid through gtid_end_transaction that invokes ordered_commit causing
-  thread handler to register in wsrep group commit queue but since storage
-  engine commit is not done it would fail to unregister the said thread
-  handler as part of storage engine commit.Handle unregistration here,
-  because doing it in wsrep_after_commit() is too late. If there is another
-  thread following this thread in currently processed commit queue,
-  current thread is commited (but does not commit in SE, so does not unregister
-  from wsrep_group_commit_queue. Then the following thread calls
-  wsrep_wait_for_turn_in_group_commit() but sees the previous thread at
-  the front and waits infinitely.
-
-  Case 2:
-  Similar to the above. If the current thd's (thd_1) commit in InnoDB SE fails
-  (innobase_commit returns with error because the thread gets aborted, or
-  any other reason which causes that innobase_commit() desn't reach
-  trx_sys_update_wsrep_checkpoint() where thd unregistration from
-  wsrep_group_commit_queue happens), and there is another thread (thd_2)
-  in the commit queue following thd_1, we end up in the situation when thd_2
-  waits for being the 1st one in wsrep_group_commit_queue, but thd_1 is still
-  the 1st one, so the processing of commit queue is blocked.
-  We need to remove thd_1 from wsrep_group_commit_queue now, no matter if commit
-  failed or not, to give a chance to commit for the following threads.
-
-  Note:
-  Consider removing waiting and unregistration from
-  trx_sys_update_wsrep_checkpoint() as the below unregistration should hadle
-  all cases.
-  */
-  wsrep_wait_for_turn_in_group_commit(thd);
-  wsrep_unregister_from_group_commit(thd);
-
   if (!error && thd->run_wsrep_commit_hooks) {
     (void)wsrep_after_commit(thd, all);
   }
   thd->run_wsrep_commit_hooks = false;
-
 #endif /* WITH_WSREP */
 
   return error;
@@ -2239,23 +2233,19 @@ int ha_rollback_low(THD *thd, bool all) {
   (void)wsrep_before_rollback(thd, all);
 #endif /* WITH_WSREP */
 
-  if (ha_list) {
-    bool restore_backup_ha_data = false;
-    /*
-      Similarly to the commit case, the binlog or slave applier
-      reattaches the engine ha_data to THD.
-    */
-    if (all && thd->is_engine_ha_data_detached()) {
-      assert(trn_ctx->xid_state()->get_state() != XID_STATE::XA_NOTR ||
-             thd->killed == THD::KILL_CONNECTION);
+  /*
+    Similar to the commit case, the binlog or slave applier reattaches the
+    engine ha_data to THD, previously saved at XA START.
+  */
+  const bool need_restore_backup_ha_data =
+      all && thd->is_engine_ha_data_detached() &&
+      (trn_ctx->xid_state()->get_state() != XID_STATE::XA_NOTR ||
+       thd->killed == THD::KILL_CONNECTION);
 
-      restore_backup_ha_data = true;
-    }
-
-    for (auto &ha_info : ha_list) {
-      int err;
-      auto ht = ha_info.ht();
-      if ((err = ht->rollback(ht, thd, all))) {  // cannot happen
+  for (auto &ha_info : ha_list) {
+    int err;
+    auto ht = ha_info.ht();
+    if ((err = ht->rollback(ht, thd, all))) {  // cannot happen
 
 #ifdef WITH_WSREP
         WSREP_INFO(
@@ -2265,26 +2255,26 @@ int ha_rollback_low(THD *thd, bool all) {
         Diagnostics_area *da = thd->get_stmt_da();
         if (da) {
           WSREP_INFO("stmt DA %d %s", da->status(),
-                     (da->is_error()) ? da->message_text() : "void");
+                    (da->is_error()) ? da->message_text() : "void");
         }
 #endif /* WITH_WSREP */
 
-        char errbuf[MYSQL_ERRMSG_SIZE];
-        my_error(ER_ERROR_DURING_ROLLBACK, MYF(0), err,
-                 my_strerror(errbuf, MYSQL_ERRMSG_SIZE, err));
-        error = 1;
-      }
-      assert(!thd->status_var_aggregated);
-      thd->status_var.ha_rollback_count++;
-      global_aggregated_stats.get_shard(thd->thread_id()).ha_rollback_count++;
-      ha_info.reset(); /* keep it conveniently zero-filled */
+      char errbuf[MYSQL_ERRMSG_SIZE];
+      my_error(ER_ERROR_DURING_ROLLBACK, MYF(0), err,
+              my_strerror(errbuf, MYSQL_ERRMSG_SIZE, err));
+      error = 1;
+    }
+    assert(!thd->status_var_aggregated);
+    thd->status_var.ha_rollback_count++;
+    global_aggregated_stats.get_shard(thd->thread_id()).ha_rollback_count++;
+    ha_info.reset(); /* keep it conveniently zero-filled */
 #ifdef WITH_WSREP
       DEBUG_SYNC(thd, "ha_rollback_low_after_ha_reset");
 #endif
-    }
-    if (restore_backup_ha_data) thd->rpl_reattach_engine_ha_data();
-    trn_ctx->reset_scope(trx_scope);
   }
+
+  if (need_restore_backup_ha_data) thd->rpl_reattach_engine_ha_data();
+  if (ha_list) trn_ctx->reset_scope(trx_scope);
 
   /*
     Thanks to possibility of MDL deadlock rollback request can come even if
@@ -2918,7 +2908,7 @@ int ha_store_binlog_info(THD *thd) {
 
   assert(tc_log == &mysql_bin_log);
 
-  LOG_INFO li;
+  Log_info li;
   bool warn = true;
 
   /* Block commits to get consistent binlog coordinates */
@@ -3160,6 +3150,12 @@ void HA_CREATE_INFO::init_create_options_from_share(const TABLE_SHARE *share,
     secondary_engine = share->secondary_engine;
   }
   secondary_load = share->secondary_load;
+
+  /* Copy the partitioning information that exists in the table share */
+  if (share->m_part_info != nullptr) {
+    part_info = share->m_part_info->get_clone(current_thd);
+    part_info->subpart_type = share->m_part_info->subpart_type;
+  }
 
   if (!(used_fields & HA_CREATE_USED_AUTOEXTEND_SIZE)) {
     /* m_implicit_tablespace_autoextend_size = 0 is a valid value. Hence,
@@ -6594,6 +6590,12 @@ int ha_binlog_index_purge_file(THD *thd, const char *file) {
   return 0;
 }
 
+void ha_binlog_index_purge_wait(THD *thd) {
+  assert(thd);
+  binlog_func_st bfn = {BFN_BINLOG_PURGE_WAIT, nullptr};
+  binlog_func_foreach(thd, &bfn);
+}
+
 struct binlog_log_query_st {
   enum_binlog_command binlog_command;
   const char *query;
@@ -6668,15 +6670,15 @@ void ha_acl_notify(THD *thd, class Acl_change_notification *data) {
   @return
     Estimated cost of 'index only' scan
 */
-
 double handler::index_only_read_time(uint keynr, double records) {
-  double read_time;
+  const uint index_bytes_per_record =
+      table_share->key_info[keynr].key_length + ref_length;
+
   const uint keys_per_block =
-      (stats.block_size / 2 /
-           (table_share->key_info[keynr].key_length + ref_length) +
-       1);
-  read_time = ((double)(records + keys_per_block - 1) / (double)keys_per_block);
-  return read_time;
+      1 + ((stats.block_size / 2) / index_bytes_per_record);
+
+  return static_cast<double>(records + keys_per_block - 1) /
+         static_cast<double>(keys_per_block);
 }
 
 double handler::table_in_memory_estimate() const {
@@ -6901,6 +6903,7 @@ static bool key_uses_partial_cols(TABLE *table, uint keyno) {
                          OUT: Size of the buffer that is expected to be actually
                               used, or 0 if buffer is not needed.
   @param [in,out] flags  A combination of HA_MRR_* flags
+  @param [out] force_default_mrr Force default MRR implementation
   @param [out] cost      Estimated cost of MRR access
 
   @note
@@ -6921,12 +6924,14 @@ ha_rows handler::multi_range_read_info_const(uint keyno, RANGE_SEQ_IF *seq,
                                              void *seq_init_param,
                                              uint n_ranges_arg [[maybe_unused]],
                                              uint *bufsz, uint *flags,
+                                             bool *force_default_mrr,
                                              Cost_estimate *cost) {
   KEY_MULTI_RANGE range;
   range_seq_t seq_it;
   ha_rows rows, total_rows = 0;
   uint n_ranges = 0;
   THD *thd = current_thd;
+  *force_default_mrr = false;
 
   /* Default MRR implementation doesn't need buffer */
   *bufsz = 0;
@@ -6947,6 +6952,17 @@ ha_rows handler::multi_range_read_info_const(uint keyno, RANGE_SEQ_IF *seq,
       max_endp = range.end_key.length ? &range.end_key : nullptr;
     }
 
+    /*
+      Allow multi-valued index for DS-MRR only for equality ranges.
+      For non-equality ranges, the storage engine might need to call
+      Field_typed_array::key_cmp(), which is not safe when doing an
+      index-only scan.
+    */
+    if (!*force_default_mrr &&
+        (table->key_info[keyno].flags & HA_MULTI_VALUED_KEY) &&
+        !(range.range_flag & EQ_RANGE)) {
+      *force_default_mrr = true;
+    }
     /*
       Return HA_POS_ERROR if the specified keyno is not capable of
       serving the specified range request. The cases checked for are:
@@ -7023,13 +7039,17 @@ ha_rows handler::multi_range_read_info_const(uint keyno, RANGE_SEQ_IF *seq,
   }
 
   assert(total_rows != HA_POS_ERROR);
-  {
+  *flags |= (HA_MRR_USE_DEFAULT_IMPL | HA_MRR_SUPPORT_SORTED);
+
+  // Cost computation.
+  assert(cost->is_zero());
+  if (thd->lex->using_hypergraph_optimizer()) {
+    cost->add_cpu(
+        EstimateIndexRangeScanCost(table, keyno, n_ranges, total_rows));
+  } else {
     const Cost_model_table *const cost_model = table->cost_model();
 
     /* The following calculation is the same as in multi_range_read_info(): */
-    *flags |= (HA_MRR_USE_DEFAULT_IMPL | HA_MRR_SUPPORT_SORTED);
-
-    assert(cost->is_zero());
     if (*flags & HA_MRR_INDEX_ONLY)
       *cost = index_scan_cost(keyno, static_cast<double>(n_ranges),
                               static_cast<double>(total_rows));
@@ -7644,10 +7664,12 @@ ha_rows DsMrr_impl::dsmrr_info_const(uint keyno, RANGE_SEQ_IF *seq,
   ha_rows rows;
   uint def_flags = *flags;
   uint def_bufsz = *bufsz;
+  bool force_default_mrr = false;
 
   /* Get cost/flags/mem_usage of default MRR implementation */
   rows = h->handler::multi_range_read_info_const(
-      keyno, seq, seq_init_param, n_ranges, &def_bufsz, &def_flags, cost);
+      keyno, seq, seq_init_param, n_ranges, &def_bufsz, &def_flags,
+      &force_default_mrr, cost);
   if (rows == HA_POS_ERROR) {
     /* Default implementation can't perform MRR scan => we can't either */
     return rows;
@@ -7656,10 +7678,12 @@ ha_rows DsMrr_impl::dsmrr_info_const(uint keyno, RANGE_SEQ_IF *seq,
   /*
     If HA_MRR_USE_DEFAULT_IMPL has been passed to us, that is an order to
     use the default MRR implementation (we need it for UPDATE/DELETE).
-    Otherwise, make a choice based on cost and mrr* flags of
-    @@optimizer_switch.
+    Also, if multi_range_read_info_const() detected that "DS_MRR" cannot
+    be used (E.g. Using a multi-valued index for non-equality ranges), we
+    are mandated to use the default implementation. Else, make a choice
+    based on cost and mrr* flags of @@optimizer_switch.
   */
-  if ((*flags & HA_MRR_USE_DEFAULT_IMPL) ||
+  if ((*flags & HA_MRR_USE_DEFAULT_IMPL) || force_default_mrr ||
       choose_mrr_impl(keyno, rows, flags, bufsz, cost)) {
     DBUG_PRINT("info", ("Default MRR implementation choosen"));
     *flags = def_flags;
@@ -8211,14 +8235,19 @@ void handler::set_end_range(const key_range *range,
 int handler::compare_key(key_range *range) {
   int cmp = -1;
   if (!range || in_range_check_pushed_down) return 0;  // No max range
-  /*
-    Virtual fields are not updated during multi-valued index read in MRR.
-    Hence key comparison is skipped for MV index.
-    TODO: Disable MRR on MV index or implement a comparison logic.
-  */
-  if (!(table->key_info[active_index].flags & HA_MULTI_VALUED_KEY)) {
-    cmp = key_cmp(range_key_part, range->key, range->length);
+
+  if ((table->key_info[active_index].flags & HA_MULTI_VALUED_KEY) &&
+      table->key_read) {
+    // For multi-valued indexes, key_cmp() needs to read the virtual column
+    // backing the index. See Field_typed_array::key_cmp(). The virtual column
+    // is not available during index-only scans (typically used by DS-MRR), so
+    // skip the end of range scan in that case, and let the SQL layer do the
+    // filtering. Assuming the scan is ascending, returning -1 (less than range)
+    // makes the scan return the row to the next layer.
+    assert(range_scan_direction == RANGE_SCAN_ASC);
+    return -1;
   }
+  cmp = key_cmp(range_key_part, range->key, range->length);
   if (!cmp) cmp = key_compare_result_on_equal;
   return cmp;
 }
@@ -8868,6 +8897,10 @@ int handler::ha_delete_row(const uchar *buf) {
   */
   assert(buf == table->record[0] || buf == table->record[1]);
   DBUG_EXECUTE_IF("inject_error_ha_delete_row", return HA_ERR_INTERNAL_ERROR;);
+  DBUG_EXECUTE_IF("simulate_error_ha_delete_row_lock_wait_timeout", {
+    DBUG_SET("-d,simulate_error_ha_delete_row_lock_wait_timeout");
+    return HA_ERR_LOCK_WAIT_TIMEOUT;
+  });
 
   DBUG_EXECUTE_IF(
       "handler_crashed_table_on_usage",

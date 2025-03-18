@@ -43,6 +43,8 @@ SET AUTOCOMMIT=OFF;
 START TRANSACTION;
 INSERT INTO t1 VALUES (1);
 INSERT INTO t2 VALUES (1);
+Warnings:
+Warning	6414	Combining the storage engines InnoDB and MyISAM is deprecated, but the statement or transaction updates both the InnoDB table test.t2 and the MyISAM table test.t1.
 COMMIT;
 SELECT COUNT(*) = 1 FROM t1;
 COUNT(*) = 1
@@ -55,6 +57,8 @@ SET AUTOCOMMIT=OFF;
 START TRANSACTION;
 INSERT INTO t1 VALUES (2);
 INSERT INTO t2 VALUES (2);
+Warnings:
+Warning	6414	Combining the storage engines InnoDB and MyISAM is deprecated, but the statement or transaction updates both the InnoDB table test.t2 and the MyISAM table test.t1.
 ROLLBACK;
 Warnings:
 Warning	1196	Some non-transactional changed tables couldn't be rolled back
@@ -73,6 +77,8 @@ SET AUTOCOMMIT=OFF;
 START TRANSACTION;
 INSERT INTO t1 VALUES (1);
 INSERT INTO t2 VALUES (1);
+Warnings:
+Warning	6414	Combining the storage engines InnoDB and MyISAM is deprecated, but the statement or transaction updates both the InnoDB table test.t2 and the MyISAM table test.t1.
 INSERT INTO t1 VALUES (1);
 ERROR 23000: Duplicate entry '1' for key 't1.PRIMARY'
 COMMIT;

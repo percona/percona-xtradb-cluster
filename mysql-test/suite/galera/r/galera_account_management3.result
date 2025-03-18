@@ -1,8 +1,10 @@
 CREATE ROLE 'reader', 'writer';
 GRANT SELECT ON *.* TO 'reader';
 GRANT INSERT, UPDATE, DELETE ON *.* TO 'writer';
-CREATE USER 'user1'@'%' IDENTIFIED WITH mysql_native_password BY 'passwd';
-CREATE USER 'user2'@'%' IDENTIFIED WITH mysql_native_password BY 'passwd';
+CREATE USER 'user1'@'%' IDENTIFIED BY 'passwd';
+CREATE USER 'user2'@'%' IDENTIFIED BY 'passwd';
+FLUSH BINARY LOGS;
+FLUSH BINARY LOGS;
 GRANT ALL PRIVILEGES ON *.* TO 'user1'@'%' WITH GRANT OPTION ;
 GRANT 'reader', 'writer' TO 'user2'@'%';
 GRANT USAGE ON *.* TO 'user2'@'%' WITH GRANT OPTION;

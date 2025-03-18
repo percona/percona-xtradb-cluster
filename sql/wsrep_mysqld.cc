@@ -44,6 +44,7 @@
 #include "sp_head.h"
 #include "sql_base.h"  // TEMP_PREFIX
 #include "wsrep_applier.h"
+#include "wsrep_async_monitor.h"
 #include "wsrep_binlog.h"
 #include "wsrep_priv.h"
 #include "wsrep_sst.h"
@@ -149,6 +150,9 @@ bool pxc_encrypt_cluster_traffic = 0;
 
 ulong wsrep_gcache_encrypt = WSREP_ENCRYPT_MODE_NONE;
 ulong wsrep_disk_pages_encrypt = WSREP_ENCRYPT_MODE_NONE;
+
+/* Enables Async Monitors to avoid TOI deadlocks */
+bool wsrep_use_async_monitor = true;
 
 /* force flush of error message if error is detected at early stage
    during SST or other initialization. */
@@ -1077,7 +1081,9 @@ void wsrep_deinit_server() {
   Wsrep_server_state::destroy();
 }
 
-static void override_galera_option(const std::string& option, const std::string& new_value, std::string& options) {
+static void override_galera_option(const std::string &option,
+                                   const std::string &new_value,
+                                   std::string &options) {
   size_t option_pos = options.find(option + "=");
   if (option_pos == std::string::npos) {
     option_pos = options.find(option + " ");
@@ -1093,7 +1099,7 @@ static void override_galera_option(const std::string& option, const std::string&
   // erase the option form the original string
   std::string modified_options = options.substr(0, option_pos);
   if (separator_pos != std::string::npos) {
-    modified_options += options.substr(separator_pos+1);
+    modified_options += options.substr(separator_pos + 1);
   }
 
   // add the new value of the option at the end
@@ -1102,17 +1108,20 @@ static void override_galera_option(const std::string& option, const std::string&
   options = modified_options;
 }
 
-static void setup_galera_encryption_params(char* provider_options, size_t buf_size) {
+static void setup_galera_encryption_params(char *provider_options,
+                                           size_t buf_size) {
   std::string options(provider_options);
   static const std::string yes("yes");
   static const std::string no("no");
 
   if (wsrep_gcache_encrypt != WSREP_ENCRYPT_MODE_NONE) {
-    const std::string& val = wsrep_gcache_encrypt == WSREP_ENCRYPT_MODE_ON ? yes : no;
+    const std::string &val =
+        wsrep_gcache_encrypt == WSREP_ENCRYPT_MODE_ON ? yes : no;
     override_galera_option("gcache.encryption", val, options);
   }
   if (wsrep_disk_pages_encrypt != WSREP_ENCRYPT_MODE_NONE) {
-    const std::string& val = wsrep_disk_pages_encrypt == WSREP_ENCRYPT_MODE_ON ? yes : no;
+    const std::string &val =
+        wsrep_disk_pages_encrypt == WSREP_ENCRYPT_MODE_ON ? yes : no;
     override_galera_option("allocator.disk_pages_encryption", val, options);
   }
 
@@ -1933,8 +1942,8 @@ int wsrep_to_buf_helper(THD *thd, const char *query, uint query_len,
   }
 
   if ((thd->variables.option_bits & OPTION_BIN_LOG) == 0) {
-    Intvar_log_event ev((uchar)binary_log::Intvar_event::BINLOG_CONTROL_EVENT,
-                        0);
+    Intvar_log_event ev(
+        (uchar)mysql::binlog::event::Intvar_event::BINLOG_CONTROL_EVENT, 0);
     if (ev.write(&tmp_io_cache)) ret = 1;
   }
 
@@ -2243,8 +2252,7 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
         If any of the remaining tables refer to temporary table error
         is returned to client, so TOI can be skipped
       */
-      for (Table_ref *it = first_table->next_global; it;
-           it = it->next_global) {
+      for (Table_ref *it = first_table->next_global; it; it = it->next_global) {
         if (find_temporary_table(thd, it)) {
           return false;
         }
@@ -2851,11 +2859,10 @@ static int wsrep_RSU_begin(THD *thd, const char *, const char *) {
         "was executed with wsrep_OSU_method = RSU. "
         "Query: %s",
         WSREP_QUERY(thd));
-    push_warning_printf(
-        thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
-        "The statement was neither written to the binary log "
-        "nor any GTID was generated as the statement "
-        "was executed with wsrep_OSU_method = RSU.");
+    push_warning_printf(thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+                        "The statement was neither written to the binary log "
+                        "nor any GTID was generated as the statement "
+                        "was executed with wsrep_OSU_method = RSU.");
     thd->disable_binlog_guard =
         std::make_shared<Disable_binlog_guard>(thd, true);
   }
@@ -2868,6 +2875,39 @@ static void wsrep_RSU_end(THD *thd) {
     WSREP_WARN("Failed to end RSU, server may need to be restarted");
   }
   thd->disable_binlog_guard.reset();
+}
+
+void thd_enter_async_monitor(THD *thd) {
+  // Only replica worker threads are allowed to enter
+  if (thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER) {
+    // If the thread is already killed, leave it to the called to handle it.
+    if (thd->killed != THD::NOT_KILLED || thd->wsrep_applier) {
+      return;
+    }
+    Slave_worker *sw = dynamic_cast<Slave_worker *>(thd->rli_slave);
+    Wsrep_async_monitor *wsrep_async_monitor{sw->get_wsrep_async_monitor()};
+    if (wsrep_async_monitor) {
+      auto seqno = sw->sequence_number();
+      assert(seqno > 0);
+      // TODO: If requied, we must set current_mutex and current_cond here
+      // i.e, thd->enter_cond();
+      wsrep_async_monitor->enter(seqno);
+    }
+  }
+}
+
+void thd_leave_async_monitor(THD *thd) {
+  if (thd->wsrep_applier) return;
+
+  if (thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER) {
+    Slave_worker *sw = dynamic_cast<Slave_worker *>(thd->rli_slave);
+    Wsrep_async_monitor *wsrep_async_monitor{sw->get_wsrep_async_monitor()};
+    if (wsrep_async_monitor) {
+      auto seqno = sw->sequence_number();
+      assert(seqno > 0);
+      wsrep_async_monitor->leave(seqno);
+    }
+  }
 }
 
 int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
@@ -2966,6 +3006,8 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
     thd->variables.auto_increment_increment = 1;
   }
 
+  thd_enter_async_monitor(thd);
+
   DEBUG_SYNC(thd, "wsrep_to_isolation_begin_before_replication");
 
   if (thd->variables.wsrep_on && wsrep_thd_is_local(thd)) {
@@ -3038,6 +3080,8 @@ void wsrep_to_isolation_end(THD *thd) {
     assert(0);
   }
   if (wsrep_emulate_bin_log) wsrep_thd_binlog_trx_reset(thd);
+
+  thd_leave_async_monitor(thd);
 
   DEBUG_SYNC(thd, "wsrep_to_isolation_end_before_wsrep_skip_wsrep_hton");
   mysql_mutex_lock(&thd->LOCK_thd_data);

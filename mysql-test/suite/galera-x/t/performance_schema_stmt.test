@@ -13,7 +13,7 @@ call mtr.add_suppression("Query apply failed");
 --connection node_1
 
 # Tests
---write_file $MYSQL_TMP_DIR/performance_schema_stmt.tmp
+--write_file $MYSQL_TMP_DIR/performance_schema_stmt.xpl
 -->import sql_history.macro
 -->quiet
 
@@ -237,6 +237,43 @@ Mysqlx.Crud.Delete {
 -->recvresult
 -->callmacro Show_sql_history
 
+-->echo ######### get validation error when working with collections #########
+stmtadmin create_collection	{"schema": "xtest", "name": "test3", "options": {
+  "validation": {
+    "level": "STRICT",
+    "schema": {
+      "type": "object", "properties": {
+        "value": {"type": "number", "minimum": 0, "maximum": 10}
+      },
+      "required": ["value"]
+    }
+  }
+}};
+-->recvresult
+-->callmacro Clear_sql_history
+Mysqlx.Crud.Insert {
+  collection {
+    name: "test3"
+    schema: "xtest"
+  }
+  data_model: DOCUMENT
+  row {
+    field {
+      type: LITERAL
+      literal {
+        type: V_STRING
+        v_string {
+          value: "{\"_id\": \"one\", \"value\": 100}"
+        }
+      }
+    }
+  }
+}
+-->recverror ER_X_DOCUMENT_DOESNT_MATCH_EXPECTED_SCHEMA
+-->callmacro Show_sql_history
+-->stmtadmin drop_collection	{"schema":"xtest", "name":"test3"}
+-->recvresult
+
 -->callmacro Clear_sql_history
 -->echo ######### create_collection_index #########
 -->stmtadmin create_collection_index	{"schema": "xtest", "collection":"test2", "name":"foo", "unique":true, "fields":{"field":"$.foo", "type":"TEXT(1)", "required":false}}
@@ -301,14 +338,17 @@ set password for unpriv@localhost = 'x';
 
 -->callmacro Clear_sql_history
 -->echo ######### kill_client #########
-# Perfrom single authentication using mysql41.
+# Perfrom single authentication using plain.
 # One query is going to be execute on mysql.user
 # and must be visible in PFS.
--->newsession_mysql41 unpriv	unpriv	x
+-->newsession_plain unpriv	unpriv	x
 -->varlet %CLIENT_ID% %ACTIVE_CLIENT_ID%
--->newsession_mysql41 x_root	x_root
+-->newsession_plain x_root	x_root
 -->stmtadmin kill_client	{"id": %CLIENT_ID%}
 -->recvresult
+-->setsession unpriv
+-->recvuntildisc
+-->setsession x_root
 -->stmtsql drop user unpriv@localhost;
 -->recvresult
 -->callmacro Show_sql_history
@@ -349,9 +389,7 @@ EOF
 
 --let $MACROS= --import=$MYSQLXTEST_MACRO_DIR
 --replace_regex /BINARY // /KILL [0-9]+/KILL/ /([a-z]*.+localhost[ 	]+)[0-9]+/\1$SESSION/
---exec $MYSQLXTEST -ux_root --password='' $MACROS --file=$MYSQL_TMP_DIR/performance_schema_stmt.tmp 2>&1
+--exec $MYSQLXTEST -ux_root --password='' $MACROS --file=$MYSQL_TMP_DIR/performance_schema_stmt.xpl 2>&1
 
 ## Cleanup
-DROP SCHEMA IF EXISTS xtest;
---remove_file $MYSQL_TMP_DIR/performance_schema_stmt.tmp
---source include/xplugin_drop_user.inc
+--source ../include/xplugin_cleanup.inc

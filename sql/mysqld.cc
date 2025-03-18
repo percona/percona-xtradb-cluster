@@ -396,6 +396,9 @@ MySQL clients support the protocol:
   @subpage page_event_tracking_services
   @subpage PAGE_MYSQL_SERVER_METRICS_INSTRUMENT_SERVICE
   @subpage PAGE_MYSQL_SERVER_TELEMETRY_METRICS_SERVICE
+  @subpage PAGE_MYSQL_GLOBAL_VARIABLE_ATTRIBUTES_SERVICE
+  @subpage PAGE_MYSQL_SERVER_TELEMETRY_LOGS_SERVICE
+  @subpage PAGE_MYSQL_SERVER_TELEMETRY_LOGS_CLIENT_SERVICE
 */
 
 
@@ -720,7 +723,9 @@ MySQL clients support the protocol:
 #include "mysql/components/services/bits/psi_bits.h"
 #include "mysql/components/services/log_builtins.h"
 #include "mysql/components/services/log_shared.h"
+#include "mysql/components/services/mysql_option_tracker.h"
 #include "mysql/components/services/mysql_runtime_error_service.h"
+#include "mysql/components/util/weak_service_reference.h"
 #include "mysql/my_loglevel.h"
 #include "mysql/plugin.h"
 #include "mysql/plugin_audit.h"
@@ -827,8 +832,10 @@ MySQL clients support the protocol:
 #ifdef _WIN32
 #include "sql/restart_monitor_win.h"
 #endif
+#include <mysql/psi/mysql_telemetry_logs_client.h>  // mysql_log_client_register
 #include "my_openssl_fips.h"  // OPENSSL_ERROR_LENGTH, set_fips_mode
 #include "pfs_metric_provider.h"
+#include "pfs_telemetry_logs_client_provider.h"
 #include "sql/binlog/services/iterator/file_storage.h"
 #include "sql/rpl_async_conn_failover_configuration_propagation.h"
 #include "sql/rpl_event_ctx.h"  // Rpl_event_ctx
@@ -1275,6 +1282,7 @@ bool opt_show_replica_auth_info;
 bool opt_log_replica_updates = false;
 char *opt_replica_skip_errors;
 bool opt_replica_allow_batching = true;
+bool opt_collect_replica_applier_metrics = false;
 
 /*
   Legacy global handlerton. These will be removed (please do not add more).
@@ -1322,8 +1330,7 @@ mysql_mutex_t LOCK_partial_revokes;
 MYSQL_PLUGIN_IMPORT uint opt_debug_sync_timeout = 0;
 #endif /* defined(ENABLED_DEBUG_SYNC) */
 bool trust_function_creators = false;
-bool check_proxy_users = false, mysql_native_password_proxy_users = false,
-     sha256_password_proxy_users = false;
+bool check_proxy_users = false, sha256_password_proxy_users = false;
 bool opt_userstat = false;
 bool opt_thread_statistics = false;
 /*
@@ -1420,7 +1427,11 @@ ulong locked_account_connection_count = 0;
 
 ulonglong denied_connections = 0;
 ulonglong global_conn_mem_limit = 0;
+ulonglong global_conn_memory_status_limit = 0;
 ulonglong global_conn_mem_counter = 0;
+std::atomic<long> atomic_count_hit_query_past_global_conn_mem_status_limit{0};
+ulonglong conn_memory_status_limit = 0;
+std::atomic<long> atomic_count_hit_query_past_conn_mem_status_limit{0};
 
 /**
   This variable holds handle to the object that's responsible
@@ -1502,7 +1513,7 @@ const char *relay_ext = "-relay-bin";
 bool log_bin_supplied = false;
 
 time_t server_start_time, flush_status_time;
-
+std::atomic<time_t> last_mixed_non_transactional_engine_warning = 0;
 char server_uuid[UUID_LENGTH + 1];
 const char *server_uuid_ptr;
 #if defined(HAVE_BUILD_ID_SUPPORT)
@@ -1552,7 +1563,6 @@ ulonglong tf_sequence_table_max_upper_bound = 0;
 /** name of reference on left expression in rewritten IN subquery */
 const char *in_left_expr_name = "<left expr>";
 
-my_decimal decimal_zero;
 /** Number of connection errors from internal server errors. */
 ulong connection_errors_internal = 0;
 /** Number of errors when reading the peer address. */
@@ -1674,8 +1684,6 @@ mysql_mutex_t LOCK_wsrep_slave_threads;
 mysql_cond_t COND_wsrep_slave_threads;
 mysql_mutex_t LOCK_wsrep_cluster_config;
 mysql_mutex_t LOCK_wsrep_desync;
-mysql_mutex_t LOCK_wsrep_group_commit;
-mysql_cond_t COND_wsrep_group_commit;
 mysql_mutex_t LOCK_wsrep_SR_pool;
 mysql_mutex_t LOCK_wsrep_SR_store;
 mysql_mutex_t LOCK_wsrep_alter_tablespace;
@@ -1792,6 +1800,7 @@ static int remaining_argc;
 static char **remaining_argv;
 
 void unregister_server_metric_sources();
+void unregister_server_telemetry_loggers();
 
 /**
  Holds the "original" (i.e. as on startup) set of arguments.
@@ -2098,6 +2107,10 @@ SERVICE_TYPE(mysql_psi_system_v1) * system_service;
 SERVICE_TYPE(mysql_rwlock_v1) * rwlock_service;
 SERVICE_TYPE_NO_CONST(registry) * srv_registry;
 SERVICE_TYPE_NO_CONST(registry) * srv_registry_no_lock;
+SERVICE_TYPE_NO_CONST(registry_registration) * srv_registry_registration{
+                                                   nullptr};
+SERVICE_TYPE_NO_CONST(registry_registration) *
+    srv_registry_registration_no_lock{nullptr};
 SERVICE_TYPE(dynamic_loader_scheme_file) * scheme_file_srv;
 using loader_type_t = SERVICE_TYPE_NO_CONST(dynamic_loader);
 using runtime_error_type_t = SERVICE_TYPE_NO_CONST(mysql_runtime_error);
@@ -2146,15 +2159,20 @@ static bool component_infrastructure_init() {
                         reinterpret_cast<my_h_service *>(
                             const_cast<loader_type_t **>(&dynamic_loader_srv)));
 
-  my_service<SERVICE_TYPE(registry_registration)> registrator(
-      "registry_registration", srv_registry);
+  srv_registry->acquire(
+      "registry_registration",
+      reinterpret_cast<my_h_service *>(&srv_registry_registration));
+
+  srv_registry->acquire(
+      "registry_registration.mysql_minimal_chassis_no_lock",
+      reinterpret_cast<my_h_service *>(&srv_registry_registration_no_lock));
 
   // Sets default file scheme loader for MySQL server.
-  registrator->set_default(
+  srv_registry_registration->set_default(
       "dynamic_loader_scheme_file.mysql_server_path_filter");
 
   // Sets default rw_lock for MySQL server.
-  registrator->set_default("mysql_rwlock_v1.mysql_server");
+  srv_registry_registration->set_default("mysql_rwlock_v1.mysql_server");
   srv_registry->acquire("mysql_rwlock_v1.mysql_server",
                         reinterpret_cast<my_h_service *>(
                             const_cast<rwlock_type_t **>(&rwlock_service)));
@@ -2162,7 +2180,7 @@ static bool component_infrastructure_init() {
       reinterpret_cast<SERVICE_TYPE(mysql_rwlock_v1) *>(rwlock_service);
 
   // Sets default psi_system event service for MySQL server.
-  registrator->set_default("mysql_psi_system_v1.mysql_server");
+  srv_registry_registration->set_default("mysql_psi_system_v1.mysql_server");
   srv_registry->acquire("mysql_psi_system_v1.mysql_server",
                         reinterpret_cast<my_h_service *>(
                             const_cast<psi_system_type_t **>(&system_service)));
@@ -2171,7 +2189,7 @@ static bool component_infrastructure_init() {
       reinterpret_cast<SERVICE_TYPE(mysql_psi_system_v1) *>(system_service);
 
   // Sets default mysql_runtime_error for MySQL server.
-  registrator->set_default("mysql_runtime_error.mysql_server");
+  srv_registry_registration->set_default("mysql_runtime_error.mysql_server");
   srv_registry->acquire(
       "mysql_runtime_error.mysql_server",
       reinterpret_cast<my_h_service *>(
@@ -2184,12 +2202,23 @@ static bool component_infrastructure_init() {
   return retval;
 }
 
+static const std::string c_name("mysql_server"),
+    s_name("mysql_option_tracker_option");
+typedef weak_service_reference<SERVICE_TYPE(mysql_option_tracker_option),
+                               c_name, s_name>
+    srv_weak_option_option;
 /**
   This function is used to initialize the mysql_server component services.
 */
 static void server_component_init() {
   mysql_comp_sys_var_services_init();
   init_thd_store_service();
+  srv_weak_option_option::init(
+      srv_registry, srv_registry_registration,
+      [&](SERVICE_TYPE(mysql_option_tracker_option) * opt) {
+        return 0 != opt->define("MySQL Server", "mysql_server", 1);
+      },
+      false);
 }
 
 /**
@@ -2244,6 +2273,12 @@ static bool component_infrastructure_deinit(bool print_message) {
     LogErr(INFORMATION_LEVEL, ER_COMPONENTS_INFRASTRUCTURE_SHUTDOWN_START);
     sysd::notify("Shutdown of components in progress\n");
   }
+
+  srv_weak_option_option::deinit(
+      srv_registry_no_lock, srv_registry_registration_no_lock,
+      [&](SERVICE_TYPE(mysql_option_tracker_option) * opt) {
+        return 0 != opt->undefine("MySQL Server");
+      });
   persistent_dynamic_loader_deinit();
   bool retval = false;
 
@@ -2258,6 +2293,10 @@ static bool component_infrastructure_deinit(bool print_message) {
       const_cast<psi_system_type_t *>(system_service)));
   srv_registry->release(reinterpret_cast<my_h_service>(
       const_cast<rwlock_type_t *>(rwlock_service)));
+  srv_registry->release(
+      reinterpret_cast<my_h_service>(srv_registry_registration));
+  srv_registry->release(
+      reinterpret_cast<my_h_service>(srv_registry_registration_no_lock));
 
   if (deinitialize_minimal_chassis(srv_registry)) {
     if (print_message)
@@ -3075,6 +3114,7 @@ static void clean_up(bool print_message) {
 
   unregister_pfs_metric_sources();
   unregister_server_metric_sources();
+  unregister_server_telemetry_loggers();
 
   authentication_policy::deinit();
   denit_command_maps();
@@ -3190,6 +3230,14 @@ static void clean_up(bool print_message) {
   Singleton_event_tracking_service_to_plugin_mapping::remove_instance();
   component_infrastructure_deinit(print_message);
   /*
+    The component unregister_variable() api for session string type variables
+    depends on global_system_variables. So we yank cleanup of
+    global_system_variables and max_system_variables from plugin_shutdown()
+    code and calling after component_infrastructure_deinit()
+  */
+  cleanup_global_system_variables();
+
+  /*
     component unregister_variable() api depends on system_variable_hash.
     component_infrastructure_deinit() interns calls the deinit function
     of components which are loaded, and the deinit functions can have
@@ -3285,8 +3333,6 @@ static void clean_up_mutexes() {
   mysql_cond_destroy(&COND_wsrep_slave_threads);
   mysql_mutex_destroy(&LOCK_wsrep_cluster_config);
   mysql_mutex_destroy(&LOCK_wsrep_desync);
-  mysql_mutex_destroy(&LOCK_wsrep_group_commit);
-  mysql_cond_destroy(&COND_wsrep_group_commit);
   mysql_mutex_destroy(&LOCK_wsrep_SR_pool);
   mysql_mutex_destroy(&LOCK_wsrep_SR_store);
   mysql_mutex_destroy(&LOCK_wsrep_alter_tablespace);
@@ -5412,8 +5458,8 @@ constexpr bool CanTypeFitValue(const U value) {
 template <typename T, typename U>
 T Clamp(U x) {
   return CanTypeFitValue<T>(x) ? T(x)
-                               : x < 0 ? std::numeric_limits<T>::min()
-                                       : std::numeric_limits<T>::max();
+         : x < 0               ? std::numeric_limits<T>::min()
+                               : std::numeric_limits<T>::max();
 }
 
 // simple (no measurement attributes supported) metric callback
@@ -5503,6 +5549,28 @@ static void get_metric_global_mem_counter(
   assert(delivery != nullptr);
   MUTEX_LOCK(lock, &LOCK_global_conn_mem_limit);
   const auto measurement = global_conn_mem_counter;
+  const int64_t value = Clamp<int64_t>(measurement);
+  delivery->value_int64(delivery_context, value);
+}
+
+static void get_count_hit_query_past_global_conn_mem_status_limit(
+    void * /* measurement_context */, measurement_delivery_callback_t delivery,
+    void *delivery_context) {
+  // see show_count_hit_query_past_global_conn_mem_status_limit()
+  assert(delivery != nullptr);
+  const auto measurement =
+      atomic_count_hit_query_past_global_conn_mem_status_limit.load();
+  const int64_t value = Clamp<int64_t>(measurement);
+  delivery->value_int64(delivery_context, value);
+}
+
+static void get_count_hit_query_past_conn_mem_status_limit(
+    void * /* measurement_context */, measurement_delivery_callback_t delivery,
+    void *delivery_context) {
+  // see show_count_hit_query_past_conn_mem_status_limit()
+  assert(delivery != nullptr);
+  const auto measurement =
+      atomic_count_hit_query_past_conn_mem_status_limit.load();
   const int64_t value = Clamp<int64_t>(measurement);
   delivery->value_int64(delivery_context, value);
 }
@@ -6533,6 +6601,22 @@ static PSI_metric_info_v1 core_metrics[] = {
      MetricOTELType::ASYNC_COUNTER, MetricNumType::METRIC_INTEGER, 0, 0,
      get_metric_aggregated_integer,
      (void *)offsetof(aggregated_stats_buffer, created_tmp_tables)},
+    {"count.hit_tmp_table_size", "",
+     "The number of times temp table size exceeded the tmp table size limit"
+     "while executing statements (Count_hit_tmp_table_size)",
+     MetricOTELType::ASYNC_COUNTER, MetricNumType::METRIC_INTEGER, 0, 0,
+     get_metric_aggregated_integer,
+     (void *)offsetof(aggregated_stats_buffer, count_hit_tmp_table_size)},
+    {"count_hit_query_past_connection_memory_status_limit", "",
+     "The number of time connection memory usage crossed the threshold limit"
+     "(Count_hit_query_past_connection_memory_status_limit)",
+     MetricOTELType::ASYNC_GAUGE_COUNTER, MetricNumType::METRIC_INTEGER, 0, 0,
+     get_count_hit_query_past_conn_mem_status_limit, nullptr},
+    {"count_hit_query_past_global_connection_memory_status_limit", "",
+     "The number of time global memory usage crossed the threshold limit"
+     "(Count_hit_query_past_global_connection_memory_status_limit)",
+     MetricOTELType::ASYNC_GAUGE_COUNTER, MetricNumType::METRIC_INTEGER, 0, 0,
+     get_count_hit_query_past_global_conn_mem_status_limit, nullptr},
     {"error_log.buffered_bytes", "",
      "The number of bytes currently used in the Performance Schema error_log "
      "table (Error_log_buffered_bytes)",
@@ -6588,8 +6672,8 @@ static PSI_metric_info_v1 core_metrics[] = {
      "The maximum number of connections that have been in use simultaneously "
      "since the server started (Max_used_connections)",
      MetricOTELType::ASYNC_GAUGE_COUNTER, MetricNumType::METRIC_INTEGER, 0, 0,
-     get_metric_simple_integer<decltype(
-         Connection_handler_manager::max_used_connections)>,
+     get_metric_simple_integer<
+         decltype(Connection_handler_manager::max_used_connections)>,
      &Connection_handler_manager::max_used_connections},
     {"open_files", "",
      "The number of files that are open. This count includes regular files "
@@ -6686,8 +6770,8 @@ static PSI_metric_info_v1 core_metrics[] = {
      "The number of threads that have taken more than slow_launch_time seconds "
      "to create (Slow_launch_threads)",
      MetricOTELType::ASYNC_COUNTER, MetricNumType::METRIC_INTEGER, 0, 0,
-     get_metric_simple_integer<decltype(
-         Per_thread_connection_handler::slow_launch_threads)>,
+     get_metric_simple_integer<
+         decltype(Per_thread_connection_handler::slow_launch_threads)>,
      &Per_thread_connection_handler::slow_launch_threads},
     {"slow_queries", "",
      "The number of queries that have taken more than long_query_time seconds "
@@ -6934,8 +7018,8 @@ static PSI_metric_info_v1 myisam_metrics[] = {
      "The number of requests to read a key block from the MyISAM key cache "
      "(Key_read_requests)",
      MetricOTELType::ASYNC_GAUGE_COUNTER, MetricNumType::METRIC_INTEGER, 0, 0,
-     get_metric_simple_integer<decltype(
-         dflt_key_cache->global_cache_r_requests)>,
+     get_metric_simple_integer<
+         decltype(dflt_key_cache->global_cache_r_requests)>,
      &dflt_key_cache->global_cache_r_requests},
     {"key_reads", "",
      "The number of physical reads of a key block from disk into the MyISAM "
@@ -6947,8 +7031,8 @@ static PSI_metric_info_v1 myisam_metrics[] = {
      "The number of requests to write a key block to the MyISAM key cache "
      "(Key_write_requests)",
      MetricOTELType::ASYNC_COUNTER, MetricNumType::METRIC_INTEGER, 0, 0,
-     get_metric_simple_integer<decltype(
-         dflt_key_cache->global_cache_w_requests)>,
+     get_metric_simple_integer<
+         decltype(dflt_key_cache->global_cache_w_requests)>,
      &dflt_key_cache->global_cache_w_requests},
     {"key_writes", "",
      "The number of physical writes of a key block from the MyISAM key cache "
@@ -7038,13 +7122,25 @@ void unregister_server_metric_sources() {
   mysql_meter_unregister(core_meters, std::size(core_meters));
 }
 
+PSI_logger_key key_error_logger = 0;
+
+static PSI_logger_info_v1 err_loggers[] = {
+    {"error_log", "MySQL error logger", 0, &key_error_logger}};
+
+void register_server_telemetry_loggers() {
+  mysql_log_client_register(err_loggers, std::size(err_loggers), "error");
+}
+
+void unregister_server_telemetry_loggers() {
+  mysql_log_client_unregister(err_loggers, std::size(err_loggers));
+}
+
 int init_common_variables() {
 #if defined(HAVE_BUILD_ID_SUPPORT)
   my_find_build_id(server_build_id);
 #endif
 
-  my_decimal_set_zero(&decimal_zero);  // set decimal_zero constant;
-  tzset();                             // Set tzname
+  tzset();  // Set tzname
 
   max_system_variables.pseudo_thread_id = (my_thread_id)~0;
   server_start_time = flush_status_time = time(nullptr);
@@ -7808,9 +7904,6 @@ static int init_thread_environment() {
                    MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_wsrep_desync, &LOCK_wsrep_desync,
                    MY_MUTEX_INIT_FAST);
-  mysql_mutex_init(key_LOCK_wsrep_group_commit, &LOCK_wsrep_group_commit,
-                   MY_MUTEX_INIT_FAST);
-  mysql_cond_init(key_COND_wsrep_group_commit, &COND_wsrep_group_commit);
   mysql_mutex_init(key_LOCK_wsrep_SR_pool, &LOCK_wsrep_SR_pool,
                    MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_wsrep_SR_store, &LOCK_wsrep_SR_store,
@@ -7875,7 +7968,9 @@ static int init_ssl() {
     LogErr(WARNING_LEVEL, ER_DEPRECATE_MSG_NO_REPLACEMENT, "--ssl-fips-mode");
 
   if (get_fips_mode() == 1) {
+#ifdef WITH_WSREP
     wsrep_enable_fips_mode();
+#endif
     LogErr(INFORMATION_LEVEL, ER_SSL_FIPS_MODE_ENABLED);
   }
 
@@ -9865,17 +9960,19 @@ static void calculate_mysql_home_from_my_progname() {
   This helper class sets them temporarily by reading configurations
   and resets them in destructor.
 */
-class Plugin_and_data_dir_option_parser final {
+class Manifest_file_option_parser_helper final {
  public:
-  Plugin_and_data_dir_option_parser(int argc, char **argv)
+  Manifest_file_option_parser_helper(int argc, char **argv)
       : datadir_(nullptr),
         plugindir_(nullptr),
         save_homedir_{0},
         save_plugindir_{0},
         valid_(false) {
-    char *ptr, **res, *datadir = nullptr, *plugindir = nullptr;
+    char *ptr, **res, *datadir = nullptr, *plugindir = nullptr,
+                      *basedir = nullptr;
     char dir[FN_REFLEN] = {0}, local_datadir_buffer[FN_REFLEN] = {0},
-         local_plugindir_buffer[FN_REFLEN] = {0};
+         local_plugindir_buffer[FN_REFLEN] = {0},
+         local_basedir_buffer[FN_REFLEN] = {0};
     const char *dirs = nullptr;
 
     my_option datadir_options[] = {
@@ -9883,6 +9980,8 @@ class Plugin_and_data_dir_option_parser final {
          0, nullptr, 0, nullptr},
         {"plugin_dir", 0, "", &plugindir, nullptr, nullptr, GET_STR, OPT_ARG, 0,
          0, 0, nullptr, 0, nullptr},
+        {"basedir", 0, "", &basedir, nullptr, nullptr, GET_STR, OPT_ARG, 0, 0,
+         0, nullptr, 0, nullptr},
         {nullptr, 0, nullptr, nullptr, nullptr, nullptr, GET_NO_ARG, NO_ARG, 0,
          0, 0, nullptr, 0, nullptr}};
 
@@ -9907,6 +10006,8 @@ class Plugin_and_data_dir_option_parser final {
     }
     my_getopt_skip_unknown = false;
 
+    if (basedir) convert_dirname(local_basedir_buffer, basedir, NullS);
+
     if (!datadir) {
       /* mysql_real_data_home must be initialized at this point */
       assert(mysql_real_data_home[0]);
@@ -9915,7 +10016,13 @@ class Plugin_and_data_dir_option_parser final {
         See calculate_mysql_home_from_my_progname() for details
       */
       assert(mysql_home_ptr && mysql_home_ptr[0]);
-      convert_dirname(local_datadir_buffer, mysql_real_data_home, NullS);
+      if (basedir)
+        convert_dirname(
+            local_datadir_buffer,
+            (std::string{local_basedir_buffer} + mysql_real_data_home).c_str(),
+            NullS);
+      else
+        convert_dirname(local_datadir_buffer, mysql_real_data_home, NullS);
       (void)my_load_path(local_datadir_buffer, local_datadir_buffer,
                          mysql_home_ptr);
       datadir = local_datadir_buffer;
@@ -9925,9 +10032,15 @@ class Plugin_and_data_dir_option_parser final {
     datadir_ = my_strdup(PSI_INSTRUMENT_ME, dir, MYF(0));
     memset(dir, 0, FN_REFLEN);
 
-    convert_dirname(local_plugindir_buffer,
-                    plugindir ? plugindir : get_relative_path(PLUGINDIR),
-                    NullS);
+    if (plugindir)
+      convert_dirname(local_plugindir_buffer, plugindir, NullS);
+    else if (basedir)
+      convert_dirname(
+          local_plugindir_buffer,
+          (std::string{basedir} + get_relative_path(PLUGINDIR)).c_str(), NullS);
+    else
+      convert_dirname(local_plugindir_buffer, get_relative_path(PLUGINDIR),
+                      NullS);
     (void)my_load_path(local_plugindir_buffer, local_plugindir_buffer,
                        mysql_home);
     plugindir_ = my_strdup(PSI_INSTRUMENT_ME, local_plugindir_buffer, MYF(0));
@@ -9948,7 +10061,7 @@ class Plugin_and_data_dir_option_parser final {
     valid_ = true;
   }
 
-  ~Plugin_and_data_dir_option_parser() {
+  ~Manifest_file_option_parser_helper() {
     valid_ = false;
     if (datadir_ != nullptr) {
       memset(mysql_real_data_home, 0, sizeof(mysql_real_data_home));
@@ -10001,7 +10114,7 @@ int mysqld_main(int argc, char **argv)
   {
     LogErr(ERROR_LEVEL, ER_MYINIT_FAILED);
     flush_error_log_messages();
-    return 1;
+    return MYSQLD_ABORT_EXIT;
   }
 #endif /* _WIN32 */
 #ifdef WITH_WSREP
@@ -10015,7 +10128,7 @@ int mysqld_main(int argc, char **argv)
   if (load_defaults(MYSQL_CONFIG_NAME, load_default_groups, &argc, &argv,
                     &argv_alloc)) {
     flush_error_log_messages();
-    return 1;
+    return MYSQLD_ABORT_EXIT;
   }
 
   argc_cached = argc;
@@ -10056,7 +10169,7 @@ int mysqld_main(int argc, char **argv)
       persisted_variables_cache.append_parse_early_variables(
           &argc, &argv, arg_separator_added)) {
     flush_error_log_messages();
-    return 1;
+    return MYSQLD_ABORT_EXIT;
   }
 
   remaining_argc = argc;
@@ -10071,6 +10184,8 @@ int mysqld_main(int argc, char **argv)
     Initialize the array of performance schema instrument configurations.
   */
   init_pfs_instrument_array();
+  init_pfs_meter_array();
+  init_pfs_logger_array();
 #endif /* WITH_PERFSCHEMA_STORAGE_ENGINE */
 
   /* init_error_log() is required by error_log_printf() in
@@ -10116,7 +10231,8 @@ int mysqld_main(int argc, char **argv)
           &psi_cond_hook, &psi_file_hook, &psi_socket_hook, &psi_table_hook,
           &psi_mdl_hook, &psi_idle_hook, &psi_stage_hook, &psi_statement_hook,
           &psi_transaction_hook, &psi_memory_hook, &psi_error_hook,
-          &psi_data_lock_hook, &psi_system_hook, &psi_tls_channel_hook);
+          &psi_data_lock_hook, &psi_system_hook, &psi_tls_channel_hook,
+          &psi_metric_hook, &psi_logs_client_hook);
       if ((pfs_rc != 0) && pfs_param.m_enabled) {
         pfs_param.m_enabled = false;
         LogErr(WARNING_LEVEL, ER_PERFSCHEMA_INIT_FAILED);
@@ -10287,6 +10403,14 @@ int mysqld_main(int argc, char **argv)
     }
   }
 
+  if (psi_logs_client_hook != nullptr) {
+    service =
+        psi_logs_client_hook->get_interface(PSI_CURRENT_LOGGER_CLIENT_VERSION);
+    if (service != nullptr) {
+      set_psi_logs_client_service(service);
+    }
+  }
+
   /*
     Now that we have parsed the command line arguments, and have initialized
     the performance schema itself, the next step is to register all the
@@ -10318,23 +10442,23 @@ int mysqld_main(int argc, char **argv)
   */
   if (component_infrastructure_init()) {
     flush_error_log_messages();
-    return 1;
+    return MYSQLD_ABORT_EXIT;
   }
 
   {
     /* Must be initialized early because it is required by dynamic loader */
     files_charset_info = &my_charset_utf8mb3_general_ci;
-    auto keyring_helper = std::make_unique<Plugin_and_data_dir_option_parser>(
+    auto keyring_helper = std::make_unique<Manifest_file_option_parser_helper>(
         remaining_argc, remaining_argv);
 
     if (keyring_helper->valid() == false) {
       flush_error_log_messages();
-      return 1;
+      return MYSQLD_ABORT_EXIT;
     }
 
     if (initialize_manifest_file_components()) {
       flush_error_log_messages();
-      return 1;
+      return MYSQLD_ABORT_EXIT;
     }
 
     /*
@@ -10353,7 +10477,7 @@ int mysqld_main(int argc, char **argv)
   if (persisted_variables_cache.append_read_only_variables(
           &remaining_argc, &remaining_argv, arg_separator_added, false)) {
     flush_error_log_messages();
-    return 1;
+    return MYSQLD_ABORT_EXIT;
   }
   my_getopt_use_args_separator = false;
 
@@ -10804,9 +10928,6 @@ int mysqld_main(int argc, char **argv)
     (void)RUN_HOOK(server_state, after_engine_recovery, (nullptr));
   }
 
-  register_server_metric_sources();
-  register_pfs_metric_sources();
-
   if (init_ssl_communication()) unireg_abort(MYSQLD_ABORT_EXIT);
   if (network_init()) unireg_abort(MYSQLD_ABORT_EXIT);
 
@@ -10954,7 +11075,7 @@ int mysqld_main(int argc, char **argv)
   if (authentication_policy::init(opt_authentication_policy)) {
     /* --authentication_policy is set to invalid value */
     LogErr(ERROR_LEVEL, ER_INVALID_AUTHENTICATION_POLICY);
-    return 1;
+    unireg_abort(MYSQLD_ABORT_EXIT);
   }
 
 #ifdef WITH_WSREP /* WSREP AFTER SE */
@@ -10975,7 +11096,7 @@ int mysqld_main(int argc, char **argv)
   if (persisted_variables_cache.set_persisted_options(false)) {
     LogErr(ERROR_LEVEL, ER_CANT_SET_UP_PERSISTED_VALUES);
     flush_error_log_messages();
-    return 1;
+    unireg_abort(MYSQLD_ABORT_EXIT);
   }
 
 #ifdef WITH_WSREP /* WSREP AFTER SE */
@@ -11051,6 +11172,16 @@ int mysqld_main(int argc, char **argv)
   */
   set_super_read_only_post_init();
 
+  /*
+    Expose MySQL metrics.
+    This is done only when the server bootstrap is complete,
+    to avoid observing states that are not fully initialized.
+  */
+  register_server_metric_sources();
+  register_pfs_metric_sources();
+
+  register_server_telemetry_loggers();
+
   DBUG_PRINT("info", ("Block, listening for incoming connections"));
 
   (void)MYSQL_SET_STAGE(0, __FILE__, __LINE__);
@@ -11089,6 +11220,16 @@ int mysqld_main(int argc, char **argv)
   sysd::notify("STOPPING=1\nSTATUS=Server shutdown in progress\n");
 
   DBUG_PRINT("info", ("No longer listening for incoming connections"));
+
+  /*
+    No longer expose MySQL metrics.
+    This is done before performing the cleanup to shutdown,
+    to avoid observing states that are being destroyed.
+  */
+  unregister_pfs_metric_sources();
+  unregister_server_metric_sources();
+
+  unregister_server_telemetry_loggers();
 
   mysql_event_tracking_shutdown_notify(
       AUDIT_EVENT(EVENT_TRACKING_SHUTDOWN_SHUTDOWN),
@@ -12667,6 +12808,25 @@ static int show_global_mem_counter(THD *, SHOW_VAR *var, char *buff) {
   return 0;
 }
 
+static int show_count_hit_query_past_global_conn_mem_status_limit(THD *,
+                                                                  SHOW_VAR *var,
+                                                                  char *buf) {
+  var->type = SHOW_LONG;
+  var->value = buf;
+  *((long *)buf) =
+      (long)(atomic_count_hit_query_past_global_conn_mem_status_limit.load());
+  return 0;
+}
+
+static int show_count_hit_query_past_conn_mem_status_limit(THD *, SHOW_VAR *var,
+                                                           char *buf) {
+  var->type = SHOW_LONG;
+  var->value = buf;
+  *((long *)buf) =
+      (long)(atomic_count_hit_query_past_conn_mem_status_limit.load());
+  return 0;
+}
+
 static int show_table_definitions(THD *, SHOW_VAR *var, char *buff) {
   var->type = SHOW_LONG;
   var->value = buff;
@@ -12864,6 +13024,18 @@ static int show_resource_group_support(THD *, SHOW_VAR *var, char *buf) {
   return 0;
 }
 
+static int show_telemetry_logs_support(THD * /*unused*/, SHOW_VAR *var,
+                                       char *buf) {
+  var->type = SHOW_BOOL;
+  var->value = buf;
+#ifdef HAVE_PSI_SERVER_TELEMETRY_LOGS_INTERFACE
+  *(pointer_cast<bool *>(buf)) = true;
+#else
+  *(pointer_cast<bool *>(buf)) = false;
+#endif /* HAVE_PSI_SERVER_TELEMETRY_LOGS_INTERFACE */
+  return 0;
+}
+
 static int show_telemetry_metrics_support(THD * /*unused*/, SHOW_VAR *var,
                                           char *buf) {
   var->type = SHOW_BOOL;
@@ -12985,6 +13157,12 @@ SHOW_VAR status_vars[] = {
      SHOW_FUNC, SHOW_SCOPE_GLOBAL},
     {"Connection_errors_tcpwrap", (char *)&show_connection_errors_tcpwrap,
      SHOW_FUNC, SHOW_SCOPE_GLOBAL},
+    {"Count_hit_query_past_connection_memory_status_limit",
+     (char *)&show_count_hit_query_past_conn_mem_status_limit, SHOW_FUNC,
+     SHOW_SCOPE_GLOBAL},
+    {"Count_hit_query_past_global_connection_memory_status_limit",
+     (char *)&show_count_hit_query_past_global_conn_mem_status_limit, SHOW_FUNC,
+     SHOW_SCOPE_GLOBAL},
     {"Created_tmp_disk_tables",
      (char *)offsetof(System_status_var, created_tmp_disk_tables),
      SHOW_LONGLONG_STATUS, SHOW_SCOPE_ALL},
@@ -12992,6 +13170,9 @@ SHOW_VAR status_vars[] = {
      SHOW_SCOPE_GLOBAL},
     {"Created_tmp_tables",
      (char *)offsetof(System_status_var, created_tmp_tables),
+     SHOW_LONGLONG_STATUS, SHOW_SCOPE_ALL},
+    {"Count_hit_tmp_table_size",
+     (char *)offsetof(System_status_var, count_hit_tmp_table_size),
      SHOW_LONGLONG_STATUS, SHOW_SCOPE_ALL},
     {"Delayed_errors", (char *)&delayed_insert_errors, SHOW_LONG,
      SHOW_SCOPE_GLOBAL},
@@ -13306,6 +13487,8 @@ SHOW_VAR status_vars[] = {
     {"Tls_library_version", (char *)&show_tls_library_version, SHOW_FUNC,
      SHOW_SCOPE_GLOBAL},
     {"Resource_group_supported", (char *)show_resource_group_support, SHOW_FUNC,
+     SHOW_SCOPE_GLOBAL},
+    {"Telemetry_logs_supported", (char *)show_telemetry_logs_support, SHOW_FUNC,
      SHOW_SCOPE_GLOBAL},
     {"Telemetry_metrics_supported", (char *)show_telemetry_metrics_support,
      SHOW_FUNC, SHOW_SCOPE_GLOBAL},
@@ -13682,6 +13865,313 @@ static int parse_replicate_rewrite_db(char **key, char **val, char *argument) {
   }
 
   return 0;
+}
+
+/**
+  Extract instrument name and value from argument
+  and (on success) store it to the instrument configuration array.
+
+  @param argument The configuration value to parse.
+
+  @retval
+    0    OK
+  @retval
+    1    Error
+*/
+static bool process_opt_pfs_instrument(char *argument) {
+#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
+  /*
+    Parse instrument name and value from argument string. Handle leading
+    and trailing spaces. Also handle single quotes.
+
+    Acceptable:
+      performance_schema_instrument = ' foo/%/bar/  =  ON  '
+      performance_schema_instrument = '%=OFF'
+    Not acceptable:
+      performance_schema_instrument = '' foo/%/bar = ON ''
+      performance_schema_instrument = '%='OFF''
+  */
+  char *name = argument, *p = nullptr, *val = nullptr;
+  bool quote = false; /* true if quote detected */
+  bool error = true;  /* false if no errors detected */
+  const int PFS_BUFFER_SIZE = 128;
+  char orig_argument[PFS_BUFFER_SIZE + 1];
+  orig_argument[0] = 0;
+
+  if (!argument) goto pfs_error;
+
+  /* Save original argument string for error reporting */
+  strncpy(orig_argument, argument, PFS_BUFFER_SIZE);
+
+  /* Split instrument name and value at the equal sign */
+  if (!(p = strchr(argument, '='))) goto pfs_error;
+
+  /* Get option value */
+  val = p + 1;
+  if (!*val) goto pfs_error;
+
+  /* Trim leading spaces and quote from the instrument name */
+  while (*name && (my_isspace(mysqld_charset, *name) || (*name == '\''))) {
+    /* One quote allowed */
+    if (*name == '\'') {
+      if (!quote)
+        quote = true;
+      else
+        goto pfs_error;
+    }
+    name++;
+  }
+
+  /* Trim trailing spaces from instrument name */
+  while ((p > name) && my_isspace(mysqld_charset, p[-1])) p--;
+  *p = 0;
+
+  /* Remove trailing slash from instrument name */
+  if (p > name && (p[-1] == '/')) p[-1] = 0;
+
+  if (!*name) goto pfs_error;
+
+  /* Trim leading spaces from option value */
+  while (*val && my_isspace(mysqld_charset, *val)) val++;
+
+  /* Trim trailing spaces and matching quote from value */
+  p = val + strlen(val);
+  while (p > val && (my_isspace(mysqld_charset, p[-1]) || p[-1] == '\'')) {
+    /* One matching quote allowed */
+    if (p[-1] == '\'') {
+      if (quote)
+        quote = false;
+      else
+        goto pfs_error;
+    }
+    p--;
+  }
+
+  *p = 0;
+
+  if (!*val) goto pfs_error;
+
+  /* Add instrument name and value to array of configuration options */
+  if (add_pfs_instr_to_array(name, val)) goto pfs_error;
+
+  error = false;
+
+pfs_error:
+  if (error) {
+    LogErr(WARNING_LEVEL, ER_INVALID_INSTRUMENT, orig_argument);
+    return true;
+  }
+
+  // success
+  return false;
+#else
+  // success (ignored)
+  return false;
+#endif /* WITH_PERFSCHEMA_STORAGE_ENGINE */
+}
+
+/**
+  Extract telemetry meter name and attribute values from argument
+  and (on success) store it to the meter configuration array.
+  @param argument The configuration value to parse.
+  @retval
+    0    OK
+  @retval
+    1    Error
+*/
+static bool process_opt_pfs_meter(char *argument) {
+#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
+  /*
+    Parse instrument name and value from argument string. Handle leading
+    and trailing spaces. Also handle single quotes.
+
+    Acceptable:
+      performance_schema_meter = ' foo/%/bar/  = enabled:ON,frequency:30  '
+      performance_schema_meter = '%=enabled:OFF'
+    Not acceptable:
+      performance_schema_meter = '' foo/%/bar = enabled:ON ''
+      performance_schema_meter = '%='enabled:OFF''
+  */
+  char *name = argument, *p = nullptr, *val = nullptr;
+  bool quote = false; /* true if quote detected */
+  bool error = true;  /* false if no errors detected */
+  const int PFS_BUFFER_SIZE = 128;
+  char orig_argument[PFS_BUFFER_SIZE + 1];
+  orig_argument[0] = 0;
+
+  if (!argument) goto pfs_error_meter;
+
+  /* Save original argument string for error reporting */
+  strncpy(orig_argument, argument, PFS_BUFFER_SIZE);
+
+  /* Split instrument name and value at the equal sign */
+  if (!(p = strchr(argument, '='))) goto pfs_error_meter;
+
+  /* Get option value */
+  val = p + 1;
+  if (!*val) goto pfs_error_meter;
+
+  /* Trim leading spaces and quote from the instrument name */
+  while (*name && (my_isspace(mysqld_charset, *name) || (*name == '\''))) {
+    /* One quote allowed */
+    if (*name == '\'') {
+      if (!quote)
+        quote = true;
+      else
+        goto pfs_error_meter;
+    }
+    name++;
+  }
+
+  /* Trim trailing spaces from instrument name */
+  while ((p > name) && my_isspace(mysqld_charset, p[-1])) p--;
+  *p = 0;
+
+  /* Remove trailing slash from instrument name */
+  if (p > name && (p[-1] == '/')) p[-1] = 0;
+
+  if (!*name) goto pfs_error_meter;
+
+  /* Trim leading spaces from option value */
+  while (*val && my_isspace(mysqld_charset, *val)) val++;
+
+  /* Trim trailing spaces and matching quote from value */
+  p = val + strlen(val);
+  while (p > val && (my_isspace(mysqld_charset, p[-1]) || p[-1] == '\'')) {
+    /* One matching quote allowed */
+    if (p[-1] == '\'') {
+      if (quote)
+        quote = false;
+      else
+        goto pfs_error_meter;
+    }
+    p--;
+  }
+
+  *p = 0;
+
+  if (!*val) goto pfs_error_meter;
+
+  /* Add instrument name and value to array of configuration options */
+  if (add_pfs_meter_to_array(name, val)) goto pfs_error_meter;
+
+  error = false;
+
+pfs_error_meter:
+  if (error) {
+    LogErr(WARNING_LEVEL, ER_INVALID_METER, orig_argument);
+    return true;
+  }
+
+  // success
+  return false;
+#else
+  // success (ignored)
+  return false;
+#endif /* WITH_PERFSCHEMA_STORAGE_ENGINE */
+}
+
+/**
+  Extract logger name and level value from argument
+  and (on success) store it to the logger configuration array.
+
+  @param argument The configuration value to parse.
+
+  @retval
+    0    OK
+  @retval
+    1    Error
+*/
+static bool process_opt_pfs_logger(char *argument) {
+#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
+  /*
+    Parse instrument name and value from argument string. Handle leading
+    and trailing spaces. Also handle single quotes.
+
+    Acceptable:
+      performance_schema_logger = ' foo/%/bar/  =  level:INFO  '
+      performance_schema_logger = '%=level:NONE'
+    Not acceptable:
+      performance_schema_logger = '' foo/%/bar = level:INFO ''
+      performance_schema_logger = '%='level:ERROR''
+  */
+  char *name = argument, *p = nullptr, *val = nullptr;
+  bool quote = false; /* true if quote detected */
+  bool error = true;  /* false if no errors detected */
+  const int PFS_BUFFER_SIZE = 128;
+  char orig_argument[PFS_BUFFER_SIZE + 1];
+  orig_argument[0] = 0;
+
+  if (!argument) goto pfs_error_logger;
+
+  /* Save original argument string for error reporting */
+  strncpy(orig_argument, argument, PFS_BUFFER_SIZE);
+
+  /* Split instrument name and value at the equal sign */
+  if (!(p = strchr(argument, '='))) goto pfs_error_logger;
+
+  /* Get option value */
+  val = p + 1;
+  if (!*val) goto pfs_error_logger;
+
+  /* Trim leading spaces and quote from the instrument name */
+  while (*name && (my_isspace(mysqld_charset, *name) || (*name == '\''))) {
+    /* One quote allowed */
+    if (*name == '\'') {
+      if (!quote)
+        quote = true;
+      else
+        goto pfs_error_logger;
+    }
+    name++;
+  }
+
+  /* Trim trailing spaces from instrument name */
+  while ((p > name) && my_isspace(mysqld_charset, p[-1])) p--;
+  *p = 0;
+
+  /* Remove trailing slash from instrument name */
+  if (p > name && (p[-1] == '/')) p[-1] = 0;
+
+  if (!*name) goto pfs_error_logger;
+
+  /* Trim leading spaces from option value */
+  while (*val && my_isspace(mysqld_charset, *val)) val++;
+
+  /* Trim trailing spaces and matching quote from value */
+  p = val + strlen(val);
+  while (p > val && (my_isspace(mysqld_charset, p[-1]) || p[-1] == '\'')) {
+    /* One matching quote allowed */
+    if (p[-1] == '\'') {
+      if (quote)
+        quote = false;
+      else
+        goto pfs_error_logger;
+    }
+    p--;
+  }
+
+  *p = 0;
+
+  if (!*val) goto pfs_error_logger;
+
+  /* Add instrument name and values to array of configuration options */
+  if (add_pfs_logger_to_array(name, val)) goto pfs_error_logger;
+
+  error = false;
+
+pfs_error_logger:
+  if (error) {
+    LogErr(WARNING_LEVEL, ER_INVALID_LOGGER, orig_argument);
+    return true;
+  }
+
+  // success
+  return false;
+#else
+  // success (ignore)
+  return false;
+#endif /* WITH_PERFSCHEMA_STORAGE_ENGINE */
 }
 
 bool mysqld_get_one_option(int optid,
@@ -14128,92 +14618,15 @@ bool mysqld_get_one_option(int optid,
     case OPT_PLUGIN_LOAD_ADD:
       opt_plugin_load_list_ptr->push_back(new i_string(argument));
       break;
-    case OPT_PFS_INSTRUMENT: {
-#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
-      /*
-        Parse instrument name and value from argument string. Handle leading
-        and trailing spaces. Also handle single quotes.
-
-        Acceptable:
-          performance_schema_instrument = ' foo/%/bar/  =  ON  '
-          performance_schema_instrument = '%=OFF'
-        Not acceptable:
-          performance_schema_instrument = '' foo/%/bar = ON ''
-          performance_schema_instrument = '%='OFF''
-      */
-      char *name = argument, *p = nullptr, *val = nullptr;
-      bool quote = false; /* true if quote detected */
-      bool error = true;  /* false if no errors detected */
-      const int PFS_BUFFER_SIZE = 128;
-      char orig_argument[PFS_BUFFER_SIZE + 1];
-      orig_argument[0] = 0;
-
-      if (!argument) goto pfs_error;
-
-      /* Save original argument string for error reporting */
-      strncpy(orig_argument, argument, PFS_BUFFER_SIZE);
-
-      /* Split instrument name and value at the equal sign */
-      if (!(p = strchr(argument, '='))) goto pfs_error;
-
-      /* Get option value */
-      val = p + 1;
-      if (!*val) goto pfs_error;
-
-      /* Trim leading spaces and quote from the instrument name */
-      while (*name && (my_isspace(mysqld_charset, *name) || (*name == '\''))) {
-        /* One quote allowed */
-        if (*name == '\'') {
-          if (!quote)
-            quote = true;
-          else
-            goto pfs_error;
-        }
-        name++;
-      }
-
-      /* Trim trailing spaces from instrument name */
-      while ((p > name) && my_isspace(mysqld_charset, p[-1])) p--;
-      *p = 0;
-
-      /* Remove trailing slash from instrument name */
-      if (p > name && (p[-1] == '/')) p[-1] = 0;
-
-      if (!*name) goto pfs_error;
-
-      /* Trim leading spaces from option value */
-      while (*val && my_isspace(mysqld_charset, *val)) val++;
-
-      /* Trim trailing spaces and matching quote from value */
-      p = val + strlen(val);
-      while (p > val && (my_isspace(mysqld_charset, p[-1]) || p[-1] == '\'')) {
-        /* One matching quote allowed */
-        if (p[-1] == '\'') {
-          if (quote)
-            quote = false;
-          else
-            goto pfs_error;
-        }
-        p--;
-      }
-
-      *p = 0;
-
-      if (!*val) goto pfs_error;
-
-      /* Add instrument name and value to array of configuration options */
-      if (add_pfs_instr_to_array(name, val)) goto pfs_error;
-
-      error = false;
-
-    pfs_error:
-      if (error) {
-        LogErr(WARNING_LEVEL, ER_INVALID_INSTRUMENT, orig_argument);
-        return false;
-      }
-#endif /* WITH_PERFSCHEMA_STORAGE_ENGINE */
+    case OPT_PFS_INSTRUMENT:
+      if (process_opt_pfs_instrument(argument)) return false;
       break;
-    }
+    case OPT_PFS_METER:
+      if (process_opt_pfs_meter(argument)) return false;
+      break;
+    case OPT_PFS_LOGGER:
+      if (process_opt_pfs_logger(argument)) return false;
+      break;
     case OPT_THREAD_CACHE_SIZE:
       thread_cache_size_specified = true;
       break;
@@ -15266,7 +15679,6 @@ PSI_mutex_key key_LOCK_wsrep_slave_threads;
 PSI_mutex_key key_LOCK_wsrep_cluster_config;
 PSI_mutex_key key_LOCK_wsrep_desync;
 
-PSI_mutex_key key_LOCK_wsrep_group_commit;
 PSI_mutex_key key_LOCK_wsrep_SR_pool;
 PSI_mutex_key key_LOCK_wsrep_SR_store;
 
@@ -15379,9 +15791,8 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOCK_delegate_connection_mutex, "LOCK_delegate_connection_mutex", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_group_replication_connection_mutex, "LOCK_group_replication_connection_mutex", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_authentication_policy, "LOCK_authentication_policy", PSI_FLAG_SINGLETON, 0, "A lock to ensure execution of CREATE USER or ALTER USER sql and SET @@global.authentication_policy variable are serialized"},
-  { &key_LOCK_global_conn_mem_limit, "LOCK_global_conn_mem_limit", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME}
+  { &key_LOCK_global_conn_mem_limit, "LOCK_global_conn_mem_limit", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
 #ifdef WITH_WSREP
-  ,
   { &key_LOCK_wsrep_ready, "LOCK_wsrep_ready", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_wsrep_sst, "LOCK_wsrep_sst", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_wsrep_sst_init, "LOCK_wsrep_sst_init", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
@@ -15391,7 +15802,6 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOCK_wsrep_cluster_config, "LOCK_wsrep_cluster_config", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_wsrep_desync, "LOCK_wsrep_desync", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
 
-  { &key_LOCK_wsrep_group_commit, "LOCK_wsrep_group_commit", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_wsrep_SR_pool, "LOCK_wsrep_SR_pool", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_wsrep_SR_store, "LOCK_wsrep_SR_store", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
 
@@ -15479,7 +15889,6 @@ PSI_cond_key key_COND_wsrep_thd;
 PSI_cond_key key_COND_wsrep_sst_thread;
 
 PSI_cond_key key_COND_wsrep_thd_queue;
-PSI_cond_key key_COND_wsrep_group_commit;
 #endif /* WITH_WSREP */
 
 PSI_cond_key key_RELAYLOG_update_cond;
@@ -15546,7 +15955,6 @@ static PSI_cond_info all_server_conds[]=
   { &key_COND_wsrep_sst_thread, "COND_wsrep_sst_thread", 0, 0, PSI_DOCUMENT_ME},
 
   { &key_COND_wsrep_thd_queue, "COND_wsrep_thd_queue", 0, 0, PSI_DOCUMENT_ME},
-  { &key_COND_wsrep_group_commit, "COND_wsrep_group_commit", 0, 0, PSI_DOCUMENT_ME}
 #endif /* WITH_WSREP */
 };
 /* clang-format on */
@@ -16128,6 +16536,8 @@ static void init_server_psi_keys(void) {
   init_vio_psi_keys();
   /* TLS interfaces */
   init_tls_psi_keys();
+  /* Statement handle interface PSI keys */
+  init_statement_handle_interface_psi_keys();
 }
 #endif /* HAVE_PSI_INTERFACE */
 

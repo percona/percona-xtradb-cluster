@@ -168,7 +168,7 @@ int Certification_handler::handle_applier_view_change_packet(
 }
 
 int Certification_handler::handle_recovery_metadata(Pipeline_event *pevent,
-                                                    Continuation *cont) {
+                                                    Continuation * /* cont */) {
   View_change_packet *view_change_packet =
       static_cast<View_change_packet *>(pevent->get_applier_event_packet());
   int error = 0;
@@ -898,9 +898,8 @@ Certification_handler::generate_view_change_bgc_ticket() {
     all transactions ordered after the view will have a ticket
     greater that the one assigned to the view.
   */
-  auto ticket =
-      ticket_manager.push_new_ticket(binlog::BgcTmOptions::inc_session_count)
-          .first;
+  auto [ticket, _] =
+      ticket_manager.push_new_ticket(binlog::BgcTmOptions::inc_session_count);
 
   return ticket.get();
 }

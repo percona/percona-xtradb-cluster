@@ -172,7 +172,6 @@ INSERT INTO t1 VALUES (3);
 --source include/connection.inc
 SET DEBUG_SYNC='now SIGNAL waiting';
 SET @@GLOBAL.DEBUG= @debug_save;
-SET DEBUG_SYNC='RESET';
 
 --echo
 --echo ########################################################################

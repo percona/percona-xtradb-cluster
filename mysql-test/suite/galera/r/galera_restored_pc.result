@@ -1,6 +1,5 @@
 Killing server ...
 Killing server ...
-# restart:<hidden args>
-include/wait_for_removed_expect_file.inc
+# restart_abort:<hidden args>
 # restart:<hidden args>
 # restart:<hidden args>

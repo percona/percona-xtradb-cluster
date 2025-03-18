@@ -12,5 +12,11 @@ Note	1051	Unknown table 'test.v1'
 DROP EVENT IF EXISTS ev1;
 Warnings:
 Note	1305	Event ev1 does not exist
-include/rpl/gtid_step_assert.inc [count=4, only_count=0]
+DROP PROCEDURE IF EXISTS pr1;
+Warnings:
+Note	1305	PROCEDURE test.pr1 does not exist
+DROP FUNCTION IF EXISTS fn1;
+Warnings:
+Note	1305	FUNCTION test.fn1 does not exist
+include/rpl/gtid_step_assert.inc [count=6, only_count=0]
 include/rpl/gtid_utils_end.inc

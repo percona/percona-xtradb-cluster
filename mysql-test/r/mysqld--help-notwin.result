@@ -286,6 +286,9 @@ The following options may be given as the first argument:
  memory counter
  --connection-memory-limit=# 
  Maximum amount of memory connection can consume
+ --connection-memory-status-limit=# 
+ Maximum amount of memory connection can consume before
+ status update
  --console           Write error output on screen; don't remove the console
  window on windows.
  --core-file         Write core on errors.
@@ -428,6 +431,9 @@ The following options may be given as the first argument:
  CREATE USER-,SET PASSWORD- or ALTER USER statements
  --global-connection-memory-limit=# 
  Maximum amount of memory all connections can consume
+ --global-connection-memory-status-limit=# 
+ Global connection memory usage threshold for triggering
+ status update
  --global-connection-memory-tracking 
  Enable updating the global memory counter and checking
  the global connection memory limit exceeding
@@ -792,17 +798,6 @@ The following options may be given as the first argument:
  NULLS_UNEQUAL (default behavior for 4.1 and later),
  NULLS_EQUAL (emulate 4.0 behavior), and NULLS_IGNORED
  --myisam-use-mmap   Use memory mapping for reading and writing MyISAM tables
- --mysql-native-password[=name] 
- Enable or disable mysql_native_password plugin. Possible
- values are ON, OFF, FORCE (don't start if the plugin
- fails to load).
- --mysql-native-password-proxy-users 
- If set to FALSE (the default), then the
- mysql_native_password plugin will not signal for
- authenticated users to be checked for mapping to proxy
- users.  When set to TRUE, the plugin will flag associated
- authenticated accounts to be mapped to proxy users when
- the server option check_proxy_users is enabled.
  --net-buffer-length=# 
  Buffer length for TCP/IP and socket communication
  --net-buffer-shrink-interval=# 
@@ -991,6 +986,8 @@ The following options may be given as the first argument:
  --performance-schema-instrument[=name] 
  Default startup value for a performance schema
  instrument.
+ --performance-schema-logger[=name] 
+ Default startup value for a performance schema logger.
  --performance-schema-max-cond-classes=# 
  Maximum number of condition instruments.
  --performance-schema-max-cond-instances=# 
@@ -1015,6 +1012,8 @@ The following options may be given as the first argument:
  --performance-schema-max-index-stat=# 
  Maximum number of index statistics for instrumented
  tables. Use 0 to disable, -1 for automated scaling.
+ --performance-schema-max-logger-classes=# 
+ Maximum number of logger source instruments.
  --performance-schema-max-memory-classes=# 
  Maximum number of memory pool instruments.
  --performance-schema-max-metadata-locks=# 
@@ -1067,6 +1066,8 @@ The following options may be given as the first argument:
  --performance-schema-max-thread-instances=# 
  Maximum number of instrumented threads. Use 0 to disable,
  -1 for automated scaling.
+ --performance-schema-meter[=name] 
+ Default startup value for a performance schema meter.
  --performance-schema-session-connect-attrs-size=# 
  Size of session attribute string buffer per thread. Use 0
  to disable, -1 for automated sizing.
@@ -1863,6 +1864,16 @@ The following options may be given as the first argument:
  --wsrep-trx-fragment-unit=name 
  Unit for streaming replication transaction fragments'
  size: bytes, rows, statements
+ --wsrep-use-async-monitor 
+ Use Async Monitors to avoid deadlock of replicated
+ transactions in a multi-threaded replica. Deadlock is
+ possible when the PXC replica tries to commit the
+ replicated transactions in galera in a different order
+ than its order in the relay log. Use
+ 'wsrep_use_async_monitor' to avoid such deadlocks.This
+ variable is only allowed to be changed through command
+ line.
+ (Defaults to on; use --skip-wsrep-use-async-monitor to disable.)
  --xa-detach-on-prepare 
  When set, XA transactions will be detached (AKA
  dissociated or disconnected) from connection as part of
@@ -1941,6 +1952,7 @@ concurrent-insert AUTO
 connect-timeout 10
 connection-memory-chunk-size 8192
 connection-memory-limit 18446744073709551615
+connection-memory-status-limit 18446744073709551615
 console FALSE
 coredumper (No default value)
 create-admin-listener-thread FALSE
@@ -1982,6 +1994,7 @@ gdb FALSE
 general-log FALSE
 generated-random-password-length 20
 global-connection-memory-limit 18446744073709551615
+global-connection-memory-status-limit 18446744073709551615
 global-connection-memory-tracking FALSE
 group-concat-max-len 1024
 group-replication-consistency BEFORE_ON_PRIMARY_FAILOVER
@@ -2088,8 +2101,6 @@ myisam-recover-options OFF
 myisam-sort-buffer-size 8388608
 myisam-stats-method nulls_unequal
 myisam-use-mmap FALSE
-mysql-native-password OFF
-mysql-native-password-proxy-users FALSE
 net-buffer-length 16384
 net-buffer-shrink-interval 0
 net-read-timeout 30
@@ -2141,6 +2152,7 @@ performance-schema-events-waits-history-long-size -1
 performance-schema-events-waits-history-size -1
 performance-schema-hosts-size -1
 performance-schema-instrument 
+performance-schema-logger 
 performance-schema-max-cond-classes 177
 performance-schema-max-cond-instances -1
 performance-schema-max-digest-length 1024
@@ -2149,6 +2161,7 @@ performance-schema-max-file-classes 80
 performance-schema-max-file-handles 32768
 performance-schema-max-file-instances -1
 performance-schema-max-index-stat -1
+performance-schema-max-logger-classes 80
 performance-schema-max-memory-classes 530
 performance-schema-max-metadata-locks -1
 performance-schema-max-meter-classes 30
@@ -2163,13 +2176,14 @@ performance-schema-max-socket-classes 10
 performance-schema-max-socket-instances -1
 performance-schema-max-sql-text-length 1024
 performance-schema-max-stage-classes 199
-performance-schema-max-statement-classes 228
+performance-schema-max-statement-classes 234
 performance-schema-max-statement-stack 10
 performance-schema-max-table-handles -1
 performance-schema-max-table-instances -1
 performance-schema-max-table-lock-stat -1
 performance-schema-max-thread-classes 100
 performance-schema-max-thread-instances -1
+performance-schema-meter 
 performance-schema-session-connect-attrs-size -1
 performance-schema-setup-actors-size -1
 performance-schema-setup-objects-size -1
@@ -2364,7 +2378,7 @@ wsrep-retry-autocommit 1
 wsrep-slave-FK-checks TRUE
 wsrep-slave-UK-checks FALSE
 wsrep-slave-threads 1
-wsrep-sst-allowed-methods xtrabackup-v2
+wsrep-sst-allowed-methods xtrabackup-v2,clone
 wsrep-sst-donor 
 wsrep-sst-donor-rejects-queries FALSE
 wsrep-sst-method xtrabackup-v2
@@ -2373,6 +2387,7 @@ wsrep-start-position 00000000-0000-0000-0000-000000000000:-1
 wsrep-sync-wait 0
 wsrep-trx-fragment-size 0
 wsrep-trx-fragment-unit bytes
+wsrep-use-async-monitor TRUE
 xa-detach-on-prepare TRUE
 
 To see what values a running MySQL server is using, type

@@ -18,6 +18,8 @@ count(1)
 call mtr.add_suppression(
 "Cannot save table statistics for table `test`.`t1`: Deadlock"
 );
+Warnings:
+Warning	6414	Combining the storage engines MyISAM and InnoDB is deprecated, but the statement or transaction updates both the MyISAM table mtr.test_suppressions and the InnoDB table test.t1.
 COMMIT;
 DROP TABLE t1;
 CREATE TABLE t1 (

@@ -116,7 +116,6 @@ void Wsrep_client_service::cleanup_transaction() {
   m_thd->wsrep_skip_wsrep_GTID = false;
   m_thd->run_wsrep_commit_hooks = false;
   m_thd->run_wsrep_ordered_commit = false;
-  m_thd->wsrep_enforce_group_commit = false;
   m_thd->wsrep_post_insert_error = false;
   m_thd->wsrep_stmt_transaction_rolled_back = false;
   m_thd->wsrep_force_savept_rollback = false;

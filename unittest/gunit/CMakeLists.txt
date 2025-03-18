@@ -34,9 +34,6 @@ ENDIF()
 
 INCLUDE_DIRECTORIES(SYSTEM ${GMOCK_INCLUDE_DIRS})
 
-# TODO(sgunders): Remove when all GMock tests use MOCK_METHOD().
-STRING(REPLACE "-Wsuggest-override" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-
 MY_CHECK_CXX_COMPILER_FLAG("-fno-builtin-memcmp" HAVE_NO_BUILTIN_MEMCMP)
 
 SET(DISABLE_PSI_DEFINITIONS
@@ -85,6 +82,8 @@ ADD_STATIC_LIBRARY(gunit_large
   thread_utils.cc
   LINK_LIBRARIES ext::icu ext::zlib
 )
+TARGET_INCLUDE_DIRECTORIES(gunit_large SYSTEM PRIVATE 
+  ${CMAKE_SOURCE_DIR}/extra/unordered_dense/unordered_dense-4.4.0/include)
 
 # Add a library for enable_win_jemalloc.cc
 # and link it with both gunit_small and gunit_large below.
@@ -120,7 +119,6 @@ SET(TESTS
   decimal
   dns_srv_data
   dphyp
-  dynarray
   filesort_buffer
   filesort_compare
   filesort_mergechunk
@@ -131,6 +129,7 @@ SET(TESTS
   like_range
   m_string
   mdl
+  mem_root_array
   mem_root_deque
   mutex_lock
   my_alloc
@@ -277,6 +276,7 @@ SET(SERVER_TESTS
   opt_ref
   opt_trace
   persisted_variables
+  print_utils
   protocol_classic
   regexp_engine
   regexp_facade
@@ -315,7 +315,15 @@ IF(LINUX_ALPINE)
 ENDIF()
 
 IF(MY_COMPILER_IS_GNU AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 12)
-  ADD_COMPILE_FLAGS(regexp_engine-t.cc COMPILE_FLAGS "-Wno-restrict")
+  ADD_COMPILE_FLAGS(
+    regexp_engine-t.cc
+    gis_area-t.cc
+    gis_is_simple-t.cc
+    gis_isvalid-t.cc
+    gis_relops-t.cc
+    gis_setops-t.cc
+    COMPILE_FLAGS "-Wno-restrict"
+  )
 ENDIF()
 
 IF(WIN32)
@@ -379,6 +387,7 @@ MYSQL_ADD_EXECUTABLE(merge_small_tests-t ${ALL_SMALL_TESTS}
   ENABLE_EXPORTS
   LINK_LIBRARIES sqlgunitlib gunit_small extra::rapidjson extra::boost
   )
+DOWNGRADE_STRINGOP_WARNINGS(merge_small_tests-t)
 
 LIST(APPEND ALL_LARGE_TESTS ../../storage/example/ha_example.cc)
 
@@ -387,6 +396,13 @@ MYSQL_ADD_EXECUTABLE(merge_large_tests-t ${ALL_LARGE_TESTS}
   ENABLE_EXPORTS
   LINK_LIBRARIES gunit_large server_unittest_library
   )
+IF(MY_COMPILER_IS_GNU)
+  TARGET_LINK_OPTIONS(merge_large_tests-t PRIVATE -Wno-alloc-size-larger-than)
+ENDIF()
+
+TARGET_INCLUDE_DIRECTORIES(merge_large_tests-t SYSTEM PRIVATE
+  ${CMAKE_SOURCE_DIR}/extra/unordered_dense/unordered_dense-4.4.0/include)
+
 
 FOREACH(test ${TESTS})
   MYSQL_ADD_EXECUTABLE(${test}-t ${test}-t.cc
@@ -455,11 +471,24 @@ MYSQL_ADD_EXECUTABLE(rpl_event_ctx-t rpl_event_ctx-t.cc
   LINK_LIBRARIES rpl_event_ctx_lib gunit_small
 )
 
+# WITH_WSREP
+ADD_LIBRARY(wsrep_async_monitor_lib STATIC
+  ${CMAKE_SOURCE_DIR}/sql/wsrep_async_monitor.cc
+)
+TARGET_LINK_LIBRARIES(wsrep_async_monitor_lib)
+
+MYSQL_ADD_EXECUTABLE(wsrep_async_monitor-t wsrep_async_monitor-t.cc
+  ENABLE_EXPORTS
+  ADD_TEST wsrep_async_monitor
+  LINK_LIBRARIES wsrep_async_monitor_lib gunit_small
+)
+
 ADD_SUBDIRECTORY(ddl_rewriter)
 ADD_SUBDIRECTORY(innodb)
 ADD_SUBDIRECTORY(components/mysql_server)
 ADD_SUBDIRECTORY(components/keyring_common)
 ADD_SUBDIRECTORY(components/keyring_vault)
+ADD_SUBDIRECTORY(components/percona_telemetry)
 ADD_SUBDIRECTORY(xplugin)
 ADD_SUBDIRECTORY(group_replication)
 ADD_SUBDIRECTORY(libmysqlgcs)

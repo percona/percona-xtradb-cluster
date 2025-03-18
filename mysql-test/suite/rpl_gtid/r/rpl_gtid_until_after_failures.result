@@ -25,6 +25,8 @@ include/suppress_messages.inc
 [connection slave]
 SET sql_log_bin=0;
 INSERT INTO t1 VALUES(2);
+Warnings:
+Warning	6414	Combining the storage engines InnoDB and MyISAM is deprecated, but the statement or transaction updates both the InnoDB table test.t1 and the MyISAM table mtr.test_suppressions.
 SET sql_log_bin=1;
 [connection master]
 INSERT INTO t1 VALUES(2);

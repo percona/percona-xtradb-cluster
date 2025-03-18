@@ -1222,11 +1222,13 @@ bool reset_binary_logs_and_gtids(THD *thd, bool unlock_global_read_lock) {
     */
 #ifdef WITH_WSREP
     if (WSREP(thd) && global_gtid_mode.get() > Gtid_mode::OFF) {
-      /* RESET MASTER will initialize GTID sequence, and that would happen
-         locally in this node only, so better reject it
+      /* RESET BINARY LOGS AND GTIDS will initialize GTID sequence, and that
+         would happen locally in this node only, so better reject it
       */
-      my_message(ER_NOT_ALLOWED_COMMAND,
-                 "RESET MASTER not allowed when node is in cluster", MYF(0));
+      my_message(
+          ER_NOT_ALLOWED_COMMAND,
+          "RESET BINARY LOGS AND GTIDS not allowed when node is in cluster",
+          MYF(0));
       ret = true;
     } else {
       ret = mysql_bin_log.reset_logs(thd);
@@ -1303,7 +1305,7 @@ bool show_binary_log_status(THD *thd) {
   protocol->start_row();
 
   if (mysql_bin_log.is_open()) {
-    LOG_INFO li;
+    Log_info li;
     mysql_bin_log.get_current_log(&li);
     size_t dir_len = dirname_length(li.log_file_name);
     protocol->store(li.log_file_name + dir_len, &my_charset_bin);
@@ -1332,7 +1334,7 @@ bool show_binary_log_status(THD *thd) {
 */
 bool show_binlogs(THD *thd) {
   IO_CACHE *index_file;
-  LOG_INFO cur;
+  Log_info cur;
   File file;
   char fname[FN_REFLEN];
   size_t length;

@@ -128,73 +128,45 @@ DATA="${WSREP_SST_OPT_DATA}"
 
 # Which rolling upgrade combinations do we support?
 # MySql supports following in-place upgrades:
-# 1. 8.0.x (LTS) -> 8.i : 8.0 (LTS) to any 8 innovative
-# 2. 8.i -> 8.k : 8.i innovative to 8.k innovative
-# 3. 8.i -> 8.4 (LTS) : 8 innovative to 8.4 (LTS)
-# 4. 8.0.x (LTS) -> 8.4 (LTS) : LTS to LTS
-#
-# PXB 8.0.x supports prepare for 8.0 (LTS) only.
-# PXB 8.1 supports prepare for 8.1 innovative only.
-# PXB 8.2 supports prepare for 8.2 innovative only.
-# PXB 8.3 supports prepare for 8.3 innovative only.
-# PXB 8.4 supports prepare for 8.4 LTS only.
-#
-# If we wanted to support all possible upgrade paths in PXC we would have to
-# support:
-# 1. 8.0 (LTS) -> 8.i : LTS to any innovative
-# 2. 8.i -> 8.k : any innovative to any innovative
-# 3. 8.0 (LTS) -> 8.4 (LTS) : LTS to LTS
-#
-# To do so, PXC-8.4 SST script would have to support PXB 8.0/8.1/8.2/8.3/8.4
-# (5 pxb versions) to be able to prepare SST from any donor version.
-# It would be even worse for 9.x series, where there will be 8 versions,
-# plus possibility to upgrade from 8.4, which gives 9 PXB versions in total.
-#
-# To make things easier we will support the following paths, which require using
-# up to 3 versions of PXB:
-#
-# 1. 8.0.x (LTS) -> 8.i : 8.0 (LTS) to any 8 innovative
-# 2. 8.i -> 8.k : 8.i innovative to 8.k innovative
-# 3. 8.0.x (LTS) -> 8.4 (LTS) : LTS to LTS
+# 1. From previous version (it can be innovative or LTS)
+# 2. From previous LTS version
+# 3. From the same version
 #
 # This way, every PXB version needs to understand:
 # 1. Previous LTS backup
 # 2. Previous innovative backup
 # 3. Backup from the current version of PXC
 #
-# E.g. PXC-8.3 needs to be bundled with PXB-8.0.x, PXB-8.2, PXB-8.3
 # The upgrade from one innovative version to another innovative version does
 # not support skipping versions. The same is for upgrading to next LTS: only
 # upgrade from previous LTS or previous innovative is supported.
-# If the cluster is on 8.1 the only way to upgrade it to 8.4 is to go through
-# 8.2 and 8.3
 
 XTRABACKUP_PATH_PREFIX="$(dirname $0)/pxc_extra/pxb-"
 
 # XB path compatible with the current version of PXC
-XTRABACKUP_THIS_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.4"
+XTRABACKUP_THIS_VER_PATH="$(dirname $0)/pxc_extra/pxb-9.1"
 
 # XB path compatible with prev PXC version. It may be prev Innovative release or LTS
 # if current PXC version is 1st Innovative.
 # Note that this can be the same as XTRABACKUP_PREV_LTS_VER_PATH
-XTRABACKUP_PREV_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.3"
+XTRABACKUP_PREV_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.4"
 
 # XB path compatible previous PXC LTS version
-XTRABACKUP_PREV_LTS_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.0"
+XTRABACKUP_PREV_LTS_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.4"
 
 # Minimum PXB required versions for this node to work
 # To be able to service this version
-XB_THIS_REQUIRED_VERSION="8.4.0"
+XB_THIS_REQUIRED_VERSION="9.1.0"
 # To be able to service previous version
-XB_PREV_REQUIRED_VERSION="8.3.0"
+XB_PREV_REQUIRED_VERSION="8.4.0"
 # To be able to service previous LTS version
-XB_PREV_LTS_REQUIRED_VERSION="8.0.35"
+XB_PREV_LTS_REQUIRED_VERSION="8.4.0"
 
 # Joiner requires Donor to be this LTS version...
-REQUIRED_DONOR_MYSQL_LTS_VERSION="8.0"
+REQUIRED_DONOR_MYSQL_LTS_VERSION="8.4"
 # ...or to be this previous version (note that it may be LTS as well if this is
 # 1st innovative)
-REQUIRED_DONOR_MYSQL_PREV_VERSION="8.3"
+REQUIRED_DONOR_MYSQL_PREV_VERSION="8.4"
 
 # These files carry some important information in form of GTID of the data
 # that is being backed up.
@@ -780,7 +752,6 @@ read_cnf()
 
     ssl_dhparams=$(parse_cnf sst ssl-dhparams "")
 
-    uextra=$(parse_cnf sst use-extra 0)
     iopts=$(parse_cnf sst inno-backup-opts "")
     iapts=$(parse_cnf sst inno-apply-opts "")
     impts=$(parse_cnf sst inno-move-opts "")
@@ -1033,19 +1004,6 @@ cleanup_donor()
 }
 
 #
-# Get the value assosciated with the key in a json file
-#
-# 1st param: json file path
-# 2nd param: key to be searched
-#
-get_json_value() {
-  local json_file="$1"
-  local key="$2"
-  local value=$(cat $json_file | tr -d "\n" | grep -E -o "$key\" *: *(true|false)" | cut -d: -f2 | tr -d ' ')
-  echo $value
-}
-
-#
 # Get the keyring manifest and config file paths
 #
 # 1st param: Datadir
@@ -1066,7 +1024,7 @@ get_keyring_manifest_and_config()
     # Get keyring manifest file path
 
     if [ -e $mysqld_dir/$binary.my ]; then
-        local local_manifest=$(get_json_value $mysqld_dir/mysqld.my "read_local_manifest")
+        local local_manifest=$(get_json_value $mysqld_dir/$binary.my "read_local_manifest")
         if [[ $local_manifest == "true" ]]; then
             # Handle local manifest file
             if [ -e $datadir/$binary.my ]; then
@@ -1326,28 +1284,10 @@ wait_for_listen()
 
 #
 # check if there are any extra options to parse.
-# Note: if port is specified socket is not used.
+# This function is executed only on the donor side.
 check_extra()
 {
-    local use_socket=1
-    if [[ $uextra -eq 1 ]]; then
-        if $MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF mysqld | tr '_' '-' | grep -- "--thread-handling=" | grep -q 'pool-of-threads'; then
-            local eport=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF mysqld | tr '_' '-' | grep -- "--extra-port=" | cut -d= -f2)
-            if [[ -n $eport ]]; then
-                # Xtrabackup works only locally.
-                # Hence, setting host to 127.0.0.1 unconditionally.
-                wsrep_log_debug "SST through extra_port $eport"
-                INNOEXTRA+=" --host=127.0.0.1 --port=$eport "
-                use_socket=0
-            else
-                wsrep_log_error "Extra port $eport null, failing"
-                exit 1
-            fi
-        else
-            wsrep_log_warning "Thread pool not set, ignore the option use_extra"
-        fi
-    fi
-    if [[ $use_socket -eq 1 ]] && [[ -n "${WSREP_SST_OPT_SOCKET}" ]]; then
+    if [[ -n "${WSREP_SST_OPT_SOCKET}" ]]; then
         INNOEXTRA+=" --socket=${WSREP_SST_OPT_SOCKET}"
     fi
 }
@@ -2118,13 +2058,22 @@ then
             wsrep_log_error "****************************************************** "
             do_exit=1
         fi
-        if [[ ${RC[$(( ${#RC[@]}-1 ))]} -eq 1 ]]; then
-            wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "$tcmd finished with error: ${RC[1]}"
-            wsrep_log_error "Line $LINENO"
-            wsrep_log_error "****************************************************** "
-            do_exit=1
-        fi
+
+        # Now let's go through the rest of return codes and see if there were
+        # any errors in tcmd (it may be a pipeline of several commands)
+        for ecode in "${RC[@]:1}"; do
+            if [[ $ecode -ne 0 ]]; then
+                wsrep_log_error "******************* FATAL ERROR ********************** "
+                wsrep_log_error "${tcmd} finished with error codes: ${RC[@]:1}"
+                wsrep_log_error "Line $LINENO"
+                wsrep_log_error "****************************************************** "
+                do_exit=1
+
+                # All exit codes already printed out, no need to iterate more
+                break
+            fi
+        done
+
         if [[ $do_exit -eq 1 ]]; then
             exit 22
         fi
@@ -2417,6 +2366,7 @@ then
             rebuildcmd="--rebuild-indexes --rebuild-threads=$nthreads"
         fi
 
+        # KH: todo: remove
         # We still can receive qpress-compressed backup as the donor may be any 8.0.x
         if test -n "$(find ${DATA} -maxdepth 1 -type f -name '*.qp' -print -quit)"; then
             wsrep_log_info "Compressed qpress files found"

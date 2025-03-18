@@ -493,8 +493,6 @@ INSERT INTO global_suppressions VALUES
  */
  ("'--ssl-fips-mode' is deprecated and will be removed in a future release."),
 
- ("'mysql_native_password' is deprecated and will be removed in a future release."),
-
  ("THE_LAST_SUPPRESSION");
 
 
@@ -587,11 +585,11 @@ BEGIN
     TRUNCATE test_ignored_global_suppressions;
     TRUNCATE asserted_test_suppressions;
     SET wsrep_on = 1;
-  ELSE 
+  ELSE
     TRUNCATE test_suppressions;
     TRUNCATE test_ignored_global_suppressions;
     TRUNCATE asserted_test_suppressions;
-  END IF;    
+  END IF;
 
   DROP TABLE error_log;
 
@@ -610,6 +608,5 @@ END
 */$$
 
 DELIMITER ;
-
 
 

@@ -30,15 +30,15 @@ let NEW_CMD = $MYSQLD --no-defaults --initialize-insecure --datadir=$MYSQLD_DATA
 --source include/restart_mysqld.inc
 
 SELECT current_user;
-SELECT user, plugin FROM mysql.user;
+SELECT user, plugin FROM mysql.user WHERE user != 'percona.telemetry';
 
 --echo
 --echo # Set the password for the root user
 SET PASSWORD = 'passwd';
 
 --echo
---echo # Create a new user with non-default plugin
-CREATE USER 'native_user' IDENTIFIED WITH 'mysql_native_password' BY 'passwd';
+--echo # Create a new user
+CREATE USER 'new_user' IDENTIFIED WITH 'caching_sha2_password' BY 'passwd';
 --echo
 
 --remove_file $BOOTSTRAP_SQL
