@@ -15,11 +15,14 @@
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA */
 
 #include <mysqld_error.h>
-#include <regex>
 #include <sstream>
 
 #include "data_provider.h"
 #include "logger.h"
+
+#ifdef WITH_WSREP
+#include <regex>
+#endif
 
 namespace {
 inline const char *b2s(bool val) { return val ? "1" : "0"; }

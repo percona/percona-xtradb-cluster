@@ -729,7 +729,8 @@ int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
     replayer_thd->set_psi(psi);
     PSI_THREAD_CALL(set_thread)(psi);
     PSI_THREAD_CALL(set_thread_os_id)(psi);
-    PSI_THREAD_CALL(set_thread_account)("root", strlen("root"), nullptr, 0);
+    PSI_THREAD_CALL(set_thread_account)
+    ("system user", strlen("system user"), nullptr, 0);
     assert(psi != nullptr);
 #endif
     replayer_thd->store_globals();
