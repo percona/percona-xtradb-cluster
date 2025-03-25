@@ -43,6 +43,13 @@ Prefix: %{_sysconfdir}
 %define revision @@REVISION@@
 %define distribution  rhel%{redhatversion}  
 
+%if 0%{?amzn} == 2023
+   %define distribution  amzn2023
+   %define rhel 9
+%else
+   %define distribution  rhel%{redhatversion}
+%endif
+
 %if 0%{?rhel} >= 8
 %global pxc_telemetry          /usr/local/percona/telemetry/pxc
 %endif
@@ -246,6 +253,12 @@ Prefix: %{_sysconfdir}
         %endif
       %endif
     %else
+      %if %(test -f /etc/amazon-linux-release && echo 1 || echo 0)
+         %define distro_description    Amazon Linux 2023
+         %define distro_releasetag     amzn2023
+         %define distro_buildreq       gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake
+         %define distro_requires       chkconfig coreutils grep procps shadow-utils %distro_req
+      %endif
       %if %(test -f /etc/SuSE-release && echo 1 || echo 0)
         %define susever %(rpm -qf --qf '%%{version}\\n' /etc/SuSE-release)
         %if "%susever" == "10"
@@ -328,7 +341,11 @@ Requires:             percona-xtradb-cluster-server = %{version}-%{release}
 Requires:             percona-xtradb-cluster-client = %{version}-%{release}
 Provides:       mysql-server galera-57 galera-57-debuginfo
 BuildRequires:  %{distro_buildreq} pam-devel openssl-devel numactl-devel
+%if 0%{?amzn} == 2023
+BuildRequires:  check-devel glibc-devel %{gcc_req} openssl-devel %{boost_req} check-devel openldap-devel
+%else
 BuildRequires:  scons check-devel glibc-devel %{gcc_req} openssl-devel %{boost_req} check-devel openldap-devel
+%endif
 %if 0%{?systemd}
 BuildRequires:  systemd
 %endif
@@ -717,8 +734,10 @@ mkdir debug
   CFLAGS=`echo " ${CFLAGS} " | \
             sed -e 's/ -unroll2 / /' \
 %if 0%{?rhel} < 9
+%if 0%{?amzn} != 2023
                 -e 's/ -O[0-9]* / /' \
                 -e 's/-Wp,-D_FORTIFY_SOURCE=2/ -Wno-missing-field-initializers -Wno-error /' \
+%endif
 %endif
                 -e 's/ -ip / /' \
                 -e 's/^ //' \
@@ -775,7 +794,7 @@ mkdir debug
            -DMYSQL_SERVER_SUFFIX=".%{rel}" \
            %{?mecab_option} \
            -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_ON} %{ROCKSDB_FLAGS}
-  echo BEGIN_DEBUG_CONFIG ; egrep '^#define' include/config.h ; echo END_DEBUG_CONFIG
+  # echo BEGIN_DEBUG_CONFIG ; egrep '^#define' include/config.h ; echo END_DEBUG_CONFIG
   make %{?_smp_mflags}
 )
 # Build full release
@@ -824,7 +843,7 @@ mkdir release
            %{?mecab_option} \
            -DMYSQL_SERVER_SUFFIX=".%{rel}" \
            -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_OFF} %{ROCKSDB_FLAGS}
-  echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
+  # echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
   make %{?_smp_mflags}
 )
 
@@ -1589,7 +1608,7 @@ fi
 #%attr(755, root, root) %{_bindir}/resolveip
 %attr(755, root, root) %{_bindir}/wsrep_sst_common
 %attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup-v2
-#%attr(755, root, root) %{_bindir}/wsrep_sst_upgrade
+%attr(755, root, root) %{_bindir}/wsrep_sst_clone
 %attr(755, root, root) %{_bindir}/ps_mysqld_helper
 # Explicit %attr() mode not applicaple to symlink
 %attr(755, root, root) %{_bindir}/mysql_test_event_tracking
@@ -1885,7 +1904,9 @@ else
                 echo "Not bootstrapping with $(( numint-1 )) nodes already in cluster PC"
                 echo "Restarting with mysql.service in its stead"
                 %if 0%{?rhel} < 9
+                %if 0%{?amzn} != 2023
                     %systemd_postun
+                %endif
                 %endif
                 /usr/bin/systemctl stop mysql@bootstrap.service
                 /usr/bin/systemctl start mysql.service
@@ -1941,7 +1962,6 @@ rm -rf %{pxc_telemetry}
 %{_libdir}/mysqlrouter/private/libmysqlrouter_http.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_http_auth_backend.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_http_auth_realm.so.*
-%{_libdir}/mysqlrouter/private/libprotobuf-lite.so.*
 %{_libdir}/mysqlrouter/private/libabsl_*.so
 %{_libdir}/mysqlrouter/private/libmysqlrouter_io_component.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_metadata_cache.so.*
@@ -1949,6 +1969,13 @@ rm -rf %{pxc_telemetry}
 %{_libdir}/mysqlrouter/private/libmysqlrouter_routing.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_destination_status.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_routing_connections.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_cluster.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_http_server.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_mysql.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_mysqlclient.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_mysqlxclient.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_utils.so.*
+%{_libdir}/mysqlrouter/private/libprotobuf.so.*
 %dir %{_libdir}/mysqlrouter
 %dir %{_libdir}/mysqlrouter/private
 %{_libdir}/mysqlrouter/*.so*
