@@ -21,7 +21,7 @@ usr/bin/wsrep_sst_common
 usr/bin/wsrep_sst_xtrabackup-v2
 usr/bin/mysql_keyring_encryption_test
 usr/bin/mysql_migrate_keyring
-# usr/bin/wsrep_sst_rsync
+usr/bin/wsrep_sst_clone
 #usr/bin/wsrep_sst_upgrade
 usr/sbin/mysqld
 usr/bin/mysql-systemd
