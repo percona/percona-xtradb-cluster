@@ -93,20 +93,6 @@ constexpr bool unlikely(bool expr) { return expr; }
 #define __func__ __FUNCTION__
 #endif
 
-#if defined(__cplusplus) && defined(__cpp_attributes) && \
-    defined(__has_cpp_attribute)
-#if __has_cpp_attribute(nodiscard)
-#define MY_NODISCARD [[nodiscard]]
-#elif __has_cpp_attribute(gnu::warn_unused_result)
-#define MY_NODISCARD [[gnu::warn_unused_result]]
-#endif /* __has_cpp_attribute(gnu::warn_unused_result) */
-#endif /* defined(__cplusplus) && defined(__cpp_attributes) && \
-          defined(__has_cpp_attribute) */
-
-#ifndef MY_NODISCARD
-#define MY_NODISCARD MY_ATTRIBUTE((warn_unused_result))
-#endif /* MY_NODISCARD */
-
 #if defined(_MSC_VER)
 #define ALWAYS_INLINE __forceinline
 #else
@@ -127,9 +113,6 @@ constexpr bool unlikely(bool expr) { return expr; }
 // clang -fsanitize=undefined
 #if defined(HAVE_UBSAN) && defined(__clang__)
 #define SUPPRESS_UBSAN MY_ATTRIBUTE((no_sanitize("undefined")))
-#if (__clang_major__ >= 10)
-#define SUPPRESS_UBSAN_CLANG10 MY_ATTRIBUTE((no_sanitize("undefined")))
-#endif
 // gcc -fsanitize=undefined
 #elif defined(HAVE_UBSAN) && __has_attribute(no_sanitize_undefined)
 #define SUPPRESS_UBSAN MY_ATTRIBUTE((no_sanitize_undefined))
@@ -137,11 +120,6 @@ constexpr bool unlikely(bool expr) { return expr; }
 #define SUPPRESS_UBSAN
 #endif
 #endif /* SUPPRESS_UBSAN */
-
-// TODO(tdidriks) Fix new 'applying offset to null pointer' warnings.
-#ifndef SUPPRESS_UBSAN_CLANG10
-#define SUPPRESS_UBSAN_CLANG10
-#endif
 
 #ifndef SUPPRESS_TSAN
 #if defined(HAVE_TSAN) && defined(__clang__)

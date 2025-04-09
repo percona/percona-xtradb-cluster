@@ -18,6 +18,7 @@
 #include <cstdlib>
 #include <regex>
 #include <sstream>
+#include <string>
 #include "debug_sync.h"
 #include "log_event.h"
 #include "my_rnd.h"
@@ -73,6 +74,7 @@ extern const char *wsrep_defaults_group_suffix;
 #define WSREP_SST_ONLY_IST "ist_only"
 #define WSREP_SST_XTRABACKUP "xtrabackup"
 #define WSREP_SST_XTRABACKUP_V2 "xtrabackup-v2"
+#define WSREP_SST_CLONE "clone"
 #define WSREP_SST_DEFAULT WSREP_SST_XTRABACKUP_V2
 #define WSREP_SST_ADDRESS_AUTO "AUTO"
 
@@ -82,7 +84,7 @@ const char *wsrep_sst_method = WSREP_SST_DEFAULT;
 const char *wsrep_sst_receive_address = WSREP_SST_ADDRESS_AUTO;
 const char *wsrep_sst_donor = "";
 
-#define WSREP_SST_ALLOWED_METHODS_DEFAULT WSREP_SST_XTRABACKUP_V2
+#define WSREP_SST_ALLOWED_METHODS_DEFAULT WSREP_SST_XTRABACKUP_V2  "," WSREP_SST_CLONE
 const char *wsrep_sst_allowed_methods = WSREP_SST_ALLOWED_METHODS_DEFAULT;
 static std::vector<std::string> allowed_sst_methods;
 
@@ -203,10 +205,10 @@ bool wsrep_setup_allowed_sst_methods() {
 static bool sst_awaiting_callback = false;
 
 bool wsrep_sst_in_progress() {
-    if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
-    bool in_progress = sst_awaiting_callback;
-    mysql_mutex_unlock (&LOCK_wsrep_sst);
-    return in_progress;
+  if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
+  bool in_progress = sst_awaiting_callback;
+  mysql_mutex_unlock(&LOCK_wsrep_sst);
+  return in_progress;
 }
 
 // Signal end of SST
@@ -276,17 +278,24 @@ static char *my_fgets(char *buf, size_t buf_len, FILE *stream) {
   return ret;
 }
 
+// New strucutre to host user info
+struct sst_auth {
+  std::string remote_name_;
+  std::string remote_pswd_;
+};
+
 struct sst_thread_arg {
   const char *cmd;
   char **env;
+  const sst_auth &auth_container;
   char *ret_str;
   int err;
 
   mysql_mutex_t LOCK_wsrep_sst_thread;
   mysql_cond_t COND_wsrep_sst_thread;
 
-  sst_thread_arg(const char *c, char **e)
-      : cmd(c), env(e), ret_str(0), err(-1) {
+  sst_thread_arg(const char *c, char **e, sst_auth &auth)
+      : cmd(c), env(e), auth_container(auth), ret_str(0), err(-1) {
     mysql_mutex_init(key_LOCK_wsrep_sst_thread, &LOCK_wsrep_sst_thread,
                      MY_MUTEX_INIT_FAST);
     mysql_cond_init(key_COND_wsrep_sst_thread, &COND_wsrep_sst_thread);
@@ -754,8 +763,11 @@ static ssize_t sst_prepare_other(const char *method, const char *addr_in,
   reset_ld_preload(env);
 #endif
 
+  // We define the auth here to pass it to the thread args
+  sst_auth auth;
+
   pthread_t tmp;
-  sst_thread_arg arg(cmd_str(), env());
+  sst_thread_arg arg(cmd_str(), env(), auth);
   mysql_mutex_lock(&arg.LOCK_wsrep_sst_thread);
   ret = pthread_create(&tmp, NULL, sst_joiner_thread, &arg);
   if (ret) {
@@ -792,12 +804,14 @@ std::string wsrep_sst_prepare() {
     /* Inform Galera that we are done with SST and it can proceed with IST.
     In fact the following call will wait until the server is fully initialized
     and then inform Galera about two things:
-    1. call sst_received() - so from Galera's point of view it looks like we are done with
-                             sst
-    2. return empty string from this function - informs Galera that only IST should
-       be processed.*/
-    WSREP_WARN("State Transfer via SST was prohibited by setting wsrep_sst_method=ist_only. "
-               "The node will try to join the cluster using only IST.");
+    1. call sst_received() - so from Galera's point of view it looks like we are
+    done with sst
+    2. return empty string from this function - informs Galera that only IST
+    should be processed.*/
+    WSREP_WARN(
+        "State Transfer via SST was prohibited by setting "
+        "wsrep_sst_method=ist_only. "
+        "The node will try to join the cluster using only IST.");
     wsrep_sst_complete(current_thd, 0);
     return WSREP_STATE_TRANSFER_NO_SST;
   }
@@ -874,7 +888,19 @@ std::string wsrep_sst_prepare() {
 
   const char *method_ptr(ret.data());
   const char *addr_ptr(ret.data() + strlen(method_ptr) + 1);
-  WSREP_INFO("Prepared SST request: %s|%s", method_ptr, addr_ptr);
+  /* we check for @ as separator in user:pw@address format and return only the
+     address part if not present we do not filter it We decide to do not mask
+     the PWD but to remove compeletely the information user:pwd to keep
+     consistency with the already deployed solution for XB. This in case a user
+     had implemented any kind of log traking
+  */
+  std::string addr_str = addr_ptr;
+  size_t atPosition = addr_str.find("@");
+  if (atPosition > 0) {
+    addr_str = addr_str.substr(atPosition + 1);
+  }
+
+  WSREP_INFO("Prepared SST request: %s|%s", method_ptr, addr_str.c_str());
 
   if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
   sst_awaiting_callback = true;
@@ -1170,20 +1196,22 @@ static int wsrep_create_sst_user(bool initialize_thread, const char *password) {
   // The second entry is the string to be displayed if the query fails
   //  (this can be NULL, in which case the actual query will be used)
   const char *cmds[] = {
-    "SET SESSION sql_log_bin = OFF;",
-    nullptr,
-    "DROP USER IF EXISTS 'mysql.pxc.sst.user'@localhost;",
-    nullptr,
-    "CREATE USER 'mysql.pxc.sst.user'@localhost "
-    " IDENTIFIED BY '%s' ACCOUNT LOCK;",
-    "CREATE USER mysql.pxc.sst.user IDENTIFIED WITH * BY * ACCOUNT LOCK",
-    "GRANT 'mysql.pxc.sst.role'@localhost TO 'mysql.pxc.sst.user'@localhost;", nullptr,
-    "SET DEFAULT ROLE 'mysql.pxc.sst.role'@localhost to 'mysql.pxc.sst.user'@localhost;", nullptr,
-    "ALTER USER 'mysql.pxc.sst.user'@localhost ACCOUNT UNLOCK;",
-    nullptr,
-    nullptr,
-    nullptr
-  };
+      "SET SESSION sql_log_bin = OFF;",
+      nullptr,
+      "DROP USER IF EXISTS 'mysql.pxc.sst.user'@localhost;",
+      nullptr,
+      "CREATE USER 'mysql.pxc.sst.user'@localhost "
+      " IDENTIFIED BY '%s' ACCOUNT LOCK;",
+      "CREATE USER mysql.pxc.sst.user IDENTIFIED WITH * BY * ACCOUNT LOCK",
+      "GRANT 'mysql.pxc.sst.role'@localhost TO 'mysql.pxc.sst.user'@localhost;",
+      nullptr,
+      "SET DEFAULT ROLE 'mysql.pxc.sst.role'@localhost to "
+      "'mysql.pxc.sst.user'@localhost;",
+      nullptr,
+      "ALTER USER 'mysql.pxc.sst.user'@localhost ACCOUNT UNLOCK;",
+      nullptr,
+      nullptr,
+      nullptr};
 
   wsrep_allow_server_session = true;
   session = setup_server_session(initialize_thread);
@@ -1254,6 +1282,7 @@ int wsrep_remove_sst_user(bool initialize_thread) {
 
 static void *sst_donor_thread(void *a) {
   sst_thread_arg *arg = (sst_thread_arg *)a;
+  sst_auth const auth(arg->auth_container);
 
 #ifdef HAVE_PSI_INTERFACE
   wsrep_pfs_register_thread(key_THREAD_wsrep_sst_donor);
@@ -1316,6 +1345,18 @@ static void *sst_donor_thread(void *a) {
     if (ret < 0) {
       WSREP_ERROR("sst_donor_thread(): fprintf() failed: %d", ret);
       err = (ret < 0 ? ret : -EMSGSIZE);
+    }
+
+    // if remote user is defined we will pass the user-name/password pair
+    if (auth.remote_name_.length()) {
+      ret = fprintf(proc.write_pipe(),
+                    "sst_remote_user=%s\n"
+                    "sst_remote_password=%s\n",
+                    auth.remote_name_.c_str(), auth.remote_pswd_.c_str());
+      if (ret < 0) {
+        WSREP_ERROR("sst_donor_thread(): fprintf(2) failed: %d", ret);
+        err = (ret < 0 ? ret : -EMSGSIZE);
+      }
     }
 
     // Close the pipe, so that the other side gets an EOF
@@ -1397,8 +1438,6 @@ static void *sst_donor_thread(void *a) {
                 strerror(err));
   }
 
-  wsrep_remove_sst_user(true);
-
   if (locked)  // don't forget to unlock server before return
   {
     sst_disallow_writes(thd.ptr, false);
@@ -1416,6 +1455,9 @@ static void *sst_donor_thread(void *a) {
   // also have exited
   if (logger_thd) pthread_join(logger_thd, NULL);
 
+  // The process has exited, so sst user is no longer needed
+  wsrep_remove_sst_user(true);
+
 #ifdef HAVE_PSI_INTERFACE
   wsrep_pfs_delete_thread();
 #endif /* HAVE_PSI_INTERFACE */
@@ -1425,7 +1467,7 @@ static void *sst_donor_thread(void *a) {
 
 static int sst_donate_other(const char *method, const char *addr,
                             const wsrep::gtid &gtid, bool bypass,
-                            char **env)  // carries auth info
+                            sst_auth &auth, char **env)  // carries auth info
 {
   int const cmd_len = 4096;
   wsp::string cmd_str(cmd_len);
@@ -1483,7 +1525,7 @@ static int sst_donate_other(const char *method, const char *addr,
   if (!bypass && wsrep_sst_donor_rejects_queries) sst_reject_queries(false);
 
   pthread_t tmp;
-  sst_thread_arg arg(cmd_str(), env);
+  sst_thread_arg arg(cmd_str(), env, auth);
   mysql_mutex_lock(&arg.LOCK_wsrep_sst_thread);
   ret = pthread_create(&tmp, NULL, sst_donor_thread, &arg);
   if (ret) {
@@ -1540,12 +1582,17 @@ static bool is_sst_request_valid(const std::string &msg) {
       Instead of this we will just allow alpha-num + a few special characters
       (colon, slash, dot, underscore, square brackets, hyphen). */
     std::string data = msg.substr(method_len + 1, data_len);
-    static const std::regex allowed_chars_regex("[\\w:/.[\\]-]+");
+    static const std::regex allowed_chars_regex("[\\w:/.[\\]@-]+");
     if (!std::regex_match(data, allowed_chars_regex)) {
       return false;
     }
   }
   return true;
+}
+
+static std::string mask_password_in_string(const std::string &str) {
+  static std::regex password_regex(R"(:[^@]+@)");
+  return std::regex_replace(str, password_regex, ":********@");
 }
 
 int wsrep_sst_donate(const std::string &msg, const wsrep::gtid &current_gtid,
@@ -1562,7 +1609,8 @@ int wsrep_sst_donate(const std::string &msg, const wsrep::gtid &current_gtid,
       else
         ss << "<nullptr>";
     });
-    WSREP_ERROR("Invalid sst_request: %s", ss.str().c_str());
+    WSREP_ERROR("Invalid sst_request: %s",
+                mask_password_in_string(ss.str()).c_str());
     return WSREP_CB_FAILURE;
   }
 
@@ -1577,6 +1625,32 @@ int wsrep_sst_donate(const std::string &msg, const wsrep::gtid &current_gtid,
     WSREP_ERROR("wsrep_sst_donate_cb(): env var ctor failed: %d", -env.error());
     return WSREP_CB_FAILURE;
   }
+
+  /*
+  [start]
+  section to support clone user/pw
+  check for auth@addr separator
+  */
+  const char *addr = strrchr(data, '@');
+  wsp::string remote_auth;
+  if (addr) {
+    remote_auth.set(strndup(data, addr - data));
+    addr++;
+  } else {
+    // no auth part
+    addr = data;
+  }
+
+  /* Set up auth info (from <user>:<password> strings) */
+  sst_auth auth;
+  if (remote_auth()) {
+    /* wsp::string is just a dynamically allocated char* underneath
+     * so we can safely do all that arithmetics */
+    const char *col = strchrnul(remote_auth(), ':');
+    auth.remote_name_ = std::string(remote_auth(), col - remote_auth());
+    auth.remote_pswd_ = std::string(':' == *col ? col + 1 : "");
+  }
+  /* [END] */
 
 #if defined(HAVE_ASAN)
   reset_ld_preload(env);
@@ -1599,7 +1673,7 @@ int wsrep_sst_donate(const std::string &msg, const wsrep::gtid &current_gtid,
   };);
 
   int ret;
-  ret = sst_donate_other(method, data, current_gtid, bypass, env());
+  ret = sst_donate_other(method, addr, current_gtid, bypass, auth, env());
 
   /* Above methods should return 0 in case of success and negative value
    * in case of failure. If we have any positive value here it means that we

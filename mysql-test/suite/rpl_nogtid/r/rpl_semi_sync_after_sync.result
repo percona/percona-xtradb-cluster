@@ -30,6 +30,8 @@ include/assert.inc [Table has 1 record]
 [connection master]
 SET DEBUG_SYNC= "now SIGNAL end";
 [connection server_1]
+Warnings:
+Warning	6414	Combining the storage engines InnoDB and MyISAM is deprecated, but the statement or transaction updates both the InnoDB table test.t1 and the MyISAM table mtr.test_suppressions.
 include/assert.inc [rpl_semi_sync_source_yes_tx increased only 1]
 TRUNCATE t1;
 #

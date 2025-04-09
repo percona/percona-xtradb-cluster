@@ -4,12 +4,14 @@ call mtr.add_suppression("Plugin \'InnoDB\'");
 select sleep(1);
 sleep(1)
 0
-SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM performance_schema.processlist WHERE `state` != 'cleaning up' ORDER BY user, state ASC;
+SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM INFORMATION_SCHEMA.PROCESSLIST WHERE `state` != 'cleaning up' ORDER BY user,state ASC;
 user	host	db	command	state	info
 event_scheduler	localhost	NULL	Daemon	Waiting on empty queue	NULL
-root	localhost	test	Query	executing	SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM performance_schema.processlist WHERE `state` != 'cleaning up' ORDER BY user, state ASC
-system user	NULL	NULL	Connect		DELETE FROM mysql.wsrep_cluster_members
-system user	NULL	NULL	Sleep	wsrep: aborter idle	NULL
+root	localhost	test	Query	executing	SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM INFORMATION_SCHEMA.PROCESSLIST WHERE `state` != 'cleaning up' ORDER BY user,state ASC
+system user		NULL	Sleep	innobase_commit_low (-1)	NULL
+system user		NULL	Sleep	wsrep: aborter idle	NULL
+Warnings:
+Warning	1287	'INFORMATION_SCHEMA.PROCESSLIST' is deprecated and will be removed in a future release. Please use performance_schema.processlist instead
 RUN create procedure test.get_stuck()
 begin
     declare i int;
@@ -71,10 +73,7 @@ Mysqlx.Resultset.ColumnMetaData {
 
 aborting session sess
 switched to session default
-RUN select sleep(2)
-sleep(2)
-0
-0 rows affected
+Verify [Global status variable "mysqlx_connections_closed" needs to have a value of 2]
 RUN show global status like 'mysqlx_connections_%'
 Variable_name	Value
 Mysqlx_connections_accepted	3
@@ -92,10 +91,7 @@ send Mysqlx.Sql.StmtExecute {
 
 aborting session sess
 switched to session default
-RUN select sleep(2)
-sleep(2)
-0
-0 rows affected
+Verify [Global status variable "mysqlx_connections_closed" needs to have a value of 3]
 RUN show global status like 'mysqlx_connections_%'
 Variable_name	Value
 Mysqlx_connections_accepted	4
@@ -117,6 +113,7 @@ send Mysqlx.Sql.StmtExecute {
 
 aborting session sess
 switched to session default
+Verify [Global status variable "mysqlx_connections_closed" needs to have a value of 4]
 RUN show global status like 'mysqlx_connections_%'
 Variable_name	Value
 Mysqlx_connections_accepted	5
@@ -2029,10 +2026,12 @@ Variable_name	Value
 Mysqlx_connections_accepted	23
 Mysqlx_connections_closed	23
 Mysqlx_connections_rejected	0
-SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM performance_schema.processlist WHERE `state` != 'cleaning up' ORDER BY user, state ASC;
+SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM INFORMATION_SCHEMA.PROCESSLIST WHERE `state` != 'cleaning up' ORDER BY user,state ASC;
 user	host	db	command	state	info
 event_scheduler	localhost	NULL	Daemon	Waiting on empty queue	NULL
-root	localhost	test	Query	executing	SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM performance_schema.processlist WHERE `state` != 'cleaning up' ORDER BY user, state ASC
-system user	NULL	NULL	Connect		DELETE FROM mysql.wsrep_cluster_members
-system user	NULL	NULL	Sleep	wsrep: aborter idle	NULL
+root	localhost	test	Query	executing	SELECT `user`,`host`,`db`,`command`,`state`,`info` FROM INFORMATION_SCHEMA.PROCESSLIST WHERE `state` != 'cleaning up' ORDER BY user,state ASC
+system user		NULL	Sleep	innobase_commit_low (-1)	NULL
+system user		NULL	Sleep	wsrep: aborter idle	NULL
+Warnings:
+Warning	1287	'INFORMATION_SCHEMA.PROCESSLIST' is deprecated and will be removed in a future release. Please use performance_schema.processlist instead
 drop procedure test.get_stuck;

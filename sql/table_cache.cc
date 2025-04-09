@@ -354,10 +354,10 @@ void Table_cache_manager::free_table(THD *thd [[maybe_unused]],
   for (uint i = 0; i < table_cache_instances; i++) {
     if (cache_el[i]) {
       /*
-        Since freeing last TABLE object for the share will destroy all
+        Since freeing the last TABLE object for the share will destroy all
         related Table_cache_element objects and hence their list members,
-        we need to remember the fact whether unused TABLE objects lists
-        are empty (and avoid iterating through them) before proceeding to
+        we need to remember whether the unused TABLE objects lists are
+        empty (and avoid iterating through them) before proceeding to
         freeing TABLE objects.
       */
       bool has_free_tables_slim = !cache_el[i]->free_tables_slim.is_empty();

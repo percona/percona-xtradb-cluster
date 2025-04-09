@@ -14,14 +14,14 @@ insert into t1 values (4);
 ERROR HY000: Lost connection to MySQL server during query
 #node-1
 #waiting to restart node-1
-# restart:
+# restart
 set session wsrep_on=0;
 set debug="+d,crash_before_trx_commit_in_memory";
 insert into t1 values (40);
 ERROR HY000: Lost connection to MySQL server during query
 #node-1
 #waiting to restart node-1
-# restart:
+# restart
 select * from t1;
 i
 1

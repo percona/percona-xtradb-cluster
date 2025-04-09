@@ -3,6 +3,10 @@
 
 --source include/have_util_sed.inc
 --source include/galera_cluster.inc
+--let $xplugin_create_user_cache=USOCKET
+--source include/not_windows.inc
+--let $xplugin_disable_ssl_for_x_at_client_side=1
+--let $xplugin_cache_x_root=1
 --source include/xplugin_preamble.inc
 --source include/xplugin_ssl_warnings_suppression.inc
 --source include/xplugin_create_user.inc
@@ -15,10 +19,10 @@ call mtr.add_suppression(".*Failed to set up SSL.*");
 --connection node_1
 
 --let $SS_VERIFY=--ssl-ca=$MYSQL_TEST_DIR/std_data/ca-cert-verify.pem
---let $MYSQLXTEST_SSLCA_TEST=$MYSQLXTEST -u x_root --password='' --file=$MYSQL_TMP_DIR/mysqlx-connection-info.tmp $SS_VERIFY --quiet
---let $MYSQLXTEST_TEST=$MYSQLXTEST -u x_root --password='' --file=$MYSQL_TMP_DIR/mysqlx-connection-info.tmp --quiet
+--let $MYSQLXTEST_SSLCA_TEST=$MYSQLXTEST -u x_root --password='' --file=$MYSQL_TMP_DIR/mysqlx-connection-info.xpl $SS_VERIFY --quiet
+--let $MYSQLXTEST_TEST=$MYSQLXTEST -u x_root --password='' --file=$MYSQL_TMP_DIR/mysqlx-connection-info.xpl --quiet
 
---write_file $MYSQL_TMP_DIR/mysqlx-connection-info.tmp
+--write_file $MYSQL_TMP_DIR/mysqlx-connection-info.xpl
 -->echo [Verify that SSL_cert and SSL_mode=%OPTION_SSL_MODE%, makes 'mysqlx_ssl_active' status variable set to %EXPECT%]
 -->stmtsql SELECT variable_value FROM performance_schema.global_status WHERE variable_name LIKE 'mysqlx_ssl_active';
 -->recvtovar %IS_SSL_ACTIVE%
@@ -29,5 +33,7 @@ EOF
 --source ../include/mysqlxtest_mode_ssl.inc
 
 ## Cleanup
---remove_file $MYSQL_TMP_DIR/mysqlx-connection-info.tmp
---source include/xplugin_drop_user.inc
+--let $restart_parameters = restart:
+--source include/restart_mysqld.inc
+
+--source ../include/xplugin_cleanup.inc

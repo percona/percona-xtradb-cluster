@@ -103,7 +103,7 @@ class Binlog_iterator_ctx {
   bool m_is_valid{false};
   /// @brief The log file information to lock files from being purged,
   ///        i.e., the log one is reading from.
-  LOG_INFO m_linfo{};
+  Log_info m_linfo{};
 
   /// @brief Get the next file to open object
   ///
@@ -644,7 +644,7 @@ DEFINE_METHOD(Binlog_iterator_service_get_status, FileStorage::get,
 
   // update the file cursor (and get the event size, which we can disregard
   // here)
-  auto cursor_update_ret = std::get<0>(ctx.update_cursor());
+  auto [cursor_update_ret, event_size] = ctx.update_cursor();
   if (cursor_update_ret != kBinlogIteratorGetOk) return cursor_update_ret;
 
   // read the event

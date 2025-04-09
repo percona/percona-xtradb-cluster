@@ -28,6 +28,7 @@ audit_null.audit_plugin_bugs : BUG#28080637 Test fails consistently
 
 # binlog suite tests
 binlog.binlog_mysqlbinlog_rewrite_db @windows     : BUG#26717205 Requires a debug client binary and fails consistently.
+binlog.binlog_mysqlbinlog_4g_start_position       : BUG#0000 PS-9381 Requires too much memory/space in Jenkins
 binlog_gtid.binlog_xa_select_gtid_executed_explicitly_crash : Bug#28588717 Fails both on FreeBSD and other platforms
 # func1 suite tests
 funcs_1.is_basics_mixed @darwin  : BUG#25882809 INCORRECT RESULT WHEN USING SUBQUERY ON TOP OF VIEW.
@@ -87,6 +88,49 @@ innodb_gis.gis_split_nan                          : BUG#3129 PXC requires 16k In
 innodb.mysql_ts_alter_encrypt_1                 : BUG#29531106 - ATTACHABLE_TRX(): ASSERTION `!M_THD->TRANSACTION_ROLLBACK_REQUEST' FAILED
 component_keyring_file.mysql_ts_alter_encrypt_1 : BUG#29531106 - ATTACHABLE_TRX(): ASSERTION `!M_THD->TRANSACTION_ROLLBACK_REQUEST' FAILED
 
+# Tests disabled because they don't accept the 9.0 version
+innodb.check_table                         : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.discarded_partition_upgrade_from_80 : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.innodb_autoextend_upgrade           : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.instant_ddl_recovery_old_2          : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.log_8_0_11_case1                    : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.log_8_0_19_case1                    : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.log_deprecated_params_upgrade       : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.partition_upgrade_8013              : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.partition_upgrade_8013_debug        : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.partition_upgrade_8015              : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.partition_upgrade_8015_debug        : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.partition_upgrade_8017              : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.partition_upgrade_8017_debug        : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.partition_upgrade_8019_lin_lctn_0   : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.partition_upgrade_8019_lin_lctn_0_debug : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.partition_upgrade_8019_lin_lctn_1       : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.partition_upgrade_8019_lin_lctn_1_debug : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.partition_upgrade_8019_mac_lctn_1       : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.partition_upgrade_8019_mac_lctn_1_debug : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.partition_upgrade_8019_mac_lctn_2       : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.partition_upgrade_8019_mac_lctn_2_debug : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.partition_upgrade_8019_win_lctn_1       : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.partition_upgrade_8019_win_lctn_1_debug : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.partition_upgrade_8019_win_lctn_2       : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.partition_upgrade_8019_win_lctn_2_debug : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.portability_tablespace_linux         : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.portability_tablespace_windows       : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.log_upgrade_empty_disabled_log_normal_shutdown : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.log_upgrade_empty_log_fast_shutdown            : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+innodb.log_upgrade                                    : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+main.partition_prefixkey_upgrade            : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+main.dd_upgrade_error_cs                    : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+main.dd_upgrade_cs                          : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+main.dd_upgrade_error_ci                    : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+main.dd_upgrade_ci                          : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+main.dd_upgrade_error_debug                 : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+main.dd_schema_definition_after_upgrade_80_debug : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+main.mysql_inplace_upgrade                  : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+main.mysql_80_inplace_upgrade               : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+main.upgrade_with_float_auto_increment      : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+main.read_only_ddl                          : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
+encryption.upgrade                          : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
 
 # main suite tests
 main.initialize                                   : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
@@ -113,6 +157,7 @@ max_parts.innodb_partition_open_files_limit                 : BUG#27423163 Test 
 
 # percona suite test
 percona.bug100352 : BUG#100352 https://bugs.mysql.com/bug.php?id=100352
+percona.backup_safe_binlog_info : BUG#0000 - PS-8897 Test for broken and unused functionality.
 
 # perfschema suite test
 perfschema.threads_history      : BUG#27712231
@@ -120,6 +165,12 @@ perfschema.idx_compare_events_waits_current : BUG#27865960
 perfschema.idx_compare_ews_by_thread_by_event_name : BUG#31041671
 perfschema.idx_compare_ews_by_instance : BUG#31791537
 perfschema.idx_compare_rwlock_instances : BUG#31791537
+
+# rocksdb suite tests
+rocksdb.non_blocking_manual_compaction : BUG#0000 PS-9381 Often fails in Jenkins due to races.
+
+# rocksdb_stress suite tests
+rocksdb_stress.drop_cf_stress : BUG#0000 PS-9381 Often fails in Jenkins due to races.
 
 # rpl_gtid suite tests
 rpl_gtid.rpl_async_conn_failover_restart @windows : BUG#34132168 Disabled until bug is fixed
@@ -139,14 +190,9 @@ rpl_nogtid.rpl_nogtid_encryption_read             : Bug#36172046 Update rpl_nogt
 # rpl suite tests
 rpl.rpl_io_thd_wait_for_disk_space_stress : BUG#23581287 Disabled until bug is fixed.
 rpl.rpl_writeset_add_unique_key : Bug#33134835 RPL_WRITESET_ADD_UNIQUE_KEY FAILS SPORADICALLY
-rpl.rpl_replication_observers_example_plugin_ongoing_transaction : Bug#35982448	rpl_replication_observers_example_plugin_ongoing_transaction fails 
-
-# secondary_engine tests
-secondary_engine.query_preparation : BUG#36306426 Disabled until bug is fixed
 
 # sys_vars tests
 sys_vars.max_execution_time_basic @freebsd : BUG#31041720
-sys_vars.innodb_log_writer_threads_basic : Bug#32129814 SYS_VARS.INNODB_LOG_WRITER_THREADS_BASIC TIMES OUT SPORADICALLY ON PB2
 
 # sysschema suite tests
 sysschema.v_wait_classes_global_by_avg_latency : BUG#21550054 Test fails too often.

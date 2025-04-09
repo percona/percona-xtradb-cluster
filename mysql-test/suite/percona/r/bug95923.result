@@ -4,7 +4,7 @@ CREATE TABLE t0(a int);
 ALTER TABLE t0 DISCARD TABLESPACE;
 ALTER TABLE t0 DISCARD TABLESPACE;
 Warnings:
-Warning	1814	InnoDB: Tablespace has been discarded for table 't0'
+Warning	1814	InnoDB: Tablespace is discarded for table, 't0'
 Warning	1812	InnoDB: Tablespace is missing for table test/t0.
 SET @@global.table_open_cache=@old_table_open_cache;;
 DROP TABLE t0;

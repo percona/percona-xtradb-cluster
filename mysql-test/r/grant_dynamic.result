@@ -19,6 +19,7 @@ mysql.infoschema	localhost	FIREWALL_EXEMPT	N
 mysql.infoschema	localhost	SYSTEM_USER	N
 mysql.pxc.internal.session	localhost	ALLOW_NONEXISTENT_DEFINER	Y
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
+mysql.pxc.internal.session	localhost	AUDIT_ABORT_EXEMPT	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
 mysql.pxc.internal.session	localhost	BACKUP_ADMIN	Y
@@ -27,6 +28,7 @@ mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
+mysql.pxc.internal.session	localhost	FIREWALL_EXEMPT	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
 mysql.pxc.internal.session	localhost	FLUSH_PRIVILEGES	Y
 mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
@@ -55,7 +57,12 @@ mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
-mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
+mysql.pxc.sst.role	localhost	BACKUP_ADMIN	Y
+mysql.pxc.sst.role	localhost	CLONE_ADMIN	N
+mysql.pxc.sst.role	localhost	CONNECTION_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
+mysql.pxc.sst.role	localhost	SYSTEM_USER	N
+mysql.pxc.sst.role	localhost	SYSTEM_VARIABLES_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
@@ -124,6 +131,7 @@ mysql.infoschema	localhost	FIREWALL_EXEMPT	N
 mysql.infoschema	localhost	SYSTEM_USER	N
 mysql.pxc.internal.session	localhost	ALLOW_NONEXISTENT_DEFINER	Y
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
+mysql.pxc.internal.session	localhost	AUDIT_ABORT_EXEMPT	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
 mysql.pxc.internal.session	localhost	BACKUP_ADMIN	Y
@@ -132,6 +140,7 @@ mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
+mysql.pxc.internal.session	localhost	FIREWALL_EXEMPT	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
 mysql.pxc.internal.session	localhost	FLUSH_PRIVILEGES	Y
 mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
@@ -160,7 +169,12 @@ mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
-mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
+mysql.pxc.sst.role	localhost	BACKUP_ADMIN	Y
+mysql.pxc.sst.role	localhost	CLONE_ADMIN	N
+mysql.pxc.sst.role	localhost	CONNECTION_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
+mysql.pxc.sst.role	localhost	SYSTEM_USER	N
+mysql.pxc.sst.role	localhost	SYSTEM_VARIABLES_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
@@ -228,6 +242,7 @@ mysql.infoschema	localhost	FIREWALL_EXEMPT	N
 mysql.infoschema	localhost	SYSTEM_USER	N
 mysql.pxc.internal.session	localhost	ALLOW_NONEXISTENT_DEFINER	Y
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
+mysql.pxc.internal.session	localhost	AUDIT_ABORT_EXEMPT	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
 mysql.pxc.internal.session	localhost	BACKUP_ADMIN	Y
@@ -236,6 +251,7 @@ mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
+mysql.pxc.internal.session	localhost	FIREWALL_EXEMPT	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
 mysql.pxc.internal.session	localhost	FLUSH_PRIVILEGES	Y
 mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
@@ -264,7 +280,12 @@ mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
-mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
+mysql.pxc.sst.role	localhost	BACKUP_ADMIN	Y
+mysql.pxc.sst.role	localhost	CLONE_ADMIN	N
+mysql.pxc.sst.role	localhost	CONNECTION_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
+mysql.pxc.sst.role	localhost	SYSTEM_USER	N
+mysql.pxc.sst.role	localhost	SYSTEM_VARIABLES_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
@@ -345,6 +366,7 @@ mysql.infoschema	localhost	FIREWALL_EXEMPT	N
 mysql.infoschema	localhost	SYSTEM_USER	N
 mysql.pxc.internal.session	localhost	ALLOW_NONEXISTENT_DEFINER	Y
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
+mysql.pxc.internal.session	localhost	AUDIT_ABORT_EXEMPT	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
 mysql.pxc.internal.session	localhost	BACKUP_ADMIN	Y
@@ -353,6 +375,7 @@ mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
+mysql.pxc.internal.session	localhost	FIREWALL_EXEMPT	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
 mysql.pxc.internal.session	localhost	FLUSH_PRIVILEGES	Y
 mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
@@ -381,7 +404,12 @@ mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
-mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
+mysql.pxc.sst.role	localhost	BACKUP_ADMIN	Y
+mysql.pxc.sst.role	localhost	CLONE_ADMIN	N
+mysql.pxc.sst.role	localhost	CONNECTION_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
+mysql.pxc.sst.role	localhost	SYSTEM_USER	N
+mysql.pxc.sst.role	localhost	SYSTEM_VARIABLES_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
@@ -454,6 +482,7 @@ mysql.infoschema	localhost	FIREWALL_EXEMPT	N
 mysql.infoschema	localhost	SYSTEM_USER	N
 mysql.pxc.internal.session	localhost	ALLOW_NONEXISTENT_DEFINER	Y
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
+mysql.pxc.internal.session	localhost	AUDIT_ABORT_EXEMPT	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
 mysql.pxc.internal.session	localhost	BACKUP_ADMIN	Y
@@ -462,6 +491,7 @@ mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
+mysql.pxc.internal.session	localhost	FIREWALL_EXEMPT	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
 mysql.pxc.internal.session	localhost	FLUSH_PRIVILEGES	Y
 mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
@@ -490,7 +520,12 @@ mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
-mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
+mysql.pxc.sst.role	localhost	BACKUP_ADMIN	Y
+mysql.pxc.sst.role	localhost	CLONE_ADMIN	N
+mysql.pxc.sst.role	localhost	CONNECTION_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
+mysql.pxc.sst.role	localhost	SYSTEM_USER	N
+mysql.pxc.sst.role	localhost	SYSTEM_VARIABLES_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
@@ -558,6 +593,7 @@ mysql.infoschema	localhost	FIREWALL_EXEMPT	N
 mysql.infoschema	localhost	SYSTEM_USER	N
 mysql.pxc.internal.session	localhost	ALLOW_NONEXISTENT_DEFINER	Y
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
+mysql.pxc.internal.session	localhost	AUDIT_ABORT_EXEMPT	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
 mysql.pxc.internal.session	localhost	BACKUP_ADMIN	Y
@@ -566,6 +602,7 @@ mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
+mysql.pxc.internal.session	localhost	FIREWALL_EXEMPT	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
 mysql.pxc.internal.session	localhost	FLUSH_PRIVILEGES	Y
 mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
@@ -594,7 +631,12 @@ mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
-mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
+mysql.pxc.sst.role	localhost	BACKUP_ADMIN	Y
+mysql.pxc.sst.role	localhost	CLONE_ADMIN	N
+mysql.pxc.sst.role	localhost	CONNECTION_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
+mysql.pxc.sst.role	localhost	SYSTEM_USER	N
+mysql.pxc.sst.role	localhost	SYSTEM_VARIABLES_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
@@ -685,6 +727,7 @@ mysql.infoschema	localhost	FIREWALL_EXEMPT	N
 mysql.infoschema	localhost	SYSTEM_USER	N
 mysql.pxc.internal.session	localhost	ALLOW_NONEXISTENT_DEFINER	Y
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
+mysql.pxc.internal.session	localhost	AUDIT_ABORT_EXEMPT	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
 mysql.pxc.internal.session	localhost	BACKUP_ADMIN	Y
@@ -693,6 +736,7 @@ mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
+mysql.pxc.internal.session	localhost	FIREWALL_EXEMPT	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
 mysql.pxc.internal.session	localhost	FLUSH_PRIVILEGES	Y
 mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
@@ -721,7 +765,12 @@ mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
-mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
+mysql.pxc.sst.role	localhost	BACKUP_ADMIN	Y
+mysql.pxc.sst.role	localhost	CLONE_ADMIN	N
+mysql.pxc.sst.role	localhost	CONNECTION_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
+mysql.pxc.sst.role	localhost	SYSTEM_USER	N
+mysql.pxc.sst.role	localhost	SYSTEM_VARIABLES_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
@@ -803,6 +852,7 @@ mysql.infoschema	localhost	FIREWALL_EXEMPT	N
 mysql.infoschema	localhost	SYSTEM_USER	N
 mysql.pxc.internal.session	localhost	ALLOW_NONEXISTENT_DEFINER	Y
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
+mysql.pxc.internal.session	localhost	AUDIT_ABORT_EXEMPT	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
 mysql.pxc.internal.session	localhost	BACKUP_ADMIN	Y
@@ -811,6 +861,7 @@ mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
+mysql.pxc.internal.session	localhost	FIREWALL_EXEMPT	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
 mysql.pxc.internal.session	localhost	FLUSH_PRIVILEGES	Y
 mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
@@ -839,7 +890,12 @@ mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
-mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
+mysql.pxc.sst.role	localhost	BACKUP_ADMIN	Y
+mysql.pxc.sst.role	localhost	CLONE_ADMIN	N
+mysql.pxc.sst.role	localhost	CONNECTION_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
+mysql.pxc.sst.role	localhost	SYSTEM_USER	N
+mysql.pxc.sst.role	localhost	SYSTEM_VARIABLES_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
@@ -929,6 +985,7 @@ mysql.infoschema	localhost	FIREWALL_EXEMPT	N
 mysql.infoschema	localhost	SYSTEM_USER	N
 mysql.pxc.internal.session	localhost	ALLOW_NONEXISTENT_DEFINER	Y
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
+mysql.pxc.internal.session	localhost	AUDIT_ABORT_EXEMPT	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
 mysql.pxc.internal.session	localhost	BACKUP_ADMIN	Y
@@ -937,6 +994,7 @@ mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
+mysql.pxc.internal.session	localhost	FIREWALL_EXEMPT	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
 mysql.pxc.internal.session	localhost	FLUSH_PRIVILEGES	Y
 mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
@@ -965,7 +1023,12 @@ mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	TELEMETRY_LOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	TRANSACTION_GTID_TAG	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
-mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
+mysql.pxc.sst.role	localhost	BACKUP_ADMIN	Y
+mysql.pxc.sst.role	localhost	CLONE_ADMIN	N
+mysql.pxc.sst.role	localhost	CONNECTION_ADMIN	N
+mysql.pxc.sst.role	localhost	INNODB_REDO_LOG_ARCHIVE	N
+mysql.pxc.sst.role	localhost	SYSTEM_USER	N
+mysql.pxc.sst.role	localhost	SYSTEM_VARIABLES_ADMIN	N
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.session	localhost	AUTHENTICATION_POLICY_ADMIN	N
 mysql.session	localhost	BACKUP_ADMIN	N
@@ -1221,7 +1284,7 @@ SET GLOBAL init_connect = '';
 SET GLOBAL offline_mode = 'ON';
 REVOKE CONNECTION_ADMIN ON *.* from u1@localhost;
 # Connection will fail
-ERROR HY000: The server is currently in offline mode
+ERROR HY000: The server is currently in offline mode since TIMESTAMP, set by user u1
 GRANT CONNECTION_ADMIN ON *.* TO u1@localhost;
 SET GLOBAL offline_mode = 'OFF';
 SET GLOBAL read_only = 'ON';
@@ -1500,7 +1563,7 @@ GRANT ALL ON *.* TO u1@localhost;
 SHOW GRANTS;
 Grants for u1@localhost
 GRANT <ALL_STATIC_PRIVILEGES> ON *.* TO `u1`@`localhost`
-GRANT ALLOW_NONEXISTENT_DEFINER,APPLICATION_PASSWORD_ADMIN,AUDIT_ADMIN,AUTHENTICATION_POLICY_ADMIN,BACKUP_ADMIN,BINLOG_ADMIN,BINLOG_ENCRYPTION_ADMIN,CLONE_ADMIN,CONNECTION_ADMIN,ENCRYPTION_KEY_ADMIN,FLUSH_OPTIMIZER_COSTS,FLUSH_PRIVILEGES,FLUSH_STATUS,FLUSH_TABLES,FLUSH_USER_RESOURCES,GROUP_REPLICATION_ADMIN,GROUP_REPLICATION_STREAM,INNODB_REDO_LOG_ARCHIVE,INNODB_REDO_LOG_ENABLE,OPTIMIZE_LOCAL_TABLE,PASSWORDLESS_USER_ADMIN,PERSIST_RO_VARIABLES_ADMIN,REPLICATION_APPLIER,REPLICATION_SLAVE_ADMIN,RESOURCE_GROUP_ADMIN,RESOURCE_GROUP_USER,ROLE_ADMIN,SENSITIVE_VARIABLES_OBSERVER,SERVICE_CONNECTION_ADMIN,SESSION_VARIABLES_ADMIN,SET_ANY_DEFINER,SHOW_ROUTINE,SYSTEM_USER,SYSTEM_VARIABLES_ADMIN,TABLE_ENCRYPTION_ADMIN,TELEMETRY_LOG_ADMIN,TRANSACTION_GTID_TAG,XA_RECOVER_ADMIN ON *.* TO `u1`@`localhost`
+GRANT <ALL_DYNAMIC_PRIVILEGES> ON *.* TO `u1`@`localhost`
 REVOKE ALL ON *.* FROM CURRENT_USER();
 SHOW GRANTS;
 Grants for u1@localhost

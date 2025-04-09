@@ -92,8 +92,8 @@ Restarting nodes to satisfy MTR's end-of-test checks
 # restart
 SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
 Variable_name	Value
-wsrep_sst_allowed_methods	xtrabackup-v2
+wsrep_sst_allowed_methods	xtrabackup-v2,clone
 # restart
 SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
 Variable_name	Value
-wsrep_sst_allowed_methods	xtrabackup-v2
+wsrep_sst_allowed_methods	xtrabackup-v2,clone

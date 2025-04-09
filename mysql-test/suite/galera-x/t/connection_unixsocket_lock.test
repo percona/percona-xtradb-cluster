@@ -5,21 +5,22 @@
 --source include/galera_cluster.inc
 --source include/not_windows.inc
 --source ../include/have_performance_schema_threads.inc
+--let $xplugin_disable_ssl_for_x_at_client_side=1
 --source include/xplugin_preamble.inc
 --source include/xplugin_create_user.inc
 
 ## Test starts here
---write_file $MYSQL_TMP_DIR/check_unixsocket.tmp
+--write_file $MYSQL_TMP_DIR/check_unixsocket.xpl
 ## Test data
 #Ensure that each of following uses UNIX Socket
 -->quiet
 -->wait_for 1	SELECT count(*) from performance_schema.threads WHERE PROCESSLIST_COMMAND='Query' AND CONNECTION_TYPE='Socket';
 EOF
 
---write_file $MYSQL_TMP_DIR/check_connection.tmp
+--write_file $MYSQL_TMP_DIR/check_connection.xpl
 EOF
 
---exec $MYSQLXTEST --socket=$MASTER_X_MYSOCK -ux_root --password='' --file=$MYSQL_TMP_DIR/check_unixsocket.tmp 2>&1
+--exec $MYSQLXTEST --socket=$MASTER_X_MYSOCK -ux_root --password='' --file=$MYSQL_TMP_DIR/check_unixsocket.xpl 2>&1
 
 
 --echo Test lock file issue
@@ -35,8 +36,10 @@ let $restart_parameters = restart: --loose-mysqlx-socket=$MYSQL_TMP_DIR/mysqlx.c
 --source ../include/restart_mysqld.inc
 
 --replace_regex $UNIX_SOCKET_REGEX
---error 1
---exec $MYSQLXTEST --socket=$MYSQL_TMP_DIR/mysqlx.custom -ux_root --password='' --file=$MYSQL_TMP_DIR/check_unixsocket.tmp 2>&1
+exec $MYSQLXTEST
+   --socket=$MYSQL_TMP_DIR/mysqlx.custom
+   -ux_root --password='' --expect-error 2002
+   --file=$MYSQL_TMP_DIR/check_unixsocket.xpl 2>&1;
 
 
 --mkdir $MYSQL_TMP_DIR/mysqlx.dir.socket.lock
@@ -48,8 +51,10 @@ let $restart_parameters = restart: --loose-mysqlx-socket=$MYSQL_TMP_DIR/mysqlx.d
 --source ../include/restart_mysqld.inc
 
 --replace_regex $UNIX_SOCKET_REGEX
---error 1
---exec $MYSQLXTEST --socket=$MYSQL_TMP_DIR/mysqlx.dir.socket -ux_root --password='' --file=$MYSQL_TMP_DIR/check_unixsocket.tmp 2>&1
+exec $MYSQLXTEST
+   --socket=$MYSQL_TMP_DIR/mysqlx.dir.socket
+   -ux_root --password='' --expect-error 2002
+   --file=$MYSQL_TMP_DIR/check_unixsocket.xpl 2>&1;
 
 
 --remove_file $MYSQL_TMP_DIR/mysqlx.custom.lock
@@ -64,14 +69,17 @@ let $restart_parameters = restart: --loose-mysqlx-socket=$MYSQL_TMP_DIR/mysqlx.c
 --source ../include/restart_mysqld.inc
 
 --replace_regex $UNIX_SOCKET_REGEX
---error 1
---exec $MYSQLXTEST --socket=$MYSQL_TMP_DIR/mysqlx.custom -ux_root --password='' --file=$MYSQL_TMP_DIR/check_unixsocket.tmp 2>&1
+exec $MYSQLXTEST
+  --socket=$MYSQL_TMP_DIR/mysqlx.custom
+  -ux_root --password='' --expect-error 2002
+  --file=$MYSQL_TMP_DIR/check_unixsocket.xpl 2>&1;
 
 
 ## Cleanup
---remove_file $MYSQL_TMP_DIR/check_unixsocket.tmp
---remove_file $MYSQL_TMP_DIR/check_connection.tmp
+--let $restart_parameters = restart:
+--source include/restart_mysqld.inc
+
 --remove_file $MYSQL_TMP_DIR/mysqlx.custom.lock
 --rmdir $MYSQL_TMP_DIR/mysqlx.dir.socket.lock
---source include/xplugin_drop_user.inc
+--source ../include/xplugin_cleanup.inc
 

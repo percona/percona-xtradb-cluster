@@ -366,7 +366,6 @@ my @mysqld_rules = (
   { 'tmpdir'                                       => \&fix_tmpdir },
   { 'loose-sha256_password_auto_generate_rsa_keys' => "0" },
   { 'loose-caching_sha2_password_auto_generate_rsa_keys' => "0" },
-  { 'loose-mysql-native-password' => "ON" },
 
   { '#mtr_basedir' => sub { return shift->{ARGS}->{basedir}; }
   },
@@ -530,7 +529,7 @@ sub post_check_client_groups {
 }
 
 sub resolve_at_variable {
-  my ($self, $config, $group, $option, $worker) = @_;
+  my ($self, $config, $group, $option) = @_;
   local $_ = $option->value();
   my ($res, $after);
 
@@ -542,9 +541,7 @@ sub resolve_at_variable {
     $group_name =~ s/^\@//; # Remove at
     my $value;
 
-    if ($group_name =~ "envarray") {
-      $value = $ENV{$option_name.$worker};
-    } elsif ($group_name =~ "env") {
+    if ($group_name =~ "env") {
       $value = $ENV{$option_name};
     } else {
       my $from_group= $config->group($group_name)
@@ -560,12 +557,12 @@ sub resolve_at_variable {
 }
 
 sub post_fix_resolve_at_variables {
-  my ($self, $config, $worker) = @_;
+  my ($self, $config) = @_;
 
   foreach my $group ($config->groups()) {
     foreach my $option ($group->options()) {
       next unless defined $option->value();
-      $self->resolve_at_variable($config, $group, $option, $worker)
+      $self->resolve_at_variable($config, $group, $option)
 	    if ($option->value() =~ /\@/);
     }
   }
@@ -755,7 +752,7 @@ sub run_generate_sections_from_cluster_config {
 sub new_config {
   my ($class, $args) = @_;
 
-  my @required_args = ('basedir', 'baseport', 'vardir', 'template_path', 'testdir', 'tmpdir', 'worker');
+  my @required_args = ('basedir', 'baseport', 'vardir', 'template_path', 'testdir', 'tmpdir');
 
   foreach my $required (@required_args) {
     croak "you must pass '$required'" unless defined $args->{$required};
@@ -833,12 +830,9 @@ sub new_config {
     push(@post_rules, \&post_check_secondary_engine_mysqld_group);
   }
 
-  # Worker ID
-  my $worker = $args->{'worker'};
-
   # Run post rules
   foreach my $rule (@post_rules) {
-    &$rule($self, $config, $worker);
+    &$rule($self, $config);
   }
 
   return $config;

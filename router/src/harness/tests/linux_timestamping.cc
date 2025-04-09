@@ -27,12 +27,13 @@
 #include <bitset>
 #include <chrono>
 #include <cstddef>
-#include <cstring>  // memcpy
-#include <iostream>
+#include <cstring>   // memcpy
+#include <iostream>  // cerr
 #include <sstream>
 #include <string>
 #include <string_view>
 #include <thread>
+#include <type_traits>
 #include <vector>
 
 #include "hexify.h"
@@ -152,17 +153,16 @@ using SocketTimestampOld =
 
 #ifdef SO_TIMESTAMP
 // linux + freebsd
-using SocketTimestamp = SocketTimestampBase<SOL_SOCKET, SO_TIMESTAMP,
+using SocketTimestamp =
+    SocketTimestampBase<SOL_SOCKET, SO_TIMESTAMP,
 #ifdef SO_TIMESTAMP_NEW
-#if SO_TIMESTAMP == SO_TIMESTAMP_NEW
-                                            SocketTimestampNew::value_type
+                        std::conditional_t<SO_TIMESTAMP == SO_TIMESTAMP_NEW,
+                                           SocketTimestampNew::value_type,
+                                           SocketTimestampOld::value_type>
 #else
-                                            SocketTimestampOld::value_type
+                        timeval
 #endif
-#else
-                                            timeval
-#endif
-                                            >;
+                        >;
 #endif
 
 template <int Lvl, int Type, class V>
@@ -206,18 +206,16 @@ using SocketTimestampNanosecondOld =
 #endif
 
 #ifdef SO_TIMESTAMPNS
-using SocketTimestampNanosecond =
-    SocketTimestampNanosecondBase<SOL_SOCKET, SO_TIMESTAMPNS,
+using SocketTimestampNanosecond = SocketTimestampNanosecondBase<
+    SOL_SOCKET, SO_TIMESTAMPNS,
 #ifdef SO_TIMESTAMPNS_NEW
-#if SO_TIMESTAMPNS == SO_TIMESTAMPNS_NEW
-                                  SocketTimestampNanosecondNew::value_type
+    std::conditional_t<SO_TIMESTAMPNS == SO_TIMESTAMPNS_NEW,
+                       SocketTimestampNanosecondNew::value_type,
+                       SocketTimestampNanosecondOld::value_type>
 #else
-                                  SocketTimestampNanosecondOld::value_type
+    timespec
 #endif
-#else
-                                  timespec
-#endif
-                                  >;
+    >;
 #endif
 
 template <int Lvl, int Type, class V>
@@ -266,13 +264,11 @@ class SocketTimestampingBase : public ControlMsgBase<Lvl, Type> {
   value_type ts_;
 };
 
-#if defined(SO_TIMESTAMPING) && !defined(SO_TIMESTAMPING_NEW)
 template <typename, typename = void>
 constexpr bool is_type_complete_v = false;
 
 template <typename T>
 constexpr bool is_type_complete_v<T, std::void_t<decltype(sizeof(T))>> = true;
-#endif
 
 namespace fallback {
 // scm_timestamping is defined in <linux/errqueue.h>
@@ -293,20 +289,17 @@ using SocketTimestampingOld =
 #endif
 
 #ifdef SO_TIMESTAMPING
-using SocketTimestamping =
-    SocketTimestampingBase<SOL_SOCKET, SO_TIMESTAMPING,
+using SocketTimestamping = SocketTimestampingBase<
+    SOL_SOCKET, SO_TIMESTAMPING,
 #ifdef SO_TIMESTAMPING_NEW
-#if SO_TIMESTAMPING == SO_TIMESTAMPING_NEW
-                           SocketTimestampingNew::value_type
+    std::conditional_t<SO_TIMESTAMPING == SO_TIMESTAMPING_NEW,
+                       SocketTimestampingNew::value_type,
+                       SocketTimestampingOld::value_type>
 #else
-                           SocketTimestampingOld::value_type
+    std::conditional_t<is_type_complete_v<struct scm_timestamping>,
+                       scm_timestamping, fallback::scm_timestamping>
 #endif
-#else
-                           std::conditional_t<
-                               is_type_complete_v<struct scm_timestamping>,
-                               scm_timestamping, fallback::scm_timestamping>
-#endif
-                           >;
+    >;
 #endif
 
 // if they are defined, check they have the expected value.
@@ -529,8 +522,10 @@ template <class T>
 struct has_printer_unit<T, std::void_t<decltype(Printer<T>::unit)>>
     : std::true_type {};
 
-template <class T, std::enable_if_t<has_printer<T>::value> * = nullptr>
-std::ostream &operator<<(std::ostream &os, T v) {
+template <class T>
+std::ostream &operator<<(std::ostream &os, T v)
+  requires(has_printer<T>::value)
+{
   os << Printer<T>::name << ": ";
 
   if (std::is_same_v<decltype(v.value()), uint8_t>) {

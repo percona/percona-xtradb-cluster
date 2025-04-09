@@ -2,6 +2,12 @@
 # blocks.
 # Usage:  bash check_src/run.sh <PS_DIRECTORY>
 PS_LOCATION=$1
+
+if [[ ! -d "${PS_LOCATION}" ]]; then
+  echo "Incorrect Percona Server directory: ${PS_LOCATION}"
+  exit 1
+fi
+
 find . -type f -name '*.h' -exec bash check_src/check_file.sh '{}' $PS_LOCATION \;
 find . -type f -name '*.cc' -exec bash check_src/check_file.sh '{}' $PS_LOCATION \;
 find . -type f -name '*.c' -exec bash check_src/check_file.sh '{}' $PS_LOCATION \;

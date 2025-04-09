@@ -32,8 +32,8 @@ DROP TABLE t1;
 CREATE TABLE t1 (id VARCHAR(20), value VARCHAR(50), value2 VARCHAR(50), value3 TEXT, PRIMARY KEY (id), INDEX(value, value2)) ENGINE=ROCKSDB CHARSET UTF8MB3 COLLATE UTF8MB3_BIN;
 DROP TABLE t1;
 
-# cs mixed latin1_bin and UTF8_BIN is allowed
-CREATE TABLE t1 (id VARCHAR(20) COLLATE LATIN1_BIN, value VARCHAR(50) COLLATE UTF8_BIN, value2 VARCHAR(50) COLLATE LATIN1_BIN, value3 TEXT, PRIMARY KEY (id), INDEX(value, value2)) ENGINE=ROCKSDB CHARSET UTF8MB3;
+# cs mixed latin1_bin and utf8mb4_bin is allowed
+CREATE TABLE t1 (id VARCHAR(20) COLLATE LATIN1_BIN, value VARCHAR(50) COLLATE utf8mb4_bin, value2 VARCHAR(50) COLLATE LATIN1_BIN, value3 TEXT, PRIMARY KEY (id), INDEX(value, value2)) ENGINE=ROCKSDB CHARSET utf8mb4;
 DROP TABLE t1;
 
 # test allowing alters to create temporary tables

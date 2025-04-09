@@ -290,6 +290,10 @@ in constraints which reference it */
 be accessed by the caller afterwards */
 void dict_index_remove_from_cache(dict_table_t *table, dict_index_t *index);
 
+/** Gathers ids of all tables in cache at the moment.
+@return ids of all tables */
+std::vector<table_id_t> dict_get_all_table_ids();
+
 /** Change the id of a table object in the dictionary cache. This is used in
  DISCARD TABLESPACE. */
 void dict_table_change_id_in_cache(
@@ -1665,7 +1669,7 @@ extern bool dict_upgrade_zip_dict_missing;
 @param[out]	dict_id		zip_dict id
 @retval	DB_SUCCESS		if OK
 @retval	DB_RECORD_NOT_FOUND	if not found */
-MY_NODISCARD
+[[nodiscard]]
 dberr_t dict_get_dictionary_id_by_key(table_id_t table_id, ulint column_pos,
                                       ulint *dict_id);
 
@@ -1679,7 +1683,7 @@ Must be freed with mem_free().
 @param[out]	data_len	dictionary data length
 @retval	DB_SUCCESS		if OK
 @retval	DB_RECORD_NOT_FOUND	if not found */
-MY_NODISCARD
+[[nodiscard]]
 dberr_t dict_get_dictionary_info_by_id(ulint dict_id, char **name,
                                        ulint *name_len, char **data,
                                        ulint *data_len);

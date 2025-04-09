@@ -260,10 +260,7 @@ int main(int argc, char *const argv[]) {
       } else if (strcmp(arg, "--nocore") == 0) {
         nocore = true;  // Don't allow the process to dump core
       } else if (strncmp(arg, "--env ", 6) == 0) {
-        static char *env = nullptr;
-        if (env) free(env);
-        env = strdup(arg + 6);
-        putenv(env);
+        putenv(strdup(arg + 6));
       } else
         die("Unknown option: %s", arg);
     }
@@ -311,7 +308,7 @@ int main(int argc, char *const argv[]) {
     // Close write end
     close(pfd[1]);
 
-#if defined(HAVE_ASAN) && defined(HAVE_TIRPC)
+#if defined(HAVE_ASAN) && defined(HAVE_SYSTEM_TIRPC)
 #include "asan_library_name.h"
     std::string ld_preload = "LD_PRELOAD=";
     int lib_count = 0;
