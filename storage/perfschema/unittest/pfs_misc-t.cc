@@ -39,7 +39,7 @@
 #endif /* WITH_WSREP */
 
 static void test_digest_length_overflow() {
-  if (sizeof(size_t) != 4) {
+  if constexpr (sizeof(size_t) != 4) {
     skip(3, "digest length overflow requires a 32-bit environment");
     return;
   }

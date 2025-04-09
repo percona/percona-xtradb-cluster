@@ -2,17 +2,25 @@
 ##          with SSL cert verification on client side.
 
 --source include/galera_cluster.inc
+--let $xplugin_disable_ssl_for_x_at_client_side=1
 --source include/xplugin_preamble.inc
 
 
 CREATE DATABASE xtest;
-CREATE USER 'user1'@'127.0.0.1' IDENTIFIED BY 'user1_pass';
-CREATE USER 'user2'@'127.0.0.1' IDENTIFIED BY 'user2_pass';
+--let $user_auth_name =user1
+--let $user_auth_host='127.0.0.1'
+--let $user_auth_pass="user1_pass"
+--source ../include/create_user_cached.inc
+
+--let $user_auth_name =user2
+--let $user_auth_host='127.0.0.1'
+--let $user_auth_pass="user2_pass"
+--source ../include/create_user_cached.inc
 
 GRANT SELECT ON xtest.* TO user1@'127.0.0.1';
 GRANT SELECT ON xtest.* TO user2@'127.0.0.1';
 
---write_file $MYSQL_TMP_DIR/mysqlx-verify-variables.tmp
+--write_file $MYSQL_TMP_DIR/mysqlx-verify-variables.xpl
 -->import connection.macro
 -->callmacro Verify_its_xprotocol_connection
 -->varlet %OLD_SOCKET_ID% %ACTIVE_SOCKET_ID%
@@ -50,24 +58,10 @@ GRANT SELECT ON xtest.* TO user2@'127.0.0.1';
 -->assert_eq %EXPECTED_CLIENT_ID%	%ACTIVE_CLIENT_ID%
 EOF
 
+
 --echo
 --echo ############################################################
 --echo ## Verify mysqlxtests variables at first connection
---echo ##
-
-exec $MYSQLXTEST
-  -v%EXPECTED_CLIENT_ID%=1
-  --no-auth
-  --user=user1
-  --password=user1_pass
-  --host=127.0.0.1
-  --schema=xtest
-  --ssl-mode=DISABLED
-  --file=$MYSQL_TMP_DIR/mysqlx-verify-variables.tmp 2>&1;
-
---echo
---echo ############################################################
---echo ## Verify mysqlxtests variables at second connection
 --echo ##
 
 exec $MYSQLXTEST
@@ -78,11 +72,25 @@ exec $MYSQLXTEST
   --host=127.0.0.1
   --schema=xtest
   --ssl-mode=DISABLED
-  --file=$MYSQL_TMP_DIR/mysqlx-verify-variables.tmp 2>&1;
+  --file=$MYSQL_TMP_DIR/mysqlx-verify-variables.xpl 2>&1;
+
+--echo
+--echo ############################################################
+--echo ## Verify mysqlxtests variables at second connection
+--echo ##
+
+exec $MYSQLXTEST
+  -v%EXPECTED_CLIENT_ID%=5
+  --no-auth
+  --user=user1
+  --password=user1_pass
+  --host=127.0.0.1
+  --schema=xtest
+  --ssl-mode=DISABLED
+  --file=$MYSQL_TMP_DIR/mysqlx-verify-variables.xpl 2>&1;
 
 ## Cleanup
-DROP DATABASE xtest;
 DROP USER 'user1'@'127.0.0.1';
 DROP USER 'user2'@'127.0.0.1';
---remove_file $MYSQL_TMP_DIR/mysqlx-verify-variables.tmp
+--source ../include/xplugin_cleanup.inc
 

@@ -1,0 +1,3 @@
+--loose-mysqlx=ON
+$MYSQLXGLOBALRESET_OPT
+--authentication_policy=*:caching_sha2_password,,

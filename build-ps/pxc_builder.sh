@@ -23,7 +23,7 @@ Usage: $0 [OPTIONS]
         --bin_release       BIN version( default = 1)
         --debug             Build debug tarball
         --help) usage ;;
-Example $0 --builddir=/tmp/PXC80 --get_sources=1 --build_src_rpm=1 --build_rpm=1
+Example $0 --builddir=/tmp/PXC9x --get_sources=1 --build_src_rpm=1 --build_rpm=1
 EOF
         exit 1
 }
@@ -172,29 +172,29 @@ get_sources(){
     export MYSQL_VERSION="$MYSQL_VERSION_MAJOR.$MYSQL_VERSION_MINOR.$MYSQL_VERSION_PATCH"
     export MYSQL_RELEASE="$(echo $MYSQL_VERSION_EXTRA | sed 's/^-//')"
 
-    PRODUCT=Percona-XtraDB-Cluster-80
+    PRODUCT=Percona-XtraDB-Cluster-91
     PRODUCT_FULL=Percona-XtraDB-Cluster-${MYSQL_VERSION}
 
-    echo "WSREP_VERSION=${WSREP_VERSION}" > ${WORKDIR}/pxc-80.properties
-    echo "WSREP_REV=${WSREP_REV}" >> ${WORKDIR}/pxc-80.properties
-    echo "REVISION=${REVISION}" >> ${WORKDIR}/pxc-80.properties
-    echo "MYSQL_VERSION=$MYSQL_VERSION" >> ${WORKDIR}/pxc-80.properties
-    echo "MYSQL_RELEASE=$MYSQL_RELEASE" >> ${WORKDIR}/pxc-80.properties
-    echo "BRANCH_NAME=${BRANCH}" >> ${WORKDIR}/pxc-80.properties
-    echo "PRODUCT=${PRODUCT}" >> ${WORKDIR}/pxc-80.properties
+    echo "WSREP_VERSION=${WSREP_VERSION}" > ${WORKDIR}/pxc-9x.properties
+    echo "WSREP_REV=${WSREP_REV}" >> ${WORKDIR}/pxc-9x.properties
+    echo "REVISION=${REVISION}" >> ${WORKDIR}/pxc-9x.properties
+    echo "MYSQL_VERSION=$MYSQL_VERSION" >> ${WORKDIR}/pxc-9x.properties
+    echo "MYSQL_RELEASE=$MYSQL_RELEASE" >> ${WORKDIR}/pxc-9x.properties
+    echo "BRANCH_NAME=${BRANCH}" >> ${WORKDIR}/pxc-9x.properties
+    echo "PRODUCT=${PRODUCT}" >> ${WORKDIR}/pxc-9x.properties
 
-    echo "PRODUCT_FULL=${PRODUCT_FULL}" >> ${WORKDIR}/pxc-80.properties
-    echo "BUILD_NUMBER=${BUILD_NUMBER}" >> ${WORKDIR}/pxc-80.properties
+    echo "PRODUCT_FULL=${PRODUCT_FULL}" >> ${WORKDIR}/pxc-9x.properties
+    echo "BUILD_NUMBER=${BUILD_NUMBER}" >> ${WORKDIR}/pxc-9x.properties
     #
     if [ -z "${DESTINATION:-}" ]; then
     export DESTINATION=experimental
     fi
     DESTINATION="UPLOAD/${DESTINATION}/BUILDS/${PRODUCT}/${PRODUCT_FULL}/${BRANCH}/${REVISION}/${BUILD_NUMBER}"
-    echo "DESTINATION=UPLOAD/${DESTINATION}/BUILDS/${PRODUCT}/${PRODUCT_FULL}/${BRANCH}/${REVISION}/${BUILD_NUMBER}" >> ${WORKDIR}/pxc-80.properties
-    echo "GALERA_REVNO=${GALERA_REVNO}" >>${WORKDIR}/pxc-80.properties
+    echo "DESTINATION=UPLOAD/${DESTINATION}/BUILDS/${PRODUCT}/${PRODUCT_FULL}/${BRANCH}/${REVISION}/${BUILD_NUMBER}" >> ${WORKDIR}/pxc-9x.properties
+    echo "GALERA_REVNO=${GALERA_REVNO}" >>${WORKDIR}/pxc-9x.properties
     DEST=${DESTINATION}
-    echo "DEST=${DEST}" >> ${WORKDIR}/pxc-80.properties
-    if [ -f /etc/redhat-release ]; then
+    echo "DEST=${DEST}" >> ${WORKDIR}/pxc-9x.properties
+    if [ "x$OS" = "xrpm" ]; then
       export OS_RELEASE="centos$(lsb_release -sr | awk -F'.' '{print $1}')"
       RHEL=$(rpm --eval %rhel)
     if [ "x${RHEL}" = "x6" ]; then
@@ -218,7 +218,7 @@ get_sources(){
     make dist
     mv *.tar.gz ${WORKDIR}/
     cd ${WORKDIR} || exit
-    cat pxc-80.properties
+    cat pxc-9x.properties
     cd ${WORKDIR} || exit
     ls
     #EXPORTED_TAR=$(basename $(find . -type f -name "*.tar.gz" | sort  | grep -v new | tail -n 1))
@@ -257,7 +257,7 @@ get_sources(){
     #
     tar --owner=0 --group=0 --exclude=.bzr --exclude=.git -czf ${PXCDIR}.tar.gz ${PXCDIR}
     rm -fr ${PXCDIR}
-    cat pxc-80.properties
+    cat pxc-9x.properties
 
     mkdir $WORKDIR/source_tarball
     mkdir $CURDIR/source_tarball
@@ -280,6 +280,12 @@ get_system(){
         ARCH=$(echo $(uname -m) | sed -e 's:i686:i386:g')
         OS_NAME="el$RHEL"
         OS="rpm"
+    elif [ -f /etc/amazon-linux-release ]; then
+         GLIBC_VER_TMP="$(rpm glibc -qa --qf %{VERSION})"
+         RHEL=$(rpm --eval %amzn)
+         ARCH=$(echo $(uname -m) | sed -e 's:i686:i386:g')
+         OS_NAME="amzn$RHEL"
+         OS="rpm"
     else
         GLIBC_VER_TMP="$(dpkg-query -W -f='${Version}' libc6 | awk -F'-' '{print $1}')"
         ARCH=$(uname -m)
@@ -307,18 +313,17 @@ install_deps() {
         if [ "x${RHEL}" = "x8" -o "x${RHEL}" = "x7" ]; then
             switch_to_vault_repo
         fi
-        RHEL=$(rpm --eval %rhel)
         ARCH=$(echo $(uname -m) | sed -e 's:i686:i386:g')
         yum update -y
         yum install -y perl
         yum install -y https://repo.percona.com/yum/percona-release-latest.noarch.rpm
-        percona-release enable tools testing
-	if [ x"$ARCH" = "xaarch64" ]; then
-	    percona-release enable pxb-84-lts testing
-	fi
+        percona-release enable pxb-80 testing
+	percona-release enable pxb-84-lts release
         if [ "x$RHEL" = "x8" -o "x$RHEL" = "x9" ]; then
             yum -y install dnf-plugins-core epel-release
             yum config-manager --set-enabled powertools
+        fi
+        if [ "x$RHEL" = "x8" -o "x$RHEL" = "x9" -o "x$RHEL" = "x2023" ]; then
 	    yum -y install git
             yum -y install python2-scons || true
             yum -y install python2-pip python36-devel
@@ -331,25 +336,40 @@ install_deps() {
             yum -y install bison boost-devel check-devel cmake libaio-devel libcurl-devel libudev-devel
             yum -y install redhat-rpm-config
 	    if [ x"$ARCH" = "xx86_64" ]; then
-                wget https://downloads.percona.com/downloads/packaging/rpcgen-1.4-2.fc30.x86_64.rpm
-                wget https://downloads.percona.com/downloads/packaging/gperf-3.1-6.fc29.x86_64.rpm
-                yum -y install rpcgen-1.4-2.fc30.x86_64.rpm gperf-3.1-6.fc29.x86_64.rpm
+                if [ "x${RHEL}" != "x2023" ]; then
+                     wget https://downloads.percona.com/downloads/packaging/rpcgen-1.4-2.fc30.x86_64.rpm
+                     wget https://downloads.percona.com/downloads/packaging/gperf-3.1-6.fc29.x86_64.rpm
+                     yum -y install rpcgen-1.4-2.fc30.x86_64.rpm gperf-3.1-6.fc29.x86_64.rpm
+                 else
+                     yum -y install gperf rpcgen annobin-plugin-gcc annobin-annocheck chkconfig nmap
+                 fi
 	    else
 		yum -y install yum-utils
-		dnf config-manager --enable ol${RHEL}_codeready_builder
-		yum -y install gperf rpcgen
+		if [ "x${RHEL}" != "x2023" ]; then
+		    dnf config-manager --enable ol${RHEL}_codeready_builder
+                fi
+                yum -y install gperf rpcgen
 	    fi
 
-            if [ "x${RHEL}" = "x9" ]; then
-                yum install -y https://yum.oracle.com/repo/OracleLinux/OL9/distro/builder/${ARCH}/getPackage/procps-ng-devel-3.3.17-8.el9.x86_64.rpm
-                yum -y install dnf-utils
-                dnf config-manager --enable ol9_codeready_builder
+            if [ "x${RHEL}" = "x9" -o "x${RHEL}" = "x2023" ]; then
+                if [ "x${RHEL}" != "x2023" ]; then
+                     yum install -y https://yum.oracle.com/repo/OracleLinux/OL9/distro/builder/${ARCH}/getPackage/procps-ng-devel-3.3.17-8.el9.x86_64.rpm
+                     yum -y install dnf-utils
+                     dnf config-manager --enable ol9_codeready_builder
+                     yum -y install gcc-toolset-12-gcc gcc-toolset-12-gcc-c++ gcc-toolset-12-binutils gcc-toolset-12-annobin-annocheck gcc-toolset-12-annobin-plugin-gcc gcc-toolset-12-libatomic-devel
+                fi
                 yum -y install libedit-devel
                 yum -y install libtirpc-devel
                 yum -y install gcc
-                yum -y install gcc-toolset-12-gcc gcc-toolset-12-gcc-c++ gcc-toolset-12-binutils gcc-toolset-12-annobin-annocheck gcc-toolset-12-annobin-plugin-gcc gcc-toolset-12-libatomic-devel
-                yum -y install scons pip python3-devel
-                pip install --user typing pyyaml regex Cheetah3
+                yum -y install pip python3-devel
+                if [ "x${RHEL}" = "x2023" ]; then
+                    yum -y install libatomic annobin-annocheck annobin-plugin-gcc
+                    yum -y install procps-ng-devel python3-setuptools
+                    pip install --user typing scons pyyaml regex Cheetah3
+                else
+                    yum -y install scons
+                    pip install --user typing pyyaml regex Cheetah3
+                fi
             else
                 wget https://downloads.percona.com/downloads/packaging/python2-scons-3.0.1-9.el8.noarch.rpm
                 yum -y install ./python2-scons-3.0.1-9.el8.noarch.rpm || true
@@ -439,21 +459,16 @@ install_deps() {
         percona-release enable tools release
         
         # (1) PXB compatible with previous PXC LTS version
-	if [ x"$ARCH" = "xx86_64" ]; then
-            percona-release enable pxb-80 release
-	else
-	    percona-release enable pxb-80 testing
-	fi
-        if [ x"${DIST}" = xnoble ]; then
-            percona-release enable pxb-8x-innovation experimental
+        percona-release enable pxb-80 release
+        if [ x"${DIST}" = xjammy ]; then
+            percona-release enable pxb-9x-innovation experimental
         else
-            percona-release enable pxb-8x-innovation release
-        fi
-        percona-release enable pxb-84-lts testing
+            percona-release enable pxb-84-lts release
+        fi 
         # (2) PXB compatible with previous PXC version (note: it may be LTS as well)
-        percona-release enable pxc-8x-innovation testing
+        # percona-release enable pxc-8x-innovation testing
         # (3) PXB compatible with this PXC version (LTS or Innovative)
-        percona-release enable pxc-84-lts testing
+        # percona-release enable pxc-84-lts testing
         
         until apt-get update; do
             sleep 1
@@ -512,8 +527,12 @@ install_deps() {
         apt-get -y install libtool libnuma-dev scons libboost-dev libboost-program-options-dev check
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
-        apt-get -y install --download-only percona-xtrabackup-80=8.0.35-31-1.${DIST}
-        apt-get -y install --download-only percona-xtrabackup-84=8.4.0-1-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-80=8.0.35-32-1.${DIST}
+        if [ x"${DIST}" = xjammy ]; then
+            apt-get -y install --download-only percona-xtrabackup-91=9.1.0-1-1.${DIST}
+        else
+            apt-get -y install --download-only percona-xtrabackup-84=8.4.0-2-1.${DIST}
+        fi
     fi
     return;
 }
@@ -575,7 +594,7 @@ build_srpm(){
     get_tar "source_tarball"
     rm -fr rpmbuild
     mkdir -vp rpmbuild/{SOURCES,SPECS,BUILD,SRPMS,RPMS}
-    source ${WORKDIR}/pxc-80.properties
+    source ${WORKDIR}/pxc-9x.properties
     TARFILE=$(basename $(find . -iname 'Percona-XtraDB-Cluster-*.tar.gz' | sort | tail -n1))
     NAME="Percona-XtraDB-Cluster"
     VERSION=$MYSQL_VERSION
@@ -611,7 +630,6 @@ build_srpm(){
     #
 
     SRCRPM=$(find . -name *.src.rpm)
-    RHEL=$(rpm --eval %rhel)
     #
     ARCH=$(uname -m)
     if [ ${ARCH} = i686 ]; then
@@ -624,7 +642,7 @@ build_srpm(){
     else
         SCONS_ARGS=""
     fi
-    source ${WORKDIR}/pxc-80.properties
+    source ${WORKDIR}/pxc-9x.properties
     cd ${WORKDIR}/rpmbuild/SPECS
     line_number=$(grep -n SOURCE999 percona-xtradb-cluster.spec | awk -F ':' '{print $1}')
     cp ../SOURCES/call-home.sh ./
@@ -646,7 +664,7 @@ build_srpm(){
         fi
     fi
     #
-    echo "RPM_RELEASE=$RPM_RELEASE" >> pxc-80.properties
+    echo "RPM_RELEASE=$RPM_RELEASE" >> pxc-9x.properties
 
     mkdir -p ${WORKDIR}/srpm
     mkdir -p ${CURDIR}/srpm
@@ -739,11 +757,10 @@ build_rpm(){
     mkdir -vp rpmbuild/{SOURCES,SPECS,BUILD,SRPMS,RPMS}
     cp $SRC_RPM rpmbuild/SRPMS/
 
-    RHEL=$(rpm --eval %rhel)
     ARCH=$(echo $(uname -m) | sed -e 's:i686:i386:g')
     #
-    echo "RHEL=${RHEL}" >> pxc-80.properties
-    echo "ARCH=${ARCH}" >> pxc-80.properties
+    echo "RHEL=${RHEL}" >> pxc-9x.properties
+    echo "ARCH=${ARCH}" >> pxc-9x.properties
     #
     SRCRPM=$(basename $(find . -name '*.src.rpm' | sort | tail -n1))
     mkdir -vp rpmbuild/{SOURCES,SPECS,BUILD,SRPMS,RPMS}
@@ -773,13 +790,13 @@ build_rpm(){
         source /opt/rh/gcc-toolset-11/enable
     fi
 
-    source ${WORKDIR}/pxc-80.properties
-    source ${CURDIR}/srpm/pxc-80.properties
+    source ${WORKDIR}/pxc-9x.properties
+    source ${CURDIR}/srpm/pxc-9x.properties
     #
     if [ ${ARCH} = x86_64 ]; then
-        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
     else
-        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
     fi
     return_code=$?
     if [ $return_code != 0 ]; then
@@ -802,7 +819,7 @@ build_source_deb(){
         echo "It is not possible to build source deb here"
         exit 1
     fi
-    source ${WORKDIR}/pxc-80.properties
+    source ${WORKDIR}/pxc-9x.properties
     rm -rf percona-server*
     get_tar "source_tarball"
     rm -f *.dsc *.orig.tar.gz *.debian.tar.gz *.changes
@@ -872,7 +889,7 @@ build_deb(){
         get_deb_sources $file
     done
     cd $WORKDIR || exit
-    source ${WORKDIR}/pxc-80.properties
+    source ${WORKDIR}/pxc-9x.properties
     rm -fv *.deb
 
     export DEBIAN_VERSION="$(lsb_release -sc)"
@@ -896,8 +913,8 @@ build_deb(){
     rm -rf $DIRNAME
 
     #
-    echo "ARCH=${ARCH}" >> ${WORKDIR}/pxc-80.properties
-    echo "DEBIAN_VERSION=${DEBIAN_VERSION}" >> ${WORKDIR}/pxc-80.properties
+    echo "ARCH=${ARCH}" >> ${WORKDIR}/pxc-9x.properties
+    echo "DEBIAN_VERSION=${DEBIAN_VERSION}" >> ${WORKDIR}/pxc-9x.properties
 
     dpkg-source -x ${DSC}
 
@@ -906,11 +923,19 @@ build_deb(){
     # (1) PXB compatible with previous PXC LTS version
     mkdir -p pxb-8.0
     # (2) PXB compatible with this PXC version (LTS or Innovative)
-    mkdir -p pxb-8.4
+    if [ x"${DEBIAN_VERSION}" = xjammy ]; then
+        mkdir -p pxb-9.1
+    else
+        mkdir -p pxb-8.4
+    fi
 
 
     dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-80* pxb-8.0
-    dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-84* pxb-8.4
+    if [ x"${DEBIAN_VERSION}" = xjammy ]; then
+        dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-91* pxb-9.1
+    else
+        dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-84* pxb-8.4
+    fi
 
     #  (1)
     cd pxb-8.0 || exit
@@ -919,7 +944,11 @@ build_deb(){
         rm -rf usr *.deb DEBIAN
 
     # (2)
-    cd ../pxb-8.4 || exit
+    if [ x"${DEBIAN_VERSION}" = xjammy ]; then
+        cd ../pxb-9.1 || exit
+    else
+        cd ../pxb-8.4 || exit
+    fi
         mv usr/bin ./
         mv usr/lib* ./
         rm -rf usr *.deb DEBIAN
@@ -963,6 +992,10 @@ build_deb(){
         sed -i 's/export CXXFLAGS=/export CXXFLAGS=-Wno-error=nonnull-compare /' debian/rules
     fi
 
+    if [ ${DEBIAN_VERSION} = "jammy" ]; then
+        sed -i 's/pxb-8.4/pxb-9.1/g' debian/rules
+    fi
+
     GALERA_REVNO="${GALERA_REVNO}" SCONS_ARGS=' strict_build_flags=0'  MAKE_JFLAG=-j4  dpkg-buildpackage -rfakeroot -uc -us -b
     #
     cd ${WORKSPACE} || exit
@@ -986,10 +1019,10 @@ build_tarball(){
     if [ x"$RHEL" = x8 ]; then
         switch_to_vault_repo
     fi
-    source ${WORKDIR}/pxc-80.properties
+    source ${WORKDIR}/pxc-9x.properties
     get_tar "source_tarball"
     cd $WORKDIR || exit
-    source ${WORKDIR}/pxc-80.properties
+    source ${WORKDIR}/pxc-9x.properties
     TARFILE=$(basename $(find . -iname 'percona-xtradb-cluster*.tar.gz' | sort | tail -n1))
     if [ -f /etc/debian_version ]; then
         export OS_RELEASE="$(lsb_release -sc)"
@@ -1053,6 +1086,7 @@ build_tarball(){
 
         # (2)
         mkdir pxb-8.4
+%{_libdir}/mysqlrouter/private/libprotobuf-lite.so.*
         pushd pxb-8.4
         yumdownloader percona-xtrabackup-84-8.4.0
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
@@ -1068,10 +1102,19 @@ build_tarball(){
         tar -zcvf  percona-xtrabackup-8.0.tar.gz pxb-8.0
         tar -zcvf  percona-xtrabackup-8.4.tar.gz pxb-8.4
     else
+        DEBIAN_VERSION="$(lsb_release -sc)"
         mkdir pxb-8.0
-        mkdir pxb-8.4
+        if [ x"${DEBIAN_VERSION}" = xjammy ]; then
+            mkdir pxb-9.1
+        else
+            mkdir pxb-8.4
+        fi
         dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-80* pxb-8.0
-        dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-84* pxb-8.4
+        if [ x"${DEBIAN_VERSION}" = xjammy ]; then
+            dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-91* pxb-9.1
+        else
+            dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-84* pxb-8.4
+        fi
         
         # (1)
         pushd pxb-8.0
@@ -1081,19 +1124,27 @@ build_tarball(){
         popd
 
         # (2)
-        pushd pxb-8.4
+        if [ x"${DEBIAN_VERSION}" = xjammy ]; then
+            pushd pxb-9.1
+        else
+            pushd pxb-8.4
+        fi
             mv usr/bin ./
             mv usr/lib* ./
             rm -rf usr *.deb DEBIAN
         popd
         
         tar -zcvf  percona-xtrabackup-8.0.tar.gz pxb-8.0
-        tar -zcvf  percona-xtrabackup-8.4.tar.gz pxb-8.4
+        if [ x"${DEBIAN_VERSION}" = xjammy ]; then
+            tar -zcvf  percona-xtrabackup-9.1.tar.gz pxb-9.1
+        else
+            tar -zcvf  percona-xtrabackup-8.4.tar.gz pxb-8.4
+        fi
     fi
     mkdir -p ${BUILD_ROOT}/target/pxc_extra/
     cp *.tar.gz ${BUILD_ROOT}/target/pxc_extra/
     cp *.tar.gz ${BUILD_ROOT}/target
-    rm -rf pxb-8.0 pxb-8.4
+    rm -rf pxb-8.0 pxb-8.4 pxb-9.1 || true
     cd ${CURDIR} || exit
     rm -rf jemalloc
     wget https://github.com/jemalloc/jemalloc/releases/download/$JVERSION/jemalloc-$JVERSION.tar.bz2
@@ -1133,7 +1184,7 @@ build_tarball(){
 #main
 
 CURDIR=$(pwd)
-VERSION_FILE=$CURDIR/pxc-80.properties
+VERSION_FILE=$CURDIR/pxc-9x.properties
 args=
 WORKDIR=
 SRPM=0
@@ -1152,14 +1203,14 @@ DEB_RELEASE=1
 BIN_RELEASE=1
 DEBUG=0
 REVISION=0
-BRANCH="8.0"
+BRANCH="trunk"
 MECAB_INSTALL_DIR="${WORKDIR}/mecab-install"
 REPO="https://github.com/percona/percona-xtradb-cluster.git"
-PRODUCT=Percona-XtraDB-Cluster-8.0
-MYSQL_VERSION=8.0.13
-MYSQL_RELEASE=3
+PRODUCT=Percona-XtraDB-Cluster-9.0
+MYSQL_VERSION=9.1.0
+MYSQL_RELEASE=1
 WSREP_VERSION=31.33
-PRODUCT_FULL=Percona-XtraDB-Cluster-8.0.13-31.33
+PRODUCT_FULL=Percona-XtraDB-Cluster-9.1.0-31.33
 BOOST_PACKAGE_NAME=boost_1_59_0
 parse_arguments PICK-ARGS-FROM-ARGV "$@"
 

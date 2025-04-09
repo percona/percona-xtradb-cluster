@@ -21,6 +21,7 @@ SET AUTOCOMMIT = 1;
 BEGIN;
 UPDATE t SET f = 'yellow 2' WHERE i = 3;
 Warnings:
+Warning	6414	Combining the storage engines MyISAM and InnoDB is deprecated, but the statement or transaction updates both the MyISAM table test.n and the InnoDB table test.t.
 Note	1592	Unsafe statement written to the binary log using statement format since BINLOG_FORMAT = STATEMENT. Statement is unsafe because it invokes a trigger or a stored function that inserts into an AUTO_INCREMENT column. Inserted values cannot be logged correctly.
 Note	1592	Unsafe statement written to the binary log using statement format since BINLOG_FORMAT = STATEMENT. Statement accesses nontransactional table as well as transactional or temporary table, and writes to any of them.
 SET AUTOCOMMIT = 1;
@@ -52,6 +53,7 @@ SET AUTOCOMMIT = 1;
 BEGIN;
 UPDATE t SET f = 'gray 2' WHERE i = 3;
 Warnings:
+Warning	6414	Combining the storage engines MyISAM and InnoDB is deprecated, but the statement or transaction updates both the MyISAM table test.n and the InnoDB table test.t.
 Note	1592	Unsafe statement written to the binary log using statement format since BINLOG_FORMAT = STATEMENT. Statement is unsafe because it invokes a trigger or a stored function that inserts into an AUTO_INCREMENT column. Inserted values cannot be logged correctly.
 Note	1592	Unsafe statement written to the binary log using statement format since BINLOG_FORMAT = STATEMENT. Statement accesses nontransactional table as well as transactional or temporary table, and writes to any of them.
 SET AUTOCOMMIT = 1;
@@ -80,6 +82,7 @@ master-bin.000001	#	Xid	#	#	COMMIT /* XID */
 SET AUTOCOMMIT = 0;
 UPDATE t SET f = 'yellow 1' WHERE i = 3;
 Warnings:
+Warning	6414	Combining the storage engines MyISAM and InnoDB is deprecated, but the statement or transaction updates both the MyISAM table test.n and the InnoDB table test.t.
 Note	1592	Unsafe statement written to the binary log using statement format since BINLOG_FORMAT = STATEMENT. Statement is unsafe because it invokes a trigger or a stored function that inserts into an AUTO_INCREMENT column. Inserted values cannot be logged correctly.
 Note	1592	Unsafe statement written to the binary log using statement format since BINLOG_FORMAT = STATEMENT. Statement accesses nontransactional table as well as transactional or temporary table, and writes to any of them.
 SET AUTOCOMMIT = 0;
@@ -109,6 +112,7 @@ master-bin.000001	#	Query	#	#	ROLLBACK
 SET AUTOCOMMIT = 0;
 UPDATE t SET f = 'gray 1' WHERE i = 3;
 Warnings:
+Warning	6414	Combining the storage engines MyISAM and InnoDB is deprecated, but the statement or transaction updates both the MyISAM table test.n and the InnoDB table test.t.
 Note	1592	Unsafe statement written to the binary log using statement format since BINLOG_FORMAT = STATEMENT. Statement is unsafe because it invokes a trigger or a stored function that inserts into an AUTO_INCREMENT column. Inserted values cannot be logged correctly.
 Note	1592	Unsafe statement written to the binary log using statement format since BINLOG_FORMAT = STATEMENT. Statement accesses nontransactional table as well as transactional or temporary table, and writes to any of them.
 SET AUTOCOMMIT = 0;

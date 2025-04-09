@@ -179,6 +179,7 @@ analyze table t2;
 -- enable_result_log
 -- enable_query_log
 
+--replace_regex $elide_costs
 EXPLAIN SELECT t1.f1 FROM t1
 WHERE (SELECT COUNT(*) FROM t2 WHERE t2.f3 = 'h' AND t2.f2 = t1.f1) = 0 AND t1.f1 = 2;
 
@@ -346,6 +347,7 @@ analyze table t2;
 --disable_warnings
 if (!$skip_ror_EXPLAIN_for_MyRocks)
 {
+--replace_regex $elide_costs
 EXPLAIN UPDATE t1 SET col_time_nokey = 25
 WHERE (col_varchar_key, col_varchar_nokey) IN (
   SELECT col_int_key, col_int_key

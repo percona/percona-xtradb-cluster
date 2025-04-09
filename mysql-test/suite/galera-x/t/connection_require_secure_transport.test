@@ -4,10 +4,12 @@
 --source include/have_util_sed.inc
 --source include/galera_cluster.inc
 --source include/not_windows.inc
+--let $xplugin_disable_ssl_for_x_at_client_side=1
+--let $xplugin_cache_x_root=1
 --source include/xplugin_preamble.inc
 --source include/xplugin_create_user.inc
 
---write_file $MYSQL_TMP_DIR/check_plain_connection.tmp
+--write_file $MYSQL_TMP_DIR/check_plain_connection.xpl
 -->import connection.macro
 -->callmacro Verify_its_xprotocol_connection
 Mysqlx.Session.AuthenticateStart {
@@ -17,10 +19,10 @@ Mysqlx.Session.AuthenticateStart {
 -->recvuntil Mysqlx.Session.AuthenticateOk do_not_show_intermediate
 EOF
 
---write_file $MYSQL_TMP_DIR/check_connection.tmp
+--write_file $MYSQL_TMP_DIR/check_connection.xpl
 EOF
 
---write_file $MYSQL_TMP_DIR/check_ssl_plain_connection.tmp
+--write_file $MYSQL_TMP_DIR/check_ssl_plain_connection.xpl
 -->import connection.macro
 -->callmacro Verify_its_xprotocol_connection
 -->callmacro Enable_ssl_on_xprotocol_and_transmision_layer
@@ -33,37 +35,34 @@ Mysqlx.Session.AuthenticateStart {
 EOF
 
 --echo Wait for the X Plugin before restarting the server
---exec $MYSQLXTEST -q -ux_root --password='' --file=$MYSQL_TMP_DIR/check_connection.tmp 2>&1
+--exec $MYSQLXTEST -q -ux_root --password='' --file=$MYSQL_TMP_DIR/check_connection.xpl 2>&1
 
 --echo Test different connection types while secure transport when the server was started with this flag set to ON
 # Cases when the flag is dynamicly changes is tests in related x test file (for example connection_ssl.test)
-let $restart_parameters = restart: --require_secure_transport=ON;
 
 --source include/xplugin_drop_user.inc
 --source include/shutdown_mysqld.inc
 --source include/safe_to_bootstrap.inc
+let $restart_parameters = restart: --require_secure_transport=ON;
 --source include/start_mysqld_no_echo.inc
 
 --connect(ssl_con1,localhost,root,,,,,SSL)
 --source include/xplugin_create_user.inc
 
---exec $MYSQLXTEST -n --socket=$MASTER_X_MYSOCK -ux_root --password='' --file=$MYSQL_TMP_DIR/check_plain_connection.tmp 2>&1
---exec $MYSQLXTEST -n -ux_root --password='' --ssl-ca=$MYSQL_TEST_DIR/std_data/cacert.pem --ssl-key=$MYSQL_TEST_DIR/std_data/client-key.pem --ssl-cert=$MYSQL_TEST_DIR/std_data/client-cert.pem  --file=$MYSQL_TMP_DIR/check_ssl_plain_connection.tmp 2>&1
+--exec $MYSQLXTEST -n --socket=$MASTER_X_MYSOCK -ux_root --password='' --file=$MYSQL_TMP_DIR/check_plain_connection.xpl 2>&1
+--exec $MYSQLXTEST -n -ux_root --password='' --ssl-ca=$MYSQL_TEST_DIR/std_data/cacert.pem --ssl-key=$MYSQL_TEST_DIR/std_data/client-key.pem --ssl-cert=$MYSQL_TEST_DIR/std_data/client-cert.pem  --file=$MYSQL_TMP_DIR/check_ssl_plain_connection.xpl 2>&1
 
 --error 1
---exec $MYSQLXTEST -n  -ux_root --password='' --file=$MYSQL_TMP_DIR/check_plain_connection.tmp 2>&1
+--exec $MYSQLXTEST -n  -ux_root --password='' --file=$MYSQL_TMP_DIR/check_plain_connection.xpl 2>&1
 
---exec $MYSQLXTEST --expect-error ER_SECURE_TRANSPORT_REQUIRED -ux_root --password='' --file=$MYSQL_TMP_DIR/check_connection.tmp 2>&1
+--exec $MYSQLXTEST --expect-error ER_SECURE_TRANSPORT_REQUIRED -ux_root --password='' --file=$MYSQL_TMP_DIR/check_connection.xpl 2>&1
 
 SET GLOBAL require_secure_transport=OFF;
 
 --error 1
---exec $MYSQLXTEST -n  -ux_root --password='' --file=$MYSQL_TMP_DIR/check_plain_connection.tmp 2>&1
---exec $MYSQLXTEST -n --socket=$MASTER_X_MYSOCK -ux_root --password='' --file=$MYSQL_TMP_DIR/check_plain_connection.tmp 2>&1
---exec $MYSQLXTEST -ux_root --password='' --file=$MYSQL_TMP_DIR/check_connection.tmp 2>&1
+--exec $MYSQLXTEST -n  -ux_root --password='' --file=$MYSQL_TMP_DIR/check_plain_connection.xpl 2>&1
+--exec $MYSQLXTEST -n --socket=$MASTER_X_MYSOCK -ux_root --password='' --file=$MYSQL_TMP_DIR/check_plain_connection.xpl 2>&1
+--exec $MYSQLXTEST -ux_root --password='' --file=$MYSQL_TMP_DIR/check_connection.xpl 2>&1
 
 ## Cleanup
---remove_file $MYSQL_TMP_DIR/check_plain_connection.tmp
---remove_file $MYSQL_TMP_DIR/check_connection.tmp
---remove_file $MYSQL_TMP_DIR/check_ssl_plain_connection.tmp
---source include/xplugin_drop_user.inc
+--source ../include/xplugin_cleanup.inc

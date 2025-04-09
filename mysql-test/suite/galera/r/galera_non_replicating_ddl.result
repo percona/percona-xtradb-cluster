@@ -11,7 +11,7 @@ FLUSH TABLE t FOR EXPORT;
 UNLOCK TABLES;
 alter table t discard tablespace;
 select * from t;
-ERROR HY000: Tablespace has been discarded for table 't'
+ERROR HY000: Tablespace is discarded for table, 't'
 call mtr.add_suppression("Cannot delete tablespace.*");
 call mtr.add_suppression("While running PXC node in cluster mode it will skip.*");
 alter table t discard tablespace;

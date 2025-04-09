@@ -1,5 +1,5 @@
-percona-xtradb-cluster (8.0.13-3) unstable; urgency=low
+percona-xtradb-cluster (9.1.0-1) unstable; urgency=low
 
-  * Packaging for 8.0
+  * Packaging for 9.1
 
  -- Evgeniy Patlan <evgeniy.patlan@percona.com>  Tue, 19 Feb 2019 12:50:32 +0300

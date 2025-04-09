@@ -107,7 +107,12 @@ IF(MY_COMPILER_IS_CLANG)
     # require clang-11 or later when enabling -Wdocumentation to workaround
     #
     # https://bugs.llvm.org/show_bug.cgi?id=38905
-    MY_ADD_C_WARNING_FLAG("Wdocumentation")
+    # Disable for PXC.
+    # Server includes wsrep-lib headers (like server_state.hpp) that have
+    # documentation issues.
+    # wsrep-API headers have the same problem. However, if we disable Wdocumentation
+    # warning here, there is no need for disabling it in wsrep-lib or galera cmake
+    # MY_ADD_C_WARNING_FLAG("Wdocumentation")
 
     # -Wdocumentation enables -Wdocumentation-deprecated-sync
     # which currently raises to many warnings
@@ -147,7 +152,6 @@ IF(MY_COMPILER_IS_CLANG)
   STRING_APPEND(MY_CXX_WARNING_FLAGS " -Wundefined-reinterpret-cast")
   STRING_APPEND(MY_CXX_WARNING_FLAGS " -Wrange-loop-analysis")
 
-  # Disable for PXC. See GCC part above for detailed explanation.
   MY_ADD_CXX_WARNING_FLAG("Winconsistent-missing-destructor-override")
   MY_ADD_CXX_WARNING_FLAG("Winconsistent-missing-override")
   MY_ADD_CXX_WARNING_FLAG("Wshadow-field")
@@ -155,8 +159,13 @@ IF(MY_COMPILER_IS_CLANG)
 
   # require clang-11 or later when enabling -Wdocumentation to workaround
   #
-  # https://bugs.llvm.org/show_bug.cgi?id=38905
-  MY_ADD_CXX_WARNING_FLAG("Wdocumentation")
+  # https://bugs.llvm.org/show_bug.cgi?id=38905  
+  # Disable for PXC.
+  # Server includes wsrep-lib headers (like server_state.hpp) that have
+  # documentation issues.
+  # wsrep-API headers have the same problem. However, if we disable Wdocumentation
+  # warning here, there is no need for disabling it in wsrep-lib or galera cmake
+  # MY_ADD_CXX_WARNING_FLAG("Wdocumentation")
   # -Wdocumentation enables -Wdocumentation-deprecated-sync
   # which currently raises to many warnings
   MY_ADD_CXX_WARNING_FLAG("Wno-documentation-deprecated-sync")

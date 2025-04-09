@@ -98,11 +98,11 @@ insert into test.pfs_published_schema
 
 insert into test.pfs_published_schema
  values("MySQL 8.0.22", 80022,
-        "55f21a1c75161f414bb75eb0f46c24becf15232dcf3938d4c80bc3361ecdedea");
+        "b9000c4a106a8351d2274028965f19d7902c3ccb9faa9407603c9258812f77fe");
 
 insert into test.pfs_published_schema
  values("MySQL 8.0.23", 80023,
-        "6f3e7fc656953ea433e9c857619a3d5cb252bfc068291657c4b56acb7ef012e1");
+        "1ac8f01232e37285ef6c44b400ca0f3a3685a89d8224e4cfa2dc853fb655c50f");
 
 insert into test.pfs_published_schema
  values("MySQL 8.0.24", 80024,
@@ -110,39 +110,43 @@ insert into test.pfs_published_schema
 
 insert into test.pfs_published_schema
  values("MySQL 8.0.25", 80025,
-        "2c0f18a287586e591cf58a670c0768c72cf76b571173e7008e58fb59983fbd1f");
+        "a35216aad234f74054935422bfc301ae17a1e612a11763040da7343e101b3ba5");
 
 insert into test.pfs_published_schema
  values("MySQL 8.0.27", 80027,
-        "69d5f4536bc649b4a198a5d135c1619817889aa9eae4a7d1c7d8f0e06d89a79f");
+        "788ba22c99444621d371a6fd2aa5e6672fb5f2241c322421c5072e600720538a");
 
 insert into test.pfs_published_schema
  values("MySQL 8.0.28", 80028,
-        "493bc6b273f75ba7ace80a626a940757e2353dffabd52b6bde9781c938a2edcb");
+        "13b60d68e6263e02af75b7385dae1f05168eab2e0256913e9a6d4f7a0316b8cc");
 
 insert into test.pfs_published_schema
  values("MySQL 8.0.29", 80029,
-        "73a49507e32a69a288febb39895e45da17f9aa7409146431a4d1ee5d4639aebc");
+        "0d7d375b1377cb3855228fe83462772ccf96d5e5e52b663f3f9a59e1509b2c8d");
 
 insert into test.pfs_published_schema
  values("MySQL 8.0.30", 80030,
-        "611d5a5a1e863c674f20a6afa078525c11b5b175dcb5b6537e1755e7923abe55");
+        "0e72d1064e73b26ab21417dd633a2b79eab38292f7f8dfdf34b2cdf9871f1783");
 
 insert into test.pfs_published_schema
  values("MySQL 8.0.31", 80031,
-        "3f3b1274f3924c5874cbe6dd331ab14217ec89ff0b378fef2305c1d7e1918630");
+        "8b12e692226585c848967de7528b3bc57a08029ba4012f0e1afa9a15aee8ac60");
 
 insert into test.pfs_published_schema
  values("MySQL 8.0.32", 80032,
-        "556baad25ce27574fea75370799eaca7877291d4b7b54c36e6ce54017bb4e927");
+        "8b775d397a86188b9fb6d3da2c138b65c62aa4e3d268a584ed6c8cde47fc57a0");
 
 insert into test.pfs_published_schema
  values("MySQL 8.0.33", 80033,
-        "1182e14dbd5a25625152b84217f967e8733fc599efbb6e7f1e193eb3bc083123");
+        "fb9c8d88611c3d935e3d78daff4f3faf2595896a342dd2c121b3081131df593f");
+
+insert into test.pfs_published_schema
+ values("MySQL 8.0.40", 80040,
+        "b56610322b2a64779b7cfe96976cd0b5c6542a098bec88dacb0bb8a1fe7be458");
 
 insert into test.pfs_published_schema
  values("MySQL 8.2.0", 80200,
-        "566f78af08ea40a489c9d7ccb0f398896f36d5bee49f621680b0fdf382660da4");
+        "a0a5ec52fc2e8aaf0fde0d304c3647ef54ea34cbe9e286c72e9874ca7f0815e6");
 
 # MySQL 8.3.0 was incorrectly published with PFS_DD_VERSION 80200,
 # which is a bug.
@@ -156,7 +160,19 @@ insert into test.pfs_published_schema
 # Correct entry
 insert into test.pfs_published_schema
  values("MySQL 8.3.0", 80300,
-        "e76782448cff7ad04f95786b1eaf47604c50678d28ac9cdad3e57bbe84bcee93");
+        "465e86aaeee818c0aeeef15780883765c9d2d758b41499c0e5165fa725d9e045");
+
+insert into test.pfs_published_schema
+ values("MySQL 8.4.3", 80403,
+        "ffec29dba39f7ebbd15ace21cafbd8784312834fbb1226504d435af0c1dddcd5");
+
+insert into test.pfs_published_schema
+ values("MySQL 9.0.0", 90000,
+        "fefb8c85575ab81e8c5a9517b11d21180bf8ae90213740e8636ef0ebf59cfe94");
+
+insert into test.pfs_published_schema
+ values("MySQL 9.1.0", 90100,
+        "62d37b1d33fb066101a91e80ee61cba863a7dacb81fd0840417e567a8d63f7ce");
 
 create table test.pfs_check_table
   (id int NOT NULL AUTO_INCREMENT,

@@ -43,7 +43,7 @@ ANALYZE TABLE t1;
 ERROR HY000: The MySQL server is running with the --super-read-only option so it cannot execute this statement
 SET GLOBAL super_read_only=0;
 SET GLOBAL read_only=1;
-CREATE USER 'testuser'@'%' IDENTIFIED WITH 'mysql_native_password' BY 'testuser';
+CREATE USER 'testuser'@'%' IDENTIFIED BY 'testuser';
 GRANT SELECT, UPDATE, INSERT, DELETE ON *.* to 'testuser'@'%';
 ANALYZE TABLE t1;
 ERROR HY000: The MySQL server is running with the --read-only option so it cannot execute this statement

@@ -21,23 +21,6 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
-# Fix "undefined reference to '__muloti4'" for clang-7 or older
-# https://stackoverflow.com/questions/49793632/clang-fsanitize-undefined-with-128-integer-operations-undefined-reference-to
-IF(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 8)
-  STRING_APPEND(CMAKE_CXX_LINK_FLAGS " --rtlib=compiler-rt -lgcc_s")
-ENDIF()
-
-IF(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7)
-  MESSAGE(FATAL_ERROR "Compiler version not supported. Please, use -DWITH_ROUTER=OFF or use at least clang 7")
-ENDIF()
-
-# Disable ld.gold for clang-7 and clang-8
-IF(USE_LD_LLD AND CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND
-   NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7.0 AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
-  STRING(REPLACE "-fuse-ld=gold" "" CMAKE_C_LINK_FLAGS "${CMAKE_C_LINK_FLAGS}")
-  STRING(REPLACE "-fuse-ld=gold" "" CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS}")
-ENDIF()
-
 INCLUDE(cmake/version.cmake)
 SET(CMAKE_MODULE_PATH
   ${CMAKE_MODULE_PATH}
@@ -101,6 +84,12 @@ IF(WIN32)
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4251")
 ENDIF()
 
+IF(WIN32_CLANG)
+  # Clang complains that classes to be DLLexported need an explicit
+  # copy assignment operator.
+  STRING_APPEND(CMAKE_CXX_FLAGS " -Wno-deprecated-copy-with-dtor")
+ENDIF()
+
 INCLUDE(${CMAKE_SOURCE_DIR}/cmake/rapidjson.cmake)
 
 SET(ROUTER_LICENSE_FILE "${CMAKE_SOURCE_DIR}/router/LICENSE.router")
@@ -125,6 +114,22 @@ INCLUDE(cmake/Plugin.cmake)
 INCLUDE(cmake/fuzzer.cmake)
 
 INCLUDE_DIRECTORIES(${PROJECT_BINARY_DIR}/include)
+
+IF(ROUTER_INSTALL_LAYOUT STREQUAL "STANDALONE")
+  IF(TARGET mysql_native_password)
+    ADD_DEFINITIONS(-DROUTER_CLIENT_PLUGINS_ARE_BUNDLED)
+    # install libmysqlclient's mysql_native_password client plugin
+    # into the Router's plugin-dir.
+
+    INSTALL(TARGETS mysql_native_password
+      RUNTIME DESTINATION ${ROUTER_INSTALL_PLUGINDIR}
+      LIBRARY DESTINATION ${ROUTER_INSTALL_PLUGINDIR}
+      COMPONENT Router
+      NAMELINK_SKIP
+      )
+  ENDIF()
+ENDIF()
+
 
 # a meta-target to allow build everything router related, but nothing that
 # it doesn't depend on

@@ -114,7 +114,7 @@ void row_mysql_prebuilt_free_compress_heap(row_prebuilt_t *prebuilt) noexcept;
 @param[in]	compress_heap   memory heap used to compress/decompress
                                 blob column
 @return pointer to the uncompressed data */
-MY_NODISCARD
+[[nodiscard]]
 const byte *row_decompress_column(const byte *data, ulint *len,
                                   const byte *dict_data, ulint dict_data_len,
                                   mem_heap_t **compress_heap);
@@ -128,7 +128,7 @@ const byte *row_decompress_column(const byte *data, ulint *len,
 @param[in]	compress_heap   memory heap used to compress/decompress
                                 blob column
 @return pointer to the compressed data */
-MY_NODISCARD
+[[nodiscard]]
 byte *row_compress_column(const byte *data, ulint *len, ulint lenlen,
                           const byte *dict_data, ulint dict_data_len,
                           mem_heap_t **compress_heap);
@@ -586,10 +586,12 @@ constexpr uint32_t ROW_PREBUILT_FREED = 26423527;
 handle used within MySQL; these are used to save CPU time. */
 
 struct row_prebuilt_t {
-  ulint magic_n;               /*!< this magic number is set to
-                               ROW_PREBUILT_ALLOCATED when created,
-                               or ROW_PREBUILT_FREED when the
-                               struct has been freed */
+  ulint magic_n; /*!< this magic number is set to
+                 ROW_PREBUILT_ALLOCATED when created,
+                 or ROW_PREBUILT_FREED when the
+                 struct has been freed */
+  space_id_t space_id() const { return table->space; }
+
   dict_table_t *table;         /*!< Innobase table handle */
   dict_index_t *index;         /*!< current index for a search, if
                                any */

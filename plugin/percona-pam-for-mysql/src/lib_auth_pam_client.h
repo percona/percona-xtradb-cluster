@@ -27,6 +27,7 @@
 
 #define STDCALL
 
+#include <stdbool.h>
 #include "mysql/client_plugin.h"
 
 /**
