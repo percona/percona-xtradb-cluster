@@ -1580,6 +1580,7 @@ void RecLock::set_wait_state(lock_t *lock) {
   ut_a(stopped);
 }
 
+#ifdef WITH_WSREP
 /**
 Enqueue a lock wait for normal transaction. If it is a high priority transaction
 then jump the record lock wait queue and if the transaction at the head of the
@@ -1592,6 +1593,7 @@ queue is itself waiting roll it back, also do a deadlock check and resolve.
         there was a deadlock, but another transaction was chosen
         as a victim, and we got the lock immediately: no need to
         wait then */
+#endif
 dberr_t RecLock::add_to_waitq(const lock_t *wait_for, const lock_prdt_t *prdt) {
   ut_ad(locksys::owns_page_shard(m_rec_id.get_page_id()));
   ut_ad(m_trx == thr_get_trx(m_thr));
@@ -2074,6 +2076,7 @@ static dberr_t lock_rec_lock(bool impl, select_mode sel_mode, ulint mode,
                           Useful when reporting a deadlock cycle. (optional)
 @return The conflicting lock which is the reason wait_lock has to wait
 or nullptr if it can be granted now */
+
 static const lock_t *lock_rec_has_to_wait_in_queue(
 #ifdef WITH_WSREP
     const lock_t *wait_lock, bool validation_check,
@@ -3732,7 +3735,6 @@ static inline void lock_table_remove_low(
 
 /** Enqueues a waiting request for a table lock which cannot be granted
  immediately. Checks for deadlocks.
- @param[in] c_lock         conflicting lock
  @param[in] mode           lock mode this transaction is requesting
  @param[in] table          the table to be locked
  @param[in] thr            the query thread requesting the lock
