@@ -619,142 +619,142 @@ DROP PREPARE stmt;
 
 -- Add the privilege XA_RECOVER_ADMIN for every user who has the privilege SUPER
 -- provided that there isn't a user who already has the privilige XA_RECOVER_ADMIN.
-SET @hadXARecoverAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'XA_RECOVER_ADMIN');
+SET @hadXARecoverAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'XA_RECOVER_ADMIN' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT user, host, 'XA_RECOVER_ADMIN', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE super_priv = 'Y' AND @hadXARecoverAdminPriv = 0;
+FROM mysql.user WHERE super_priv = 'Y' AND @hadXARecoverAdminPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privilege CLONE_ADMIN for every user who has the privilege SUPER
 -- provided that there isn't a user who already has the privilege CLONE_ADMIN.
-SET @hadCloneAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'CLONE_ADMIN');
+SET @hadCloneAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'CLONE_ADMIN' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT user, host, 'CLONE_ADMIN', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE super_priv = 'Y' AND @hadCloneAdminPriv = 0;
+FROM mysql.user WHERE super_priv = 'Y' AND @hadCloneAdminPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privilege INNODB_REDO_LOG_ENABLE for every user who has the privilege SUPER
 -- provided that there isn't a user who already has the privilege INNODB_REDO_LOG_ENABLE.
-SET @hadRedoLogEnablePriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'INNODB_REDO_LOG_ENABLE');
+SET @hadRedoLogEnablePriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'INNODB_REDO_LOG_ENABLE' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT user, host, 'INNODB_REDO_LOG_ENABLE', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE super_priv = 'Y' AND @hadRedoLogEnablePriv = 0;
+FROM mysql.user WHERE super_priv = 'Y' AND @hadRedoLogEnablePriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privilege BACKUP_ADMIN for every user who has the privilege RELOAD
 -- provided that there isn't a user who already has the privilege BACKUP_ADMIN.
-SET @hadBackupAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'BACKUP_ADMIN');
+SET @hadBackupAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'BACKUP_ADMIN' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT user, host, 'BACKUP_ADMIN', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE Reload_priv = 'Y' AND @hadBackupAdminPriv = 0;
+FROM mysql.user WHERE Reload_priv = 'Y' AND @hadBackupAdminPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privilege INNODB_REDO_LOG_ARCHIVE for every user who has the privilege BACKUP_ADMIN
 -- provided that there isn't a user who already has the privilege INNODB_REDO_LOG_ARCHIVE.
-SET @hadInnodbRedoLogArchivePriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'INNODB_REDO_LOG_ARCHIVE');
+SET @hadInnodbRedoLogArchivePriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'INNODB_REDO_LOG_ARCHIVE' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT user, host, 'INNODB_REDO_LOG_ARCHIVE', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE Reload_priv = 'Y' AND @hadInnodbRedoLogArchivePriv = 0;
+FROM mysql.user WHERE Reload_priv = 'Y' AND @hadInnodbRedoLogArchivePriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privilege RESOURCE_GROUP_ADMIN for every user who has the privilege SUPER
 -- provided that there isn't a user who already has the privilege RESOURCE_GROUP_ADMIN.
-SET @hadResourceGroupAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'RESOURCE_GROUP_ADMIN');
+SET @hadResourceGroupAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'RESOURCE_GROUP_ADMIN' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT user, host, 'RESOURCE_GROUP_ADMIN',
-IF(grant_priv = 'Y', 'Y', 'N') FROM mysql.user WHERE super_priv = 'Y' AND @hadResourceGroupAdminPriv = 0;
+IF(grant_priv = 'Y', 'Y', 'N') FROM mysql.user WHERE super_priv = 'Y' AND @hadResourceGroupAdminPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privilege SERVICE_CONNECTION_ADMIN for every user who has the privilege SUPER
 -- provided that there isn't a user who already has the privilege SERVICE_CONNECTION_ADMIN.
-SET @hadServiceConnectionAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'SERVICE_CONNECTION_ADMIN');
+SET @hadServiceConnectionAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'SERVICE_CONNECTION_ADMIN' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT user, host, 'SERVICE_CONNECTION_ADMIN', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE super_priv = 'Y' AND @hadServiceConnectionAdminPriv = 0;
+FROM mysql.user WHERE super_priv = 'Y' AND @hadServiceConnectionAdminPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 
 -- Add the privilege APPLICATION_PASSWORD_ADMIN for every user who has the
 -- privilege CREATE USER provided that there isn't a user who already has
 -- privilege APPLICATION_PASSWORD_ADMIN
-SET @hadApplicationPasswordAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'APPLICATION_PASSWORD_ADMIN');
+SET @hadApplicationPasswordAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'APPLICATION_PASSWORD_ADMIN' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT user, host, 'APPLICATION_PASSWORD_ADMIN', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE Create_user_priv = 'Y' AND @hadApplicationPasswordAdminPriv = 0;
+FROM mysql.user WHERE Create_user_priv = 'Y' AND @hadApplicationPasswordAdminPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privilege AUDIT_ADMIN for every user who has the privilege SUPER
 -- provided that there isn't a user who already has the privilige AUDIT_ADMIN.
-SET @hadAuditAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'AUDIT_ADMIN');
+SET @hadAuditAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'AUDIT_ADMIN' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT user, host, 'AUDIT_ADMIN', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE super_priv = 'Y' AND @hadAuditAdminPriv = 0;
+FROM mysql.user WHERE super_priv = 'Y' AND @hadAuditAdminPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privilege TELEMETRY_LOG_ADMIN for every user who has the privilege SUPER
 -- provided that there isn't a user who already has the privilige TELEMETRY_LOG_ADMIN.
-SET @hadAuditAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'TELEMETRY_LOG_ADMIN');
+SET @hadAuditAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'TELEMETRY_LOG_ADMIN' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT user, host, 'TELEMETRY_LOG_ADMIN', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE super_priv = 'Y' AND @hadAuditAdminPriv = 0;
+FROM mysql.user WHERE super_priv = 'Y' AND @hadAuditAdminPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privilege BINLOG_ADMIN for every user who has the privilege SUPER
 -- provided that there isn't a user who already has the privilige BINLOG_ADMIN.
-SET @hadBinLogAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'BINLOG_ADMIN');
+SET @hadBinLogAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'BINLOG_ADMIN' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT user, host, 'BINLOG_ADMIN', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE super_priv = 'Y' AND @hadBinLogAdminPriv = 0;
+FROM mysql.user WHERE super_priv = 'Y' AND @hadBinLogAdminPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privilege BINLOG_ENCRYPTION_ADMIN for every user who has the privilege SUPER
 -- provided that there isn't a user who already has the privilige BINLOG_ENCRYPTION_ADMIN.
-SET @hadBinLogEncryptionAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'BINLOG_ENCRYPTION_ADMIN');
+SET @hadBinLogEncryptionAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'BINLOG_ENCRYPTION_ADMIN' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT user, host, 'BINLOG_ENCRYPTION_ADMIN', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE super_priv = 'Y' AND @hadBinLogEncryptionAdminPriv = 0;
+FROM mysql.user WHERE super_priv = 'Y' AND @hadBinLogEncryptionAdminPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privilege CONNECTION_ADMIN for every user who has the privilege SUPER
 -- provided that there isn't a user who already has the privilige CONNECTION_ADMIN.
-SET @hadConnectionAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'CONNECTION_ADMIN');
+SET @hadConnectionAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'CONNECTION_ADMIN' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT user, host, 'CONNECTION_ADMIN', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE super_priv = 'Y' AND @hadConnectionAdminPriv = 0;
+FROM mysql.user WHERE super_priv = 'Y' AND @hadConnectionAdminPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privilege ENCRYPTION_KEY_ADMIN for every user who has the privilege SUPER
 -- provided that there isn't a user who already has the privilige ENCRYPTION_KEY_ADMIN.
-SET @hadEncryptionKeyAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'ENCRYPTION_KEY_ADMIN');
+SET @hadEncryptionKeyAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'ENCRYPTION_KEY_ADMIN' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT user, host, 'ENCRYPTION_KEY_ADMIN', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE super_priv = 'Y' AND @hadEncryptionKeyAdminPriv = 0;
+FROM mysql.user WHERE super_priv = 'Y' AND @hadEncryptionKeyAdminPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privilege GROUP_REPLICATION_ADMIN for every user who has the privilege SUPER
 -- provided that there isn't a user who already has the privilige GROUP_REPLICATION_ADMIN.
-SET @hadGroupReplicationAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'GROUP_REPLICATION_ADMIN');
+SET @hadGroupReplicationAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'GROUP_REPLICATION_ADMIN' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT user, host, 'GROUP_REPLICATION_ADMIN', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE super_priv = 'Y' AND @hadGroupReplicationAdminPriv = 0;
+FROM mysql.user WHERE super_priv = 'Y' AND @hadGroupReplicationAdminPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privilege PERSIST_RO_VARIABLES_ADMIN for every user who has the privilege SUPER
 -- provided that there isn't a user who already has the privilige PERSIST_RO_VARIABLES_ADMIN.
-SET @hadPersistRoVariablesAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'PERSIST_RO_VARIABLES_ADMIN');
+SET @hadPersistRoVariablesAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'PERSIST_RO_VARIABLES_ADMIN' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT user, host, 'PERSIST_RO_VARIABLES_ADMIN', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE super_priv = 'Y' AND @hadPersistRoVariablesAdminPriv = 0;
+FROM mysql.user WHERE super_priv = 'Y' AND @hadPersistRoVariablesAdminPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privilege REPLICATION_SLAVE_ADMIN for every user who has the privilege SUPER
 -- provided that there isn't a user who already has the privilige REPLICATION_SLAVE_ADMIN.
-SET @hadReplicationSlaveAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'REPLICATION_SLAVE_ADMIN');
+SET @hadReplicationSlaveAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'REPLICATION_SLAVE_ADMIN' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT user, host, 'REPLICATION_SLAVE_ADMIN', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE super_priv = 'Y' AND @hadReplicationSlaveAdminPriv = 0;
+FROM mysql.user WHERE super_priv = 'Y' AND @hadReplicationSlaveAdminPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privilege RESOURCE_GROUP_USER for every user who has the privilege SUPER
 -- provided that there isn't a user who already has the privilige RESOURCE_GROUP_USER.
-SET @hadResourceGroupUserPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'RESOURCE_GROUP_USER');
+SET @hadResourceGroupUserPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'RESOURCE_GROUP_USER' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT user, host, 'RESOURCE_GROUP_USER', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE super_priv = 'Y' AND @hadResourceGroupUserPriv = 0;
+FROM mysql.user WHERE super_priv = 'Y' AND @hadResourceGroupUserPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privilege ROLE_ADMIN for every user who has the privilege SUPER
 -- provided that there isn't a user who already has the privilige ROLE_ADMIN.
-SET @hadRoleAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'ROLE_ADMIN');
+SET @hadRoleAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'ROLE_ADMIN' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT user, host, 'ROLE_ADMIN', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE super_priv = 'Y' AND @hadRoleAdminPriv = 0;
+FROM mysql.user WHERE super_priv = 'Y' AND @hadRoleAdminPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privilege SESSION_VARIABLES_ADMIN for every user who has the privilege SUPER
 -- provided that there isn't a user who already has the privilige SESSION_VARIABLES_ADMIN.
-SET @hadSessionVariablesAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'SESSION_VARIABLES_ADMIN');
+SET @hadSessionVariablesAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'SESSION_VARIABLES_ADMIN' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT user, host, 'SESSION_VARIABLES_ADMIN', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE super_priv = 'Y' AND @hadSessionVariablesAdminPriv = 0;
+FROM mysql.user WHERE super_priv = 'Y' AND @hadSessionVariablesAdminPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privileges SET_ANY_DEFINER and ALLOW_NONEXISTENT_DEFINER for every user who has the privilege SUPER
@@ -770,9 +770,9 @@ COMMIT;
 
 -- Add the privilege SYSTEM_VARIABLES_ADMIN for every user who has the privilege SUPER
 -- provided that there isn't a user who already has the privilige SYSTEM_VARIABLES_ADMIN.
-SET @hadSystemVariablesAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'SYSTEM_VARIABLES_ADMIN');
+SET @hadSystemVariablesAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'SYSTEM_VARIABLES_ADMIN' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT user, host, 'SYSTEM_VARIABLES_ADMIN', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE super_priv = 'Y' AND @hadSystemVariablesAdminPriv = 0;
+FROM mysql.user WHERE super_priv = 'Y' AND @hadSystemVariablesAdminPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privilege SYSTEM_USER for every user who has privilege SET_USER_ID privilege
@@ -783,9 +783,9 @@ COMMIT;
 
 -- Add the privilege SYSTEM_USER for every user who has the privilege SUPER
 -- provided that there isn't a user who already has the privilege SYSTEM_USER
-SET @hadSystemUserPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'SYSTEM_USER');
+SET @hadSystemUserPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'SYSTEM_USER' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT user, host, 'SYSTEM_USER', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE super_priv = 'Y' AND @hadSystemUserPriv = 0;
+FROM mysql.user WHERE super_priv = 'Y' AND @hadSystemUserPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privilege TABLE_ENCRYPTION_ADMIN for every user who has the privilege SUPER
@@ -801,9 +801,9 @@ COMMIT;
 
 -- Add the privilege REPLICATION_APPLIER for every user who has the privilege SUPER
 -- provided that there isn't a user who already has the privilige REPLICATION_APPLIER.
-SET @hadReplicationApplierPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'REPLICATION_APPLIER');
+SET @hadReplicationApplierPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'REPLICATION_APPLIER' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT user, host, 'REPLICATION_APPLIER', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE super_priv = 'Y' AND @hadReplicationApplierPriv = 0;
+FROM mysql.user WHERE super_priv = 'Y' AND @hadReplicationApplierPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privilege SHOW_ROUTINE for every user who has global SELECT privilege
@@ -815,16 +815,16 @@ COMMIT;
 
 -- Add the privilege AUTHENTICATION_POLICY_ADMIN for every user who has the SYSTEM_VARIABLES_ADMIN privilege
 -- provided that there isn't a user who already has the privilege AUTHENTICATION_POLICY_ADMIN.
-SET @hadAuthenticationPolicyAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'AUTHENTICATION_POLICY_ADMIN');
+SET @hadAuthenticationPolicyAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'AUTHENTICATION_POLICY_ADMIN' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT mu.user, mu.host, 'AUTHENTICATION_POLICY_ADMIN', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user mu, global_grants gg WHERE mu.user = gg.user AND gg.priv = 'SYSTEM_VARIABLES_ADMIN' AND @hadAuthenticationPolicyAdminPriv = 0;
+FROM mysql.user mu, global_grants gg WHERE mu.user = gg.user AND gg.priv = 'SYSTEM_VARIABLES_ADMIN' AND @hadAuthenticationPolicyAdminPriv = 0 AND mu.user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privilege PASSWORDLESS_USER_ADMIN for every user who has the privilege CREATE USER
 -- provided that there isn't a user who already has the privilege PASSWORDLESS_USER_ADMIN.
-SET @hadPasswordlessUserAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'PASSWORDLESS_USER_ADMIN');
+SET @hadPasswordlessUserAdminPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'PASSWORDLESS_USER_ADMIN' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT user, host, 'PASSWORDLESS_USER_ADMIN', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE Create_user_priv = 'Y' AND @hadPasswordlessUserAdminPriv = 0;
+FROM mysql.user WHERE Create_user_priv = 'Y' AND @hadPasswordlessUserAdminPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 # Activate the new, possible modified privilege tables
@@ -1335,52 +1335,103 @@ DROP PREPARE stmt;
 #
 #INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.internal.session','N','N','N','N','N','N','Y','N','N','N','Y','N','N','N','N','Y','N','N','N','N','N','N','N','N','N','Y','N','N','N','','','','',0,0,0,0,'caching_sha2_password','$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED','N',CURRENT_TIMESTAMP, NULL,'Y','N','N',NULL,NULL,NULL,NULL);
 
+# The above commented INSERT IGNORE INTO should be enough, but check the comment about
+# 'bugs with roles' in mysql_system_users.sql where we create mysql.pxc.internal.session.
+# This is why below we do what 'GRANT ALL PRIVILEGES ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;'
+# does.
+#
+# ================ IMPORTANT: ================
+#
+# Note that this file contains multiple updates to dynamic privileges in sections like
+# -- Add the privilege SOME_PRIVILEGE for every user who has the privilege OTHER_PRIVILEGE
+# and we don't want mysql.pxc.internal.session or mysql.pxc.internal.session cause them not to work.
+# It means that every such privilege update should exclude the above two users from consideration
+# adding AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role') clause.
+#
 # (Use this since the CREATE DATABASE doesn't work when the grant is in a role)
 # So we assign the mysql.pxc.internal.session root privileges with grant option
 # These are the values for
 #  GRANT ALL PRIVILEGES ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
-#  GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
 #
 INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.internal.session','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','','','','',0,0,0,0,'caching_sha2_password','$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED','N',CURRENT_TIMESTAMP,NULL,'Y','Y','Y',NULL,NULL,NULL,NULL);
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'AUDIT_ABORT_EXEMPT', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'AUDIT_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'AUTHENTICATION_POLICY_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'BACKUP_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'BINLOG_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'BINLOG_ENCRYPTION_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'CLONE_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'CONNECTION_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'ENCRYPTION_KEY_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'FIREWALL_EXEMPT', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'FLUSH_OPTIMIZER_COSTS', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'FLUSH_STATUS', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'FLUSH_TABLES', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'FLUSH_USER_RESOURCES', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'GROUP_REPLICATION_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'GROUP_REPLICATION_STREAM', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'INNODB_REDO_LOG_ARCHIVE', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'INNODB_REDO_LOG_ENABLE', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'PASSWORDLESS_USER_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'PERSIST_RO_VARIABLES_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'REPLICATION_APPLIER', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'REPLICATION_SLAVE_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'RESOURCE_GROUP_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'RESOURCE_GROUP_USER', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'ROLE_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'SENSITIVE_VARIABLES_OBSERVER', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'SERVICE_CONNECTION_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'SESSION_VARIABLES_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'SET_ANY_DEFINER', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'ALLOW_NONEXISTENT_DEFINER', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'SHOW_ROUTINE', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'SYSTEM_USER', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'SYSTEM_VARIABLES_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'TABLE_ENCRYPTION_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'TELEMETRY_LOG_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'XA_RECOVER_ADMIN', 'Y');
 
 
 #
 # mysql.pxc.sst.role
-#   See the comments in mysql_system_tables.sql
+#   See the comments in mysql_system_users.sql
+#   Below we try to restore mysql.pxc.sst.role if someone deleted it
 
-# These are the values for
-#  GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER, INNODB_REDO_LOG_ARCHIVE ON *.* TO 'mysql.pxc.sst.role'@localhost;
+# These are the values for sst_xtrabackup
+#  (needed by sst_xtrabackup):
+#  GRANT BACKUP_ADMIN, INNODB_REDO_LOG_ARCHIVE, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.* TO 'mysql.pxc.sst.role'@localhost;
 #  GRANT ALTER, CREATE, SELECT, INSERT ON PERCONA_SCHEMA.xtrabackup_history TO 'mysql.pxc.sst.role'@localhost;
 #  GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost;
 #  GRANT CREATE ON PERCONA_SCHEMA.* to 'mysql.pxc.sst.role'@localhost;
-INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.sst.role','N','N','N','N','N','N','Y','N','Y','N','N','N','N','N','N','Y','N','Y','N','N','Y','N','N','N','N','N','N','N','N','','','','',0,0,0,0,'caching_sha2_password','','Y',CURRENT_TIMESTAMP,NULL,'Y','N','N',NULL,NULL,NULL,NULL);
 
-INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'BACKUP_ADMIN', 'N');
+#
+#  (additionally needed by sst_clone):
+#  GRANT BACKUP_ADMIN, EXECUTE ON *.* TO 'mysql.pxc.sst.role'@localhost WITH GRANT OPTION;
+#  GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost WITH GRANT OPTION;
+#
+#  Note: CREATE USER enables CREATE_ROLE and DROP_ROLE
+#  GRANT CLONE_ADMIN, SYSTEM_USER, SHUTDOWN, CONNECTION_ADMIN, CREATE USER, CREATE ROLE, DROP ROLE, SYSTEM_VARIABLES_ADMIN ON *.* TO 'mysql.pxc.sst.role'@localhost;
+#  GRANT INSERT, DELETE ON mysql.plugin TO 'mysql.pxc.sst.role'@localhost;
+#  GRANT UPDATE, INSERT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost;
+
+# common
+INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.sst.role','N','N','N','N','N','N','Y','Y','Y','N','Y','N','N','N','N','Y','N','Y','Y','N','Y','N','N','N','N','Y','N','N','N','','','','',0,0,0,0,'caching_sha2_password','','Y',CURRENT_TIMESTAMP,NULL,'Y','Y','Y',NULL,NULL,NULL,NULL);
+
+#  pxb-sst
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'BACKUP_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'INNODB_REDO_LOG_ARCHIVE', 'N');
 INSERT IGNORE INTO mysql.tables_priv VALUES ('localhost', 'PERCONA_SCHEMA', 'mysql.pxc.sst.role', 'xtrabackup_history', 'root\@localhost', CURRENT_TIMESTAMP, 'Alter,Select,Insert,Create', '');
-INSERT IGNORE INTO mysql.db VALUES ('localhost', 'performance_schema', 'mysql.pxc.sst.role','Y','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N');
 INSERT IGNORE INTO mysql.db VALUES ('localhost', 'PERCONA_SCHEMA', 'mysql.pxc.sst.role','N','N','N','N','Y','N','N','N','N','N','N','N','N','N','N','N','N','N','N');
+
+#  common
+INSERT IGNORE INTO mysql.db VALUES ('localhost', 'performance_schema', 'mysql.pxc.sst.role','Y','Y','Y','N','N','N','Y','N','N','N','N','N','N','N','N','N','N','N','N');
+
+#  clone-sst
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'CLONE_ADMIN', 'N');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'SYSTEM_USER', 'N');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'CONNECTION_ADMIN', 'N');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'SYSTEM_VARIABLES_ADMIN', 'N');
+INSERT IGNORE INTO mysql.tables_priv VALUES ('localhost', 'mysql', 'mysql.pxc.sst.role', 'plugin', 'root\@localhost', CURRENT_TIMESTAMP, 'Insert,Delete', '');
 
 #! PXC_SECTION::END
 # flush privileges at this stage can cause problem with upgrade from 57 -> 80
@@ -1740,23 +1791,23 @@ ALTER TABLE time_zone
   MODIFY Use_leap_seconds enum('Y','N') COLLATE utf8mb3_general_ci DEFAULT 'N' NOT NULL;
 
 -- grant AUDIT_ABORT_EXEMPT to all current holders of SYSTEM_USER
-SET @hadAuditAbortExempt = (SELECT COUNT(*) FROM global_grants WHERE priv = 'AUDIT_ABORT_EXEMPT');
+SET @hadAuditAbortExempt = (SELECT COUNT(*) FROM global_grants WHERE priv = 'AUDIT_ABORT_EXEMPT' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO mysql.global_grants
   SELECT user, host, 'AUDIT_ABORT_EXEMPT', IF (WITH_GRANT_OPTION = 'Y', 'Y', 'N')
-   FROM mysql.global_grants WHERE priv = 'SYSTEM_USER' AND @hadAuditAbortExempt = 0;
+   FROM mysql.global_grants WHERE priv = 'SYSTEM_USER' AND @hadAuditAbortExempt = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 
 -- grant FIREWALL_EXEMPT to all current holders of SYSTEM_USER
-SET @hadFirewallExempt = (SELECT COUNT(*) FROM global_grants WHERE priv = 'FIREWALL_EXEMPT');
+SET @hadFirewallExempt = (SELECT COUNT(*) FROM global_grants WHERE priv = 'FIREWALL_EXEMPT' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO mysql.global_grants
   SELECT user, host, 'FIREWALL_EXEMPT', IF (WITH_GRANT_OPTION = 'Y', 'Y', 'N')
-   FROM mysql.global_grants WHERE priv = 'SYSTEM_USER' AND @hadFirewallExempt = 0;
+   FROM mysql.global_grants WHERE priv = 'SYSTEM_USER' AND @hadFirewallExempt = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 
 -- Add the privilege SENSITIVE_VARIABLES_OBSERVER for every user who has the SYSTEM_VARIABLES_ADMIN privilege
 -- provided that there isn't a user who already has the privilege SENSITIVE_VARIABLES_OBSERVER.
-SET @hadSensitiveVariablesAdmin = (SELECT COUNT(*) FROM global_grants WHERE priv = 'SENSITIVE_VARIABLES_OBSERVER');
+SET @hadSensitiveVariablesAdmin = (SELECT COUNT(*) FROM global_grants WHERE priv = 'SENSITIVE_VARIABLES_OBSERVER' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO mysql.global_grants
   SELECT user, host, 'SENSITIVE_VARIABLES_OBSERVER', IF (WITH_GRANT_OPTION = 'Y', 'Y', 'N')
-   FROM mysql.global_grants WHERE priv = 'SYSTEM_VARIABLES_ADMIN' AND @hadSensitiveVariablesAdmin = 0 AND user NOT IN ('mysql.infoschema','mysql.session','mysql.sys');
+   FROM mysql.global_grants WHERE priv = 'SYSTEM_VARIABLES_ADMIN' AND @hadSensitiveVariablesAdmin = 0 AND user NOT IN ('mysql.infoschema','mysql.session','mysql.sys','mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- add the PK for mysql.firewall_membership, if missing and if the table is present
@@ -1829,3 +1880,9 @@ FROM mysql.user WHERE Reload_priv = 'Y' AND @hadFlushPrivilegesPriv = 0 AND user
 
 -- SET_USER_ID is removed dynamic privilege, revoke all grants of it.
 DELETE FROM global_grants WHERE PRIV = 'SET_USER_ID';
+
+-- Bug#36808636 System accounts are not converted to non legacy auth plugin during upgrade
+-- Convert authentication of 'mysql.sys' and 'mysql.sessioon' users
+-- from mysql_native_password into caching_sha2_password.
+UPDATE mysql.user SET plugin='caching_sha2_password', authentication_string='$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED' WHERE user='mysql.sys';
+UPDATE mysql.user SET plugin='caching_sha2_password', authentication_string='$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED' WHERE user='mysql.session';

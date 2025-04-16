@@ -9896,10 +9896,8 @@ static void set_binlog_snapshot_file(const char *src) {
           sizeof(binlog_snapshot_file) - 1);
 }
 
-
-
 void MYSQL_BIN_LOG::report_missing_purged_gtids(
-  const Gtid_set *slave_executed_gtid_set, std::string &errmsg) {
+    const Gtid_set *slave_executed_gtid_set, std::string &errmsg) {
   DBUG_TRACE;
   THD *thd = current_thd;
   Gtid_set gtid_missing(gtid_state->get_lost_gtids()->get_tsid_map());

@@ -80,8 +80,13 @@ void Wsrep_async_monitor::leave(seqno_t seqno) {
     //                   ? "none"
     //                   : std::to_string(scheduled_seqnos.front()))
     //           << " but got " << seqno << "." << std::endl;
+#ifdef EXTRA_CODE_FOR_UNIT_TESTING
+    // We don't have assert() in release build.
+    // We don't have unireg_abort() in unit tests.
+    fprintf(stderr, "Sequence number mismatch in leave()");
+    abort();
+#else
     assert(false && "Sequence number mismatch in leave()");
-#ifndef EXTRA_CODE_FOR_UNIT_TESTING
     unireg_abort(1);
 #endif
   }
