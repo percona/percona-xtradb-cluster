@@ -160,6 +160,7 @@ get_sources(){
         pushd percona-xtradb-cluster-galera
            GALERA_REVISION=$(git rev-parse --short HEAD)
            echo ${GALERA_REVISION} > GALERA-REVISION
+           sed -i "s/XXXX/${GALERA_REVISION}/g" cmake/version.cmake
         popd
         GALERA_REVNO="$(test -r percona-xtradb-cluster-galera/GALERA-REVISION && cat percona-xtradb-cluster-galera/GALERA-REVISION)"
     fi

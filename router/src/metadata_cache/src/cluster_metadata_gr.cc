@@ -157,7 +157,7 @@ class GRClusterSetMetadataBackend : public GRMetadataBackendV2 {
    * filters or policies (like target_cluster etc.)
    * @return object containing cluster topology information in case of success,
    * or error code in case of failure
-   * @throws metadata_cache::metadata_error
+   * @throws metadata_cache::metadata_error on failure
    */
   stdx::expected<metadata_cache::ClusterTopology, std::error_code>
   fetch_cluster_topology(
@@ -852,6 +852,13 @@ GRClusterMetadata::fetch_cluster_topology(
         }
 
         MySQLSession::Transaction transaction(metadata_connection_.get());
+
+        if (!is_server_version_supported(metadata_connection_.get())) {
+          log_warning("%s - skipping", get_unsupported_server_version_msg(
+                                           metadata_connection_.get())
+                                           .c_str());
+          continue;
+        }
 
         // throws metadata_cache::metadata_error and
         // MetadataUpgradeInProgressException
