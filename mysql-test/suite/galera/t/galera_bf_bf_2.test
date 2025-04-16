@@ -1,0 +1,23 @@
+#
+# Test that
+# RENAME TABLE <child_table> and concurrent INSERT INTO <parent_table>
+# RENAME TABLE <parent_table> and concurrent INSERT INTO <child_table>
+# are properly ordered.
+#
+
+--source include/have_debug_sync.inc
+--source suite/galera/include/galera_have_debug_sync.inc
+--source include/galera_cluster.inc
+
+--let $ddl_query = RENAME TABLE child TO child_new
+--let $dml_query = INSERT INTO parent VALUES (1)
+--let $dml_table = parent
+--let $drop_query = DROP TABLE child_new, parent
+--source galera_bf_bf_2.inc
+
+--let $ddl_query = RENAME TABLE parent TO parent_new
+--let $dml_query = INSERT INTO child VALUES (1, 0)
+--let $drop_query = DROP TABLE child, parent_new
+--let $dml_table = child
+--source galera_bf_bf_2.inc
+
