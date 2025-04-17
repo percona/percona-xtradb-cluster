@@ -500,6 +500,12 @@ INSERT INTO global_suppressions VALUES
  */
  (".*WARNING: unhandled amd64-linux syscall:.*"),
 
+ /*
+   GCache uses mmaped memory for encryption layer. If mmap fails, the functionality still works
+   but the performance is affected and the warning is printed.
+ */
+ (".*mlock failed. It will still work, but swap pages into the disk, so performance will be affected"),
+
  ("THE_LAST_SUPPRESSION");
 
 
