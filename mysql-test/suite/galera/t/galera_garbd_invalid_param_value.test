@@ -1,0 +1,103 @@
+# ==== Purpose ====
+#
+# This test verifies that garbd shuts down smoothly when any option has the value
+# containing non-printable ASCII string.
+#
+# ==== Implementation ====
+#
+# 1. Create a two node cluster.
+# 2. Shutdown node2 and use its ports for garbd.
+# 3. Start garbd in background with an invalid parameter value and wait till garbd is shutdown.
+# 4. Verify that the reason for the shutdown is logged in the error log.
+# 5. Restart node2
+#
+# ==== References ====
+#
+# Test a single node with an arbitrator.  Startup a 2-node cluster, shut down
+# node 2, and use it's ports for the garbd.
+#
+
+--echo #
+--echo # 1. Create a two node cluster.
+--source include/galera_cluster.inc
+
+--echo #
+--echo # 2. Shutdown node2 and use its ports for garbd.
+--connection node_2
+--source include/shutdown_mysqld.inc
+
+# Wait for the cluster size to become 1
+--connection node_1
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+SHOW STATUS LIKE 'wsrep_flow_control_interval';
+
+--echo #
+--echo # 3 & 4. Start garbd with an invalid parameter and verify logs.
+
+# Test options one-by-one
+# --address and --group can't be omitted
+
+--let $option_name = name
+--let $command_opt_value = --name "\$(echo -ne '\x0dtest')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
+--source ../include/galera_garbd_invalid_param_value.inc
+
+--let $option_name = address
+--let $command_opt_value = --address "\$(echo -ne 'gcomm://\x0d127.0.0.1:$NODE_GALERAPORT_1')" --group my_wsrep_cluster
+--source ../include/galera_garbd_invalid_param_value.inc
+
+--let $option_name = group
+--let $command_opt_value = --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group "\$(echo -ne 'my_wsrep_cluster\x0d')"
+--source ../include/galera_garbd_invalid_param_value.inc
+
+--let $option_name = sst
+--let $command_opt_value = --sst "\$(echo -ne '\x0dxtrabackup-v2:127.0.0.1:9999/xtrabackup_sst//1')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
+--source ../include/galera_garbd_invalid_param_value.inc
+
+--let $option_name = donor
+--let $command_opt_value = --donor "\$(echo -ne '\x0ddonor_name')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
+--source ../include/galera_garbd_invalid_param_value.inc
+
+--let $option_name = options
+--let $command_opt_value = --options "\$(echo -ne 'evs.inactive_timeout=PT\x0d6S')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
+--source ../include/galera_garbd_invalid_param_value.inc
+
+--let $option_name = log
+--let $command_opt_value = --log "\$(echo -ne '/log/\x0file/path')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
+--source ../include/galera_garbd_invalid_param_value.inc
+
+--let $option_name = recv-script
+--let $command_opt_value = --recv-script "\$(echo -ne '\x0d/script/path')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
+--source ../include/galera_garbd_invalid_param_value.inc
+
+--let $option_name = post-recv-script
+--let $command_opt_value = --post-recv-script "\$(echo -ne '\x0d/script/path')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
+--source ../include/galera_garbd_invalid_param_value.inc
+
+--let $option_name = workdir
+--let $command_opt_value = --workdir "\$(echo -ne '\x0d/workdir/path')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
+--source ../include/galera_garbd_invalid_param_value.inc
+
+--let $option_name = cfg
+--let $command_opt_value = --cfg "\$(echo -ne '/cfg/\x0d//path')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
+--source ../include/galera_garbd_invalid_param_value.inc
+
+--echo #
+--echo # 5. Restart node2
+--connection node_2
+--echo [connection node_2]
+--let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
+--source include/start_mysqld.inc
+--source include/wait_until_connected_again.inc
+
+# Wait for the cluster size to become 2
+--connection node_1
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+--connection node_2
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+
