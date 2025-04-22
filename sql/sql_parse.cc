@@ -4278,6 +4278,9 @@ int mysql_execute_command(THD *thd, bool first_level) {
     case SQLCOM_RENAME_TABLE: {
       assert(first_table == all_tables && first_table != nullptr);
       Table_ref *table;
+#ifdef WITH_WSREP
+      wsrep::key_array keys;
+#endif
       for (table = first_table; table; table = table->next_local->next_local) {
         if (check_access(thd, ALTER_ACL | DROP_ACL, table->db,
                          &table->grant.privilege, &table->grant.m_internal,
@@ -4286,6 +4289,16 @@ int mysql_execute_command(THD *thd, bool first_level) {
                          &table->next_local->grant.privilege,
                          &table->next_local->grant.m_internal, false, false))
           goto error;
+
+#ifdef WITH_WSREP
+        // append tables referenced by this table
+        // append tables that are referencing this table
+        if (wsrep_append_fk_parent_table(thd, table, &keys) ||
+            wsrep_append_child_tables(thd, table, &keys)) {
+          WSREP_DEBUG("TOI replication for RENAME TABLE failed");
+          goto error;
+        }
+#endif
 
         Table_ref old_list = table[0];
         Table_ref new_list = table->next_local[0];
@@ -4308,7 +4321,8 @@ int mysql_execute_command(THD *thd, bool first_level) {
 
 #ifdef WITH_WSREP
       if (WSREP(thd) &&
-          wsrep_to_isolation_begin(thd, NULL, NULL, first_table)) {
+          wsrep_to_isolation_begin(thd, nullptr, nullptr, first_table, nullptr,
+                                   nullptr, &keys)) {
         goto error;
       }
 #endif /* WITH_WSREP */
