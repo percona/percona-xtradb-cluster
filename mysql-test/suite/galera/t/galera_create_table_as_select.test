@@ -182,3 +182,34 @@ SHOW TABLES;
 
 --connection node_1
 DROP TABLE t1, t2;
+
+#
+# This scenario checks that the creation of temporary table as select 
+# is not putting the node in TOI mode.
+#
+
+--connection node_1
+CREATE TABLE t2 (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO t2 VALUES (1),(2),(3),(4),(5);
+
+CREATE TEMPORARY TABLE t1 AS SELECT * FROM t2;
+
+# Add a sleep to delay the completion of the query
+--send SELECT SLEEP(10);
+
+--connection node_1a
+let $wait_condition = SELECT COUNT(*) > 0 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE INFO = 'SELECT SLEEP(10)';
+--source include/wait_condition.inc
+
+let $thread_id = `SELECT ID FROM INFORMATION_SCHEMA.PROCESSLIST WHERE INFO = 'SELECT SLEEP(10)' LIMIT 1`;
+--disable_query_log
+--eval KILL QUERY $thread_id;
+--enable_query_log
+
+--connection node_1
+--reap
+let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE INFO = 'SELECT SLEEP(10)';
+--source include/wait_condition.inc
+
+--connection node_1
+DROP TABLE IF EXISTS t1, t2;
