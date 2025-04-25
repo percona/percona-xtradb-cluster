@@ -291,7 +291,7 @@ bool Sql_cmd_create_table::execute(THD *thd) {
     Till PXC-5.7, it was being replicated through normal binlog replication.
     After MySQL-8.0, made DDL atomic, it introduces xid in-consistency
     with CTAS (check bug#93948). */
-    if (WSREP(thd) &&
+    if (WSREP(thd) && !is_temporary_table &&
         wsrep_to_isolation_begin(thd, create_table->db,
                                  create_table->table_name, NULL)) {
       if (create_info.tablespace) {
