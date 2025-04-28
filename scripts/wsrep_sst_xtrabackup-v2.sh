@@ -1753,6 +1753,16 @@ if [[ ! -x $XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN ]]; then
 fi
 XB_2x_VERSION=$($XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN --version 2>&1 | grep -oe ' [0-9]\.[0-9]\.[0-9]*' | head -n1)
 XB_2x_VERSION=${XB_2x_VERSION# }
+
+if [[ -z "$XB_2x_VERSION" ]]; then
+    wsrep_log_error "******************* FATAL ERROR ********************** "
+    wsrep_log_error "Cannot determine the xtrabackup 2.x version."
+    wsrep_log_error "$XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN"
+    wsrep_log_error "Please verify that PXC was installed correctly."
+    wsrep_log_error "****************************************************** "
+    exit 2
+fi
+
 if compare_versions "$XB_2x_VERSION" "<" "$XB_2x_REQUIRED_VERSION"; then
     wsrep_log_error "******************* FATAL ERROR ********************** "
     wsrep_log_error "The $XTRABACKUP_BIN version is $XB_2x_VERSION."
@@ -1779,6 +1789,16 @@ if [[ ! -x $XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN ]]; then
 fi
 XB_8x_VERSION=$($XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN --version 2>&1 | grep -oe ' [0-9]\.[0-9]\.[0-9]*' | head -n1)
 XB_8x_VERSION=${XB_8x_VERSION# }
+
+if [[ -z "$XB_8x_VERSION" ]]; then
+    wsrep_log_error "******************* FATAL ERROR ********************** "
+    wsrep_log_error "Cannot determine the xtrabackup 8.x version."
+    wsrep_log_error "$XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN"
+    wsrep_log_error "Please verify that PXC was installed correctly."
+    wsrep_log_error "****************************************************** "
+    exit 2
+fi
+
 if compare_versions "$XB_8x_VERSION" "<" "$XB_8x_REQUIRED_VERSION"; then
     wsrep_log_error "******************* FATAL ERROR ********************** "
     wsrep_log_error "The $XTRABACKUP_BIN version is $XB_8x_VERSION."
