@@ -1727,6 +1727,16 @@ function verify_pxb_version()
 
     local xb_version=$($pxb_bin_path --version 2>&1 | grep -oe ' [0-9]\.[0-9]\.[0-9]*' | head -n1)
     xb_version=${xb_version# }
+
+    if [[ -z "$xb_version" ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "Cannot determine the xtrabackup version."
+        wsrep_log_error "$pxb_bin_path"
+        wsrep_log_error "Please verify that PXC was installed correctly."
+        wsrep_log_error "****************************************************** "
+        exit 2
+    fi
+
     if compare_versions "$xb_version" "<" "$pxb_expected_version"; then
         wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "The $XTRABACKUP_BIN version is $xb_version."
