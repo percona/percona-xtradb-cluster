@@ -30,6 +30,7 @@
 #endif
 
 #include <gmock/gmock.h>
+#include <gtest/gtest.h>
 #include <rapidjson/document.h>
 
 #include "dim.h"
@@ -813,7 +814,7 @@ TEST_F(RestMockServerRestServerMockTest, delete_all_connections) {
   EXPECT_EQ(resp_body.length(), 0u);
 
   SCOPED_TRACE("// check connection is killed");
-  wait_connection_dropped(client);
+  ASSERT_TRUE(wait_connection_dropped(client));
 }
 
 TEST_F(RestMockServerRestServerMockTest, auth_succeeds_require_user_and_pass) {
@@ -1230,16 +1231,13 @@ INSTANTIATE_TEST_SUITE_P(
     });
 
 static void init_DIM() {
+  static mysql_harness::logging::Registry static_registry;
+
   mysql_harness::DIM &dim = mysql_harness::DIM::instance();
 
   // logging facility
-  dim.set_LoggingRegistry(
-      []() {
-        static mysql_harness::logging::Registry registry;
-        return &registry;
-      },
-      [](mysql_harness::logging::Registry *) {}  // don't delete our static!
-  );
+  dim.set_static_LoggingRegistry(&static_registry);
+
   mysql_harness::logging::Registry &registry = dim.get_LoggingRegistry();
 
   mysql_harness::logging::create_module_loggers(

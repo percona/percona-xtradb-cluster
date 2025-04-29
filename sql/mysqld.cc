@@ -1674,8 +1674,6 @@ mysql_mutex_t LOCK_wsrep_slave_threads;
 mysql_cond_t COND_wsrep_slave_threads;
 mysql_mutex_t LOCK_wsrep_cluster_config;
 mysql_mutex_t LOCK_wsrep_desync;
-mysql_mutex_t LOCK_wsrep_group_commit;
-mysql_cond_t COND_wsrep_group_commit;
 mysql_mutex_t LOCK_wsrep_SR_pool;
 mysql_mutex_t LOCK_wsrep_SR_store;
 mysql_mutex_t LOCK_wsrep_alter_tablespace;
@@ -3285,8 +3283,6 @@ static void clean_up_mutexes() {
   mysql_cond_destroy(&COND_wsrep_slave_threads);
   mysql_mutex_destroy(&LOCK_wsrep_cluster_config);
   mysql_mutex_destroy(&LOCK_wsrep_desync);
-  mysql_mutex_destroy(&LOCK_wsrep_group_commit);
-  mysql_cond_destroy(&COND_wsrep_group_commit);
   mysql_mutex_destroy(&LOCK_wsrep_SR_pool);
   mysql_mutex_destroy(&LOCK_wsrep_SR_store);
   mysql_mutex_destroy(&LOCK_wsrep_alter_tablespace);
@@ -5412,8 +5408,8 @@ constexpr bool CanTypeFitValue(const U value) {
 template <typename T, typename U>
 T Clamp(U x) {
   return CanTypeFitValue<T>(x) ? T(x)
-                               : x < 0 ? std::numeric_limits<T>::min()
-                                       : std::numeric_limits<T>::max();
+         : x < 0               ? std::numeric_limits<T>::min()
+                               : std::numeric_limits<T>::max();
 }
 
 // simple (no measurement attributes supported) metric callback
@@ -6588,8 +6584,8 @@ static PSI_metric_info_v1 core_metrics[] = {
      "The maximum number of connections that have been in use simultaneously "
      "since the server started (Max_used_connections)",
      MetricOTELType::ASYNC_GAUGE_COUNTER, MetricNumType::METRIC_INTEGER, 0, 0,
-     get_metric_simple_integer<decltype(
-         Connection_handler_manager::max_used_connections)>,
+     get_metric_simple_integer<
+         decltype(Connection_handler_manager::max_used_connections)>,
      &Connection_handler_manager::max_used_connections},
     {"open_files", "",
      "The number of files that are open. This count includes regular files "
@@ -6686,8 +6682,8 @@ static PSI_metric_info_v1 core_metrics[] = {
      "The number of threads that have taken more than slow_launch_time seconds "
      "to create (Slow_launch_threads)",
      MetricOTELType::ASYNC_COUNTER, MetricNumType::METRIC_INTEGER, 0, 0,
-     get_metric_simple_integer<decltype(
-         Per_thread_connection_handler::slow_launch_threads)>,
+     get_metric_simple_integer<
+         decltype(Per_thread_connection_handler::slow_launch_threads)>,
      &Per_thread_connection_handler::slow_launch_threads},
     {"slow_queries", "",
      "The number of queries that have taken more than long_query_time seconds "
@@ -6934,8 +6930,8 @@ static PSI_metric_info_v1 myisam_metrics[] = {
      "The number of requests to read a key block from the MyISAM key cache "
      "(Key_read_requests)",
      MetricOTELType::ASYNC_GAUGE_COUNTER, MetricNumType::METRIC_INTEGER, 0, 0,
-     get_metric_simple_integer<decltype(
-         dflt_key_cache->global_cache_r_requests)>,
+     get_metric_simple_integer<
+         decltype(dflt_key_cache->global_cache_r_requests)>,
      &dflt_key_cache->global_cache_r_requests},
     {"key_reads", "",
      "The number of physical reads of a key block from disk into the MyISAM "
@@ -6947,8 +6943,8 @@ static PSI_metric_info_v1 myisam_metrics[] = {
      "The number of requests to write a key block to the MyISAM key cache "
      "(Key_write_requests)",
      MetricOTELType::ASYNC_COUNTER, MetricNumType::METRIC_INTEGER, 0, 0,
-     get_metric_simple_integer<decltype(
-         dflt_key_cache->global_cache_w_requests)>,
+     get_metric_simple_integer<
+         decltype(dflt_key_cache->global_cache_w_requests)>,
      &dflt_key_cache->global_cache_w_requests},
     {"key_writes", "",
      "The number of physical writes of a key block from the MyISAM key cache "
@@ -7072,9 +7068,9 @@ int init_common_variables() {
   }
   /*
     We set SYSTEM time zone as reasonable default and
-    also for failure of my_tz_init() and bootstrap mode.
+    also for failure of my_tz_full_init() and bootstrap mode.
     If user explicitly set time zone with --default-time-zone
-    option we will change this value in my_tz_init().
+    option we will change this value in my_tz_full_init().
   */
   global_system_variables.time_zone = my_tz_SYSTEM;
 
@@ -7808,9 +7804,6 @@ static int init_thread_environment() {
                    MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_wsrep_desync, &LOCK_wsrep_desync,
                    MY_MUTEX_INIT_FAST);
-  mysql_mutex_init(key_LOCK_wsrep_group_commit, &LOCK_wsrep_group_commit,
-                   MY_MUTEX_INIT_FAST);
-  mysql_cond_init(key_COND_wsrep_group_commit, &COND_wsrep_group_commit);
   mysql_mutex_init(key_LOCK_wsrep_SR_pool, &LOCK_wsrep_SR_pool,
                    MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_wsrep_SR_store, &LOCK_wsrep_SR_store,
@@ -7875,7 +7868,9 @@ static int init_ssl() {
     LogErr(WARNING_LEVEL, ER_DEPRECATE_MSG_NO_REPLACEMENT, "--ssl-fips-mode");
 
   if (get_fips_mode() == 1) {
+#ifdef WITH_WSREP
     wsrep_enable_fips_mode();
+#endif
     LogErr(INFORMATION_LEVEL, ER_SSL_FIPS_MODE_ENABLED);
   }
 
@@ -10495,6 +10490,11 @@ int mysqld_main(int argc, char **argv)
   }
 #endif
 
+  // Post daemonization operations performed
+  // such as initializing the timer_thread when using
+  // --thread-handling=pool-of-threads
+  Connection_handler_manager::get_instance()->post_daemonize_init();
+
 #ifndef _WIN32
   user_info = check_user(mysqld_user);
   if (!user_info.IsVoid()) {
@@ -10804,9 +10804,6 @@ int mysqld_main(int argc, char **argv)
     (void)RUN_HOOK(server_state, after_engine_recovery, (nullptr));
   }
 
-  register_server_metric_sources();
-  register_pfs_metric_sources();
-
   if (init_ssl_communication()) unireg_abort(MYSQLD_ABORT_EXIT);
   if (network_init()) unireg_abort(MYSQLD_ABORT_EXIT);
 
@@ -11051,6 +11048,14 @@ int mysqld_main(int argc, char **argv)
   */
   set_super_read_only_post_init();
 
+  /*
+    Expose MySQL metrics.
+    This is done only when the server bootstrap is complete,
+    to avoid observing states that are not fully initialized.
+  */
+  register_server_metric_sources();
+  register_pfs_metric_sources();
+
   DBUG_PRINT("info", ("Block, listening for incoming connections"));
 
   (void)MYSQL_SET_STAGE(0, __FILE__, __LINE__);
@@ -11089,6 +11094,14 @@ int mysqld_main(int argc, char **argv)
   sysd::notify("STOPPING=1\nSTATUS=Server shutdown in progress\n");
 
   DBUG_PRINT("info", ("No longer listening for incoming connections"));
+
+  /*
+    No longer expose MySQL metrics.
+    This is done before performing the cleanup to shutdown,
+    to avoid observing states that are being destroyed.
+  */
+  unregister_pfs_metric_sources();
+  unregister_server_metric_sources();
 
   mysql_event_tracking_shutdown_notify(
       AUDIT_EVENT(EVENT_TRACKING_SHUTDOWN_SHUTDOWN),
@@ -12273,9 +12286,14 @@ static int init_wsrep_thread(THD *thd) {
   PSI_THREAD_CALL(set_thread_id)(psi, thd->thread_id());
   /*
     perfshema table_processlist::index_init() filters out threads which
-    do not have set user_name set.
-    If it detects thd marked as system thread, and the user_name is "root"
-    it converts it to "system_user".
+    do not have set user_name set (background threads).
+    If it detects thd marked as system thread, and the thread IS NOT
+    a singleton, it converts it to "system_user".
+    If it detects thd marked as system thread, and the thread IS
+    a singleton, it leaves the username unchanged.
+    Note that there is logical error in table_processlist::make_row(). First it
+    returns if username is empty, but then it has additional logic basing on
+    empty username.
     Q: Why we set it explicitly here?
     A: If wsrep thread is created by 'set global wsrep_applier_threads=30;'
        pfs descriptor inherits the user_name from the parrent thread, which
@@ -12284,7 +12302,8 @@ static int init_wsrep_thread(THD *thd) {
        the main server thread which does not have user set. As the result
        P_S filters this thred out from processlist table as described above.
   */
-  PSI_THREAD_CALL(set_thread_account)("root", strlen("root"), nullptr, 0);
+  PSI_THREAD_CALL(set_thread_account)
+  ("system user", strlen("system user"), nullptr, 0);
 #endif /* HAVE_PSI_INTERFACE */
 
   DBUG_EXECUTE_IF("simulate_wsrep_slave_error_on_init", simulate_error |= 1;);
@@ -15266,7 +15285,6 @@ PSI_mutex_key key_LOCK_wsrep_slave_threads;
 PSI_mutex_key key_LOCK_wsrep_cluster_config;
 PSI_mutex_key key_LOCK_wsrep_desync;
 
-PSI_mutex_key key_LOCK_wsrep_group_commit;
 PSI_mutex_key key_LOCK_wsrep_SR_pool;
 PSI_mutex_key key_LOCK_wsrep_SR_store;
 
@@ -15391,7 +15409,6 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOCK_wsrep_cluster_config, "LOCK_wsrep_cluster_config", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_wsrep_desync, "LOCK_wsrep_desync", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
 
-  { &key_LOCK_wsrep_group_commit, "LOCK_wsrep_group_commit", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_wsrep_SR_pool, "LOCK_wsrep_SR_pool", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_wsrep_SR_store, "LOCK_wsrep_SR_store", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
 
@@ -15479,7 +15496,6 @@ PSI_cond_key key_COND_wsrep_thd;
 PSI_cond_key key_COND_wsrep_sst_thread;
 
 PSI_cond_key key_COND_wsrep_thd_queue;
-PSI_cond_key key_COND_wsrep_group_commit;
 #endif /* WITH_WSREP */
 
 PSI_cond_key key_RELAYLOG_update_cond;
@@ -15546,7 +15562,6 @@ static PSI_cond_info all_server_conds[]=
   { &key_COND_wsrep_sst_thread, "COND_wsrep_sst_thread", 0, 0, PSI_DOCUMENT_ME},
 
   { &key_COND_wsrep_thd_queue, "COND_wsrep_thd_queue", 0, 0, PSI_DOCUMENT_ME},
-  { &key_COND_wsrep_group_commit, "COND_wsrep_group_commit", 0, 0, PSI_DOCUMENT_ME}
 #endif /* WITH_WSREP */
 };
 /* clang-format on */
@@ -15589,7 +15604,7 @@ PSI_FLAG_USER | PSI_FLAG_NO_SEQNUM, 0, PSI_DOCUMENT_ME},
   { &key_THREAD_wsrep_sst_joiner, "THREAD_wsrep_sst_joiner", "sst_joiner", PSI_FLAG_SINGLETON | PSI_FLAG_THREAD_SYSTEM, 0, PSI_DOCUMENT_ME},
   { &key_THREAD_wsrep_sst_donor, "THREAD_wsrep_sst_donor", "sst_donor", PSI_FLAG_SINGLETON | PSI_FLAG_THREAD_SYSTEM, 0, PSI_DOCUMENT_ME},
   { &key_THREAD_wsrep_sst_logger, "THREAD_wsrep_sst_logger", "sst_logger", PSI_FLAG_SINGLETON | PSI_FLAG_THREAD_SYSTEM, 0, PSI_DOCUMENT_ME},
-  { &key_THREAD_wsrep_applier, "THREAD_wsrep_applier", "applier", PSI_FLAG_SINGLETON | PSI_FLAG_THREAD_SYSTEM, 0, PSI_DOCUMENT_ME},
+  { &key_THREAD_wsrep_applier, "THREAD_wsrep_applier", "applier", PSI_FLAG_THREAD_SYSTEM, 0, PSI_DOCUMENT_ME},
   { &key_THREAD_wsrep_rollbacker, "THREAD_wsrep_rollbacker", "rlb", PSI_FLAG_SINGLETON | PSI_FLAG_THREAD_SYSTEM, 0, PSI_DOCUMENT_ME},
   { &key_THREAD_wsrep_post_rollbacker, "THREAD_wsrep_post_rollbacker", "postrlb", PSI_FLAG_SINGLETON | PSI_FLAG_THREAD_SYSTEM, 0, PSI_DOCUMENT_ME}
 #endif /* WITH_WSREP */

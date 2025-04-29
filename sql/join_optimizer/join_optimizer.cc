@@ -3173,18 +3173,10 @@ bool CostingReceiver::ProposeDistanceIndexScan(
   double num_output_rows = table->file->stats.records;
   double cost;
 
-  // Same cost estimation as for index scan.
-  if (table->covering_keys.is_set(key_idx)) {
-    // The index is covering, so we can do an index-only scan.
-    cost =
-        table->file->index_scan_cost(key_idx, /*ranges=*/1.0, num_output_rows)
-            .total_cost();
-  } else {
-    // This is the case of distance index scan.
-    // For now we use the same cost as in the index scan case.
-    cost = table->file->read_cost(key_idx, /*ranges=*/1.0, num_output_rows)
-               .total_cost();
-  }
+  assert(!table->covering_keys.is_set(key_idx));
+  // Same cost estimation for index scan and distance index scan.
+  cost = table->file->read_cost(key_idx, /*ranges=*/1.0, num_output_rows)
+             .total_cost();
 
   path.num_output_rows_before_filter = num_output_rows;
   path.set_init_cost(0.0);
@@ -4244,6 +4236,8 @@ void CostingReceiver::ProposeHashJoin(
   join_path.hash_join().rewrite_semi_to_inner = rewrite_semi_to_inner;
   join_path.hash_join().tables_to_get_rowid_for = 0;
   join_path.hash_join().allow_spill_to_disk = true;
+  join_path.has_group_skip_scan =
+      left_path->has_group_skip_scan || right_path->has_group_skip_scan;
 
   // The rows from the inner side of a hash join come in different order from
   // that of the underlying scan, so we need to store row IDs for any
@@ -4733,6 +4727,9 @@ void CostingReceiver::ProposeNestedLoopJoin(
   join_path.nested_loop_join().already_expanded_predicates = false;
   join_path.nested_loop_join().outer = left_path;
   join_path.nested_loop_join().inner = right_path;
+  join_path.has_group_skip_scan =
+      left_path->has_group_skip_scan || right_path->has_group_skip_scan;
+
   if (rewrite_semi_to_inner) {
     // This join is a semijoin (which is non-commutative), but the caller wants
     // us to try to invert it anyway; or to be precise, it has already inverted

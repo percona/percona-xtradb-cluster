@@ -141,9 +141,16 @@ enum class Fil_state {
   /** Space ID matches but the paths don't match. */
   MOVED,
 
+  /** Space ID and paths match but dd_table data dir flag is false despite the
+  file being outside default data dir */
+  MOVED_PREV,
+
   /** Tablespace and/or filename was renamed. The DDL log will handle
   this case. */
-  RENAMED
+  RENAMED,
+
+  /** In case of error during comparison. */
+  COMPARE_ERROR
 };
 
 struct fil_space_t;
@@ -700,6 +707,14 @@ class Fil_path {
   @param[in]  other  directory path to compare to
   @return true if this path is the same as the other path */
   [[nodiscard]] bool is_same_as(const std::string &other) const;
+
+  /** Get the absolute directory of this path */
+  [[nodiscard]] Fil_path get_abs_directory() const;
+
+  /** Check if the directory to path is same as directory as the other path.
+  @param[in]  other  directory path to compare to
+  @return true if this path directory is the same as the other path directory */
+  [[nodiscard]] bool is_dir_same_as(const Fil_path &other) const;
 
   /** Check if two path strings are equal. Put them into Fil_path objects
   so that they can be compared correctly.
@@ -2058,7 +2073,7 @@ inline void fil_space_open_if_needed(fil_space_t *space) {
 /** Enable encryption of temporary tablespace
 @param[in,out]	space	tablespace object
 @return DB_SUCCESS on success, DB_ERROR on failure */
-MY_NODISCARD
+[[nodiscard]]
 dberr_t fil_temp_update_encryption(fil_space_t *space);
 
 #ifdef UNIV_LINUX
@@ -2177,19 +2192,24 @@ bool fil_update_partition_name(space_id_t space_id, uint32_t fsp_flags,
 @param[in]      space_id        Innodb tablespace ID
 @param[in]      space_name      New tablespace name
 @param[in]      old_path        Old Path in the data dictionary
-@param[in]      new_path        New path to be update in dictionary */
+@param[in]      new_path        New path to be update in dictionary
+@param[in]      dd_flag_missing This tablespace is outside default data
+                                directory, yet it is missing
+                                DD_TABLE_DATA_DIRECTORY flag. This could
+                                happen in versions earlier than
+                                8.0.38/8.4.1/9.0.0 */
 void fil_add_moved_space(dd::Object_id dd_object_id, space_id_t space_id,
                          const char *space_name, const std::string &old_path,
-                         const std::string &new_path);
+                         const std::string &new_path, bool dd_flag_missing);
 
 /** Lookup the tablespace ID and return the path to the file. The filename
 is ignored when testing for equality. Only the path up to the file name is
 considered for matching: e.g. ./test/a.ibd == ./test/b.ibd.
-@param[in]  space_id      tablespace ID to lookup
-@param[in]  space_name    tablespace name
-@param[in]  fsp_flags     tablespace flags
-@param[in]  old_path      the path found in dd:Tablespace_files
-@param[out] new_path      the scanned path for this space_id
+@param[in]  space_id                tablespace ID to lookup
+@param[in]  space_name              tablespace name
+@param[in]  fsp_flags               tablespace flags
+@param[in]  old_path                the path found in dd:Tablespace_files
+@param[out] new_path                the scanned path for this space_id
 @return status of the match. */
 [[nodiscard]] Fil_state fil_tablespace_path_equals(space_id_t space_id,
                                                    const char *space_name,

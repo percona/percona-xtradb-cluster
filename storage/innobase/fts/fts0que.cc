@@ -35,6 +35,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <math.h>
 #include <sys/types.h>
 #include <iomanip>
+#include <limits>
 #include <vector>
 
 #include "dict0dict.h"
@@ -295,6 +296,9 @@ struct fts_word_freq_t {
   double idf;          /*!< Inverse document frequency */
 };
 
+static ib_rbt_compare fts_ranking_doc_id_cmp =
+    fts_doc_id_field_cmp<fts_ranking_t>;
+
 /********************************************************************
 Callback function to fetch the rows in an FTS INDEX record.
 @return always true */
@@ -383,21 +387,7 @@ fts_query_terms_in_document(
         fts_query_t*    query,          /*!< in: FTS query state */
         doc_id_t        doc_id,         /*!< in: the word to check */
         ulint*          total);         /*!< out: total words in document */
-#endif
 
-/********************************************************************
-Compare two fts_doc_freq_t doc_ids.
-@return < 0 if n1 < n2, 0 if n1 == n2, > 0 if n1 > n2 */
-static inline int fts_freq_doc_id_cmp(const void *p1, /*!< in: id1 */
-                                      const void *p2) /*!< in: id2 */
-{
-  const fts_doc_freq_t *fq1 = (const fts_doc_freq_t *)p1;
-  const fts_doc_freq_t *fq2 = (const fts_doc_freq_t *)p2;
-
-  return ((int)(fq1->doc_id - fq2->doc_id));
-}
-
-#if 0
 /*******************************************************************//**
 Print the table used for calculating LCS. */
 static
@@ -646,8 +636,8 @@ static fts_word_freq_t *fts_query_add_word_freq(
 
     word_freq.doc_count = 0;
 
-    word_freq.doc_freqs =
-        rbt_create(sizeof(fts_doc_freq_t), fts_freq_doc_id_cmp);
+    word_freq.doc_freqs = rbt_create(sizeof(fts_doc_freq_t),
+                                     fts_doc_id_field_cmp<fts_doc_freq_t>);
 
     parent.last = rbt_add_node(query->word_freqs, &parent, &word_freq);
 
@@ -2924,14 +2914,17 @@ fts_query_find_doc_id(
                 ulint           freq = 0;
                 ulint           min_pos = 0;
                 ulint           last_pos = 0;
-                ulint           pos = fts_decode_vlc(&ptr);
+                const uint64_t  delta = fts_decode_vlc(&ptr);
 
                 /* Add the delta. */
-                doc_id += pos;
+                doc_id += delta;
 
                 while (*ptr) {
                         ++freq;
-                        last_pos += fts_decode_vlc(&ptr);
+                        const uint64_t decoded_pos = fts_decode_vlc(&ptr);
+                        ut_ad(uint64_t(last_pos) + decoded_pos
+                              <= std::numeric_limits<ulint>::max());
+                        last_pos += static_cast<ulint>(decoded_pos);
 
                         /* Only if min_pos is not set and the current
                         term exists in a position greater than the
@@ -2999,15 +2992,15 @@ static dberr_t fts_query_filter_doc_ids(
     fts_doc_freq_t *doc_freq;
     fts_match_t *match = nullptr;
     ulint last_pos = 0;
-    ulint pos = fts_decode_vlc(&ptr);
+    const uint64_t delta = fts_decode_vlc(&ptr);
 
     /* Some sanity checks. */
     if (doc_id == 0) {
-      ut_a(pos == node->first_doc_id);
+      ut_a(delta == node->first_doc_id);
     }
 
     /* Add the delta. */
-    doc_id += pos;
+    doc_id += delta;
 
     if (calc_doc_count) {
       word_freq->doc_count++;
@@ -3035,7 +3028,10 @@ static dberr_t fts_query_filter_doc_ids(
 
     /* Unpack the positions within the document. */
     while (*ptr) {
-      last_pos += fts_decode_vlc(&ptr);
+      const uint64_t pos_delta = fts_decode_vlc(&ptr);
+      ut_ad(uint64_t(last_pos) + pos_delta <=
+            std::numeric_limits<ulint>::max());
+      last_pos += static_cast<ulint>(pos_delta);
 
       /* Collect the matching word positions, for phrase
       matching later. */
@@ -3729,7 +3725,7 @@ dberr_t fts_query(trx_t *trx, dict_index_t *index, uint flags,
   DEBUG_SYNC_C("fts_deleted_doc_ids_append");
 
   /* Sort the vector so that we can do a binary search over the ids. */
-  ib_vector_sort(query.deleted->doc_ids, fts_update_doc_id_cmp);
+  ib_vector_sort(query.deleted->doc_ids, fts_doc_id_field_cmp<fts_update_t>);
 
   /* Convert the query string to lower case before parsing. We own
   the ut_malloc'ed result and so remember to free it before return. */

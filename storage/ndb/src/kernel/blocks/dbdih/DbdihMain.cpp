@@ -106,12 +106,12 @@
 static const Uint32 WaitTableStateChangeMillis = 10;
 
 #if (defined(VM_TRACE) || defined(ERROR_INSERT))
-//#define DEBUG_MULTI_TRP 1
-//#define DEBUG_NODE_STOP 1
-//#define DEBUG_REDO_CONTROL 1
-//#define DEBUG_LCP 1
-//#define DEBUG_LCP_COMP 1
-//#define DEBUG_COPY_ACTIVE 1
+// #define DEBUG_MULTI_TRP 1
+// #define DEBUG_NODE_STOP 1
+// #define DEBUG_REDO_CONTROL 1
+// #define DEBUG_LCP 1
+// #define DEBUG_LCP_COMP 1
+// #define DEBUG_COPY_ACTIVE 1
 #endif
 
 #ifdef DEBUG_COPY_ACTIVE
@@ -1508,10 +1508,32 @@ void Dbdih::execREAD_CONFIG_REQ(Signal *signal) {
   ndb_mgm_get_int_parameter(p, CFG_DB_AUTO_THREAD_CONFIG,
                             &use_auto_thread_config);
 
+  /**
+   * Ignore AutomaticThreadConfig configuration for single threaded data
+   * node (ndbd).
+   */
+  if (use_auto_thread_config && !globalData.isNdbMt) {
+    jam();
+    use_auto_thread_config = 0;
+  }
+
   Uint32 use_classic_fragmentation = 1;
   ndb_mgm_get_int_parameter(p, CFG_DB_CLASSIC_FRAGMENTATION,
                             &use_classic_fragmentation);
   m_use_classic_fragmentation = use_classic_fragmentation;
+
+  /**
+   * Ignore ClassicFragmentation configuration for single threaded data
+   * node (ndbd).
+   */
+  if (!m_use_classic_fragmentation && !globalData.isNdbMt) {
+    jam();
+    m_use_classic_fragmentation = 1;
+    g_eventLogger->info(
+        "ClassicFragmentation configuration ignored, "
+        "ndbd does not support non classic fragmentation");
+  }
+
   if (m_use_classic_fragmentation && use_auto_thread_config) {
     jam();
     m_use_classic_fragmentation = 0;
@@ -1519,6 +1541,7 @@ void Dbdih::execREAD_CONFIG_REQ(Signal *signal) {
 
   c_fragments_per_node_ = 0;
   if (!m_use_classic_fragmentation) {
+    ndbrequire(globalData.isNdbMt);
     jam();
     c_fragments_per_node_ = 2;
     ndb_mgm_get_int_parameter(p, CFG_DB_PARTITIONS_PER_NODE,
@@ -5018,7 +5041,7 @@ void Dbdih::execUPDATE_FRAG_STATEREQ(Signal *signal) {
 
 /* Debug Node Recovery Status module */
 #define DBG_NRS(a)
-//#define DBG_NRS(a) ndbout << a << endl
+// #define DBG_NRS(a) ndbout << a << endl
 
 void Dbdih::initNodeRecoveryStatus() {
   NodeRecordPtr nodePtr;
@@ -5247,7 +5270,7 @@ void Dbdih::setNodeRecoveryStatus(Uint32 nodeId,
     nodePtr.p->is_pausable = false;
   }
 
-  if (getNodeState().startLevel != NodeState::SL_STARTED) {
+  if (getNodeState().startLevel < NodeState::SL_STARTED) {
     jam();
     /**
      * We will ignore all state transitions until we are started ourselves
@@ -9038,6 +9061,9 @@ void Dbdih::execNODE_FAILREP(Signal *signal) {
   sendSignal(BACKUP_REF, GSN_NODE_FAILREP, signal, NodeFailRep::SignalLength,
              JBB, lsptr, 1);
 
+  sendSignal(TRIX_REF, GSN_NODE_FAILREP, signal, NodeFailRep::SignalLength, JBB,
+             lsptr, 1);
+
   sendSignal(SUMA_REF, GSN_NODE_FAILREP, signal, NodeFailRep::SignalLength, JBB,
              lsptr, 1);
 
@@ -9318,6 +9344,8 @@ void Dbdih::checkStopMe(Signal *signal, NodeRecordPtr failedNodePtr) {
 void Dbdih::checkStopPermMaster(Signal *signal, NodeRecordPtr failedNodePtr) {
   DihSwitchReplicaRef *const ref = (DihSwitchReplicaRef *)&signal->theData[0];
   jam();
+  /* Node is no longer 'stopping', clear from bitmap */
+  c_stopPermMaster.stoppingNodes.clear(failedNodePtr.i);
   if (c_DIH_SWITCH_REPLICA_REQ_Counter.isWaitingFor(failedNodePtr.i)) {
     jam();
     ndbrequire(c_stopPermMaster.clientRef != 0);
@@ -9906,6 +9934,14 @@ bool Dbdih::handle_master_take_over_copy_gci(Signal *signal,
                         MasterGCPReq::SignalLength);
     return true;
   }
+
+  /**
+   * We are more strict than older versions, align inherited
+   * info at Master takeover before the info has a chance
+   * to be checked if we become new Master
+   */
+  upgradeAlignCopyGci();
+
   c_handled_master_take_over_copy_gci = new_master_node_id;
   return false;
 }
@@ -10328,6 +10364,7 @@ void Dbdih::MASTER_GCPhandling(Signal *signal, Uint32 failedNodeId) {
         /**
          * Restart GCP_SAVE_REQ
          */
+        m_gcp_save.m_master.m_saveConfNodes.clear();
         sendLoopMacro(GCP_SAVEREQ, sendGCP_SAVEREQ, RNIL);
         break;
       }
@@ -16244,6 +16281,7 @@ void Dbdih::execGCP_NODEFINISH(Signal *signal) {
   Uint32 saveGCI = old_hi;
   m_gcp_save.m_master.m_state = GcpSave::GCP_SAVE_REQ;
   m_gcp_save.m_master.m_new_gci = saveGCI;
+  m_gcp_save.m_master.m_saveConfNodes.clear();
 
 #ifdef ERROR_INSERT
   if (ERROR_INSERTED(7188)) {
@@ -16353,9 +16391,14 @@ void Dbdih::execGCP_SAVECONF(Signal *signal) {
     return;
   }
 
+  /* Master */
   ndbrequire(saveConf->gci == m_gcp_save.m_master.m_new_gci);
   ndbrequire(saveConf->nodeId == saveConf->dihPtr);
-  SYSFILE->lastCompletedGCI[saveConf->nodeId] = saveConf->gci;
+
+  /* Record CONF received in this round */
+  ndbrequire(!m_gcp_save.m_master.m_saveConfNodes.get(saveConf->nodeId));
+  m_gcp_save.m_master.m_saveConfNodes.set(saveConf->nodeId);
+
   GCP_SAVEhandling(signal, saveConf->nodeId);
 }  // Dbdih::execGCP_SAVECONF()
 
@@ -16376,6 +16419,7 @@ void Dbdih::execGCP_SAVEREF(Signal *signal) {
 
   ndbrequire(saveRef->gci == m_gcp_save.m_master.m_new_gci);
   ndbrequire(saveRef->nodeId == saveRef->dihPtr);
+  ndbrequire(!m_gcp_save.m_master.m_saveConfNodes.get(saveRef->nodeId));
 
   /**
    * Only allow reason not to save
@@ -16402,6 +16446,22 @@ void Dbdih::GCP_SAVEhandling(Signal *signal, Uint32 nodeId) {
    * RESTART.
    *------------------------------------------------------------------------*/
   SYSFILE->newestRestorableGCI = m_gcp_save.m_gci;
+
+  /**
+   * Set lastCompletedGci values for all CONFed participants in
+   * the GCP Save round atomically with the newestRestorableGci
+   * now.
+   * This avoids any intermediate CopyGCIReq rounds propagating
+   * transition states prior to a GCI being fully restorable.
+   */
+  {
+    Uint32 participant = 0;
+    while ((participant = m_gcp_save.m_master.m_saveConfNodes.find_next(
+                participant + 1)) != BitmaskImpl::NotFound) {
+      SYSFILE->lastCompletedGCI[participant] = m_gcp_save.m_gci;
+    }
+    m_gcp_save.m_master.m_saveConfNodes.clear();
+  }
   if (SYSFILE->getInitialStartOngoing() &&
       getNodeState().startLevel == NodeState::SL_STARTED) {
     jam();
@@ -16541,8 +16601,6 @@ void Dbdih::execGCP_COMMIT(Signal *signal) {
     signal->theData[0] = 5048;
     sendSignal(numberToRef(DBLQH, c_error_insert_extra), GSN_NDB_TAMPER, signal,
                1, JBB);
-    signal->theData[0] = save;
-    CLEAR_ERROR_INSERT_VALUE;
 
     signal->theData[0] = 9999;
     sendSignal(numberToRef(CMVMI, c_error_insert_extra), GSN_DUMP_STATE_ORD,
@@ -16864,6 +16922,133 @@ void Dbdih::execDIHNDBTAMPER(Signal *signal) {
 /*****************************************************************************/
 /* **********     FILE HANDLING MODULE                           *************/
 /*****************************************************************************/
+bool Dbdih::checkAllNgsRepresented(Signal *signal,
+                                   const NdbNodeBitmask *nodes) {
+  jam();
+
+  /**
+   * CheckNodeGroups will examine our bitmap of nodes
+   * If any nodegroup is entirely missing then the result
+   * will be Lose.
+   * If all nodegroups are present then the result will
+   * be Win or Partitioning (we don't care which)
+   */
+  CheckNodeGroups *cng = (CheckNodeGroups *)&signal->theData[0];
+  cng->requestType = CheckNodeGroups::Direct | CheckNodeGroups::ArbitCheck;
+  cng->mask.assign(*nodes);
+  execCHECKNODEGROUPSREQ(signal);
+
+  return (cng->output != CheckNodeGroups::Lose);
+}
+
+void Dbdih::validateCopyGci(Signal *signal) {
+  jam();
+  /**
+   * Before we (Master) copy our GCI info to all other
+   * nodes, let's check it for sanity
+   */
+  bool newestRestorableGCIIsMax = true;
+  bool recoverableNodesAreSufficientForSR = true;
+
+  const Uint32 newestRestorableGCI = SYSFILE->newestRestorableGCI;
+
+  /* Build bitmap of recoverable nodes */
+  NdbNodeBitmask recoverableNodes;
+  for (Uint32 i = 0; i < MAX_NDB_NODES; i++) {
+    const Uint32 nodeLastCompletedGci = SYSFILE->lastCompletedGCI[i];
+
+    if (nodeLastCompletedGci == newestRestorableGCI) {
+      recoverableNodes.set(i);
+    }
+
+    if (nodeLastCompletedGci > newestRestorableGCI) {
+      jam();
+      newestRestorableGCIIsMax = false;
+    }
+  }
+
+  /* Check overall system is recoverable */
+  recoverableNodesAreSufficientForSR =
+      checkAllNgsRepresented(signal, &recoverableNodes);
+
+  if (unlikely(
+          !(newestRestorableGCIIsMax && recoverableNodesAreSufficientForSR))) {
+    jam();
+    g_eventLogger->error("DIH : newestRestorableGCI %u", newestRestorableGCI);
+    for (Uint32 i = 0; i < MAX_NDB_NODES; i++) {
+      if (SYSFILE->getNodeStatus(i) != Sysfile::NS_NotDefined)
+        g_eventLogger->error("DIH : Node %u lastCompletedGCI %u", i,
+                             SYSFILE->lastCompletedGCI[i]);
+    }
+
+    if (!newestRestorableGCIIsMax) {
+      jam();
+      /**
+       * Require that the newestRestorableGci number is the max of
+       * the per-node lastCommittedGci numbers
+       * Otherwise one of those can be chosen as President in a subsequent
+       * System Restart making it unrecoverable.
+       */
+      g_eventLogger->error(
+          "DIH : Invalid CopyGCIREQ attempted, newestRestorableGCI is not max");
+    }
+    if (!recoverableNodesAreSufficientForSR) {
+      jam();
+      /**
+       * Require that every nodegroup has at least one representative
+       * which is restorable to the newestRestorableGci number.
+       * Otherwise System Restart with all nodes present will not have
+       * sufficient 'log' to be recoverable
+       */
+      g_eventLogger->error(
+          "DIH : Invalid CopyGCIREQ attempted, recoverable nodes are not "
+          "sufficient for SR");
+    }
+    ndbrequire(newestRestorableGCIIsMax);
+    ndbrequire(recoverableNodesAreSufficientForSR);
+  }
+}
+
+void Dbdih::upgradeAlignCopyGci() {
+  jam();
+
+  /**
+   * We now require that the newestRestorableGci is the
+   * highest Gci recorded in the per-node lastCompletedGci
+   * array.
+   *
+   * This is enforced in new code, but may not have been
+   * the case previously.
+   *
+   * In case we inherit invalid GCI info from the previous
+   * Master, lets filter it here to avoid e.g. a cascading
+   * failure as part of RR, which would in fact require
+   * a subsequent SR exactly when the SR is problematic.
+   *
+   * The assumption here is that any case where the
+   * lastCompletedGci is > newestRestorableGci is due to
+   * exposure of a transient state prior to GCP_SAVE round
+   * completion, which can be safely treated as though the
+   * round were not completed.
+   *
+   * When we are no longer likely to upgrade from a system
+   * which may send invalid CopyGci data, this realignment
+   * logic can be removed.
+   */
+  for (Uint32 i = 0; i < MAX_NDB_NODES; i++) {
+    if (SYSFILE->lastCompletedGCI[i] > SYSFILE->newestRestorableGCI) {
+      jam();
+      g_eventLogger->warning(
+          "DIH : Aligning lastCompletedGCI of node %u from %u to %u", i,
+          SYSFILE->lastCompletedGCI[i], SYSFILE->newestRestorableGCI);
+      /* This is only intended for one specific upgrade scenario */
+      ndbrequire(SYSFILE->lastCompletedGCI[i] ==
+                 SYSFILE->newestRestorableGCI + 1);
+      SYSFILE->lastCompletedGCI[i] = SYSFILE->newestRestorableGCI;
+    }
+  }
+}
+
 void Dbdih::copyGciLab(Signal *signal, CopyGCIReq::CopyReason reason) {
   if (c_copyGCIMaster.m_copyReason != CopyGCIReq::IDLE) {
     jam();
@@ -16921,6 +17106,9 @@ void Dbdih::copyGciLab(Signal *signal, CopyGCIReq::CopyReason reason) {
       // fall-through
     }
   }
+
+  /* Check integrity of GCI info before propagating */
+  validateCopyGci(signal);
 
   sendLoopMacro(COPY_GCIREQ, sendCOPY_GCIREQ, RNIL);
 
@@ -19644,11 +19832,11 @@ void Dbdih::storeNewLcpIdLab(Signal *signal) {
 
   DEB_LCP_COMP(("Set to LCP_COPY_GCI"));
   c_lcpState.setLcpStatus(LCP_COPY_GCI, __LINE__);
-  //#ifdef VM_TRACE
-  //  infoEvent("LocalCheckpoint %d started", SYSFILE->latestLCP_ID);
-  //  signal->theData[0] = 7012;
-  //  execDUMP_STATE_ORD(signal);
-  //#endif
+  // #ifdef VM_TRACE
+  //   infoEvent("LocalCheckpoint %d started", SYSFILE->latestLCP_ID);
+  //   signal->theData[0] = 7012;
+  //   execDUMP_STATE_ORD(signal);
+  // #endif
 
   copyGciLab(signal, CopyGCIReq::LOCAL_CHECKPOINT);
 }  // Dbdih::storeNewLcpIdLab()
@@ -19866,7 +20054,7 @@ void Dbdih::master_lcp_fragmentMutex_locked(Signal *signal,
   startLcpRoundLoopLab(signal, 0, 0);
 }
 
-//#define DIH_DEBUG_REPLICA_SEARCH
+// #define DIH_DEBUG_REPLICA_SEARCH
 #ifdef DIH_DEBUG_REPLICA_SEARCH
 static Uint32 totalScheduled;
 static Uint32 totalExamined;
@@ -22959,7 +23147,7 @@ void Dbdih::initRestorableGciFiles() {
   filePtr.p->fileName[0] = (Uint32)-1; /* T DIRECTORY NOT USED  */
   filePtr.p->fileName[1] = (Uint32)-1; /* F DIRECTORY NOT USED  */
   filePtr.p->fileName[2] = (Uint32)-1; /* S PART IGNORED        */
-  tirgTmp = 1;                         /* FILE NAME VERSION 1   */
+  tirgTmp = FsOpenReq::V_BLOCK;        /* FILE NAME VERSION 1   */
   tirgTmp = (tirgTmp << 8) + 6;        /* .SYSFILE              */
   tirgTmp = (tirgTmp << 8) + 1;        /* D1 DIRECTORY          */
   tirgTmp = (tirgTmp << 8) + 0;        /* P0 FILE NAME          */
@@ -22976,7 +23164,7 @@ void Dbdih::initRestorableGciFiles() {
   filePtr.p->fileName[0] = (Uint32)-1; /* T DIRECTORY NOT USED  */
   filePtr.p->fileName[1] = (Uint32)-1; /* F DIRECTORY NOT USED  */
   filePtr.p->fileName[2] = (Uint32)-1; /* S PART IGNORED        */
-  tirgTmp = 1;                         /* FILE NAME VERSION 1   */
+  tirgTmp = FsOpenReq::V_BLOCK;        /* FILE NAME VERSION 1   */
   tirgTmp = (tirgTmp << 8) + 6;        /* .SYSFILE              */
   tirgTmp = (tirgTmp << 8) + 2;        /* D1 DIRECTORY          */
   tirgTmp = (tirgTmp << 8) + 0;        /* P0 FILE NAME          */
@@ -23041,7 +23229,7 @@ void Dbdih::initTableFile(TabRecordPtr tabPtr) {
   filePtr.p->fileName[0] = (Uint32)-1; /* T DIRECTORY NOT USED  */
   filePtr.p->fileName[1] = (Uint32)-1; /* F DIRECTORY NOT USED  */
   filePtr.p->fileName[2] = tabPtr.i;   /* Stid FILE NAME        */
-  titfTmp = 1;                         /* FILE NAME VERSION 1   */
+  titfTmp = FsOpenReq::V_BLOCK;        /* FILE NAME VERSION 1   */
   titfTmp = (titfTmp << 8) + 3;        /* .FRAGLIST             */
   titfTmp = (titfTmp << 8) + 1;        /* D1 DIRECTORY          */
   titfTmp = (titfTmp << 8) + 255;      /* P PART IGNORED        */
@@ -23058,7 +23246,7 @@ void Dbdih::initTableFile(TabRecordPtr tabPtr) {
   filePtr.p->fileName[0] = (Uint32)-1; /* T DIRECTORY NOT USED  */
   filePtr.p->fileName[1] = (Uint32)-1; /* F DIRECTORY NOT USED  */
   filePtr.p->fileName[2] = tabPtr.i;   /* Stid FILE NAME        */
-  titfTmp = 1;                         /* FILE NAME VERSION 1   */
+  titfTmp = FsOpenReq::V_BLOCK;        /* FILE NAME VERSION 1   */
   titfTmp = (titfTmp << 8) + 3;        /* .FRAGLIST             */
   titfTmp = (titfTmp << 8) + 2;        /* D2 DIRECTORY          */
   titfTmp = (titfTmp << 8) + 255;      /* P PART IGNORED        */
@@ -25955,6 +26143,21 @@ void Dbdih::execSTOP_PERM_REQ(Signal *signal) {
       return;
     }  // if
 
+    if (c_stopPermMaster.stoppingNodes.count() > 0) {
+      jam();
+
+      /**
+       * Only grant one node graceful stopping
+       * permission currently
+       * Future extension : Max one per NG
+       */
+      ref->senderData = senderData;
+      ref->errorCode = StopPermRef::NodeShutdownInProgress;
+      sendSignal(senderRef, GSN_STOP_PERM_REF, signal,
+                 StopPermRef::SignalLength, JBB);
+      return;
+    }
+
     if (c_nodeStartMaster.activeState) {
       jam();
       ref->senderData = senderData;
@@ -25969,6 +26172,7 @@ void Dbdih::execSTOP_PERM_REQ(Signal *signal) {
      */
     c_nodeStartMaster.activeState = true;
     c_stopPermMaster.clientRef = senderRef;
+    c_stopPermMaster.stoppingNodes.set(nodeId);
 
     c_stopPermMaster.clientData = senderData;
     c_stopPermMaster.returnValue = 0;
@@ -26151,6 +26355,11 @@ void Dbdih::switchReplica(Signal *signal, Uint32 nodeId, Uint32 tableId,
         ref->errorCode = c_stopPermMaster.returnValue;
         sendSignal(c_stopPermMaster.clientRef, GSN_STOP_PERM_REF, signal, 2,
                    JBB);
+
+        /* Failure to get stop permission, clear node from stopping bitmap */
+        const Uint32 nodeId = refToNode(c_stopPermMaster.clientRef);
+        /* Expect bit to be set, unless stopping node failed early */
+        c_stopPermMaster.stoppingNodes.clear(nodeId);
       }  // if
 
       /**

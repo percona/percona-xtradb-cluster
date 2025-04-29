@@ -25,11 +25,13 @@
 
 #include <thread>
 
+#include "mysql/harness/filesystem.h"
 #include "router_component_test.h"
 
 #include "dim.h"
 #include "filesystem_utils.h"
 #include "mock_server_testutils.h"
+#include "mysqlrouter/utils.h"  // copy_file
 #include "random_generator.h"
 #include "router_component_testutils.h"
 
@@ -37,14 +39,9 @@ using namespace std::chrono_literals;
 using namespace std::string_literals;
 
 void RouterComponentTest::SetUp() {
-  mysql_harness::DIM &dim = mysql_harness::DIM::instance();
-  // RandomGenerator
-  dim.set_RandomGenerator(
-      []() {
-        static mysql_harness::RandomGenerator rg;
-        return &rg;
-      },
-      [](mysql_harness::RandomGeneratorInterface *) {});
+  static mysql_harness::RandomGenerator static_rg;
+
+  mysql_harness::DIM::instance().set_static_RandomGenerator(&static_rg);
 }
 
 void RouterComponentTest::TearDown() {
@@ -57,6 +54,27 @@ void RouterComponentTest::TearDown() {
   if (::testing::Test::HasFailure()) {
     dump_all();
   }
+}
+
+void RouterComponentTest::prepare_config_dir_with_default_certs(
+    const std::string &config_dir) {
+  mysql_harness::Path dst_dir(config_dir);
+  auto datadir = dst_dir.join("data");
+
+  mysql_harness::mkdir(datadir.str(), 0700, true);
+
+  copy_default_certs_to_datadir(datadir.str());
+}
+
+void RouterComponentTest::copy_default_certs_to_datadir(
+    const std::string &dst_dir) {
+  mysql_harness::Path to(dst_dir);
+  mysql_harness::Path from(SSL_TEST_DATA_DIR);
+
+  mysqlrouter::copy_file(from.join("server-key.pem").str(),
+                         to.join("router-key.pem").str());
+  mysqlrouter::copy_file(from.join("server-cert.pem").str(),
+                         to.join("router-cert.pem").str());
 }
 
 void RouterComponentTest::sleep_for(std::chrono::milliseconds duration) {
@@ -173,7 +191,7 @@ void RouterComponentBootstrapTest::bootstrap_failover(
 
   std::vector<std::string> router_cmdline;
 
-  if (router_options.size()) {
+  if (!router_options.empty()) {
     router_cmdline = router_options;
   } else {
     router_cmdline.emplace_back("--bootstrap=127.0.0.1:" +
@@ -183,13 +201,6 @@ void RouterComponentBootstrapTest::bootstrap_failover(
     router_cmdline.emplace_back("1");
     router_cmdline.emplace_back("-d");
     router_cmdline.emplace_back(bootstrap_dir.name());
-  }
-
-  if (getenv("WITH_VALGRIND")) {
-    // for the bootstrap tests that are using this method the "--disable-rest"
-    // is not relevant so we use it for VALGRIND testing as it saves huge amount
-    // of time that generating the certificates takes
-    router_cmdline.emplace_back("--disable-rest");
   }
 
   for (const auto &opt : extra_router_options) {
@@ -236,6 +247,12 @@ void RouterComponentBootstrapTest::bootstrap_failover(
     ASSERT_NO_FATAL_FAILURE(
         check_config_file_access_rights(state_file, /*read_only=*/false));
   }
+}
+
+void RouterComponentBootstrapWithDefaultCertsTest::SetUp() {
+  RouterComponentTest::SetUp();
+
+  prepare_config_dir_with_default_certs(bootstrap_dir.name());
 }
 
 std::ostream &operator<<(

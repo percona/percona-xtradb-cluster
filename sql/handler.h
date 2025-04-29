@@ -711,7 +711,8 @@ enum enum_binlog_func {
   BFN_RESET_SLAVE = 2,
   BFN_BINLOG_WAIT = 3,
   BFN_BINLOG_END = 4,
-  BFN_BINLOG_PURGE_FILE = 5
+  BFN_BINLOG_PURGE_FILE = 5,
+  BFN_BINLOG_PURGE_WAIT = 6
 };
 
 enum enum_binlog_command {
@@ -3175,8 +3176,8 @@ inline constexpr const decltype(handlerton::flags) HTON_SUPPORTS_DISTANCE_SCAN{
     1 << 23};
 
 /* Whether the engine supports being specified as a default storage engine */
-inline constexpr const decltype(
-    handlerton::flags) HTON_NO_DEFAULT_ENGINE_SUPPORT{1 << 24};
+inline constexpr const decltype(handlerton::flags)
+    HTON_NO_DEFAULT_ENGINE_SUPPORT{1 << 24};
 
 /** Start of Percona specific HTON_* defines */
 
@@ -4309,9 +4310,7 @@ class Ft_hints {
 
      @return pointer to ft_hints struct
    */
-  struct ft_hints *get_hints() {
-    return &hints;
-  }
+  struct ft_hints *get_hints() { return &hints; }
 };
 
 /**
@@ -5533,10 +5532,9 @@ class handler {
   double estimate_in_memory_buffer(ulonglong table_index_size) const;
 
  public:
-  virtual ha_rows multi_range_read_info_const(uint keyno, RANGE_SEQ_IF *seq,
-                                              void *seq_init_param,
-                                              uint n_ranges, uint *bufsz,
-                                              uint *flags, Cost_estimate *cost);
+  virtual ha_rows multi_range_read_info_const(
+      uint keyno, RANGE_SEQ_IF *seq, void *seq_init_param, uint n_ranges,
+      uint *bufsz, uint *flags, bool *force_default_mrr, Cost_estimate *cost);
   virtual ha_rows multi_range_read_info(uint keyno, uint n_ranges, uint keys,
                                         uint *bufsz, uint *flags,
                                         Cost_estimate *cost);
@@ -5575,7 +5573,7 @@ class handler {
   */
 
   virtual bool is_ignorable_error(int error);
-  MY_NODISCARD virtual bool continue_partition_copying_on_error(
+  [[nodiscard]] virtual bool continue_partition_copying_on_error(
       int error [[maybe_unused]]) {
     return false;
   }
@@ -6800,7 +6798,7 @@ class handler {
     @brief Offload an update to the storage engine. See handler::fast_update()
     for details.
   */
-  MY_NODISCARD int ha_fast_update(THD *thd,
+  [[nodiscard]] int ha_fast_update(THD *thd,
                                   mem_root_deque<Item *> &update_fields,
                                   mem_root_deque<Item *> &update_values,
                                   Item *conds);
@@ -6809,7 +6807,7 @@ class handler {
     @brief Offload an upsert to the storage engine. See handler::upsert()
     for details.
   */
-  MY_NODISCARD int ha_upsert(THD *thd, mem_root_deque<Item *> &update_fields,
+  [[nodiscard]] int ha_upsert(THD *thd, mem_root_deque<Item *> &update_fields,
                              mem_root_deque<Item *> &update_values);
 
  private:
@@ -6832,7 +6830,7 @@ class handler {
     @note HA_READ_BEFORE_WRITE_REMOVAL flag doesn not fit there because
     handler::ha_update_row(...) does not accept conditions.
   */
-  MY_NODISCARD virtual int fast_update(THD *thd [[maybe_unused]],
+  [[nodiscard]] virtual int fast_update(THD *thd [[maybe_unused]],
                                        mem_root_deque<Item *> &update_fields
                                        [[maybe_unused]],
                                        mem_root_deque<Item *> &update_values
@@ -6857,7 +6855,7 @@ class handler {
 
     @return an error if the insert should be terminated.
   */
-  MY_NODISCARD virtual int upsert(THD *thd [[maybe_unused]],
+  [[nodiscard]] virtual int upsert(THD *thd [[maybe_unused]],
                                   mem_root_deque<Item *> &update_fields
                                   [[maybe_unused]],
                                   mem_root_deque<Item *> &update_values
@@ -7911,7 +7909,42 @@ void trans_register_ha(THD *thd, bool all, handlerton *ht,
                        const ulonglong *trxid);
 
 int ha_reset_logs(THD *thd);
+
+/**
+  Inform storage engine(s) that a binary log file will be purged and any
+  references to it should be removed.
+
+  The function is called for all purged files, regardless if it is an explicit
+  PURGE BINARY LOGS statement, or an automatic purge performed by the server.
+
+  @note Since function is called with the LOCK_index mutex held the work
+  performed in this callback should be kept at minimum. One way to defer work is
+  to schedule work and use the `ha_binlog_index_purge_wait` callback to wait for
+  completion.
+
+  @param thd Thread handle of session purging file. The nullptr value indicates
+  that purge is done at server startup.
+  @param file Name of file being purged.
+  @return Always 0, return value are ignored by caller.
+*/
 int ha_binlog_index_purge_file(THD *thd, const char *file);
+
+/**
+  Request the storage engine to complete any operations that were initiated
+  by `ha_binlog_index_purge_file` and which need to complete
+  before PURGE BINARY LOGS completes.
+
+  The function is called only from PURGE BINARY LOGS. Each PURGE BINARY LOGS
+  statement will result in 0, 1 or more calls to `ha_binlog_index_purge_file`,
+  followed by exactly 1 call to `ha_binlog_index_purge_wait`.
+
+  @note This function is called without LOCK_index mutex held and thus any
+  waiting performed will only affect the current session.
+
+  @param thd Thread handle of session.
+*/
+void ha_binlog_index_purge_wait(THD *thd);
+
 void ha_reset_slave(THD *thd);
 void ha_binlog_log_query(THD *thd, handlerton *db_type,
                          enum_binlog_command binlog_command, const char *query,

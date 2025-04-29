@@ -227,7 +227,7 @@ transaction.
 @param[in]	trx	receiver transaction
 @param[in]	from_trx	donor transaction
 @return read view clone */
-MY_NODISCARD
+[[nodiscard]]
 ReadView *trx_clone_read_view(trx_t *trx, trx_t *from_trx);
 
 /** Prepares a transaction for commit/rollback. */
@@ -404,15 +404,6 @@ If this is a high priority transaction,
 kill all transactions that are blocking this transaction from acquiring locks.
 @param[in,out] trx      High priority transaction */
 void trx_kill_blocking(trx_t *trx);
-
-/** Provides an id of the transaction which does not change over time.
-Contrast this with trx->id and trx_get_id_for_print(trx) which change value once
-a transaction can no longer be treated as read-only and becomes read-write.
-@param[in]  trx   The transaction for which you want an immutable id
-@return the transaction's immutable id */
-static inline uint64_t trx_immutable_id(const trx_t *trx) {
-  return (uint64_t{reinterpret_cast<uintptr_t>(trx)});
-}
 
 /**
 Check if redo/noredo rseg is modified for insert/update.
@@ -749,7 +740,7 @@ class trx_stats final {
    already posted read in progress
   @return value to be passed to end_io_read
   */
-  MY_NODISCARD
+  [[nodiscard]]
   static std::chrono::steady_clock::time_point start_io_read(
       trx_t *trx, ulint bytes) noexcept;
 
@@ -761,7 +752,7 @@ class trx_stats final {
    already posted read in progress
   @return value to be passed to end_io_read
   */
-  MY_NODISCARD
+  [[nodiscard]]
   static std::chrono::steady_clock::time_point start_io_read(
       const trx_t &trx, ulint bytes) noexcept;
 
@@ -840,7 +831,7 @@ class trx_stats final {
   @param	page_id_fold	result of page_id_t::fold */
   static void inc_page_get(const trx_t &trx, ulint page_id_fold) noexcept;
 
-  MY_NODISCARD
+  [[nodiscard]]
   bool enabled() const noexcept { return take_stats; }
 
   void set(bool take) noexcept { take_stats = take; }

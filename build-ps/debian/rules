@@ -4,6 +4,7 @@
 	dh $@
 
 export DH_VERBOSE=1
+export FIPSFLAGS=
 export CFLAGS=
 export CXXFLAGS=
 export CPPFLAGS=
@@ -16,8 +17,13 @@ wsrep_version="@@WSREP_VERSION@@"
 percona_server_version="@@PERCONA_VERSION@@"
 revision="@@REVISION@@"
 rel="@@DEB_RELEASE@@"
-compilation_comment_debug="Percona XtraDB Cluster - Debug (GPL), Release rel$(percona_server_version), Revision $(revision), WSREP version $(wsrep_version)"
-compilation_comment_release="Percona XtraDB Cluster (GPL), Release rel$(percona_server_version), Revision $(revision), WSREP version $(wsrep_version)"
+ifneq ($(FIPSFLAGS),)
+	compilation_comment_debug="Percona XtraDB Cluster Pro - Debug (GPL), Release rel$(percona_server_version), Revision $(revision), WSREP version $(wsrep_version)"
+	compilation_comment_release="Percona XtraDB Cluster Pro (GPL), Release rel$(percona_server_version), Revision $(revision), WSREP version $(wsrep_version)"
+else
+	compilation_comment_debug="Percona XtraDB Cluster - Debug (GPL), Release rel$(percona_server_version), Revision $(revision), WSREP version $(wsrep_version)"
+	compilation_comment_release="Percona XtraDB Cluster (GPL), Release rel$(percona_server_version), Revision $(revision), WSREP version $(wsrep_version)"
+endif
 server_suffix=""
 prefix=/usr
 
@@ -103,7 +109,7 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 		-DWITH_LIBEVENT=bundled \
 		-DWITH_FIDO=bundled \
 		-DWITH_NUMA=ON \
-		-DWITH_PERCONA_TELEMETRY=ON \
+		-DWITH_PERCONA_TELEMETRY=ON $(FIPSFLAGS)\
 		-DWITH_EXTRA_CHARSETS=all ..
 endif
 
@@ -155,7 +161,7 @@ endif
 		-DWITH_LIBEVENT=bundled \
 		-DWITH_FIDO=bundled \
 		-DWITH_NUMA=ON \
-		-DWITH_PERCONA_TELEMETRY=ON \
+		-DWITH_PERCONA_TELEMETRY=ON $(FIPSFLAGS)\
 		-DWITH_EXTRA_CHARSETS=all ..
 
 #	cd $(galeradir) &&  scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) psi=1 libgalera_smm.so $(SCONS_ARGS) && scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) garb/garbd $(SCONS_ARGS)

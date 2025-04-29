@@ -719,7 +719,7 @@ bool Sql_cmd_delete::prepare_inner(THD *thd) {
   if (select->setup_tables(thd, table_list, false))
     return true; /* purecov: inspected */
 
-  const ulong want_privilege_saved = thd->want_privilege;
+  const Access_bitmask want_privilege_saved = thd->want_privilege;
   thd->want_privilege = SELECT_ACL;
   const enum enum_mark_columns mark_used_columns_saved = thd->mark_used_columns;
   thd->mark_used_columns = MARK_COLUMNS_READ;
@@ -882,6 +882,7 @@ bool Sql_cmd_delete::prepare_inner(THD *thd) {
 
   opt_trace_print_expanded_query(thd, select, &trace_wrapper);
 
+  select->original_tables_map = select->all_tables_map();
   if (select->has_sj_candidates() && select->flatten_subqueries(thd))
     return true;
 

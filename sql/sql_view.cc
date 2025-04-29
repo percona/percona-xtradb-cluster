@@ -637,15 +637,16 @@ bool mysql_create_view(THD *thd, Table_ref *views, enum_view_create_mode mode) {
        This will hold the intersection of the privileges on all columns in the
        view.
      */
-    uint final_priv = VIEW_ANY_ACL;
+    Access_bitmask final_priv = VIEW_ANY_ACL;
 
     for (sl = query_block; sl; sl = sl->next_query_block()) {
       assert(view->db); /* Must be set in the parser */
       for (Item *item : sl->visible_fields()) {
         Item_field *fld = item->field_for_view_update();
-        uint priv = (get_column_grant(thd, &view->grant, view->db,
-                                      view->table_name, item->item_name.ptr()) &
-                     VIEW_ANY_ACL);
+        Access_bitmask priv =
+            (get_column_grant(thd, &view->grant, view->db, view->table_name,
+                              item->item_name.ptr()) &
+             VIEW_ANY_ACL);
 
         if (fld && !fld->field->table->s->tmp_table) {
           final_priv &= fld->have_privileges;
@@ -1763,8 +1764,11 @@ bool mysql_drop_view(THD *thd, Table_ref *views) {
   dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
   Security_context *sctx = thd->security_context();
 
-  // First check which views exist
   String non_existant_views;
+  bool view_does_not_exist = false;
+  bool base_table_with_same_name_exists = false;
+
+  // First check which views exist
   for (Table_ref *view = views; view; view = view->next_local) {
     /*
       Either, the entity does not exist, in which case we will
@@ -1777,7 +1781,16 @@ bool mysql_drop_view(THD *thd, Table_ref *views) {
     const dd::Abstract_table *at = nullptr;
     if (thd->dd_client()->acquire(view->db, view->table_name, &at)) return true;
 
-    if (at == nullptr) {
+    view_does_not_exist = (at == nullptr);
+    base_table_with_same_name_exists =
+        (at && (at->type() == dd::enum_table_type::BASE_TABLE));
+
+    /*
+      If DROP ... IF EXISTS is specified, then reporting a warning will
+      suffice when the view does not exist or when a base table with the same
+      name exists. Otherwise, report an appropriate error.
+    */
+    if (view_does_not_exist) {
       String tbl_name(view->db, system_charset_info);
       tbl_name.append('.');
       tbl_name.append(String(view->table_name, system_charset_info));
@@ -1789,25 +1802,52 @@ bool mysql_drop_view(THD *thd, Table_ref *views) {
         if (non_existant_views.length()) non_existant_views.append(',');
         non_existant_views.append(tbl_name);
       }
-    } else if (at->type() == dd::enum_table_type::BASE_TABLE) {
-      my_error(ER_WRONG_OBJECT, MYF(0), view->db, view->table_name, "VIEW");
-      return true;
+    } else if (base_table_with_same_name_exists) {
+      if (thd->lex->drop_if_exists)
+        push_warning_printf(thd, Sql_condition::SL_NOTE, ER_WRONG_OBJECT,
+                            ER_THD(thd, ER_WRONG_OBJECT), view->db,
+                            view->table_name, "VIEW");
+      else {
+        my_error(ER_WRONG_OBJECT, MYF(0), view->db, view->table_name, "VIEW");
+        return true;
+      }
     }
 
 #ifdef WITH_WSREP
     /* WSREP flow does this check before kick-starting final view drop
-    so that it can safely initiate TOI replication. */
-    if (at != NULL) {
-      const dd::View *vw = dynamic_cast<const dd::View *>(at);
+    so that it can safely initiate TOI replication.
+    1. If there is no such view:
+    1.1 we already printed printed a warning (drop if exists)
+    1.2 or added it to non_existant_views which will cause return below without
+       TOI replication..
+    2. If the table with the same name exists:
+    2.1 we already printed a warning (drop if exists)
+    2.2 or returned.
 
-      /*
-        If definer has the SYSTEM_USER privilege then invoker can drop view
-        only if latter also has same privilege.
-      */
-      Auth_id definer(vw->definer_user().c_str(), vw->definer_host().c_str());
-      if (sctx->can_operate_with(definer, consts::system_user, true))
-        return true;
+    Case 1.2 will cause return just after the loop, without TOI replication.
+    For cases 1.1 and 2.1 we skip privileges check and allow TOI replication.
+    If view does not exist, or is a table, it won't be processed by the loop
+    below (when actual drop happens).
+    The same logic applies on the replica side: views that don't exist or are
+    base tables will be just skipped. */
+    if (view_does_not_exist || base_table_with_same_name_exists) {
+      /* The loop is collecting all non-existing views, so we can get here
+      if there are several view specified, but some do not exist */
+      continue;  // Warning reported above.
     }
+
+    // The view exists and there is no table with the same name
+    assert(at->type() == dd::enum_table_type::SYSTEM_VIEW ||
+           at->type() == dd::enum_table_type::USER_VIEW);
+
+    const dd::View *vw = dynamic_cast<const dd::View *>(at);
+    assert(vw);
+
+    /*
+      If definer has the SYSTEM_USER privilege then invoker can drop view
+      only if latter also has same privilege. */
+    Auth_id definer(vw->definer_user().c_str(), vw->definer_host().c_str());
+    if (sctx->can_operate_with(definer, consts::system_user, true)) return true;
 #endif /* WITH_WSREP */
   }
   if (non_existant_views.length()) {
@@ -1843,7 +1883,11 @@ bool mysql_drop_view(THD *thd, Table_ref *views) {
       return true;
     }
 
-    if (at == nullptr) {
+    view_does_not_exist = (at == nullptr);
+    base_table_with_same_name_exists =
+        (at && (at->type() == dd::enum_table_type::BASE_TABLE));
+
+    if (view_does_not_exist || base_table_with_same_name_exists) {
       assert(thd->lex->drop_if_exists);
       continue;  // Warning reported above.
     }
@@ -1960,7 +2004,7 @@ bool check_key_in_view(THD *thd, Table_ref *view, const Table_ref *table_ref) {
     */
     enum_mark_columns save_mark_used_columns = thd->mark_used_columns;
     thd->mark_used_columns = MARK_COLUMNS_NONE;
-    ulong want_privilege_saved = thd->want_privilege;
+    Access_bitmask want_privilege_saved = thd->want_privilege;
     thd->want_privilege = 0;
     for (Field_translator *fld = trans; fld < end_of_trans; fld++) {
       if (!fld->item->fixed && fld->item->fix_fields(thd, &fld->item))

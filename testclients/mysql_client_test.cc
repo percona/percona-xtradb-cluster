@@ -7499,14 +7499,13 @@ static void test_explain_bug() {
     verify_prepare_field(result, 4, "Default", "Default", MYSQL_TYPE_BLOB,
                          nullptr, nullptr, "information_schema", 0);
   } else {
-    verify_prepare_field(result, 4, "Default", "Default",
-                         mysql_get_server_version(mysql) >= 50027
-                             ? MYSQL_TYPE_BLOB
-                             : mysql_get_server_version(mysql) <= 50000
-                                   ? MYSQL_TYPE_STRING
-                                   : MYSQL_TYPE_VAR_STRING,
-                         nullptr, nullptr, "mysql",
-                         mysql_get_server_version(mysql) >= 50027 ? 0 : 64);
+    verify_prepare_field(
+        result, 4, "Default", "Default",
+        mysql_get_server_version(mysql) >= 50027   ? MYSQL_TYPE_BLOB
+        : mysql_get_server_version(mysql) <= 50000 ? MYSQL_TYPE_STRING
+                                                   : MYSQL_TYPE_VAR_STRING,
+        nullptr, nullptr, "mysql",
+        mysql_get_server_version(mysql) >= 50027 ? 0 : 64);
   }
 
   verify_prepare_field(result, 5, "Extra", "Extra",
@@ -18539,7 +18538,8 @@ static void test_wl6791() {
                                    MYSQL_OPT_CAN_HANDLE_EXPIRED_PASSWORDS,
                                    MYSQL_OPT_OPTIONAL_RESULTSET_METADATA},
                     const_char_opts[] =
-  { MYSQL_READ_DEFAULT_FILE,
+  {
+    MYSQL_READ_DEFAULT_FILE,
     MYSQL_READ_DEFAULT_GROUP,
     MYSQL_SET_CHARSET_DIR,
     MYSQL_SET_CHARSET_NAME,
@@ -18559,7 +18559,8 @@ static void test_wl6791() {
     MYSQL_OPT_TLS_SNI_SERVERNAME,
     MYSQL_OPT_SSL_CRL,
     MYSQL_OPT_SSL_CRLPATH,
-    MYSQL_SERVER_PUBLIC_KEY },
+    MYSQL_SERVER_PUBLIC_KEY
+  },
                     err_opts[] = {
                         MYSQL_OPT_NAMED_PIPE, MYSQL_OPT_CONNECT_ATTR_RESET,
                         MYSQL_OPT_CONNECT_ATTR_DELETE, MYSQL_INIT_COMMAND};
@@ -23479,6 +23480,311 @@ static void test_wl16221_bind_param() {
   }
 }
 
+/**
+  Run single prepared statement. The statement must have 2 result fields
+  and 1 parameter.
+
+  @param stmt_text -the statement text
+*/
+static void test_bug34951115_run_one_ps(const char *stmt_text) {
+  MYSQL_BIND bind_params[1], bind_fields[2];
+  memset(bind_params, 0, sizeof(bind_params));
+  memset(bind_fields, 0, sizeof(bind_fields));
+  long param = 2;
+  long n = 3;
+  long id = 0;
+
+  bind_params[0].buffer_type = MYSQL_TYPE_LONG;
+  bind_params[0].buffer = &param;
+  bind_params[0].length = NULL;
+  bind_params[0].buffer_length = sizeof(n);
+  bind_params[0].is_null = 0;
+
+  bind_fields[0].buffer_type = MYSQL_TYPE_LONG;
+  bind_fields[0].buffer = &id;
+  bind_fields[0].buffer_length = sizeof(id);
+  bind_fields[0].length = NULL;
+  bind_fields[1].buffer_type = MYSQL_TYPE_LONG;
+  bind_fields[1].buffer = &n;
+  bind_fields[1].buffer_length = sizeof(n);
+  bind_fields[1].length = NULL;
+
+  MYSQL_STMT *stmt = mysql_stmt_init(mysql);
+
+  int rc = mysql_stmt_prepare(stmt, stmt_text, (ulong)strlen(stmt_text));
+  check_execute(stmt, rc);
+
+  rc = mysql_stmt_bind_named_param(stmt, bind_params, 1, nullptr);
+  check_execute(stmt, rc);
+
+  rc = mysql_stmt_execute(stmt);
+  check_execute(stmt, rc);
+
+  rc = mysql_stmt_bind_result(stmt, bind_fields);
+  check_execute(stmt, rc);
+
+  rc = mysql_stmt_store_result(stmt);
+  check_execute(stmt, rc);
+
+  if (!opt_silent) {
+    printf("\n id |  n\n----+----\n");
+    while (mysql_stmt_fetch(stmt) == 0) {
+      printf("  %ld |  %ld\n", id, n);
+    }
+  }
+  mysql_stmt_close(stmt);
+}
+
+static void test_bug34951115(void) {
+  myheader("test_bug34951115");
+
+  /* Create and fill test table */
+  const char *stmt_text = "DROP TABLE IF EXISTS t";
+  int rc = mysql_real_query(mysql, stmt_text, (ulong)strlen(stmt_text));
+  myquery(rc);
+
+  stmt_text = "CREATE TABLE t (id INT AUTO_INCREMENT PRIMARY KEY, n INT)";
+  rc = mysql_real_query(mysql, stmt_text, (ulong)strlen(stmt_text));
+  myquery(rc);
+
+  stmt_text = "INSERT INTO t VALUES(1,5),(2,4),(3,3),(4,2),(5,1)";
+  rc = mysql_real_query(mysql, stmt_text, (ulong)strlen(stmt_text));
+  myquery(rc);
+
+  /* Run PS with ? replacing identifier in ORDER BY.
+     This is not a valid usage, the parameter will be ignored,
+     but the test proves the preparation and execution not hanging. */
+  test_bug34951115_run_one_ps("SELECT id,n FROM t ORDER BY ?");
+
+  /* Run PS with ? replacing value in SELECT. This is a valid use,
+     the test must succeed.*/
+  test_bug34951115_run_one_ps("SELECT id,n+? FROM t");
+
+  stmt_text = "DROP TABLE IF EXISTS t";
+  rc = mysql_real_query(mysql, stmt_text, (ulong)strlen(stmt_text));
+  myquery(rc);
+}
+
+static void test_bug36891894() {
+  mysql_library_init(0, nullptr, nullptr);
+
+  // Initialize two connections.
+  // To keep things simple, both connections have the same setup.
+  MYSQL *connection_1 = mysql_client_init(nullptr);
+
+  if (connection_1 == nullptr) {
+    fprintf(stderr, "mysql_init failed\n");
+    mysql_library_end();
+    return;
+  }
+
+  MYSQL *connection_2 = mysql_client_init(nullptr);
+
+  if (connection_2 == nullptr) {
+    fprintf(stderr, "mysql_init failed\n");
+    mysql_close(connection_1);
+    mysql_library_end();
+    return;
+  }
+
+  const char *host = "127.0.0.1";
+  const char *user = "test";
+  const char *passwd = "test";
+  const char *db = nullptr;
+  unsigned int port = 0;
+  const char *unix_socket = nullptr;
+  unsigned long clientflag = 0;
+  net_async_status status;
+
+  do {
+    status = mysql_real_connect_nonblocking(connection_1, host, user, passwd,
+                                            db, port, unix_socket, clientflag);
+  } while (status == NET_ASYNC_NOT_READY);
+
+  if (status == NET_ASYNC_ERROR) {
+    fprintf(stderr, "mysql_real_connect_nonblocking failed\n");
+    mysql_close(connection_1);
+    mysql_close(connection_2);
+    mysql_library_end();
+    return;
+  }
+
+  do {
+    status = mysql_real_connect_nonblocking(connection_2, host, user, passwd,
+                                            db, port, unix_socket, clientflag);
+  } while (status == NET_ASYNC_NOT_READY);
+
+  if (status == NET_ASYNC_ERROR) {
+    fprintf(stderr, "mysql_real_connect_nonblocking failed\n");
+    mysql_close(connection_1);
+    mysql_close(connection_2);
+    mysql_library_end();
+    return;
+  }
+
+  // The query on the first connection must cause a packet split.
+  const char *query = "SELECT REPEAT(1, 256 * 256 * 256 + 1)";
+  std::size_t query_length = std::strlen(query);
+
+  do {
+    status = mysql_real_query_nonblocking(connection_1, query, query_length);
+  } while (status == NET_ASYNC_NOT_READY);
+
+  if (status == NET_ASYNC_ERROR) {
+    fprintf(stderr, "mysql_real_query_nonblocking failed\n");
+    mysql_close(connection_1);
+    mysql_close(connection_2);
+    mysql_library_end();
+    return;
+  }
+
+  // The query on the second connection can be anything.
+  query = "SELECT 0";
+  query_length = std::strlen(query);
+
+  do {
+    status = mysql_real_query_nonblocking(connection_2, query, query_length);
+  } while (status == NET_ASYNC_NOT_READY);
+
+  if (status == NET_ASYNC_ERROR) {
+    fprintf(stderr, "mysql_real_query_nonblocking failed\n");
+    mysql_close(connection_1);
+    mysql_close(connection_2);
+    mysql_library_end();
+    return;
+  }
+
+  // We are going to interleave result fetching of query one and two.
+  // Fetching the result of the second query must start after the first packet
+  // of the first query has been received.
+  MYSQL_RES *result_1 = nullptr;
+  int count = 0;
+
+  do {
+    ++count;
+    status = mysql_store_result_nonblocking(connection_1, &result_1);
+
+    // At this point, the first maximum length packet of the first query's
+    // result has been received. Now go and fetch the result of the second
+    // query. The count of 1025 may be very individual. If you don't get a
+    // crash, check the output of the count variable.
+    if (status == NET_ASYNC_NOT_READY && count == 1025) {
+      MYSQL_RES *result_2 = nullptr;
+      net_async_status status_2;
+      do {
+        status_2 = mysql_store_result_nonblocking(connection_2, &result_2);
+      } while (status_2 == NET_ASYNC_NOT_READY);
+
+      if (status_2 == NET_ASYNC_ERROR) {
+        fprintf(stderr, "mysql_store_result_nonblocking failed\n");
+        if (result_1 != nullptr) {
+          mysql_free_result(result_1);
+        }
+        if (result_2 != nullptr) {
+          mysql_free_result(result_2);
+        }
+        mysql_close(connection_1);
+        mysql_close(connection_2);
+        mysql_library_end();
+        return;
+      }
+      MYSQL_ROW row = mysql_fetch_row(result_2);
+      if (row != nullptr) {
+        // std::cout << row[0] << std::endl;
+      }
+      mysql_free_result(result_2);
+    }
+  } while (status == NET_ASYNC_NOT_READY);
+
+  if (status == NET_ASYNC_ERROR) {
+    fprintf(stderr, "mysql_store_result_nonblocking failed\n");
+    if (result_1 != nullptr) {
+      mysql_free_result(result_1);
+    }
+    mysql_close(connection_1);
+    mysql_close(connection_2);
+    mysql_library_end();
+    return;
+  }
+
+  fprintf(stderr, "mysql_store_result_nonblocking count: %d\n", count);
+
+  // This will cause a crash
+  MYSQL_ROW row = mysql_fetch_row(result_1);
+
+  if (row != nullptr) {
+    // std::cout << row[0] << std::endl;
+  }
+  mysql_free_result(result_1);
+  mysql_close(connection_1);
+  mysql_close(connection_2);
+  mysql_library_end();
+}
+
+static void test_bug37202066() {
+  myheader("test_bug37202066");
+#ifndef NDEBUG
+  DBUG_SET("+d,test_stmt_ext_allocations");
+  int rc;
+
+  rc = mysql_query(mysql, "DROP TABLE IF EXISTS test_bug37202066");
+  myquery(rc);
+
+  rc = mysql_query(mysql,
+                   "CREATE TABLE test_bug37202066("
+                   "col1 MEDIUMBLOB NOT NULL,"
+                   "col2 TINYINT DEFAULT NULL"
+                   ") Engine=InnoDB;");
+  myquery(rc);
+
+  MYSQL_STMT *stmt = mysql_stmt_init(mysql);
+  const char *query = "INSERT INTO test_bug37202066 (col1, col2) VALUES (?,?)";
+  rc = mysql_stmt_prepare(stmt, query, (ulong)strlen(query));
+  check_execute(stmt, rc);
+
+  MYSQL_BIND bind[2];
+  memset(bind, 0, sizeof(bind));
+
+  long int_data = 0;
+  bool is_null = true;
+  /* should be longer than initial NET buffer size of 8k */
+  unsigned long buflen = 20000;
+  unsigned long len = buflen;
+  auto data_buf = std::make_unique<char[]>(buflen);
+  memset(data_buf.get(), 'A', buflen);
+
+  /* BLOB COLUMN */
+  bind[0].buffer_type = MYSQL_TYPE_BLOB;  // Same thing with MYSQL_TYPE_STRING
+  bind[0].buffer = data_buf.get();
+  bind[0].buffer_length = buflen;
+  bind[0].is_null = nullptr;
+  bind[0].length = &len;
+
+  /* INT COLUMN */
+  bind[1].buffer_type = MYSQL_TYPE_LONG;
+  bind[1].buffer = (char *)&int_data;
+  bind[1].is_null = &is_null;
+
+  /* validates (under valgrind) that multiple bind param
+   * calls in a row do not make the memory usage grow */
+  for (size_t i = 0; i < 10; ++i) {
+    rc = mysql_stmt_bind_named_param(stmt, bind, std::size(bind), nullptr);
+    check_execute(stmt, rc);
+  }
+
+  /* success criteria: should complete */
+  rc = mysql_stmt_execute(stmt);
+  check_execute(stmt, rc);
+
+  /* cleanup */
+  mysql_stmt_close(stmt);
+  rc = mysql_query(mysql, "DROP TABLE test_bug37202066");
+  myquery(rc);
+
+  DBUG_SET("-d,test_stmt_ext_allocations");
+#endif
+}
+
 static struct my_tests_st my_tests[] = {
     {"disable_query_logs", disable_query_logs},
     {"client_query", client_query},
@@ -23791,6 +24097,9 @@ static struct my_tests_st my_tests[] = {
     {"test_wl16221_refresh", test_wl16221_refresh},
     {"test_wl16221_reload", test_wl16221_reload},
     {"test_wl16221_bind_param", test_wl16221_bind_param},
+    {"test_bug34951115", test_bug34951115},
+    {"test_bug36891894", test_bug36891894},
+    {"test_bug37202066", test_bug37202066},
     {nullptr, nullptr}};
 
 static struct my_tests_st *get_my_tests() { return my_tests; }

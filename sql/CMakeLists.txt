@@ -1,4 +1,4 @@
-# Copyright (c) 2006, 2024, Oracle and/or its affiliates.
+﻿# Copyright (c) 2006, 2024, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -22,6 +22,12 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
 ADD_WSHADOW_WARNING()
+
+# Too many error: empty paragraph passed to '@throws'
+IF(MY_COMPILER_IS_CLANG AND
+    CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 19)
+  DISABLE_DOCUMENTATION_WARNINGS()
+ENDIF()
 
 # Lots of warnings about -Walloc-size-larger-than= from my_malloc.cc
 # but it is basically impossible to trace the actual origin.
@@ -873,43 +879,12 @@ MY_ADD_COMPILE_DEFINITIONS(
   COMPILE_DEFINITIONS XXH_NAMESPACE=MY_
   )
 
-# Workaround for Apple Clang bug on ARM.
-# When linking mysqld (and executables using server_unittest_library)
-# we get linker warnings about
-# ld: warning: direct access in function ....
-#     to global weak symbol 'typeinfo for .... '
-# It turns out we end up with conflicting visibilities for typeinfo symbols:
-# e.g. in in singleton.cc.o  vs  histogram.cc.o
-# (__DATA,__const) weak external __ZTIN10histograms9SingletonI6StringEE
-# (__DATA,__const) weak private external __ZTIN10histograms9SingletonI6StringEE
-#
-# Setting an explicit visibility here fixes the warnings.
-# Note that the LINK_PUBLIC for server_unittest_library
-# will make unit tests pick up histogram symbols from libsql_main.a.
-IF(APPLE_ARM)
-  ADD_COMPILE_FLAGS(
-    histograms/equi_height.cc
-    histograms/equi_height_bucket.cc
-    histograms/histogram.cc
-    histograms/singleton.cc
-    histograms/value_map.cc
-    COMPILE_FLAGS -fvisibility=hidden
-    )
-ENDIF()
-
 ADD_COMPILE_FLAGS(
   ${BUNDLED_LZ4_PATH}/xxhash.c
   iterators/hash_join_iterator.cc
   iterators/composite_iterators.cc
   rpl_write_set_handler.cc
   COMPILE_FLAGS -I${CMAKE_SOURCE_DIR}/extra/lz4 -I${BUNDLED_LZ4_PATH}
-  )
-
-ADD_COMPILE_FLAGS(
-  iterators/composite_iterators.cc
-  iterators/hash_join_buffer.cc
-  COMPILE_FLAGS
-  -I${CMAKE_SOURCE_DIR}/extra/unordered_dense/unordered_dense-4.4.0/include
   )
 
 # Fixes "C1128: number of sections exceeded object file format limit" in MSVC
@@ -1007,6 +982,8 @@ MYSQL_ADD_PLUGIN(mysql_native_password
   LINK_LIBRARIES extra::boost
   SYSTEM_INCLUDE_DIRECTORIES "${RAPIDJSON_INCLUDE_DIR}"
   STATIC_ONLY DEFAULT)
+
+TARGET_LINK_LIBRARIES(sql_main extra::unordered_dense)
 
 TARGET_LINK_LIBRARIES(sql_main ${MYSQLD_STATIC_PLUGIN_LIBS}
   mysql_server_component_services mysys strings vio
@@ -1169,6 +1146,7 @@ SET (RPL_REPLICA_SRCS
   rpl_trx_boundary_parser.cc
   udf_service_impl.cc
   udf_service_util.cc
+  wsrep_async_monitor.cc
   )
 ADD_STATIC_LIBRARY(rpl_replica ${RPL_REPLICA_SRCS}
   DEPENDENCIES GenError
@@ -1211,6 +1189,12 @@ LIST(APPEND MYSQLD_SOURCE partitioning/partition_base.cc)
 MYSQL_ADD_EXECUTABLE(mysqld
   ${MYSQLD_SOURCE} DESTINATION ${INSTALL_SBINDIR} COMPONENT Server
   )
+
+# With Ninja, link huge executables one-by-one.
+IF(WIN32)
+  SET_PROPERTY(TARGET mysqld PROPERTY JOB_POOL_LINK one_job)
+ENDIF()
+
 # You may want to redirect output for this one,
 # the list of exported symbols is loooong.
 ADD_OBJDUMP_TARGET(show_mysqld "$<TARGET_FILE:mysqld>" DEPENDS mysqld)
@@ -1251,6 +1235,11 @@ IF(WITH_LTO OR CMAKE_COMPILER_FLAG_WITH_LTO)
   IF(HAS_WARN_FLAG)
     MY_TARGET_LINK_OPTIONS(mysqld "${HAS_WARN_FLAG}")
   ENDIF()
+  # The linker claims that unmasked_server_id is uninitialized.
+  MY_CHECK_CXX_COMPILER_WARNING("error=uninitialized" HAS_WARN_FLAG)
+  IF(HAS_WARN_FLAG)
+    MY_TARGET_LINK_OPTIONS(mysqld "${HAS_WARN_FLAG}")
+  ENDIF()
 ENDIF()
 
 GET_TARGET_PROPERTY(mysqld_link_flags mysqld LINK_FLAGS)
@@ -1258,7 +1247,10 @@ IF(NOT mysqld_link_flags)
   SET(mysqld_link_flags)
 ENDIF()
 
-IF(UNIX_INSTALL_RPATH_ORIGIN_PRIV_LIBDIR OR LINUX_INSTALL_RPATH_ORIGIN)
+IF(UNIX_INSTALL_RPATH_ORIGIN_PRIV_LIBDIR
+    OR LINUX_INSTALL_RPATH_ORIGIN
+    OR TARGET my_tcmalloc
+    )
   # Because of INSTALL_DEBUG_TARGET which does INSTALL(FILES ...)
   IF(UNIX AND NOT APPLE AND CMAKE_BUILD_TYPE_UPPER STREQUAL "DEBUG")
     STRING_APPEND(mysqld_link_flags
@@ -1441,6 +1433,7 @@ MYSQL_ADD_EXECUTABLE(gen_lex_hash gen_lex_hash.cc SKIP_INSTALL)
 IF(HAS_MISSING_PROFILE)
   ADD_COMPILE_FLAGS(
     gen_lex_hash.cc
+    binlog/log_sanitizer.cc
     COMPILE_FLAGS ${HAS_MISSING_PROFILE})
 ENDIF()
 

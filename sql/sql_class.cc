@@ -756,7 +756,6 @@ THD::THD(bool enable_plugins)
       wsrep_replayer(false),
       run_wsrep_commit_hooks(false),
       run_wsrep_ordered_commit(false),
-      wsrep_enforce_group_commit(false),
       wsrep_post_insert_error(false),
       wsrep_stmt_transaction_rolled_back(false),
       wsrep_force_savept_rollback(false),
@@ -1255,7 +1254,6 @@ void THD::init(void) {
   wsrep_non_replicating_atomic_ddl = false;
   run_wsrep_commit_hooks = false;
   run_wsrep_ordered_commit = false;
-  wsrep_enforce_group_commit = false;
   wsrep_post_insert_error = false;
   wsrep_stmt_transaction_rolled_back = false;
   wsrep_force_savept_rollback = false;

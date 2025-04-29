@@ -1158,13 +1158,13 @@ void kill_zombie_dump_threads(THD *thd) {
     */
     if (log_error_verbosity > 2) {
       if (replica_uuid.length()) {
-        LogErr(INFORMATION_LEVEL, ER_RPL_ZOMBIE_ENCOUNTERED, "UUID",
-               replica_uuid.c_ptr(), "UUID", tmp_ptr->thread_id());
+        LogErr(INFORMATION_LEVEL, ER_RPL_KILL_OLD_DUMP_THREAD_ENCOUNTERED,
+               "UUID", replica_uuid.c_ptr(), "UUID", tmp_ptr->thread_id());
       } else {
         char numbuf[32];
         snprintf(numbuf, sizeof(numbuf), "%u", thd->server_id);
-        LogErr(INFORMATION_LEVEL, ER_RPL_ZOMBIE_ENCOUNTERED, "server_id",
-               numbuf, "server_id", tmp_ptr->thread_id());
+        LogErr(INFORMATION_LEVEL, ER_RPL_KILL_OLD_DUMP_THREAD_ENCOUNTERED,
+               "server_id", numbuf, "server_id", tmp_ptr->thread_id());
       }
     }
     tmp_ptr->duplicate_slave_id = true;
@@ -1222,11 +1222,13 @@ bool reset_binary_logs_and_gtids(THD *thd, bool unlock_global_read_lock) {
     */
 #ifdef WITH_WSREP
     if (WSREP(thd) && global_gtid_mode.get() > Gtid_mode::OFF) {
-      /* RESET MASTER will initialize GTID sequence, and that would happen
-         locally in this node only, so better reject it
+      /* RESET BINARY LOGS AND GTIDS will initialize GTID sequence, and that
+         would happen locally in this node only, so better reject it
       */
-      my_message(ER_NOT_ALLOWED_COMMAND,
-                 "RESET MASTER not allowed when node is in cluster", MYF(0));
+      my_message(
+          ER_NOT_ALLOWED_COMMAND,
+          "RESET BINARY LOGS AND GTIDS not allowed when node is in cluster",
+          MYF(0));
       ret = true;
     } else {
       ret = mysql_bin_log.reset_logs(thd);

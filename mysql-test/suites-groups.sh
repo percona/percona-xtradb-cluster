@@ -39,9 +39,9 @@ function set_suites() {
     WORKER_2_MTR_SUITES="galera_nbo,galera_3nodes,galera_sr,galera_3nodes_nbo,galera_3nodes_sr,galera_encryption,wsrep,galera-x,rpl|nobig"
     WORKER_3_MTR_SUITES="engines/funcs,innodb,perfschema,percona_innodb,component_keyring_file"
     WORKER_4_MTR_SUITES="main|big,rpl|big"
-    WORKER_5_MTR_SUITES="rpl_nogtid,rpl_gtid,galera|big"
-    WORKER_6_MTR_SUITES="parts,group_replication,clone,innodb_gis"
-    WORKER_7_MTR_SUITES="gcol,engines/iuds,encryption,federated,funcs_1,auth_sec,binlog_nogtid,binlog_gtid,funcs_2,jp,information_schema,rpl_encryption,sysschema,json,opt_trace,collations,gis,query_rewrite_plugins,test_service_sql_api,secondary_engine,component_audit_log_filter,component_encryption_udf,percona,component_masking_functions"
+    WORKER_5_MTR_SUITES="rpl_nogtid,rpl_gtid,galera|big,group_replication|nobig"
+    WORKER_6_MTR_SUITES="parts,group_replication|big,innodb_gis"
+    WORKER_7_MTR_SUITES="clone,gcol,engines/iuds,encryption,federated,funcs_1,auth_sec,binlog_nogtid,binlog_gtid,funcs_2,jp,information_schema,rpl_encryption,sysschema,json,opt_trace,collations,gis,query_rewrite_plugins,test_service_sql_api,secondary_engine,component_audit_log_filter,component_encryption_udf,percona,component_masking_functions"
     WORKER_8_MTR_SUITES="galera|nobig,main|nobig"
   fi
 }

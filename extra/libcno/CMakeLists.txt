@@ -16,6 +16,10 @@ SET(LIBCNO_GENERATE_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 
 DISABLE_MISSING_PROFILE_WARNING()
 
+IF(APPLE_XCODE)
+  STRING_APPEND(CMAKE_C_FLAGS " -Wno-shorten-64-to-32")
+ENDIF()
+
 # Following targets were created to mimic behavior of following
 # files supplied by libcno:
 #
@@ -30,7 +34,6 @@ MYSQL_ADD_EXECUTABLE(
   cno_huffman_generator
   cno_huffman_generator.cc
   SKIP_INSTALL
-  EXCLUDE_FROM_ALL
   )
 ADD_CUSTOM_COMMAND(
   OUTPUT "${LIBCNO_GENERATE_DIR}/hpack-data.h"
@@ -62,3 +65,8 @@ TARGET_INCLUDE_DIRECTORIES(cno
 ADD_DEPENDENCIES(cno
   do_cno_huffman_generator
   )
+
+MY_CHECK_CXX_COMPILER_WARNING("-Warray-bounds" HAS_WARN_FLAG)
+IF(HAS_WARN_FLAG)
+  TARGET_COMPILE_OPTIONS(cno PRIVATE "${HAS_WARN_FLAG}")
+ENDIF()

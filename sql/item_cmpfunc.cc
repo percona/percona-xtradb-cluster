@@ -746,7 +746,9 @@ bool Item_bool_func2::resolve_type(THD *thd) {
   // Both arguments are needed for type resolving
   assert(args[0] && args[1]);
 
-  Item_bool_func::resolve_type(thd);
+  if (Item_bool_func::resolve_type(thd)) {
+    return true;
+  }
   /*
     See agg_item_charsets() in item.cc for comments
     on character set and collation aggregation.
@@ -1136,11 +1138,10 @@ bool Arg_comparator::get_date_from_const(Item *date_arg, Item *str_arg,
       value = get_date_from_str(thd, str_val, t_type, date_arg->item_name.ptr(),
                                 &error);
       if (error) {
-        const char *typestr = (date_arg_type == MYSQL_TYPE_DATE)
-                                  ? "DATE"
-                                  : (date_arg_type == MYSQL_TYPE_DATETIME)
-                                        ? "DATETIME"
-                                        : "TIMESTAMP";
+        const char *typestr = (date_arg_type == MYSQL_TYPE_DATE) ? "DATE"
+                              : (date_arg_type == MYSQL_TYPE_DATETIME)
+                                  ? "DATETIME"
+                                  : "TIMESTAMP";
 
         const ErrConvString err(str_val->ptr(), str_val->length(),
                                 thd->variables.character_set_client);
@@ -3284,10 +3285,9 @@ static inline longlong compare_between_int_result(
     bool negated, Item **args, bool *null_value) {
   {
     LLorULL a, b, value;
-    value = compare_as_temporal_times
-                ? args[0]->val_time_temporal()
-                : compare_as_temporal_dates ? args[0]->val_date_temporal()
-                                            : args[0]->val_int();
+    value = compare_as_temporal_times   ? args[0]->val_time_temporal()
+            : compare_as_temporal_dates ? args[0]->val_date_temporal()
+                                        : args[0]->val_int();
     if ((*null_value = args[0]->null_value)) return 0; /* purecov: inspected */
     if (compare_as_temporal_times) {
       a = args[1]->val_time_temporal();
@@ -4875,11 +4875,16 @@ bool cmp_item_row::allocate_template_comparators(THD *thd, Item *item) {
 void cmp_item_row::store_value(Item *item) {
   DBUG_TRACE;
   assert(comparators != nullptr);
-  item->bring_value();
   item->null_value = false;
-  for (uint i = 0; i < n; i++) {
-    comparators[i]->store_value(item->element_index(i));
-    item->null_value |= item->element_index(i)->null_value;
+  item->bring_value();
+  if (item->null_value) {
+    set_null_value(/*nv=*/true);
+  } else {
+    item->null_value = false;
+    for (uint i = 0; i < n; i++) {
+      comparators[i]->store_value(item->element_index(i));
+      item->null_value |= item->element_index(i)->null_value;
+    }
   }
 }
 
@@ -4905,12 +4910,17 @@ bool cmp_item_row::allocate_value_comparators(MEM_ROOT *mem_root,
 
 void cmp_item_row::store_value_by_template(cmp_item *t, Item *item) {
   cmp_item_row *tmpl = (cmp_item_row *)t;
-  item->bring_value();
   item->null_value = false;
-  for (uint i = 0; i < n; i++) {
-    comparators[i]->store_value_by_template(tmpl->comparators[i],
-                                            item->element_index(i));
-    item->null_value |= item->element_index(i)->null_value;
+  item->bring_value();
+  if (item->null_value) {
+    set_null_value(/*nv=*/true);
+  } else {
+    item->null_value = false;
+    for (uint i = 0; i < n; i++) {
+      comparators[i]->store_value_by_template(tmpl->comparators[i],
+                                              item->element_index(i));
+      item->null_value |= item->element_index(i)->null_value;
+    }
   }
 }
 

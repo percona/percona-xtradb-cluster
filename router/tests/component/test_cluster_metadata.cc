@@ -43,6 +43,7 @@
 #include "router_component_testutils.h"
 #include "router_config.h"
 #include "router_test_helpers.h"
+#include "stdx_expected_no_error.h"
 
 using mysqlrouter::ClusterType;
 using mysqlrouter::MetadataSchemaVersion;
@@ -50,6 +51,12 @@ using mysqlrouter::MySQLSession;
 using ::testing::PrintToString;
 using namespace std::chrono_literals;
 using namespace std::string_literals;
+
+namespace mysqlrouter {
+std::ostream &operator<<(std::ostream &os, const MysqlError &e) {
+  return os << e.sql_state() << " code: " << e.value() << ": " << e.message();
+}
+}  // namespace mysqlrouter
 
 class RouterComponenClustertMetadataTest : public RouterComponentMetadataTest {
 };
@@ -610,7 +617,11 @@ TEST_P(UpgradeInProgressTest, UpgradeInProgress) {
   EXPECT_TRUE(wait_for_port_used(router_port));
 
   SCOPED_TRACE("// let us make some user connection via the router port");
-  auto client = make_new_connection_ok(router_port, md_server_port);
+  auto client_res = make_new_connection(router_port);
+  ASSERT_NO_ERROR(client_res);
+  ASSERT_NO_FATAL_FAILURE(verify_port(client_res->get(), md_server_port));
+
+  auto client = std::move(*client_res);
 
   SCOPED_TRACE("// let's mimmic start of the metadata update now");
   auto globals = mock_GR_metadata_as_json(
@@ -716,8 +727,10 @@ TEST_P(NodeRemovedTest, NodeRemoved) {
   EXPECT_TRUE(wait_for_transaction_count_increase(node_http_ports[0], 2));
   SCOPED_TRACE(
       "// Make a connection to the primary, it should be the first node");
-  { /*auto client =*/
-    make_new_connection_ok(router_port, node_ports[0]);
+  {
+    auto conn_res = make_new_connection(router_port);
+    ASSERT_NO_ERROR(conn_res);
+    ASSERT_NO_FATAL_FAILURE(verify_port(conn_res->get(), node_ports[0]));
   }
 
   SCOPED_TRACE(
@@ -744,7 +757,11 @@ TEST_P(NodeRemovedTest, NodeRemoved) {
   EXPECT_TRUE(wait_for_transaction_count_increase(node_http_ports[1], 2));
 
   SCOPED_TRACE("// let us make some user connection via the router port");
-  /*auto client =*/make_new_connection_ok(router_port, node_ports[1]);
+  {
+    auto conn_res = make_new_connection(router_port);
+    ASSERT_NO_ERROR(conn_res);
+    ASSERT_NO_FATAL_FAILURE(verify_port(conn_res->get(), node_ports[1]));
+  }
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -928,8 +945,19 @@ TEST_P(MetadataCacheChangeClusterName, ChangeClusterName) {
                                /*wait_for_notify_ready=*/30s);
 
   // make sure that Router works
-  make_new_connection_ok(router_rw_port, md_servers_classic_ports[0]);
-  make_new_connection_ok(router_ro_port, md_servers_classic_ports[1]);
+  {
+    auto conn_res = make_new_connection(router_rw_port);
+    ASSERT_NO_ERROR(conn_res);
+    ASSERT_NO_FATAL_FAILURE(
+        verify_port(conn_res->get(), md_servers_classic_ports[0]));
+  }
+
+  {
+    auto conn_res = make_new_connection(router_ro_port);
+    ASSERT_NO_ERROR(conn_res);
+    ASSERT_NO_FATAL_FAILURE(
+        verify_port(conn_res->get(), md_servers_classic_ports[1]));
+  }
 
   // now change the cluster name in the metadata
   for (const auto [i, http_port] :
@@ -941,8 +969,19 @@ TEST_P(MetadataCacheChangeClusterName, ChangeClusterName) {
       wait_for_transaction_count_increase(md_servers_http_ports[0], 2, 5s));
 
   // the Router should still work
-  make_new_connection_ok(router_rw_port, md_servers_classic_ports[0]);
-  make_new_connection_ok(router_ro_port, md_servers_classic_ports[1]);
+  {
+    auto conn_res = make_new_connection(router_rw_port);
+    ASSERT_NO_ERROR(conn_res);
+    ASSERT_NO_FATAL_FAILURE(
+        verify_port(conn_res->get(), md_servers_classic_ports[0]));
+  }
+
+  {
+    auto conn_res = make_new_connection(router_ro_port);
+    ASSERT_NO_ERROR(conn_res);
+    ASSERT_NO_FATAL_FAILURE(
+        verify_port(conn_res->get(), md_servers_classic_ports[1]));
+  }
 
   // now stop the Router and start it again, this is to make sure that not only
   // change of the ClusterName while the Router is running works but also when
@@ -955,8 +994,19 @@ TEST_P(MetadataCacheChangeClusterName, ChangeClusterName) {
                                      md_servers_classic_ports, EXIT_SUCCESS,
                                      /*wait_for_notify_ready=*/30s);
 
-  make_new_connection_ok(router_rw_port, md_servers_classic_ports[0]);
-  make_new_connection_ok(router_ro_port, md_servers_classic_ports[1]);
+  {
+    auto conn_res = make_new_connection(router_rw_port);
+    ASSERT_NO_ERROR(conn_res);
+    ASSERT_NO_FATAL_FAILURE(
+        verify_port(conn_res->get(), md_servers_classic_ports[0]));
+  }
+
+  {
+    auto conn_res = make_new_connection(router_ro_port);
+    ASSERT_NO_ERROR(conn_res);
+    ASSERT_NO_FATAL_FAILURE(
+        verify_port(conn_res->get(), md_servers_classic_ports[1]));
+  }
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -1378,6 +1428,161 @@ INSTANTIATE_TEST_SUITE_P(
     [](const ::testing::TestParamInfo<StatsUpdatesFrequencyParam> &info) {
       return info.param.test_name;
     });
+
+static constexpr const unsigned long max_supported_version =
+    MYSQL_ROUTER_VERSION_MAJOR * 10000 + MYSQL_ROUTER_VERSION_MINOR * 100 + 99;
+
+struct ServerCompatTestParam {
+  std::string description;
+  ClusterType cluster_type;
+  std::string tracefile;
+  std::string server_version;
+  bool expect_failure;
+  std::string expected_error_msg;
+};
+
+class CheckServerCompatibilityTest
+    : public RouterComponenClustertMetadataTest,
+      public ::testing::WithParamInterface<ServerCompatTestParam> {};
+
+/**
+ * @test
+ *       Verifies that the server version is checked for compatibility when the
+ * Router is running with the GR Cluster and Replica Set
+ */
+TEST_P(CheckServerCompatibilityTest, Spec) {
+  RecordProperty("Description", GetParam().description);
+
+  const size_t kClusterNodes{2};
+  std::vector<ProcessWrapper *> cluster_nodes;
+  std::vector<uint16_t> md_servers_classic_ports, md_servers_http_ports;
+
+  const std::string tracefile = get_data_dir().join(GetParam().tracefile).str();
+  // launch the mock servers
+  for (size_t i = 0; i < kClusterNodes; ++i) {
+    const auto classic_port = port_pool_.get_next_available();
+    const auto http_port = port_pool_.get_next_available();
+    cluster_nodes.push_back(&launch_mysql_server_mock(
+        tracefile, classic_port, EXIT_SUCCESS, false, http_port));
+
+    md_servers_classic_ports.push_back(classic_port);
+    md_servers_http_ports.push_back(http_port);
+  }
+
+  for (const auto http_port : md_servers_http_ports) {
+    set_mock_metadata(http_port, "uuid",
+                      classic_ports_to_gr_nodes(md_servers_classic_ports), 0,
+                      classic_ports_to_cluster_nodes(md_servers_classic_ports));
+  }
+
+  // launch the router
+  const std::string metadata_cache_section =
+      get_metadata_cache_section(GetParam().cluster_type);
+  const auto router_rw_port = port_pool_.get_next_available();
+  const std::string routing_rw_section = get_metadata_cache_routing_section(
+      router_rw_port, "PRIMARY", "first-available", "rw");
+  const auto router_ro_port = port_pool_.get_next_available();
+  const std::string routing_ro_section = get_metadata_cache_routing_section(
+      router_ro_port, "SECONDARY", "round-robin", "ro");
+  auto &router = launch_router(metadata_cache_section,
+                               routing_rw_section + routing_ro_section,
+                               md_servers_classic_ports, EXIT_SUCCESS,
+                               /*wait_for_notify_ready=*/30s);
+
+  // make sure that Router works
+  auto client_res = make_new_connection(router_rw_port);
+  ASSERT_NO_ERROR(client_res);
+  ASSERT_NO_FATAL_FAILURE(
+      verify_port(client_res->get(), md_servers_classic_ports[0]));
+
+  client_res = make_new_connection(router_ro_port);
+  ASSERT_NO_ERROR(client_res);
+  ASSERT_NO_FATAL_FAILURE(
+      verify_port(client_res->get(), md_servers_classic_ports[1]));
+
+  // change the cluster nodes versions
+  for (const auto http_port : md_servers_http_ports) {
+    set_mock_server_version(http_port, GetParam().server_version);
+  }
+
+  EXPECT_TRUE(
+      wait_for_transaction_count_increase(md_servers_http_ports[0], 5, 5s));
+
+  if (GetParam().expect_failure) {
+    verify_new_connection_fails(router_rw_port);
+    verify_new_connection_fails(router_ro_port);
+
+    EXPECT_TRUE(wait_log_contains(router, GetParam().expected_error_msg, 5s));
+  } else {
+    auto conn_res = make_new_connection(router_rw_port);
+    ASSERT_NO_ERROR(conn_res);
+    ASSERT_NO_FATAL_FAILURE(
+        verify_port(conn_res->get(), md_servers_classic_ports[0]));
+
+    conn_res = make_new_connection(router_ro_port);
+    ASSERT_NO_ERROR(conn_res);
+    ASSERT_NO_FATAL_FAILURE(
+        verify_port(conn_res->get(), md_servers_classic_ports[1]));
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Spec, CheckServerCompatibilityTest,
+    ::testing::Values(
+        ServerCompatTestParam{
+            "GR Cluster; Server is the same version as Router - OK",
+            ClusterType::GR_V2, "metadata_dynamic_nodes_v2_gr.js",
+            std::to_string(MYSQL_ROUTER_VERSION_MAJOR) + "." +
+                std::to_string(MYSQL_ROUTER_VERSION_MINOR) + "." +
+                std::to_string(MYSQL_ROUTER_VERSION_PATCH),
+            false, ""},
+        ServerCompatTestParam{
+            "Replica Set; Server is the same version as Router - OK",
+            ClusterType::RS_V2, "metadata_dynamic_nodes_v2_ar.js",
+            std::to_string(MYSQL_ROUTER_VERSION_MAJOR) + "." +
+                std::to_string(MYSQL_ROUTER_VERSION_MINOR) + "." +
+                std::to_string(MYSQL_ROUTER_VERSION_PATCH),
+            false, ""},
+        ServerCompatTestParam{
+            "GR Cluster; Server major version is highier than Router - "
+            "we should reject the metadata",
+            ClusterType::GR_V2, "metadata_dynamic_nodes_v2_gr.js",
+            std::to_string(MYSQL_ROUTER_VERSION_MAJOR + 1) + "." +
+                std::to_string(MYSQL_ROUTER_VERSION_MINOR) + "." +
+                std::to_string(MYSQL_ROUTER_VERSION_PATCH),
+            true,
+            "WARNING .* Unsupported MySQL Server version '.*'. Maximal "
+            "supported version is '" +
+                std::to_string(max_supported_version) + "'."},
+        ServerCompatTestParam{
+            "GR Cluster; Server minor version is highier than Router - "
+            "we should reject the metadata",
+            ClusterType::GR_V2, "metadata_dynamic_nodes_v2_gr.js",
+            std::to_string(MYSQL_ROUTER_VERSION_MAJOR) + "." +
+                std::to_string(MYSQL_ROUTER_VERSION_MINOR + 1) + "." +
+                std::to_string(MYSQL_ROUTER_VERSION_PATCH),
+            true,
+            "WARNING .* Unsupported MySQL Server version '.*'. Maximal "
+            "supported version is '" +
+                std::to_string(max_supported_version) + "'."},
+        ServerCompatTestParam{
+            "GR Cluster; Server patch version is highier than Router - OK",
+            ClusterType::GR_V2, "metadata_dynamic_nodes_v2_gr.js",
+            std::to_string(MYSQL_ROUTER_VERSION_MAJOR) + "." +
+                std::to_string(MYSQL_ROUTER_VERSION_MINOR) + "." +
+                std::to_string(MYSQL_ROUTER_VERSION_PATCH + 1),
+            false, ""},
+        ServerCompatTestParam{
+            "Replica Set; Server minor version is highier than Router - "
+            "we should reject the metadata",
+            ClusterType::RS_V2, "metadata_dynamic_nodes_v2_ar.js",
+            std::to_string(MYSQL_ROUTER_VERSION_MAJOR) + "." +
+                std::to_string(MYSQL_ROUTER_VERSION_MINOR + 1) + "." +
+                std::to_string(MYSQL_ROUTER_VERSION_PATCH),
+            true,
+            "WARNING .* Unsupported MySQL Server version '.*'. Maximal "
+            "supported version is '" +
+                std::to_string(max_supported_version) + "'."}));
 
 int main(int argc, char *argv[]) {
   init_windows_sockets();

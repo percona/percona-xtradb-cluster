@@ -117,6 +117,7 @@ IF(NOT WITHOUT_SERVER)
     plugin/ndb_replica.cc
     plugin/ndb_binlog_index_rows.cc
     plugin/ndb_rpl_filter.cc
+    plugin/ndb_binlog_purger.cc
   )
 
   # Include directories used when building ha_ndbcluster
@@ -126,8 +127,11 @@ IF(NOT WITHOUT_SERVER)
   # unless it is explicitly disabled on the command line.
   MYSQL_ADD_PLUGIN(ndbcluster ${NDBCLUSTER_SOURCES} STORAGE_ENGINE
     DEFAULT STATIC_ONLY
-    LINK_LIBRARIES ndbclient_static extra::rapidjson)
-
+    LINK_LIBRARIES
+    ndbclient_static
+    extra::rapidjson
+    extra::unordered_dense
+    )
   SET_PROPERTY(SOURCE plugin/ha_ndbcluster.cc
                PROPERTY COMPILE_DEFINITIONS
                NDB_TLS_SEARCH_PATH="${WITH_NDB_TLS_SEARCH_PATH}")

@@ -137,6 +137,7 @@ my $opt_platform_exclude;
 my $opt_ps_protocol;
 my $opt_report_features;
 my $opt_skip_core;
+my $opt_skip_suite;
 my $opt_skip_test_list;
 my $opt_sp_protocol;
 my $opt_start;
@@ -210,6 +211,7 @@ my $build_thread       = 0;
 my $daemonize_mysqld   = 0;
 my $debug_d            = "d";
 my $exe_ndbmtd_counter = 0;
+my $tmpdir_path_updated= 0;
 my $source_dist        = 0;
 my $shutdown_report    = 0;
 my $valgrind_reports   = 0;
@@ -303,10 +305,10 @@ our @DEFAULT_SUITES = qw(
   component_keyring_file
 
   component_audit_log_filter
-  component_encryption_udf
   percona
   percona_innodb
   percona-pam-for-mysql
+  component_encryption_udf
   component_masking_functions
   procfs
   rpl_encryption
@@ -420,8 +422,6 @@ use constant { MYSQLTEST_PASS        => 0,
                MYSQLTEST_SKIPPED     => 62,
                MYSQLTEST_NOSKIP_PASS => 63,
                MYSQLTEST_NOSKIP_FAIL => 64 };
-
-use constant DEFAULT_WORKER_ID => 1;
 
 sub check_timeout ($) { return testcase_timeout($_[0]) / 10; }
 
@@ -662,6 +662,19 @@ sub main {
     $opt_suites =~ s/,$//;
   }
 
+  # Skip suites which match the --skip-suite filter
+  if ($opt_skip_suite) {
+    my $opt_skip_suite_reg = init_pattern($opt_skip_suite, "--skip-suite");
+    for my $suite (split(",", $opt_suites)) {
+      if ($opt_skip_suite_reg and $suite =~ /$opt_skip_suite_reg/) {
+        remove_suite_from_list($suite);
+      }
+    }
+
+    # Removing ',' at the end of $opt_suites if exists
+    $opt_suites =~ s/,$//;
+  }
+
   if ($opt_skip_sys_schema) {
     remove_suite_from_list("sysschema");
   }
@@ -867,6 +880,7 @@ sub main {
       if ($opt_parallel > 1) {
         set_vardir("$opt_vardir/$child_num");
         $opt_tmpdir = "$opt_tmpdir/$child_num";
+        $tmpdir_path_updated = 1;
       }
 
       init_timers();
@@ -1796,6 +1810,7 @@ sub command_line_setup {
     'skip-im'                            => \&ignore_option,
     'skip-ndbcluster|skip-ndb'           => \$opt_skip_ndbcluster,
     'skip-rpl'                           => \&collect_option,
+    'skip-suite=s'                       => \$opt_skip_suite,
     'skip-sys-schema'                    => \$opt_skip_sys_schema,
     'skip-test=s'                        => \&collect_option,
     'start-from=s'                       => \&collect_option,
@@ -2218,7 +2233,7 @@ sub command_line_setup {
     $opt_tmpdir = "$opt_vardir/tmp" unless $opt_tmpdir;
 
     my $res =
-      check_socket_path_length("$opt_tmpdir/mysqld.NN.sock", $opt_parallel);
+      check_socket_path_length("$opt_tmpdir/mysqld.NN.sock", $opt_parallel, $tmpdir_path_updated);
 
     if ($res) {
       mtr_report("Too long tmpdir path '$opt_tmpdir'",
@@ -3709,9 +3724,6 @@ sub remove_stale_vardir () {
   # Remove the "tmp" dir
   mtr_verbose("Removing $opt_tmpdir/");
   rmtree("$opt_tmpdir/");
-  for (my $worker = 1; $worker <= $opt_parallel; ++$worker) {
-    invoke_fs_cleanup_hook($worker);
-  }
 }
 
 # Create var and the directories needed in var
@@ -3761,7 +3773,7 @@ sub setup_vardir() {
   # UNIX domain socket's path far below PATH_MAX. Don't allow that
   # to happen.
   my $res =
-    check_socket_path_length("$opt_tmpdir/mysqld.NN.sock", $opt_parallel);
+    check_socket_path_length("$opt_tmpdir/mysqld.NN.sock", $opt_parallel, $tmpdir_path_updated);
   if ($res) {
     mtr_error("Socket path '$opt_tmpdir' too long, it would be ",
               "truncated and thus not possible to use for connection to ",
@@ -4491,7 +4503,6 @@ sub default_mysqld {
                                     baseport      => 0,
                                     user          => $opt_user,
                                     password      => '',
-                                    worker        => DEFAULT_WORKER_ID,
                                     bind_local    => $opt_bind_local
                                   });
 
@@ -5353,8 +5364,6 @@ sub run_testcase ($) {
                            tmpdir              => $opt_tmpdir,
                            user                => $opt_user,
                            vardir              => $opt_vardir,
-                           worker              => $tinfo->{worker} ||
-                                                    DEFAULT_WORKER_ID,
                            bind_local          => $opt_bind_local
                          });
 
@@ -6358,17 +6367,24 @@ sub check_expected_crash_and_restart($$) {
           delete $mysqld->{'restart_opts'};
         }
 
-        # Attempt to remove the .expect file. If it fails in
-        # windows, retry removal after a sleep.
-        my $retry = 1;
-        while (
-          unlink($expect_file) == 0 &&
-          $! == 13 &&    # Error = 13, Permission denied
-          IS_WINDOWS && $retry-- >= 0
-          ) {
-          # Permission denied to unlink.
-          # Race condition seen on windows. Wait and retry.
-          mtr_milli_sleep(1000);
+        # Attempt to remove the .expect file. It was observed that on Windows
+        # 439 are sometimes not enough, while 440th attempt succeeded. The exact
+        # cause of the problem is unknown, as trying to list the processes with
+        # open handle using sysinternal tool named Handle, caused the tool
+        # itself to crash. We make only 30 iterations here, as a trade-off,
+        # which seems to be enough in most cases, but waitng longer seems to
+        # risk timing out the whole test suite. Not removing a file might impact
+        # the next test case, thus we emit a warning in such case.
+        my $attempts = 0;
+        while (unlink($expect_file) == 0) {
+          if ($! == 13 && IS_WINDOWS && ++$attempts < 30){
+            # Permission denied to unlink.
+            # Race condition seen on windows. Wait and retry.
+            mtr_milli_sleep(1000);
+          } else {
+            mtr_warning("attempt#$attempts to unlink($expect_file) failed: $!");
+            last;
+          }
         }
 
         # Instruct an implicit wait in case the restart is intended
@@ -6433,20 +6449,6 @@ sub clean_dir {
     $dir);
 }
 
-sub invoke_fs_cleanup_hook($) {
-  my ($worker_id) = @_;
-
-  if (defined $opt_fs_cleanup_hook and $opt_fs_cleanup_hook ne '') {
-    mtr_report(" - executing custom fs-cleanup hook for worker $worker_id");
-    my $hook_command_line = $opt_fs_cleanup_hook;
-    if (substr($opt_fs_cleanup_hook, 0, 1) eq '@') {
-      $hook_command_line = substr($opt_fs_cleanup_hook, 1) . ' ' . $worker_id;
-    }
-    mtr_verbose(" - $hook_command_line");
-    system($hook_command_line);
-  }
-}
-
 sub clean_datadir {
   my ($tinfo) = @_;
 
@@ -6473,7 +6475,6 @@ sub clean_datadir {
         !$bootstrap_opts) {
       mtr_verbose(" - removing '$mysqld_dir'");
       rmtree($mysqld_dir);
-      invoke_fs_cleanup_hook($tinfo->{worker} || DEFAULT_WORKER_ID);
     }
   }
 
@@ -6489,13 +6490,12 @@ sub clean_datadir {
 }
 
 # Save datadir before it's removed
-sub save_datadir_after_failure($$$) {
-  my ($dir, $savedir, $worker) = @_;
+sub save_datadir_after_failure($$) {
+  my ($dir, $savedir) = @_;
 
   mtr_report(" - saving '$dir'");
   my $dir_name = basename($dir);
   rename("$dir", "$savedir/$dir_name");
-  invoke_fs_cleanup_hook($worker);
 }
 
 sub remove_ndbfs_from_ndbd_datadir {
@@ -6541,14 +6541,12 @@ sub after_failure ($) {
         }
       }
 
-      save_datadir_after_failure($cluster_dir, $save_dir,
-                                 $tinfo->{worker} || DEFAULT_WORKER_ID);
+      save_datadir_after_failure($cluster_dir, $save_dir);
     }
   } else {
     foreach my $mysqld (mysqlds()) {
       my $data_dir = $mysqld->value('datadir');
-      save_datadir_after_failure(dirname($data_dir), $save_dir,
-                                 $tinfo->{worker} || DEFAULT_WORKER_ID);
+      save_datadir_after_failure(dirname($data_dir), $save_dir);
       save_secondary_engine_logdir($save_dir) if $tinfo->{'secondary-engine'};
     }
   }

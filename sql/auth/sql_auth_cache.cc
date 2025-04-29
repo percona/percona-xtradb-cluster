@@ -396,11 +396,18 @@ ACL_USER::ACL_USER() {
   /* Acl_credentials is initialized by its constructor */
 }
 
+void ACL_USER::Password_locked_state::set_temporary_lock_state_parameters(
+    uint remaining_login_attempts, long daynr_locked) {
+  m_remaining_login_attempts = remaining_login_attempts;
+  m_daynr_locked = daynr_locked;
+}
+
 void ACL_USER::Password_locked_state::set_parameters(
-    uint password_lock_time_days, uint failed_login_attempts) {
+    int password_lock_time_days, uint failed_login_attempts) {
   m_password_lock_time_days = password_lock_time_days;
-  m_remaining_login_attempts = m_failed_login_attempts = failed_login_attempts;
-  m_daynr_locked = 0;
+  m_failed_login_attempts = failed_login_attempts;
+  set_temporary_lock_state_parameters(failed_login_attempts, 0);
+  assert(is_default() == true);
 }
 
 /**
@@ -937,7 +944,7 @@ bool hostname_requires_resolving(const char *hostname) {
   return false; /* all characters are either dots or digits. */
 }
 
-GRANT_COLUMN::GRANT_COLUMN(String &c, ulong y)
+GRANT_COLUMN::GRANT_COLUMN(String &c, Access_bitmask y)
     : rights(y), column(c.ptr(), c.length()) {}
 
 void GRANT_NAME::set_user_details(const char *h, const char *d, const char *u,
@@ -965,13 +972,13 @@ void GRANT_NAME::set_user_details(const char *h, const char *d, const char *u,
 }
 
 GRANT_NAME::GRANT_NAME(const char *h, const char *d, const char *u,
-                       const char *t, ulong p, bool is_routine)
+                       const char *t, Access_bitmask p, bool is_routine)
     : db(nullptr), tname(nullptr), privs(p) {
   set_user_details(h, d, u, t, is_routine);
 }
 
 GRANT_TABLE::GRANT_TABLE(const char *h, const char *d, const char *u,
-                         const char *t, ulong p, ulong c)
+                         const char *t, Access_bitmask p, Access_bitmask c)
     : GRANT_NAME(h, d, u, t, p, false),
       cols(c),
       hash_columns(system_charset_info, key_memory_acl_memex) {}
@@ -1003,7 +1010,8 @@ GRANT_NAME::GRANT_NAME(TABLE *form, bool is_routine) {
   hash_key.push_back('\0');
 
   if (form->field[MYSQL_TABLES_PRIV_FIELD_TABLE_PRIV]) {
-    privs = (ulong)form->field[MYSQL_TABLES_PRIV_FIELD_TABLE_PRIV]->val_int();
+    privs = (Access_bitmask)form->field[MYSQL_TABLES_PRIV_FIELD_TABLE_PRIV]
+                ->val_int();
     privs = fix_rights_for_table(privs);
   }
 }
@@ -1018,7 +1026,8 @@ GRANT_TABLE::GRANT_TABLE(TABLE *form)
   }
 
   if (form->field[MYSQL_TABLES_PRIV_FIELD_COLUMN_PRIV]) {
-    cols = (ulong)form->field[MYSQL_TABLES_PRIV_FIELD_COLUMN_PRIV]->val_int();
+    cols = (Access_bitmask)form->field[MYSQL_TABLES_PRIV_FIELD_COLUMN_PRIV]
+               ->val_int();
     cols = fix_rights_for_column(cols);
   } else
     cols = 0;
@@ -1078,7 +1087,8 @@ bool GRANT_TABLE::init(TABLE *col_privs) {
       GRANT_COLUMN *mem_check;
       /* As column name is a string, we don't have to supply a buffer */
       res = col_privs->field[4]->val_str(&column_name);
-      const ulong priv = (ulong)col_privs->field[6]->val_int();
+      const Access_bitmask priv =
+          (Access_bitmask)col_privs->field[6]->val_int();
       DBUG_EXECUTE_IF("mysql_grant_table_init_out_of_memory",
                       DBUG_SET("+d,simulate_out_of_memory"););
       if (!(mem_check = new (*THR_MALLOC)
@@ -1369,9 +1379,9 @@ static void insert_entry_in_db_cache(THD *thd, acl_entry *entry) {
   @return Database ACL
 */
 
-ulong acl_get(THD *thd, const char *host, const char *ip, const char *user,
-              const char *db, bool db_is_pattern) {
-  ulong host_access = ~(ulong)0, db_access = 0;
+Access_bitmask acl_get(THD *thd, const char *host, const char *ip,
+                       const char *user, const char *db, bool db_is_pattern) {
+  Access_bitmask host_access = ~(Access_bitmask)0, db_access = 0;
   size_t key_length, copy_length;
   char key[ACL_KEY_LENGTH], *tmp_db, *end;
   acl_entry *entry;
@@ -1400,7 +1410,7 @@ ulong acl_get(THD *thd, const char *host, const char *ip, const char *user,
     const auto it = db_cache.find(std::string(key, key_length));
     if (it != db_cache.end()) {
       db_access = it->second->access;
-      DBUG_PRINT("exit", ("access: 0x%lx", db_access));
+      DBUG_PRINT("exit", ("access: 0x%" PRIx32, db_access));
       return db_access;
     }
   }
@@ -1451,7 +1461,7 @@ exit:
     acl_cache_lock.unlock();
     insert_entry_in_db_cache(thd, entry);
   }
-  DBUG_PRINT("exit", ("access: 0x%lx", db_access & host_access));
+  DBUG_PRINT("exit", ("access: 0x%" PRIx32, db_access & host_access));
   return db_access & host_access;
 }
 
@@ -1903,7 +1913,7 @@ bool acl_getroot(THD *thd, Security_context *sctx, const char *user,
 
   if (acl_user && sctx->get_active_roles()->size() > 0) {
     sctx->checkout_access_maps();
-    const ulong db_acl = db ? sctx->db_acl({db, strlen(db)}) : 0;
+    const Access_bitmask db_acl = db ? sctx->db_acl({db, strlen(db)}) : 0;
     sctx->cache_current_db_access(db_acl);
   }
   return res;
@@ -2101,7 +2111,7 @@ bool acl_init(bool dont_read_acl_tables) {
     will be freed there are global static objects and thus are initialized
     by zeros at startup.
   */
-  return_val |= acl_reload(thd, false);
+  return_val |= acl_reload(thd, false, false, nullptr);
   notify_flush_event(thd);
   /*
     Turn ON the system variable '@@partial_revokes' during server
@@ -2267,7 +2277,6 @@ static bool acl_load(THD *thd, Table_ref *tables) {
     LogErr(WARNING_LEVEL, ER_MISSING_GRANT_SYSTEM_TABLE);
   }
 
-  initialized = true;
   return_val = false;
 
 end:
@@ -2449,6 +2458,109 @@ bool is_expected_or_transient_error(THD *thd) {
          thd->get_stmt_da()->mysql_errno() == ER_LOCK_DEADLOCK;
 }
 
+ACL_temporary_lock_state::ACL_temporary_lock_state(
+    const char *host, const char *user, uint remaining_login_attempts,
+    long daynr_locked)
+    : m_host(host ? host : ""),
+      m_user(user ? user : ""),
+      m_remaining_login_attempts(remaining_login_attempts),
+      m_daynr_locked(daynr_locked) {}
+
+bool ACL_temporary_lock_state::is_modified(ACL_USER *acl_user) {
+  assert(acl_user != nullptr);
+  assert(assert_acl_cache_write_lock(current_thd));
+  return (!acl_user->password_locked_state.is_default() &&
+          !acl_user->account_locked);
+}
+
+/**
+  Enables preserving temporary account locking attributes of a user during ACL
+  DDL.
+
+  @ref ACL_temporary_lock_state
+
+  @param [in]  host      Account's hostname.
+  @param [in]  user      Account's username.
+  @param [out] user_list List in which a user's lock state is preserved.
+
+  @returns find_acl_user(host, user, true)
+*/
+ACL_USER *ACL_temporary_lock_state::preserve_user_lock_state(
+    const char *host, const char *user, Lock_state_list &user_list) {
+  assert(assert_acl_cache_write_lock(current_thd));
+  ACL_USER *acl_user;
+  if ((acl_user = find_acl_user(host, user, true))) {
+    if (ACL_temporary_lock_state::is_modified(acl_user)) {
+      user_list.emplace_back(
+          host, user,
+          acl_user->password_locked_state.get_remaining_login_attempts(),
+          acl_user->password_locked_state.get_daynr_locked());
+    }
+  }
+  return acl_user;
+}
+
+/**
+  Enables restoring temporary account locking attributes of a user after ACL
+  reload.
+
+  @ref ACL_temporary_lock_state
+
+  @param [in] host       Account's hostname.
+  @param [in] user       Account's username.
+  @param [in] remaining_login_attempts
+                         Account's remaining login attempts.
+  @param [in] daynr_locked
+                         Account's locked day.
+*/
+void ACL_temporary_lock_state::restore_user_lock_state(
+    const char *host, const char *user, uint remaining_login_attempts,
+    long daynr_locked) {
+  assert(assert_acl_cache_write_lock(current_thd));
+  ACL_USER *acl_user;
+  if ((acl_user = find_acl_user(host, user, true))) {
+    acl_user->password_locked_state.set_temporary_lock_state_parameters(
+        remaining_login_attempts, daynr_locked);
+  }
+}
+
+/**
+  Enables restoring temporary account locking attributes of all users after ACL
+  reload.
+
+  @ref ACL_temporary_lock_state
+
+  @param [in] old_acl_users    List of users in the old ACL cache.
+  @param [in] modified_user_lock_state_list
+                               List of users whose temporary account
+                               locking attributes are likely modified.
+*/
+void ACL_temporary_lock_state::restore_temporary_account_locking(
+    Prealloced_array<ACL_USER, ACL_PREALLOC_SIZE> *old_acl_users,
+    Lock_state_list *modified_user_lock_state_list) {
+  assert(assert_acl_cache_write_lock(current_thd));
+  if (old_acl_users) {
+    for (ACL_USER *old_acl_user = old_acl_users->begin();
+         old_acl_user != old_acl_users->end(); ++old_acl_user) {
+      if (ACL_temporary_lock_state::is_modified(old_acl_user)) {
+        ACL_temporary_lock_state::restore_user_lock_state(
+            old_acl_user->host.get_host(),
+            old_acl_user->user ? old_acl_user->user : "",
+            old_acl_user->password_locked_state.get_remaining_login_attempts(),
+            old_acl_user->password_locked_state.get_daynr_locked());
+      }
+    }
+  }
+  if (modified_user_lock_state_list) {
+    for (auto element = modified_user_lock_state_list->rbegin();
+         element != modified_user_lock_state_list->rend(); ++element) {
+      ACL_temporary_lock_state::restore_user_lock_state(
+          element->m_host, element->m_user, element->m_remaining_login_attempts,
+          element->m_daynr_locked);
+    }
+  }
+}
+
 /*
   Forget current user/db-level privileges and read new privileges
   from the privilege tables.
@@ -2468,7 +2580,10 @@ bool is_expected_or_transient_error(THD *thd) {
     true   Failure
 */
 
-bool acl_reload(THD *thd, bool mdl_locked) {
+bool acl_reload(THD *thd, bool mdl_locked,
+                bool preserve_temporary_account_locking,
+                Lock_state_list *modified_user_lock_state_list) {
+  assert(preserve_temporary_account_locking || !modified_user_lock_state_list);
   MEM_ROOT old_mem;
   bool return_val = true;
   const uint flags = mdl_locked
@@ -2601,8 +2716,18 @@ bool acl_reload(THD *thd, bool mdl_locked) {
     init_check_host();
     delete swap_dynamic_privileges_map(old_dyn_priv_map);
     if (!old_dyn_priv_map) dynamic_privileges_init();
-    if (acl_users) rebuild_cached_acl_users_for_name();
+    if (acl_users) {
+      rebuild_cached_acl_users_for_name();
+      if (preserve_temporary_account_locking) {
+        ACL_temporary_lock_state::restore_temporary_account_locking(
+            nullptr, modified_user_lock_state_list);
+      }
+    }
   } else {
+    if (acl_users && preserve_temporary_account_locking) {
+      ACL_temporary_lock_state::restore_temporary_account_locking(
+          old_acl_users, modified_user_lock_state_list);
+    }
     delete old_acl_users;
     delete old_acl_dbs;
     delete old_acl_proxy_users;
@@ -2905,6 +3030,7 @@ end_unlock:
   t_table->file->ha_index_end();
 end_index_init:
   thd->variables.sql_mode = old_sql_mode;
+  if (!return_val) initialized = true;
   return return_val;
 }
 
@@ -2961,6 +3087,8 @@ static bool grant_reload_procs_priv(Table_ref *table) {
 */
 
 bool grant_reload(THD *thd, bool mdl_locked) {
+  DBUG_EXECUTE_IF("enable_debug_sync_before_grant_reload",
+                  { DEBUG_SYNC(thd, "before_grant_reload"); };);
   MEM_ROOT old_mem;
   bool return_val = true;
   const uint flags = mdl_locked
@@ -2971,9 +3099,6 @@ bool grant_reload(THD *thd, bool mdl_locked) {
   const sql_mode_t old_sql_mode = thd->variables.sql_mode;
 
   DBUG_TRACE;
-
-  /* Don't do anything if running with --skip-grant-tables */
-  if (!initialized) return false;
 
   thd->variables.sql_mode &= ~MODE_PAD_CHAR_TO_FULL_LENGTH;
 
@@ -3047,7 +3172,7 @@ end:
 void acl_update_user(const char *user, const char *host, enum SSL_type ssl_type,
                      const char *ssl_cipher, const char *x509_issuer,
                      const char *x509_subject, USER_RESOURCES *mqh,
-                     ulong privileges, const LEX_CSTRING &plugin,
+                     Access_bitmask privileges, const LEX_CSTRING &plugin,
                      const LEX_CSTRING &auth, const std::string &second_auth,
                      const MYSQL_TIME &password_change_time,
                      const LEX_ALTER &password_life, Restrictions &restrictions,
@@ -3108,8 +3233,8 @@ void acl_update_user(const char *user, const char *host, enum SSL_type ssl_type,
           }
         }
         DBUG_PRINT("info",
-                   ("Updates global privilege for %s@%s to %lu", acl_user->user,
-                    acl_user->host.get_host(), privileges));
+                   ("Updates global privilege for %s@%s to %" PRIu32,
+                    acl_user->user, acl_user->host.get_host(), privileges));
         acl_user->access = privileges;
         if (what_to_update.m_what & USER_ATTRIBUTES &&
             (what_to_update.m_user_attributes &
@@ -3208,7 +3333,7 @@ void acl_update_user(const char *user, const char *host, enum SSL_type ssl_type,
 void acl_users_add_one(const char *user, const char *host,
                        enum SSL_type ssl_type, const char *ssl_cipher,
                        const char *x509_issuer, const char *x509_subject,
-                       USER_RESOURCES *mqh, ulong privileges,
+                       USER_RESOURCES *mqh, Access_bitmask privileges,
                        const LEX_CSTRING &plugin, const LEX_CSTRING &auth,
                        const LEX_CSTRING &second_auth,
                        const MYSQL_TIME &password_change_time,
@@ -3322,7 +3447,7 @@ void acl_insert_user(THD *thd [[maybe_unused]], const char *user,
                      const char *host, enum SSL_type ssl_type,
                      const char *ssl_cipher, const char *x509_issuer,
                      const char *x509_subject, USER_RESOURCES *mqh,
-                     ulong privileges, const LEX_CSTRING &plugin,
+                     Access_bitmask privileges, const LEX_CSTRING &plugin,
                      const LEX_CSTRING &auth,
                      const MYSQL_TIME &password_change_time,
                      const LEX_ALTER &password_life, Restrictions &restrictions,
@@ -3366,7 +3491,7 @@ void acl_update_proxy_user(ACL_PROXY_USER *new_value, bool is_revoke) {
 }
 
 void acl_update_db(const char *user, const char *host, const char *db,
-                   ulong privileges) {
+                   Access_bitmask privileges) {
   assert(assert_acl_cache_write_lock(current_thd));
 
   for (ACL_DB *acl_db = acl_dbs->begin(); acl_db < acl_dbs->end();) {
@@ -3405,7 +3530,7 @@ void acl_update_db(const char *user, const char *host, const char *db,
 */
 
 void acl_insert_db(const char *user, const char *host, const char *db,
-                   ulong privileges) {
+                   Access_bitmask privileges) {
   ACL_DB acl_db;
   assert(assert_acl_cache_write_lock(current_thd));
   acl_db.set_user(&global_acl_memory, user);
@@ -3586,6 +3711,7 @@ Acl_map::Acl_map(Security_context *sctx, uint64 ver)
 
 Acl_map::~Acl_map() {
   // Db_access_map is automatically destroyed and cleaned up.
+  assert(reference_count() == 0);
 }
 
 Acl_map::Acl_map(const Acl_map &&map) { operator=(map); }
@@ -3606,7 +3732,7 @@ Acl_map &Acl_map::operator=(Acl_map &&map) {
 
 Acl_map &Acl_map::operator=(const Acl_map &) { return *this; }
 
-ulong Acl_map::global_acl() { return m_global_acl; }
+Access_bitmask Acl_map::global_acl() { return m_global_acl; }
 
 Db_access_map *Acl_map::db_acls() { return &m_db_acls; }
 
@@ -3632,8 +3758,22 @@ void Acl_map::decrease_reference_count() { --m_reference_count; }
 
 void Acl_cache::increase_version() {
   DBUG_TRACE;
+  mysql_mutex_lock(&m_cache_flush_mutex);
+  /**
+    We increase the m_role_graph_version twice here i.e., once before the
+    flush_cache() and once after to indicate that flush has started and stopped.
+    With this, the LF Hash will now contains the records with:
+    a. version equal to the global version => current records
+    b. version+1 equal to global version => almost old (could be still in use)
+    c. version+2 less or equal to global version => old records (safe to delete)
+    We check the reference count along with the map version in cache_flusher()
+    to match the old records that can be deleted and we delete only those
+    objects from the hash.
+   */
   ++m_role_graph_version;
   flush_cache();
+  ++m_role_graph_version;
+  mysql_mutex_unlock(&m_cache_flush_mutex);
 }
 
 uint64 Acl_cache::version() { return m_role_graph_version.load(); }
@@ -3659,6 +3799,7 @@ Acl_map *Acl_cache::checkout_acl_map(Security_context *sctx, Auth_id_ref &uid,
   if (entry == nullptr || entry == MY_LF_ERRPTR) {
     lf_hash_search_unpin(pins);
     Acl_map *map = create_acl_map(version, sctx);  // deleted in cache_flusher
+    map->increase_reference_count();
     Acl_hash_entry new_entry;
     new_entry.version = version;
     new_entry.map = map;
@@ -3669,13 +3810,19 @@ Acl_map *Acl_cache::checkout_acl_map(Security_context *sctx, Auth_id_ref &uid,
     if (rc != 0) {
       /* There was a duplicate; throw away the allocated memory */
       lf_hash_put_pins(pins);
+      map->decrease_reference_count();
       my_free(key);
       delete map;
       DBUG_PRINT("info", ("Someone else checked out the cache key"));
       /* Potentially dangerous to dive here? */
       return checkout_acl_map(sctx, uid, active_roles);
     }
-    map->increase_reference_count();
+    DBUG_EXECUTE_IF("test_acl_race_condition", {
+      if (sctx->get_thd()->get_command() == COM_CONNECT) {
+        const char act[] = "now SIGNAL map_inserted WAIT_FOR map_removed";
+        assert(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
+      }
+    });
     lf_hash_put_pins(pins);
     DBUG_PRINT("info", ("Checked out new privilege map. Key= %s", key));
     return map;
@@ -3701,7 +3848,7 @@ void Acl_cache::return_acl_map(Acl_map *map) {
 uint64 l_cache_flusher_global_version;
 
 /**
-  Utility function for removing all items from the hash.
+  Utility function for removing items from the hash.
   @param ptr A pointer to a Acl_hash_entry
   @param arg not used
   @return Always 0 with the intention that this causes the hash_search
@@ -3712,7 +3859,7 @@ static int cache_flusher(const uchar *ptr, void *arg [[maybe_unused]]) {
   const Acl_hash_entry *entry = reinterpret_cast<const Acl_hash_entry *>(ptr);
   if (entry != nullptr) {
     if (entry->map->reference_count() == 0 &&
-        entry->map->version() < l_cache_flusher_global_version)
+        ((entry->map->version() + 2) <= l_cache_flusher_global_version))
       return 1;
   }
   return 0;
@@ -3720,11 +3867,12 @@ static int cache_flusher(const uchar *ptr, void *arg [[maybe_unused]]) {
 
 void Acl_cache::flush_cache() {
   DBUG_TRACE;
-  LF_PINS *pins = lf_hash_get_pins(&m_cache);
+  DEBUG_SYNC(current_thd, "flush_cache_begin");
+  if (m_cache.size == 0) return;
   Acl_hash_entry *entry = nullptr;
-  mysql_mutex_lock(&m_cache_flush_mutex);
   l_cache_flusher_global_version = version();
   do {
+    LF_PINS *pins = lf_hash_get_pins(&m_cache);
     entry = static_cast<Acl_hash_entry *>(
         lf_hash_random_match(&m_cache, pins, &cache_flusher, 0, nullptr));
     if (entry &&
@@ -3734,9 +3882,39 @@ void Acl_cache::flush_cache() {
       delete entry->map;
     }
     lf_hash_search_unpin(pins);
+    lf_hash_put_pins(pins);
   } while (entry != nullptr);
-  lf_hash_put_pins(pins);
-  mysql_mutex_unlock(&m_cache_flush_mutex);
+  DEBUG_SYNC(current_thd, "flush_cache_end");
+}
+
+/**
+  Helper function for Acl_cache::clear_acl_cache
+
+  @returns 1 to indicate that entry is a match
+*/
+int match_all_entries(const uchar *, void *) { return 1; }
+
+/**
+  This method is called from the shutdown_acl_cache() to remove the remaining
+  entries, if any present, from the Acl_cache irrespective of the reference
+  count or the map version.
+*/
+void Acl_cache::clear_acl_cache() {
+  Acl_hash_entry *entry = nullptr;
+  if (m_cache.size == 0) return;
+  do {
+    LF_PINS *pins = lf_hash_get_pins(&m_cache);
+    entry = static_cast<Acl_hash_entry *>(
+        lf_hash_random_match(&m_cache, pins, match_all_entries, 0, nullptr));
+    if (entry != nullptr && entry != MY_LF_ERRPTR &&
+        !lf_hash_delete(&m_cache, pins, entry->key, entry->key_length)) {
+      // Hash element is removed from cache; safe to delete
+      my_free(entry->key);
+      delete entry->map;
+    }
+    lf_hash_search_unpin(pins);
+    lf_hash_put_pins(pins);
+  } while (entry != nullptr);
 }
 
 Acl_map *Acl_cache::create_acl_map(uint64 version, Security_context *sctx) {
@@ -3766,7 +3944,7 @@ void shutdown_acl_cache() {
   if (!acl_cache_initialized) return;
 
   /* This should clean up all remaining Acl_cache items */
-  g_acl_cache->increase_version();
+  g_acl_cache->clear_acl_cache();
   assert(g_acl_cache->size() == 0);
   delete g_acl_cache;
   g_acl_cache = nullptr;
@@ -3966,12 +4144,21 @@ uint32 global_password_reuse_interval = 0;
 
   @param [in] thd              THD handle
   @param [in] mdl_locked       MDL locks are taken
+  @param [in] preserve_temporary_account_locking
+                               Preserve temporary account locking
+                               attributes of all users.
+  @param [in] modified_user_lock_state_list
+                               List of users whose temporary account
+                               locking attributes are likely modified.
+
   @returns Status of reloading ACL caches
     @retval false Success
     @retval true Error
 */
 
-bool reload_acl_caches(THD *thd, bool mdl_locked) {
+bool reload_acl_caches(THD *thd, bool mdl_locked,
+                       bool preserve_temporary_account_locking,
+                       Lock_state_list *modified_user_lock_state_list) {
   DBUG_TRACE;
   bool retval = true;
   const bool save_mdl_locked = mdl_locked;
@@ -4014,7 +4201,9 @@ bool reload_acl_caches(THD *thd, bool mdl_locked) {
   }
 
   if (check_engine_type_for_acl_table(thd, mdl_locked) ||
-      check_acl_tables_intact(thd, mdl_locked) || acl_reload(thd, mdl_locked) ||
+      check_acl_tables_intact(thd, mdl_locked) ||
+      acl_reload(thd, mdl_locked, preserve_temporary_account_locking,
+                 modified_user_lock_state_list) ||
       grant_reload(thd, mdl_locked)) {
     goto end;
   }

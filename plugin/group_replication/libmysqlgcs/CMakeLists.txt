@@ -237,8 +237,14 @@ ADD_LIBRARY(mysqlgcs STATIC ${XCOM_SOURCES} ${GCS_SOURCES})
 # but pick up symbols from the server:
 # TARGET_LINK_LIBRARIES(mysqlgcs mysys)
 
-IF(LINUX AND WITH_TIRPC STREQUAL "bundled")
-  ADD_DEPENDENCIES(mysqlgcs tirpc_ext)
+# Lots of C-style casting in the interface to XDR functions.
+#   xcom_xdr_free((xdrproc_t)proc ...)
+#   xdr_free((xdrproc_t)xdr_app_data_ptr
+# Add -Wno-cast-function-type-mismatch as a PUBLIC property,
+# since we have header files calling xdr_free().
+MY_CHECK_CXX_COMPILER_WARNING("-Wcast-function-type-mismatch" HAS_WARN_FLAG)
+IF(HAS_WARN_FLAG)
+  TARGET_COMPILE_OPTIONS(mysqlgcs PUBLIC ${HAS_WARN_FLAG})
 ENDIF()
 
 IF(CMAKE_VERSION VERSION_GREATER "3.19" AND NOT APPLE_XCODE)
@@ -257,8 +263,8 @@ IF(WIN32)
   TARGET_COMPILE_OPTIONS(mysqlgcs PRIVATE "/wd4005")
 ENDIF()
 
-IF(TIRPC_LIBRARIES)
-  TARGET_LINK_LIBRARIES(mysqlgcs ${TIRPC_LIBRARIES})
+IF(TARGET ext::rpc)
+  TARGET_LINK_LIBRARIES(mysqlgcs PUBLIC ext::rpc)
 ENDIF()
 
 IF(MSVC)

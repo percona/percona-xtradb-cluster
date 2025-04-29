@@ -43,6 +43,9 @@ typedef int64 query_id_t;
 
 class THD;
 
+extern "C" long long wsrep_xid_seqno(const struct xid_t *xid);
+const unsigned char *wsrep_xid_uuid(const struct xid_t *xid);
+
 /* Return true if wsrep is enabled for a thd. This means that
    wsrep is enabled globally and the thd has wsrep on */
 extern "C" bool wsrep_on(const THD *thd);

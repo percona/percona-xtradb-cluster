@@ -1079,11 +1079,12 @@ static inline int execute_no_commit_ie(Thd_ndb *thd_ndb,
   return res;
 }
 
-Thd_ndb::Thd_ndb(THD *thd)
+Thd_ndb::Thd_ndb(THD *thd, const char *name)
     : m_thd(thd),
       options(0),
       trans_options(0),
       m_ddl_ctx(nullptr),
+      m_thread_name(name),
       m_batch_mem_root(key_memory_thd_ndb_batch_mem_root,
                        BATCH_MEM_ROOT_BLOCK_SIZE),
       global_schema_lock_trans(nullptr),
@@ -3034,6 +3035,9 @@ int ha_ndbcluster::peek_indexed_rows(const uchar *record,
         bitmap_is_overlapping(table->write_set, m_key_fields[i])) {
       // Unique index being written
 
+      if (unlikely(m_index[i].type == UNDEFINED_INDEX))
+        return fail_index_offline(table, i);
+
       /*
         It's not possible to lookup a NULL field value in a unique index. But
         since keys with NULLs are not indexed, such rows cannot conflict anyway
@@ -3912,6 +3916,10 @@ int ha_ndbcluster::full_table_scan(const KEY *key_info,
   options.scan_flags =
       guess_scan_flags(lm, m_table_map, m_table, table->read_set);
   options.parallel = DEFAULT_PARALLELISM;
+  DBUG_EXECUTE_IF("ndb_disk_scan", {
+    if (!(options.scan_flags & NdbScanOperation::SF_DiskScan))
+      return ER_INTERNAL_ERROR;
+  });
 
   if (use_set_part_id) {
     assert(m_user_defined_partitioning);
@@ -5148,19 +5156,17 @@ static int handle_row_conflict(
      * We now take steps to generate a refresh Binlog event so that
      * other clusters will be re-aligned.
      */
-    DBUG_PRINT(
-        "info",
-        ("Conflict on table %s.  Operation type : %s, "
-         "conflict cause :%s, conflict error : %u : %s",
-         table_name,
-         ((op_type == WRITE_ROW)
-              ? "WRITE_ROW"
-              : (op_type == UPDATE_ROW) ? "UPDATE_ROW" : "DELETE_ROW"),
-         ((conflict_cause == ROW_ALREADY_EXISTS)
-              ? "ROW_ALREADY_EXISTS"
-              : (conflict_cause == ROW_DOES_NOT_EXIST) ? "ROW_DOES_NOT_EXIST"
-                                                       : "ROW_IN_CONFLICT"),
-         conflict_error.code, conflict_error.message));
+    DBUG_PRINT("info",
+               ("Conflict on table %s.  Operation type : %s, "
+                "conflict cause :%s, conflict error : %u : %s",
+                table_name,
+                ((op_type == WRITE_ROW)    ? "WRITE_ROW"
+                 : (op_type == UPDATE_ROW) ? "UPDATE_ROW"
+                                           : "DELETE_ROW"),
+                ((conflict_cause == ROW_ALREADY_EXISTS)   ? "ROW_ALREADY_EXISTS"
+                 : (conflict_cause == ROW_DOES_NOT_EXIST) ? "ROW_DOES_NOT_EXIST"
+                                                          : "ROW_IN_CONFLICT"),
+                conflict_error.code, conflict_error.message));
 
     assert(key_rec != nullptr);
     assert(row != nullptr);
@@ -6210,7 +6216,7 @@ static void get_default_value(void *def_val, Field *field) {
   }
 }
 
-static inline int fail_index_offline(TABLE *t, int index) {
+int fail_index_offline(TABLE *t, int index) {
   KEY *key_info = t->key_info + index;
   push_warning_printf(
       t->in_use, Sql_condition::SL_WARNING, ER_NOT_KEYFILE,
@@ -7213,10 +7219,9 @@ double ha_ndbcluster::read_time(uint index, uint ranges, ha_rows rows) {
   assert(rows >= ranges);
 
   const NDB_INDEX_TYPE index_type =
-      (index < MAX_KEY)
-          ? get_index_type(index)
-          : (index == MAX_KEY) ? PRIMARY_KEY_INDEX  // Hidden primary key
-                               : UNDEFINED_INDEX;   // -> worst index
+      (index < MAX_KEY)    ? get_index_type(index)
+      : (index == MAX_KEY) ? PRIMARY_KEY_INDEX  // Hidden primary key
+                           : UNDEFINED_INDEX;   // -> worst index
 
   // fanout_factor is intended to compensate for the amount
   // of roundtrips between API <-> data node and between data nodes
@@ -7390,6 +7395,10 @@ void Thd_ndb::transaction_checks() {
     THDVAR(thd, optimized_node_selection) =
         THDVAR(nullptr, optimized_node_selection) & 1; /* using global value */
   }
+
+  /* Set thread's Ndb object's optimized_node_selection (locality) value */
+  get_thd_ndb(thd)->ndb->set_optimized_node_selection(
+      THDVAR(thd, optimized_node_selection) & 1);
 }
 
 int ha_ndbcluster::start_statement(THD *thd, Thd_ndb *thd_ndb,
@@ -7678,8 +7687,6 @@ NdbTransaction *ha_ndbcluster::start_transaction(int &error) {
 
   m_thd_ndb->transaction_checks();
 
-  const uint opti_node_select = THDVAR(table->in_use, optimized_node_selection);
-  m_thd_ndb->connection->set_optimized_node_selection(opti_node_select & 1);
   if ((trans = m_thd_ndb->ndb->startTransaction(m_table))) {
     // NOTE! No hint provided when starting transaction
 
@@ -8157,16 +8164,26 @@ static int create_ndb_column(THD *thd, NDBCOL &col, Field *field,
         const NDB_Modifier *mod = column_modifiers.get("BLOB_INLINE_SIZE");
 
         if (mod->m_found) {
-          int mod_size = atoi(mod->m_val_str.str);
+          char *end = nullptr;
+          long mod_size = strtol(mod->m_val_str.str, &end, 10);
 
           if (mod_size > INT_MAX) mod_size = INT_MAX;
 
-          if (mod_size <= 0) {
+          if (*end != 0 || mod_size < 0) {
             if (thd) {
               get_thd_ndb(thd)->push_warning(
                   "Failed to parse BLOB_INLINE_SIZE=%s, "
                   "using default value %d",
                   mod->m_val_str.str, size);
+            }
+            mod_size = size;
+          }
+          if (col.getPartSize() == 0) {
+            if (thd) {
+              get_thd_ndb(thd)->push_warning(
+                  "BLOB_INLINE_SIZE not supported for BLOB column with no part "
+                  "table (e.g. TINYBLOB), using default value %d",
+                  size);
             }
             mod_size = size;
           }
@@ -8364,10 +8381,10 @@ static int create_ndb_column(THD *thd, NDBCOL &col, Field *field,
         col.setType(NDBCOL::Text);
         col.setCharset(cs);
       }
-      col.setInlineSize(256);
       // No parts
       col.setPartSize(0);
       col.setStripeSize(0);
+      set_blob_inline_size(thd, col, 256);
       break;
     // mysql_type_blob:
     case MYSQL_TYPE_GEOMETRY:
@@ -8391,12 +8408,13 @@ static int create_ndb_column(THD *thd, NDBCOL &col, Field *field,
         if (field_blob->max_data_length() < (1 << 8))
           goto mysql_type_tiny_blob;
         else if (field_blob->max_data_length() < (1 << 16)) {
-          set_blob_inline_size(thd, col, 256);
-          col.setPartSize(2000);
-          col.setStripeSize(0);
           if (mod_maxblob->m_found) {
             col.setPartSize(DEFAULT_MAX_BLOB_PART_SIZE);
+          } else {
+            col.setPartSize(2000);
           }
+          col.setStripeSize(0);
+          set_blob_inline_size(thd, col, 256);
         } else if (field_blob->max_data_length() < (1 << 24))
           goto mysql_type_medium_blob;
         else
@@ -8411,12 +8429,13 @@ static int create_ndb_column(THD *thd, NDBCOL &col, Field *field,
         col.setType(NDBCOL::Text);
         col.setCharset(cs);
       }
-      set_blob_inline_size(thd, col, 256);
-      col.setPartSize(4000);
-      col.setStripeSize(0);
       if (mod_maxblob->m_found) {
         col.setPartSize(DEFAULT_MAX_BLOB_PART_SIZE);
+      } else {
+        col.setPartSize(4000);
       }
+      col.setStripeSize(0);
+      set_blob_inline_size(thd, col, 256);
       break;
     mysql_type_long_blob:
     case MYSQL_TYPE_LONG_BLOB:
@@ -8426,10 +8445,10 @@ static int create_ndb_column(THD *thd, NDBCOL &col, Field *field,
         col.setType(NDBCOL::Text);
         col.setCharset(cs);
       }
-      set_blob_inline_size(thd, col, 256);
+      // The mod_maxblob modified has no effect here, already at max
       col.setPartSize(DEFAULT_MAX_BLOB_PART_SIZE);
       col.setStripeSize(0);
-      // The mod_maxblob modified has no effect here, already at max
+      set_blob_inline_size(thd, col, 256);
       break;
 
     // MySQL 5.7 binary-encoded JSON type
@@ -8448,9 +8467,9 @@ static int create_ndb_column(THD *thd, NDBCOL &col, Field *field,
       const int NDB_JSON_PART_SIZE = 8100;
 
       col.setType(NDBCOL::Blob);
-      set_blob_inline_size(thd, col, NDB_JSON_INLINE_SIZE);
       col.setPartSize(NDB_JSON_PART_SIZE);
       col.setStripeSize(0);
+      set_blob_inline_size(thd, col, NDB_JSON_INLINE_SIZE);
       break;
     }
 
@@ -12271,8 +12290,6 @@ static bool is_supported_system_table(const char *, const char *, bool) {
 Ndb_index_stat_thread ndb_index_stat_thread;
 Ndb_metadata_change_monitor ndb_metadata_change_monitor_thread;
 
-extern THD *ndb_create_thd(char *stackptr);
-
 //
 // Functionality used for delaying MySQL Server startup until
 // connection to NDB and setup (of index stat plus binlog) has completed
@@ -12326,9 +12343,30 @@ static int ndb_wait_setup_server_startup(void *) {
   Returns false on success.
 */
 static bool upgrade_migrate_privilege_tables() {
+  /*
+    Setup THD object
+  */
+  auto ndb_create_thd = [](void *stackptr) -> THD * {
+    THD *thd = new THD;
+    thd->thread_stack = reinterpret_cast<char *>(stackptr);
+    thd->store_globals();
+
+    thd->init_query_mem_roots();
+    thd->set_command(COM_DAEMON);
+    thd->security_context()->skip_grants();
+
+    CHARSET_INFO *charset_connection =
+        get_charset_by_csname("utf8mb3", MY_CS_PRIMARY, MYF(MY_WME));
+    thd->variables.character_set_client = charset_connection;
+    thd->variables.character_set_results = charset_connection;
+    thd->variables.collation_connection = charset_connection;
+    thd->update_charset();
+
+    return thd;
+  };
+
   int stack_base = 0;
-  std::unique_ptr<THD> temp_thd(
-      ndb_create_thd(reinterpret_cast<char *>(&stack_base)));
+  std::unique_ptr<THD> temp_thd(ndb_create_thd(&stack_base));
   Ndb *ndb = check_ndb_in_thd(temp_thd.get());
 
   NdbDictionary::Dictionary *dict = ndb->getDictionary();
@@ -13277,7 +13315,7 @@ static bool read_multi_needs_scan(NDB_INDEX_TYPE cur_index_type,
 
 ha_rows ha_ndbcluster::multi_range_read_info_const(
     uint keyno, RANGE_SEQ_IF *seq, void *seq_init_param, uint n_ranges,
-    uint *bufsz, uint *flags, Cost_estimate *cost) {
+    uint *bufsz, uint *flags, bool *force_default_mrr, Cost_estimate *cost) {
   ha_rows rows;
   uint def_flags = *flags;
   uint def_bufsz = *bufsz;
@@ -13285,8 +13323,9 @@ ha_rows ha_ndbcluster::multi_range_read_info_const(
   DBUG_TRACE;
 
   /* Get cost/flags/mem_usage of default MRR implementation */
-  rows = handler::multi_range_read_info_const(
-      keyno, seq, seq_init_param, n_ranges, &def_bufsz, &def_flags, cost);
+  rows = handler::multi_range_read_info_const(keyno, seq, seq_init_param,
+                                              n_ranges, &def_bufsz, &def_flags,
+                                              force_default_mrr, cost);
   if (unlikely(rows == HA_POS_ERROR)) {
     return rows;
   }
@@ -13294,10 +13333,13 @@ ha_rows ha_ndbcluster::multi_range_read_info_const(
   /*
     If HA_MRR_USE_DEFAULT_IMPL has been passed to us, that is
     an order to use the default MRR implementation.
-    Otherwise, make a choice based on requested *flags, handler
-    capabilities, cost and mrr* flags of @@optimizer_switch.
+    Also, if multi_range_read_info_const() detected that "DS_MRR" cannot
+    be used (E.g. Using a multi-valued index for non-equality ranges), we
+    are mandated to use the default implementation. Else, make a choice
+    based on requested *flags, handler capabilities, cost and mrr* flags
+    of @@optimizer_switch.
   */
-  if ((*flags & HA_MRR_USE_DEFAULT_IMPL) ||
+  if ((*flags & HA_MRR_USE_DEFAULT_IMPL) || *force_default_mrr ||
       choose_mrr_impl(keyno, n_ranges, rows, bufsz, flags, cost)) {
     DBUG_PRINT("info", ("Default MRR implementation choosen"));
     *flags = def_flags;
@@ -15722,6 +15764,16 @@ enum_alter_inplace_result ha_ndbcluster::check_inplace_alter_supported(
     }
   }
 
+  if (alter_flags & Alter_inplace_info::ADD_PK_INDEX) {
+    return inplace_unsupported(ha_alter_info, "Adding primary key");
+  }
+
+  if (alter_flags & Alter_inplace_info::DROP_PK_INDEX) {
+    return inplace_unsupported(ha_alter_info, "Dropping primary key");
+  }
+
+  // Catch all for everything not supported, should ideally have been caught
+  // already and returned a clear text message.
   if (alter_flags & not_supported) {
     if (alter_info->requested_algorithm ==
         Alter_info::ALTER_TABLE_ALGORITHM_INPLACE)
@@ -17501,7 +17553,7 @@ bool ha_ndbcluster::upgrade_table(THD *thd, const char *db_name,
 }
 
 /*
-  @brief Shut down ndbcluster background tasks that could access the DD
+  @brief Shut down background tasks accessing DD or InnoDB before shutting down.
 
   @param  hton  Handlerton of the SE
 
@@ -17510,6 +17562,8 @@ static void ndbcluster_pre_dd_shutdown(handlerton *hton [[maybe_unused]]) {
   // Stop and deinitialize the ndb_metadata_change_monitor thread
   ndb_metadata_change_monitor_thread.stop();
   ndb_metadata_change_monitor_thread.deinit();
+  // Notify ndb_binlog that the ndb_purger need to be stopped
+  ndbcluster_binlog_pre_dd_shutdown();
 }
 
 static int show_ndb_status(THD *thd, SHOW_VAR *var, char *) {
@@ -18133,6 +18187,51 @@ static MYSQL_SYSVAR_UINT(log_transaction_compression_level_zstd, /* name */
                          22,                             /* max */
                          0);
 
+ulong opt_ndb_log_purge_rate;
+static MYSQL_SYSVAR_ULONG(
+    log_purge_rate,         /* name */
+    opt_ndb_log_purge_rate, /* var */
+    PLUGIN_VAR_RQCMDARG,
+    "Rate of rows to delete when purging rows from ndb_binlog_index.",
+    nullptr,     /* check func. */
+    nullptr,     /* update func. */
+    8192,        /* default */
+    1,           /* min */
+    1024 * 1024, /* max */
+    0            /* block */
+);
+
+// Overrides --binlog-cache-size for the ndb binlog thread
+ulong opt_ndb_log_cache_size;
+static void fix_ndb_log_cache_size(THD *thd, SYS_VAR *, void *val_ptr,
+                                   const void *checked) {
+  ulong new_size = *static_cast<const ulong *>(checked);
+
+  // Cap the max value in the same way as other binlog cache size variables
+  if (new_size > max_binlog_cache_size) {
+    push_warning_printf(
+        thd, Sql_condition::SL_WARNING, ER_BINLOG_CACHE_SIZE_GREATER_THAN_MAX,
+        "Option ndb_log_cache_size (%lu) is greater than max_binlog_cache_size "
+        "(%lu); setting ndb_log_cache_size equal to max_binlog_cache_size.",
+        (ulong)new_size, (ulong)max_binlog_cache_size);
+    new_size = static_cast<ulong>(max_binlog_cache_size);
+  }
+  *(static_cast<ulong *>(val_ptr)) = new_size;
+}
+
+static MYSQL_SYSVAR_ULONG(
+    log_cache_size,         /* name */
+    opt_ndb_log_cache_size, /* var */
+    PLUGIN_VAR_RQCMDARG,
+    "Size of the binary log transaction cache used by NDB binlog",
+    nullptr,                /* check func. */
+    fix_ndb_log_cache_size, /* update func. */
+    64 * 1024 * 1024,       /* default */
+    IO_SIZE,                /* min */
+    ULONG_MAX,              /* max */
+    IO_SIZE                 /* block */
+);
+
 bool opt_ndb_clear_apply_status;
 static MYSQL_SYSVAR_BOOL(
     clear_apply_status,         /* name */
@@ -18545,6 +18644,8 @@ static SYS_VAR *system_variables[] = {
     MYSQL_SYSVAR(log_transaction_id),
     MYSQL_SYSVAR(log_transaction_compression),
     MYSQL_SYSVAR(log_transaction_compression_level_zstd),
+    MYSQL_SYSVAR(log_purge_rate),
+    MYSQL_SYSVAR(log_cache_size),
     MYSQL_SYSVAR(log_fail_terminate),
     MYSQL_SYSVAR(log_transaction_dependency),
     MYSQL_SYSVAR(clear_apply_status),

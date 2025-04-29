@@ -41,6 +41,12 @@
 # Regression tests may take a long time, override the default to skip them
 %{!?runselftest:%global runselftest 1}
 
+%if 0%{?fedora} > 39
+%global compatver 8.0.37
+%global compatlib 21
+%global compatsrc https://cdn.mysql.com/Downloads/MySQL-8.0/mysql-boost-%{compatver}.tar.gz
+%endif
+
 %{!?product_suffix:              %global product_suffix community}
 %{!?compilation_comment_release: %global compilation_comment_release MySQL Community - GPL}
 %{!?compilation_comment_debug:   %global compilation_comment_debug MySQL Community - GPL - Debug}
@@ -65,6 +71,9 @@ Version:        @MYSQL_NO_DASH_VERSION@
 Release:        10@MYSQL_VERSION_EXTRA_DOT@%{?dist}
 License:        Copyright (c) 2000, @MYSQL_COPYRIGHT_YEAR@, %{mysql_vendor}. Under %{?license_type} license as shown in the Description field.
 Source0:        https://cdn.mysql.com/Downloads/MySQL-@MYSQL_BASE_VERSION@/%{src_dir}.tar.gz
+%if 0%{?compatlib}
+Source1:        %{compatsrc}
+%endif
 URL:            http://www.mysql.com/
 Packager:       MySQL Release Engineering <mysql-build@oss.oracle.com>
 Vendor:         %{mysql_vendor}
@@ -83,6 +92,9 @@ BuildRequires:  ncurses-devel
 BuildRequires:  numactl-devel
 BuildRequires:  openldap-devel
 BuildRequires:  openssl-devel
+%if 0%{?fedora} > 40
+BuildRequires:  openssl-devel-engine
+%endif
 BuildRequires:  patchelf
 BuildRequires:  perl
 BuildRequires:  perl(Carp)
@@ -265,6 +277,7 @@ Obsoletes:      mysql-community-common < %{version}-%{release}
 Obsoletes:      mariadb-config
 Obsoletes:      community-mysql-common < %{version}-%{release}
 Obsoletes:      community-mysql-errmsg < %{version}-%{release}
+Obsoletes:      mysql-errmsg < %{version}-%{release}
 Obsoletes:      mysql-common < %{version}-%{release}
 Provides:       mysql-common = %{version}-%{release}
 Provides:       mysql-common%{?_isa} = %{version}-%{release}
@@ -368,6 +381,14 @@ Provides:       mysql-libs%{?_isa} = %{version}-%{release}
 %description    libs
 This package contains the shared libraries for MySQL client
 applications.
+
+%if 0%{?compatlib}
+%package        libs-compat
+Summary:        Shared compat libraries for MySQL %{compatver} database client applications
+%description    libs-compat
+This package contains the shared compat libraries for MySQL
+%{compatver} client applications.
+%endif
 
 %package        client-plugins
 Summary:        Shared plugins for MySQL client applications
@@ -474,20 +495,20 @@ data.
 Summary:        MySQL Cluster Connector for Java
 %description    java
 This package contains MySQL Cluster Connector for Java, which includes
-ClusterJ and ClusterJPA, a plugin for use with OpenJPA.
+ClusterJ.
 
 ClusterJ is a high level database API that is similar in style and
 concept to object-relational mapping persistence frameworks such as
 Hibernate and JPA.
 
-ClusterJPA is an OpenJPA implementation for MySQL Cluster that
-attempts to offer the best possible performance by leveraging the
-strengths of both ClusterJ and JDBC
-
 %endif # cluster
 
 %prep
+%if 0%{?compatlib}
+%setup -q -T -a 0 -a 1 -c -n %{src_dir}
+%else
 %setup -q -T -a 0 -c -n %{src_dir}
+%endif
 
 %build
 # Fail quickly and obviously if user tries to build as root
@@ -500,12 +521,43 @@ if [ "x$(id -u)" = "x0" ] ; then
 fi
 %endif
 
+# Build compat libs
+%if 0%{?compatlib}
+(
+  pushd mysql-%{compatver}
+  mkdir build && pushd build
+  cmake .. \
+           -DBUILD_CONFIG=mysql_release \
+           -DINSTALL_LAYOUT=RPM \
+           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+           -DMYSQL_MAINTAINER_MODE=0 \
+           -DCMAKE_C_FLAGS="%{optflags}" \
+           -DCMAKE_CXX_FLAGS="%{optflags}" \
+           -DWITH_SYSTEMD=0 \
+           -DWITH_SYSTEM_LIBS=1 \
+           -DWITH_MECAB=system \
+           -DWITH_FIDO=system \
+           -DWITH_BOOST=../boost \
+           -DWITH_ROUTER=0 \
+           -DWITH_AUTHENTICATION_CLIENT_PLUGINS=0 \
+           -DWITHOUT_SERVER=1 \
+           -DMYSQL_UNIX_ADDR="%{mysqldatadir}/mysql.sock" \
+           -DMYSQLX_UNIX_ADDR="/run/mysqld/mysqlx.sock" \
+           -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
+           -DCOMPILATION_COMMENT_SERVER="%{compilation_comment_server_release}" \
+           -DMYSQL_SERVER_SUFFIX="%{?server_suffix}"
+  pushd libmysql
+  make %{?_smp_mflags} VERBOSE=1
+  popd && popd && popd
+)
+%endif # 0%{?compatlib}
+
 # Build debug versions of mysqld
 mkdir debug
 (
   cd debug
   # Attempt to remove any optimisation flags from the debug build
-  optflags=$(echo "%{optflags}" | sed -e 's/-O2 / /' -e 's/-Wp,-D_FORTIFY_SOURCE=2/ /' -e 's/%{_lto_cflags}/ /')
+  optflags=$(echo "%{optflags}" | sed -e 's/-O2 / /' -e 's/-Wp,-U_FORTIFY_SOURCE,-D_FORTIFY_SOURCE=[0-9]/ /' -e 's/%{_lto_cflags}/ /')
   cmake ../%{src_dir} \
            -DBUILD_CONFIG=mysql_release \
            -DINSTALL_LAYOUT=RPM \
@@ -515,6 +567,7 @@ mkdir debug
            -DWITH_CURL=system \
            -DWITH_FIDO=system \
            -DWITH_MECAB=system \
+           -DWITH_ZLIB=system \
            -DCMAKE_C_FLAGS="$optflags" \
            -DCMAKE_CXX_FLAGS="$optflags" \
            -DWITH_SYSTEMD=1 \
@@ -535,7 +588,7 @@ mkdir debug
            -DCOMPILATION_COMMENT="%{compilation_comment_debug}" \
            -DCOMPILATION_COMMENT_SERVER="%{compilation_comment_server_debug}" \
            -DMYSQL_SERVER_SUFFIX="%{?server_suffix}"
-  echo BEGIN_DEBUG_CONFIG ; egrep '^#define' include/config.h ; echo END_DEBUG_CONFIG
+  echo BEGIN_DEBUG_CONFIG ; grep -E '^#define' include/my_config.h ; echo END_DEBUG_CONFIG
   make %{?_smp_mflags} VERBOSE=1
 )
 
@@ -551,6 +604,7 @@ mkdir release
            -DWITH_CURL=system \
            -DWITH_FIDO=system \
            -DWITH_MECAB=system \
+           -DWITH_ZLIB=system \
            -DCMAKE_C_FLAGS="%{optflags}" \
            -DCMAKE_CXX_FLAGS="%{optflags}" \
            -DWITH_SYSTEMD=1 \
@@ -571,11 +625,22 @@ mkdir release
            -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
            -DCOMPILATION_COMMENT_SERVER="%{compilation_comment_server_release}" \
            -DMYSQL_SERVER_SUFFIX="%{?server_suffix}"
-  echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
+  echo BEGIN_NORMAL_CONFIG ; grep -E '^#define' include/my_config.h ; echo END_NORMAL_CONFIG
   make %{?_smp_mflags} VERBOSE=1
 )
 
 %install
+
+%if 0%{?compatlib}
+# Install compat libs
+(
+    pushd mysql-%{compatver}/build/libmysql
+    make DESTDIR=%{buildroot} mysqlclient install
+    rm -f %{buildroot}%{_libdir}/mysql/libmysqlclient.{a,so}
+    popd
+)
+%endif # 0%{?compatlib}
+
 MBD=$RPM_BUILD_DIR/%{src_dir}
 
 # Ignore absolute RPATH followed by $ORIGIN in mysqld.
@@ -625,8 +690,7 @@ fi
 %check
 %if 0%{?runselftest} || 0%{?with_unittests}
 pushd release
-export CTEST_OUTPUT_ON_FAILURE=1
-make test || true
+make test-unit || true
 %endif
 %if 0%{?runselftest}
 export MTR_BUILD_THREAD=auto
@@ -995,6 +1059,7 @@ fi
 %attr(644, root, root) %{_mandir}/man1/ndb_select_all.1*
 %attr(644, root, root) %{_mandir}/man1/ndb_select_count.1*
 %attr(644, root, root) %{_mandir}/man1/ndb_show_tables.1*
+%attr(644, root, root) %{_mandir}/man1/ndb_sign_keys.1*
 %attr(644, root, root) %{_mandir}/man1/ndb_size.pl.1*
 %attr(644, root, root) %{_mandir}/man1/ndb_top.1*
 %attr(644, root, root) %{_mandir}/man1/ndb_waiter.1*
@@ -1020,6 +1085,16 @@ fi
 %dir %attr(755, root, root) %{_libdir}/mysql
 %attr(644, root, root) %{_sysconfdir}/ld.so.conf.d/mysql-%{_arch}.conf
 %{_libdir}/mysql/libmysqlclient.so.24*
+
+%if 0%{?compatlib}
+%files libs-compat
+%defattr(-, root, root, -)
+%doc %{?license_files_server}
+%dir %attr(755, root, root) %{_libdir}/mysql
+%attr(644, root, root) %{_sysconfdir}/ld.so.conf.d/mysql-%{_arch}.conf
+%{_libdir}/mysql/libmysqlclient.so.%{compatlib}
+%{_libdir}/mysql/libmysqlclient.so.%{compatlib}.*
+%endif
 
 %files client-plugins
 %defattr(-, root, root, -)
@@ -1297,16 +1372,20 @@ fi
 %{_libdir}/mysqlrouter/private/libmysqlharness_stdx.so.*
 %{_libdir}/mysqlrouter/private/libmysqlharness_tls.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_cluster.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_connection_pool.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_destination_status.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_http.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_http_auth_backend.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_http_auth_realm.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_http_server.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_io_component.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_metadata_cache.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_mysqlxmessages.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_mysql.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_routing.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_routing_connections.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_utils.so.*
 %{_libdir}/mysqlrouter/private/libprotobuf-lite.so.24.4.0
 %{_libdir}/mysqlrouter/private/libabsl_*.so
 %dir %{_libdir}/mysqlrouter

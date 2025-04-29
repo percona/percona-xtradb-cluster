@@ -1294,9 +1294,9 @@ bool Item_field::check_function_as_value_generator(uchar *checker_args) {
     func_args->err_code =
         (func_args->source == VGS_GENERATED_COLUMN)
             ? ER_GENERATED_COLUMN_REF_AUTO_INC
-            : (func_args->source == VGS_DEFAULT_EXPRESSION)
-                  ? ER_DEFAULT_VAL_GENERATED_REF_AUTO_INC
-                  : ER_CHECK_CONSTRAINT_REFERS_AUTO_INCREMENT_COLUMN;
+        : (func_args->source == VGS_DEFAULT_EXPRESSION)
+            ? ER_DEFAULT_VAL_GENERATED_REF_AUTO_INC
+            : ER_CHECK_CONSTRAINT_REFERS_AUTO_INCREMENT_COLUMN;
     return true;
   }
 
@@ -2004,7 +2004,7 @@ void Item_splocal::print(const THD *thd, String *str, enum_query_type) const {
 }
 
 bool Item_splocal::set_value(THD *thd, sp_rcontext *ctx, Item **it) {
-  return ctx->set_variable(thd, get_var_idx(), it);
+  return ctx->set_variable(thd, false, get_var_idx(), it);
 }
 
 /*****************************************************************************
@@ -3076,9 +3076,9 @@ const char *Item_ident::full_name() const {
       m_orig_field_name != nullptr ? m_orig_field_name : field_name;
   char *tmp;
   if (table_name == nullptr || f_name == nullptr)
-    return f_name != nullptr
-               ? f_name
-               : item_name.is_set() ? item_name.ptr() : "tmp_field";
+    return f_name != nullptr    ? f_name
+           : item_name.is_set() ? item_name.ptr()
+                                : "tmp_field";
   if (db_name && db_name[0]) {
     tmp = pointer_cast<char *>(
         (*THR_MALLOC)
@@ -3107,12 +3107,12 @@ void Item_ident::print(const THD *thd, String *str, enum_query_type query_type,
   if (lower_case_table_names == 1 ||
       // mode '2' does not apply to aliases:
       (lower_case_table_names == 2 && !alias_name_used())) {
-    if (table_name_arg && table_name_arg[0]) {
+    if (!(query_type & QT_NO_TABLE) && table_name_arg && table_name_arg[0]) {
       my_stpcpy(t_name_buff, table_name_arg);
       my_casedn_str(files_charset_info, t_name_buff);
       t_name = t_name_buff;
     }
-    if (db_name_arg && db_name_arg[0]) {
+    if (!(query_type & QT_NO_DB) && db_name_arg && db_name_arg[0]) {
       my_stpcpy(d_name_buff, db_name_arg);
       my_casedn_str(files_charset_info, d_name_buff);
       d_name = d_name_buff;
@@ -3120,9 +3120,9 @@ void Item_ident::print(const THD *thd, String *str, enum_query_type query_type,
   }
 
   if (table_name_arg == nullptr || f_name == nullptr || !f_name[0]) {
-    const char *nm = (f_name != nullptr && f_name[0])
-                         ? f_name
-                         : item_name.is_set() ? item_name.ptr() : "tmp_field";
+    const char *nm = (f_name != nullptr && f_name[0]) ? f_name
+                     : item_name.is_set()             ? item_name.ptr()
+                                                      : "tmp_field";
     append_identifier(thd, str, nm, strlen(nm));
     return;
   }
@@ -4101,11 +4101,10 @@ bool Item_param::set_str(const char *str, size_t length) {
     - when the source string is a binary string, keep it as-is and perform
       no conversion.
   */
-  set_collation_actual(collation_source() == &my_charset_bin
-                           ? &my_charset_bin
-                           : collation.collation != &my_charset_bin
-                                 ? collation.collation
-                                 : current_thd->variables.collation_connection);
+  set_collation_actual(collation_source() == &my_charset_bin ? &my_charset_bin
+                       : collation.collation != &my_charset_bin
+                           ? collation.collation
+                           : current_thd->variables.collation_connection);
 
   m_param_state = STRING_VALUE;
   return false;
@@ -7224,9 +7223,9 @@ bool Item_float::eq(const Item *arg, bool) const {
 }
 
 static inline uint char_val(char X) {
-  return (uint)(X >= '0' && X <= '9'
-                    ? X - '0'
-                    : X >= 'A' && X <= 'Z' ? X - 'A' + 10 : X - 'a' + 10);
+  return (uint)(X >= '0' && X <= '9'   ? X - '0'
+                : X >= 'A' && X <= 'Z' ? X - 'A' + 10
+                                       : X - 'a' + 10);
 }
 
 Item_hex_string::Item_hex_string() { hex_string_init("", 0); }
@@ -7793,6 +7792,7 @@ bool Item::clean_up_after_removal(uchar *arg) {
 
   if (reference_count() > 1) {
     (void)decrement_ref_count();
+    ctx->stop_at(this);
   }
   return false;
 }
@@ -8325,12 +8325,17 @@ bool Item_ref::fix_fields(THD *thd, Item **reference) {
           // Add the view reference to the select expression list as hidden
           // item.
           m_ref_item = qb->add_hidden_item(*reference);
+          // Increment the reference count as the expression is now part
+          // of the select list. The call to link_referenced_item()
+          // later will account for the reference from this Item_ref object.
+          (*reference)->increment_ref_count();
           *reference = this;
         } else {
           Item_field *fld = new Item_field(
               thd, context, from_field->table->pos_in_table_list, from_field);
           if (fld == nullptr) return true;
           m_ref_item = qb->add_hidden_item(fld);
+          fld->increment_ref_count();
         }
       }
     }
@@ -9423,8 +9428,8 @@ bool Item_trigger_field::eq(const Item *item, bool) const {
              down_cast<const Item_trigger_field *>(item)->field_name);
 }
 
-bool Item_trigger_field::set_value(THD *thd, sp_rcontext * /*ctx*/, Item **it) {
-  Item *item = sp_prepare_func_item(thd, it);
+bool Item_trigger_field::set_value(THD *thd, sp_rcontext *, Item **it) {
+  Item *item = sp_prepare_func_item(thd, true, it);
   if (item == nullptr) return true;
 
   if (!fixed) {
@@ -10103,7 +10108,7 @@ longlong Item_cache_datetime::val_int() { return val_int_from_decimal(); }
 
 Item_cache_json::Item_cache_json()
     : Item_cache(MYSQL_TYPE_JSON),
-      m_value(new (*THR_MALLOC) Json_wrapper()),
+      m_value(new(*THR_MALLOC) Json_wrapper()),
       m_is_sorted(false) {}
 
 Item_cache_json::~Item_cache_json() {

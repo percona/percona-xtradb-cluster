@@ -1196,7 +1196,7 @@ class THD : public MDL_context_owner,
     call Item::check_column_privileges().
     After use, restore previous value as current value.
   */
-  ulong want_privilege;
+  Access_bitmask want_privilege;
 
  private:
   /**
@@ -1642,8 +1642,7 @@ class THD : public MDL_context_owner,
     /// Asserts that current_thd has locked this plan, if it does not own it.
     void assert_plan_is_locked_if_other() const
 #ifdef NDEBUG
-    {
-    }
+        {}
 #else
         ;
 #endif
@@ -1653,7 +1652,8 @@ class THD : public MDL_context_owner,
           sql_command(SQLCOM_END),
           lex(nullptr),
           modification_plan(nullptr),
-          is_ps(false) {}
+          is_ps(false) {
+    }
 
     /**
       Set query plan.
@@ -2061,6 +2061,24 @@ class THD : public MDL_context_owner,
   uchar *binlog_row_event_extra_data;
 
   int binlog_setup_trx_data();
+
+  /**
+   * @brief Configure size of binlog transaction cache. Used to configure the
+   * size of an individual cache, normally to a value that differs from the
+   * default `binlog_cache_size` which controls the size otherwise.
+   *
+   * @note Assumes that the binlog cache manager already exist (i.e created
+   * by call to binlog_setup_trx_data()) and is empty.
+   *
+   * @param new_size The new size of cache. Value exceeding
+   * `max_binlog_cache_size` will be clamped and warning logged. Value must be
+   * a multiple of IO_SIZE which is the block size for all binlog cache size
+   * related variables.
+   *
+   * @return true if new cache size can't be configured, in that case the cache
+   * is not usable.
+   */
+  bool binlog_configure_trx_cache_size(ulong new_size);
 
   /*
     Public interface to write RBR events to the binlog
@@ -3365,21 +3383,6 @@ class THD : public MDL_context_owner,
     transaction append stage (Stage_manager::Mutex_queue::append).
   */
   bool run_wsrep_ordered_commit;
-
-  /**
-    Force group commit protocol for transactions that logs fragments
-    to wsrep_streaming_log as these transactions runs with binlog disabled
-    even though system wide setting may enforce binlog enabled.
-    (this special setting is done to ensure update to wsrep_streaming_log
-     is not replicated across the cluster).
-
-    Given binlog is disabled for some internal transactions and external/user
-    transactions continue to work with binlog enabled (following group commit),
-    a co-ordination needs to be worked out to ensure wsrep co-ordinates
-    are updated as per the seqno.
-    Variable is set to true as part of this co-ordination framework.
-  */
-  bool wsrep_enforce_group_commit;
 
   /**
     Set to true if there is error post insert action.

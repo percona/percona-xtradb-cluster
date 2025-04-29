@@ -178,6 +178,7 @@
 
 #ifdef WITH_WSREP
 #include "service_wsrep.h"
+#include "sql/wsrep_async_monitor.h"
 #include "wsrep_mysqld.h"
 #include "wsrep_xid.h"
 #endif /* WITH_WSREP */
@@ -2261,9 +2262,9 @@ void Rows_log_event::print_verbose(IO_CACHE *file,
   const enum_row_image_type row_image_type =
       get_general_type_code() == mysql::binlog::event::WRITE_ROWS_EVENT
           ? enum_row_image_type::WRITE_AI
-          : get_general_type_code() == mysql::binlog::event::DELETE_ROWS_EVENT
-                ? enum_row_image_type::DELETE_BI
-                : enum_row_image_type::UPDATE_BI;
+      : get_general_type_code() == mysql::binlog::event::DELETE_ROWS_EVENT
+          ? enum_row_image_type::DELETE_BI
+          : enum_row_image_type::UPDATE_BI;
 
   if (m_extra_row_info.have_ndb_info() ||
       DBUG_EVALUATE_IF("simulate_error_in_ndb_info_print", 1, 0)) {
@@ -2656,8 +2657,10 @@ Slave_worker *Log_event::get_slave_worker(Relay_log_info *rli) {
              !is_mts_db_partitioned(rli));
 
       if (is_s_event || is_any_gtid_event(this)) {
-        Slave_job_item job_item = {this, rli->get_event_relay_log_number(),
-                                   rli->get_event_start_pos()};
+        Slave_job_item job_item = {this, rli->get_event_start_pos(), {'\0'}};
+        if (rli->get_event_relay_log_name())
+          strcpy(job_item.event_relay_log_name,
+                 rli->get_event_relay_log_name());
         // B-event is appended to the Deferred Array associated with GCAP
         rli->curr_group_da.push_back(job_item);
 
@@ -2675,6 +2678,14 @@ Slave_worker *Log_event::get_slave_worker(Relay_log_info *rli) {
 
           Gtid_log_event *gtid_log_ev = static_cast<Gtid_log_event *>(this);
           rli->started_processing(gtid_log_ev);
+#ifdef WITH_WSREP
+          Wsrep_async_monitor *wsrep_async_monitor{
+              rli->get_wsrep_async_monitor()};
+          if (wsrep_async_monitor) {
+            auto seqno = gtid_log_ev->sequence_number;
+            wsrep_async_monitor->schedule(seqno);
+          }
+#endif /* WITH_WSREP */
         }
 
         if (schedule_next_event(this, rli)) {
@@ -2692,8 +2703,9 @@ Slave_worker *Log_event::get_slave_worker(Relay_log_info *rli) {
        TODO: Make GITD event as B-event that is starts_group() to
        return true.
       */
-      Slave_job_item job_item = {this, rli->get_event_relay_log_number(),
-                                 rli->get_event_relay_log_pos()};
+      Slave_job_item job_item = {this, rli->get_event_relay_log_pos(), {'\0'}};
+      if (rli->get_event_relay_log_name())
+        strcpy(job_item.event_relay_log_name, rli->get_event_relay_log_name());
 
       // B-event is appended to the Deferred Array associated with GCAP
       rli->curr_group_da.push_back(job_item);
@@ -2721,8 +2733,9 @@ Slave_worker *Log_event::get_slave_worker(Relay_log_info *rli) {
         rli, &rli->workers, this);
     if (ret_worker == nullptr) {
       /* get_least_occupied_worker may return NULL if the thread is killed */
-      Slave_job_item job_item = {this, rli->get_event_relay_log_number(),
-                                 rli->get_event_start_pos()};
+      Slave_job_item job_item = {this, rli->get_event_start_pos(), {'\0'}};
+      if (rli->get_event_relay_log_name())
+        strcpy(job_item.event_relay_log_name, rli->get_event_relay_log_name());
       rli->curr_group_da.push_back(job_item);
 
       assert(thd->killed);
@@ -2873,8 +2886,9 @@ Slave_worker *Log_event::get_slave_worker(Relay_log_info *rli) {
         Their association with relay-log physical coordinates is provided
         by the same mechanism that applies to a regular event.
       */
-      Slave_job_item job_item = {this, rli->get_event_relay_log_number(),
-                                 rli->get_event_start_pos()};
+      Slave_job_item job_item = {this, rli->get_event_start_pos(), {'\0'}};
+      if (rli->get_event_relay_log_name())
+        strcpy(job_item.event_relay_log_name, rli->get_event_relay_log_name());
       rli->curr_group_da.push_back(job_item);
 
       assert(!ret_worker);
@@ -4517,7 +4531,9 @@ static bool is_silent_error(THD *thd) {
 int Query_log_event::do_apply_event(Relay_log_info const *rli,
                                     const char *query_arg, size_t q_len_arg) {
   DBUG_TRACE;
-  int expected_error, actual_error = 0;
+  DBUG_EXECUTE_IF("simulate_error_in_ddl", error_code = 1051;);
+  const int expected_error = error_code;
+  int actual_error = 0;
   auto post_filters_actions_guard = create_scope_guard(
       [&]() { thd->rpl_thd_ctx.post_filters_actions().clear(); });
 
@@ -4596,14 +4612,26 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
     char llbuff[22];
     if ((error =
              rows_event_stmt_cleanup(const_cast<Relay_log_info *>(rli), thd))) {
+      char buff[MAX_SLAVE_ERRMSG]{0};
+      const char *buff_end = buff + sizeof(buff);
+      char *slider = buff;
+      Diagnostics_area::Sql_condition_iterator it =
+          thd->get_stmt_da()->sql_conditions();
+      for (const Sql_condition *err = it++;
+           err != nullptr && slider < buff_end - 1; err = it++) {
+        slider += snprintf(slider, buff_end - slider, " %s, Error_code: %d;",
+                           err->message_text(), err->mysql_errno());
+      }
       const_cast<Relay_log_info *>(rli)->report(
           ERROR_LEVEL, error,
           "Error in cleaning up after an event preceding the commit; "
-          "the group log file/position: %s %s",
+          "%s the group log file/position: %s %s",
+          buff,
           const_cast<Relay_log_info *>(rli)->get_group_master_log_name_info(),
           llstr(const_cast<Relay_log_info *>(rli)
                     ->get_group_master_log_pos_info(),
                 llbuff));
+      goto compare_errors;
     }
     /*
       Executing a part of rli->stmt_done() logics that does not deal
@@ -4646,9 +4674,7 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
     thd->set_query_id(next_query_id());
     DBUG_PRINT("query", ("%s", thd->query().str));
 
-    DBUG_EXECUTE_IF("simulate_error_in_ddl", error_code = 1051;);
-
-    if (ignored_error_code((expected_error = error_code)) ||
+    if (ignored_error_code((expected_error)) ||
         !unexpected_error_code(expected_error)) {
       if (flags2_inited)
         /*
@@ -7939,7 +7965,7 @@ Rows_log_event::Rows_log_event(THD *thd_arg, TABLE *tbl_arg,
       m_curr_row_end(nullptr),
       m_key(nullptr),
       m_key_info(nullptr),
-      m_distinct_keys(Key_compare(&m_key_info)),
+      m_distinct_keys(0, Key_hash(&m_key_info), Key_equal(&m_key_info)),
       m_distinct_key_spare_buf(nullptr) {
   DBUG_TRACE;
   common_header->type_code = event_type;
@@ -8030,7 +8056,7 @@ Rows_log_event::Rows_log_event(
       m_curr_row_end(nullptr),
       m_key(nullptr),
       m_key_info(nullptr),
-      m_distinct_keys(Key_compare(&m_key_info)),
+      m_distinct_keys(0, Key_hash(&m_key_info), Key_equal(&m_key_info)),
       m_distinct_key_spare_buf(nullptr)
 #endif
 {
@@ -8212,6 +8238,13 @@ int Rows_log_event::unpack_current_row(const Relay_log_info *const rli,
             auto field = table->field[column_index];
             if (field->is_field_for_functional_index())  // Always exclude
                                                          // functional indexes
+              return true;
+            if (!is_after_image &&
+                !bitmap_is_subset(
+                    &field->gcol_info->base_columns_map,
+                    &this->m_local_cols))  // Exclude generated columns for
+                                           // which the base columns are
+                                           // unavailable
               return true;
             if (!is_after_image &&  // Always exclude virtual generated columns
                 field->is_virtual_gcol())  // if not processing after-image
@@ -9099,9 +9132,9 @@ int Rows_log_event::next_record_scan(bool first_read) {
           marker according to the next key value that we have in the list.
          */
         if (error) {
-          if (m_itr != m_distinct_keys.end()) {
-            m_key = *m_itr;
-            m_itr++;
+          if (m_distinct_key_idx != m_distinct_keys_original_order.size()) {
+            m_key = m_distinct_keys_original_order[m_distinct_key_idx];
+            m_distinct_key_idx++;
             first_read = true;
           } else {
             if (!is_trx_retryable_upon_engine_error(error))
@@ -9135,14 +9168,13 @@ int Rows_log_event::open_record_scan() {
 
   if (m_key_index < MAX_KEY) {
     if (m_rows_lookup_algorithm == ROW_LOOKUP_HASH_SCAN) {
-      /* initialize the iterator over the list of distinct keys that we have */
-      m_itr = m_distinct_keys.begin();
-
-      /* get the first element from the list of keys and increment the
-         iterator
+      /* Initialize the index to go over the vector of distinct keys */
+      m_distinct_key_idx = 0;
+      /* get the first element from the vector of keys and increment the
+         index
        */
-      m_key = *m_itr;
-      m_itr++;
+      m_key = m_distinct_keys_original_order[m_distinct_key_idx];
+      m_distinct_key_idx++;
     } else {
       /* this is an INDEX_SCAN we need to store the key in m_key */
       assert((m_rows_lookup_algorithm == ROW_LOOKUP_INDEX_SCAN) && m_key);
@@ -9189,9 +9221,9 @@ int Rows_log_event::add_key_to_distinct_keyset() {
   DBUG_TRACE;
   assert(m_key_index < MAX_KEY);
   key_copy(m_distinct_key_spare_buf, m_table->record[0], m_key_info, 0);
-  std::pair<std::set<uchar *, Key_compare>::iterator, bool> ret =
-      m_distinct_keys.insert(m_distinct_key_spare_buf);
+  auto ret = m_distinct_keys.insert(m_distinct_key_spare_buf);
   if (ret.second) {
+    m_distinct_keys_original_order.push_back(m_distinct_key_spare_buf);
     /* Insert is successful, so allocate a new buffer for next key */
     m_distinct_key_spare_buf = (uchar *)thd->alloc(m_key_info->key_length);
     if (!m_distinct_key_spare_buf) {
@@ -10080,7 +10112,8 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli) {
     Applier_security_context_guard security_context{rli, thd};
     const char *privilege_missing = nullptr;
     if (!security_context.skip_priv_checks()) {
-      std::vector<std::tuple<ulong, const TABLE *, Rows_log_event *>> l;
+      std::vector<std::tuple<Access_bitmask, const TABLE *, Rows_log_event *>>
+          l;
       switch (get_general_type_code()) {
         case mysql::binlog::event::WRITE_ROWS_EVENT: {
           l.push_back(std::make_tuple(INSERT_ACL, this->m_table, this));
@@ -11121,6 +11154,23 @@ static enum_tbl_map_status check_table_map(Relay_log_info const *rli,
       }
     }
   }
+
+#ifdef WITH_WSREP
+  // This transaction is anyways going to be skipped. So skip the transaction
+  // in the async monitor as well
+  if (WSREP(rli->info_thd) &&
+      rli->info_thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER &&
+      !thd_is_wsrep_applier && res == FILTERED_OUT) {
+    Slave_worker *sw =
+        static_cast<Slave_worker *>(const_cast<Relay_log_info *>(rli));
+    Wsrep_async_monitor *wsrep_async_monitor{sw->get_wsrep_async_monitor()};
+    if (wsrep_async_monitor) {
+      auto seqno = sw->sequence_number();
+      assert(seqno > 0);
+      wsrep_async_monitor->skip(seqno);
+    }
+  }
+#endif /* WITH_WSREP */
 
   DBUG_PRINT("debug", ("check of table map ended up with: %u", res));
 

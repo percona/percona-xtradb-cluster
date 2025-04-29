@@ -796,7 +796,7 @@ bool Sql_cmd_update::update_single_table(THD *thd) {
         if (thd->killed && !error)  // Aborted
           error = 1;                /* purecov: inspected */
         limit = tmp_limit;
-        end_semi_consistent_read.rollback();
+        end_semi_consistent_read.reset();
         if (used_index < MAX_KEY && covering_keys_for_cond.is_set(used_index))
           table->set_keyread(false);
         table->file->ha_index_or_rnd_end();
@@ -1085,7 +1085,7 @@ bool Sql_cmd_update::update_single_table(THD *thd) {
         }
       }
     }
-    end_semi_consistent_read.rollback();
+    end_semi_consistent_read.reset();
 
     dup_key_found = 0;
     /*
@@ -1814,6 +1814,7 @@ bool Sql_cmd_update::prepare_inner(THD *thd) {
   Opt_trace_array trace_steps(trace, "steps");
   opt_trace_print_expanded_query(thd, select, &trace_wrapper);
 
+  select->original_tables_map = select->all_tables_map();
   if (select->has_sj_candidates() && select->flatten_subqueries(thd))
     return true; /* purecov: inspected */
 

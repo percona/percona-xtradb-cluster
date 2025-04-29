@@ -24,7 +24,9 @@
 */
 
 #include "connection_container.h"
+
 #include "mysql/harness/logging/logging.h"
+#include "mysqlrouter/datatypes.h"
 
 IMPORT_LOG_FUNCTIONS()
 
@@ -33,12 +35,42 @@ void ConnectionContainer::add_connection(
   connections_.put(connection.get(), std::move(connection));
 }
 
+#if 0
+namespace {
+std::string to_string(mysqlrouter::ServerMode mode) {
+  switch (mode) {
+    case mysqlrouter::ServerMode::ReadWrite:
+      return "RW";
+    case mysqlrouter::ServerMode::ReadOnly:
+      return "RO";
+    case mysqlrouter::ServerMode::Unavailable:
+      return "n/a";
+  }
+
+  return "?";
+}
+}  // namespace
+#endif
+
 unsigned ConnectionContainer::disconnect(const AllowedNodes &nodes) {
   unsigned number_of_disconnected_connections = 0;
 
 #if 0
-  for (const auto &allowed_node : nodes) {
-    std::cerr << "allowed: " << allowed_node.address.str() << "\n";
+  {
+    std::ostringstream oss;
+    oss << "allowed: ";
+    bool is_first{true};
+    for (const auto &allowed_node : nodes) {
+      if (!is_first) {
+        oss << ", ";
+      } else {
+        is_first = false;
+      }
+
+      oss << "(" << allowed_node.address.str() << ", "
+          << to_string(allowed_node.mode) << ")";
+    }
+    std::cerr << oss.str() << "\n";
   }
 #endif
 
@@ -62,17 +94,19 @@ unsigned ConnectionContainer::disconnect(const AllowedNodes &nodes) {
           auto allowed_dest_id = allowed_node.address.str();
 
           if (allowed_dest_id == conn_ro_dest_id) ro_allowed = true;
-          if (allowed_dest_id == conn_rw_dest_id) rw_allowed = true;
+          if (allowed_dest_id == conn_rw_dest_id &&
+              allowed_node.mode == mysqlrouter::ServerMode::ReadWrite) {
+            rw_allowed = true;
+          }
 
           // both are allowed.
           if (ro_allowed && rw_allowed) return;
         }
 
-        const auto server_address = conn->get_server_address();
-        const auto client_address = conn->get_client_address();
+        auto stats = conn->get_stats();
 
         log_info("Disconnecting client %s from server %s",
-                 client_address.c_str(), server_address.c_str());
+                 stats.client_address.c_str(), stats.server_address.c_str());
         conn->disconnect();
 
         ++number_of_disconnected_connections;
@@ -92,7 +126,7 @@ MySQLRoutingConnectionBase *ConnectionContainer::get_connection(
 
   auto lookup = [&ret, &client_endpoint](auto &connection) {
     if (ret) return;
-    const auto client_address = connection.first->get_client_address();
+    const auto client_address = connection.first->get_stats().client_address;
     if (client_address == client_endpoint) {
       ret = connection.first;
     }

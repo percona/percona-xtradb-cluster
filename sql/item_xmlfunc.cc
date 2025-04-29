@@ -497,7 +497,6 @@ class Item_nodeset_to_const_comparator final : public Item_bool_func {
   longlong val_int() override {
     auto comp = down_cast<Item_bool_func *>(args[1]);
     auto fake = down_cast<Item_string *>(comp->arguments()[0]);
-    fake->collation.collation = collation.collation;
     auto *nodeset_func = down_cast<const Item_nodeset_func *>(args[0]);
     XPathFilter res;
     nodeset_func->val_nodeset(&res);
@@ -2498,21 +2497,24 @@ String *Item_func_xml_extractvalue::val_str(String *str) {
 }
 
 String *Item_func_xml_update::val_str(String *str) {
-  String *res = nullptr, *rep = nullptr;
-
   null_value = false;
   if (!nodeset_func && parse_xpath(args[1])) {
     assert(is_nullable());
-    null_value = true;
-    return nullptr;
+    return error_str();
   }
 
-  if (!nodeset_func || !(res = args[0]->val_str(str)) ||
-      !(rep = args[2]->val_str(&tmp_value)) || !parse_xml(res, &pxml) ||
-      (nodeset_func->type() != XPATH_NODESET_ITEM)) {
-    null_value = true;
-    return nullptr;
-  }
+  if (nodeset_func == nullptr) return error_str();
+
+  String *res = eval_string_arg(collation.collation, args[0], str);
+  if (res == nullptr) return error_str();
+
+  StringBuffer<STRING_BUFFER_USUAL_SIZE> rep_buf(nullptr, 0,
+                                                 collation.collation);
+  String *rep = eval_string_arg(collation.collation, args[2], &rep_buf);
+  if (rep == nullptr) return error_str();
+
+  if (!parse_xml(res, &pxml)) return error_str();
+  if (nodeset_func->type() != XPATH_NODESET_ITEM) return error_str();
 
   XPathFilter nodeset;
   down_cast<const Item_nodeset_func *>(nodeset_func)->val_nodeset(&nodeset);
@@ -2525,13 +2527,14 @@ String *Item_func_xml_update::val_str(String *str) {
 
   const MY_XML_NODE *node = &pxml.at(nodeset.at(0).num);
 
-  if (!node->level) {
+  if (node->level == 0) {
     /*
       Root element, without NameTest:
       UpdateXML(xml, '/', 'replacement');
       Just return the replacement string.
     */
-    return rep;
+    tmp_value.copy(*rep);
+    return &tmp_value;
   }
 
   tmp_value.length(0);

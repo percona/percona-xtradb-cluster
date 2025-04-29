@@ -1128,8 +1128,9 @@ static bool check_locking_clause_access(THD *thd, Global_tables_list tables) {
         If either of these privileges is present along with SELECT, access is
         granted.
       */
-      for (uint allowed_priv : {UPDATE_ACL, DELETE_ACL, LOCK_TABLES_ACL}) {
-        ulong priv = SELECT_ACL | allowed_priv;
+      for (Access_bitmask allowed_priv :
+           {UPDATE_ACL, DELETE_ACL, LOCK_TABLES_ACL}) {
+        Access_bitmask priv = SELECT_ACL | allowed_priv;
         if (!check_table_access(thd, priv, table_ref, false, 1, true)) {
           access_is_granted = true;
           // No need to check for other privileges for this table.
@@ -1231,7 +1232,7 @@ bool Sql_cmd_dml::check_all_table_privileges(THD *thd) {
     if (tr->is_internal())  // No privilege check required for internal tables
       continue;
     // Calculated wanted privilege based on how table/view is used:
-    ulong want_privilege = 0;
+    Access_bitmask want_privilege = 0;
     if (tr->is_inserted()) {
       want_privilege |= INSERT_ACL;
     }
@@ -1431,7 +1432,7 @@ SJ_TMP_TABLE *create_sj_tmp_table(THD *thd, JOIN *join,
   return sjtbl;
 }
 
-/**
+/*
   Setup the strategies to eliminate semi-join duplicates.
 
   @param join           Join to process
@@ -2177,7 +2178,7 @@ bool check_privileges_for_join(THD *thd, mem_root_deque<Table_ref *> *tables) {
   @returns false if success, true if error (insufficient privileges)
 */
 bool check_privileges_for_list(THD *thd, const mem_root_deque<Item *> &items,
-                               ulong privileges) {
+                               Access_bitmask privileges) {
   thd->want_privilege = privileges;
   for (Item *item : items) {
     if (item->walk(&Item::check_column_privileges, enum_walk::PREFIX,
@@ -3467,6 +3468,14 @@ bool make_join_readinfo(JOIN *join, uint no_jbuf_after) {
 
     if (tab->position()->filter_effect <= COND_FILTER_STALE) {
       /*
+        Cost and rows produced needs to be updated to match the logic
+        in test_if_skip_sort_order().
+      */
+      bool need_cost_update =
+          join->primary_tables == 1 &&
+          tab->position()->filter_effect == COND_FILTER_STALE_NO_CONST &&
+          table->s->has_secondary_engine();
+      /*
         Give a proper value for EXPLAIN.
         For performance reasons, we do not recalculate the filter for
         non-EXPLAIN queries; thus, EXPLAIN CONNECTION may show 100%
@@ -3478,7 +3487,7 @@ bool make_join_readinfo(JOIN *join, uint no_jbuf_after) {
         applied.
       */
       tab->position()->filter_effect =
-          (join->thd->lex->is_explain() ||
+          (join->thd->lex->is_explain() || need_cost_update ||
            (join->m_select_limit != HA_POS_ERROR &&
             !Overlaps(join->thd->variables.option_bits, OPTION_BIG_SELECTS)))
               ? calculate_condition_filter(
@@ -3488,6 +3497,12 @@ bool make_join_readinfo(JOIN *join, uint no_jbuf_after) {
                     tab->position()->rows_fetched, false, false,
                     trace_refine_table)
               : COND_FILTER_ALLPASS;
+      /*
+        Update the cost/rows data accordingly for single table queries. Updating
+        Multi-table queries here can lead to inconsistencies.
+      */
+      if (need_cost_update)
+        tab->position()->set_prefix_join_cost(tab->idx(), join->cost_model());
     }
 
     assert(!table_ref->is_recursive_reference() || qep_tab->type() == JT_ALL);
@@ -4442,9 +4457,20 @@ bool JOIN::make_tmp_tables_info() {
     computed for each group. Thus all MIN/MAX functions should be
     treated as regular functions, and there is no need to perform
     grouping in the main execution loop.
-    Notice that currently loose index scan is applicable only for
-    single table queries, thus it is sufficient to test only the first
-    join_tab element of the plan for its access method.
+    Currently loose index scan is only applicable for single table queries. The
+    only exception is when a single table query becomes a multi-table query
+    because of a semijoin transformation. We check the first join_tab element
+    of the plan for its access method here, which holds good even for the
+    multi-table query, but only when optimizer has picked nested loop joins.
+    Skip scan is enabled only for the original table in the query which is the
+    first table in the join order for a nested loop join. However, for hash
+    joins it does not hold good. So, we see an additional de-duplication step
+    when hash join is picked as it is not aware that de-duplication is taken
+    care by the access method picked.
+
+    TODO: Make optimize_distinct_group_order() understand that de-duplication
+    is taken care by the chosen access method, so that we avoid the additional
+    de-duplication step.
   */
   if (qep_tab && qep_tab[0].range_scan() &&
       is_loose_index_scan(qep_tab[0].range_scan()))
@@ -4961,7 +4987,7 @@ bool JOIN::make_tmp_tables_info() {
     etc).
   */
   assert(!query_block->is_recursive() || !tmp_tables);
-  cleanup_tmp_tables_on_error.commit();
+  cleanup_tmp_tables_on_error.release();
   return false;
 }
 
@@ -5100,6 +5126,9 @@ bool JOIN::add_sorting_to_table(uint idx, ORDER_with_src *sort_order,
   @param [out]  saved_best_key_parts  NULL by default, otherwise preserve the
                                       value for further use in
                                       ReverseIndexRangeScanIterator
+  @param [out]    new_read_time       NULL by default, otherwise return the
+                                      cost of access using new_key if success
+                                      or undefined if the function fails
 
   @note
     This function takes into account table->quick_condition_rows statistic
@@ -5117,7 +5146,8 @@ bool test_if_cheaper_ordering(const JOIN_TAB *tab, ORDER_with_src *order,
                               ha_rows select_limit, int *new_key,
                               int *new_key_direction, ha_rows *new_select_limit,
                               uint *new_used_key_parts,
-                              uint *saved_best_key_parts) {
+                              uint *saved_best_key_parts,
+                              double *new_read_time) {
   DBUG_TRACE;
   /*
     Check whether there is an index compatible with the given order
@@ -5132,6 +5162,7 @@ bool test_if_cheaper_ordering(const JOIN_TAB *tab, ORDER_with_src *order,
   uint best_key_parts = 0;
   int best_key_direction = 0;
   ha_rows best_records = 0;
+  double best_read_time = 0;
   double read_time;
   int best_key = -1;
   bool is_best_covering = false;
@@ -5315,6 +5346,7 @@ bool test_if_cheaper_ordering(const JOIN_TAB *tab, ORDER_with_src *order,
             best_key = nr;
             best_key_parts = keyinfo->user_defined_key_parts;
             if (saved_best_key_parts) *saved_best_key_parts = used_key_parts;
+            best_read_time = index_scan_time;
             best_records = quick_records;
             is_best_covering = is_covering;
             best_key_direction = direction;
@@ -5331,6 +5363,7 @@ bool test_if_cheaper_ordering(const JOIN_TAB *tab, ORDER_with_src *order,
   *new_key_direction = best_key_direction;
   *new_select_limit = has_limit ? best_select_limit : table_records;
   if (new_used_key_parts != nullptr) *new_used_key_parts = best_key_parts;
+  if (new_read_time) *new_read_time = best_read_time;
 
   return true;
 }

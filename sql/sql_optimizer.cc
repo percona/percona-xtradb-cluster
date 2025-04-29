@@ -1575,7 +1575,8 @@ bool JOIN::optimize_distinct_group_order() {
     }
   }
   if (!(!group_list.empty() || tmp_table_param.sum_func_count || windowing) &&
-      select_distinct && plan_is_single_table() &&
+      select_distinct &&
+      (plan_is_single_table() || query_block->original_tables_map == 1) &&
       rollup_state == RollupState::NONE) {
     int order_idx = -1, group_idx = -1;
     /*
@@ -1758,6 +1759,13 @@ void JOIN::test_skip_sort() {
              tab, order, m_select_limit, false,
              &tab->table()->keys_in_use_for_order_by, &dummy))) {
       m_ordered_index_usage = ORDERED_INDEX_ORDER_BY;
+      /*
+        Update plan cost if there is only one table. Multi-table/join scenarios
+        are more complex and will not reflect updated costs after access change.
+      */
+      if (primary_tables == 1 && tab->table()->s->has_secondary_engine()) {
+        best_read = qep_tab->position()->prefix_cost + sort_cost;
+      }
     }
   }
 }
@@ -2016,14 +2024,18 @@ uint find_shortest_key(TABLE *table, const Key_map *usable_keys) {
       if (nr == usable_clustered_pk) continue;
       if (usable_keys->is_set(nr)) {
         /*
-          Can not do full index scan on rtree index because it is not
-          supported by Innodb, probably not supported by others either.
+          Cannot do full index scan on rtree index. It is not supported by
+          Innodb as it's rtree index does not store data, but only the
+          minimum bouding box (maybe makes sense only for geometries of
+          type POINT). Index scans on rtrees are probabaly not supported
+          by other storage engines either.
           A multi-valued key requires unique filter, and won't be the most
           fast option even if it will be the shortest one.
          */
         const KEY &key_ref = table->key_info[nr];
-        assert(!(key_ref.flags & HA_MULTI_VALUED_KEY));
-        if (key_ref.key_length < min_length && !(key_ref.flags & HA_SPATIAL)) {
+        assert(!(key_ref.flags & HA_MULTI_VALUED_KEY) &&
+               !(key_ref.flags & HA_SPATIAL));
+        if (key_ref.key_length < min_length) {
           min_length = key_ref.key_length;
           best = nr;
         }
@@ -2245,6 +2257,7 @@ static bool test_if_skip_sort_order(JOIN_TAB *tab, ORDER_with_src &order,
   THD *const thd = join->thd;
   AccessPath *const save_range_scan = tab->range_scan();
   int best_key = -1;
+  double best_read_time = 0;
   bool set_up_ref_access_to_key = false;
   bool can_skip_sorting = false;  // used as return value
   int changed_key = -1;
@@ -2488,15 +2501,16 @@ static bool test_if_skip_sort_order(JOIN_TAB *tab, ORDER_with_src &order,
         table->force_index ||
         (is_group_by ? table->force_index_group : table->force_index_order);
 
-    // Find an ordering index alternative over the chosen plan iff
-    // prefer_ordering_index switch is on. This switch is overridden only when
-    // force index for order/group is specified.
+    // We try to find an ordering_index alternative over the chosen plan, if:
+    // 1. "prefer_ordering_index" switch is on or
+    // 2. Force index for order/group is specified or
+    // 3. Optimizer has chosen to do table scan currently.
     if (thd->optimizer_switch_flag(OPTIMIZER_SWITCH_PREFER_ORDERING_INDEX) ||
-        is_force_index)
+        is_force_index || ref_key == -1)
       test_if_cheaper_ordering(tab, &order, table, usable_keys, ref_key_hint,
                                select_limit, &best_key, &best_key_direction,
                                &select_limit, &best_key_parts,
-                               &saved_best_key_parts);
+                               &saved_best_key_parts, &best_read_time);
 
     // Try backward scan for previously found key
     if (best_key < 0 && order_direction < 0) goto check_reverse_order;
@@ -2770,6 +2784,28 @@ fix_ICP:
         select_limit < table->file->stats.records) {
       assert(select_limit > 0);
       tab->position()->rows_fetched = select_limit;
+      /*
+        Update the cost data if secondary engine is active as it is needed to
+        make the query offload decision later.
+      */
+      if (best_read_time > 0 && join->primary_tables == 1 &&
+          table->s->has_secondary_engine()) {
+        tab->position()->read_cost = best_read_time;
+        /*
+          Assume no filter at this point to calculate the access cost. This
+          will be updated later to proper values when/if filter_effect is
+          updated. The logic is to ensure the cost covers accessing at least
+          LIMIT number of rows using the access method. If there exists a WHERE
+          clause, then more than LIMIT number of rows needs to be accessed.
+          Ideally we should calculate proper filtering effect and update
+          rows_fetched to include the filtering effect as well. Eg:
+          tab->position()->rows_fetched = select_limit / filter_effect;
+        */
+        tab->position()->filter_effect = COND_FILTER_ALLPASS;
+        // Update the cost values accordingly.
+        tab->position()->set_prefix_join_cost(tab->idx(), join->cost_model());
+      }
+      // Update filter effect to reflect the access change.
       tab->position()->filter_effect = COND_FILTER_STALE_NO_CONST;
     }
 
@@ -6525,9 +6561,11 @@ static bool has_not_null_predicate(Item *cond, Item_field *not_null_item) {
   handled outside of this function.
 
   Restrict some function types from being pushed down to storage engine:
-  a) Don't push down the triggered conditions. Nested outer joins execution
-     code may need to evaluate a condition several times (both triggered and
-     untriggered).
+  a) Don't push down the triggered conditions with exception for
+  IS_NOT_NULL_COMPL trigger condition since the NULL-complemented rows are added
+  at a later stage in the iterators, so we won't see NULL-complemented rows when
+  evaluating it as an index condition. Nested outer joins execution code may
+  need to evaluate a condition several times (both triggered and untriggered).
      TODO: Consider cloning the triggered condition and using the copies for:
         1. push the first copy down, to have most restrictive index condition
            possible.
@@ -6567,9 +6605,15 @@ bool uses_index_fields_only(Item *item, TABLE *tbl, uint keyno,
       Item_func *item_func = (Item_func *)item;
       const Item_func::Functype func_type = item_func->functype();
 
-      if (func_type == Item_func::TRIG_COND_FUNC ||  // Restriction a.
-          func_type == Item_func::DD_INTERNAL_FUNC)  // Restriction d.
+      if (func_type == Item_func::DD_INTERNAL_FUNC)  // Restriction d.
         return false;
+
+      // Restriction a.
+      if (func_type == Item_func::TRIG_COND_FUNC &&
+          down_cast<Item_func_trig_cond *>(item_func)->get_trig_type() !=
+              Item_func_trig_cond::IS_NOT_NULL_COMPL) {
+        return false;
+      }
 
       /* This is a function, apply condition recursively to arguments */
       if (item_func->argument_count() > 0) {
@@ -8087,9 +8131,9 @@ bool is_indexed_agg_distinct(JOIN *join,
   bool result = false;
   Field_map first_aggdistinct_fields;
 
-  if (join->primary_tables > 1 || /* reference more than 1 table */
-      join->select_distinct ||    /* or a DISTINCT */
-
+  if (join->query_block->original_tables_map > 1 ||  /* reference more than 1
+                                                        table originally */
+      join->select_distinct ||                       /* or a DISTINCT */
       join->query_block->is_non_primitive_grouped()) /* Check (B3) for
                                                       non-primitive grouping */
     return false;
@@ -8209,7 +8253,9 @@ static void add_loose_index_scan_and_skip_scan_keys(JOIN *join,
   const char *cause;
 
   /* Find the indexes that might be used for skip scan queries. */
-  if (join->where_cond && join->primary_tables == 1 &&
+  if (join->where_cond != nullptr &&
+      join->query_block->original_tables_map == 1 &&
+      join->query_block->original_tables_map == join_tab->table_ref->map() &&
       join->group_list.empty() &&
       !is_indexed_agg_distinct(join, &indexed_fields) &&
       !join->select_distinct) {
@@ -9896,13 +9942,23 @@ static bool make_join_query_block(JOIN *join, Item *cond) {
                   recheck_reason = DONT_RECHECK;
                 }
               }
-              // We do a cost based search for an ordering index here. Do this
-              // only if prefer_ordering_index switch is on or an index is
-              // forced for order by
+
+              // We do a cost based search for an ordering index here, if:
+              // 1. "prefer_ordering_index" switch is on or
+              // 2. An index is forced for order by or
+              // 3. Optimizer has chosen to do table scan.
               if (recheck_reason != DONT_RECHECK &&
-                  (tab->table()->force_index_order ||
-                   thd->optimizer_switch_flag(
-                       OPTIMIZER_SWITCH_PREFER_ORDERING_INDEX))) {
+                  (thd->optimizer_switch_flag(
+                       OPTIMIZER_SWITCH_PREFER_ORDERING_INDEX) ||
+                   tab->table()->force_index_order || tab->type() == JT_ALL)) {
+                DBUG_EXECUTE_IF("prefer_ordering_index_check", {
+                  const char act[] =
+                      "now wait_for "
+                      "signal.prefer_ordering_index_check_continue";
+                  assert(!debug_sync_set_action(current_thd,
+                                                STRING_WITH_LEN(act)));
+                });
+
                 int best_key = -1;
                 ha_rows select_limit =
                     join->query_expression()->select_limit_cnt;

@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <memory>
 
 #include <openssl/err.h>
 #include <openssl/evp.h>
@@ -40,7 +41,7 @@
 
 #include "debugger/EventLogger.hpp"
 #include "portlib/ndb_localtime.h"
-#include "util/File.hpp"
+#include "util/File.hpp"  // S_IRUSR
 #include "util/ndb_openssl3_compat.h"
 #include "util/require.h"
 
@@ -85,8 +86,33 @@ static void handle_pem_error(const char fn_name[]) {
  */
 
 bool PkiFile::remove(const PathName &path) {
-  return File_class::remove(path.c_str());
+  return PkiFile::remove(path.c_str());
 }
+
+#ifdef _WIN32
+bool PkiFile::remove(const char *name) {
+  bool mustSetWriteAccess = false;
+  if (_access(name, 06) != 0) {
+    if (errno == ENOENT) return false;
+    mustSetWriteAccess = (errno == EACCES);
+  }
+  if (mustSetWriteAccess)
+    if (_chmod(name, _S_IREAD | _S_IWRITE) != 0) return false;
+
+  if (::remove(name) == 0) return true;  // success
+
+  /* Unusual error: access() has succeeded but remove() has failed .*/
+  g_eventLogger->error("NDB TLS Error %d removing file %s", errno, name);
+
+  if (mustSetWriteAccess) _chmod(name, _S_IREAD);
+  return false;
+}
+
+#else
+
+bool PkiFile::remove(const char *name) { return (::remove(name) == 0); }
+
+#endif
 
 int PkiFile::assign(PathName &path, const char *dir, const char *file) {
   path.clear();
@@ -291,12 +317,12 @@ short PkiFilenames::find_file(const TlsSearchPath *path,
 
 static bool promote_file(const char *pending, const char *active,
                          const char *retired) {
+  PkiFile::remove(retired);  // this may fail if retired does not exist
 #ifdef _WIN32
   rename(active, retired);  // this may fail if active does not exist
 #else
-  File_class::remove(retired);  // this may fail if retired does not exist
-  if (link(active, retired)) {
-  }  // this may fail if active does not exist
+  std::ignore =
+      link(active, retired);  // this may fail if active does not exist
 #endif
   return (rename(pending, active) == 0);
 }
@@ -386,7 +412,6 @@ bool PendingPrivateKey::promote(const PkiFile::PathName &pending_file) {
   retired.append(base);
   retired.append(suffix3);
   if (retired.is_truncated()) return false;
-
   return promote_file(pending_file.c_str(), active.c_str(), retired.c_str());
 }
 
@@ -403,12 +428,12 @@ short ActivePrivateKey::find(const TlsSearchPath *searchPath, int node_id,
  *    SigningRequest class
  */
 SigningRequest::SigningRequest(X509_REQ *req, Node::Type type, int node_id)
-    : CertSubject(type, node_id), CertLifetime(), m_req(req) {
+    : CertSubject(type, node_id), CertLifetime(DefaultDays), m_req(req) {
   m_bound_hostnames = sk_GENERAL_NAME_new_null();
 }
 
 SigningRequest::SigningRequest(X509_REQ *req)
-    : CertSubject(), CertLifetime(), m_req(req) {
+    : CertSubject(), CertLifetime(DefaultDays), m_req(req) {
   parse_name();
   m_bound_hostnames = sk_GENERAL_NAME_new_null();
   int idx = -1;
@@ -512,7 +537,7 @@ bool SigningRequest::store(const char *dir) const {
     return true;
   } else {
     fclose(fp);
-    File_class::remove(path);
+    PkiFile::remove(path);
     return false;
   }
 }
@@ -734,9 +759,6 @@ static bool initClusterCertAuthority(X509 *cert, const char *ordinal) {
   snprintf((char *)subject, sizeof(subject), ClusterCertAuthority::Subject,
            ordinal);
 
-  /* Valid for 4 years */
-  Certificate::set_expire_time(cert, (4 * 365) + 1);
-
   /* Set a random ten byte serial number */
   ASN1_STRING *serial = SerialNumber::random();
   r1 = X509_set_serialNumber(cert, serial);
@@ -759,18 +781,20 @@ static bool initClusterCertAuthority(X509 *cert, const char *ordinal) {
   return (r1 == 1);
 }
 
-static X509 *create_unsigned_CA(EVP_PKEY *key, const char *ordinal) {
+static X509 *create_unsigned_CA(EVP_PKEY *key, const char *ordinal,
+                                const CertLifetime &certLifetime) {
   X509 *cert = Certificate::create(key);
   if (cert) {
+    certLifetime.set_cert_lifetime(cert);
     if (initClusterCertAuthority(cert, ordinal)) return cert;
     Certificate::free(cert);
   }
   return nullptr;
 }
 
-X509 *ClusterCertAuthority::create(EVP_PKEY *key, const char *ordinal,
-                                   bool sign) {
-  X509 *cert = create_unsigned_CA(key, ordinal);
+X509 *ClusterCertAuthority::create(EVP_PKEY *key, const CertLifetime &lifetime,
+                                   const char *ordinal, bool sign) {
+  X509 *cert = create_unsigned_CA(key, ordinal, lifetime);
   if (cert) {
     if (!sign || ClusterCertAuthority::sign(cert, key, cert)) return cert;
     Certificate::free(cert);
@@ -1063,9 +1087,11 @@ bool CertLifetime::set_exact_duration(time_t duration) {
   return (bool)gmtime_r(&expires, &m_notAfter);
 }
 
-void CertLifetime::set_cert_lifetime(X509 *cert) const {
-  X509_gmtime_adj(X509_getm_notBefore(cert), 0);
-  X509_gmtime_adj(X509_getm_notAfter(cert), m_duration);
+bool CertLifetime::set_cert_lifetime(X509 *cert) const {
+  time_t time1 = timegm(&m_notBefore);
+  time_t time2 = timegm(&m_notAfter);
+  return (ASN1_TIME_set(X509_getm_notBefore(cert), time1) &&
+          ASN1_TIME_set(X509_getm_notAfter(cert), time2));
 }
 
 time_t CertLifetime::expire_time(struct tm **tptr) const {
@@ -1097,7 +1123,7 @@ time_t CertLifetime::replace_time(float pct) const {
  *    NodeCertificate class
  */
 NodeCertificate::NodeCertificate(Node::Type type, int node_id)
-    : CertSubject(type, node_id), CertLifetime() {
+    : CertSubject(type, node_id), CertLifetime(DefaultDays) {
   m_bound_hostnames = sk_GENERAL_NAME_new_null();
 }
 
@@ -1237,7 +1263,7 @@ int NodeCertificate::finalise(X509 *CA_cert, EVP_PKEY *CA_key) {
   if (r1 == 0) return -60;
 
   /* Set lifetime */
-  set_cert_lifetime(m_x509);
+  if (!set_cert_lifetime(m_x509)) return -70;
 
   /* Sign the certificate */
   if (CA_key) {
@@ -1393,7 +1419,7 @@ static int parser_test() {
 */
 
 static int cert_lifetime_test() {
-  CertLifetime c1;
+  CertLifetime c1(CertLifetime::DefaultDays);
   time_t t1, t2;
 
   /* Compare replacement date */
@@ -1411,8 +1437,7 @@ static int cert_lifetime_test() {
   if (!c1.set_lifetime(-10, 0)) return 8;
 
   /* Cert expires 20 days from now. Create a replacement 5 days from now. */
-  CertLifetime c2;
-  c2.set_lifetime(20, 0);
+  CertLifetime c2(20);
   t2 = c2.replace_time(5) - time(&t1);
   printf("t2: %ld days\n", (long)t2 / CertLifetime::SecondsPerDay);
   if (t2 != five_days) return 9;
@@ -1420,7 +1445,7 @@ static int cert_lifetime_test() {
   /* Write lifetime to certificate */
   EVP_PKEY *key = PrivateKey::create("P-256");
   X509 *cert = Certificate::create(key);
-  c2.set_cert_lifetime(cert);
+  if (!c2.set_cert_lifetime(cert)) return 13;
 
   /* Read lifetime from certificate and compare to original */
   CertLifetime c3(cert);
@@ -1492,7 +1517,8 @@ static int file_test() {
   /* Create a CA */
   EVP_PKEY *CA_key = EVP_RSA_gen(2048);
   require(CA_key);
-  X509 *CA_cert = ClusterCertAuthority::create(CA_key);
+  CertLifetime lifetime(CertLifetime::CaDefaultDays);
+  X509 *CA_cert = ClusterCertAuthority::create(CA_key, lifetime);
   require(CA_cert);
 
   /* Open the stored signing request */
@@ -1609,11 +1635,12 @@ static int verify_test() {
 
   /* Create a CA */
   EVP_PKEY *CA_key = EVP_RSA_gen(2048);
-  X509 *CA_cert = ClusterCertAuthority::create(CA_key);
+  CertLifetime CA_lifetime(CertLifetime::CaDefaultDays);
+  X509 *CA_cert = ClusterCertAuthority::create(CA_key, CA_lifetime);
   require(CA_cert);
 
   /* Create a private key and a NodeCertificate */
-  NodeCertificate *nc = new NodeCertificate(Node::Type::Client, 150);
+  auto nc = std::make_unique<NodeCertificate>(Node::Type::Client, 150);
   nc->create_keys("P-256");
   nc->set_lifetime(90, 10);
   r1 = nc->finalise(CA_cert, CA_key);
@@ -1629,7 +1656,6 @@ static int verify_test() {
 
   Certificate::free(CA_cert);
   PrivateKey::free(CA_key);
-  delete nc;
 
   return 0;
 }

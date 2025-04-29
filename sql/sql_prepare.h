@@ -114,7 +114,7 @@ class Reprepare_observer final {
   static constexpr int MAX_REPREPARE_ATTEMPTS = 3;
 };
 
-void rewrite_query_if_needed(THD *thd);
+void rewrite_query(THD *thd);
 void log_execute_line(THD *thd);
 
 bool ask_to_reprepare(THD *thd);
@@ -203,6 +203,8 @@ class Prepared_statement final {
   bool m_in_use{false};
 
   bool m_with_log{false};
+
+  bool m_first_execution{true};
 
   /// Name of the prepared statement.
   LEX_CSTRING m_name{NULL_CSTR};

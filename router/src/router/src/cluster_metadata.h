@@ -26,7 +26,7 @@
 #ifndef ROUTER_CLUSTER_METADATA_INCLUDED
 #define ROUTER_CLUSTER_METADATA_INCLUDED
 
-#include "mysqlrouter/router_export.h"
+#include "mysqlrouter/router_cluster_export.h"
 
 #include <stdexcept>
 
@@ -115,10 +115,10 @@ class ClusterMetadata {
   /** @brief Verify that host is a valid metadata server
    *
    *
-   * @throws MySQLSession::Error
-   * @throws std::runtime_error
-   * @throws std::out_of_range
-   * @throws std::logic_error
+   * @throws MySQLSession::Error on failure
+   * @throws std::runtime_error on failure
+   * @throws std::out_of_range on failure
+   * @throws std::logic_error on failure
    *
    * checks that the server
    *
@@ -131,10 +131,10 @@ class ClusterMetadata {
   /** @brief Verify that host is a valid cluster member (either Group
    * Replication or ReplicaSet cluster)
    *
-   * @throws MySQLSession::Error
-   * @throws std::runtime_error
-   * @throws std::out_of_range
-   * @throws std::logic_error
+   * @throws MySQLSession::Error on failure
+   * @throws std::runtime_error on failure
+   * @throws std::out_of_range on failure
+   * @throws std::logic_error on failure
    */
   virtual void require_cluster_is_ok() = 0;
 
@@ -325,7 +325,7 @@ class ClusterMetadataAR : public ClusterMetadata {
   uint64_t query_cluster_count() override;
 };
 
-std::unique_ptr<ClusterMetadata> ROUTER_LIB_EXPORT
+std::unique_ptr<ClusterMetadata> ROUTER_CLUSTER_EXPORT
 create_metadata(const MetadataSchemaVersion &schema_version,
                 MySQLSession *mysql, const OptionsMap &options = {},
                 mysql_harness::SocketOperationsBase *sockops =

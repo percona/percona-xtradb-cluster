@@ -549,8 +549,8 @@ extern bool initialized;
     privilege mask
 */
 
-ulong get_access(TABLE *form, uint fieldnr, uint *next_field) {
-  ulong access_bits = 0, bit;
+Access_bitmask get_access(TABLE *form, uint fieldnr, uint *next_field) {
+  Access_bitmask access_bits = 0, bit;
   char buff[2];
   String res(buff, sizeof(buff), &my_charset_latin1);
   Field **pos;
@@ -606,8 +606,9 @@ void acl_notify_htons(THD *thd, enum_sql_command operation,
   @retval True  - Error.
 */
 
-static bool acl_end_trans_and_close_tables(THD *thd,
-                                           bool rollback_transaction) {
+static bool acl_end_trans_and_close_tables(
+    THD *thd, bool rollback_transaction,
+    Lock_state_list *modified_user_lock_state_list) {
   bool result;
 
   /*
@@ -653,7 +654,7 @@ static bool acl_end_trans_and_close_tables(THD *thd,
     */
     DBUG_EXECUTE_IF("wl14084_acl_ddl_error_before_cache_reload_trigger_timeout",
                     sleep(2););
-    reload_acl_caches(thd, true);
+    reload_acl_caches(thd, true, true, modified_user_lock_state_list);
     close_thread_tables(thd);
   }
   thd->mdl_context.release_transactional_locks();
@@ -677,17 +678,22 @@ static bool acl_end_trans_and_close_tables(THD *thd,
   @param write_to_binlog        Skip writing to binlog.
                                 Used for routine grants while
                                 creating routine.
+  @param modified_user_lock_state_list
+                                List of users whose temporary account
+                                locking attributes are likely modified.
 
   @returns status of log and commit
     @retval 0 Successfully committed. Optionally : written to binlog.
     @retval 1 If an error is raised at any stage
 */
 
-bool log_and_commit_acl_ddl(THD *thd, bool transactional_tables,
-                            std::set<LEX_USER *> *extra_users, /* = NULL */
-                            Rewrite_params *rewrite_params,    /* = NULL */
-                            bool extra_error,                  /* = true */
-                            bool write_to_binlog) {            /* = true */
+bool log_and_commit_acl_ddl(
+    THD *thd, bool transactional_tables,
+    std::set<LEX_USER *> *extra_users,                /* = NULL */
+    Rewrite_params *rewrite_params,                   /* = NULL */
+    bool extra_error,                                 /* = false */
+    bool write_to_binlog,                             /* = true */
+    Lock_state_list *modified_user_lock_state_list) { /* = nullptr */
   bool result = false;
   DBUG_TRACE;
   assert(thd);
@@ -783,7 +789,10 @@ bool log_and_commit_acl_ddl(THD *thd, bool transactional_tables,
     mysql_rewrite_acl_query(thd, rlb, Consumer_type::TEXTLOG, rewrite_params);
   }
 
-  if (acl_end_trans_and_close_tables(thd, result)) result = true;
+  if (acl_end_trans_and_close_tables(thd, result,
+                                     modified_user_lock_state_list)) {
+    result = true;
+  }
 
   return result;
 }
@@ -833,9 +842,10 @@ void acl_print_ha_error(int handler_error) {
 */
 static int compatibility_replace_db_table(THD *thd, TABLE *table,
                                           const char *db, const LEX_USER &combo,
-                                          ulong rights, bool revoke_grant) {
+                                          Access_bitmask rights,
+                                          bool revoke_grant) {
   uint i;
-  ulong priv, store_rights;
+  Access_bitmask priv, store_rights;
   bool old_row_exists = false;
   int error;
   const char what = (revoke_grant) ? 'N' : 'Y';
@@ -993,12 +1003,12 @@ inline bool compatibility_mode(const THD *thd, uint32_t fix_version) {
 */
 
 int replace_db_table(THD *thd, TABLE *table, const char *db,
-                     const LEX_USER &combo, ulong rights, bool revoke_grant,
-                     bool all_current_privileges) {
+                     const LEX_USER &combo, Access_bitmask rights,
+                     bool revoke_grant, bool all_current_privileges) {
   uint i;
-  ulong priv, store_rights;
+  Access_bitmask priv, store_rights;
   bool old_row_exists = false;
-  ulong old_rights, nonexisting_rights;
+  Access_bitmask old_rights, nonexisting_rights;
   int error;
   const char what = (revoke_grant) ? 'N' : 'Y';
   uchar user_key[MAX_KEY_LENGTH];
@@ -1317,8 +1327,8 @@ table_error:
 
 int replace_column_table(THD *thd, GRANT_TABLE *g_t, TABLE *table,
                          const LEX_USER &combo, List<LEX_COLUMN> &columns,
-                         const char *db, const char *table_name, ulong rights,
-                         bool revoke_grant) {
+                         const char *db, const char *table_name,
+                         Access_bitmask rights, bool revoke_grant) {
   int result = 0;
   int error;
   uchar key[MAX_KEY_LENGTH];
@@ -1358,7 +1368,7 @@ int replace_column_table(THD *thd, GRANT_TABLE *g_t, TABLE *table,
   }
 
   while ((column = iter++)) {
-    ulong column_rights = column->rights;
+    Access_bitmask column_rights = column->rights;
     bool old_row_exists = false;
     uchar user_key[MAX_KEY_LENGTH];
 
@@ -1397,7 +1407,8 @@ int replace_column_table(THD *thd, GRANT_TABLE *g_t, TABLE *table,
       table->field[4]->store(column->column.ptr(), column->column.length(),
                              system_charset_info);
     } else {
-      ulong old_column_rights = (ulong)table->field[6]->val_int();
+      Access_bitmask old_column_rights =
+          (Access_bitmask)table->field[6]->val_int();
       old_column_rights = fix_rights_for_column(old_column_rights);
       if (revoke_grant) {
         /* Check if not trying to revoke non existing privilege + The backward
@@ -1513,7 +1524,7 @@ int replace_column_table(THD *thd, GRANT_TABLE *g_t, TABLE *table,
 
     /* Scan through all rows with the same host,db,user and table */
     do {
-      ulong privileges = (ulong)table->field[6]->val_int();
+      Access_bitmask privileges = (Access_bitmask)table->field[6]->val_int();
       privileges = fix_rights_for_column(privileges);
       store_record(table, record[1]);
 
@@ -1611,11 +1622,11 @@ static int compatibility_replace_table_table(
     std::unique_ptr<GRANT_TABLE, Destroy_only<GRANT_TABLE>>
         *deleted_grant_table,
     TABLE *table, const LEX_USER &combo, const char *db, const char *table_name,
-    ulong rights, ulong col_rights, bool revoke_grant) {
+    Access_bitmask rights, Access_bitmask col_rights, bool revoke_grant) {
   char grantor[USER_HOST_BUFF_SIZE];
   int old_row_exists = 1;
   int error = 0;
-  ulong store_table_rights, store_col_rights;
+  Access_bitmask store_table_rights, store_col_rights;
   uchar user_key[MAX_KEY_LENGTH];
   Acl_table_intact table_intact(thd);
   DBUG_TRACE;
@@ -1676,10 +1687,10 @@ static int compatibility_replace_table_table(
   store_table_rights = get_rights_for_table(rights);
   store_col_rights = get_rights_for_column(col_rights);
   if (old_row_exists) {
-    ulong j, k;
+    Access_bitmask j, k;
     store_record(table, record[1]);
-    j = (ulong)table->field[6]->val_int();
-    k = (ulong)table->field[7]->val_int();
+    j = (Access_bitmask)table->field[6]->val_int();
+    k = (Access_bitmask)table->field[7]->val_int();
 
     if (revoke_grant) {
       /* column rights are already fixed in mysql_table_grant */
@@ -1783,13 +1794,14 @@ int replace_table_table(THD *thd, GRANT_TABLE *grant_table,
                         std::unique_ptr<GRANT_TABLE, Destroy_only<GRANT_TABLE>>
                             *deleted_grant_table,
                         TABLE *table, const LEX_USER &combo, const char *db,
-                        const char *table_name, ulong rights, ulong col_rights,
-                        bool revoke_grant, bool all_current_privileges) {
+                        const char *table_name, Access_bitmask rights,
+                        Access_bitmask col_rights, bool revoke_grant,
+                        bool all_current_privileges) {
   char grantor[USER_HOST_BUFF_SIZE];
   bool old_row_exists = false;
   int error = 0;
-  ulong store_table_rights, store_col_rights;
-  ulong old_table_rights, old_col_rights;
+  Access_bitmask store_table_rights, store_col_rights;
+  Access_bitmask old_table_rights, old_col_rights;
   uchar user_key[MAX_KEY_LENGTH];
   Acl_table_intact table_intact(thd);
 
@@ -1844,16 +1856,16 @@ int replace_table_table(THD *thd, GRANT_TABLE *grant_table,
   } else {
     old_row_exists = true;
     store_record(table, record[1]);
-    old_table_rights = (ulong)table->field[6]->val_int();
-    old_col_rights = (ulong)table->field[7]->val_int();
+    old_table_rights = (Access_bitmask)table->field[6]->val_int();
+    old_col_rights = (Access_bitmask)table->field[7]->val_int();
   }
 
   store_table_rights = get_rights_for_table(rights);
   store_col_rights = get_rights_for_column(col_rights);
 
   if (revoke_grant) {
-    ulong store_rights(store_table_rights | store_col_rights);
-    ulong old_rights(old_table_rights | old_col_rights);
+    Access_bitmask store_rights(store_table_rights | store_col_rights);
+    Access_bitmask old_rights(old_table_rights | old_col_rights);
     /* We are revoking some rights that were not previously granted
      * if rights being removed are out of their intersection of old rights */
     bool revoking_not_granted(store_rights != (old_rights & store_rights));
@@ -1960,12 +1972,13 @@ table_error:
 
 int replace_routine_table(THD *thd, GRANT_NAME *grant_name, TABLE *table,
                           const LEX_USER &combo, const char *db,
-                          const char *routine_name, bool is_proc, ulong rights,
-                          bool revoke_grant, bool all_current_privileges) {
+                          const char *routine_name, bool is_proc,
+                          Access_bitmask rights, bool revoke_grant,
+                          bool all_current_privileges) {
   char grantor[USER_HOST_BUFF_SIZE];
   int old_row_exists = 1;
   int error = 0;
-  ulong store_proc_rights;
+  Access_bitmask store_proc_rights;
   Acl_table_intact table_intact(thd);
   uchar user_key[MAX_KEY_LENGTH];
   DBUG_TRACE;
@@ -2029,9 +2042,9 @@ int replace_routine_table(THD *thd, GRANT_NAME *grant_name, TABLE *table,
 
   store_proc_rights = get_rights_for_procedure(rights);
   if (old_row_exists) {
-    ulong old_rights;
+    Access_bitmask old_rights;
     store_record(table, record[1]);
-    old_rights = (ulong)table->field[6]->val_int();
+    old_rights = (Access_bitmask)table->field[6]->val_int();
 
     if (revoke_grant) {
       /* If not REVOKE ALL PRIVILEGES and not in the backward compatibility

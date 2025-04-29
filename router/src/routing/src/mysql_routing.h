@@ -26,6 +26,7 @@
 #ifndef ROUTING_MYSQLROUTING_INCLUDED
 #define ROUTING_MYSQLROUTING_INCLUDED
 
+#include "mysqlrouter/datatypes.h"
 #include "mysqlrouter/routing_export.h"
 #include "mysqlrouter/routing_plugin_export.h"
 
@@ -40,7 +41,6 @@
 #include <array>
 #include <atomic>
 #include <chrono>
-#include <iostream>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -166,32 +166,6 @@ class ROUTING_EXPORT AcceptingEndpointUnixSocket : public AcceptingEndpoint {
  *  The class MySQLRouter is used to start a service listening on a particular
  *  TCP port for incoming MySQL Client connection and route these to a MySQL
  *  Server.
- *
- *  Connection routing will not analyze or parse any MySQL package (except from
- *  those in the handshake phase to be able to discover invalid connection
- *  error) nor will it do any authentication. It will not handle errors from the
- *  MySQL server and not automatically recover. The client communicate through
- *  MySQL Router just like it would directly connecting.
- *
- *  The MySQL Server is chosen from a given list of hosts or IP addresses
- *  (with or without TCP port) based on the the mode. For example, mode
- *  read-only will go through the list of servers in a round-robin way. The
- *  mode read-write will always go through the list from the beginning and
- *  failover to the next available.
- *
- *
- *  Example usage: bind to all IP addresses and use TCP Port 7001
- *
- *  @code
- *      MySQLRouting r(conf, ioctx);
- *      r.destination_connect_timeout = std::chrono::seconds(1);
- *      r.set_destinations_from_csv("10.0.10.5;10.0.11.6");
- *      r.run();
- *  @endcode
- *
- *  The above example will, when MySQL running on 10.0.10.5 is not available,
- *  use 10.0.11.6 to setup the connection routing.
- *
  */
 class ROUTING_EXPORT MySQLRouting : public MySQLRoutingBase {
  public:
@@ -220,11 +194,8 @@ class ROUTING_EXPORT MySQLRouting : public MySQLRoutingBase {
 
   /** @brief Sets the destinations from URI
    *
-   * Sets destinations using the given string and the given mode. The string
-   * should be a comma separated list of MySQL servers.
-   *
-   * The mode is one of MySQLRouting::Mode, for example
-   * MySQLRouting::Mode::kReadOnly.
+   * Sets destinations using the given string. The string should be a comma
+   * separated list of MySQL servers.
    *
    * Example of destinations:
    *   "10.0.10.5,10.0.11.6:3307"
@@ -338,6 +309,25 @@ class ROUTING_EXPORT MySQLRouting : public MySQLRoutingBase {
   MySQLRoutingContext &get_context() override { return context_; }
 
   bool is_running() const override { return is_running_; }
+
+  /**
+   * get the purpose of connections to this route.
+   *
+   * - read-write : all statements are treated as "read-write".
+   * - read-only  : all statements are treated as "read-only".
+   * - unavailable: it is currently unknown where the statement should go to.
+   *
+   * "Unavailable" is used for read-write splitting where the purpose is
+   * determined per statement, session, ...
+   *
+   * A statement over a read-only server connection may end up on a read-write
+   * server in case all read-only servers aren't reachable. Even if the server
+   * is read-write, the connections purpose is read-only and if the server
+   * changes its role from PRIMARY to SECONDARY, these read-only connections
+   * will not be abort as a SECONDARY is good enough to serve read-only
+   * connections.
+   */
+  mysqlrouter::ServerMode purpose() const override;
 
  private:
   /** Monitor for notifying socket acceptor */

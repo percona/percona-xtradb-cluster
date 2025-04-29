@@ -4085,6 +4085,12 @@ void SimulatedBlock::init_global_uint32(void **tmp, size_t cnt) {
   mt_init_global_variables_uint32_instances(m_threadId, tmp, cnt);
 #endif
 }
+
+void SimulatedBlock::init_global_block() {
+#ifdef NDBD_MULTITHREADED
+  mt_init_global_variables_block(m_threadId, this);
+#endif
+}
 #endif
 
 int SimulatedBlock::cmp_key(Uint32 tab, const Uint32 *s1,
@@ -4950,14 +4956,22 @@ Uint32 SimulatedBlock::get_recv_thread_idx(TrpId trp_id) {
 
 #ifndef NDBD_MULTITHREADED
 /**
- * Add a stub for this function since we have some code in ErrorReporter.cpp
- * that needs this function, it's only really needed for ndbmtd, so need an
- * empty function in ndbd.
+ * Function for ndbd only. ndbmtd version of this function
+ * is implemented in ErrorReporter.cpp
  */
 void ErrorReporter::prepare_to_crash(bool first_phase,
                                      bool error_insert_crash) {
   (void)first_phase;
   (void)error_insert_crash;
+
+  static bool crash_handling_started = false;
+  if (!first_phase) {
+    if (crash_handling_started) {
+      /* Someone else handling the crash, exit now */
+      my_thread_exit(nullptr);
+    }
+    crash_handling_started = true;
+  }
 }
 #endif
 
@@ -5500,6 +5514,20 @@ Uint32 SimulatedBlock::m_num_rr_groups = 0;
 Uint32 SimulatedBlock::m_num_query_thread_per_ldm = 0;
 Uint32 SimulatedBlock::m_num_distribution_threads = 0;
 bool SimulatedBlock::m_inited_rr_groups = false;
+
+#if defined(USE_INIT_GLOBAL_VARIABLES)
+void SimulatedBlock::checkInitGlobalVariables() {
+  jam();
+  jamLine(refToMain(reference()));
+  jamLine(refToInstance(reference()));
+
+  /* Blocks must override */
+  g_eventLogger->error(
+      "Unimplemented checkInitGlobalVariables in block %u instance %u\n",
+      refToMain(reference()), refToInstance(reference()));
+  ndbabort();
+}
+#endif
 
 /**
  * #undef is needed since this file is included by SimulatedBlock_nonmt.cpp

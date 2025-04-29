@@ -281,6 +281,8 @@ wsrep_trx_fragment_size
 wsrep_trx_fragment_size
 wsrep_trx_fragment_unit
 wsrep_trx_fragment_unit
+wsrep_use_async_monitor
+wsrep_use_async_monitor
 xa_detach_on_prepare
 xa_detach_on_prepare
 drop table t1;

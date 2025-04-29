@@ -23,6 +23,7 @@
 #ifndef SQL_USER_CACHE_INCLUDED
 #define SQL_USER_CACHE_INCLUDED
 
+#include <assert.h>
 #include <string.h>
 #include <sys/types.h>
 #include <atomic>
@@ -161,7 +162,7 @@ class ACL_ACCESS {
   ACL_ACCESS() : host(), sort(0), access(0) {}
   ACL_HOST_AND_IP host;
   ulong sort;
-  ulong access;
+  Access_bitmask access;
 };
 
 /**
@@ -309,11 +310,21 @@ class ACL_USER : public ACL_ACCESS {
     bool is_active() const {
       return m_password_lock_time_days != 0 && m_failed_login_attempts != 0;
     }
+    bool is_default() const {
+      return (m_remaining_login_attempts == m_failed_login_attempts &&
+              m_daynr_locked == 0);
+    }
     int get_password_lock_time_days() const {
       return m_password_lock_time_days;
     }
     uint get_failed_login_attempts() const { return m_failed_login_attempts; }
-    void set_parameters(uint password_lock_time_days,
+    uint get_remaining_login_attempts() const {
+      return m_remaining_login_attempts;
+    }
+    long get_daynr_locked() const { return m_daynr_locked; }
+    void set_temporary_lock_state_parameters(uint remaining_login_attempts,
+                                             long daynr_locked);
+    void set_parameters(int password_lock_time_days,
                         uint failed_login_attempts);
     bool update(THD *thd, bool successful_login, long *ret_days_remaining);
     Password_locked_state()
@@ -431,16 +442,16 @@ class ACL_PROXY_USER : public ACL_ACCESS {
 
 class acl_entry {
  public:
-  ulong access;
+  Access_bitmask access;
   uint16 length;
   char key[1];  // Key will be stored here
 };
 
 class GRANT_COLUMN {
  public:
-  ulong rights;
+  Access_bitmask rights;
   std::string column;
-  GRANT_COLUMN(String &c, ulong y);
+  GRANT_COLUMN(String &c, Access_bitmask y);
 };
 
 class GRANT_NAME {
@@ -449,11 +460,11 @@ class GRANT_NAME {
   char *db;
   const char *user;
   char *tname;
-  ulong privs;
+  Access_bitmask privs;
   ulong sort;
   std::string hash_key;
   GRANT_NAME(const char *h, const char *d, const char *u, const char *t,
-             ulong p, bool is_routine);
+             Access_bitmask p, bool is_routine);
   GRANT_NAME(TABLE *form, bool is_routine);
   virtual ~GRANT_NAME() = default;
   virtual bool ok() { return privs != 0; }
@@ -463,13 +474,13 @@ class GRANT_NAME {
 
 class GRANT_TABLE : public GRANT_NAME {
  public:
-  ulong cols;
+  Access_bitmask cols;
   collation_unordered_multimap<std::string,
                                unique_ptr_destroy_only<GRANT_COLUMN>>
       hash_columns;
 
   GRANT_TABLE(const char *h, const char *d, const char *u, const char *t,
-              ulong p, ulong c);
+              Access_bitmask p, Access_bitmask c);
   explicit GRANT_TABLE(TABLE *form);
   bool init(TABLE *col_privs);
   ~GRANT_TABLE() override;
@@ -566,6 +577,7 @@ inline GRANT_NAME *routine_hash_search(const char *host, const char *ip,
                                        const char *db, const char *user,
                                        const char *tname, bool proc,
                                        bool exact) {
+  assert(proc ? proc_priv_hash : func_priv_hash);
   return name_hash_search(proc ? *proc_priv_hash : *func_priv_hash, host, ip,
                           db, user, tname, exact, true);
 }
@@ -573,6 +585,7 @@ inline GRANT_NAME *routine_hash_search(const char *host, const char *ip,
 inline GRANT_TABLE *table_hash_search(const char *host, const char *ip,
                                       const char *db, const char *user,
                                       const char *tname, bool exact) {
+  assert(column_priv_hash);
   return name_hash_search(*column_priv_hash, host, ip, db, user, tname, exact,
                           false);
 }
@@ -651,7 +664,7 @@ class Acl_map {
   void increase_reference_count();
   void decrease_reference_count();
 
-  ulong global_acl();
+  Access_bitmask global_acl();
   Db_access_map *db_acls();
   Db_access_map *db_wild_acls();
   Table_access_map *table_acls();
@@ -669,7 +682,7 @@ class Acl_map {
   Db_access_map m_db_acls;
   Db_access_map m_db_wild_acls;
   Table_access_map m_table_acls;
-  ulong m_global_acl;
+  Access_bitmask m_global_acl;
   SP_access_map m_sp_acls;
   SP_access_map m_func_acls;
   Grant_acl_set m_with_admin_acls;
@@ -724,6 +737,10 @@ class Acl_cache {
     Removes all acl map objects with a references count of zero.
   */
   void flush_cache();
+  /**
+    Removes all acl map objects when shutdown_acl_cache is called.
+  */
+  void clear_acl_cache();
   /**
     Return a lower boundary to the current version count.
   */
@@ -814,6 +831,58 @@ class Acl_restrictions {
 
  private:
   malloc_unordered_map<std::string, Restrictions> m_restrictions_map;
+};
+
+/**
+  Enables preserving temporary account locking attributes during ACL DDL.
+  Enables restoring temporary account locking attributes after ACL reload.
+
+  This class is used to preserve the state of the accounts being altered by the
+  current ACL statement. The account locking data needs to be preserved since
+  the current state of account locking is not stored into the table and can't be
+  restored from it when the code needs to re-create the ACL caches from the
+  tables.
+
+  When an ACL DDL statement that can modify account locking data starts, a new
+  instance of this class is created and the current in-memory account locking
+  data is preserved for each user that is modified by the statement, if account
+  locking data is not default.
+
+  ACL DDL rollback results in the in-memory ACL cache being re-created during
+  ACL reload.
+
+  After ACL reload:
+  - For all users in the new ACL cache, the temporary account locking state is
+    restored from the old ACL cache, if account locking data is not default.
+  - For specific users in the new ACL cache, the temporary account locking state
+    is restored from the instances of this class that were created at the start
+    of the ACL DDL statement. This needs to be done since these accounts could
+    be dropped (mysql_drop_user), renamed (mysql_rename_user) or altered
+    (mysql_alter_user) in the old ACL cache.
+*/
+class ACL_temporary_lock_state {
+ public:
+  ACL_temporary_lock_state(const char *host, const char *user,
+                           uint remaining_login_attempts, long daynr_locked);
+
+  static bool is_modified(ACL_USER *acl_user);
+
+  static ACL_USER *preserve_user_lock_state(const char *host, const char *user,
+                                            Lock_state_list &user_list);
+
+  static void restore_user_lock_state(const char *host, const char *user,
+                                      uint remaining_login_attempts,
+                                      long daynr_locked);
+
+  static void restore_temporary_account_locking(
+      Prealloced_array<ACL_USER, ACL_PREALLOC_SIZE> *old_acl_users,
+      Lock_state_list *modified_user_lock_state_list);
+
+ private:
+  const char *m_host;
+  const char *m_user;
+  const uint m_remaining_login_attempts;
+  const long m_daynr_locked;
 };
 
 extern ACL_USER acl_utility_user;

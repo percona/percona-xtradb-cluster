@@ -18,11 +18,9 @@
 
 --connection node_2
 --let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
---let $expect_crash_on_start = 1
 --let $do_not_echo_parameters = 1
---let $restart_parameters = "restart: --wsrep_provider_options='base_port=$NODE_GALERAPORT_2;pc.wait_restored_prim_timeout=PT10S' --log-error=$ofile"
---source include/start_mysqld.inc
---let expect_crash_on_start = 0
+--let $restart_parameters = "--wsrep_provider_options='base_port=$NODE_GALERAPORT_2;pc.wait_restored_prim_timeout=PT10S' --log-error=$ofile"
+--source include/start_mysqld_expecting_crash.inc
 # Sleep to ensure that server exited...
 --sleep 30
 

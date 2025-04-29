@@ -43,8 +43,6 @@
 #include <gtest/gtest-param-test.h>
 #include <gtest/gtest.h>
 
-#define RAPIDJSON_HAS_STDSTRING 1
-
 #include "my_rapidjson_size_t.h"
 
 #include <rapidjson/pointer.h>
@@ -3572,7 +3570,7 @@ TEST_P(ConnectionTest, classic_protocol_replay_session_trackers) {
     }
 
     std::ostringstream oss;
-    oss << "SET @@SESSION." << std::quoted(var[0], '`') << "=";
+    oss << "SET @@SESSION." << var[0] << "=";
 
     if (var[1].empty()) {
       if (var[0] == "innodb_ft_user_stopword_table") {
@@ -3660,7 +3658,7 @@ TEST_P(ConnectionTest, classic_protocol_session_vars_nullable) {
 
   for (auto var : session_vars) {
     std::ostringstream oss;
-    oss << "SET @@SESSION." << std::quoted(var[0], '`') << "="
+    oss << "SET @@SESSION." << var[0] << "="
         << "NULL";
 
     SCOPED_TRACE("// " + oss.str());

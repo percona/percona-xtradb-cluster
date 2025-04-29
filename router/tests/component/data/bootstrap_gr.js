@@ -29,6 +29,13 @@ if (mysqld.global.gr_id === undefined) {
   mysqld.global.gr_id = "cluster-specific-id";
 }
 
+if (mysqld.global.server_version === undefined) {
+  // Let's keep the default server version as some known compatible version.
+  // If there is a need to some specific compatibility checks, this should be
+  // overwritten from the test.
+  mysqld.global.server_version = "8.3.0";
+}
+
 var members = gr_memberships.gr_members(
     mysqld.global.gr_node_host, mysqld.global.gr_nodes);
 
@@ -56,6 +63,14 @@ if (mysqld.global.config_defaults_stored_is_null === undefined) {
   mysqld.global.config_defaults_stored_is_null = 0;
 }
 
+if (mysqld.global.last_insert_id === undefined) {
+  mysqld.global.last_insert_id = 1;
+}
+
+if (mysqld.global.account_user_pattern === undefined) {
+  mysqld.global.account_user_pattern = "mysql_router1_[0-9a-z]{7}";
+}
+
 var options = {
   metadata_schema_version: mysqld.global.metadata_schema_version,
   cluster_type: "gr",
@@ -69,6 +84,9 @@ var options = {
   gr_members_recovering: recovering_gr_nodes,
   router_version: mysqld.global.router_version,
   config_defaults_stored_is_null: mysqld.global.config_defaults_stored_is_null,
+  last_insert_id: mysqld.global.last_insert_id,
+  account_user_pattern:
+      "mysql_router" + mysqld.global.last_insert_id + "_[0-9a-z]{7}",
 };
 
 var common_responses = common_stmts.prepare_statement_responses(
@@ -124,7 +142,8 @@ var router_store_config_defaults_gr_cluster =
     auth: {
       username: "root",
       password: "fake-pass",
-    }
+    },
+    greeting: {server_version: mysqld.global.server_version}
   },
   stmts: function(stmt) {
     var res;

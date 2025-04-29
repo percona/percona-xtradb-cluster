@@ -27,6 +27,7 @@
 
 #include <chrono>
 #include <deque>
+#include <initializer_list>
 #include <memory>
 #include <optional>
 #include <ratio>
@@ -39,7 +40,6 @@
 #include "classic_greeting_forwarder.h"  // ServerGreetor
 #include "classic_init_schema_sender.h"
 #include "classic_query_sender.h"
-#include "classic_quit_sender.h"
 #include "classic_reset_connection_sender.h"
 #include "classic_set_option_sender.h"
 #include "mysql/harness/logging/logging.h"
@@ -47,8 +47,10 @@
 #include "mysql_com.h"
 #include "mysqlrouter/classic_protocol_message.h"
 #include "mysqlrouter/connection_pool_component.h"
+#include "mysqlrouter/datatypes.h"
 #include "mysqlrouter/utils.h"  // to_string
 #include "router_require.h"
+#include "sql_value.h"  // sql_value_to_string
 
 IMPORT_LOG_FUNCTIONS()
 
@@ -76,9 +78,10 @@ class FailedQueryHandler : public QuerySender::Handler {
 
 class IsTrueHandler : public QuerySender::Handler {
  public:
-  IsTrueHandler(LazyConnector &processor,
+  IsTrueHandler(LazyConnector &processor, std::string stmt,
                 classic_protocol::message::server::Error on_cond_fail_error)
       : processor_(processor),
+        stmt_(std::move(stmt)),
         on_condition_fail_error_(std::move(on_cond_fail_error)) {}
 
   void on_column_count(uint64_t count) override {
@@ -121,7 +124,7 @@ class IsTrueHandler : public QuerySender::Handler {
   }
 
   void on_error(const classic_protocol::message::server::Error &err) override {
-    log_warning("%s", err.message().c_str());
+    log_warning("%s failed: %s", stmt_.c_str(), err.message().c_str());
 
     processor_.failed(err);
   }
@@ -129,6 +132,8 @@ class IsTrueHandler : public QuerySender::Handler {
  private:
   LazyConnector &processor_;
   uint64_t row_count_{};
+
+  std::string stmt_;
 
   classic_protocol::message::server::Error on_condition_fail_error_;
 };
@@ -192,8 +197,10 @@ class SelectSessionVariablesHandler : public QuerySender::Handler {
       for (; !session_variables_.empty(); session_variables_.pop_front()) {
         auto &node = session_variables_.front();
 
-        connection_->execution_context().system_variables().set(
-            std::move(node.first), std::move(node.second));
+        connection_->client_protocol().system_variables().set(node.first,
+                                                              node.second);
+        connection_->server_protocol().system_variables().set(node.first,
+                                                              node.second);
       }
     }
   }
@@ -217,13 +224,16 @@ class SelectSessionVariablesHandler : public QuerySender::Handler {
 
   bool something_failed_{false};
 
-  std::deque<std::pair<std::string, Value>> session_variables_;
+  std::deque<std::pair<std::string, std::optional<std::string>>>
+      session_variables_;
 };
 
 }  // namespace
 
 stdx::expected<Processor::Result, std::error_code> LazyConnector::process() {
   switch (stage()) {
+    case Stage::Init:
+      return init();
     case Stage::FromStash:
       return from_stash();
     case Stage::Connect:
@@ -288,6 +298,13 @@ stdx::expected<Processor::Result, std::error_code> LazyConnector::process() {
   harness_assert_this_should_not_execute();
 }
 
+stdx::expected<Processor::Result, std::error_code> LazyConnector::init() {
+  connection()->current_server_mode(connection()->expected_server_mode());
+
+  stage(Stage::FromStash);
+  return Result::Again;
+}
+
 stdx::expected<Processor::Result, std::error_code> LazyConnector::from_stash() {
   connection()->has_transient_error_at_connect(false);
 
@@ -317,6 +334,8 @@ stdx::expected<Processor::Result, std::error_code> LazyConnector::from_stash() {
           // reset the seq-id of the server side as this is a new command.
           connection()->server_protocol().seq_id(0xff);
 
+          connection()->server_address(connection()->server_conn().endpoint());
+
           if (auto &tr = tracer()) {
             tr.trace(Tracer::Event().stage(
                 "connect::from_stash::unstashed::mine: fd=" +
@@ -329,7 +348,7 @@ stdx::expected<Processor::Result, std::error_code> LazyConnector::from_stash() {
             trace_span_end(ev);
           }
 
-          stage(Stage::WaitGtidExecuted);
+          stage(Stage::SetVars);
           return Result::Again;
         }
 
@@ -520,30 +539,22 @@ LazyConnector::authenticated() {
 }
 
 namespace {
-void set_session_var(std::string &q, const std::string &key, const Value &val) {
+void set_session_var(std::string &q, const std::string &key,
+                     const std::optional<std::string> &val) {
   if (q.empty()) {
     q = "SET ";
   } else {
     q += ",\n    ";
   }
 
-  q += "@@SESSION." + key + " = " + val.to_string();
+  q += "@@SESSION." + key + " = " + sql_value_to_string(val);
 }
 
-void set_session_var_if_not_set(
-    std::string &q, const ExecutionContext::SystemVariables &sysvars,
-    const std::string &key, const Value &value) {
-  if (sysvars.get(key) == Value(std::nullopt)) {
-    set_session_var(q, key, value);
-  }
-}
-
-void set_session_var_or_value(std::string &q,
-                              const ExecutionContext::SystemVariables &sysvars,
-                              const std::string &key,
-                              const Value &default_value) {
+void set_session_var_or_value(
+    std::string &q, const ClassicProtocolState::SystemVariables &sysvars,
+    const std::string &key, const std::optional<std::string> &default_value) {
   auto value = sysvars.get(key);
-  if (value == Value(std::nullopt)) {
+  if (value == std::nullopt) {
     set_session_var(q, key, default_value);
   } else {
     set_session_var(q, key, value);
@@ -552,7 +563,8 @@ void set_session_var_or_value(std::string &q,
 }  // namespace
 
 stdx::expected<Processor::Result, std::error_code> LazyConnector::set_vars() {
-  auto &sysvars = connection()->execution_context().system_variables();
+  auto &client_sysvars = connection()->client_protocol().system_variables();
+  auto &server_sysvars = connection()->server_protocol().system_variables();
 
   std::string stmt;
 
@@ -562,34 +574,50 @@ stdx::expected<Processor::Result, std::error_code> LazyConnector::set_vars() {
 
   // must be first, to track all variables that are set.
   if (need_session_trackers) {
-    set_session_var_or_value(stmt, sysvars, "session_track_system_variables",
-                             Value("*"));
+    auto server_sysvar_has =
+        server_sysvars.find("session_track_system_variables");
+
+    if (!server_sysvar_has || *server_sysvar_has != "*") {
+      set_session_var_or_value(stmt, client_sysvars,
+                               "session_track_system_variables", "*");
+    }
   } else {
-    auto var = sysvars.get("session_track_system_variables");
-    if (var != Value(std::nullopt)) {
+    auto var = client_sysvars.get("session_track_system_variables");
+    if (var != std::nullopt) {
       set_session_var(stmt, "session_track_system_variables", var);
     }
   }
 
-  for (const auto &var : sysvars) {
+  for (const auto &var : client_sysvars) {
     // already set earlier.
     if (var.first == "session_track_system_variables") continue;
 
     // is read-only
     if (var.first == "statement_id") continue;
+    auto server_sysvar_has = server_sysvars.find(var.first);
 
-    set_session_var(stmt, var.first, var.second);
+    if (!server_sysvar_has || *server_sysvar_has != var.second) {
+      set_session_var(stmt, var.first, var.second);
+    }
   }
 
   if (need_session_trackers) {
-    set_session_var_if_not_set(stmt, sysvars, "session_track_gtids",
-                               Value("OWN_GTID"));
-    set_session_var_if_not_set(stmt, sysvars, "session_track_schema",
-                               Value("ON"));
-    set_session_var_if_not_set(stmt, sysvars, "session_track_state_change",
-                               Value("ON"));
-    set_session_var_if_not_set(stmt, sysvars, "session_track_transaction_info",
-                               Value("CHARACTERISTICS"));
+    for (auto [k, v] : std::initializer_list<
+             std::pair<std::string, std::optional<std::string>>>{
+             {"session_track_gtids", "OWN_GTID"},
+             {"session_track_schema", "ON"},
+             {"session_track_state_change", "ON"},
+             {"session_track_transaction_info", "CHARACTERISTICS"},
+         }) {
+      auto client_sysvar_has = client_sysvars.find(k);
+      if (client_sysvar_has) continue;  // already handled above.
+
+      auto server_sysvar_has = server_sysvars.find(k);
+
+      if (!server_sysvar_has || *server_sysvar_has != v) {
+        set_session_var(stmt, k, v);
+      }
+    }
   }
 
   if (!stmt.empty()) {
@@ -601,13 +629,13 @@ stdx::expected<Processor::Result, std::error_code> LazyConnector::set_vars() {
 
     trace_event_set_vars_ = trace_span(trace_event_connect_, "mysql/set_var");
     if (auto *ev = trace_event_set_vars_) {
-      for (const auto &var : sysvars) {
+      for (const auto &var : client_sysvars) {
         if (var.first == "statement_id") continue;
 
-        if (var.second.value()) {
+        if (var.second) {
           ev->attrs.emplace_back(
               "mysql.session.@@SESSION." + var.first,
-              TraceEvent::element_type::second_type{*var.second.value()});
+              TraceEvent::element_type::second_type{*var.second});
         } else {
           // NULL
           ev->attrs.emplace_back(var.first,
@@ -692,8 +720,7 @@ LazyConnector::fetch_sys_vars() {
     // fetch the sys-vars that aren't known yet.
     for (const auto &expected_var :
          {"collation_connection", "character_set_client", "sql_mode"}) {
-      const auto &sys_vars =
-          connection()->execution_context().system_variables();
+      const auto &sys_vars = connection()->client_protocol().system_variables();
       auto find_res = sys_vars.find(expected_var);
       if (!find_res) {
         if (oss.tellp() != 0) {
@@ -792,7 +819,7 @@ LazyConnector::wait_gtid_executed() {
                                         // didn't wait.
 
   if (connection()->wait_for_my_writes() &&
-      (connection()->expected_server_mode() ==
+      (connection()->current_server_mode() ==
        mysqlrouter::ServerMode::ReadOnly)) {
     auto gtid_executed = connection()->gtid_at_least_executed();
     if (!gtid_executed.empty()) {
@@ -810,19 +837,22 @@ LazyConnector::wait_gtid_executed() {
 
       std::ostringstream oss;
       if (max_replication_lag.count() == 0) {
-        oss << "SELECT GTID_SUBSET(" << std::quoted(gtid_executed)
+        // use ' to quote to make it ANSI_QUOTES safe.
+        oss << "SELECT GTID_SUBSET(" << std::quoted(gtid_executed, '\'')
             << ", @@GLOBAL.gtid_executed)";
       } else {
+        // use ' to quote to make it ANSI_QUOTES safe.
         oss << "SELECT NOT WAIT_FOR_EXECUTED_GTID_SET("
-            << std::quoted(gtid_executed) << ", "
+            << std::quoted(gtid_executed, '\'') << ", "
             << std::to_string(max_replication_lag.count()) << ")";
       }
 
       connection()->push_processor(std::make_unique<QuerySender>(
           connection(), oss.str(),
           std::make_unique<IsTrueHandler>(
-              *this, classic_protocol::message::server::Error{
-                         0, "wait_for_my_writes timed out", "HY000"})));
+              *this, oss.str(),
+              classic_protocol::message::server::Error{
+                  0, "wait_for_my_writes timed out", "HY000"})));
     }
   }
 
@@ -856,38 +886,20 @@ stdx::expected<Processor::Result, std::error_code>
 LazyConnector::pool_or_close() {
   stage(Stage::FallbackToWrite);
 
-#if 1
   connection()->stash_server_conn();
-#else
-  const auto pool_res = pool_server_connection();
-  if (!pool_res) return stdx::unexpected(pool_res.error());
-
-  const auto still_open = *pool_res;
-  if (still_open) {
-    if (auto &tr = tracer()) {
-      tr.trace(Tracer::Event().stage("connect::pooled"));
-    }
-
-  } else {
-    // connection wasn't pooled as the pool was full. close it.
-    if (auto &tr = tracer()) {
-      tr.trace(Tracer::Event().stage("connect::pool_full"));
-    }
-
-    connection()->push_processor(std::make_unique<QuitSender>(connection()));
-  }
-#endif
 
   return Result::Again;
 }
 
 stdx::expected<Processor::Result, std::error_code>
 LazyConnector::fallback_to_write() {
-  if (already_fallback_ || connection()->expected_server_mode() ==
-                               mysqlrouter::ServerMode::ReadWrite) {
+  if (already_fallback_ ||
+      (connection()->expected_server_mode() ==
+       mysqlrouter::ServerMode::ReadWrite) ||
+      (connection()->current_server_mode() ==
+       mysqlrouter::ServerMode::ReadWrite)) {
     // only fallback to the primary once and if the client is asking for
     // "read-only" nodes
-    //
 
     // failed() is already set.
 
@@ -899,7 +911,8 @@ LazyConnector::fallback_to_write() {
     tr.trace(Tracer::Event().stage("connect::fallback_to_write"));
   }
 
-  connection()->expected_server_mode(mysqlrouter::ServerMode::ReadWrite);
+  // connect to the read-write node in read-only mode.
+  connection()->current_server_mode(mysqlrouter::ServerMode::ReadWrite);
   already_fallback_ = true;
 
   // reset the failed state

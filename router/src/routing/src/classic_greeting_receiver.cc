@@ -59,7 +59,6 @@
 #include "openssl_version.h"
 #include "processor.h"
 #include "router_config.h"  // MYSQL_ROUTER_VERSION
-#include "sql/server_component/mysql_command_services_imp.h"
 #include "tracer.h"
 
 IMPORT_LOG_FUNCTIONS()
@@ -593,7 +592,7 @@ stdx::expected<Processor::Result, std::error_code> ClientGreetor::tls_accept() {
       if (ec == TlsErrc::kWantRead) return Result::RecvFromClient;
 
       log_info("accepting TLS connection from %s failed: %s",
-               connection()->get_client_address().c_str(),
+               connection()->client_conn().endpoint().c_str(),
                ec.message().c_str());
 
       stage(Stage::Error);

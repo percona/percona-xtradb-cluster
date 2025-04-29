@@ -1,0 +1,37 @@
+#
+# If PXB is configured with redo-log-arch-dir option, it complains about lack of INNODB_REDO_LOG_ARCHIVE during SST
+#
+
+--source include/galera_cluster.inc
+
+# Shutdown node2 and remove the grastate.dat file to force SST.
+--connection node_2
+--source include/shutdown_mysqld.inc
+--remove_file $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
+
+# Wait until the cluster size is updated on node1.
+--connection node_1
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+# remove previous pxb log
+--remove_file $MYSQLTEST_VARDIR/mysqld.1/data/innobackup.backup.log
+
+# Start node_2
+--connection node_2
+--let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
+--source include/start_mysqld.inc
+--source include/wait_until_connected_again.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+# Check donor's innobackup.backup.log. It shouldn't contain error.
+--connection node_1
+--let $assert_select = Access denied; you need (at least one of) the INNODB_REDO_LOG_ARCHIVE privilege(s) for this operation
+--let $assert_count_condition = ==0
+--let $assert_text = Check that innobackup.backup.log doesn't contain privilege-related errors
+--let $assert_file = $MYSQLTEST_VARDIR/mysqld.1/data/innobackup.backup.log
+
+--source include/assert_grep.inc
+

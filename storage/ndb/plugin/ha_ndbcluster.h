@@ -188,6 +188,7 @@ class ha_ndbcluster : public handler, public Partition_handler {
   ha_rows multi_range_read_info_const(uint keyno, RANGE_SEQ_IF *seq,
                                       void *seq_init_param, uint n_ranges,
                                       uint *bufsz, uint *flags,
+                                      bool *force_default_mrr,
                                       Cost_estimate *cost) override;
   ha_rows multi_range_read_info(uint keyno, uint n_ranges, uint keys,
                                 uint *bufsz, uint *flags,
@@ -740,5 +741,6 @@ class ha_ndbcluster : public handler, public Partition_handler {
 };
 
 int ndb_to_mysql_error(const NdbError *ndberr);
+int fail_index_offline(TABLE *t, int index);
 
 #endif

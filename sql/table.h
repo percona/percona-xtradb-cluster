@@ -45,6 +45,7 @@
 #include "mysql/components/services/bits/mysql_mutex_bits.h"
 #include "mysql/components/services/bits/psi_table_bits.h"
 #include "mysql/strings/m_ctype.h"
+#include "sql/auth/auth_acls.h"        // Access_bitmask
 #include "sql/dd/types/foreign_key.h"  // dd::Foreign_key::enum_rule
 #include "sql/enum_query_type.h"       // enum_query_type
 #include "sql/key.h"
@@ -406,7 +407,7 @@ struct GRANT_INFO {
 
      The set is implemented as a bitmap, with the bits defined in sql_acl.h.
    */
-  ulong privilege{0};
+  Access_bitmask privilege{0};
   /** The grant state for internal tables. */
   GRANT_INTERNAL_INFO m_internal;
 };
@@ -1662,9 +1663,9 @@ struct TABLE {
     m_set_counter = set_counter;
     m_last_operation_is_distinct = distinct;
     assert(m_set_op_type == SOT_NONE);
-    m_set_op_type = except
-                        ? (distinct ? SOT_EXCEPT_DISTINCT : SOT_EXCEPT_ALL)
-                        : distinct ? SOT_INTERSECT_DISTINCT : SOT_INTERSECT_ALL;
+    m_set_op_type = except ? (distinct ? SOT_EXCEPT_DISTINCT : SOT_EXCEPT_ALL)
+                    : distinct ? SOT_INTERSECT_DISTINCT
+                               : SOT_INTERSECT_ALL;
   }
 
   Field_longlong *set_counter() { return m_set_counter; }
@@ -3637,7 +3638,9 @@ class Table_ref {
 
     @param privilege   Privileges granted for this table.
   */
-  void set_privileges(ulong privilege) { grant.privilege |= privilege; }
+  void set_privileges(Access_bitmask privilege) {
+    grant.privilege |= privilege;
+  }
 
   bool save_properties();
   void restore_properties();

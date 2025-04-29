@@ -579,6 +579,7 @@ int Mts_submode_logical_clock::schedule_next_event(Relay_log_info *rli,
                                                    Log_event *ev) {
   longlong last_sequence_number = sequence_number;
   bool gap_successor = false;
+  static_assert(SEQ_UNINIT == 0, "MTA scheduling code assumes SEQ_UNINIT is 0");
 
   DBUG_TRACE;
   // We should check if the SQL thread was already killed before we schedule
@@ -630,23 +631,19 @@ int Mts_submode_logical_clock::schedule_next_event(Relay_log_info *rli,
              sequence_number, last_sequence_number);
       return ER_MTA_CANT_PARALLEL;
     }
-    /*
-      Transaction sequence as scheduled may have gaps, even in
-      relay log. In such case a transaction that succeeds a gap will
-      wait for all earlier that were scheduled to finish. It's marked
-      as gap successor now.
-    */
-    static_assert(SEQ_UNINIT == 0, "");
-    if (unlikely(sequence_number > last_sequence_number + 1)) {
-      /*
-        TODO: account autopositioning
-        assert(rli->replicate_same_server_id);
-      */
-      DBUG_PRINT("info", ("sequence_number gap found, "
-                          "last_sequence_number %lld, sequence_number %lld",
-                          last_sequence_number, sequence_number));
-      gap_successor = true;
-    }
+  }
+
+  /*
+    Transaction sequence as scheduled may have gaps, even in
+    relay log. In such case a transaction that succeeds a gap will
+    wait for all earlier that were scheduled to finish. It's marked
+    as gap successor now.
+  */
+  if (unlikely(sequence_number > last_sequence_number + 1)) {
+    DBUG_PRINT("info", ("sequence_number gap found, "
+                        "last_sequence_number %lld, sequence_number %lld",
+                        last_sequence_number, sequence_number));
+    gap_successor = true;
   }
 
   /*
@@ -810,13 +807,13 @@ void Mts_submode_logical_clock::attach_temp_tables(THD *thd,
       cur_table->next = nullptr;
       mts_move_temp_tables_to_thd(thd, cur_table);
     } else
-        /* We must shift the C->temp_table pointer to the fist table unused in
-           this iteration. If all the tables have ben used C->temp_tables will
-           point to NULL */
-        if (!shifted) {
-      c_rli->info_thd->temporary_tables = cur_table;
-      shifted = true;
-    }
+      /* We must shift the C->temp_table pointer to the fist table unused in
+         this iteration. If all the tables have ben used C->temp_tables will
+         point to NULL */
+      if (!shifted) {
+        c_rli->info_thd->temporary_tables = cur_table;
+        shifted = true;
+      }
   } while (table);
   mysql_mutex_unlock(&c_rli->mts_temp_table_LOCK);
 }

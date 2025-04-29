@@ -616,7 +616,7 @@ class Item_func_database : public Item_func_sysconst {
 
   String *val_str(String *) override;
   bool resolve_type(THD *) override {
-    set_data_type_string(uint32{MAX_FIELD_NAME});
+    set_data_type_string(uint32{NAME_CHAR_LEN});
     set_nullable(true);
     return false;
   }
@@ -1057,9 +1057,6 @@ class Item_load_file final : public Item_str_func {
     func_arg->banned_function_name = func_name();
     return true;
   }
-
-  // prevent caching of the item value in Item_func_isnull
-  table_map used_tables() const override { return (table_map)1L; }
 };
 
 class Item_func_export_set final : public Item_str_func {

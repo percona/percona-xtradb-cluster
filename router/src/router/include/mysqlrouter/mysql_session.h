@@ -26,7 +26,7 @@
 #ifndef _ROUTER_MYSQL_SESSION_H_
 #define _ROUTER_MYSQL_SESSION_H_
 
-#include "mysqlrouter/router_export.h"
+#include "mysqlrouter/router_mysql_export.h"
 
 #include <functional>
 #include <memory>
@@ -150,7 +150,7 @@ class Option<Opt, std::nullptr_t> {
 
 // mysql_options() may be used with MYSQL * == nullptr to get global values.
 
-class ROUTER_LIB_EXPORT MySQLSession {
+class ROUTER_MYSQL_EXPORT MySQLSession {
  public:
   static constexpr int kDefaultConnectTimeout = 5;
   static constexpr int kDefaultReadTimeout = 30;
@@ -295,7 +295,7 @@ class ROUTER_LIB_EXPORT MySQLSession {
     Row row_;
   };
 
-  struct ROUTER_LIB_EXPORT LoggingStrategy {
+  struct ROUTER_MYSQL_EXPORT LoggingStrategy {
     LoggingStrategy() = default;
 
     LoggingStrategy(const LoggingStrategy &) = default;
@@ -306,15 +306,23 @@ class ROUTER_LIB_EXPORT MySQLSession {
 
     virtual ~LoggingStrategy() = default;
 
+    virtual bool log_will_be_ignored() const = 0;
+
     virtual void log(const std::string &msg) = 0;
   };
 
-  struct ROUTER_LIB_EXPORT LoggingStrategyNone : public LoggingStrategy {
-    virtual void log(const std::string & /*msg*/) override {}
+  struct ROUTER_MYSQL_EXPORT LoggingStrategyNone : public LoggingStrategy {
+    // nothing will be logged.
+    bool log_will_be_ignored() const override { return true; }
+
+    void log(const std::string & /*msg*/) override {}
   };
 
-  struct ROUTER_LIB_EXPORT LoggingStrategyDebugLogger : public LoggingStrategy {
-    virtual void log(const std::string &msg) override;
+  struct ROUTER_MYSQL_EXPORT LoggingStrategyDebugLogger
+      : public LoggingStrategy {
+    bool log_will_be_ignored() const override;
+
+    void log(const std::string &msg) override;
   };
 
   MySQLSession(std::unique_ptr<LoggingStrategy> logging_strategy =

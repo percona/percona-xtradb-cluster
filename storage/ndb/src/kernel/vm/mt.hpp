@@ -38,7 +38,7 @@
  * and Round robin groups.
  * Needs to be defined in SimulatedBlock.hpp as well to work.
  */
-//#define DEBUG_SCHED_STATS 1
+// #define DEBUG_SCHED_STATS 1
 
 #define MAX_MAIN_THREADS 2  // except receiver
 /*
@@ -229,6 +229,7 @@ void mt_disable_global_variables(Uint32 self);
 void mt_init_global_variables_ptr_instances(Uint32, void **, size_t);
 void mt_init_global_variables_uint32_ptr_instances(Uint32, void **, size_t);
 void mt_init_global_variables_uint32_instances(Uint32, void **, size_t);
+void mt_init_global_variables_block(Uint32, class SimulatedBlock *);
 #endif
 
 #undef JAM_FILE_ID

@@ -556,6 +556,7 @@ class ha_innobase : public handler {
   ha_rows multi_range_read_info_const(uint keyno, RANGE_SEQ_IF *seq,
                                       void *seq_init_param, uint n_ranges,
                                       uint *bufsz, uint *flags,
+                                      bool *force_default_mrr,
                                       Cost_estimate *cost) override;
 
   /** Initialize multi range read and get information.
@@ -1421,7 +1422,7 @@ will be closed before the index creation/drop.
 @param[in,out]	share		share structure where index translation table
                                 will be constructed in.
 @return true if index translation table built successfully */
-MY_NODISCARD
+[[nodiscard]]
 bool innobase_build_index_translation(const TABLE *table,
                                       dict_table_t *ib_table,
                                       INNOBASE_SHARE *share);

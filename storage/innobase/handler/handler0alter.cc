@@ -795,9 +795,9 @@ static bool ok_to_rename_column(const Alter_inplace_info *ha_alter_info,
         for (dict_foreign_set::iterator it = dict_table->referenced_set.begin();
              it != dict_table->referenced_set.end(); ++it) {
           dict_foreign_t *foreign = *it;
-          const char *r_name = foreign->referenced_col_names[0];
 
           for (size_t i = 0; i < foreign->n_fields; ++i) {
+            const char *r_name = foreign->referenced_col_names[i];
             if (!my_strcasecmp(system_charset_info, r_name, col_name)) {
               if (report_error) {
                 my_error(ER_ALTER_OPERATION_NOT_SUPPORTED_REASON, MYF(0),
@@ -808,7 +808,6 @@ static bool ok_to_rename_column(const Alter_inplace_info *ha_alter_info,
               }
               return false;
             }
-            r_name = foreign->referenced_col_names[i];
           } /* each column in reference element */
         }   /* each element in reference set */
       }     /* each column being renamed */
@@ -1047,6 +1046,12 @@ enum_alter_inplace_result ha_innobase::check_if_supported_inplace_alter(
         if (ha_alter_info->alter_info->requested_algorithm ==
             Alter_info::ALTER_TABLE_ALGORITHM_INPLACE) {
           /* Still fall back to INPLACE since the behaviour is different */
+          break;
+        } else if ((ha_alter_info->alter_info->requested_algorithm ==
+                    Alter_info::ALTER_TABLE_ALGORITHM_DEFAULT) &&
+                   !dict_table_is_discarded(m_prebuilt->table) &&
+                   btr_is_index_empty(m_prebuilt->table->first_index())) {
+          /* No records: prefer INPLACE to prevent bumping row version */
           break;
         } else if (!((m_prebuilt->table->n_def +
                       get_num_cols_added(ha_alter_info)) < REC_MAX_N_FIELDS)) {
@@ -3572,7 +3577,8 @@ static inline bool innobase_pk_col_is_existing(const ulint new_col_no,
 }
 
 /** Determine whether both the indexes have same set of primary key
-fields arranged in the same order.
+fields arranged in the same order. If so, there is no need to do the
+external sorting of primary key fields.
 
 Rules when we cannot skip sorting:
 (1) Removing existing PK columns somewhere else than at the end of the PK;
@@ -3583,14 +3589,16 @@ columns are removed from the PK;
 follows rule(1), Increasing the prefix length just like adding existing
 PK columns follows rule(2);
 (5) Changing the ascending order of the existing PK columns.
+(6) Adding a new auto increment column with descending order in PK.
 @param[in]      col_map         mapping of old column numbers to new ones
 @param[in]      old_clust_index index to be compared
 @param[in]      new_clust_index index to be compared
+@param[in]      add_autoinc     added AUTO_INCREMENT column position
 @retval true if both indexes have same order.
 @retval false . */
 [[nodiscard]] static bool innobase_pk_order_preserved(
     const ulint *col_map, const dict_index_t *old_clust_index,
-    const dict_index_t *new_clust_index) {
+    const dict_index_t *new_clust_index, ulint add_autoinc) {
   ulint old_n_uniq = dict_index_get_n_ordering_defined_by_user(old_clust_index);
   ulint new_n_uniq = dict_index_get_n_ordering_defined_by_user(new_clust_index);
 
@@ -3642,7 +3650,13 @@ PK columns follows rule(2);
     } else if (innobase_pk_col_is_existing(new_col_no, col_map, old_n_cols)) {
       new_field_order = old_n_uniq + existing_field_count++;
     } else {
-      /* Skip newly added column. */
+      /* Skip newly added column except descending auto increment column */
+      if (add_autoinc == new_col_no &&
+          !new_clust_index->fields[new_field].is_ascending) {
+        /* Descending needs sort */
+        return (false);
+      }
+
       continue;
     }
 
@@ -4369,39 +4383,16 @@ static void dd_commit_inplace_no_change(const Alter_inplace_info *ha_alter_info,
   }
 }
 
-/** Check if a new table's index will exceed the index limit for the table
-row format
+/** Check if the key parts of the indexes of new table will exceed the
+index limit based on the table row format
 @param[in]      form            MySQL table that is being altered
-@param[in]      max_len         max index length allowed
+@param[in]      max_part_len    max index part length allowed
 @return true if within limits false otherwise */
-static bool innobase_check_index_len(const TABLE *form, ulint max_len) {
-  for (uint key_num = 0; key_num < form->s->keys; key_num++) {
-    const KEY &key = form->key_info[key_num];
-
-    for (unsigned i = 0; i < key.user_defined_key_parts; i++) {
-      const KEY_PART_INFO *key_part = &key.key_part[i];
-      unsigned prefix_len = 0;
-
-      if (key.flags & HA_SPATIAL) {
-        prefix_len = 0;
-      } else if (key.flags & HA_FULLTEXT) {
-        prefix_len = 0;
-      } else if (key_part->key_part_flag & HA_PART_KEY_SEG) {
-        /* SPATIAL and FULLTEXT index always are on
-        full columns. */
-        ut_ad(!(key.flags & (HA_SPATIAL | HA_FULLTEXT)));
-        prefix_len = key_part->length;
-        ut_ad(prefix_len > 0);
-      } else {
-        prefix_len = 0;
-      }
-
-      if (key_part->length > max_len || prefix_len > max_len) {
-        return (false);
-      }
-    }
-  }
-  return (true);
+static bool innobase_check_index_len(const TABLE *form, ulint max_part_len) {
+  bool valid = true;
+  dd_visit_keys_with_too_long_parts(form, max_part_len,
+                                    [&valid](auto) { valid = false; });
+  return valid;
 }
 
 /** Update internal structures with concurrent writes blocked,
@@ -5007,8 +4998,8 @@ template <typename Table>
   if (new_clustered) {
     dict_index_t *clust_index = user_table->first_index();
     dict_index_t *new_clust_index = ctx->new_table->first_index();
-    ctx->skip_pk_sort =
-        innobase_pk_order_preserved(ctx->col_map, clust_index, new_clust_index);
+    ctx->skip_pk_sort = innobase_pk_order_preserved(
+        ctx->col_map, clust_index, new_clust_index, ctx->add_autoinc);
 
     DBUG_EXECUTE_IF("innodb_alter_table_pk_assert_no_sort",
                     assert(ctx->skip_pk_sort););
@@ -7272,11 +7263,16 @@ after a successful commit_try_norebuild() call.
   of the column to 0. Here the columns are collected first. */
   get_col_list_to_be_dropped(ctx, drop_list, v_drop_list);
 
+  bool adding_fts_index{false};
+
   for (ulint i = 0; i < ctx->num_to_add_index; i++) {
     dict_index_t *index = ctx->add_index[i];
     assert(dict_index_get_online_status(index) == ONLINE_INDEX_COMPLETE);
     assert(!index->is_committed());
     index->set_committed(true);
+    if (index->type & DICT_FTS) {
+      adding_fts_index = true;
+    }
   }
 
   if (ctx->num_to_drop_index) {
@@ -7304,7 +7300,8 @@ after a successful commit_try_norebuild() call.
         assert(index->type == DICT_FTS || index->is_corrupted());
         assert(index->table->fts);
         ctx->fts_drop_aux_vec = new aux_name_vec_t;
-        fts_drop_index(index->table, index, trx, ctx->fts_drop_aux_vec);
+        fts_drop_index(index->table, index, trx, ctx->fts_drop_aux_vec,
+                       adding_fts_index);
       }
 
       /* It is a single table tablespace and the .ibd file is
@@ -7912,9 +7909,6 @@ rollback_trx:
 
       if (index->type & DICT_FTS) {
         assert(index->type == DICT_FTS);
-        /* We reset DICT_TF2_FTS here because the bit
-        is left unset when a drop proceeds the add. */
-        DICT_TF2_FLAG_SET(ctx->new_table, DICT_TF2_FTS);
         fts_add_index(index, ctx->new_table);
         add_fts = true;
       }
@@ -8173,7 +8167,7 @@ class Altered_partitions {
     m_ins_nodes[new_part_id] = prebuilt->ins_node;
     m_trx_ids[new_part_id] = prebuilt->trx_id;
     if (!prebuilt->sql_stat_start) {
-      m_sql_stat_start.set(new_part_id, false);
+      m_sql_stat_start.reset(new_part_id);
     }
   }
 
@@ -8260,7 +8254,7 @@ bool Altered_partitions::initialize() {
     return (true);
   }
 
-  m_sql_stat_start.init(m_bitset, UT_BITS_IN_BYTES(m_num_new_parts));
+  m_sql_stat_start = {m_bitset, UT_BITS_IN_BYTES(m_num_new_parts)};
 
   return (false);
 }

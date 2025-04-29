@@ -73,7 +73,7 @@ MACRO(MYSQL_ADD_COMPONENT component_arg)
     MESSAGE(FATAL_ERROR "Unknown component type ${target}")
   ENDIF()
 
-  ADD_VERSION_INFO(${target} ${kind} SOURCES)
+  ADD_VERSION_INFO(${kind} SOURCES "")
   ADD_LIBRARY(${target} ${kind} ${SOURCES})
 
   TARGET_COMPILE_DEFINITIONS(${target} PUBLIC MYSQL_COMPONENT)
@@ -98,6 +98,10 @@ MACRO(MYSQL_ADD_COMPONENT component_arg)
 
     # For APPLE: adjust path dependecy for SSL shared libraries.
     SET_PATH_TO_CUSTOM_SSL_FOR_APPLE(${target})
+
+    IF(APPLE)
+      TARGET_LINK_OPTIONS(${target} PRIVATE LINKER:-no_warn_duplicate_libraries)
+    ENDIF()
 
     IF(WIN32_CLANG AND WITH_ASAN)
       TARGET_LINK_LIBRARIES(${target}

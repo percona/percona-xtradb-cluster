@@ -312,6 +312,11 @@ class Binlog_group_commit_ctx {
     @param ticket The ticket to set the THD session to.
    */
   void set_session_ticket(binlog::BgcTicket ticket);
+#ifndef NDEBUG
+  /// @brief Pushes new bgc ticket, for testing purposes
+  void push_new_ticket();
+#endif
+
   /**
     Assigns the THD session to the ticket accepting assignments in the
     ticket manager. The method is idem-potent within the execution of a
@@ -374,6 +379,31 @@ class Binlog_group_commit_ctx {
   binlog::BgcTicket m_session_ticket{0};
   /** Whether or not the session already waited on the ticket. */
   bool m_has_waited{false};
+
+ public:
+  /// Set whether binlog max size was exceeded.
+  /// The max size exceeded condition must be checked with LOCK_log held and
+  /// thus its done early during flush stage although not used until end of BGC.
+  /// This is an optimization which avoids taking LOCK_log at end of BGC when no
+  /// session has seen that the threshold has been exceeded.
+  void set_max_size_exceeded(bool value) { m_max_size_exceeded = value; }
+
+  /// Turn on forced rotate at end of BGC. Thus performing a rotate although
+  /// the max size has not been reached.
+  void set_force_rotate() { m_force_rotate = true; }
+
+  /// Aggregate the rotate requests over all sessions in queue
+  ///
+  /// @return The first element states whether any session
+  /// detected max binlog size exceeded and the second whether any session
+  /// requested forced binlog rotate.
+  static std::pair<bool, bool> aggregate_rotate_settings(THD *queue);
+
+ private:
+  /// Whether session detected that binlog max size was exceeded.
+  bool m_max_size_exceeded{false};
+  /// Whether session requests forced rotate
+  bool m_force_rotate{false};
 };
 
 /*

@@ -157,7 +157,7 @@ class GRClusterSetMetadataBackend : public GRMetadataBackendV2 {
    * filters or policies (like target_cluster etc.)
    * @return object containing cluster topology information in case of success,
    * or error code in case of failure
-   * @throws metadata_cache::metadata_error
+   * @throws metadata_cache::metadata_error on failure
    */
   stdx::expected<metadata_cache::ClusterTopology, std::error_code>
   fetch_cluster_topology(
@@ -853,6 +853,13 @@ GRClusterMetadata::fetch_cluster_topology(
 
         MySQLSession::Transaction transaction(metadata_connection_.get());
 
+        if (!is_server_version_supported(metadata_connection_.get())) {
+          log_warning("%s - skipping", get_unsupported_server_version_msg(
+                                           metadata_connection_.get())
+                                           .c_str());
+          continue;
+        }
+
         // throws metadata_cache::metadata_error and
         // MetadataUpgradeInProgressException
         const auto version =
@@ -1276,7 +1283,7 @@ std::optional<metadata_cache::metadata_server_t>
 GRClusterSetMetadataBackend::find_rw_server() {
   if (cluster_topology_) {
     for (auto &cluster : (*cluster_topology_).clusters_data) {
-      if (!cluster.is_primary) continue;
+      if (!cluster.is_primary || cluster.is_invalidated) continue;
 
       log_debug("Updating the status of cluster '%s' to find the writable node",
                 cluster.name.c_str());
@@ -1285,7 +1292,9 @@ GRClusterSetMetadataBackend::find_rw_server() {
       // figure out the current Primary node
       metadata_->update_cluster_status_from_gr(false, cluster);
 
-      return metadata_->find_rw_server(cluster.members);
+      if (cluster.has_quorum) {
+        return metadata_->find_rw_server(cluster.members);
+      }
     }
   }
 

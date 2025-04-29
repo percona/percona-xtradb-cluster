@@ -25,10 +25,8 @@
 
 #include "cluster_metadata.h"
 
-#include <cstring>
+#include <cstring>  // strcmp
 #include <stdexcept>
-
-#define RAPIDJSON_HAS_STDSTRING 1
 
 #ifdef RAPIDJSON_NO_SIZETYPEDEFINE
 #include "my_rapidjson_size_t.h"
@@ -408,7 +406,7 @@ bool metadata_schema_version_is_compatible(
   return true;
 }
 
-std::string ROUTER_LIB_EXPORT get_metadata_schema_uncompatible_msg(
+std::string get_metadata_schema_uncompatible_msg(
     const mysqlrouter::MetadataSchemaVersion &version) {
   return "The target Cluster's Metadata version ('" + to_string(version) +
          "') is not supported. Please use the latest MySQL Shell to upgrade it "
@@ -1317,6 +1315,22 @@ std::string to_string(
 
   assert(policy == TargetCluster::InvalidatedClusterRoutingPolicy::DropAll);
   return "drop_all";
+}
+
+// We do not support server with version highier than our version
+// Patch is .99 as we only care about major and minor
+static constexpr const unsigned long max_suported_version_ulong =
+    MYSQL_ROUTER_VERSION_MAJOR * 10000 + MYSQL_ROUTER_VERSION_MINOR * 100 + 99;
+
+bool is_server_version_supported(MySQLSession *mysql) {
+  return max_suported_version_ulong >= mysql->server_version();
+}
+
+std::string get_unsupported_server_version_msg(MySQLSession *mysql) {
+  return "Unsupported MySQL Server version '" +
+         std::to_string(mysql->server_version()) +
+         "'. Maximal supported version is '" +
+         std::to_string(max_suported_version_ulong) + "'.";
 }
 
 }  // namespace mysqlrouter

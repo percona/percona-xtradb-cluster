@@ -231,7 +231,7 @@ bool Query_block::prepare(THD *thd, mem_root_deque<Item *> *insert_field_list) {
   const bool check_privs = !thd->derived_tables_processing ||
                            master_query_expression()->item != nullptr;
   thd->mark_used_columns = check_privs ? MARK_COLUMNS_READ : MARK_COLUMNS_NONE;
-  ulonglong want_privilege_saved = thd->want_privilege;
+  Access_bitmask want_privilege_saved = thd->want_privilege;
   thd->want_privilege = check_privs ? SELECT_ACL : 0;
 
   /*
@@ -408,13 +408,12 @@ bool Query_block::prepare(THD *thd, mem_root_deque<Item *> *insert_field_list) {
                     order_list.first))
       return true;
   }
+  hidden_order_field_count = fields.size() - all_fields_count;
 
   if (fulltext_uses_rollup_column(this)) {
     my_error(ER_FULLTEXT_WITH_ROLLUP, MYF(0));
     return true;
   }
-
-  hidden_order_field_count = fields.size() - all_fields_count;
 
   // Resolve OFFSET and LIMIT clauses
   if (resolve_limits(thd)) return true;
@@ -495,6 +494,9 @@ bool Query_block::prepare(THD *thd, mem_root_deque<Item *> *insert_field_list) {
             Secondary_engine_optimization::SECONDARY)) &&
       transform_scalar_subqueries_to_join_with_derived(thd))
     return true; /* purecov: inspected */
+
+  /* Preserve the original table map for later reference. */
+  original_tables_map = all_tables_map();
 
   /*
     If GROUPING function is present in having condition -
@@ -767,10 +769,12 @@ bool Query_block::prepare_values(THD *thd) {
     setup_order() is needed, however calling setup_order_final() is
     not necessary since this construct cannot be aggregated.
   */
+  const size_t all_fields_count = fields.size();
   if (is_ordered() && setup_order(thd, base_ref_items, get_table_list(),
                                   &fields, order_list.first)) {
     return true;
   }
+  hidden_order_field_count = fields.size() - all_fields_count;
 
   if (query_result() && query_result()->prepare(thd, fields, unit))
     return true; /* purecov: inspected */
@@ -1185,9 +1189,10 @@ static Table_ref **make_leaf_tables(Table_ref **list, Table_ref *tables) {
   @returns false if success, true if error.
 */
 
-bool Query_block::check_view_privileges(THD *thd, ulong want_privilege_first,
-                                        ulong want_privilege_next) {
-  ulong want_privilege = want_privilege_first;
+bool Query_block::check_view_privileges(THD *thd,
+                                        Access_bitmask want_privilege_first,
+                                        Access_bitmask want_privilege_next) {
+  Access_bitmask want_privilege = want_privilege_first;
   Internal_error_handler_holder<View_error_handler, Table_ref> view_handler(
       thd, true, leaf_tables);
 
@@ -4323,14 +4328,16 @@ bool find_order_in_list(THD *thd, Ref_item_array ref_item_array,
   thd->lex->current_query_block()->group_fix_field = save_group_fix_field;
   if (ret) return true; /* Wrong field. */
 
-  order_item->increment_ref_count();
-
-  assert_consistent_hidden_flags(*fields, order_item, /*hidden=*/true);
-
   uint el = fields->size();
-  order_item->hidden = true;
-  fields->push_front(order_item); /* Add new field to field list. */
-  ref_item_array[el] = order_item;
+
+  if (!order_item->const_for_execution()) {
+    order_item->increment_ref_count();
+    assert_consistent_hidden_flags(*fields, order_item, /*hidden=*/true);
+
+    order_item->hidden = true;
+    fields->push_front(order_item); /* Add new field to field list. */
+    ref_item_array[el] = order_item;
+  }
   /*
     If the order_item is a SUM_FUNC_ITEM, when fix_fields is called
     referenced_by is set to order->item which is the address of order_item.
@@ -4349,7 +4356,9 @@ bool find_order_in_list(THD *thd, Ref_item_array ref_item_array,
     with clean_up_after_removal() on the old order->item.
   */
   assert(order_item == *order->item);
-  order->item = &ref_item_array[el];
+  if (!order_item->const_for_execution()) {
+    order->item = &ref_item_array[el];
+  }
   return false;
 }
 
@@ -6283,6 +6292,7 @@ bool Query_block::transform_grouped_to_derived(THD *thd, bool *break_off) {
       }
     }
 
+    new_derived->original_tables_map = original_tables_map;
     if (new_derived->has_sj_candidates() &&
         new_derived->flatten_subqueries(thd))
       return true;

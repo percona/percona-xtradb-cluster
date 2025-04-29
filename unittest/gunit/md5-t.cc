@@ -1,6 +1,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#ifdef WITH_WSREP
+
 #include "my_md5.h"
 
 extern void wsrep_disable_fips_mode();
@@ -140,3 +142,5 @@ TEST_F(md5Test, Multipe_buffers) {
 }
 
 }  // namespace md5_unittest
+
+#endif /* WITH_WSREP */
