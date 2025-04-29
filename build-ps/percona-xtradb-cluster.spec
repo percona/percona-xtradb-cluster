@@ -398,7 +398,7 @@ Requires:             percona-xtradb-cluster-shared = %{version}-%{release}
 Requires:             percona-xtradb-cluster-icu-data-files = %{version}-%{release}
 Requires:             selinux-policy
 Requires:             policycoreutils
-Requires:             curl
+Requires:             curl, nmap, nc
 %if 0%{?rhel} >= 8
 Requires:	      percona-telemetry-agent
 %endif
