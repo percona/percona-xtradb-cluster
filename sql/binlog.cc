@@ -1725,6 +1725,14 @@ bool MYSQL_BIN_LOG::assign_automatic_gtids_to_flush_group(THD *first_seen) {
   DBUG_TRACE;
   bool error = false;
   bool is_global_tsid_locked = false;
+#ifdef WITH_WSREP
+  /* It would work without this flag, as multiple calls to add_lock_for_sidno()
+   with the same sidno work, but take time (log(N)).
+   As we are in a busy area of group commit, let's detect that we already added
+   wsrep_sidno and skip following calls avoiding any overhead.
+  */
+  bool wsrep_sidno_added_to_lock = false;
+#endif
 
   Scope_guard global_tsid_lock_scope_guard([&is_global_tsid_locked]() {
     if (is_global_tsid_locked) {
@@ -1740,7 +1748,21 @@ bool MYSQL_BIN_LOG::assign_automatic_gtids_to_flush_group(THD *first_seen) {
     }
     auto sidno = gtid_state->specify_transaction_sidno(head, locked_sidno_set);
     head->get_transaction()->get_rpl_transaction_ctx()->set_sidno(sidno);
+#ifdef WITH_WSREP
+    /* A simple approach:
+     If any thread participating in this group is WSREP thread, there is
+     a good chance that we will be requesting gno from wsrep_sidno set (see
+     WSREP part in the loop below). In such a case we need to lock wsrep sidno
+     set.
+    */
+    if (!wsrep_sidno_added_to_lock && WSREP(head) &&
+        head->variables.gtid_next.is_automatic()) {
+      locked_sidno_set.add_lock_for_sidno(wsrep_sidno);
+      wsrep_sidno_added_to_lock = true;
+    }
+#endif /* WITH_WSREP */
   }
+
   locked_sidno_set.lock();
   for (THD *head = first_seen; head; head = head->next_to_commit) {
     assert(head->variables.gtid_next.type != UNDEFINED_GTID);
@@ -1750,6 +1772,22 @@ bool MYSQL_BIN_LOG::assign_automatic_gtids_to_flush_group(THD *first_seen) {
       auto [ctx_sidno, ctx_gno] = head->get_transaction()
                                       ->get_rpl_transaction_ctx()
                                       ->get_gtid_components();
+
+#ifdef WITH_WSREP
+      /* If node is running in cluster mode then get wsrep_sidno */
+      bool seqno_undefined = false;
+      seqno_undefined =
+          (wsrep_thd_is_toi(head)
+               ? head->wsrep_cs().toi_meta().seqno().is_undefined()
+           : wsrep_thd_is_in_nbo(head)
+               ? head->wsrep_cs().nbo_meta().seqno().is_undefined()
+               : head->wsrep_trx().ws_meta().seqno().is_undefined());
+
+      if (WSREP(head) && !seqno_undefined && !head->wsrep_skip_wsrep_GTID)
+        ctx_sidno = wsrep_sidno;
+      else if (ctx_sidno == 0)
+        ctx_sidno = gtid_state->get_server_sidno();
+#endif /* WITH_WSREP */
 
       if (gtid_state->generate_automatic_gtid(head, ctx_sidno, ctx_gno) !=
           RETURN_STATUS_OK) {
