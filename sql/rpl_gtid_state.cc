@@ -547,22 +547,6 @@ enum_return_status Gtid_state::generate_automatic_gtid(
 #endif
     Gtid automatic_gtid = {specified_sidno, specified_gno};
 
-#ifdef WITH_WSREP
-    /* If node is running in cluster mode then get wsrep_sidno */
-    bool seqno_undefined = false;
-    seqno_undefined =
-        (wsrep_thd_is_toi(thd)
-             ? thd->wsrep_cs().toi_meta().seqno().is_undefined()
-             : wsrep_thd_is_in_nbo(thd)
-                   ? thd->wsrep_cs().nbo_meta().seqno().is_undefined()
-                   : thd->wsrep_trx().ws_meta().seqno().is_undefined());
-
-    if (WSREP(thd) && !seqno_undefined && !thd->wsrep_skip_wsrep_GTID)
-      automatic_gtid.sidno = wsrep_sidno;
-    else if (automatic_gtid.sidno == 0)
-      automatic_gtid.sidno = get_server_sidno();
-#endif /* WITH_WSREP */
-
     assert(specified_sidno > 0);  // assert that sidno has been already assigned
     if (automatic_gtid.gno == 0) {
       automatic_gtid.gno = get_automatic_gno(automatic_gtid.sidno);
