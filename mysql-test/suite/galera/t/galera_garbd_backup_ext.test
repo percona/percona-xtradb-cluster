@@ -1,0 +1,9 @@
+#
+# Test garbd recv-script and post-recv-script handling with extended exit codes enabled
+#
+
+# setup garbd to return extended exit codes
+--let $ext_exit_codes_opt = --extended-exit-codes
+--let $SST_REQUEST_FAILURE = 102
+--let $SST_SCRIPT_TERMINATED = 103
+--source galera_garbd_backup.inc
