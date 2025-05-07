@@ -157,6 +157,7 @@
 #include "thr_mutex.h"
 
 #ifdef WITH_WSREP
+#include "sql_thd_internal_api.h"  // thd_binlog_format
 #include "wsrep_mysqld.h"
 #include "wsrep_thd.h"
 #include "wsrep_trans_observer.h"
@@ -10030,7 +10031,11 @@ inline bool call_before_insert_triggers(THD *thd, TABLE *table,
     @retval true    Error occurred
 */
 
-bool fill_record_n_invoke_before_triggers(
+#ifdef WITH_WSREP
+static bool fill_record_n_invoke_before_triggers_internal(
+#else
+static bool fill_record_n_invoke_before_triggers(
+#endif
     THD *thd, COPY_INFO *optype_info, const mem_root_deque<Item *> &fields,
     const mem_root_deque<Item *> &values, TABLE *table,
     enum enum_trigger_event_type event, int num_fields,
@@ -10139,6 +10144,64 @@ bool fill_record_n_invoke_before_triggers(
     return check_record(thd, fields);
   }
 }
+
+#ifdef WITH_WSREP
+/**
+  WSREP wrapper over the original fill_record_n_invoke_before_triggers()
+  function. It calls the original function and in case of no rows changed
+  adds WSREP certification keys if needed.
+*/
+bool fill_record_n_invoke_before_triggers(
+    THD *thd, COPY_INFO *optype_info, const mem_root_deque<Item *> &fields,
+    const mem_root_deque<Item *> &values, TABLE *table,
+    enum enum_trigger_event_type event, int num_fields,
+    bool raise_autoinc_has_expl_non_null_val, bool *is_row_changed) {
+  bool res = fill_record_n_invoke_before_triggers_internal(
+      thd, optype_info, fields, values, table, event, num_fields,
+      raise_autoinc_has_expl_non_null_val, is_row_changed);
+
+  if (is_row_changed && !*is_row_changed && table->triggers) {
+    /*
+      This is the same condition as we have in
+      ha_innodb.cc static bool wsrep_do_replication(THD *thd) which is called
+      always before wsrep_append_keys(). The ideal would be having this inside
+      wsrep_append_keys() (as it is checked always), but it is as it is.
+    */
+    bool do_replication = wsrep_on(thd) && wsrep_thd_is_local(thd) &&
+                          !wsrep_consistency_check(thd) &&
+                          thd_binlog_format(thd) == BINLOG_FORMAT_ROW;
+    if (do_replication) {
+      /*
+        Update of the requested row does not change the row. If there are
+        pre/post update triggers on this table, they may produce a writeset
+        that will be replicated. Let's say there is table t1 which has a
+        trigger that inserts into t2. Update on t1 is noop, but the trigger
+        inserts into t2. In sucha case the writeset will contain
+        Table_map_log_event for t1 and t2, which will cause t1 and t2 to be DML
+        locked on the replicated node. But as t1 update is noop the writeset
+        will lack of t1-related certification keys. In such a case we need to
+        add t1 to certification keys for this transaction. Let's say there is
+        simulaneous ALTER TABLE t1. In such a case both transactions are
+        independent and can be applied in parallel. But both lock t1 which will
+        cause BF-BF abort on replicated node.
+      */
+      bool has_triggers =
+          table->triggers->get_triggers(event, TRG_ACTION_BEFORE) != nullptr ||
+          table->triggers->get_triggers(event, TRG_ACTION_AFTER) != nullptr;
+      if (has_triggers) {
+        table->file->wsrep_append_keys(
+            thd,
+            wsrep_protocol_version >= WsrepVersion::V4
+                ? WSREP_SERVICE_KEY_UPDATE
+                : WSREP_SERVICE_KEY_EXCLUSIVE,
+            table->record[1], table->record[0]);
+      }
+    }
+  }
+
+  return res;
+}
+#endif /* WITH_WSREP */
 
 /**
   Fill field buffer with values from Field list.
