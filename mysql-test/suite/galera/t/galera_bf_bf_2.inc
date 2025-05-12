@@ -1,20 +1,26 @@
 #
-# The scenario is:
-# Setup parent-child tables
+# This is the common, parametrized scenario when DDL and DML on two related tables are executed in parallel.
+#
+# Setup tables according to $setup_query
 # node2: Setup DDL applier trap before commit
 # node1: Block DDL and DML after cert_and_catch()
-# node1: DDL: RENAME TABLE child to child_new
+# node1: Execute DDL
 # node2: Wait for DDL applier to reach trap
 # node2: Setup DML applier trap before applying the writeset
-# node1: DML INSERT INTO parent VALUES (0)
+# node1: Execute DML
 # node2: Wait for DDL applier to reach trap
-# node2: DDL will block before commit (acquires locks on child and parent tables), DML will block before applying
-# node2: Unblock DML. Without the fix it will try to acquire locks on parent table, which will end up with BF-BF
+# node2: DDL will block before commit (acquires all needed locks), DML will block before applying
+# node2: Unblock DML. As the tables are related, without the fix it will try to acquire DML lock that is already acquired by DDL applier, which will end up with BF-BF
 # node2: Unblock DDL
 # node1: Unblock DDL and DML. Collect results
 #
 
 --source include/count_sessions.inc
+
+--echo ############################################################
+--echo # Testcase:
+--echo # $test_case
+--echo ############################################################
 
 --connect node_1_ddl, 127.0.0.1, root, , test, $NODE_MYPORT_1
 --connection node_1_ddl
@@ -26,10 +32,8 @@ SET SESSION wsrep_sync_wait = 0;
 
 --connection node_1
 SET SESSION wsrep_sync_wait = 0;
-CREATE TABLE parent (id INT PRIMARY KEY);
-CREATE TABLE child (id INT PRIMARY KEY, parent_id INT, FOREIGN KEY(parent_id) REFERENCES parent(id) ON DELETE CASCADE ON UPDATE CASCADE);
-INSERT INTO parent values (0);
-INSERT INTO child values (0, 0);
+--eval $setup_query
+
 --let $galera_sync_point = after_cert_and_catch
 --source include/galera_set_sync_point.inc
 
@@ -38,9 +42,7 @@ SET SESSION wsrep_sync_wait = 0;
 --let $wsrep_applier_threads_orig = `SELECT @@wsrep_applier_threads`
 SET GLOBAL wsrep_applier_threads = 2;
 
---let $wait_condition = SELECT COUNT(*) = 1 FROM parent
---source include/wait_condition.inc
---let $wait_condition = SELECT COUNT(*) = 1 FROM child
+--let $wait_condition = $setup_check
 --source include/wait_condition.inc
 
 # DDL applier should stop here
@@ -75,29 +77,44 @@ SET GLOBAL debug = "-d,ordered_commit_blocked";
 
 #
 # Let the DML applier proceed. As DDL applier already acquired all MDL locks
-# it will cause BF-BF abort if the dependency between transactions is not set
-# properly
+# it will cause BF-BF.
+# With the fix, certification will detect conflict between DDL key that is already in
+# cert index (EXCLUSIVE) and the key used by DML (UPDATE (internally changed by galera 
+# to REFERENCE as it is not leaf key). So the certification of DML will fail and will be
+# scheduled to retry (wsrep_retry_autocommit).
+# Before retry, we call transaction::release_commit_order() (advance it).
+# To do so, we acquire and release commit_order monitor, but we block on acquire, because it is
+# already acquired by DDL. So we have to wait till DDL finishes, then retry kicks-in assigning
+# depends_on of DML to the seqno of DDL.
 #
 --source include/galera_clear_sync_point.inc
 --source include/galera_signal_sync_point.inc
 
 SET DEBUG_SYNC = "now SIGNAL signal.ordered_commit_continue";
 
---let $wait_condition = SELECT COUNT(*) = 2 FROM $dml_table
---source include/wait_condition.inc
-
 #
-# Reap results on node_1
+# Let DDL and DML go ahead. DML already failed certificationa and will be retried after
+# waiting for DDL to finish.
 #
 --connection node_1
 --source include/galera_clear_sync_point.inc
 --let $galera_sync_point = after_cert_and_catch
 --source include/galera_signal_sync_point.inc
 
+#
+# Reap results on node_1
+#
 --connection node_1_ddl
 --reap
 --connection node_1_dml
 --reap
+
+#
+# Now we can check if retried DML was replicated
+#
+--connection node_2
+--let $wait_condition = $after_test_table_check
+--source include/wait_condition.inc
 
 #
 # cleanup

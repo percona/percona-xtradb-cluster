@@ -42,6 +42,7 @@ extern bool wsrep_recovery;
 typedef int64 query_id_t;
 
 class THD;
+struct TABLE;
 
 extern "C" long long wsrep_xid_seqno(const struct xid_t *xid);
 const unsigned char *wsrep_xid_uuid(const struct xid_t *xid);
@@ -142,4 +143,6 @@ extern "C" bool wsrep_consistency_check(const THD *thd);
 extern "C" my_thread_id wsrep_thd_thread_id(THD *thd);
 
 extern "C" bool get_wsrep_recovery();
+
+extern "C" bool wsrep_compare_records(const TABLE *table, THD *thd);
 #endif /* MYSQL_SERVICE_WSREP_INCLUDED */

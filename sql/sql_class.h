@@ -3351,6 +3351,8 @@ class THD : public MDL_context_owner,
     rollback. */
   bool wsrep_force_savept_rollback;
 
+  bool wsrep_transaction_added_extra_cert_key;
+
   /* Used to disable binlog when DDL is executed with wsrep_OSU_method=RSU. */
   std::shared_ptr<Disable_binlog_guard> disable_binlog_guard;
 

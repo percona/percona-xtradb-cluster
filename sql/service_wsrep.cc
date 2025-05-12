@@ -21,6 +21,9 @@
 #include "log.h"
 #include "service_wsrep.h"
 #include "sql_class.h"
+#include "sql_thd_internal_api.h"  // thd_binlog_format
+#include "sql_update.h"            // compare_records
+#include "table.h"                 // TABLE
 #include "wsrep/key.hpp"
 #include "wsrep_thd.h"
 #include "wsrep_trans_observer.h"
@@ -307,4 +310,46 @@ extern "C" bool wsrep_consistency_check(const MYSQL_THD thd) {
 
 extern "C" my_thread_id wsrep_thd_thread_id(THD *thd) {
   return thd->thread_id();
+}
+
+extern "C" bool wsrep_compare_records(const TABLE *table, THD *thd) {
+  bool res = compare_records(table);
+  if (!res) {
+    /*
+      Update didn't change a record,
+      but we still need to update certification keys of the current writeset
+      because it may be related to the table, that will be locked on replicated
+      node (so we need to set proper dependencies between writesets).
+      This is the same condition as we have in
+      ha_innodb.cc static bool wsrep_do_replication(THD *thd) which is called
+      always before wsrep_append_keys(). The ideal would be having this inside
+      wsrep_append_keys() (as it is checked always), but it is as it is.
+    */
+    bool do_replication = wsrep_on(thd) && wsrep_thd_is_local(thd) &&
+                          !wsrep_consistency_check(thd) &&
+                          thd_binlog_format(thd) == BINLOG_FORMAT_ROW;
+    if (do_replication) {
+      table->file->wsrep_append_keys(thd,
+                                     wsrep_protocol_version >= WsrepVersion::V4
+                                         ? WSREP_SERVICE_KEY_UPDATE
+                                         : WSREP_SERVICE_KEY_EXCLUSIVE,
+                                     table->record[1], table->record[0]);
+
+      /*
+        It is possible that we are here when executing something like
+        UPDATE t1 SET d = d LIMIT 1;
+        In such a case, nothing will be replicated, but galera flow
+        will commit empty transaction. (ha_commit_trans -> wsrep_commit_empty)
+        That would cause the assertion, because wsrep_commit_empty() checks
+        if the transaction is really empty (wsrep_has_changes() which checks
+        for transaction's cert keys to be empty). We would relax the original
+        assertion in wsrep_commit_empty(), but that would cause other
+        erroneous cases to sneak in. Instead of this, let's remember that we
+        added extra keys and if we end up with empty transaction, we will
+        simply ignore them.
+      */
+      thd->wsrep_transaction_added_extra_cert_key = true;
+    }
+  }
+  return res;
 }

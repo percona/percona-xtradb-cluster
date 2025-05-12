@@ -1,23 +1,89 @@
+--source include/have_debug_sync.inc
+--source suite/galera/include/galera_have_debug_sync.inc
+--source include/galera_cluster.inc
+
 #
 # Test that
 # RENAME TABLE <child_table> and concurrent INSERT INTO <parent_table>
 # RENAME TABLE <parent_table> and concurrent INSERT INTO <child_table>
 # are properly ordered.
 #
-
---source include/have_debug_sync.inc
---source suite/galera/include/galera_have_debug_sync.inc
---source include/galera_cluster.inc
-
+# The scenario is:
+# Setup parent-child tables
+# node2: Setup DDL applier trap before commit
+# node1: Block DDL and DML after cert_and_catch()
+# node1: DDL: RENAME TABLE child to child_new
+# node2: Wait for DDL applier to reach trap
+# node2: Setup DML applier trap before applying the writeset
+# node1: DML INSERT INTO parent VALUES (0)
+# node2: Wait for DDL applier to reach trap
+# node2: DDL will block before commit (acquires locks on child and parent tables), DML will block before applying
+# node2: Unblock DML. Without the fix it will try to acquire locks on parent table, which will end up with BF-BF
+# node2: Unblock DDL
+# node1: Unblock DDL and DML. Collect results
+#
+--let $test_case = RENAME TABLE <child_table> and concurrent INSERT INTO <parent_table>
+--let $setup_query = CREATE TABLE parent (id INT PRIMARY KEY); CREATE TABLE child (id INT PRIMARY KEY, parent_id INT, FOREIGN KEY(parent_id) REFERENCES parent(id) ON DELETE CASCADE ON UPDATE CASCADE); INSERT INTO parent values (0); INSERT INTO child values (0, 0);
+--let $setup_check = SELECT COUNT(*) = 1 FROM child
 --let $ddl_query = RENAME TABLE child TO child_new
 --let $dml_query = INSERT INTO parent VALUES (1)
---let $dml_table = parent
+# After the test we expect 'parent' table to have two rows
+--let $after_test_table_check = SELECT COUNT(*) = 2 FROM parent
 --let $drop_query = DROP TABLE child_new, parent
 --source galera_bf_bf_2.inc
 
+--let $test_case = RENAME TABLE <parent_table> and concurrent INSERT INTO <child_table>
 --let $ddl_query = RENAME TABLE parent TO parent_new
 --let $dml_query = INSERT INTO child VALUES (1, 0)
+# After the test we expect 'child' table to have two rows
+--let $after_test_table_check = SELECT COUNT(*) = 2 FROM child
 --let $drop_query = DROP TABLE child, parent_new
---let $dml_table = child
 --source galera_bf_bf_2.inc
 
+#
+# Test that DDL on table t1 and simultaneous DML on table t2 are properly ordered
+# in the case when t1 has an update trigger that inserts a row to t2, but update
+# doesn't change a row. In sucha case only t2 insert is replicated, but the replica
+# locks also t1, so DDL (t1) and INSERT (t2) should depend on each other.
+#
+# The scenario is:
+# Setup t1, t2 and update trigger on t1 that inserts into t2
+# node2: Setup DDL applier trap before commit
+# node1: Block DDL and DML after cert_and_catch()
+# node1: DDL: ALTER TABLE t1
+# node2: Wait for DDL applier to reach trap - it acquired MDL lock on t1
+# node2: Setup DML applier trap before applying the writeset
+# node1: UPDATE t1 SET d=d LIMIT 1 - no row update, but it will cause trigger execution that will insert into t2
+# node2: Wait for DDL applier to reach the trap
+# node2: DDL is blocked before commit (acquires t1 MDL), DML is blocked before applying
+# node2: Unblock DML. Without the fix it will try to acquire MDL lock on t1, which will end up with BF-BF
+# node2: Unblock DDL
+# node1: Unblock DDL and DML. Collect results
+#
+--let $test_case = t1 update trigger replication after noop update
+--let $setup_query = CREATE TABLE t1 (i INT NOT NULL AUTO_INCREMENT, d INT, PRIMARY KEY(i)); CREATE TABLE t2 LIKE t1; CREATE TRIGGER t1_on_update AFTER UPDATE ON t1 FOR EACH ROW INSERT INTO t2 (d) VALUES (NEW.d); INSERT INTO t1 VALUES (1, 1);
+--let $setup_check = SELECT COUNT(*) = 1 FROM t1
+--let $ddl_query = ALTER TABLE t1 ENGINE=InnoDB
+--let $dml_query = UPDATE t1 SET d=d LIMIT 1
+# After the test we expect one row inserted by the trigger to t2
+--let $after_test_table_check = SELECT COUNT(*) = 1 FROM t2
+--let $drop_query = DROP TABLE t1, t2
+--source galera_bf_bf_2.inc
+
+
+#
+# Test that DDL on table t1 and simultaneous DML on table t2 are properly ordered
+# in the case when DML uses t1 and t2, but t1 row update is noop. In such a case resulting
+# writeset contains only changes related to t2, but also information that replicated
+# node should lock t1 (and t2). It means that DDL and DML can not go in parallel
+# on the applier node, because they would cause BF-BF abort (conflict on t1).
+#
+--let $test_case = UPDATE test.t2 JOIN test.t1 USING (i) SET t2.d = t2.d+1, t1.d = t1.d
+--let $setup_query = CREATE TABLE t1 (i int NOT NULL AUTO_INCREMENT, d int, PRIMARY KEY (i) ) ENGINE=InnoDB; CREATE TABLE t2 like t1; INSERT INTO t2 values (1,1); INSERT INTO t1 values (1,1);
+--let $setup_check = SELECT COUNT(*) = 1 FROM t1
+--let $ddl_query = ALTER TABLE t1 ENGINE=InnoDB
+--let $dml_query = UPDATE test.t2 JOIN test.t1 USING (i) SET t2.d = t2.d+1, t1.d = t1.d;
+# After the test we expect t2.d to be updated to 2
+--let $after_test_table_check = SELECT COUNT(*) = 1 FROM t2 WHERE d=2
+--let $drop_query = DROP TABLE t1, t2
+--source galera_bf_bf_2.inc
