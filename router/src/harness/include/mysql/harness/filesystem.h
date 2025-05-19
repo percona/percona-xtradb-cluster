@@ -118,7 +118,7 @@ class HARNESS_EXPORT Path {
    * Construct a path
    *
    * @param path Non-empty string denoting the path.
-   * @throws std::invalid_argument
+   * @throws std::invalid_argument If "path" is not a valid path.
    */
   Path(std::string path);
 

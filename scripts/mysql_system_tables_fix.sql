@@ -1750,6 +1750,7 @@ INSERT INTO global_grants SELECT user, host, 'TRANSACTION_GTID_TAG',
 IF (WITH_GRANT_OPTION = 'Y', 'Y', 'N') FROM global_grants WHERE priv = 'BINLOG_ADMIN' AND @hadTransactionGtidTagPriv = 0;
 COMMIT;
 
+<<<<<<< HEAD
 -- Add the privilege FLUSH_PRIVILEGES for every user who has the
 -- privilege RELOAD, provided that there is not a user who already has
 -- privilege FLUSH_PRIVILEGES
@@ -1757,5 +1758,31 @@ SET @hadFlushPrivilegesPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = '
 INSERT INTO global_grants SELECT user, host, 'FLUSH_PRIVILEGES', IF(grant_priv = 'Y', 'Y', 'N')
 FROM mysql.user WHERE Reload_priv = 'Y' AND @hadFlushPrivilegesPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 
+||||||| 216560238b1
+-- Add the privilege FLUSH_PRIVILEGES for every user who has the
+-- privilege RELOAD, provided that there is not a user who already has
+-- privilege FLUSH_PRIVILEGES
+SET @hadFlushPrivilegesPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'FLUSH_PRIVILEGES');
+INSERT INTO global_grants SELECT user, host, 'FLUSH_PRIVILEGES', IF(grant_priv = 'Y', 'Y', 'N')
+FROM mysql.user WHERE Reload_priv = 'Y' AND @hadFlushPrivilegesPriv = 0;
+
+=======
+>>>>>>> percona/ps/release-9.2.0-1
 -- SET_USER_ID is removed dynamic privilege, revoke all grants of it.
 DELETE FROM global_grants WHERE PRIV = 'SET_USER_ID';
+
+-- Add the privilege CREATE_SPATIAL_REFERENCE_SYSTEM for every user who has the privilege SUPER
+-- provided that there isn't a user who already has the privilege CREATE_SPATIAL_REFERENCE_SYSTEM.
+SET @hadCreateSpatialRefrenceSystem =
+  (SELECT COUNT(*) FROM global_grants WHERE priv = 'CREATE_SPATIAL_REFERENCE_SYSTEM');
+INSERT INTO global_grants SELECT user, host, 'CREATE_SPATIAL_REFERENCE_SYSTEM', IF(grant_priv = 'Y', 'Y', 'N')
+FROM mysql.user WHERE super_priv = 'Y' AND @hadCreateSpatialRefrenceSystem = 0 AND user NOT IN ('mysql.infoschema','mysql.session','mysql.sys');
+
+-- Bug#36808636 System accounts are not converted to non legacy auth plugin during upgrade
+-- Convert authentication of 'mysql.sys' and 'mysql.sessioon' users
+-- from mysql_native_password into caching_sha2_password.
+UPDATE mysql.user SET plugin='caching_sha2_password', authentication_string='$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED' WHERE user='mysql.sys';
+UPDATE mysql.user SET plugin='caching_sha2_password', authentication_string='$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED' WHERE user='mysql.session';
+
+ALTER TABLE procs_priv
+  MODIFY Routine_type enum('FUNCTION','PROCEDURE','LIBRARY') NOT NULL;

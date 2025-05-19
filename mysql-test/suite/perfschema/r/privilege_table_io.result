@@ -24,6 +24,8 @@ update performance_schema.setup_consumers set enabled='YES';
 update performance_schema.setup_objects set enabled='YES'
   where object_type='TABLE' and object_schema= 'mysql';
 flush privileges;
+Warnings:
+Warning	1681	'FLUSH PRIVILEGES' is deprecated and will be removed in a future release.
 insert into test.marker set a = 1;
 insert into test.marker set a = 1;
 insert into test.marker set a = 1;
@@ -121,6 +123,7 @@ wait/io/table/sql/handler	handler.cc:	TABLE	mysql	global_grants	fetch	1
 wait/io/table/sql/handler	handler.cc:	TABLE	mysql	global_grants	fetch	1
 wait/io/table/sql/handler	handler.cc:	TABLE	mysql	global_grants	fetch	1
 wait/io/table/sql/handler	handler.cc:	TABLE	mysql	global_grants	fetch	1
+<<<<<<< HEAD
 wait/io/table/sql/handler	handler.cc:	TABLE	mysql	global_grants	fetch	1
 wait/io/table/sql/handler	handler.cc:	TABLE	mysql	global_grants	fetch	1
 wait/io/table/sql/handler	handler.cc:	TABLE	mysql	global_grants	fetch	1
@@ -167,6 +170,10 @@ wait/io/table/sql/handler	handler.cc:	TABLE	mysql	global_grants	fetch	1
 wait/io/table/sql/handler	handler.cc:	TABLE	mysql	global_grants	fetch	1
 wait/io/table/sql/handler	handler.cc:	TABLE	mysql	global_grants	fetch	1
 wait/io/table/sql/handler	handler.cc:	TABLE	mysql	global_grants	fetch	1
+||||||| 216560238b1
+=======
+wait/io/table/sql/handler	handler.cc:	TABLE	mysql	global_grants	fetch	1
+>>>>>>> percona/ps/release-9.2.0-1
 wait/io/table/sql/handler	handler.cc:	TABLE	mysql	role_edges	fetch	1
 wait/io/table/sql/handler	handler.cc:	TABLE	mysql	default_roles	fetch	1
 wait/io/table/sql/handler	handler.cc:	TABLE	mysql	tables_priv	fetch	1

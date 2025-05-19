@@ -36,7 +36,15 @@ Percona is dedicated to **keeping open source open**. Whenever possible, we stri
 
 ## How to get involved
 
+<<<<<<< HEAD
 We encourage contributions and are always looking for new members that are as dedicated to serving the community as we are. The [Contributing Guide](https://github.com/percona/pxc-docs/blob/8.0/contributing.md) contains instructions on how you can contribute.
+||||||| 216560238b1
+We encourage contributions and are always looking for new members that are as dedicated to serving the community as we are. The [Contributing Guide](https://github.com/percona/percona-server/blob/8.0/doc/source/contributing.md) contains how you can contribute.
+=======
+We encourage contributions and are always looking for new members that are as dedicated to serving the community as we are. The [Doc Contributing Guide](https://github.com/percona/psmysql-docs/blob/innovation-release/contributing.md) contains how you can contribute to the documentation.
+
+The [ CONTRIBUTING ](CONTRIBUTING.md) file in this directory contains instructions on contributing to the code.
+>>>>>>> percona/ps/release-9.2.0-1
 
 ## Contact
 You can reach us by using the [Forum](https://forums.percona.com/c/mysql-mariadb/percona-xtradb-cluster-8-x/)
