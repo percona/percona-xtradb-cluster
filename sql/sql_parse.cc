@@ -3541,9 +3541,16 @@ void add_automatic_sp_privileges(THD *thd, enum_sp_type sp_type,
   }
 }
 
+#ifdef WITH_WSREP
+bool remove_automatic_sp_privileges(THD *thd, enum_sp_type sp_type,
+                                    bool sp_did_not_exist, const char *db_name,
+                                    const char *sp_name,
+                                    enum_sp_return_code sp_result) {
+#else
 bool remove_automatic_sp_privileges(THD *thd, enum_sp_type sp_type,
                                     bool sp_did_not_exist, const char *db_name,
                                     const char *sp_name) {
+#endif
   /*
     We're going to issue an implicit REVOKE statement so we close all
     open tables. We have to keep metadata locks as this ensures that
@@ -3561,6 +3568,19 @@ bool remove_automatic_sp_privileges(THD *thd, enum_sp_type sp_type,
   */
   assert(thd->get_transaction()->is_empty(Transaction_ctx::STMT));
   close_thread_tables(thd);
+
+#ifdef WITH_WSREP
+  /*
+    sp_result is the result of sp_drop_routine() called by the caller of this
+    function.
+    sp_drop_routine() returns SP_INTERNAL_ERROR in case of system user
+    privileges check failure. In such a case we don't want to proceed with
+    sp_revoke_privileges which will fail anyway.
+  */
+  if (sp_result == SP_INTERNAL_ERROR) {
+    return false;
+  }
+#endif
 
   if (!sp_did_not_exist && sp_automatic_privileges && !opt_noacl &&
       sp_revoke_privileges(thd, db_name, sp_name,
@@ -5593,27 +5613,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
       const char *db = lex->spname->m_db.str;
       char *name = lex->spname->m_name.str;
 
-<<<<<<< HEAD
-      if (check_routine_access(thd, ALTER_PROC_ACL, db, name,
-                               lex->sql_command == SQLCOM_DROP_PROCEDURE,
-                               false))
-        goto error;
-
-#ifdef WITH_WSREP
-        // to isolation is now done as part of sp_drop_routine as it does
-        // additional ACL based check that ensures the fact that if the
-        // definer has SUPER PRIVILIGES then DROP/ATLER should have same too.
-        // WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-#endif /* WITH_WSREP */
-
-||||||| 216560238b1
-      if (check_routine_access(thd, ALTER_PROC_ACL, db, name,
-                               lex->sql_command == SQLCOM_DROP_PROCEDURE,
-                               false))
-        goto error;
-
-=======
->>>>>>> percona/ps/release-9.2.0-1
       const enum_sp_type sp_type = (lex->sql_command == SQLCOM_DROP_PROCEDURE)
                                        ? enum_sp_type::PROCEDURE
                                        : enum_sp_type::FUNCTION;
@@ -5625,75 +5624,18 @@ int mysql_execute_command(THD *thd, bool first_level) {
       const enum_sp_return_code sp_result =
           sp_drop_routine(thd, sp_type, lex->spname);
 
-<<<<<<< HEAD
-      /*
-        We're going to issue an implicit REVOKE statement so we close all
-        open tables. We have to keep metadata locks as this ensures that
-        this statement is atomic against concurrent FLUSH TABLES WITH READ
-        LOCK. Deadlocks which can arise due to fact that this implicit
-        statement takes metadata locks should be detected by a deadlock
-        detector in MDL subsystem and reported as errors.
-
-        No need to commit/rollback statement transaction, it's not started.
-
-        TODO: Long-term we should either ensure that implicit REVOKE statement
-              is written into binary log as a separate statement or make both
-              dropping of routine and implicit REVOKE parts of one fully atomic
-              statement.
-      */
-      assert(thd->get_transaction()->is_empty(Transaction_ctx::STMT));
-      close_thread_tables(thd);
-
 #ifdef WITH_WSREP
-      // sp_drop_routine() returns SP_INTERNAL_ERROR in case of system user
-      // privileges check failure. In such a case we don't want to proceed with
-      // sp_revoke_privileges which will fail anyway.
-      if (sp_result != SP_INTERNAL_ERROR) {
-#endif
-        if (sp_result != SP_DOES_NOT_EXISTS && sp_automatic_privileges &&
-            !opt_noacl &&
-            sp_revoke_privileges(thd, db, name,
-                                 lex->sql_command == SQLCOM_DROP_PROCEDURE)) {
-          push_warning(thd, Sql_condition::SL_WARNING, ER_PROC_AUTO_REVOKE_FAIL,
-                       ER_THD(thd, ER_PROC_AUTO_REVOKE_FAIL));
-          /* If this happens, an error should have been reported. */
-          goto error;
-        }
-#ifdef WITH_WSREP
-||||||| 216560238b1
-      /*
-        We're going to issue an implicit REVOKE statement so we close all
-        open tables. We have to keep metadata locks as this ensures that
-        this statement is atomic against concurrent FLUSH TABLES WITH READ
-        LOCK. Deadlocks which can arise due to fact that this implicit
-        statement takes metadata locks should be detected by a deadlock
-        detector in MDL subsystem and reported as errors.
-
-        No need to commit/rollback statement transaction, it's not started.
-
-        TODO: Long-term we should either ensure that implicit REVOKE statement
-              is written into binary log as a separate statement or make both
-              dropping of routine and implicit REVOKE parts of one fully atomic
-              statement.
-      */
-      assert(thd->get_transaction()->is_empty(Transaction_ctx::STMT));
-      close_thread_tables(thd);
-
-      if (sp_result != SP_DOES_NOT_EXISTS && sp_automatic_privileges &&
-          !opt_noacl &&
-          sp_revoke_privileges(thd, db, name,
-                               lex->sql_command == SQLCOM_DROP_PROCEDURE)) {
-        push_warning(thd, Sql_condition::SL_WARNING, ER_PROC_AUTO_REVOKE_FAIL,
-                     ER_THD(thd, ER_PROC_AUTO_REVOKE_FAIL));
-        /* If this happens, an error should have been reported. */
+      if (remove_automatic_sp_privileges(
+              thd, sp_type, sp_result == SP_DOES_NOT_EXISTS, db, name,
+              sp_result)) {
         goto error;
-=======
+      }
+#else
       if (remove_automatic_sp_privileges(
               thd, sp_type, sp_result == SP_DOES_NOT_EXISTS, db, name)) {
         goto error;
->>>>>>> percona/ps/release-9.2.0-1
       }
-#endif
+#endif  /* WITH_WSREP */
 
       res = sp_result;
       switch (sp_result) {
@@ -5854,8 +5796,9 @@ int mysql_execute_command(THD *thd, bool first_level) {
     case SQLCOM_EXPLAIN_OTHER:
     case SQLCOM_RESTART_SERVER:
     case SQLCOM_CREATE_SRS:
-<<<<<<< HEAD
-    case SQLCOM_DROP_SRS: {
+    case SQLCOM_DROP_SRS:
+    case SQLCOM_CREATE_LIBRARY:
+    case SQLCOM_DROP_LIBRARY: {
 #ifdef WITH_WSREP
       if (lex->sql_command == SQLCOM_SELECT)
         WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_READ)
@@ -5904,13 +5847,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
       }
 #endif /* WITH_WSREP */
 
-||||||| 216560238b1
-    case SQLCOM_DROP_SRS: {
-=======
-    case SQLCOM_DROP_SRS:
-    case SQLCOM_CREATE_LIBRARY:
-    case SQLCOM_DROP_LIBRARY: {
->>>>>>> percona/ps/release-9.2.0-1
       assert(lex->m_sql_cmd != nullptr);
 
       res = lex->m_sql_cmd->execute(thd);

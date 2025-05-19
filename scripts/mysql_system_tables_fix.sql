@@ -1750,24 +1750,6 @@ INSERT INTO global_grants SELECT user, host, 'TRANSACTION_GTID_TAG',
 IF (WITH_GRANT_OPTION = 'Y', 'Y', 'N') FROM global_grants WHERE priv = 'BINLOG_ADMIN' AND @hadTransactionGtidTagPriv = 0;
 COMMIT;
 
-<<<<<<< HEAD
--- Add the privilege FLUSH_PRIVILEGES for every user who has the
--- privilege RELOAD, provided that there is not a user who already has
--- privilege FLUSH_PRIVILEGES
-SET @hadFlushPrivilegesPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'FLUSH_PRIVILEGES' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
-INSERT INTO global_grants SELECT user, host, 'FLUSH_PRIVILEGES', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE Reload_priv = 'Y' AND @hadFlushPrivilegesPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
-
-||||||| 216560238b1
--- Add the privilege FLUSH_PRIVILEGES for every user who has the
--- privilege RELOAD, provided that there is not a user who already has
--- privilege FLUSH_PRIVILEGES
-SET @hadFlushPrivilegesPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'FLUSH_PRIVILEGES');
-INSERT INTO global_grants SELECT user, host, 'FLUSH_PRIVILEGES', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE Reload_priv = 'Y' AND @hadFlushPrivilegesPriv = 0;
-
-=======
->>>>>>> percona/ps/release-9.2.0-1
 -- SET_USER_ID is removed dynamic privilege, revoke all grants of it.
 DELETE FROM global_grants WHERE PRIV = 'SET_USER_ID';
 

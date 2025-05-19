@@ -156,11 +156,20 @@ bool Sql_cmd_drop_library::execute(THD *thd) {
   const enum_sp_return_code sp_result =
       sp_drop_routine(thd, enum_sp_type::LIBRARY, m_name);
 
+#ifdef WITH_WSREP
+  if (remove_automatic_sp_privileges(thd, enum_sp_type::LIBRARY,
+                                     sp_result == SP_DOES_NOT_EXISTS,
+                                     m_name->m_db.str, m_name->m_name.str,
+                                     sp_result)) {
+    return true;
+  }
+#else
   if (remove_automatic_sp_privileges(thd, enum_sp_type::LIBRARY,
                                      sp_result == SP_DOES_NOT_EXISTS,
                                      m_name->m_db.str, m_name->m_name.str)) {
     return true;
   }
+#endif  /* WITH_WSREP */
 
   switch (sp_result) {
     case SP_OK:

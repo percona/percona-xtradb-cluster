@@ -87,6 +87,16 @@ MYSQL_ADD_COMPONENT(masking_functions
   MODULE_ONLY
 )
 
+# This is needed by PXC, because server_helper.cpp has a hack, that directly includes sql_class.h
+# This causes compilation error
+# In file included from percona-xtradb-cluster/sql/dd/types/tablespace.h,
+#                  from percona-xtradb-cluster/sql/wsrep_mysqld.h,
+#                  from percona-xtradb-cluster/sql/sql_class.h,
+#                  from percona-xtradb-cluster/components/masking_functions/src/masking_functions/server_helpers.cpp:
+# percona-xtradb-cluster/sql/dd/sdi_fwd.h: fatal error: rapidjson/fwd.h: No such file or directory
+#    27 | #include <rapidjson/fwd.h>
+target_link_libraries(component_masking_functions PRIVATE extra::rapidjson)
+
 target_compile_definitions(component_masking_functions PRIVATE LOG_COMPONENT_TAG="component_masking_functions")
 target_include_directories(component_masking_functions PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_include_directories(component_masking_functions SYSTEM PRIVATE ${BOOST_PATCHES_DIR} ${BOOST_INCLUDE_DIR})

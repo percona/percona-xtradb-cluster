@@ -1003,14 +1003,8 @@ ENDIF()
 TARGET_LINK_LIBRARIES(sql_main extra::unordered_dense)
 
 TARGET_LINK_LIBRARIES(sql_main ${MYSQLD_STATIC_PLUGIN_LIBS}
-<<<<<<< HEAD
-  mysql_server_component_services mysys strings vio
-  ${WSREP_LIB}
-||||||| 216560238b1
-  mysql_server_component_services mysys strings vio
-=======
   mysql_server_component_services mysys library_mysys strings vio
->>>>>>> percona/ps/release-9.2.0-1
+  ${WSREP_LIB}
   mysql_binlog_event ${LIBWRAP} ${LIBDL} OpenSSL::SSL OpenSSL::Crypto
   extra::rapidjson extra::boost)
 

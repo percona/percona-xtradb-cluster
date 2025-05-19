@@ -113,9 +113,17 @@ void mysql_reset_thd_for_next_command(THD *thd);
 void create_table_set_open_action_and_adjust_tables(LEX *lex);
 void add_automatic_sp_privileges(THD *thd, enum_sp_type sp_type,
                                  const char *db_name, const char *sp_name);
+#ifdef WITH_WSREP
+#include "sp.h"  //enum_sp_return_code
+bool remove_automatic_sp_privileges(THD *thd, enum_sp_type sp_type,
+                                    bool sp_did_not_exist, const char *db_name,
+                                    const char *sp_name,
+                                    enum_sp_return_code sp_result);
+#else
 bool remove_automatic_sp_privileges(THD *thd, enum_sp_type sp_type,
                                     bool sp_did_not_exist, const char *db_name,
                                     const char *sp_name);
+#endif
 int mysql_execute_command(THD *thd, bool first_level = false);
 bool do_command(THD *thd);
 bool dispatch_command(THD *thd, const COM_DATA *com_data,

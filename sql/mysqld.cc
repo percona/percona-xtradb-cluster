@@ -8025,7 +8025,8 @@ static int init_ssl() {
 }
 
 static int init_ssl_communication() {
-<<<<<<< HEAD
+  my_ssl_algorithm_cache_load();
+
 #ifdef WITH_WSREP
   if (!wsrep_mysql_main_channel_initialized) {
     if (TLS_channel::singleton_init(&mysql_main, mysql_main_channel,
@@ -8034,11 +8035,6 @@ static int init_ssl_communication() {
     wsrep_mysql_main_channel_initialized = true;
   }
 #else
-||||||| 216560238b1
-=======
-  my_ssl_algorithm_cache_load();
-
->>>>>>> percona/ps/release-9.2.0-1
   if (TLS_channel::singleton_init(&mysql_main, mysql_main_channel,
                                   &server_main_callback, opt_initialize))
     return 1;
@@ -8074,14 +8070,10 @@ static void end_ssl() {
   TLS_channel::singleton_deinit(mysql_main);
   TLS_channel::singleton_deinit(mysql_admin);
   deinit_rsa_keys();
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   wsrep_mysql_main_channel_initialized = false;
 #endif
-||||||| 216560238b1
-=======
   my_ssl_algorithm_cache_unload();
->>>>>>> percona/ps/release-9.2.0-1
 }
 
 /**
