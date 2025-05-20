@@ -149,7 +149,7 @@ XTRABACKUP_THIS_VER_PATH="$(dirname $0)/pxc_extra/pxb-9.1"
 # XB path compatible with prev PXC version. It may be prev Innovative release or LTS
 # if current PXC version is 1st Innovative.
 # Note that this can be the same as XTRABACKUP_PREV_LTS_VER_PATH
-XTRABACKUP_PREV_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.4"
+XTRABACKUP_PREV_VER_PATH="$(dirname $0)/pxc_extra/pxb-9.1"
 
 # XB path compatible previous PXC LTS version
 XTRABACKUP_PREV_LTS_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.4"
@@ -158,7 +158,7 @@ XTRABACKUP_PREV_LTS_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.4"
 # To be able to service this version
 XB_THIS_REQUIRED_VERSION="9.1.0"
 # To be able to service previous version
-XB_PREV_REQUIRED_VERSION="8.4.0"
+XB_PREV_REQUIRED_VERSION="9.1.0"
 # To be able to service previous LTS version
 XB_PREV_LTS_REQUIRED_VERSION="8.4.0"
 
@@ -166,7 +166,7 @@ XB_PREV_LTS_REQUIRED_VERSION="8.4.0"
 REQUIRED_DONOR_MYSQL_LTS_VERSION="8.4"
 # ...or to be this previous version (note that it may be LTS as well if this is
 # 1st innovative)
-REQUIRED_DONOR_MYSQL_PREV_VERSION="8.4"
+REQUIRED_DONOR_MYSQL_PREV_VERSION="9.1"
 
 # These files carry some important information in form of GTID of the data
 # that is being backed up.
