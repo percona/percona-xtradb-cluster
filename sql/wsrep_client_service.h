@@ -65,6 +65,7 @@ class Wsrep_client_service : public wsrep::client_service {
   }
   void debug_sync(const char *) override;
   void debug_crash(const char *) override;
+  void notify_state_change() override;
   int bf_rollback() override;
 
  private:
