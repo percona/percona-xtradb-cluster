@@ -23,15 +23,40 @@
 +    LINK_LIBRARIES mysqlclient client_base
      )
  ENDIF()
+<<<<<<< HEAD
  
 @@ -63,24 +63,24 @@
+||||||| b8e378ecbc3
+
+@@ -73,37 +73,32 @@
+=======
+
+@@ -73,7 +73,7 @@
+>>>>>>> percona-server/release-8.0.42-33
    COMPONENT Test
    DEPENDENCIES GenError GenClientError
    ENABLE_EXPORTS
 -  LINK_LIBRARIES perconaserverclient
 +  LINK_LIBRARIES mysqlclient
    )
+<<<<<<< HEAD
  MYSQL_ADD_EXECUTABLE(mysqlcheck
+||||||| b8e378ecbc3
+-
+ IF (WITH_COREDUMPER)
+   TARGET_LINK_LIBRARIES(mysqltest coredumper)
+ ENDIF()
+
+-IF(MY_COMPILER_IS_GNU AND (WITH_LTO OR CMAKE_COMPILER_FLAG_WITH_LTO))
+-  TARGET_LINK_OPTIONS(mysqltest PRIVATE -Wno-error=stringop-overflow)
+-ENDIF()
+-
+ MYSQL_ADD_EXECUTABLE(mysqlcheck
+=======
+
+ IF (WITH_COREDUMPER)
+@@ -88,22 +88,22 @@
+>>>>>>> percona-server/release-8.0.42-33
    check/mysqlcheck.cc
    check/mysqlcheck_core.cc
 -  LINK_LIBRARIES perconaserverclient
@@ -52,6 +77,7 @@
 -  LINK_LIBRARIES perconaserverclient
 +  LINK_LIBRARIES mysqlclient
    )
+<<<<<<< HEAD
  MYSQL_ADD_EXECUTABLE(mysqlbinlog
    mysqlbinlog.cc
 @@ -103,7 +103,7 @@
@@ -60,11 +86,41 @@
    DEPENDENCIES GenError
 -  LINK_LIBRARIES perconaserverclient client_base binlogevents_static
 +  LINK_LIBRARIES mysqlclient client_base binlogevents_static
+||||||| b8e378ecbc3
+
+ OPTION(WITH_JSON_BINLOG_LIBRARY
+@@ -269,7 +264,8 @@
+ SET(MYSQLBINLOG_LIBRARIES
+   binlogevents_static
+   client_base
+-  perconaserverclient
++  mysqlclient
++  extra::rapidjson
+=======
+
+ OPTION(WITH_JSON_BINLOG_LIBRARY
+@@ -269,7 +269,7 @@
+ SET(MYSQLBINLOG_LIBRARIES
+   binlogevents_static
+   client_base
+-  perconaserverclient
++  mysqlclient
+   extra::unordered_dense
+>>>>>>> percona-server/release-8.0.42-33
    )
+<<<<<<< HEAD
  
  TARGET_COMPILE_DEFINITIONS(mysqlbinlog PRIVATE DISABLE_PSI_MUTEX)
 @@ -111,19 +111,19 @@
  
+||||||| b8e378ecbc3
+
+ IF(WITH_JSON_BINLOG_LIBRARY)
+@@ -311,20 +307,20 @@
+=======
+
+@@ -312,20 +312,20 @@
+>>>>>>> percona-server/release-8.0.42-33
  MYSQL_ADD_EXECUTABLE(mysqladmin
    mysqladmin.cc
 -  LINK_LIBRARIES perconaserverclient
