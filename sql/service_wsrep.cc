@@ -348,7 +348,9 @@ extern "C" bool wsrep_compare_records(const TABLE *table, THD *thd) {
         added extra keys and if we end up with empty transaction, we will
         simply ignore them.
       */
+#ifndef NDEBUG
       thd->wsrep_transaction_added_extra_cert_key = true;
+#endif
     }
   }
   return res;

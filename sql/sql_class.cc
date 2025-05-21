@@ -752,8 +752,9 @@ THD::THD(bool enable_plugins)
       wsrep_post_insert_error(false),
       wsrep_stmt_transaction_rolled_back(false),
       wsrep_force_savept_rollback(false),
+#ifndef NDEBUG
       wsrep_transaction_added_extra_cert_key(false),
-
+#endif
       /* wsrep-lib */
       m_wsrep_next_trx_id(WSREP_UNDEFINED_TRX_ID),
       m_wsrep_mutex(LOCK_wsrep_thd),
@@ -1235,7 +1236,9 @@ void THD::init(void) {
   wsrep_post_insert_error = false;
   wsrep_stmt_transaction_rolled_back = false;
   wsrep_force_savept_rollback = false;
+#ifndef NDEBUG
   wsrep_transaction_added_extra_cert_key = false;
+#endif
 #endif /* WITH_WSREP */
 
   if (variables.sql_log_bin)
