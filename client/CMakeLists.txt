@@ -270,12 +270,8 @@ SET(MYSQLBINLOG_LIBRARIES
   binlogevents_static
   client_base
   perconaserverclient
-<<<<<<< HEAD
-  extra::rapidjson
-||||||| b8e378ecbc3
-=======
   extra::unordered_dense
->>>>>>> percona-server/release-8.0.42-33
+  extra::rapidjson
   )
 
 IF(WITH_JSON_BINLOG_LIBRARY)
