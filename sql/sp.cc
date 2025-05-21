@@ -3036,7 +3036,7 @@ int wsrep_create_sp(THD *thd, uchar **buf, size_t *buf_len) {
     sp->returns_type(thd, &retstr);
   }
 
-  if (!create_string(thd, &log_query, sp->m_type,
+  if (create_string(thd, &log_query, sp->m_type,
                      (sp->m_explicit_name ? sp->m_db.str : NULL),
                      (sp->m_explicit_name ? sp->m_db.length : 0),
                      sp->m_name.str, sp->m_name.length, sp->m_params.str,
