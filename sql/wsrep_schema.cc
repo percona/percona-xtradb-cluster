@@ -310,6 +310,8 @@ static int update_or_insert(TABLE *table) {
       ret = 1;
     }
   } else if (!records_are_comparable(table) || compare_records(table)) {
+    // No need to call wsrep_compare_records, as wsrep_schema changes are not
+    // replicated
     /*
       Record has changed
     */

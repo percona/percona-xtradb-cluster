@@ -527,7 +527,9 @@ static inline void wsrep_commit_empty(THD *thd, bool all) {
     /* @todo CTAS with STATEMENT binlog format and empty result set
        seems to be committing empty. Figure out why and try to fix
        elsewhere. */
-    assert(!wsrep_has_changes(thd) || thd->wsrep_stmt_transaction_rolled_back ||
+    assert(!wsrep_has_changes(thd) ||
+           thd->wsrep_transaction_added_extra_cert_key ||
+           thd->wsrep_stmt_transaction_rolled_back ||
            (thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
             !thd->is_current_stmt_binlog_format_row()) ||
            thd->wsrep_post_insert_error);
