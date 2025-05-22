@@ -1,10 +1,11 @@
+############################################################
+# Testcase:
+# RENAME TABLE <child_table> and concurrent INSERT INTO <parent_table>
+############################################################
 SET SESSION wsrep_sync_wait = 0;
 SET SESSION wsrep_sync_wait = 0;
 SET SESSION wsrep_sync_wait = 0;
-CREATE TABLE parent (id INT PRIMARY KEY);
-CREATE TABLE child (id INT PRIMARY KEY, parent_id INT, FOREIGN KEY(parent_id) REFERENCES parent(id) ON DELETE CASCADE ON UPDATE CASCADE);
-INSERT INTO parent values (0);
-INSERT INTO child values (0, 0);
+CREATE TABLE parent (id INT PRIMARY KEY); CREATE TABLE child (id INT PRIMARY KEY, parent_id INT, FOREIGN KEY(parent_id) REFERENCES parent(id) ON DELETE CASCADE ON UPDATE CASCADE); INSERT INTO parent values (0); INSERT INTO child values (0, 0);;
 SET GLOBAL wsrep_provider_options = 'dbug=d,after_cert_and_catch';
 SET SESSION wsrep_sync_wait = 0;
 SET GLOBAL wsrep_applier_threads = 2;
@@ -23,17 +24,17 @@ SET SESSION wsrep_on = 1;
 SET GLOBAL wsrep_provider_options = 'dbug=';
 SET GLOBAL wsrep_provider_options = 'signal=sync.apply_trx.start_of_apply_trx';
 SET DEBUG_SYNC = "now SIGNAL signal.ordered_commit_continue";
-Timeout in wait_condition.inc for SELECT COUNT(*) = 2 FROM parent
 SET GLOBAL wsrep_provider_options = 'dbug=';
 SET GLOBAL wsrep_provider_options = 'signal=after_cert_and_catch';
 DROP TABLE child_new, parent;
+############################################################
+# Testcase:
+# RENAME TABLE <parent_table> and concurrent INSERT INTO <child_table>
+############################################################
 SET SESSION wsrep_sync_wait = 0;
 SET SESSION wsrep_sync_wait = 0;
 SET SESSION wsrep_sync_wait = 0;
-CREATE TABLE parent (id INT PRIMARY KEY);
-CREATE TABLE child (id INT PRIMARY KEY, parent_id INT, FOREIGN KEY(parent_id) REFERENCES parent(id) ON DELETE CASCADE ON UPDATE CASCADE);
-INSERT INTO parent values (0);
-INSERT INTO child values (0, 0);
+CREATE TABLE parent (id INT PRIMARY KEY); CREATE TABLE child (id INT PRIMARY KEY, parent_id INT, FOREIGN KEY(parent_id) REFERENCES parent(id) ON DELETE CASCADE ON UPDATE CASCADE); INSERT INTO parent values (0); INSERT INTO child values (0, 0);;
 SET GLOBAL wsrep_provider_options = 'dbug=d,after_cert_and_catch';
 SET SESSION wsrep_sync_wait = 0;
 SET GLOBAL wsrep_applier_threads = 2;
@@ -52,7 +53,64 @@ SET SESSION wsrep_on = 1;
 SET GLOBAL wsrep_provider_options = 'dbug=';
 SET GLOBAL wsrep_provider_options = 'signal=sync.apply_trx.start_of_apply_trx';
 SET DEBUG_SYNC = "now SIGNAL signal.ordered_commit_continue";
-Timeout in wait_condition.inc for SELECT COUNT(*) = 2 FROM child
 SET GLOBAL wsrep_provider_options = 'dbug=';
 SET GLOBAL wsrep_provider_options = 'signal=after_cert_and_catch';
 DROP TABLE child, parent_new;
+############################################################
+# Testcase:
+# t1 update trigger replication after noop update
+############################################################
+SET SESSION wsrep_sync_wait = 0;
+SET SESSION wsrep_sync_wait = 0;
+SET SESSION wsrep_sync_wait = 0;
+CREATE TABLE t1 (i INT NOT NULL AUTO_INCREMENT, d INT, PRIMARY KEY(i)); CREATE TABLE t2 LIKE t1; CREATE TRIGGER t1_on_update AFTER UPDATE ON t1 FOR EACH ROW INSERT INTO t2 (d) VALUES (NEW.d); INSERT INTO t1 VALUES (1, 1);;
+SET GLOBAL wsrep_provider_options = 'dbug=d,after_cert_and_catch';
+SET SESSION wsrep_sync_wait = 0;
+SET GLOBAL wsrep_applier_threads = 2;
+SET GLOBAL debug = "+d,ordered_commit_blocked";
+ALTER TABLE t1 ENGINE=InnoDB;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET DEBUG_SYNC = "now WAIT_FOR signal.ordered_commit_waiting";
+SET GLOBAL debug = "-d,ordered_commit_blocked";
+SET GLOBAL wsrep_provider_options = 'dbug=d,sync.apply_trx.start_of_apply_trx';
+UPDATE t1 SET d=d LIMIT 1;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=sync.apply_trx.start_of_apply_trx';
+SET DEBUG_SYNC = "now SIGNAL signal.ordered_commit_continue";
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=after_cert_and_catch';
+DROP TABLE t1, t2;
+############################################################
+# Testcase:
+# UPDATE test.t2 JOIN test.t1 USING (i) SET t2.d = t2.d+1, t1.d = t1.d
+############################################################
+SET SESSION wsrep_sync_wait = 0;
+SET SESSION wsrep_sync_wait = 0;
+SET SESSION wsrep_sync_wait = 0;
+CREATE TABLE t1 (i int NOT NULL AUTO_INCREMENT, d int, PRIMARY KEY (i) ) ENGINE=InnoDB; CREATE TABLE t2 like t1; INSERT INTO t2 values (1,1); INSERT INTO t1 values (1,1);;
+SET GLOBAL wsrep_provider_options = 'dbug=d,after_cert_and_catch';
+SET SESSION wsrep_sync_wait = 0;
+SET GLOBAL wsrep_applier_threads = 2;
+SET GLOBAL debug = "+d,ordered_commit_blocked";
+ALTER TABLE t1 ENGINE=InnoDB;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET DEBUG_SYNC = "now WAIT_FOR signal.ordered_commit_waiting";
+SET GLOBAL debug = "-d,ordered_commit_blocked";
+SET GLOBAL wsrep_provider_options = 'dbug=d,sync.apply_trx.start_of_apply_trx';
+UPDATE test.t2 JOIN test.t1 USING (i) SET t2.d = t2.d+1, t1.d = t1.d;;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=sync.apply_trx.start_of_apply_trx';
+SET DEBUG_SYNC = "now SIGNAL signal.ordered_commit_continue";
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=after_cert_and_catch';
+DROP TABLE t1, t2;

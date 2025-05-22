@@ -750,7 +750,11 @@ Acl_table_op_status Acl_table_user_writer::finish_operation(
         We should NEVER delete from the user table, as a uses can still
         use mysqld even if he doesn't have any privileges in the user table!
       */
+#ifdef WITH_WSREP
+      if (wsrep_compare_records(m_table, m_thd)) {
+#else
       if (compare_records(m_table)) {
+#endif
         out_error = m_table->file->ha_update_row(m_table->record[1],
                                                  m_table->record[0]);
         assert(out_error != HA_ERR_FOUND_DUPP_KEY);

@@ -3363,6 +3363,15 @@ class THD : public MDL_context_owner,
     rollback. */
   bool wsrep_force_savept_rollback;
 
+  /**
+    Set to true if certification keys were added from sql layer level.
+    Right now, it is used only in assertion in wsrep_commit_empty, so let's keep
+    it only in debug builds.
+   */
+#ifndef NDEBUG
+  bool wsrep_transaction_added_extra_cert_key;
+#endif
+
   /* Used to disable binlog when DDL is executed with wsrep_OSU_method=RSU. */
   std::shared_ptr<Disable_binlog_guard> disable_binlog_guard;
 
