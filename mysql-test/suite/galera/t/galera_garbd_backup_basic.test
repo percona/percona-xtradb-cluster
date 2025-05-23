@@ -1,0 +1,9 @@
+#
+# Test garbd recv-script and post-recv-script handling with basic exit codes enabled
+#
+
+# setup garbd to return basic exit codes (legacy behavior)
+--let $ext_error_codes_opt =
+--let $SST_REQUEST_FAILURE = 1
+--let $SST_SCRIPT_TERMINATED = 1
+--source galera_garbd_backup.inc
