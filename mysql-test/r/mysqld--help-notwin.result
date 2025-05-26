@@ -2181,16 +2181,8 @@ performance-schema-max-rwlock-instances -1
 performance-schema-max-socket-classes 10
 performance-schema-max-socket-instances -1
 performance-schema-max-sql-text-length 1024
-<<<<<<< HEAD
 performance-schema-max-stage-classes 199
-performance-schema-max-statement-classes 234
-||||||| 216560238b1
-performance-schema-max-stage-classes 175
-performance-schema-max-statement-classes 234
-=======
-performance-schema-max-stage-classes 175
 performance-schema-max-statement-classes 237
->>>>>>> percona/ps/release-9.2.0-1
 performance-schema-max-statement-stack 10
 performance-schema-max-table-handles -1
 performance-schema-max-table-instances -1
