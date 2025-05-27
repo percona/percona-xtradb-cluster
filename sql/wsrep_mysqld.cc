@@ -2879,19 +2879,26 @@ static void wsrep_RSU_end(THD *thd) {
 
 void thd_enter_async_monitor(THD *thd) {
   // Only replica worker threads are allowed to enter
+  if (thd->wsrep_applier) return;
+
   if (thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER) {
-    // If the thread is already killed, leave it to the called to handle it.
-    if (thd->killed != THD::NOT_KILLED || thd->wsrep_applier) {
+    // If the thread is already killed, leave it to the caller to handle it.
+    if (thd->killed != THD::NOT_KILLED) {
       return;
     }
     Slave_worker *sw = dynamic_cast<Slave_worker *>(thd->rli_slave);
-    Wsrep_async_monitor *wsrep_async_monitor{sw->get_wsrep_async_monitor()};
-    if (wsrep_async_monitor) {
-      auto seqno = sw->sequence_number();
-      assert(seqno > 0);
-      // TODO: If requied, we must set current_mutex and current_cond here
-      // i.e, thd->enter_cond();
-      wsrep_async_monitor->enter(seqno);
+    // It should never happen. If this is SYSTEM_THREAD_SLAVE_WORKER, but it
+    // is not wsrep applier, it has to be Slave_worker.
+    assert(sw != nullptr);
+    if (sw) {
+      Wsrep_async_monitor *wsrep_async_monitor{sw->get_wsrep_async_monitor()};
+      if (wsrep_async_monitor) {
+        auto seqno = sw->sequence_number();
+        assert(seqno > 0);
+        // TODO: If requied, we must set current_mutex and current_cond here
+        // i.e, thd->enter_cond();
+        wsrep_async_monitor->enter(seqno);
+      }
     }
   }
 }
@@ -2901,11 +2908,16 @@ void thd_leave_async_monitor(THD *thd) {
 
   if (thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER) {
     Slave_worker *sw = dynamic_cast<Slave_worker *>(thd->rli_slave);
-    Wsrep_async_monitor *wsrep_async_monitor{sw->get_wsrep_async_monitor()};
-    if (wsrep_async_monitor) {
-      auto seqno = sw->sequence_number();
-      assert(seqno > 0);
-      wsrep_async_monitor->leave(seqno);
+    // It should never happen. If this is SYSTEM_THREAD_SLAVE_WORKER, but it
+    // is not wsrep applier, it has to be Slave_worker.
+    assert(sw != nullptr);
+    if (sw) {
+      Wsrep_async_monitor *wsrep_async_monitor{sw->get_wsrep_async_monitor()};
+      if (wsrep_async_monitor) {
+        auto seqno = sw->sequence_number();
+        assert(seqno > 0);
+        wsrep_async_monitor->leave(seqno);
+      }
     }
   }
 }

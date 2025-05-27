@@ -186,10 +186,10 @@ static inline bool wsrep_run_commit_hook(THD *thd, bool all) {
   executing slave.
   Let's understand with an example:
   * Topology master <-> slave
-  * Some action is performed on slave which put it out-of-sync from master.
-  * Master then execute same action. Slave may choose to ignore error arising
+  * Some action is performed on slave which puts it out-of-sync from master.
+  * Master then executes same action. Slave may choose to ignore error arising
     from execution of these actions using slave_skip_errors configuration but
-    the GTID sequence increment still need to register on slave to keep it in
+    the GTID sequence increment still needs to register on slave to keep it in
     sync with master. So a dummy trx of this form is created. Galera
     eco-system too will capture this dummy trx and will execute it for
     internal replication to keep GTID sequence consistent across
@@ -547,8 +547,18 @@ static inline void wsrep_commit_empty(THD *thd, bool all) {
      * remove its seqno from the Async monitor.
      *
      * So we remove the seqno of the empty commit here. */
-    thd_enter_async_monitor(thd);
-    thd_leave_async_monitor(thd);
+
+    /* Do it only if the current transaction doesn't own any gtid.
+    It may happen that this is an empty transaction executed on async master
+    but still owning gtid (to skip transaction). Such a case will be handled in
+    MYSQL_BIN_LOG::gtid_end_transaction() when the transaction commits. We will
+    replicate GTID over galera channel. In such a case we will enter and leave
+    async monitor there.`
+    */
+    if (thd->owned_gtid.sidno == 0) {
+      thd_enter_async_monitor(thd);
+      thd_leave_async_monitor(thd);
+    }
     /* The committing transaction was empty but it held some locks and
        got BF aborted. As there were no certified changes in the
        data, we ignore the deadlock error and rely on error reporting

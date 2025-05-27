@@ -2032,7 +2032,7 @@ int MYSQL_BIN_LOG::gtid_end_transaction(THD *thd) {
 #ifdef WITH_WSREP
       if (WSREP_ON && !thd->wsrep_applier) {
         /* If the galera node is acting as async slave then capture
-        GTID event from the async slave applied thread and mark it for
+        GTID event from the async slave applier thread and mark it for
         replication in galera channel. */
         /* We need to replicate GTID events, if their origin is not
         slave thread as well (events do not originate from async master).
