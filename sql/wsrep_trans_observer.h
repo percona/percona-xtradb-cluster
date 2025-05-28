@@ -16,6 +16,7 @@
 #ifndef WSREP_TRANS_OBSERVER_H
 #define WSREP_TRANS_OBSERVER_H
 
+#include "debug_sync.h" /* debug_sync_set_action */
 #include "my_dbug.h"
 #include "service_wsrep.h"
 #include "sql/binlog.h"
@@ -246,6 +247,15 @@ static inline int wsrep_before_prepare(THD *thd, bool all) {
     THD_STAGE_INFO(thd, stage_wsrep_replicating_commit);
   }
 
+  DBUG_EXECUTE_IF("wsrep_before_prepare_before_async_monitor", {
+    const char act[] =
+        "now signal wsrep_before_prepare_before_async_monitor.reached wait_for "
+        "wsrep_before_prepare_before_async_monitor.continue";
+    assert(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
+  });
+
+  thd_enter_async_monitor(thd);
+
   if ((ret = thd->wsrep_cs().before_prepare()) == 0) {
     assert(!thd->wsrep_trx().ws_meta().gtid().is_undefined());
     thd->wsrep_xid.reset();
@@ -264,6 +274,7 @@ static inline int wsrep_before_prepare(THD *thd, bool all) {
       THD_STAGE_INFO(thd, stage_wsrep_write_set_replicated);
     }
   }
+  thd_leave_async_monitor(thd);
   DBUG_RETURN(ret);
 }
 
@@ -296,10 +307,19 @@ static inline int wsrep_before_commit(THD *thd, bool all) {
   WSREP_DEBUG("wsrep_before_commit: %d, %lld", wsrep_is_real(thd, all),
               (long long)wsrep_thd_trx_seqno(thd));
   int ret = 0;
+  bool async_monitor_entered = false;
 
-  /* Enter the async monitor */
-  thd_enter_async_monitor(thd);
-
+  if (!thd->wsrep_cs().transaction().ordered()) {
+    /*
+     In normal case, the transactions should have already been replicated and
+     ordered in wsrep_before_prepare. If it is still not the case (e.g. empty
+     transaction with GTID) it will be replicated and ordered as the part of
+     wsrep_cs().before_commit().
+     Enter the async monitor
+    */
+    thd_enter_async_monitor(thd);
+    async_monitor_entered = true;
+  }
   assert(wsrep_run_commit_hook(thd, all));
   if ((ret = thd->wsrep_cs().before_commit()) == 0) {
     assert(!thd->wsrep_trx().ws_meta().gtid().is_undefined());
@@ -313,6 +333,11 @@ static inline int wsrep_before_commit(THD *thd, bool all) {
     wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
                    thd->wsrep_trx().ws_meta().gtid());
   }
+
+  if (async_monitor_entered) {
+    thd_leave_async_monitor(thd);
+  }
+
   DBUG_RETURN(ret);
 }
 
