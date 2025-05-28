@@ -3018,6 +3018,13 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
     thd->variables.auto_increment_increment = 1;
   }
 
+  DBUG_EXECUTE_IF("wsrep_to_isolation_begin_before_async_monitor", {
+    const char act[] =
+        "now signal wsrep_to_isolation_begin_before_async_monitor.reached "
+        "wait_for wsrep_to_isolation_begin_before_async_monitor.continue";
+    assert(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
+  });
+
   thd_enter_async_monitor(thd);
 
   DEBUG_SYNC(thd, "wsrep_to_isolation_begin_before_replication");
@@ -3053,6 +3060,8 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
         break;
     }
   }
+
+  thd_leave_async_monitor(thd);
 
   DEBUG_SYNC(thd, "wsrep_to_isolation_begin_after_replication");
 
@@ -3092,8 +3101,6 @@ void wsrep_to_isolation_end(THD *thd) {
     assert(0);
   }
   if (wsrep_emulate_bin_log) wsrep_thd_binlog_trx_reset(thd);
-
-  thd_leave_async_monitor(thd);
 
   DEBUG_SYNC(thd, "wsrep_to_isolation_end_before_wsrep_skip_wsrep_hton");
   mysql_mutex_lock(&thd->LOCK_thd_data);

@@ -1,0 +1,24 @@
+include/assert.inc [replica_parallel_type is LOGICAL_CLOCK]
+include/assert.inc [replica_parallel_workers > 1]
+include/assert.inc [replica_preserve_commit_order is ON]
+START REPLICA USER = 'root';
+Warnings:
+Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
+include/assert.inc [binlog_transaction_dependency_tracking is COMMIT_ORDER]
+CREATE TABLE t1 (a INTEGER PRIMARY KEY);
+INSERT INTO t1 VALUES (0);
+SET GLOBAL debug = "+d,wsrep_to_isolation_begin_before_async_monitor";
+SET GLOBAL debug = "+d,wsrep_before_prepare_before_async_monitor";
+# Adding debug point 'set_commit_parent_100' to @@GLOBAL.debug
+INSERT INTO t1 VALUES (1);
+CREATE TABLE t2 (a INT PRIMARY KEY);
+# Removing debug point 'set_commit_parent_100' from @@GLOBAL.debug
+SET DEBUG_SYNC = 'now WAIT_FOR wsrep_to_isolation_begin_before_async_monitor.reached';
+SET DEBUG_SYNC = 'now WAIT_FOR wsrep_before_prepare_before_async_monitor.reached';
+SET GLOBAL debug = "-d,wsrep_to_isolation_begin_before_async_monitor";
+SET GLOBAL debug = "-d,wsrep_before_prepare_before_async_monitor";
+SET DEBUG_SYNC = 'now SIGNAL wsrep_to_isolation_begin_before_async_monitor.continue';
+SET DEBUG_SYNC = 'now SIGNAL wsrep_before_prepare_before_async_monitor.continue';
+DROP TABLE t1, t2;
+STOP REPLICA;
+RESET REPLICA ALL;
