@@ -99,7 +99,33 @@ REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'mysql.pxc.sst.role'@localhost;
 
 -- Needed by sst_xtrabackup-v2
 GRANT LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER, INNODB_REDO_LOG_ARCHIVE ON *.* TO 'mysql.pxc.sst.role'@localhost;
-GRANT ALTER, CREATE, SELECT, INSERT ON PERCONA_SCHEMA.xtrabackup_history TO 'mysql.pxc.sst.role'@localhost;
+
+DROP PROCEDURE IF EXISTS conditional_grants;
+DELIMITER $$
+CREATE PROCEDURE conditional_grants()
+BEGIN
+    DECLARE lctn INT DEFAULT 0;
+
+    -- Get the value of lower_case_table_names
+    SET lctn = @@lower_case_table_names;
+
+    IF lctn = 1 THEN
+        -- Case-insensitive system: use lowercase schema/table
+        GRANT ALTER, CREATE, SELECT, INSERT ON percona_schema.xtrabackup_history TO 'mysql.pxc.sst.role'@'localhost';
+        -- Need this to create the percona_schema database if needed
+        GRANT CREATE ON percona_schema.* TO 'mysql.pxc.sst.role'@localhost;
+    ELSE
+        -- Case-sensitive system: match the exact case used when creating DB
+        GRANT ALTER, CREATE, SELECT, INSERT ON PERCONA_SCHEMA.xtrabackup_history TO 'mysql.pxc.sst.role'@'localhost';
+        -- Need this to create the PERCONA_SCHEMA database if needed
+        GRANT CREATE ON PERCONA_SCHEMA.* TO 'mysql.pxc.sst.role'@localhost;
+    END IF;
+END $$
+DELIMITER ;
+
+CALL conditional_grants();
+
+DROP PROCEDURE conditional_grants;
 
 -- Common. WITH GRANT OPTION is needed by clone-sst script
 GRANT BACKUP_ADMIN, EXECUTE ON *.* TO 'mysql.pxc.sst.role'@localhost WITH GRANT OPTION;
@@ -116,9 +142,6 @@ GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost WITH GRAN
 GRANT CLONE_ADMIN, SYSTEM_USER, SHUTDOWN, CONNECTION_ADMIN, CREATE USER, CREATE ROLE, DROP ROLE, SYSTEM_VARIABLES_ADMIN ON *.* TO 'mysql.pxc.sst.role'@localhost;
 GRANT INSERT, DELETE ON mysql.plugin TO 'mysql.pxc.sst.role'@localhost;
 GRANT UPDATE, INSERT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost;
-
--- Need this to create the PERCONA_SCHEMA database if needed
-GRANT CREATE ON PERCONA_SCHEMA.* to 'mysql.pxc.sst.role'@localhost;
 
 -- this is a plugin priv that might not be registered
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.infoschema', 'localhost', 'AUDIT_ABORT_EXEMPT', 'N');
