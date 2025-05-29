@@ -1,0 +1,9 @@
+!include ../galera_2nodes.cnf
+
+[mysqld]
+wsrep_sst_method=xtrabackup-v2
+wsrep_debug=1
+lower_case_table_names=1
+
+[xtrabackup]
+history=backup
