@@ -120,7 +120,10 @@ INSERT INTO x2 (f2) VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
 --connection node_1
 set wsrep_on=0;
 FLUSH STATUS;
+
+# deprecated in 9.2 but still supported
 FLUSH PRIVILEGES;
+
 FLUSH USER_RESOURCES;
 FLUSH TABLES;
 FLUSH TABLES t2;

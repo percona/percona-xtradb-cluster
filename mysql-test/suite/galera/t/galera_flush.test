@@ -33,7 +33,7 @@ TRUNCATE TABLE performance_schema.host_cache;
 
 #-------------------------------------------------------------------------------
 #
-# Test: FLUSH PRIVILEGES
+# Test: FLUSH PRIVILEGES (deprecated in 9.2)
 #
 --connection node_1
 SET SESSION wsrep_replicate_myisam = TRUE;

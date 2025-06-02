@@ -27,6 +27,7 @@ mysql.pxc.internal.session	localhost	BINLOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
+mysql.pxc.internal.session	localhost	CREATE_SPATIAL_REFERENCE_SYSTEM	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
 mysql.pxc.internal.session	localhost	FIREWALL_EXEMPT	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
@@ -140,6 +141,7 @@ mysql.pxc.internal.session	localhost	BINLOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
+mysql.pxc.internal.session	localhost	CREATE_SPATIAL_REFERENCE_SYSTEM	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
 mysql.pxc.internal.session	localhost	FIREWALL_EXEMPT	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
@@ -254,6 +256,7 @@ mysql.pxc.internal.session	localhost	BINLOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
+mysql.pxc.internal.session	localhost	CREATE_SPATIAL_REFERENCE_SYSTEM	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
 mysql.pxc.internal.session	localhost	FIREWALL_EXEMPT	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
@@ -379,6 +382,7 @@ mysql.pxc.internal.session	localhost	BINLOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
+mysql.pxc.internal.session	localhost	CREATE_SPATIAL_REFERENCE_SYSTEM	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
 mysql.pxc.internal.session	localhost	FIREWALL_EXEMPT	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
@@ -498,6 +502,7 @@ mysql.pxc.internal.session	localhost	BINLOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
+mysql.pxc.internal.session	localhost	CREATE_SPATIAL_REFERENCE_SYSTEM	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
 mysql.pxc.internal.session	localhost	FIREWALL_EXEMPT	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
@@ -610,6 +615,7 @@ mysql.pxc.internal.session	localhost	BINLOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
+mysql.pxc.internal.session	localhost	CREATE_SPATIAL_REFERENCE_SYSTEM	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
 mysql.pxc.internal.session	localhost	FIREWALL_EXEMPT	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
@@ -749,6 +755,7 @@ mysql.pxc.internal.session	localhost	BINLOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
+mysql.pxc.internal.session	localhost	CREATE_SPATIAL_REFERENCE_SYSTEM	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
 mysql.pxc.internal.session	localhost	FIREWALL_EXEMPT	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
@@ -875,6 +882,7 @@ mysql.pxc.internal.session	localhost	BINLOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
+mysql.pxc.internal.session	localhost	CREATE_SPATIAL_REFERENCE_SYSTEM	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
 mysql.pxc.internal.session	localhost	FIREWALL_EXEMPT	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
@@ -1009,6 +1017,7 @@ mysql.pxc.internal.session	localhost	BINLOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	CLONE_ADMIN	Y
 mysql.pxc.internal.session	localhost	CONNECTION_ADMIN	Y
+mysql.pxc.internal.session	localhost	CREATE_SPATIAL_REFERENCE_SYSTEM	Y
 mysql.pxc.internal.session	localhost	ENCRYPTION_KEY_ADMIN	Y
 mysql.pxc.internal.session	localhost	FIREWALL_EXEMPT	Y
 mysql.pxc.internal.session	localhost	FLUSH_OPTIMIZER_COSTS	Y
@@ -1599,13 +1608,7 @@ GRANT ALL ON *.* TO u1@localhost;
 SHOW GRANTS;
 Grants for u1@localhost
 GRANT <ALL_STATIC_PRIVILEGES> ON *.* TO `u1`@`localhost`
-<<<<<<< HEAD
 GRANT <ALL_DYNAMIC_PRIVILEGES> ON *.* TO `u1`@`localhost`
-||||||| 216560238b1
-GRANT ALLOW_NONEXISTENT_DEFINER,APPLICATION_PASSWORD_ADMIN,AUDIT_ADMIN,AUTHENTICATION_POLICY_ADMIN,BACKUP_ADMIN,BINLOG_ADMIN,BINLOG_ENCRYPTION_ADMIN,CLONE_ADMIN,CONNECTION_ADMIN,ENCRYPTION_KEY_ADMIN,FLUSH_OPTIMIZER_COSTS,FLUSH_PRIVILEGES,FLUSH_STATUS,FLUSH_TABLES,FLUSH_USER_RESOURCES,GROUP_REPLICATION_ADMIN,GROUP_REPLICATION_STREAM,INNODB_REDO_LOG_ARCHIVE,INNODB_REDO_LOG_ENABLE,OPTIMIZE_LOCAL_TABLE,PASSWORDLESS_USER_ADMIN,PERSIST_RO_VARIABLES_ADMIN,REPLICATION_APPLIER,REPLICATION_SLAVE_ADMIN,RESOURCE_GROUP_ADMIN,RESOURCE_GROUP_USER,ROLE_ADMIN,SENSITIVE_VARIABLES_OBSERVER,SERVICE_CONNECTION_ADMIN,SESSION_VARIABLES_ADMIN,SET_ANY_DEFINER,SHOW_ROUTINE,SYSTEM_USER,SYSTEM_VARIABLES_ADMIN,TABLE_ENCRYPTION_ADMIN,TELEMETRY_LOG_ADMIN,TRANSACTION_GTID_TAG,XA_RECOVER_ADMIN ON *.* TO `u1`@`localhost`
-=======
-GRANT ALLOW_NONEXISTENT_DEFINER,APPLICATION_PASSWORD_ADMIN,AUDIT_ADMIN,AUTHENTICATION_POLICY_ADMIN,BACKUP_ADMIN,BINLOG_ADMIN,BINLOG_ENCRYPTION_ADMIN,CLONE_ADMIN,CONNECTION_ADMIN,CREATE_SPATIAL_REFERENCE_SYSTEM,ENCRYPTION_KEY_ADMIN,FLUSH_OPTIMIZER_COSTS,FLUSH_PRIVILEGES,FLUSH_STATUS,FLUSH_TABLES,FLUSH_USER_RESOURCES,GROUP_REPLICATION_ADMIN,GROUP_REPLICATION_STREAM,INNODB_REDO_LOG_ARCHIVE,INNODB_REDO_LOG_ENABLE,OPTIMIZE_LOCAL_TABLE,PASSWORDLESS_USER_ADMIN,PERSIST_RO_VARIABLES_ADMIN,REPLICATION_APPLIER,REPLICATION_SLAVE_ADMIN,RESOURCE_GROUP_ADMIN,RESOURCE_GROUP_USER,ROLE_ADMIN,SENSITIVE_VARIABLES_OBSERVER,SERVICE_CONNECTION_ADMIN,SESSION_VARIABLES_ADMIN,SET_ANY_DEFINER,SHOW_ROUTINE,SYSTEM_USER,SYSTEM_VARIABLES_ADMIN,TABLE_ENCRYPTION_ADMIN,TELEMETRY_LOG_ADMIN,TRANSACTION_GTID_TAG,XA_RECOVER_ADMIN ON *.* TO `u1`@`localhost`
->>>>>>> percona/ps/release-9.2.0-1
 REVOKE ALL ON *.* FROM CURRENT_USER();
 SHOW GRANTS;
 Grants for u1@localhost

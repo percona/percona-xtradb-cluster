@@ -3,9 +3,13 @@ TRUNCATE TABLE performance_schema.host_cache;
 SET SESSION wsrep_replicate_myisam = TRUE;
 CREATE USER 'user1'@'localhost' IDENTIFIED BY 'pass1';
 FLUSH PRIVILEGES;
+Warnings:
+Warning	1681	'FLUSH PRIVILEGES' is deprecated and will be removed in a future release.
 DELETE FROM mysql.user WHERE user = 'user1';
 SET SESSION wsrep_replicate_myisam = FALSE;
 FLUSH PRIVILEGES;
+Warnings:
+Warning	1681	'FLUSH PRIVILEGES' is deprecated and will be removed in a future release.
 FLUSH STATUS;
 FLUSH USER_RESOURCES;
 FLUSH TABLES;

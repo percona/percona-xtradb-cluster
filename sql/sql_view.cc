@@ -1848,9 +1848,12 @@ bool mysql_drop_view(THD *thd, Table_ref *views) {
 #ifdef WITH_WSREP
     /* WSREP flow does this check before kick-starting final view drop
     so that it can safely initiate TOI replication. */
-    if (at != NULL) {
-      const dd::View *vw = dynamic_cast<const dd::View *>(at);
 
+    /* If the view does not exist or table with the same name exists,
+     we are skipping this at */
+    if (!(view_does_not_exist || base_table_with_same_name_exists)) {
+      const dd::View *vw = dynamic_cast<const dd::View *>(at);
+      assert(vw);
       /*
         If definer has the SYSTEM_USER privilege then invoker can drop view
         only if latter also has same privilege.

@@ -7,7 +7,6 @@ CREATE USER 'testme'@'%' IDENTIFIED BY 'secret';
 GRANT SELECT ON testdb.* TO 'testme'@'%';
 GRANT INSERT ON testdb.counter TO 'testme'@'%';
 CREATE USER 'testother'@'%' IDENTIFIED BY 'secret2';
-FLUSH PRIVILEGES;
 # connection node_1
 use testdb;
 SET GLOBAL debug= 'd,sql_cmd.before_toi_begin.log_command';
@@ -26,7 +25,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT, CREATE ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 CREATE TABLE t2(id INT PRIMARY KEY AUTO_INCREMENT);
@@ -42,7 +40,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 DROP TABLE t2;
 #
 # SQLCOM_CREATE_INDEX access test
@@ -54,7 +51,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT, INDEX ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 CREATE INDEX index_t1_f2 ON t1(f2);
@@ -70,7 +66,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 DROP INDEX index_t1_f2 ON t1;
 #
 # SQLCOM_ALTER_TABLE access test
@@ -82,7 +77,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT, ALTER ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 ALTER TABLE t1 ADD COLUMN f3 LONGBLOB;
@@ -98,7 +92,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 ALTER TABLE t1 DROP COLUMN f3;
 #
 # SQLCOM_TRUNCATE access test
@@ -110,7 +103,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT, DROP ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 TRUNCATE TABLE t1;
@@ -126,7 +118,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 INSERT INTO t1(f2) VALUES(1);
 #
 # SQLCOM_DROP_TABLE access test
@@ -138,7 +129,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT, DROP ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 DROP TABLE t1;
@@ -154,7 +144,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 CREATE TABLE t1(id INT PRIMARY KEY AUTO_INCREMENT, f2 CHAR(64));
 INSERT INTO t1(f2) VALUES(1);
 #
@@ -170,7 +159,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT, INDEX ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 DROP INDEX t1_f2 ON t1;
@@ -186,7 +174,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_GRANT access test
 #
@@ -197,7 +184,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%` WITH GRANT OPTION
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 GRANT SELECT ON testdb.* TO 'testother'@'%';
@@ -219,7 +205,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_CREATE_DB access test
 #
@@ -232,7 +217,6 @@ Grants for testme@%
 GRANT CREATE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 CREATE DATABASE testdbother;
@@ -248,7 +232,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 DROP DATABASE testdbother;
 #
 # SQLCOM_DROP_DB access test
@@ -263,7 +246,6 @@ GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 GRANT DROP ON *.* TO 'testme'@'%';
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 DROP DATABASE testdbother;
@@ -279,7 +261,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_ALTER_DB access test
 #
@@ -290,7 +271,6 @@ Grants for testme@%
 GRANT ALTER ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 CREATE DATABASE testdbother;
 SHOW CREATE DATABASE testdbother;
 Database	Create Database
@@ -315,7 +295,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_REPAIR access test
 #
@@ -326,7 +305,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT, INSERT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 REPAIR TABLE t1;
@@ -344,13 +322,11 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_DROP_FUNCTION access test
 #
 # connection node_1
 GRANT CREATE ROUTINE ON testdb.* TO 'testme'@'%';
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 CREATE FUNCTION hello2 (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT('Hello again, ',s,'!');
@@ -366,7 +342,6 @@ GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT, CREATE ROUTINE, ALTER ROUTINE ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 GRANT EXECUTE, ALTER ROUTINE ON FUNCTION `testdb`.`hello2` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 DROP FUNCTION hello2;
@@ -383,13 +358,11 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_REVOKE access test
 #
 # connection node_1
 GRANT SELECT ON testdb.t1 TO 'testother'@'%';
-FLUSH PRIVILEGES;
 # connection node_1
 SHOW GRANTS FOR 'testother';
 Grants for testother@%
@@ -409,7 +382,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%` WITH GRANT OPTION
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 REVOKE SELECT ON testdb.t1 FROM 'testother'@'%';
@@ -431,7 +403,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_OPTIMIZE access test
 #
@@ -442,7 +413,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT, INSERT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 OPTIMIZE TABLE t1;
@@ -461,7 +431,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_ANALYZE access test
 #
@@ -472,7 +441,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT, INSERT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 ANALYZE TABLE t1;
@@ -490,7 +458,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_RENAME_TABLE access test
 #
@@ -501,7 +468,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT, INSERT, CREATE, DROP, ALTER ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 RENAME TABLE t1 to t2;
@@ -518,7 +484,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_CREATE_USER access test
 #
@@ -529,7 +494,6 @@ Grants for testme@%
 GRANT CREATE USER ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 CREATE USER 'foo'@'%' IDENTIFIED BY 'secret';
@@ -546,7 +510,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_DROP_USER access test
 #
@@ -558,7 +521,6 @@ Grants for testme@%
 GRANT CREATE USER ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 DROP USER 'testdbother'@'%';
@@ -574,7 +536,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_RENAME_USER access test
 #
@@ -585,7 +546,6 @@ Grants for testme@%
 GRANT CREATE USER ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 RENAME USER 'testother'@'%' TO 'testwho'@'%';
@@ -604,7 +564,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_REVOKE_ALL access test
 #
@@ -615,7 +574,6 @@ SHOW GRANTS FOR 'foo';
 Grants for foo@%
 GRANT USAGE ON *.* TO `foo`@`%`
 GRANT SELECT ON `testdb`.`t1` TO `foo`@`%`
-FLUSH PRIVILEGES;
 # connection node_1
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
@@ -623,7 +581,6 @@ GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 GRANT CREATE USER ON *.* TO 'testme'@'%';
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'foo'@'%';
@@ -644,7 +601,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_CREATE_PROCEDURE access test
 #
@@ -655,7 +611,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT, EXECUTE, CREATE ROUTINE, ALTER ROUTINE ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 CREATE PROCEDURE hellop (OUT ver_param VARCHAR(64), INOUT incr_param INT)
@@ -674,7 +629,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_CREATE_SPFUNCTION access test
 #
@@ -685,7 +639,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT, EXECUTE, CREATE ROUTINE, ALTER ROUTINE ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 CREATE FUNCTION hello (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT('Hello, ',s,'!');
@@ -702,7 +655,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_CREATE_SPFUNCTION (with log_bin_trust_function_creators=OFF) access test
 #
@@ -719,7 +671,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT ALL PRIVILEGES ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 CREATE FUNCTION hello (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT('Hello, ',s,'!');
@@ -738,7 +689,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 SET @@global.log_bin_trust_function_creators= @old_log_bin_trust_function_creators;
 Warnings:
 Warning	1287	'@@log_bin_trust_function_creators' is deprecated and will be removed in a future release.
@@ -747,7 +697,6 @@ Warning	1287	'@@log_bin_trust_function_creators' is deprecated and will be remov
 #
 # connection node_1
 GRANT CREATE ROUTINE ON testdb.* TO 'testme'@'%';
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 CREATE PROCEDURE hellop (OUT ver_param VARCHAR(25), INOUT incr_param INT)
@@ -765,7 +714,6 @@ GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT, CREATE ROUTINE, ALTER ROUTINE ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 GRANT EXECUTE, ALTER ROUTINE ON PROCEDURE `testdb`.`hellop` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 DROP PROCEDURE hellop;
@@ -781,13 +729,11 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_ALTER_PROCEDURE access test
 #
 # connection node_1
 GRANT CREATE ROUTINE ON testdb.* TO 'testme'@'%';
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 CREATE PROCEDURE hellop (OUT ver_param VARCHAR(25), INOUT incr_param INT)
@@ -808,7 +754,6 @@ GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT, CREATE ROUTINE, ALTER ROUTINE ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 GRANT EXECUTE, ALTER ROUTINE ON PROCEDURE `testdb`.`hellop` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 ALTER PROCEDURE hellop SQL SECURITY INVOKER;
@@ -826,13 +771,11 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_ALTER_FUNCTION access test
 #
 # connection node_1
 GRANT CREATE ROUTINE ON testdb.* TO 'testme'@'%';
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 CREATE FUNCTION hellof (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT('Hello again, ',s,'!');
@@ -851,7 +794,6 @@ GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT, CREATE ROUTINE, ALTER ROUTINE ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 GRANT EXECUTE, ALTER ROUTINE ON FUNCTION `testdb`.`hellof` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 ALTER FUNCTION hellof SQL SECURITY INVOKER;
@@ -869,7 +811,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_CREATE_VIEW access test
 #
@@ -880,7 +821,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT, CREATE VIEW ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 CREATE VIEW testview AS SELECT * FROM t1;
@@ -896,13 +836,11 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_DROP_VIEW access test
 #
 # connection node_1
 GRANT CREATE VIEW ON testdb.* TO 'testme'@'%';
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 CREATE VIEW helloview AS SELECT * FROM t1;
@@ -917,7 +855,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT, DROP, CREATE VIEW ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 DROP VIEW helloview;
@@ -934,7 +871,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_CREATE_TRIGGER access test
 #
@@ -945,7 +881,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT, TRIGGER ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 CREATE TRIGGER testtrigger BEFORE INSERT ON t1 FOR EACH ROW SET @sum = @sum + 1;
@@ -962,7 +897,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_DROP_TRIGGER access test
 #
@@ -979,7 +913,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT, TRIGGER ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 DROP TRIGGER hellotrigger;
@@ -995,7 +928,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_INSTALL_COMPONENT access test
 #
@@ -1006,7 +938,6 @@ Grants for testme@%
 GRANT INSERT ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 INSTALL COMPONENT 'file://component_audit_log_filter';
@@ -1025,7 +956,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_UNINSTALL_COMPONENT access test
 #
@@ -1040,7 +970,6 @@ Grants for testme@%
 GRANT DELETE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 UNINSTALL COMPONENT 'file://component_audit_log_filter';
@@ -1056,7 +985,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_CREATE_EVENT access test
 #
@@ -1067,7 +995,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT, EVENT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 CREATE EVENT testevent
@@ -1086,13 +1013,11 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_ALTER_EVENT access test
 #
 # connection node_1
 GRANT EVENT ON testdb.* TO 'testme'@'%';
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 CREATE EVENT helloevent
@@ -1109,7 +1034,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT, EVENT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 ALTER EVENT helloevent ON SCHEDULE EVERY '2:3' DAY_HOUR;
@@ -1125,7 +1049,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_DROP_EVENT access test
 #
@@ -1136,7 +1059,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT, EVENT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 DROP EVENT helloevent;
@@ -1152,7 +1074,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # SQLCOM_ALTER_USER access test
 #
@@ -1165,7 +1086,6 @@ Grants for testme@%
 GRANT CREATE USER ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
 ALTER USER 'testother'@'%' PASSWORD EXPIRE;
@@ -1181,7 +1101,6 @@ Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
 GRANT SELECT ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
-FLUSH PRIVILEGES;
 #
 # cleanup
 #

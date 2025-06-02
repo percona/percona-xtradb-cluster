@@ -158,8 +158,6 @@ GRANT INSERT ON testdb.counter TO 'testme'@'%';
 
 CREATE USER 'testother'@'%' IDENTIFIED BY 'secret2';
 
-FLUSH PRIVILEGES;
-
 --let $rpl_debug= 0
 
 --connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
@@ -194,7 +192,6 @@ use testdb;
 GRANT CREATE ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -229,7 +226,6 @@ CREATE TABLE t2(id INT PRIMARY KEY AUTO_INCREMENT);
 REVOKE CREATE ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 DROP TABLE t2;
 
@@ -248,7 +244,6 @@ DROP TABLE t2;
 GRANT INDEX ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -284,7 +279,6 @@ CREATE INDEX index_t1_f2 ON t1(f2);
 REVOKE INDEX ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 DROP INDEX index_t1_f2 ON t1;
 
@@ -303,7 +297,6 @@ DROP INDEX index_t1_f2 ON t1;
 GRANT ALTER ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -338,7 +331,6 @@ ALTER TABLE t1 ADD COLUMN f3 LONGBLOB;
 REVOKE ALTER ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 ALTER TABLE t1 DROP COLUMN f3;
 
@@ -357,7 +349,6 @@ ALTER TABLE t1 DROP COLUMN f3;
 GRANT DROP ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -392,7 +383,6 @@ TRUNCATE TABLE t1;
 REVOKE DROP ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 INSERT INTO t1(f2) VALUES(1);
 
@@ -411,7 +401,6 @@ INSERT INTO t1(f2) VALUES(1);
 GRANT DROP ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -446,7 +435,6 @@ DROP TABLE t1;
 REVOKE DROP ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 CREATE TABLE t1(id INT PRIMARY KEY AUTO_INCREMENT, f2 CHAR(64));
 INSERT INTO t1(f2) VALUES(1);
@@ -475,7 +463,6 @@ CREATE INDEX t1_f2 ON t1(f2);
 GRANT INDEX ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -511,7 +498,6 @@ DROP INDEX t1_f2 ON t1;
 REVOKE INDEX ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 
 #
@@ -528,7 +514,6 @@ FLUSH PRIVILEGES;
 GRANT GRANT OPTION ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -561,7 +546,6 @@ SHOW GRANTS FOR 'testother';
 REVOKE GRANT OPTION ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 
 #
@@ -585,7 +569,6 @@ FLUSH PRIVILEGES;
 GRANT CREATE ON *.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -620,7 +603,6 @@ CREATE DATABASE testdbother;
 REVOKE CREATE ON *.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 DROP DATABASE testdbother;
 
@@ -648,7 +630,6 @@ CREATE DATABASE testdbother;
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
 GRANT DROP ON *.* TO 'testme'@'%';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -683,7 +664,6 @@ DROP DATABASE testdbother;
 REVOKE DROP ON *.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 
 #
@@ -700,7 +680,6 @@ FLUSH PRIVILEGES;
 GRANT ALTER ON *.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 CREATE DATABASE testdbother;
 SHOW CREATE DATABASE testdbother;
 
@@ -736,7 +715,6 @@ DROP DATABASE testdbother;
 REVOKE ALTER ON *.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 
 #
@@ -754,7 +732,6 @@ FLUSH PRIVILEGES;
 GRANT INSERT ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -795,7 +772,6 @@ REPAIR TABLE t1;
 REVOKE INSERT ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 
 #
@@ -812,7 +788,6 @@ FLUSH PRIVILEGES;
 --echo # connection node_1
 --connection node_1
 GRANT CREATE ROUTINE ON testdb.* TO 'testme'@'%';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -838,7 +813,6 @@ CREATE FUNCTION hello2 (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT
 GRANT ALTER ROUTINE ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -876,7 +850,6 @@ REVOKE CREATE ROUTINE ON testdb.* FROM 'testme'@'%';
 REVOKE ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 
 #
@@ -893,7 +866,6 @@ FLUSH PRIVILEGES;
 --echo # connection node_1
 --connection node_1
 GRANT SELECT ON testdb.t1 TO 'testother'@'%';
-FLUSH PRIVILEGES;
 
 --echo # connection node_1
 --connection node_1
@@ -910,7 +882,6 @@ SHOW GRANTS FOR 'testother';
 GRANT GRANT OPTION ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -945,7 +916,6 @@ SHOW GRANTS FOR 'testother';
 REVOKE GRANT OPTION ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 
 #
@@ -963,7 +933,6 @@ FLUSH PRIVILEGES;
 GRANT INSERT ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -1004,7 +973,6 @@ OPTIMIZE TABLE t1;
 REVOKE INSERT ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 
 #
@@ -1022,7 +990,6 @@ FLUSH PRIVILEGES;
 GRANT INSERT ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -1063,7 +1030,6 @@ ANALYZE TABLE t1;
 REVOKE INSERT ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 
 #
@@ -1080,7 +1046,6 @@ FLUSH PRIVILEGES;
 GRANT ALTER,DROP,CREATE,INSERT ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -1117,7 +1082,6 @@ RENAME TABLE t2 to t1;
 REVOKE ALTER,DROP,CREATE,INSERT ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 
 #
@@ -1134,7 +1098,6 @@ FLUSH PRIVILEGES;
 GRANT CREATE USER ON *.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -1171,7 +1134,6 @@ DROP USER foo;
 REVOKE CREATE USER ON *.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 
 #
@@ -1195,7 +1157,6 @@ CREATE USER 'testdbother'@'%' IDENTIFIED BY 'secret2';
 GRANT CREATE USER ON *.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -1230,7 +1191,6 @@ DROP USER 'testdbother'@'%';
 REVOKE CREATE USER ON *.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 
 #
@@ -1247,7 +1207,6 @@ FLUSH PRIVILEGES;
 GRANT CREATE USER ON *.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -1292,7 +1251,6 @@ RENAME USER 'testwho'@'%' TO 'testother'@'%';
 REVOKE CREATE USER ON *.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 
 #
@@ -1312,7 +1270,6 @@ CREATE USER 'foo'@'%' IDENTIFIED BY 'secret';
 GRANT SELECT ON testdb.t1 TO 'foo'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'foo';
-FLUSH PRIVILEGES;
 
 --connection node_2
 --let $wait_condition = SELECT COUNT(*) = 1 FROM mysql.user WHERE User = 'foo';
@@ -1323,7 +1280,6 @@ FLUSH PRIVILEGES;
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
 GRANT CREATE USER ON *.* TO 'testme'@'%';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -1358,7 +1314,6 @@ DROP USER foo;
 REVOKE CREATE USER ON *.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 
 #
@@ -1375,7 +1330,6 @@ FLUSH PRIVILEGES;
 GRANT CREATE ROUTINE,EXECUTE,ALTER ROUTINE ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -1414,7 +1368,6 @@ DROP PROCEDURE hellop;
 REVOKE CREATE ROUTINE,EXECUTE,ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 
 #
@@ -1431,7 +1384,6 @@ FLUSH PRIVILEGES;
 GRANT CREATE ROUTINE,EXECUTE,ALTER ROUTINE ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -1468,7 +1420,6 @@ DROP FUNCTION hello;
 REVOKE CREATE ROUTINE,EXECUTE,ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo #
 --echo # SQLCOM_CREATE_SPFUNCTION (with log_bin_trust_function_creators=OFF) access test
@@ -1489,7 +1440,6 @@ SET global log_bin_trust_function_creators=OFF;
 GRANT ALL PRIVILEGES ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -1529,7 +1479,6 @@ GRANT SELECT ON testdb.* TO 'testme'@'%';
 GRANT INSERT ON testdb.counter TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 SET @@global.log_bin_trust_function_creators= @old_log_bin_trust_function_creators;
 
 #
@@ -1546,7 +1495,6 @@ SET @@global.log_bin_trust_function_creators= @old_log_bin_trust_function_creato
 --echo # connection node_1
 --connection node_1
 GRANT CREATE ROUTINE ON testdb.* TO 'testme'@'%';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -1574,7 +1522,6 @@ END;
 GRANT ALTER ROUTINE ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -1611,7 +1558,6 @@ REVOKE CREATE ROUTINE ON testdb.* FROM 'testme'@'%';
 REVOKE ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 
 #
@@ -1628,7 +1574,6 @@ FLUSH PRIVILEGES;
 --echo # connection node_1
 --connection node_1
 GRANT CREATE ROUTINE ON testdb.* TO 'testme'@'%';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -1658,7 +1603,6 @@ SELECT routine_name, security_type FROM information_schema.routines where ROUTIN
 GRANT ALTER ROUTINE ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -1700,7 +1644,6 @@ REVOKE CREATE ROUTINE ON testdb.* FROM 'testme'@'%';
 REVOKE ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 
 #
@@ -1717,7 +1660,6 @@ FLUSH PRIVILEGES;
 --echo # connection node_1
 --connection node_1
 GRANT CREATE ROUTINE ON testdb.* TO 'testme'@'%';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -1745,7 +1687,6 @@ SELECT routine_name, security_type FROM information_schema.routines where ROUTIN
 GRANT ALTER ROUTINE ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -1787,7 +1728,6 @@ REVOKE CREATE ROUTINE ON testdb.* FROM 'testme'@'%';
 REVOKE ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 
 #
@@ -1804,7 +1744,6 @@ FLUSH PRIVILEGES;
 GRANT CREATE VIEW ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -1840,7 +1779,6 @@ DROP VIEW testview;
 REVOKE CREATE VIEW ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 
 #
@@ -1857,7 +1795,6 @@ FLUSH PRIVILEGES;
 --echo # connection node_1
 --connection node_1
 GRANT CREATE VIEW ON testdb.* TO 'testme'@'%';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -1888,7 +1825,6 @@ CREATE VIEW helloview AS SELECT * FROM t1;
 GRANT DROP ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -1926,7 +1862,6 @@ REVOKE CREATE VIEW ON testdb.* FROM 'testme'@'%';
 REVOKE DROP ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 
 #
@@ -1943,7 +1878,6 @@ FLUSH PRIVILEGES;
 GRANT TRIGGER ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -1981,7 +1915,6 @@ DROP TRIGGER testtrigger;
 REVOKE TRIGGER ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 
 #
@@ -2016,7 +1949,6 @@ CREATE TRIGGER hellotrigger BEFORE INSERT ON t1 FOR EACH ROW SET @sum = @sum + 1
 GRANT TRIGGER ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -2053,7 +1985,6 @@ DROP TRIGGER hellotrigger;
 REVOKE TRIGGER ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 #
 # Q: Why do we use node_1a, node_2a below instead of node_1, node_2?
@@ -2086,7 +2017,6 @@ FLUSH PRIVILEGES;
 GRANT INSERT ON *.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -2131,7 +2061,6 @@ UNINSTALL COMPONENT 'file://component_audit_log_filter';
 REVOKE INSERT ON *.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 --disconnect node_1a
 
 
@@ -2170,7 +2099,6 @@ INSTALL COMPONENT 'file://component_audit_log_filter';
 GRANT DELETE ON *.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 # disconnect to release cached component refereces
 --disconnect node_1a
@@ -2213,7 +2141,6 @@ UNINSTALL COMPONENT 'file://component_audit_log_filter';
 REVOKE DELETE ON *.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 
 #
@@ -2230,7 +2157,6 @@ FLUSH PRIVILEGES;
 GRANT EVENT ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -2270,7 +2196,6 @@ DROP EVENT testevent;
 REVOKE EVENT ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 
 #
@@ -2287,7 +2212,6 @@ FLUSH PRIVILEGES;
 --echo # connection node_1
 --connection node_1
 GRANT EVENT ON testdb.* TO 'testme'@'%';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -2316,7 +2240,6 @@ CREATE EVENT helloevent
 GRANT EVENT ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -2355,7 +2278,6 @@ ALTER EVENT helloevent ON SCHEDULE EVERY '2:3' DAY_HOUR;
 REVOKE EVENT ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 
 #
@@ -2372,7 +2294,6 @@ FLUSH PRIVILEGES;
 GRANT EVENT ON testdb.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -2407,7 +2328,6 @@ DROP EVENT helloevent;
 REVOKE EVENT ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 
 #
@@ -2434,7 +2354,6 @@ FLUSH PRIVILEGES;
 GRANT CREATE USER ON *.* TO 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo # connection node_testme
 --disconnect node_testme
@@ -2470,7 +2389,6 @@ ALTER USER 'testother'@'%' PASSWORD EXPIRE;
 REVOKE CREATE USER ON *.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
-FLUSH PRIVILEGES;
 
 --echo #
 --echo # cleanup
@@ -2483,4 +2401,3 @@ SET GLOBAL debug= '';
 
 --connection node_2
 SET GLOBAL debug= '';
-

@@ -1778,9 +1778,9 @@ DELETE FROM global_grants WHERE PRIV = 'SET_USER_ID';
 -- Add the privilege CREATE_SPATIAL_REFERENCE_SYSTEM for every user who has the privilege SUPER
 -- provided that there isn't a user who already has the privilege CREATE_SPATIAL_REFERENCE_SYSTEM.
 SET @hadCreateSpatialRefrenceSystem =
-  (SELECT COUNT(*) FROM global_grants WHERE priv = 'CREATE_SPATIAL_REFERENCE_SYSTEM');
+  (SELECT COUNT(*) FROM global_grants WHERE priv = 'CREATE_SPATIAL_REFERENCE_SYSTEM' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
 INSERT INTO global_grants SELECT user, host, 'CREATE_SPATIAL_REFERENCE_SYSTEM', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE super_priv = 'Y' AND @hadCreateSpatialRefrenceSystem = 0 AND user NOT IN ('mysql.infoschema','mysql.session','mysql.sys');
+FROM mysql.user WHERE super_priv = 'Y' AND @hadCreateSpatialRefrenceSystem = 0 AND user NOT IN ('mysql.infoschema','mysql.session','mysql.sys','mysql.pxc.internal.session','mysql.pxc.sst.role');
 
 -- Bug#36808636 System accounts are not converted to non legacy auth plugin during upgrade
 -- Convert authentication of 'mysql.sys' and 'mysql.sessioon' users

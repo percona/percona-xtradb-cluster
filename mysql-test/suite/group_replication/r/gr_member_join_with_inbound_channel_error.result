@@ -76,6 +76,8 @@ include/assert.inc [There should be two missing GTIDs]
 # T4: waiting for preceding transaction (T3)
 [connection server_4]
 INSERT INTO t1 VALUES (4);
+Warnings:
+Warning	6414	Combining the storage engines InnoDB and MyISAM is deprecated, but the statement or transaction updates both the InnoDB table test.t1 and the MyISAM table mtr.test_suppressions.
 [connection server_1]
 # Wait until T4 is waiting for preceding transaction to commit.
 include/assert.inc [t1 should still have only one element]

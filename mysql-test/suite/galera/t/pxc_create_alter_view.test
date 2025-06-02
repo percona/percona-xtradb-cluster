@@ -38,7 +38,6 @@ CREATE USER u1@localhost IDENTIFIED BY '';
 GRANT SELECT ON db1.t1 TO u1@localhost;
 GRANT INSERT ON db1.t2 TO u1@localhost;
 GRANT ALL PRIVILEGES ON db2.* TO u1@localhost;
-FLUSH PRIVILEGES;
 
 --connect (u1_connection,127.0.0.1,u1,,db2, $NODE_MYPORT_1)
 --error ER_COLUMNACCESS_DENIED_ERROR
