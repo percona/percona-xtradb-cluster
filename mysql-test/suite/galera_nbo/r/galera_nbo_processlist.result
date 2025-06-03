@@ -1,4 +1,4 @@
-SELECT COUNT(*) = 2 FROM performance_schema.processlist WHERE USER = 'system user';
+SELECT COUNT(*) = 2 FROM performance_schema.processlist WHERE USER = 'system user' AND COMMAND != 'Daemon';
 COUNT(*) = 2
 1
 SET GLOBAL debug = 'd,sync.alter_opened_table';
