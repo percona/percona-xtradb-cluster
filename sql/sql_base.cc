@@ -162,6 +162,7 @@
 #include "thr_mutex.h"
 
 #ifdef WITH_WSREP
+#include "sql_thd_internal_api.h"  // thd_binlog_format
 #include "wsrep_mysqld.h"
 #include "wsrep_thd.h"
 #include "wsrep_trans_observer.h"
@@ -10221,7 +10222,6 @@ inline bool call_before_insert_triggers(THD *thd, TABLE *table,
     @retval false   OK
     @retval true    Error occurred
 */
-
 bool fill_record_n_invoke_before_triggers(
     THD *thd, COPY_INFO *optype_info, const mem_root_deque<Item *> &fields,
     const mem_root_deque<Item *> &values, TABLE *table,
@@ -10234,7 +10234,11 @@ bool fill_record_n_invoke_before_triggers(
     Fill DEFAULT functions (like CURRENT_TIMESTAMP) and DEFAULT expressions on
     the columns that are not on the list of assigned columns.
   */
+#ifdef WITH_WSREP
+  auto fill_function_defaults = [table, optype_info, is_row_changed, thd]() {
+#else
   auto fill_function_defaults = [table, optype_info, is_row_changed]() {
+#endif
     /*
       Unlike INSERT and LOAD, UPDATE operation requires comparison of old
       and new records to determine whether function defaults have to be
@@ -10242,7 +10246,11 @@ bool fill_record_n_invoke_before_triggers(
     */
     if (optype_info->get_operation_type() == COPY_INFO::UPDATE_OPERATION) {
       *is_row_changed =
+#ifdef WITH_WSREP
+          (!records_are_comparable(table) || wsrep_compare_records(table, thd));
+#else
           (!records_are_comparable(table) || compare_records(table));
+#endif
       /*
         Evaluate function defaults for columns with ON UPDATE clause only
         if any other column of the row is updated.
@@ -10304,7 +10312,12 @@ bool fill_record_n_invoke_before_triggers(
             optype_info->get_operation_type() == COPY_INFO::UPDATE_OPERATION &&
             !(*is_row_changed))
           *is_row_changed =
+#ifdef WITH_WSREP
+              (!records_are_comparable(table) ||
+               wsrep_compare_records(table, thd));
+#else
               (!records_are_comparable(table) || compare_records(table));
+#endif
       }
     }
     /*

@@ -77,6 +77,9 @@
 #include "string_with_len.h"     // STRING_WITH_LEN
 #include "thr_lock.h"            // thr_lock_type
 #include "typelib.h"
+#ifdef WITH_WSREP
+#include <service_wsrep.h>  // Wsrep_service_key_type
+#endif
 
 class Alter_info;
 class Create_field;
@@ -7541,6 +7544,14 @@ class handler {
     such as table->in_use == current_thd are relaxed to support cloning a
     handler belonging to a different thread. */
   bool cloned;
+
+#ifdef WITH_WSREP
+ public:
+  virtual int wsrep_append_keys(THD *, Wsrep_service_key_type, const uchar *,
+                                const uchar *) {
+    return 0;
+  }
+#endif /* WITH_WSREP */
 };
 
 /* Temporary Table handle for opening uncached table */

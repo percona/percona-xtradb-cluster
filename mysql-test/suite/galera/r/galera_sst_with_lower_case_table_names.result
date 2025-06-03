@@ -1,0 +1,6 @@
+select count(*) from mysql.db where user='mysql.pxc.sst.role' and db='percona_schema';
+count(*)
+1
+select count(*) from mysql.db where user='mysql.pxc.sst.role' and db='PERCONA_SCHEMA';
+count(*)
+0

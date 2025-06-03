@@ -1,0 +1,16 @@
+# Using the setting lower_case_table_names=1 on the startup
+# should not affect SST and should not produce a duplicated entry
+# for mysql.pxc.sst.role and percona_schema database in upper case letters.
+
+--source include/force_restart.inc
+--source include/galera_cluster.inc
+
+
+# Check that the cluster starts up
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+# Check that role mapping is not duplicated in upper case letters
+--connection node_1
+select count(*) from mysql.db where user='mysql.pxc.sst.role' and db='percona_schema';
+select count(*) from mysql.db where user='mysql.pxc.sst.role' and db='PERCONA_SCHEMA';
