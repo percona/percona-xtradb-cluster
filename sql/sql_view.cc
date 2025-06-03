@@ -1847,21 +1847,39 @@ bool mysql_drop_view(THD *thd, Table_ref *views) {
 
 #ifdef WITH_WSREP
     /* WSREP flow does this check before kick-starting final view drop
-    so that it can safely initiate TOI replication. */
+    so that it can safely initiate TOI replication.
+    1. If there is no such view:
+    1.1 we already printed printed a warning (drop if exists)
+    1.2 or added it to non_existant_views which will cause return below without
+       TOI replication..
+    2. If the table with the same name exists:
+    2.1 we already printed a warning (drop if exists)
+    2.2 or returned.
 
-    /* If the view does not exist or table with the same name exists,
-     we are skipping this at */
-    if (!(view_does_not_exist || base_table_with_same_name_exists)) {
-      const dd::View *vw = dynamic_cast<const dd::View *>(at);
-      assert(vw);
-      /*
-        If definer has the SYSTEM_USER privilege then invoker can drop view
-        only if latter also has same privilege.
-      */
-      Auth_id definer(vw->definer_user().c_str(), vw->definer_host().c_str());
-      if (sctx->can_operate_with(definer, consts::system_user, true))
-        return true;
+    Case 1.2 will cause return just after the loop, without TOI replication.
+    For cases 1.1 and 2.1 we skip privileges check and allow TOI replication.
+    If view does not exist, or is a table, it won't be processed by the loop
+    below (when actual drop happens).
+    The same logic applies on the replica side: views that don't exist or are
+    base tables will be just skipped. */
+    if (view_does_not_exist || base_table_with_same_name_exists) {
+      /* The loop is collecting all non-existing views, so we can get here
+      if there are several view specified, but some do not exist */
+      continue;  // Warning reported above.
     }
+
+    // The view exists and there is no table with the same name
+    assert(at->type() == dd::enum_table_type::SYSTEM_VIEW ||
+           at->type() == dd::enum_table_type::USER_VIEW);
+
+    const dd::View *vw = dynamic_cast<const dd::View *>(at);
+    assert(vw);
+
+    /*
+      If definer has the SYSTEM_USER privilege then invoker can drop view
+      only if latter also has same privilege. */
+    Auth_id definer(vw->definer_user().c_str(), vw->definer_host().c_str());
+    if (sctx->can_operate_with(definer, consts::system_user, true)) return true;
 #endif /* WITH_WSREP */
   }
   if (non_existant_views.length()) {
