@@ -1,0 +1,44 @@
+#
+# Test Galera as a slave to a MySQL master using GTIDs
+#
+# suite/galera/galera_2nodes_as_slave.cnf describes the setup of the nodes
+# suite/galera/t/galera_as_slave_gtid.cnf has the GTID options
+#
+# Test that commiting an empty transaction on async source
+# is handled in a proper way by PXC replica (PXC-4688)
+#
+
+--source include/have_log_bin.inc
+--source include/force_restart.inc
+
+# As node #1 is not a Galera node, we connect to node #2 in order to run include/galera_cluster.inc
+--connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--source include/galera_cluster_master_slave.inc
+
+--connection node_2
+--disable_query_log
+--eval CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1', SOURCE_PORT=$NODE_MYPORT_1;
+--enable_query_log
+START REPLICA USER='root';
+
+--connection node_1
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+
+--eval SET gtid_next='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa:1'
+BEGIN;
+COMMIT;
+SET gtid_next=AUTOMATIC;
+
+# Replication should still work
+INSERT INTO t1 VALUES(1);
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM t1;
+--source include/wait_condition.inc
+
+# It should be possible to stop the replica
+STOP REPLICA;
+
+--connection node_1
+# Cleanup
+DROP TABLE t1;

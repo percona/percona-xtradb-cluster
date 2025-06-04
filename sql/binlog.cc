@@ -2042,7 +2042,7 @@ int MYSQL_BIN_LOG::gtid_end_transaction(THD *thd) {
 #ifdef WITH_WSREP
       if (WSREP_ON && !thd->wsrep_applier) {
         /* If the galera node is acting as async slave then capture
-        GTID event from the async slave applied thread and mark it for
+        GTID event from the async slave applier thread and mark it for
         replication in galera channel. */
         /* We need to replicate GTID events, if their origin is not
         slave thread as well (events do not originate from async master).
@@ -8869,14 +8869,12 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all) {
          trans_commit_stmt()) the following call to my_error() will allow
          overwriting the error */
       my_error(ER_TRANSACTION_ROLLBACK_DURING_COMMIT, MYF(0));
-      thd_leave_async_monitor(thd);
       return RESULT_ABORTED;
     }
 
     int rc = ordered_commit(thd, all, skip_commit);
 
     if (run_wsrep_hooks) {
-      thd_leave_async_monitor(thd);
       wsrep_after_commit(thd, all);
     }
 
