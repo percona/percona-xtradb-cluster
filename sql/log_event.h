@@ -1631,10 +1631,12 @@ class Intvar_log_event : public mysql::binlog::event::Intvar_event,
     common_header->set_is_valid(true);
   }
 #ifdef WITH_WSREP
-  Intvar_log_event(uchar type_arg, ulonglong val_arg)
+  Intvar_log_event(THD *thd_arg, uchar type_arg, ulonglong val_arg)
       : mysql::binlog::event::Intvar_event(type_arg, val_arg),
         Log_event(header(), footer()) {
     common_header->set_is_valid(true);
+    server_id = thd_arg->server_id;
+    common_header->unmasked_server_id = server_id;
   }
 #endif /* WITH_WSREP */
   int pack_info(Protocol *protocol) override;

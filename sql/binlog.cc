@@ -11535,7 +11535,7 @@ int prepend_binlog_control_event(THD *const thd) {
 
   int ret = 0;
   Intvar_log_event ev(
-      (uchar)mysql::binlog::event::Intvar_event::BINLOG_CONTROL_EVENT, 0);
+      thd, (uchar)mysql::binlog::event::Intvar_event::BINLOG_CONTROL_EVENT, 0);
   if (ev.write(&tmp_io_cache)) {
     ret = ER_ERROR_ON_WRITE;
     goto cleanup;
