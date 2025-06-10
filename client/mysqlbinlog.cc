@@ -32,11 +32,6 @@
    of the log; if it is the 3rd then there is this combination:
    Format_desc_of_slave, Rotate_of_master, Format_desc_of_master.
 */
-
-#ifdef WITH_WSREP
-#undef WITH_WSREP
-#endif
-
 #include "client/mysqlbinlog.h"
 
 #include <fcntl.h>
