@@ -836,6 +836,7 @@ read_cnf()
     fi
 
     xbstream_opts=$(parse_cnf sst xbstream-opts "")
+    lock_ddl_opt=$(parse_cnf xtrabackup lock-ddl "")
 }
 
 #
@@ -1590,6 +1591,7 @@ function initialize_pxb_commands()
 
     local disver=""
     local pxb_root pxb_bin_path pxb_plugin_dir
+    local lock_ddl="--lock-ddl"
 
     # We need to use PXB compatible with donor
     pxb_root="${XTRABACKUP_PATH_PREFIX}${donor_version_str}"
@@ -1618,6 +1620,28 @@ function initialize_pxb_commands()
 
     if ${pxb_bin_path} --help 2>/dev/null | grep -q -- '--version-check'; then
         disver="--no-version-check"
+    fi
+
+    # Check if xtrabackup (PXB) Pro version is used (supports --lock-ddl=REDUCED)
+    if ${pxb_bin_path} --version 2>&1 | grep -q -- '-pro'; then
+        if [[ -z "$lock_ddl_opt" ]]; then
+            lock_ddl="--lock-ddl=REDUCED"
+            wsrep_log_info "PXB Pro detected; using default --lock-ddl=REDUCED for SST"
+        else
+            lock_ddl="--lock-ddl=$lock_ddl_opt"
+        fi    
+    else
+        # If REDUCED is requested but not supported, exit with error
+        if [[ "$lock_ddl_opt" == "REDUCED" ]]; then
+            wsrep_log_error "******************* FATAL ERROR **********************"
+            wsrep_log_error "The xtrabackup version does not support --lock-ddl=REDUCED option."
+            wsrep_log_error "Line $LINENO"
+            wsrep_log_error "******************************************************"
+            exit 2
+        fi
+        
+        # Use user-provided option if set
+        [[ -n "$lock_ddl_opt" ]] && lock_ddl="--lock-ddl=$lock_ddl_opt"
     fi
 
     local xb_version=$(${pxb_bin_path} --version 2>&1 | grep -oe ' [0-9]\.[0-9][\.0-9]*' | head -n1)
@@ -1678,7 +1702,7 @@ function initialize_pxb_commands()
                 --target-dir=\${DATA} 2>&1 | logger -p daemon.err -t ${ssystag}innobackupex-move "
             INNOBACKUP="${pxb_bin_path} --defaults-file=${WSREP_SST_OPT_CONF} \
                 --defaults-group=mysqld${WSREP_SST_OPT_CONF_SUFFIX} $disver $iopts \
-                \$INNOEXTRA \$keyringbackupopt --lock-ddl --backup --galera-info \
+                \$INNOEXTRA \$keyringbackupopt $lock_ddl --backup --galera-info \
                 \$encrypt_backup_options --stream=\$sfmt \
                 --xtrabackup-plugin-dir="$pxb_plugin_dir" \
                 --target-dir=\$itmpdir 2> >(logger -p daemon.err -t ${ssystag}innobackupex-backup)"
@@ -1701,7 +1725,7 @@ function initialize_pxb_commands()
             --target-dir=\${DATA} &>\${DATA}/innobackup.move.log"
         INNOBACKUP="${pxb_bin_path} --defaults-file=${WSREP_SST_OPT_CONF} \
             --defaults-group=mysqld${WSREP_SST_OPT_CONF_SUFFIX} $disver $iopts \
-            \$INNOEXTRA \$keyringbackupopt --lock-ddl --backup --galera-info \
+            \$INNOEXTRA \$keyringbackupopt $lock_ddl --backup --galera-info \
             \$encrypt_backup_options --stream=\$sfmt \
             --xtrabackup-plugin-dir="$pxb_plugin_dir" \
             --target-dir=\$itmpdir 2>\${DATA}/innobackup.backup.log"
