@@ -1,0 +1,154 @@
+#
+# Test Galera as a replica to a MySQL source.
+#
+# suite/galera/galera_2nodes_as_slave.cnf describes the setup of the nodes
+# suite/galera/t/galera_as_slave_gtid.cnf has the GTID options
+#
+# Check that concurrent DML and DDL are ordered in Galera in the same way as
+# they are in async replication.
+# This test checks that wsrep_async_monitor enforces the same ordering of transactions
+# in Galera channel as they are ordered in async replication channel.
+# The test will trigger a deadlock between async workers if ran with wsrep_use_async_monitor = 0.
+#
+
+--source include/have_debug.inc
+--source include/have_debug_sync.inc
+--source include/have_log_bin.inc
+--source include/force_restart.inc
+
+#
+# As node #1 is not a Galera node, we connect to node #2 in order to run include/galera_cluster.inc
+#
+--connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--source include/galera_cluster_master_slave.inc
+--disconnect node_2a
+
+--source include/count_sessions.inc
+
+#
+# Ensure replica settings are correct (defaults are fine)
+#
+--connection node_2
+--let $assert_text = replica_parallel_type is LOGICAL_CLOCK
+--let $assert_cond = "[SHOW VARIABLES LIKE "replica_parallel_type", Value, 1]" = "LOGICAL_CLOCK"
+--source include/assert.inc
+
+--let $assert_text = replica_parallel_workers > 1
+--let $assert_cond = "[SHOW VARIABLES LIKE "replica_parallel_workers", Value, 1]" > 1
+--source include/assert.inc
+
+--let $assert_text = replica_preserve_commit_order is ON
+--let $assert_cond = "[SHOW VARIABLES LIKE "replica_preserve_commit_order", Value, 1]" = "ON"
+--source include/assert.inc
+
+#
+# Configure PXC node as the replica
+#
+--disable_query_log
+--eval CHANGE REPLICATION SOURCE TO SOURCE_HOST = '127.0.0.1', SOURCE_PORT = $NODE_MYPORT_1;
+--enable_query_log
+START REPLICA USER = 'root';
+
+#
+# Ensure source settings are correct (defaults are fine)
+#
+--connection node_1
+--let $assert_text = binlog_transaction_dependency_tracking is COMMIT_ORDER
+--let $assert_cond = "[SHOW VARIABLES LIKE "binlog_transaction_dependency_tracking", Value, 1]" = "COMMIT_ORDER"
+--source include/assert.inc
+
+#
+# Do some queries and wait till they get replicated
+#
+CREATE TABLE t1 (a INTEGER PRIMARY KEY);
+INSERT INTO t1 VALUES (0);
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM t1;
+--source include/wait_condition.inc
+
+#
+# Prepare traps for replicated DDL and DML
+#
+SET GLOBAL debug = "+d,wsrep_to_isolation_begin_before_async_monitor";
+SET GLOBAL debug = "+d,wsrep_before_prepare_before_async_monitor";
+
+
+
+#
+# Async source will commit DML, then DDL.
+# Force them to have the same parent. This will allow parallel processing on the replica side.
+# It is expected by the async replica to commit in the same order.
+# To avoid a deadlock, they should be replicated in Galera in the same order as well.
+# The following actions on source node are inspired by rpl_mts_replica_preserve_commit_order_crash_nobinlog.test,
+# they use the same sync points.
+#
+--connection node_1
+# Make the following transactions have same commit parent. So they can be applied
+# parallel on replica.
+--let $debug_point = set_commit_parent_100
+--source include/add_debug_point.inc
+
+# transaction T1
+INSERT INTO t1 VALUES (1);
+
+# transaction T2
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1a
+CREATE TABLE t2 (a INT PRIMARY KEY);
+
+--let $debug_point = set_commit_parent_100
+--source include/remove_debug_point.inc
+--disconnect node_1a
+
+
+#
+# On replica side, wait for T1 and T2 to be replicated and dispatched to async replica
+# worker threads.
+#
+--connection node_2
+SET DEBUG_SYNC = 'now WAIT_FOR wsrep_to_isolation_begin_before_async_monitor.reached';
+SET DEBUG_SYNC = 'now WAIT_FOR wsrep_before_prepare_before_async_monitor.reached';
+SET GLOBAL debug = "-d,wsrep_to_isolation_begin_before_async_monitor";
+SET GLOBAL debug = "-d,wsrep_before_prepare_before_async_monitor";
+
+#
+# At this point DDL and DML are stopped before Galera replication
+#
+
+# Allow DDL to go on. Without proper ordering, it will be replicated and ordered in Galera before DML
+SET DEBUG_SYNC = 'now SIGNAL wsrep_to_isolation_begin_before_async_monitor.continue';
+
+#
+# Without a fix, it would be replicated. With fix it should wait on wsrep_async_monitor. Just wait
+# a bit to be sure it moved on.
+#
+--sleep 3
+
+# Allow DML to go on. Without proper ordering, it will be replicated and ordered in Galera after DDL
+SET DEBUG_SYNC = 'now SIGNAL wsrep_before_prepare_before_async_monitor.continue';
+
+#
+# Without wsrep_async_monitor, async workers would deadlock here and below conditions will never be met.
+#
+--let $wait_condition = SELECT COUNT(*) = 2 FROM t1;
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT COUNT(*) = 1 FROM information_schema.tables WHERE table_name = "t2";
+--source include/wait_condition.inc
+
+#
+# Cleanup
+#
+--connection node_1
+DROP TABLE t1, t2;
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 0 FROM information_schema.tables WHERE table_name = "t1";
+--source include/wait_condition.inc
+--let $wait_condition = SELECT COUNT(*) = 0 FROM information_schema.tables WHERE table_name = "t2";
+--source include/wait_condition.inc
+
+STOP REPLICA;
+RESET REPLICA ALL;
+--source include/wait_until_count_sessions.inc

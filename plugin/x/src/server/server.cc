@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2024, Oracle and/or its affiliates.
+ * Copyright (c) 2015, 2025, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0,
@@ -136,13 +136,15 @@ void Server::delayed_start_tasks() {
 }
 
 void Server::reload_ssl_context() {
-  m_ssl_context = xpl::Ssl_context_builder().get_result_context();
+  std::atomic_store(&m_ssl_context,
+                    xpl::Ssl_context_builder().get_result_context());
 }
 
 void Server::start_tasks() {
   // We can't fetch the servers ssl config at plugin-load
   // this method allows to setup it at better time.
-  m_ssl_context = xpl::Ssl_context_builder().get_result_context();
+  std::atomic_store(&m_ssl_context,
+                    xpl::Ssl_context_builder().get_result_context());
 
   if (m_state.exchange(State::State_initializing, State_running)) {
     for (auto task : m_tasks) {
@@ -436,7 +438,8 @@ bool Server::reset() {
 
   m_state.wait_for(allowed_values);
 
-  m_ssl_context->reset();
+  auto context = std::atomic_load(&m_ssl_context);
+  context->reset();
   m_id_generator.reset(new Document_id_generator());
   m_factory.reset(new xpl::Server_factory());
 

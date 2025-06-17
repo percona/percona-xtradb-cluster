@@ -347,6 +347,10 @@ void Wsrep_client_service::debug_crash(const char *crash_point
   DBUG_EXECUTE_IF(crash_point, DBUG_SUICIDE(););
 }
 
+void Wsrep_client_service::notify_state_change() {
+
+}
+
 extern void mysql_ha_flush(THD *thd);
 
 int Wsrep_client_service::bf_rollback() {

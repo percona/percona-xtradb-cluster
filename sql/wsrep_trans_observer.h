@@ -16,6 +16,7 @@
 #ifndef WSREP_TRANS_OBSERVER_H
 #define WSREP_TRANS_OBSERVER_H
 
+#include "debug_sync.h" /* debug_sync_set_action */
 #include "my_dbug.h"
 #include "service_wsrep.h"
 #include "sql/binlog.h"
@@ -186,10 +187,10 @@ static inline bool wsrep_run_commit_hook(THD *thd, bool all) {
   executing slave.
   Let's understand with an example:
   * Topology master <-> slave
-  * Some action is performed on slave which put it out-of-sync from master.
-  * Master then execute same action. Slave may choose to ignore error arising
+  * Some action is performed on slave which puts it out-of-sync from master.
+  * Master then executes same action. Slave may choose to ignore error arising
     from execution of these actions using slave_skip_errors configuration but
-    the GTID sequence increment still need to register on slave to keep it in
+    the GTID sequence increment still needs to register on slave to keep it in
     sync with master. So a dummy trx of this form is created. Galera
     eco-system too will capture this dummy trx and will execute it for
     internal replication to keep GTID sequence consistent across
@@ -246,6 +247,15 @@ static inline int wsrep_before_prepare(THD *thd, bool all) {
     THD_STAGE_INFO(thd, stage_wsrep_replicating_commit);
   }
 
+  DBUG_EXECUTE_IF("wsrep_before_prepare_before_async_monitor", {
+    const char act[] =
+        "now signal wsrep_before_prepare_before_async_monitor.reached wait_for "
+        "wsrep_before_prepare_before_async_monitor.continue";
+    assert(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
+  });
+
+  thd_enter_async_monitor(thd);
+
   if ((ret = thd->wsrep_cs().before_prepare()) == 0) {
     assert(!thd->wsrep_trx().ws_meta().gtid().is_undefined());
     thd->wsrep_xid.reset();
@@ -264,6 +274,7 @@ static inline int wsrep_before_prepare(THD *thd, bool all) {
       THD_STAGE_INFO(thd, stage_wsrep_write_set_replicated);
     }
   }
+  thd_leave_async_monitor(thd);
   DBUG_RETURN(ret);
 }
 
@@ -296,10 +307,19 @@ static inline int wsrep_before_commit(THD *thd, bool all) {
   WSREP_DEBUG("wsrep_before_commit: %d, %lld", wsrep_is_real(thd, all),
               (long long)wsrep_thd_trx_seqno(thd));
   int ret = 0;
+  bool async_monitor_entered = false;
 
-  /* Enter the async monitor */
-  thd_enter_async_monitor(thd);
-
+  if (!thd->wsrep_cs().transaction().ordered()) {
+    /*
+     In normal case, the transactions should have already been replicated and
+     ordered in wsrep_before_prepare. If it is still not the case (e.g. empty
+     transaction with GTID) it will be replicated and ordered as the part of
+     wsrep_cs().before_commit().
+     Enter the async monitor
+    */
+    thd_enter_async_monitor(thd);
+    async_monitor_entered = true;
+  }
   assert(wsrep_run_commit_hook(thd, all));
   if ((ret = thd->wsrep_cs().before_commit()) == 0) {
     assert(!thd->wsrep_trx().ws_meta().gtid().is_undefined());
@@ -313,6 +333,11 @@ static inline int wsrep_before_commit(THD *thd, bool all) {
     wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
                    thd->wsrep_trx().ws_meta().gtid());
   }
+
+  if (async_monitor_entered) {
+    thd_leave_async_monitor(thd);
+  }
+
   DBUG_RETURN(ret);
 }
 
@@ -527,7 +552,9 @@ static inline void wsrep_commit_empty(THD *thd, bool all) {
     /* @todo CTAS with STATEMENT binlog format and empty result set
        seems to be committing empty. Figure out why and try to fix
        elsewhere. */
-    assert(!wsrep_has_changes(thd) || thd->wsrep_stmt_transaction_rolled_back ||
+    assert(!wsrep_has_changes(thd) ||
+           thd->wsrep_transaction_added_extra_cert_key ||
+           thd->wsrep_stmt_transaction_rolled_back ||
            (thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
             !thd->is_current_stmt_binlog_format_row()) ||
            thd->wsrep_post_insert_error);
@@ -545,8 +572,18 @@ static inline void wsrep_commit_empty(THD *thd, bool all) {
      * remove its seqno from the Async monitor.
      *
      * So we remove the seqno of the empty commit here. */
-    thd_enter_async_monitor(thd);
-    thd_leave_async_monitor(thd);
+
+    /* Do it only if the current transaction doesn't own any gtid.
+    It may happen that this is an empty transaction executed on async master
+    but still owning gtid (to skip transaction). Such a case will be handled in
+    MYSQL_BIN_LOG::gtid_end_transaction() when the transaction commits. We will
+    replicate GTID over galera channel. In such a case we will enter and leave
+    async monitor there.`
+    */
+    if (thd->owned_gtid.sidno == 0) {
+      thd_enter_async_monitor(thd);
+      thd_leave_async_monitor(thd);
+    }
     /* The committing transaction was empty but it held some locks and
        got BF aborted. As there were no certified changes in the
        data, we ignore the deadlock error and rely on error reporting

@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2000, 2024, Oracle and/or its affiliates.
+Copyright (c) 2000, 2025, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -492,7 +492,7 @@ class ha_innobase : public handler {
 
 #ifdef WITH_WSREP
   int wsrep_append_keys(THD *thd, Wsrep_service_key_type key_type,
-                        const uchar *record0, const uchar *record1);
+                        const uchar *record0, const uchar *record1) override;
 #endif /* WITH_WSREP */
 
  private:

@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2024, Oracle and/or its affiliates.
+/* Copyright (c) 2000, 2025, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -136,8 +136,13 @@ bool modify_role_edges_in_table(THD *thd, TABLE *table,
       store_record(table, record[1]);
       table->field[MYSQL_ROLE_EDGES_FIELD_TO_WITH_ADMIN_OPT]->store(
           &with_admin_option_char, 1, system_charset_info, CHECK_FIELD_IGNORE);
+#ifdef WITH_WSREP
+      if (wsrep_compare_records(
+              table, thd))  // if we already have WITH ADMIN this is a NOP
+#else
       if (compare_records(
               table))  // if we already have WITH ADMIN this is a NOP
+#endif
         ret = table->file->ha_update_row(table->record[1], table->record[0]);
     }
   }  // else if !delete_option

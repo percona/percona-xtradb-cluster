@@ -1,4 +1,4 @@
-/* Copyright (c) 1999, 2024, Oracle and/or its affiliates.
+/* Copyright (c) 1999, 2025, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -319,11 +319,16 @@ bool all_tables_not_ok(THD *thd, Table_ref *tables) {
   if (!ret && WSREP(thd) && thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER &&
       !thd->wsrep_applier) {
     Slave_worker *sw = dynamic_cast<Slave_worker *>(thd->rli_slave);
-    Wsrep_async_monitor *wsrep_async_monitor{sw->get_wsrep_async_monitor()};
-    if (wsrep_async_monitor) {
-      auto seqno = sw->sequence_number();
-      assert(seqno > 0);
-      wsrep_async_monitor->skip(seqno);
+    // It should never happen. If this is SYSTEM_THREAD_SLAVE_WORKER, but it
+    // is not wsrep applier, it has to be Slave_worker.
+    assert(sw != nullptr);
+    if (sw) {
+      Wsrep_async_monitor *wsrep_async_monitor{sw->get_wsrep_async_monitor()};
+      if (wsrep_async_monitor) {
+        auto seqno = sw->sequence_number();
+        assert(seqno > 0);
+        wsrep_async_monitor->skip(seqno);
+      }
     }
   }
   return ret;
@@ -422,11 +427,16 @@ inline bool check_database_filters(THD *thd, const char *db,
   if (WSREP(thd) && thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER &&
       !thd->wsrep_applier && !db_ok) {
     Slave_worker *sw = dynamic_cast<Slave_worker *>(thd->rli_slave);
-    Wsrep_async_monitor *wsrep_async_monitor{sw->get_wsrep_async_monitor()};
-    if (wsrep_async_monitor) {
-      auto seqno = sw->sequence_number();
-      assert(seqno > 0);
-      wsrep_async_monitor->skip(seqno);
+    // It should never happen. If this is SYSTEM_THREAD_SLAVE_WORKER, but it
+    // is not wsrep applier, it has to be Slave_worker.
+    assert(sw != nullptr);
+    if (sw) {
+      Wsrep_async_monitor *wsrep_async_monitor{sw->get_wsrep_async_monitor()};
+      if (wsrep_async_monitor) {
+        auto seqno = sw->sequence_number();
+        assert(seqno > 0);
+        wsrep_async_monitor->skip(seqno);
+      }
     }
   }
 #endif /* WITH_WSREP */
@@ -2987,15 +2997,17 @@ done:
   }
 #endif /* WITH_WSREP */
 
-  if (!thd->is_error() && !thd->killed)
-    mysql_audit_notify(thd, AUDIT_EVENT(MYSQL_AUDIT_GENERAL_RESULT), 0, nullptr,
-                       0);
-
   const std::string &cn = Command_names::str_global(command);
-  mysql_audit_notify(
-      thd, AUDIT_EVENT(MYSQL_AUDIT_GENERAL_STATUS),
-      thd->get_stmt_da()->is_error() ? thd->get_stmt_da()->mysql_errno() : 0,
-      cn.c_str(), cn.length());
+  if (command != COM_STMT_EXECUTE) {
+    if (!thd->is_error() && !thd->killed)
+      mysql_audit_notify(thd, AUDIT_EVENT(MYSQL_AUDIT_GENERAL_RESULT), 0,
+                         nullptr, 0);
+
+    mysql_audit_notify(
+        thd, AUDIT_EVENT(MYSQL_AUDIT_GENERAL_STATUS),
+        thd->get_stmt_da()->is_error() ? thd->get_stmt_da()->mysql_errno() : 0,
+        cn.c_str(), cn.length());
+  }
 
   /* command_end is informational only. The plugin cannot abort
      execution of the command at this point. */
@@ -6085,6 +6097,18 @@ finish:
       thd->killed = THD::NOT_KILLED;
       thd->reset_query_for_display();
     }
+  }
+
+  if (thd->get_command() == COM_STMT_EXECUTE) {
+    if (!thd->is_error() && !thd->killed)
+      mysql_audit_notify(thd, AUDIT_EVENT(MYSQL_AUDIT_GENERAL_RESULT), 0,
+                         nullptr, 0);
+
+    const std::string &cn = Command_names::str_global(thd->get_command());
+    mysql_audit_notify(
+        thd, AUDIT_EVENT(MYSQL_AUDIT_GENERAL_STATUS),
+        thd->get_stmt_da()->is_error() ? thd->get_stmt_da()->mysql_errno() : 0,
+        cn.c_str(), cn.length());
   }
 
   lex->cleanup(true);

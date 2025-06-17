@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2024, Oracle and/or its affiliates.
+/* Copyright (c) 2000, 2025, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -2766,7 +2766,12 @@ bool UpdateRowsIterator::DoDelayedUpdates(bool *trans_safe,
         if (rc || check_record(thd(), table->field)) goto err;
       }
 
+#ifdef WITH_WSREP
+      if (!records_are_comparable(table) ||
+          wsrep_compare_records(table, thd())) {
+#else
       if (!records_are_comparable(table) || compare_records(table)) {
+#endif
         /*
           This function does not call the fill_record_n_invoke_before_triggers
           which sets function defaults automagically. Hence calling

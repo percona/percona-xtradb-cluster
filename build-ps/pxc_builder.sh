@@ -482,7 +482,7 @@ install_deps() {
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
         apt-get -y install --download-only percona-xtrabackup-24=2.4.29-1.${DIST}
-        apt-get -y install --download-only percona-xtrabackup-80=8.0.35-31-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-80=8.0.35-33-1.${DIST}
     fi
     return;
 }

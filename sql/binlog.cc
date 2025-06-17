@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, 2024, Oracle and/or its affiliates.
+/* Copyright (c) 2009, 2025, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -2042,7 +2042,7 @@ int MYSQL_BIN_LOG::gtid_end_transaction(THD *thd) {
 #ifdef WITH_WSREP
       if (WSREP_ON && !thd->wsrep_applier) {
         /* If the galera node is acting as async slave then capture
-        GTID event from the async slave applied thread and mark it for
+        GTID event from the async slave applier thread and mark it for
         replication in galera channel. */
         /* We need to replicate GTID events, if their origin is not
         slave thread as well (events do not originate from async master).
@@ -7041,6 +7041,15 @@ void MYSQL_BIN_LOG::dec_prep_xids(THD *thd) {
   }
 }
 
+void MYSQL_BIN_LOG::wait_for_prep_xids() {
+  DBUG_TRACE;
+  mysql_mutex_lock(&LOCK_xids);
+  while (get_prep_xids() > 0) {
+    mysql_cond_wait(&m_prep_xids_cond, &LOCK_xids);
+  }
+  mysql_mutex_unlock(&LOCK_xids);
+}
+
 /*
   Wrappers around new_file_impl to avoid using argument
   to control locking. The argument 1) less readable 2) breaks
@@ -7103,7 +7112,6 @@ int MYSQL_BIN_LOG::new_file_impl(
     mysql_mutex_assert_owner(&LOCK_log);
   DBUG_EXECUTE_IF("semi_sync_3-way_deadlock",
                   DEBUG_SYNC(current_thd, "before_rotate_binlog"););
-  mysql_mutex_lock(&LOCK_xids);
   /*
     We need to ensure that the number of prepared XIDs are 0.
 
@@ -7112,10 +7120,7 @@ int MYSQL_BIN_LOG::new_file_impl(
     - We keep the LOCK_log to block new transactions from being
       written to the binary log.
    */
-  while (get_prep_xids() > 0) {
-    mysql_cond_wait(&m_prep_xids_cond, &LOCK_xids);
-  }
-  mysql_mutex_unlock(&LOCK_xids);
+  wait_for_prep_xids();
 
   mysql_mutex_lock(&LOCK_index);
 
@@ -8864,14 +8869,12 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all) {
          trans_commit_stmt()) the following call to my_error() will allow
          overwriting the error */
       my_error(ER_TRANSACTION_ROLLBACK_DURING_COMMIT, MYF(0));
-      thd_leave_async_monitor(thd);
       return RESULT_ABORTED;
     }
 
     int rc = ordered_commit(thd, all, skip_commit);
 
     if (run_wsrep_hooks) {
-      thd_leave_async_monitor(thd);
       wsrep_after_commit(thd, all);
     }
 
@@ -9128,7 +9131,6 @@ void MYSQL_BIN_LOG::process_commit_stage_queue(THD *thd, THD *first) {
                          head->commit_error, YESNO(head->tx_commit_pending)));
   }
 
-  DEBUG_SYNC(thd, "process_commit_stage_queue_before_handle_gtid");
   /*
     Handle the GTID of the threads.
     gtid_executed table is kept updated even though transactions fail to be

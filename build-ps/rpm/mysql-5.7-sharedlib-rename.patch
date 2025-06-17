@@ -23,15 +23,17 @@
 +    LINK_LIBRARIES mysqlclient client_base
      )
  ENDIF()
- 
-@@ -63,24 +63,24 @@
+
+@@ -73,7 +73,7 @@
    COMPONENT Test
    DEPENDENCIES GenError GenClientError
    ENABLE_EXPORTS
 -  LINK_LIBRARIES perconaserverclient
 +  LINK_LIBRARIES mysqlclient
    )
- MYSQL_ADD_EXECUTABLE(mysqlcheck
+
+ IF (WITH_COREDUMPER)
+@@ -88,22 +88,22 @@
    check/mysqlcheck.cc
    check/mysqlcheck_core.cc
 -  LINK_LIBRARIES perconaserverclient
@@ -52,19 +54,18 @@
 -  LINK_LIBRARIES perconaserverclient
 +  LINK_LIBRARIES mysqlclient
    )
- MYSQL_ADD_EXECUTABLE(mysqlbinlog
-   mysqlbinlog.cc
-@@ -103,7 +103,7 @@
-   ${CMAKE_SOURCE_DIR}/sql/rpl_log_encryption.cc
- 
-   DEPENDENCIES GenError
--  LINK_LIBRARIES perconaserverclient client_base binlogevents_static
-+  LINK_LIBRARIES mysqlclient client_base binlogevents_static
+
+ OPTION(WITH_JSON_BINLOG_LIBRARY
+@@ -269,7 +269,7 @@
+ SET(MYSQLBINLOG_LIBRARIES
+   binlogevents_static
+   client_base
+-  perconaserverclient
++  mysqlclient
+   extra::unordered_dense
    )
- 
- TARGET_COMPILE_DEFINITIONS(mysqlbinlog PRIVATE DISABLE_PSI_MUTEX)
-@@ -111,19 +111,19 @@
- 
+
+@@ -312,20 +312,20 @@
  MYSQL_ADD_EXECUTABLE(mysqladmin
    mysqladmin.cc
 -  LINK_LIBRARIES perconaserverclient

@@ -2,7 +2,7 @@
 #define HANDLER_INCLUDED
 
 /*
-   Copyright (c) 2000, 2024, Oracle and/or its affiliates.
+   Copyright (c) 2000, 2025, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -74,6 +74,9 @@
 #include "sql/sql_plugin_ref.h"  // plugin_ref
 #include "thr_lock.h"            // thr_lock_type
 #include "typelib.h"
+#ifdef WITH_WSREP
+#include <service_wsrep.h>  // Wsrep_service_key_type
+#endif
 
 class Alter_info;
 class Create_field;
@@ -7308,6 +7311,14 @@ class handler {
     such as table->in_use == current_thd are relaxed to support cloning a
     handler belonging to a different thread. */
   bool cloned;
+
+#ifdef WITH_WSREP
+ public:
+  virtual int wsrep_append_keys(THD *, Wsrep_service_key_type, const uchar *,
+                                const uchar *) {
+    return 0;
+  }
+#endif /* WITH_WSREP */
 };
 
 /* Temporary Table handle for opening uncached table */

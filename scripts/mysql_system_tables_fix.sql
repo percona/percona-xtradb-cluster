@@ -1,4 +1,4 @@
--- Copyright (c) 2003, 2024, Oracle and/or its affiliates.
+-- Copyright (c) 2003, 2025, Oracle and/or its affiliates.
 --
 -- This program is free software; you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License, version 2.0,
@@ -1415,8 +1415,30 @@ INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.sst.role','N','N','
 #  pxb-sst
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'BACKUP_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'INNODB_REDO_LOG_ARCHIVE', 'N');
-INSERT IGNORE INTO mysql.tables_priv VALUES ('localhost', 'PERCONA_SCHEMA', 'mysql.pxc.sst.role', 'xtrabackup_history', 'root\@localhost', CURRENT_TIMESTAMP, 'Alter,Select,Insert,Create', '');
-INSERT IGNORE INTO mysql.db VALUES ('localhost', 'PERCONA_SCHEMA', 'mysql.pxc.sst.role','N','N','N','N','Y','N','N','N','N','N','N','N','N','N','N','N','N','N','N');
+DROP PROCEDURE IF EXISTS conditional_grants;
+DELIMITER $$
+CREATE PROCEDURE conditional_grants()
+BEGIN
+  DECLARE lctn INT DEFAULT 0;
+
+  -- Get the value of lower_case_table_names
+  SET lctn = @@lower_case_table_names;
+
+  IF lctn = 1 THEN
+    -- Case-insensitive system: use lowercase schema/table
+    INSERT IGNORE INTO mysql.tables_priv VALUES ('localhost', 'percona_schema', 'mysql.pxc.sst.role', 'xtrabackup_history', 'root\@localhost', CURRENT_TIMESTAMP, 'Alter,Select,Insert,Create', '');
+    INSERT IGNORE INTO mysql.db VALUES ('localhost', 'percona_schema', 'mysql.pxc.sst.role', 'N', 'N', 'N', 'N', 'Y', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N');
+  ELSE
+    -- Case-sensitive system: match the exact case used when creating DB
+    INSERT IGNORE INTO mysql.tables_priv VALUES ('localhost', 'PERCONA_SCHEMA', 'mysql.pxc.sst.role', 'xtrabackup_history', 'root\@localhost', CURRENT_TIMESTAMP, 'Alter,Select,Insert,Create', '');
+    INSERT IGNORE INTO mysql.db VALUES ('localhost', 'PERCONA_SCHEMA', 'mysql.pxc.sst.role', 'N', 'N', 'N', 'N', 'Y', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N');
+  END IF;
+END $$
+DELIMITER ;
+
+CALL conditional_grants();
+
+DROP PROCEDURE conditional_grants;
 
 #  common
 INSERT IGNORE INTO mysql.db VALUES ('localhost', 'performance_schema', 'mysql.pxc.sst.role','Y','Y','Y','N','N','N','Y','N','N','N','N','N','N','N','N','N','N','N','N');

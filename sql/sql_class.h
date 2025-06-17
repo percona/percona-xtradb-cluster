@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2024, Oracle and/or its affiliates.
+/* Copyright (c) 2000, 2025, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -1257,6 +1257,17 @@ class THD : public MDL_context_owner,
   String m_rewritten_query;
 
  public:
+  /* Store a thread safe copy of protocol properties. */
+  enum class cached_properties : int {
+    NONE = 0,         // No properties
+    IS_ALIVE = 1,     // protocol->is_connection_alive()
+    RW_STATUS = 2,    // protocol->get_rw_status()
+    LAST = 4,         // Next unused power of 2.
+    ALL = (LAST - 1)  // Mask selecting all properties.
+  };
+  void store_cached_properties(
+      cached_properties prop_mask = cached_properties::ALL);
+
   /* Used to execute base64 coded binlog events in MySQL server */
   Relay_log_info *rli_fake;
   /* Slave applier execution context */
@@ -1469,12 +1480,13 @@ class THD : public MDL_context_owner,
   mysql_mutex_t LOCK_query_plan;
 
   /**
-    Keep a cached value saying whether the connection is alive. Update when
+    Keep cached values of "connection alive" and "rw status". Update when
     pushing, popping or getting the protocol. Used by
     information_schema.processlist to avoid locking mutexes that might
     affect performance.
   */
   std::atomic<bool> m_cached_is_connection_alive;
+  std::atomic<uint> m_cached_rw_status;
 
  public:
   /// Locks the query plan of this THD
@@ -3351,6 +3363,15 @@ class THD : public MDL_context_owner,
     rollback. */
   bool wsrep_force_savept_rollback;
 
+  /**
+    Set to true if certification keys were added from sql layer level.
+    Right now, it is used only in assertion in wsrep_commit_empty, so let's keep
+    it only in debug builds.
+   */
+#ifndef NDEBUG
+  bool wsrep_transaction_added_extra_cert_key;
+#endif
+
   /* Used to disable binlog when DDL is executed with wsrep_OSU_method=RSU. */
   std::shared_ptr<Disable_binlog_guard> disable_binlog_guard;
 
@@ -3855,6 +3876,9 @@ class THD : public MDL_context_owner,
 
   /** Return false if connection to client is broken. */
   bool is_connected(bool use_cached_connection_alive = false) final;
+
+  /** Return the cached protocol rw status. */
+  uint get_protocol_rw_status();
 
   /**
     Mark the current error as fatal. Warning: this does not

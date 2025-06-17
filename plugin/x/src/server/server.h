@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2024, Oracle and/or its affiliates.
+ * Copyright (c) 2015, 2025, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0,
@@ -28,6 +28,7 @@
 
 #include <stdint.h>
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <list>
@@ -84,7 +85,7 @@ class Server : public xpl::iface::Server {
          std::shared_ptr<xpl::iface::Timeout_callback> timeout_callback);
 
   std::shared_ptr<xpl::iface::Ssl_context> ssl_context() const override {
-    return m_ssl_context;
+    return std::atomic_load(&m_ssl_context);
   }
 
   bool reset() override;
