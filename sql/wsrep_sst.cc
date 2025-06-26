@@ -490,7 +490,7 @@ void wsrep_sst_cancel(bool call_wsrep_cb) {
     /*
       If this is a normal shutdown, then we need to notify
       the wsrep provider about completion of the SST, to
-      prevent infinite waitng in the wsrep provider after
+      prevent infinite waiting in the wsrep provider after
       the SST process was canceled:
     */
     if (call_wsrep_cb && sst_awaiting_callback) {

@@ -1,0 +1,2 @@
+--let $ist_check_log_message = DONOR SAY IST
+--source galera_sst_timeout.inc
