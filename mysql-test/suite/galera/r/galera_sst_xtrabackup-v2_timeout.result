@@ -1,0 +1,20 @@
+SET GLOBAL wsrep_provider_options="pc.weight=1";
+CALL mtr.add_suppression("\[Warning\].*Terminating IST AsyncSender");
+CALL mtr.add_suppression("\[ERROR\].*\[WSREP-SST\]");
+CALL mtr.add_suppression("\[Warning\].*\[WSREP-SST\] Found a stale sst_in_progress file");
+CALL mtr.add_suppression("\[ERROR\].*Process completed with error");
+CALL mtr.add_suppression("\[ERROR\].*Command did not run");
+SET GLOBAL wsrep_provider_options="pc.weight=0";
+CREATE TABLE t1 (a INT PRIMARY KEY);
+INSERT INTO t1 VALUES (0);
+# Adding debug point 'halt_before_sst_donate' to @@GLOBAL.debug
+# restart_abort: <hidden args>
+include/wait_for_pattern_in_file.inc [.*Saving node state to retry with IST instead of full SST after restart.*]
+"continue with node 1"
+SET SESSION wsrep_sync_wait = 0;
+# Removing debug point 'halt_before_sst_donate' from @@GLOBAL.debug
+SET DEBUG_SYNC = "now SIGNAL continue";
+include/assert_grep.inc ["Check for uuid validity"]
+include/assert_grep.inc ["Check for seqno validity"]
+include/assert_grep.inc ["Check that node_2 joined with IST"]
+DROP TABLE t1;

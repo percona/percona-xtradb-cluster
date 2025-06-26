@@ -1,0 +1,11 @@
+!include ../galera_2nodes.cnf
+
+[mysqld.1]
+wsrep_sst_allowed_methods=clone
+
+[mysqld.2]
+wsrep_sst_method=clone
+
+[sst]
+joiner-timeout-wait-donor-message=10
+

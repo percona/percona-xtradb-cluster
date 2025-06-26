@@ -348,7 +348,7 @@ check_for_dhparams()
                 wsrep_log_error "Please ensure that openssl is installed and is in the path"
                 wsrep_log_error "Line $LINENO"
                 wsrep_log_error "****************************************************** "
-                exit 2
+                safe_exit 2
             fi
             wsrep_log_info "Could not find dhparams file, creating $DATA/dhparams.pem"
 
@@ -358,7 +358,7 @@ check_for_dhparams()
                 wsrep_log_error "* Could not create the dhparams.pem file with OpenSSL. "
                 wsrep_log_error "* Line $LINENO"
                 wsrep_log_error "****************************************************** "
-                exit 22
+                safe_exit 22
             fi
         fi
         ssl_dhparams="$DATA/dhparams.pem"
@@ -385,7 +385,7 @@ verify_cert_matches_key()
         wsrep_log_error "Please ensure that openssl and diff are installed and in the path"
         wsrep_log_error "Line $LINENO"
         wsrep_log_error "****************************************************** "
-        exit 2
+        safe_exit 2
     fi
 
     # generate the public key from the cert and the key
@@ -397,7 +397,7 @@ verify_cert_matches_key()
         wsrep_log_error "* Please check your certificate and key files. "
         wsrep_log_error "* Line $LINENO"
         wsrep_log_error "****************************************************** "
-        exit 22
+        safe_exit 22
     fi
 }
 
@@ -420,7 +420,7 @@ verify_ca_matches_cert()
         wsrep_log_error "Please ensure that openssl is installed and is in the path"
         wsrep_log_error "Line $LINENO"
         wsrep_log_error "****************************************************** "
-        exit 2
+        safe_exit 2
     fi
 
     if ! openssl verify -verbose -CAfile "$ca_path" "$cert_path" >/dev/null  2>&1
@@ -431,7 +431,7 @@ verify_ca_matches_cert()
         wsrep_log_error "* Please check your certificate and CA files.                   "
         wsrep_log_error "* Line $LINENO"
         wsrep_log_error "*************************************************************** "
-        exit 22
+        safe_exit 22
     fi
 
 }
@@ -462,7 +462,7 @@ verify_file_exists()
         fi
 
         wsrep_log_error "****************************************************** "
-        exit 22
+        safe_exit 22
     fi
 }
 
@@ -482,7 +482,7 @@ get_transfer()
             wsrep_log_error "nc(netcat) not found in path: $PATH"
             wsrep_log_error "Line $LINENO"
             wsrep_log_error "****************************************************** "
-            exit 2
+            safe_exit 2
         fi
 
         if [[ $encrypt -eq 4 ]]; then
@@ -491,7 +491,7 @@ get_transfer()
             wsrep_log_error "* is not supported when using nc(netcat)."
             wsrep_log_error "* Line $LINENO"
             wsrep_log_error "****************************************************** "
-            exit 22
+            safe_exit 22
         fi
 
         wsrep_log_debug "Using netcat as streamer"
@@ -526,7 +526,7 @@ get_transfer()
             wsrep_log_error "socat not found in path: $PATH"
             wsrep_log_error "Line $LINENO"
             wsrep_log_error "****************************************************** "
-            exit 2
+            safe_exit 2
         fi
 
         donor_extra=""
@@ -550,7 +550,7 @@ get_transfer()
                 wsrep_log_error "* Unable to encrypt SST communications. "
                 wsrep_log_error "* Line $LINENO"
                 wsrep_log_error "****************************************************** "
-                exit 2
+                safe_exit 2
             fi
 
             # Determine the socat version
@@ -560,7 +560,7 @@ get_transfer()
                 wsrep_log_error "* Cannot determine the socat version. "
                 wsrep_log_error "* Line $LINENO"
                 wsrep_log_error "****************************************************** "
-                exit 2
+                safe_exit 2
             fi
 
             # Convert the dhparams path into an absolute path
@@ -707,7 +707,7 @@ read_cnf()
         wsrep_log_error "Can't have keyring_file and keyring_vault enabled at same time"
         wsrep_log_error "Line $LINENO"
         wsrep_log_error "****************************************************** "
-        exit 32
+        safe_exit 32
     fi
 
     if [[ -n $keyring_file_data || -n $keyring_vault_config ]]; then
@@ -882,7 +882,7 @@ get_stream()
             wsrep_log_error "Please verify that PXC was installed correctly."
             wsrep_log_error "* Line $LINENO"
             wsrep_log_error "******************************************** "
-            exit 2
+            safe_exit 2
         fi
 
         # It's ok to use the 8.0 xbstream, it's compatible with
@@ -899,7 +899,7 @@ get_stream()
             wsrep_log_error "tar was not found in PATH! Make sure you have it installed."
             wsrep_log_error "* Line $LINENO"
             wsrep_log_error "******************************************** "
-            exit 2
+            safe_exit 2
         fi
 
         sfmt="tar"
@@ -1186,7 +1186,7 @@ wait_for_listen()
         wsrep_log_error "******** FATAL ERROR *********************** "
         wsrep_log_error "* Cannot find /proc/$$/net/tcp (or tcp6)"
         wsrep_log_error "******************************************** "
-        exit 1
+        safe_exit 1
     fi
     for i in "${!header[@]}"; do
         if [[ ${header[$i]} = "local_address" ]]; then
@@ -1201,7 +1201,7 @@ wait_for_listen()
         wsrep_log_error "* Unexpected /proc/xx/net/tcp layout: cannot find local_address"
         wsrep_log_error "* Line $LINENO"
         wsrep_log_error "******************************************** "
-        exit 1
+        safe_exit 1
     fi
 
     wsrep_log_debug "$LINENO: local_address index is $ip_index"
@@ -1348,7 +1348,7 @@ recv_data_from_donor_to_joiner()
         wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "SST script interrupted"
         wsrep_log_error "****************************************************** "
-        exit 32
+        safe_exit 32
     fi
 
     if [[ ${RC[0]} -eq 124 ]]; then
@@ -1362,7 +1362,7 @@ recv_data_from_donor_to_joiner()
         wsrep_log_error "Check the network connection and restart the joiner node."
         wsrep_log_error "Line $LINENO"
         wsrep_log_error "****************************************************** "
-        exit 32
+        safe_exit 32
     fi
 
     # Here we know that transfer pipeline received SIGKILL
@@ -1376,7 +1376,7 @@ recv_data_from_donor_to_joiner()
         wsrep_log_error "exit codes: ${RC[@]}"
         wsrep_log_error "Line $LINENO"
         wsrep_log_error "****************************************************** "
-        exit 32
+        safe_exit 32
     fi
 
     for ecode in "${RC[@]}"; do
@@ -1386,7 +1386,7 @@ recv_data_from_donor_to_joiner()
                             "exit codes: ${RC[@]}"
             wsrep_log_error "Line $LINENO"
             wsrep_log_error "****************************************************** "
-            exit 32
+            safe_exit 32
         fi
     done
 
@@ -1403,7 +1403,7 @@ recv_data_from_donor_to_joiner()
         wsrep_log_error "****************************************************** "
         wsrep_log_debug "Contents of datadir"
         wsrep_log_debug "$(ls -l ${dir}/*)"
-        exit 32
+        safe_exit 32
     fi
 
     if [[ $checkf -eq 2 && ! -r "${XB_DONOR_KEYRING_FILE_PATH}" ]]; then
@@ -1414,7 +1414,7 @@ recv_data_from_donor_to_joiner()
         wsrep_log_error "both sides are using a keyring file"
         wsrep_log_error "Line $LINENO"
         wsrep_log_error "****************************************************** "
-        exit 32
+        safe_exit 32
     fi
 }
 
@@ -1439,7 +1439,7 @@ send_data_from_donor_to_joiner()
         wsrep_log_error "Could not find/read the file: $FILE_TO_STREAM"
         wsrep_log_error "Line $LINENO"
         wsrep_log_error "****************************************************** "
-        exit 2
+        safe_exit 2
     fi
 
     set +e
@@ -1472,7 +1472,7 @@ send_data_from_donor_to_joiner()
                             "exit codes: ${RC[@]}"
             wsrep_log_error "Line $LINENO"
             wsrep_log_error "****************************************************** "
-            exit 32
+            safe_exit 32
         fi
     done
 }
@@ -1498,15 +1498,15 @@ initialize_tmpdir()
     if [[ -n "${tmpdir_path}" ]]; then
         if [[ ! -d "${tmpdir_path}" ]]; then
             wsrep_log_error "Cannot find the directory, ${tmpdir_path}, the tmpdir must exist before startup."
-            exit 2
+            safe_exit 2
         fi
         if [[ ! -r "${tmpdir_path}" ]]; then
             wsrep_log_error "The temporary directory, ${tmpdir_path}, is not readable.  Please check the directory permissions."
-            exit 22
+            safe_exit 22
         fi
         if [[ ! -w "${tmpdir_path}" ]]; then
             wsrep_log_error "The temporary directory, ${tmpdir_path}, is not writable.  Please check the directory permissions."
-            exit 22
+            safe_exit 22
         fi
     fi
 
@@ -1602,14 +1602,14 @@ function initialize_pxb_commands()
         wsrep_log_error "Unable to run xtrabackup (does not exist): $pxb_bin_path"
         wsrep_log_error "Line $LINENO"
         wsrep_log_error "****************************************************** "
-        exit 2
+        safe_exit 2
     fi
     if ! [[ -x $pxb_bin_path ]]; then
         wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "Unable to run xtrabackup (non-executable): $pxb_bin_path"
         wsrep_log_error "Line $LINENO"
         wsrep_log_error "****************************************************** "
-        exit 2
+        safe_exit 2
     fi
 
     if ${pxb_bin_path} --help 2>/dev/null | grep -q -- '--version-check'; then
@@ -1719,7 +1719,7 @@ if [[ -z $MYSQL_VERSION ]]; then
     wsrep_log_error "******************* FATAL ERROR ********************** "
     wsrep_log_error "FATAL: Cannot determine the mysqld server version"
     wsrep_log_error "****************************************************** "
-    exit 2
+    safe_exit 2
 fi
 
 # Verify our PXB versions
@@ -1749,7 +1749,7 @@ if [[ ! -x $XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN ]]; then
     wsrep_log_error "    Expected location: $XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN"
     wsrep_log_error "Please verify that PXC was installed correctly."
     wsrep_log_error "****************************************************** "
-    exit 2
+    safe_exit 2
 fi
 XB_2x_VERSION=$($XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN --version 2>&1 | grep -oe ' [0-9]\.[0-9]\.[0-9]*' | head -n1)
 XB_2x_VERSION=${XB_2x_VERSION# }
@@ -1760,7 +1760,7 @@ if [[ -z "$XB_2x_VERSION" ]]; then
     wsrep_log_error "$XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN"
     wsrep_log_error "Please verify that PXC was installed correctly."
     wsrep_log_error "****************************************************** "
-    exit 2
+    safe_exit 2
 fi
 
 if compare_versions "$XB_2x_VERSION" "<" "$XB_2x_REQUIRED_VERSION"; then
@@ -1769,7 +1769,7 @@ if compare_versions "$XB_2x_VERSION" "<" "$XB_2x_REQUIRED_VERSION"; then
     wsrep_log_error "xtrabackup-$XB_2x_REQUIRED_VERSION or higher is needed to perform an SST"
     wsrep_log_error "$XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN"
     wsrep_log_error "****************************************************** "
-    exit 2
+    safe_exit 2
 fi
 
 # Verify our PXB 8.0 version
@@ -1785,7 +1785,7 @@ if [[ ! -x $XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN ]]; then
     wsrep_log_error "    Expected location: $XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN"
     wsrep_log_error "Please verify that PXC was installed correctly."
     wsrep_log_error "****************************************************** "
-    exit 2
+    safe_exit 2
 fi
 XB_8x_VERSION=$($XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN --version 2>&1 | grep -oe ' [0-9]\.[0-9]\.[0-9]*' | head -n1)
 XB_8x_VERSION=${XB_8x_VERSION# }
@@ -1796,7 +1796,7 @@ if [[ -z "$XB_8x_VERSION" ]]; then
     wsrep_log_error "$XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN"
     wsrep_log_error "Please verify that PXC was installed correctly."
     wsrep_log_error "****************************************************** "
-    exit 2
+    safe_exit 2
 fi
 
 if compare_versions "$XB_8x_VERSION" "<" "$XB_8x_REQUIRED_VERSION"; then
@@ -1805,7 +1805,7 @@ if compare_versions "$XB_8x_VERSION" "<" "$XB_8x_REQUIRED_VERSION"; then
     wsrep_log_error "xtrabackup-$XB_8x_REQUIRED_VERSION or higher is needed to perform an SST"
     wsrep_log_error "$XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN"
     wsrep_log_error "****************************************************** "
-    exit 2
+    safe_exit 2
 fi
 
 
@@ -1819,13 +1819,13 @@ if [[ ! ${WSREP_SST_OPT_ROLE} == 'joiner' && ! ${WSREP_SST_OPT_ROLE} == 'donor' 
     wsrep_log_error "Invalid role ${WSREP_SST_OPT_ROLE}"
     wsrep_log_error "Line $LINENO"
     wsrep_log_error "****************************************************** "
-    exit 22
+    safe_exit 22
 fi
 
 #
 # read configuration and setup ports for streaming data.
 read_variables_from_stdin
-[[ $? -ne 0 ]] && exit 2
+[[ $? -ne 0 ]] && safe_exit 2
 
 #
 # Only the DONOR is sent the credentials
@@ -1834,7 +1834,7 @@ if [[ $WSREP_SST_OPT_ROLE == "donor" ]]; then
         wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "FATAL: The required auth credentials for an SST have not been received"
         wsrep_log_error "****************************************************** "
-        exit 2
+        safe_exit 2
     fi
 fi
 
@@ -1864,7 +1864,7 @@ if [[ "$pxc_encrypt_cluster_traffic" == "on" ]]; then
             wsrep_log_error "* Please specify a CA file with the 'ssl-ca' option. "
             wsrep_log_error "* Line $LINENO"
             wsrep_log_error "**************************************************** "
-            return 2
+            save_exit 2
         fi
     fi
     if [[ -z "$ssl_cert" ]]; then
@@ -1876,7 +1876,7 @@ if [[ "$pxc_encrypt_cluster_traffic" == "on" ]]; then
             wsrep_log_error "* Please specify a certificate file with the 'ssl-cert' option. "
             wsrep_log_error "* Line $LINENO"
             wsrep_log_error "****************************************************** "
-            return 2
+            safe_exit 2
         fi
     fi
     if [[ -z "$ssl_key" ]]; then
@@ -1888,7 +1888,7 @@ if [[ "$pxc_encrypt_cluster_traffic" == "on" ]]; then
             wsrep_log_error "* Please specify a key file with the 'ssl-key' option. "
             wsrep_log_error "* Line $LINENO"
             wsrep_log_error "****************************************************** "
-            return 2
+            safe_exit 2
         fi
     fi
 
@@ -1904,7 +1904,7 @@ if [[ $encrypt -eq 1 || $encrypt -eq 2 || $encrypt -eq 3 ]]; then
     wsrep_log_error "* Please use SSL-based encryption (encrypt=4)"
     wsrep_log_error "* Line $LINENO"
     wsrep_log_error "****************************************************** "
-    exit 22
+    safe_exit 22
 fi
 
 
@@ -1920,7 +1920,7 @@ if $MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF xtrabackup | grep -q encrypt; then
     wsrep_log_error "* SSL-based encryption (encrypt=4)."
     wsrep_log_error "* Line $LINENO"
     wsrep_log_error "****************************************************** "
-    exit 2
+    safe_exit 2
 fi
 
 
@@ -1973,7 +1973,7 @@ then
                         "is unencrypted. Enable encryption for SST traffic"
         wsrep_log_error "Line $LINENO"
         wsrep_log_error "****************************************************** "
-        exit 22
+        safe_exit 22
     fi
 
     # raise error if keyring_plugin is enabled but transit encryption is not
@@ -1983,7 +1983,7 @@ then
                         "is unencrypted. Enable encryption for SST traffic"
         wsrep_log_error "Line $LINENO"
         wsrep_log_error "****************************************************** "
-        exit 22
+        safe_exit 22
     fi
 
     # Create the SST info file
@@ -2016,7 +2016,7 @@ then
             wsrep_log_error "The joiner is not supported for this version of donor"
             wsrep_log_error "Line $LINENO"
             wsrep_log_error "****************************************************** "
-            exit 93
+            safe_exit 93
         fi
 
         # main temp directory for xtrabackup (target-dir)
@@ -2120,7 +2120,7 @@ then
         done
 
         if [[ $do_exit -eq 1 ]]; then
-            exit 22
+            safe_exit 22
         fi
 
     else # BYPASS FOR IST
@@ -2178,6 +2178,15 @@ then
     if [[ -n $KEYRING_FILE_DIR ]]; then
         rm -f "${KEYRING_FILE_DIR}/${XB_DONOR_KEYRING_FILE}"
     fi
+
+    # After starting socat listener in recv_data_from_donor_to_joiner sst-info,
+    # wait_for_listen will send "ready" message to the application.
+    # Application forms SST request from "ready" data and marks grastate.dat
+    # as 'unsafe'. From now till the point when we delete data directory,
+    # grastate.dat can be turned back to 'safe' state. This will prevent forced
+    # SST in case something goes wrong before datadir deletion.
+    # Fail "soft" until we delete datadir
+    SAFE_EXIT_CODE_OVERRIDE=${EAGAIN}
 
     # Note: this is started as a background process
     # So it has to wait for processes that are started by THIS process
@@ -2243,7 +2252,7 @@ then
         wsrep_log_error "Did not receive expected file from donor: '${SST_INFO_FILE}' or '${XB_GTID_INFO_FILE}'"
         wsrep_log_error "Line $LINENO"
         wsrep_log_error "****************************************************** "
-        exit 32
+        safe_exit 32
     fi
 
     if [ ! -r "${STATDIR}/${IST_FILE}" ]
@@ -2272,7 +2281,7 @@ then
             wsrep_log_error "The donor node must be at least version $REQUIRED_DONOR_MYSQL_VERSION."
             wsrep_log_error "Line $LINENO"
             wsrep_log_error "****************************************************** "
-            exit 2
+            safe_exit 2
         fi
 
         # Is this node's pxc version < donor's pxc version?
@@ -2283,7 +2292,7 @@ then
             wsrep_log_error "Upgrade this node before joining the cluster."
             wsrep_log_error "Line $LINENO"
             wsrep_log_error "****************************************************** "
-            exit 2
+            safe_exit 2
         fi
 
         # Initializes the command-line args for XB
@@ -2301,7 +2310,7 @@ then
                 wsrep_log_error "Please remove it or specify alternative temporary directory location by setting [sst]/tmpdir"
                 wsrep_log_error "Line $LINENO"
                 wsrep_log_error "****************************************************** "
-                exit 2
+                safe_exit 2
             fi
             mkdir -p ${DATA}/sst-xb-tmpdir
             JOINER_SST_DIR=$DATA/sst-xb-tmpdir
@@ -2318,7 +2327,7 @@ then
                             "but DONOR is not"
             wsrep_log_error "Line $LINENO"
             wsrep_log_error "****************************************************** "
-            exit 32
+            safe_exit 32
 
         fi
         # server-id is already part of backup-my.cnf so avoid appending it.
@@ -2346,7 +2355,7 @@ then
                         wsrep_log_error "It must already exist and be readable/writeable by MySQL"
                         wsrep_log_error "Line $LINENO"
                         wsrep_log_error "****************************************************** "
-                        exit 22
+                        safe_exit 22
                     fi
 
                     XB_DONOR_KEYRING_FILE_PATH="${KEYRING_FILE_DIR}/${XB_DONOR_KEYRING_FILE}"
@@ -2369,7 +2378,7 @@ then
                         wsrep_log_error "a keyring file.  Please check your configuration to ensure that"
                         wsrep_log_error "both sides are using a keyring file"
                         wsrep_log_error "****************************************************** "
-                        exit 32
+                        safe_exit 32
                     fi
                 fi
             # case-b: JOINER is configured to use keyring but DONOR is not
@@ -2379,7 +2388,7 @@ then
                                 "(file/vault) but DONOR is not"
                 wsrep_log_error "Line $LINENO"
                 wsrep_log_error "****************************************************** "
-                exit 32
+                safe_exit 32
             fi
         fi
 
@@ -2389,7 +2398,7 @@ then
                             "(file/vault) but JOINER is not"
             wsrep_log_error "Line $LINENO"
             wsrep_log_error "****************************************************** "
-            exit 32
+            safe_exit 32
         fi
 
         if [[ -n $transition_key ]]; then
@@ -2415,13 +2424,20 @@ then
             wsrep_log_error "Parent mysqld process (PID:${WSREP_SST_OPT_PARENT}) terminated unexpectedly."
             wsrep_log_error "Line $LINENO"
             wsrep_log_error "****************************************************** "
-            exit 32
+            safe_exit 32
         fi
 
         get_stream
         if [[ -n $sdecomp ]]; then
             strmcmd=" $sdecomp | $strmcmd"
         fi
+
+        # Up to this point, if anything happened that prevented SST (eg. network
+        # issue, wrong keyring configuration), datadir was not touched, so we should
+        # leave the node as it was (grastate.dat)
+        # From now on, there is no way back: we will receive SST, or the node won't
+        # work.
+        SAFE_EXIT_CODE_OVERRIDE=
 
         (recv_data_from_donor_to_joiner "$JOINER_SST_DIR" "${stagemsg}-SST" 0 0) &
         jpid=$!
@@ -2469,7 +2485,7 @@ then
             wsrep_log_error "xtrabackup_checkpoints missing. xtrabackup/SST failed on DONOR. Check DONOR log"
             wsrep_log_error "Line $LINENO"
             wsrep_log_error "****************************************************** "
-            exit 2
+            safe_exit 2
         fi
 
         # Rebuild indexes for compact backups
@@ -2493,7 +2509,7 @@ then
                 wsrep_log_error "qpress not found in path: $PATH"
                 wsrep_log_error "Line $LINENO"
                 wsrep_log_error "****************************************************** "
-                exit 22
+                safe_exit 22
             fi
 
             if [[ -n $progress ]] && pv --help | grep -q 'line-mode'; then
@@ -2532,7 +2548,7 @@ then
                 wsrep_log_error "Decompression failed. Exit code: $extcode"
                 wsrep_log_error "Line $LINENO"
                 wsrep_log_error "****************************************************** "
-                exit 22
+                safe_exit 22
             fi
         fi
 
@@ -2558,7 +2574,7 @@ then
             wsrep_log_error "Line $LINENO"
             cat_file_to_stderr "${DATA}/innobackup.decompress.log" "ERR" "innobackup.decompress.log"
             wsrep_log_error "****************************************************** "
-            exit 22
+            safe_exit 22
         fi
 
         wsrep_log_info "Preparing the backup at ${DATA}"
@@ -2576,7 +2592,7 @@ then
             wsrep_log_error "Line $LINENO"
             cat_file_to_stderr "${DATA}/innobackup.prepare.log" "ERR" "innobackup.prepare.log"
             wsrep_log_error "****************************************************** "
-            exit 22
+            safe_exit 22
         fi
 
         XB_GTID_INFO_FILE_PATH="${TDATA}/${XB_GTID_INFO_FILE}"
@@ -2636,7 +2652,7 @@ then
             wsrep_log_error "Line $LINENO"
             cat_file_to_stderr "${DATA}/innobackup.move.log" "ERR" "innobackup.move.log"
             wsrep_log_error "****************************************************** "
-            exit 22
+            safe_exit 22
         fi
 
         # Did we receive a keyring file?
@@ -2651,6 +2667,8 @@ then
         DATA=${TDATA}
         transfer_type="sst"
     else
+        SAFE_EXIT_CODE_OVERRIDE=
+
         wsrep_log_info "${IST_FILE} received from donor: Running IST"
         transfer_type="ist"
     fi
@@ -2660,7 +2678,7 @@ then
         wsrep_log_error "SST magic file ${XB_GTID_INFO_FILE_PATH} not found/readable"
         wsrep_log_error "Line $LINENO"
         wsrep_log_error "****************************************************** "
-        exit 2
+        safe_exit 2
     fi
 
     #-----------------------------------------------------------------------
@@ -2678,7 +2696,7 @@ then
     set -e
     if [[ $errcode -ne 0 ]]; then
         wsrep_log_info "...........post-processing failed.  Exiting"
-        exit $errcode
+        safe_exit $errcode
     else
         wsrep_log_info "...........post-processing done"
     fi
@@ -2690,4 +2708,4 @@ then
     fi
 fi
 
-exit 0
+safe_exit 0
