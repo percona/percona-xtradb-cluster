@@ -43,6 +43,23 @@ declare MYSQLD_PATH=""
 declare MYSQL_UPGRADE_TMPDIR=""
 declare WSREP_LOG_DIR=""
 
+# Exit codes returned by SST script.
+# For now, most of them are hardcoded like exit 32.
+# It would be good to have them here one day.
+
+# SST failed before modifying/deleting original data directory.
+readonly EAGAIN=11
+
+# Exit code used to override the default exit code. Most probably EAGAIN.
+# Use exit_safe <code> instead of exit <code> across the SST script.
+# For now, it is used on the Joiner side to inform mysqld about "soft" errors.
+# By "soft" errors we mean that SST went wrong, but data dir was not changed yet
+# so there is no need to force full SST next time. It may be the problem with
+# some system tool installed, or network connection during sst-info file transfer.
+# Once we start the main SST transfer and delete data dir, default exit codes
+# should not be override.
+SAFE_EXIT_CODE_OVERRIDE=""
+
 while [ $# -gt 0 ]; do
 case "$1" in
     '--address')
@@ -294,6 +311,14 @@ wsrep_log_debug()
 }
 
 #
+# Exit with the provided exit code or global override if defined.
+#
+safe_exit() {
+    local code=$1
+    exit "${SAFE_EXIT_CODE_OVERRIDE:-${code}}"
+}
+
+#
 # This functions stores the mysqld path in the MYSQLD_PATH
 # global variable
 #
@@ -333,7 +358,7 @@ get_mysqld_path()
         wsrep_log_error "Please ensure that ${MYSQLD_NAME} is in the path"
         wsrep_log_error "Line $LINENO"
         wsrep_log_error "******************* FATAL ERROR ********************** "
-        exit 22
+        safe_exit 22
     fi
 
     wsrep_log_debug "Found the ${MYSQLD_NAME} binary in ${MYSQLD_PATH}"
