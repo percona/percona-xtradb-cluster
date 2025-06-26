@@ -138,7 +138,7 @@
 #include "sql/sql_lex.h"
 #include "sql/sql_list.h"
 #include "sql/sql_parse.h"  // sqlcom_can_generate_row_events
-#include "sql/sql_show.h"   // append_identifier
+#include "sql/sql_show.h"   // append_identifier_*
 #include "sql/system_variables.h"
 #include "sql/table.h"
 #include "sql/transaction_info.h"
@@ -2032,7 +2032,7 @@ int MYSQL_BIN_LOG::gtid_end_transaction(THD *thd) {
 #ifdef WITH_WSREP
       if (WSREP_ON && !thd->wsrep_applier) {
         /* If the galera node is acting as async slave then capture
-        GTID event from the async slave applied thread and mark it for
+        GTID event from the async slave applier thread and mark it for
         replication in galera channel. */
         /* We need to replicate GTID events, if their origin is not
         slave thread as well (events do not originate from async master).
@@ -7920,7 +7920,6 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all) {
          trans_commit_stmt()) the following call to my_error() will allow
          overwriting the error */
       my_error(ER_TRANSACTION_ROLLBACK_DURING_COMMIT, MYF(0));
-      thd_leave_async_monitor(thd);
       return RESULT_ABORTED;
     }
 
@@ -7931,7 +7930,6 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all) {
     rc = rc ? rc : ordered_commit(thd, all, skip_commit);
 
     if (run_wsrep_hooks) {
-      thd_leave_async_monitor(thd);
       wsrep_after_commit(thd, all);
     }
 
@@ -11537,7 +11535,7 @@ int prepend_binlog_control_event(THD *const thd) {
 
   int ret = 0;
   Intvar_log_event ev(
-      (uchar)mysql::binlog::event::Intvar_event::BINLOG_CONTROL_EVENT, 0);
+      thd, (uchar)mysql::binlog::event::Intvar_event::BINLOG_CONTROL_EVENT, 0);
   if (ev.write(&tmp_io_cache)) {
     ret = ER_ERROR_ON_WRITE;
     goto cleanup;

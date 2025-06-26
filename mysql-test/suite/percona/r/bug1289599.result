@@ -2,7 +2,6 @@ call mtr.add_suppression("The plugin 'auth_socket' used to authenticate user .* 
 call mtr.add_suppression("user' entry 'mysql.pxc.sst.role@localhost' has the password ignore flag raised.* The user id will be ignored.");
 create table mysql_user_bak as select * from mysql.user;
 update mysql.user set plugin='auth_socket';
-flush privileges;
 connect(localhost,USER,,test,MASTER_PORT,MASTER_SOCKET);
 ERROR 28000: Access denied for user 'USER'@'localhost' (using password: NO)
 ERROR 28000: Access denied for user 'USER'@'localhost' (using password: NO)
@@ -13,6 +12,5 @@ ERROR 28000: Access denied for user 'USER'@'localhost' (using password: NO)
 update mysql.user set plugin='';
 delete from mysql.user;
 insert into mysql.user select * from mysql_user_bak;
-flush privileges;
 drop table mysql_user_bak;
 uninstall plugin auth_socket;

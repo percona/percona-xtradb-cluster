@@ -6,7 +6,7 @@
 --source include/have_debug_sync.inc
 
 --connection node_2
-SELECT COUNT(*) = 2 FROM performance_schema.processlist WHERE USER = 'system user';
+SELECT COUNT(*) = 2 FROM performance_schema.processlist WHERE USER = 'system user' AND COMMAND != 'Daemon';
 
 # Set ALTER TABLE to block in the applier thread. wsrep_sync_wait = 0 for the duration, as causal reads will be blocked
 --let $debug_orig = `SELECT @@debug`
@@ -22,7 +22,7 @@ SET SESSION wsrep_osu_method='NBO';
 
 --connection node_2
 # There is a separate applier thread for the ALTER TABLE
---let $wait_condition = SELECT COUNT(*) = 3 FROM performance_schema.processlist WHERE USER = 'system user';
+--let $wait_condition = SELECT COUNT(*) = 3 FROM performance_schema.processlist WHERE USER = 'system user' AND COMMAND != 'Daemon';
 --source include/wait_condition.inc
 
 # The applier thread is blocked
@@ -54,7 +54,7 @@ SET DEBUG_SYNC= 'now SIGNAL signal.alter_opened_table';
 SET SESSION wsrep_sync_wait = 7;
 
 # ... the applier thread will terminate
---let $wait_condition = SELECT COUNT(*) = 2 FROM performance_schema.processlist WHERE USER = 'system user'
+--let $wait_condition = SELECT COUNT(*) = 2 FROM performance_schema.processlist WHERE USER = 'system user' AND COMMAND != 'Daemon'
 --source include/wait_condition.inc
 
 SELECT COUNT(*) = 0 FROM performance_schema.processlist

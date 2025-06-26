@@ -33,4 +33,28 @@ SET SESSION wsrep_sync_wait = 7;
 --eval SELECT '$gtid_executed_node2' = @@global.gtid_executed AS gtid_executed_equal;
 --enable_query_log
 
+#
+# Without fixed PXC-4664, the following sequence will cause sigsegv.
+# With the fix (or in versions ealier than 8.0.41, it will cause a deadlock between
+# wsrep applier and local connection (PXC-4665).
+# As we don't plan to fix PXC-4665 for now, there is no way to provide a reliable test
+# for PXC-4664, that's why the following part is commented out.
+#
+# Uncomment it when PXC-4665 is fixed.
+#
+
+# --connection node_1
+# SET @@SESSION.GTID_NEXT= 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa:2';
+# BEGIN;
+# 
+# --connection node_2
+# SET @@SESSION.GTID_NEXT= 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa:2';
+# BEGIN;
+# COMMIT;
+# 
+# --connection node_1
+# COMMIT;
+
+
+# cleanup
 DROP TABLE t1;

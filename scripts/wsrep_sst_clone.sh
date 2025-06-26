@@ -323,7 +323,7 @@ setup_certificates_for_donor()
 
     # REQUIRE_SSL is used during clone user creation on Donor server
     REQUIRE_SSL=""
-    if [ -n "$server_ssl_ca" ] && [ -n "$server_ssl_cert" ] && [ -n "$server_ssl_key" ]; then
+    if [ -n "$server_ssl_ca" ] && [ -n "$server_ssl_cert" ] && [ -n "$server_ssl_key" ] && [ "$server_ssl_ca" != "NULL" ]; then
         REQUIRE_SSL="REQUIRE SSL"
     fi
     wsrep_log_debug "Clone SSL Server settings on $role from runtime:  CERT=$server_ssl_cert, KEY=$server_ssl_key, CA=$server_ssl_ca"

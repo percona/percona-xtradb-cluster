@@ -146,6 +146,7 @@
 #include "sql/rpl_mi.h"
 #include "sql/rpl_msr.h"  // Multisource_info
 #include "sql/rpl_mta_submode.h"
+#include "sql/rpl_opt_tracker.h"
 #include "sql/rpl_replica_commit_order_manager.h"  // Commit_order_manager
 #include "sql/rpl_replica_until_options.h"
 #include "sql/rpl_reporting.h"
@@ -5805,9 +5806,23 @@ extern "C" void *handle_slave_io(void *arg) {
           }
           queued_size = gtid_ev.get_trx_length();
         }
-        // allow waiting only if we are outside of a transaction
+
+        // If the used space exceeds the relay log limit, and the current
+        // position is on a transaction boundary, and the received event is not
+        // a FD/rotate event, wait for the applier to free space. The exception
+        // for FD/rotate events is important in case the server has just
+        // restarted with the relay log ending in a half transaction. In this
+        // case, the applier has no information indicating that the transaction
+        // is half-received, so it cannot rollback the transaction and free disk
+        // space. But when we write the FD/rotate events, the applier can deduce
+        // that the transaction is half-received, and then it can rollback and
+        // free disk space as needed.
         if (rli->log_space_limit && exceeds_relay_log_limit(rli, queued_size) &&
-            !mi->transaction_parser.is_inside_transaction()) {
+            !mi->transaction_parser.is_inside_transaction() &&
+            !(event_buf[EVENT_TYPE_OFFSET] ==
+                  mysql::binlog::event::FORMAT_DESCRIPTION_EVENT ||
+              event_buf[EVENT_TYPE_OFFSET] ==
+                  mysql::binlog::event::ROTATE_EVENT)) {
           if (wait_for_relay_log_space(rli, queued_size)) {
             LogErr(
                 ERROR_LEVEL,
@@ -6926,13 +6941,15 @@ end:
   */
   for (int i = static_cast<int>(rli->workers_copy_pfs.size()) - 1; i >= 0;
        i--) {
-    // Don't loose the stats on commit order waits
+    // Don't lose the stats on commit order waits
     order_commit_wait_count += rli->workers_copy_pfs[i]
                                    ->get_worker_metrics()
-                                   .get_number_of_waits_on_commit_order();
+                                   .get_waits_due_to_commit_order()
+                                   .get_count();
     order_commit_waited_time += rli->workers_copy_pfs[i]
                                     ->get_worker_metrics()
-                                    .get_wait_time_on_commit_order();
+                                    .get_waits_due_to_commit_order()
+                                    .get_time();
     delete rli->workers_copy_pfs[i];
     if (!clear_gtid_monitoring_info) clear_gtid_monitoring_info = true;
   }
@@ -7193,6 +7210,10 @@ wsrep_restart_point :
   {
     DBUG_TRACE;
 
+    auto guard = rli->get_applier_metrics()
+                     .get_sum_applier_execution_time()
+                     .time_scope();
+
     assert(rli->inited);
     mysql_mutex_lock(&rli->run_lock);
     assert(!rli->slave_running);
@@ -7304,7 +7325,7 @@ wsrep_restart_point :
     thd_manager->add_thd(thd);
     thd_added = true;
 
-    rli->get_applier_metrics().start_applier_timer();
+    rli->get_applier_metrics().store_last_applier_start();
 
     if (RUN_HOOK(binlog_relay_io, applier_start, (thd, rli->mi))) {
       mysql_cond_broadcast(&rli->start_cond);
@@ -7624,8 +7645,6 @@ wsrep_restart_point :
     /* When source_pos_wait() wakes up it will check this and terminate */
     rli->slave_running = 0;
     rli->atomic_is_stopping = false;
-
-    rli->get_applier_metrics().stop_applier_timer();
 
     /* Forget the relay log's format */
     if (rli->set_rli_description_event(nullptr)) {
@@ -9702,7 +9721,16 @@ bool reset_slave_cmd(THD *thd) {
       my_error(ER_REPLICA_CHANNEL_DOES_NOT_EXIST, MYF(0), lex->mi.channel);
   }
 
+  const bool replication_replica_enabled =
+      (channel_map.get_number_of_configured_channels() > 0);
   channel_map.unlock();
+
+  /*
+    Only track when Replication Replica changes to disabled.
+  */
+  if (!res && !replication_replica_enabled) {
+    rpl_opt_tracker->track_replication_replica(replication_replica_enabled);
+  }
 
   return res;
 }
@@ -11337,6 +11365,7 @@ bool change_master_cmd(THD *thd) {
   Master_info *mi = nullptr;
   LEX *lex = thd->lex;
   bool res = false;
+  bool replication_replica_enabled{false};
 
   channel_map.wrlock();
 
@@ -11443,8 +11472,18 @@ bool change_master_cmd(THD *thd) {
     my_error(ER_REPLICA_CONFIGURATION, MYF(0));
   }
 
+  replication_replica_enabled =
+      (channel_map.get_number_of_configured_channels() > 0);
+
 err:
   channel_map.unlock();
+
+  /*
+    Only track when Replication Replica changes to enabled.
+  */
+  if (!res && replication_replica_enabled) {
+    rpl_opt_tracker->track_replication_replica(replication_replica_enabled);
+  }
 
   return res;
 }

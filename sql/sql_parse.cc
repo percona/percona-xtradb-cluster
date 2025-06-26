@@ -328,11 +328,16 @@ bool all_tables_not_ok(THD *thd, Table_ref *tables) {
   if (!ret && WSREP(thd) && thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER &&
       !thd->wsrep_applier) {
     Slave_worker *sw = dynamic_cast<Slave_worker *>(thd->rli_slave);
-    Wsrep_async_monitor *wsrep_async_monitor{sw->get_wsrep_async_monitor()};
-    if (wsrep_async_monitor) {
-      auto seqno = sw->sequence_number();
-      assert(seqno > 0);
-      wsrep_async_monitor->skip(seqno);
+    // It should never happen. If this is SYSTEM_THREAD_SLAVE_WORKER, but it
+    // is not wsrep applier, it has to be Slave_worker.
+    assert(sw != nullptr);
+    if (sw) {
+      Wsrep_async_monitor *wsrep_async_monitor{sw->get_wsrep_async_monitor()};
+      if (wsrep_async_monitor) {
+        auto seqno = sw->sequence_number();
+        assert(seqno > 0);
+        wsrep_async_monitor->skip(seqno);
+      }
     }
   }
   return ret;
@@ -431,11 +436,16 @@ inline bool check_database_filters(THD *thd, const char *db,
   if (WSREP(thd) && thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER &&
       !thd->wsrep_applier && !db_ok) {
     Slave_worker *sw = dynamic_cast<Slave_worker *>(thd->rli_slave);
-    Wsrep_async_monitor *wsrep_async_monitor{sw->get_wsrep_async_monitor()};
-    if (wsrep_async_monitor) {
-      auto seqno = sw->sequence_number();
-      assert(seqno > 0);
-      wsrep_async_monitor->skip(seqno);
+    // It should never happen. If this is SYSTEM_THREAD_SLAVE_WORKER, but it
+    // is not wsrep applier, it has to be Slave_worker.
+    assert(sw != nullptr);
+    if (sw) {
+      Wsrep_async_monitor *wsrep_async_monitor{sw->get_wsrep_async_monitor()};
+      if (wsrep_async_monitor) {
+        auto seqno = sw->sequence_number();
+        assert(seqno > 0);
+        wsrep_async_monitor->skip(seqno);
+      }
     }
   }
 #endif /* WITH_WSREP */
@@ -760,6 +770,7 @@ void init_sql_command_flags() {
   sql_command_flags[SQLCOM_SHOW_CREATE] = CF_STATUS_COMMAND;
   sql_command_flags[SQLCOM_SHOW_BINLOG_STATUS] = CF_STATUS_COMMAND;
   sql_command_flags[SQLCOM_SHOW_REPLICA_STATUS] = CF_STATUS_COMMAND;
+  sql_command_flags[SQLCOM_SHOW_CREATE_LIBRARY] = CF_STATUS_COMMAND;
   sql_command_flags[SQLCOM_SHOW_CREATE_PROC] = CF_STATUS_COMMAND;
   sql_command_flags[SQLCOM_SHOW_CREATE_FUNC] = CF_STATUS_COMMAND;
   sql_command_flags[SQLCOM_SHOW_CREATE_TRIGGER] = CF_STATUS_COMMAND;
@@ -822,9 +833,13 @@ void init_sql_command_flags() {
   sql_command_flags[SQLCOM_ALTER_INSTANCE] = CF_CHANGES_DATA;
   sql_command_flags[SQLCOM_CREATE_FUNCTION] =
       CF_CHANGES_DATA | CF_AUTO_COMMIT_TRANS;
+  sql_command_flags[SQLCOM_CREATE_LIBRARY] =
+      CF_CHANGES_DATA | CF_AUTO_COMMIT_TRANS;
   sql_command_flags[SQLCOM_CREATE_PROCEDURE] =
       CF_CHANGES_DATA | CF_AUTO_COMMIT_TRANS;
   sql_command_flags[SQLCOM_CREATE_SPFUNCTION] =
+      CF_CHANGES_DATA | CF_AUTO_COMMIT_TRANS;
+  sql_command_flags[SQLCOM_DROP_LIBRARY] =
       CF_CHANGES_DATA | CF_AUTO_COMMIT_TRANS;
   sql_command_flags[SQLCOM_DROP_PROCEDURE] =
       CF_CHANGES_DATA | CF_AUTO_COMMIT_TRANS;
@@ -998,8 +1013,10 @@ void init_sql_command_flags() {
   sql_command_flags[SQLCOM_ALTER_SERVER] |= CF_DISALLOW_IN_RO_TRANS;
   sql_command_flags[SQLCOM_DROP_SERVER] |= CF_DISALLOW_IN_RO_TRANS;
   sql_command_flags[SQLCOM_CREATE_FUNCTION] |= CF_DISALLOW_IN_RO_TRANS;
+  sql_command_flags[SQLCOM_CREATE_LIBRARY] |= CF_DISALLOW_IN_RO_TRANS;
   sql_command_flags[SQLCOM_CREATE_PROCEDURE] |= CF_DISALLOW_IN_RO_TRANS;
   sql_command_flags[SQLCOM_CREATE_SPFUNCTION] |= CF_DISALLOW_IN_RO_TRANS;
+  sql_command_flags[SQLCOM_DROP_LIBRARY] |= CF_DISALLOW_IN_RO_TRANS;
   sql_command_flags[SQLCOM_DROP_PROCEDURE] |= CF_DISALLOW_IN_RO_TRANS;
   sql_command_flags[SQLCOM_DROP_FUNCTION] |= CF_DISALLOW_IN_RO_TRANS;
   sql_command_flags[SQLCOM_ALTER_PROCEDURE] |= CF_DISALLOW_IN_RO_TRANS;
@@ -1120,12 +1137,15 @@ void init_sql_command_flags() {
   sql_command_flags[SQLCOM_RENAME_USER] |= CF_ALLOW_PROTOCOL_PLUGIN;
   sql_command_flags[SQLCOM_REVOKE_ALL] |= CF_ALLOW_PROTOCOL_PLUGIN;
   sql_command_flags[SQLCOM_CHECKSUM] |= CF_ALLOW_PROTOCOL_PLUGIN;
+  sql_command_flags[SQLCOM_CREATE_LIBRARY] |= CF_ALLOW_PROTOCOL_PLUGIN;
   sql_command_flags[SQLCOM_CREATE_PROCEDURE] |= CF_ALLOW_PROTOCOL_PLUGIN;
   sql_command_flags[SQLCOM_CREATE_SPFUNCTION] |= CF_ALLOW_PROTOCOL_PLUGIN;
   sql_command_flags[SQLCOM_CALL] |= CF_ALLOW_PROTOCOL_PLUGIN;
+  sql_command_flags[SQLCOM_DROP_LIBRARY] |= CF_ALLOW_PROTOCOL_PLUGIN;
   sql_command_flags[SQLCOM_DROP_PROCEDURE] |= CF_ALLOW_PROTOCOL_PLUGIN;
   sql_command_flags[SQLCOM_ALTER_PROCEDURE] |= CF_ALLOW_PROTOCOL_PLUGIN;
   sql_command_flags[SQLCOM_ALTER_FUNCTION] |= CF_ALLOW_PROTOCOL_PLUGIN;
+  sql_command_flags[SQLCOM_SHOW_CREATE_LIBRARY] |= CF_ALLOW_PROTOCOL_PLUGIN;
   sql_command_flags[SQLCOM_SHOW_CREATE_PROC] |= CF_ALLOW_PROTOCOL_PLUGIN;
   sql_command_flags[SQLCOM_SHOW_CREATE_FUNC] |= CF_ALLOW_PROTOCOL_PLUGIN;
   sql_command_flags[SQLCOM_SHOW_STATUS_PROC] |= CF_ALLOW_PROTOCOL_PLUGIN;
@@ -1223,7 +1243,11 @@ void init_sql_command_flags() {
       CF_NEEDS_AUTOCOMMIT_OFF | CF_POTENTIAL_ATOMIC_DDL;
   sql_command_flags[SQLCOM_CREATE_FUNCTION] |=
       CF_NEEDS_AUTOCOMMIT_OFF | CF_POTENTIAL_ATOMIC_DDL;
+  sql_command_flags[SQLCOM_CREATE_LIBRARY] |=
+      CF_NEEDS_AUTOCOMMIT_OFF | CF_POTENTIAL_ATOMIC_DDL;
   sql_command_flags[SQLCOM_CREATE_PROCEDURE] |=
+      CF_NEEDS_AUTOCOMMIT_OFF | CF_POTENTIAL_ATOMIC_DDL;
+  sql_command_flags[SQLCOM_DROP_LIBRARY] |=
       CF_NEEDS_AUTOCOMMIT_OFF | CF_POTENTIAL_ATOMIC_DDL;
   sql_command_flags[SQLCOM_DROP_PROCEDURE] |=
       CF_NEEDS_AUTOCOMMIT_OFF | CF_POTENTIAL_ATOMIC_DDL;
@@ -2684,7 +2708,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
 
       thd->bind_parameter_values = nullptr;
       thd->bind_parameter_values_count = 0;
-      thd->set_secondary_engine_statement_context(nullptr);
+      thd->cleanup_after_statement_execution();
 
       /* Need to set error to true for graceful shutdown */
       if ((thd->lex->sql_command == SQLCOM_SHUTDOWN) &&
@@ -3451,6 +3475,132 @@ static inline void binlog_gtid_end_transaction(THD *thd) {
         thd->lex->sql_command == SQLCOM_DROP_TABLE) &&
        !thd->in_multi_stmt_transaction_mode()))
     (void)mysql_bin_log.gtid_end_transaction(thd);
+}
+
+void add_automatic_sp_privileges(THD *thd, enum_sp_type sp_type,
+                                 const char *db_name, const char *sp_name) {
+  /* only add privileges if really necessary */
+
+  Security_context security_context;
+  bool restore_backup_context = false;
+  Security_context *backup = nullptr;
+  /*
+    We're going to issue an implicit GRANT statement so we close all
+    open tables. We have to keep metadata locks as this ensures that
+    this statement is atomic against concurrent FLUSH TABLES WITH READ
+    LOCK. Deadlocks which can arise due to fact that this implicit
+    statement takes metadata locks should be detected by a deadlock
+    detector in MDL subsystem and reported as errors.
+
+    No need to commit/rollback statement transaction, it's not started.
+
+    TODO: Long-term we should either ensure that implicit GRANT
+    statement is written into binary log as a separate statement or make
+    both creation of routine and implicit GRANT parts of one fully
+    atomic statement.
+  */
+  assert(thd->get_transaction()->is_empty(Transaction_ctx::STMT));
+  close_thread_tables(thd);
+  /*
+    Check if invoker exists on slave, then use invoker privilege to
+    insert routine privileges to mysql.procs_priv. If invoker is not
+    available then consider using definer.
+
+    Check if the definer exists on slave,
+    then use definer privilege to insert routine privileges to
+    mysql.procs_priv.
+
+    For current user of SQL thread has GLOBAL_ACL privilege,
+    which doesn't any check routine privileges,
+    so no routine privilege record  will insert into mysql.procs_priv.
+  */
+
+  if (thd->slave_thread) {
+    LEX_CSTRING current_user;
+    LEX_CSTRING current_host;
+    if (thd->has_invoker()) {
+      current_host = thd->get_invoker_host();
+      current_user = thd->get_invoker_user();
+    } else {
+      current_host = thd->lex->definer->host;
+      current_user = thd->lex->definer->user;
+    }
+    if (is_acl_user(thd, current_host.str, current_user.str)) {
+      security_context.change_security_context(thd, current_user, current_host,
+                                               db_name, &backup);
+      restore_backup_context = true;
+    }
+  }
+
+  if (sp_automatic_privileges && !opt_noacl &&
+      check_routine_access(thd, DEFAULT_CREATE_PROC_ACLS, db_name, sp_name,
+                           enum_sp_type_to_acl_type(sp_type), true)) {
+    if (sp_grant_privileges(thd, db_name, sp_name,
+                            enum_sp_type_to_acl_type(sp_type)))
+      push_warning(thd, Sql_condition::SL_WARNING, ER_PROC_AUTO_GRANT_FAIL,
+                   ER_THD(thd, ER_PROC_AUTO_GRANT_FAIL));
+    thd->clear_error();
+  }
+
+  /*
+    Restore current user with GLOBAL_ACL privilege of SQL thread
+  */
+  if (restore_backup_context) {
+    assert(thd->slave_thread == 1);
+    thd->security_context()->restore_security_context(thd, backup);
+  }
+}
+
+#ifdef WITH_WSREP
+bool remove_automatic_sp_privileges(THD *thd, enum_sp_type sp_type,
+                                    bool sp_did_not_exist, const char *db_name,
+                                    const char *sp_name,
+                                    enum_sp_return_code sp_result) {
+#else
+bool remove_automatic_sp_privileges(THD *thd, enum_sp_type sp_type,
+                                    bool sp_did_not_exist, const char *db_name,
+                                    const char *sp_name) {
+#endif
+  /*
+    We're going to issue an implicit REVOKE statement so we close all
+    open tables. We have to keep metadata locks as this ensures that
+    this statement is atomic against concurrent FLUSH TABLES WITH READ
+    LOCK. Deadlocks which can arise due to fact that this implicit
+    statement takes metadata locks should be detected by a deadlock
+    detector in MDL subsystem and reported as errors.
+
+    No need to commit/rollback statement transaction, it's not started.
+
+    TODO: Long-term we should either ensure that implicit REVOKE statement
+    is written into binary log as a separate statement or make both
+    dropping of routine and implicit REVOKE parts of one fully atomic
+    statement.
+  */
+  assert(thd->get_transaction()->is_empty(Transaction_ctx::STMT));
+  close_thread_tables(thd);
+
+#ifdef WITH_WSREP
+  /*
+    sp_result is the result of sp_drop_routine() called by the caller of this
+    function.
+    sp_drop_routine() returns SP_INTERNAL_ERROR in case of system user
+    privileges check failure. In such a case we don't want to proceed with
+    sp_revoke_privileges which will fail anyway.
+  */
+  if (sp_result == SP_INTERNAL_ERROR) {
+    return false;
+  }
+#endif
+
+  if (!sp_did_not_exist && sp_automatic_privileges && !opt_noacl &&
+      sp_revoke_privileges(thd, db_name, sp_name,
+                           enum_sp_type_to_acl_type(sp_type))) {
+    push_warning(thd, Sql_condition::SL_WARNING, ER_PROC_AUTO_REVOKE_FAIL,
+                 ER_THD(thd, ER_PROC_AUTO_REVOKE_FAIL));
+    /* If this happens, an error should have been reported. */
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -4931,17 +5081,17 @@ int mysql_execute_command(THD *thd, bool first_level) {
           }
         }
         if (lex->type == TYPE_ENUM_PROCEDURE ||
-            lex->type == TYPE_ENUM_FUNCTION) {
+            lex->type == TYPE_ENUM_FUNCTION || lex->type == TYPE_ENUM_LIBRARY) {
           uint grants = lex->all_privileges
                             ? (PROC_OP_ACLS) | (lex->grant & GRANT_ACL)
                             : lex->grant;
           if (check_grant_routine(thd, grants | GRANT_ACL, all_tables,
-                                  lex->type == TYPE_ENUM_PROCEDURE, false))
+                                  lex_type_to_acl_type(lex->type), false))
             goto error;
           /* Conditionally writes to binlog */
           res = mysql_routine_grant(
-              thd, all_tables, lex->type == TYPE_ENUM_PROCEDURE,
-              lex->users_list, grants, lex->sql_command == SQLCOM_REVOKE, true,
+              thd, all_tables, lex_type_to_acl_type(lex->type), lex->users_list,
+              grants, lex->sql_command == SQLCOM_REVOKE, true,
               lex->all_privileges);
           if (!res) my_ok(thd);
         } else {
@@ -5268,6 +5418,12 @@ int mysql_execute_command(THD *thd, bool first_level) {
 
       assert(lex->sphead != nullptr);
 
+      bool library_import_supported =
+          native_strcasecmp(lex->sp_chistics.language.str, "JAVASCRIPT") == 0;
+      auto imported_libraries = lex->sp_chistics.get_imported_libraries();
+      bool imports_library =
+          imported_libraries != nullptr && !imported_libraries->empty();
+
       if (!lex->sphead->is_sql()) {
         if (srv_registry == nullptr) {
           my_error(ER_LANGUAGE_COMPONENT_NOT_AVAILABLE, MYF(0));
@@ -5288,6 +5444,14 @@ int mysql_execute_command(THD *thd, bool first_level) {
                      lex->sp_chistics.language.str);
             goto error;
           }
+
+          // Check that libraries are supported before parsing the code
+          if (!library_import_supported && imports_library) {
+            my_error(ER_LIBRARIES_NOT_SUPPORTED, MYF(0),
+                     lex->sp_chistics.language.str);
+            goto error;
+          }
+
           my_service<SERVICE_TYPE(external_program_execution)> sp_service(
               "external_program_execution", srv_registry);
           if (!sp_service.is_valid())
@@ -5297,6 +5461,13 @@ int mysql_execute_command(THD *thd, bool first_level) {
         } else {
           push_warning(thd, ER_LANGUAGE_COMPONENT_NOT_AVAILABLE);
         }
+      }
+
+      // Also do this check for SQL and when language service is not available
+      if (!library_import_supported && imports_library) {
+        my_error(ER_LIBRARIES_NOT_SUPPORTED, MYF(0),
+                 lex->sp_chistics.language.str);
+        goto error;
       }
 
       assert(lex->sphead->m_db.str); /* Must be initialized in the parser */
@@ -5326,6 +5497,28 @@ int mysql_execute_command(THD *thd, bool first_level) {
         }
       }
 
+      // Check that the SP creator has EXECUTE privilege on all of the used
+      // libraries
+      if (imports_library) {
+        auto import_error = false;
+        for (const auto &import : *imported_libraries) {
+          if (check_routine_access(thd, EXECUTE_ACL, import.m_db.str,
+                                   import.m_name.str, Acl_type::LIBRARY,
+                                   false)) {
+            import_error = true;
+            break;
+          }
+          auto lib_name = sp_name{import.m_db, import.m_name, true};
+          if (sp_exists_library(thd, &lib_name)) {
+            my_error(ER_SP_DOES_NOT_EXIST, MYF(0), "LIBRARY",
+                     import.m_name.str);
+            import_error = true;
+            break;
+          }
+        }
+        if (import_error) goto error;
+      }
+
       if (sp_process_definer(thd)) goto error;
 
       /*
@@ -5340,80 +5533,12 @@ int mysql_execute_command(THD *thd, bool first_level) {
                 thd->lex->create_info->options & HA_LEX_CREATE_IF_NOT_EXISTS,
                 sp_already_exists))) {
         if (!sp_already_exists) {
-          /* only add privileges if really necessary */
-
-          Security_context security_context;
-          bool restore_backup_context = false;
-          Security_context *backup = nullptr;
-          /*
-            We're going to issue an implicit GRANT statement so we close all
-            open tables. We have to keep metadata locks as this ensures that
-            this statement is atomic against concurrent FLUSH TABLES WITH READ
-            LOCK. Deadlocks which can arise due to fact that this implicit
-            statement takes metadata locks should be detected by a deadlock
-            detector in MDL subsystem and reported as errors.
-
-            No need to commit/rollback statement transaction, it's not started.
-
-            TODO: Long-term we should either ensure that implicit GRANT
-            statement is written into binary log as a separate statement or make
-            both creation of routine and implicit GRANT parts of one fully
-            atomic statement.
-          */
-          assert(thd->get_transaction()->is_empty(Transaction_ctx::STMT));
-          close_thread_tables(thd);
-          /*
-            Check if invoker exists on slave, then use invoker privilege to
-            insert routine privileges to mysql.procs_priv. If invoker is not
-            available then consider using definer.
-
-            Check if the definer exists on slave,
-            then use definer privilege to insert routine privileges to
-            mysql.procs_priv.
-
-            For current user of SQL thread has GLOBAL_ACL privilege,
-            which doesn't any check routine privileges,
-            so no routine privilege record  will insert into mysql.procs_priv.
-          */
-
-          if (thd->slave_thread) {
-            LEX_CSTRING current_user;
-            LEX_CSTRING current_host;
-            if (thd->has_invoker()) {
-              current_host = thd->get_invoker_host();
-              current_user = thd->get_invoker_user();
-            } else {
-              current_host = lex->definer->host;
-              current_user = lex->definer->user;
-            }
-            if (is_acl_user(thd, current_host.str, current_user.str)) {
-              security_context.change_security_context(
-                  thd, current_user, current_host, thd->lex->sphead->m_db.str,
-                  &backup);
-              restore_backup_context = true;
-            }
-          }
-
-          if (sp_automatic_privileges && !opt_noacl &&
-              check_routine_access(
-                  thd, DEFAULT_CREATE_PROC_ACLS, lex->sphead->m_db.str, name,
-                  lex->sql_command == SQLCOM_CREATE_PROCEDURE, true)) {
-            if (sp_grant_privileges(
-                    thd, lex->sphead->m_db.str, name,
-                    lex->sql_command == SQLCOM_CREATE_PROCEDURE))
-              push_warning(thd, Sql_condition::SL_WARNING,
-                           ER_PROC_AUTO_GRANT_FAIL,
-                           ER_THD(thd, ER_PROC_AUTO_GRANT_FAIL));
-            thd->clear_error();
-          }
-
-          /*
-            Restore current user with GLOBAL_ACL privilege of SQL thread
-          */
-          if (restore_backup_context) {
-            assert(thd->slave_thread == 1);
-            thd->security_context()->restore_security_context(thd, backup);
-          }
+          const enum_sp_type sp_type =
+              (lex->sql_command == SQLCOM_CREATE_PROCEDURE)
+                  ? enum_sp_type::PROCEDURE
+                  : enum_sp_type::FUNCTION;
+          add_automatic_sp_privileges(thd, sp_type, lex->sphead->m_db.str,
+                                      name);
         }
         my_ok(thd);
       }
@@ -5422,15 +5547,15 @@ int mysql_execute_command(THD *thd, bool first_level) {
 
     case SQLCOM_ALTER_PROCEDURE:
     case SQLCOM_ALTER_FUNCTION: {
-      if (check_routine_access(thd, ALTER_PROC_ACL, lex->spname->m_db.str,
-                               lex->spname->m_name.str,
-                               lex->sql_command == SQLCOM_ALTER_PROCEDURE,
-                               false))
-        goto error;
-
       const enum_sp_type sp_type = (lex->sql_command == SQLCOM_ALTER_PROCEDURE)
                                        ? enum_sp_type::PROCEDURE
                                        : enum_sp_type::FUNCTION;
+
+      if (check_routine_access(thd, ALTER_PROC_ACL, lex->spname->m_db.str,
+                               lex->spname->m_name.str,
+                               enum_sp_type_to_acl_type(sp_type), false))
+        goto error;
+
       /*
         Note that if you implement the capability of ALTER FUNCTION to
         alter the body of the function, this command should be made to
@@ -5498,62 +5623,29 @@ int mysql_execute_command(THD *thd, bool first_level) {
       const char *db = lex->spname->m_db.str;
       char *name = lex->spname->m_name.str;
 
-      if (check_routine_access(thd, ALTER_PROC_ACL, db, name,
-                               lex->sql_command == SQLCOM_DROP_PROCEDURE,
-                               false))
-        goto error;
-
-#ifdef WITH_WSREP
-        // to isolation is now done as part of sp_drop_routine as it does
-        // additional ACL based check that ensures the fact that if the
-        // definer has SUPER PRIVILIGES then DROP/ATLER should have same too.
-        // WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-#endif /* WITH_WSREP */
-
       const enum_sp_type sp_type = (lex->sql_command == SQLCOM_DROP_PROCEDURE)
                                        ? enum_sp_type::PROCEDURE
                                        : enum_sp_type::FUNCTION;
+      if (check_routine_access(thd, ALTER_PROC_ACL, db, name,
+                               enum_sp_type_to_acl_type(sp_type), false))
+        goto error;
 
       /* Conditionally writes to binlog */
       const enum_sp_return_code sp_result =
           sp_drop_routine(thd, sp_type, lex->spname);
 
-      /*
-        We're going to issue an implicit REVOKE statement so we close all
-        open tables. We have to keep metadata locks as this ensures that
-        this statement is atomic against concurrent FLUSH TABLES WITH READ
-        LOCK. Deadlocks which can arise due to fact that this implicit
-        statement takes metadata locks should be detected by a deadlock
-        detector in MDL subsystem and reported as errors.
-
-        No need to commit/rollback statement transaction, it's not started.
-
-        TODO: Long-term we should either ensure that implicit REVOKE statement
-              is written into binary log as a separate statement or make both
-              dropping of routine and implicit REVOKE parts of one fully atomic
-              statement.
-      */
-      assert(thd->get_transaction()->is_empty(Transaction_ctx::STMT));
-      close_thread_tables(thd);
-
 #ifdef WITH_WSREP
-      // sp_drop_routine() returns SP_INTERNAL_ERROR in case of system user
-      // privileges check failure. In such a case we don't want to proceed with
-      // sp_revoke_privileges which will fail anyway.
-      if (sp_result != SP_INTERNAL_ERROR) {
-#endif
-        if (sp_result != SP_DOES_NOT_EXISTS && sp_automatic_privileges &&
-            !opt_noacl &&
-            sp_revoke_privileges(thd, db, name,
-                                 lex->sql_command == SQLCOM_DROP_PROCEDURE)) {
-          push_warning(thd, Sql_condition::SL_WARNING, ER_PROC_AUTO_REVOKE_FAIL,
-                       ER_THD(thd, ER_PROC_AUTO_REVOKE_FAIL));
-          /* If this happens, an error should have been reported. */
-          goto error;
-        }
-#ifdef WITH_WSREP
+      if (remove_automatic_sp_privileges(
+              thd, sp_type, sp_result == SP_DOES_NOT_EXISTS, db, name,
+              sp_result)) {
+        goto error;
       }
-#endif
+#else
+      if (remove_automatic_sp_privileges(
+              thd, sp_type, sp_result == SP_DOES_NOT_EXISTS, db, name)) {
+        goto error;
+      }
+#endif  /* WITH_WSREP */
 
       res = sp_result;
       switch (sp_result) {
@@ -5667,6 +5759,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
     case SQLCOM_SHOW_CREATE_EVENT:
     case SQLCOM_SHOW_CREATE_FUNC:
     case SQLCOM_SHOW_CREATE_PROC:
+    case SQLCOM_SHOW_CREATE_LIBRARY:
     case SQLCOM_SHOW_CREATE:
     case SQLCOM_SHOW_CREATE_TRIGGER:
     // case SQLCOM_SHOW_CREATE_USER:
@@ -5713,7 +5806,9 @@ int mysql_execute_command(THD *thd, bool first_level) {
     case SQLCOM_EXPLAIN_OTHER:
     case SQLCOM_RESTART_SERVER:
     case SQLCOM_CREATE_SRS:
-    case SQLCOM_DROP_SRS: {
+    case SQLCOM_DROP_SRS:
+    case SQLCOM_CREATE_LIBRARY:
+    case SQLCOM_DROP_LIBRARY: {
 #ifdef WITH_WSREP
       if (lex->sql_command == SQLCOM_SELECT)
         WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_READ)
@@ -8152,6 +8247,8 @@ Comp_creator *comp_ne_creator(bool invert) {
 /**
   Construct ALL/ANY/SOME subquery Item.
 
+  @param thd         thread handler
+  @param pos         string from parsed item
   @param left_expr   pointer to left expression
   @param cmp         compare function creator
   @param all         true if we create ALL subquery
@@ -8160,24 +8257,42 @@ Comp_creator *comp_ne_creator(bool invert) {
   @return
     constructed Item (or 0 if out of memory)
 */
-Item *all_any_subquery_creator(Item *left_expr,
+Item *all_any_subquery_creator(THD *thd, const POS &pos, Item *left_expr,
                                chooser_compare_func_creator cmp, bool all,
                                Query_block *query_block) {
-  if ((cmp == &comp_eq_creator) && !all)  //  = ANY <=> IN
-    return new Item_in_subselect(left_expr, query_block);
-  if ((cmp == &comp_ne_creator) && all)  // <> ALL <=> NOT IN
-  {
-    Item *i = new Item_in_subselect(left_expr, query_block);
-    if (i == nullptr) return nullptr;
-    Item *neg_i = i->truth_transformer(nullptr, Item::BOOL_NEGATED);
-    if (neg_i != nullptr) return neg_i;
-    return new Item_func_not(i);
-  }
-  Item_allany_subselect *it =
-      new Item_allany_subselect(left_expr, cmp, query_block, all);
-  if (all) return it->m_upper_item = new Item_func_not_all(it); /* ALL */
+  Item *item = nullptr;
 
-  return it->m_upper_item = new Item_func_nop_all(it); /* ANY/SOME */
+  if (cmp == &comp_eq_creator && !all) {  //  = ANY <=> IN
+    item = new (thd->mem_root) Item_in_subselect(pos, left_expr, query_block);
+    if (item == nullptr) return nullptr;
+
+    down_cast<Item_subselect *>(item)->set_contextualized();
+    thd->add_item(item);
+  } else if (cmp == &comp_ne_creator && all) {  // <> ALL <=> NOT IN
+    item = new Item_in_subselect(pos, left_expr, query_block);
+    if (item == nullptr) return nullptr;
+
+    down_cast<Item_subselect *>(item)->set_contextualized();
+    thd->add_item(item);
+
+    Item *negated = item->truth_transformer(nullptr, Item::BOOL_NEGATED);
+    if (negated != nullptr) return negated;
+    item = new (thd->mem_root) Item_func_not(item);
+  } else {
+    Item_allany_subselect *it = new (thd->mem_root)
+        Item_allany_subselect(pos, left_expr, cmp, query_block, all);
+    if (it == nullptr) return nullptr;
+
+    it->set_contextualized();
+    thd->add_item(it);
+
+    if (all) {  // ALL
+      item = it->m_upper_item = new (thd->mem_root) Item_func_not_all(it);
+    } else {  // ANY/SOME
+      item = it->m_upper_item = new (thd->mem_root) Item_func_nop_all(it);
+    }
+  }
+  return item;
 }
 
 /**

@@ -10,6 +10,7 @@ USER	COMMAND	STATE
 event_scheduler	Daemon	Waiting on empty queue
 root	Sleep	
 system user	Sleep	wsrep: aborter idle
+system user	Daemon	Suspending
 system user	Connect	
 x_root	Query	executing
 0 rows affected
@@ -40,6 +41,7 @@ event_scheduler	Daemon	Waiting on empty queue
 root	Sleep	
 root	Sleep	
 system user	Sleep	wsrep: aborter idle
+system user	Daemon	Suspending
 system user	Connect	
 x_root	Query	executing
 0 rows affected
@@ -61,6 +63,7 @@ event_scheduler	Daemon	Waiting on empty queue
 root	Sleep	
 root	Sleep	
 system user	Sleep	wsrep: aborter idle
+system user	Daemon	Suspending
 system user	Connect	
 x_root	Query	executing
 x_root	Sleep	
@@ -81,6 +84,7 @@ event_scheduler	Daemon	Waiting on empty queue
 root	Query	executing
 root	Sleep	
 system user	Sleep	wsrep: aborter idle
+system user	Daemon	Suspending
 system user	Connect	
 RUN set @current := connection_id()
 
@@ -91,6 +95,7 @@ event_scheduler	Daemon	Waiting on empty queue
 root	Sleep	
 root	Sleep	
 system user	Sleep	wsrep: aborter idle
+system user	Daemon	Suspending
 system user	Connect	
 x_root	Query	executing
 0 rows affected
@@ -107,6 +112,7 @@ event_scheduler	Daemon	Waiting on empty queue
 root	Query	executing
 root	Sleep	
 system user	Sleep	wsrep: aborter idle
+system user	Daemon	Suspending
 system user	Connect	
 show status like 'Mysqlx_sessions%';
 Variable_name	Value

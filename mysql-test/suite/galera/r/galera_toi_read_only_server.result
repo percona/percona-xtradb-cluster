@@ -26,10 +26,14 @@ SET GLOBAL super_read_only=0;
 CREATE USER 'user1'@'localhost' IDENTIFIED BY 'pass1';
 SET GLOBAL super_read_only=1;
 FLUSH PRIVILEGES;
+Warnings:
+Warning	1681	'FLUSH PRIVILEGES' is deprecated and will be removed in a future release.
 SET GLOBAL super_read_only=0;
 DELETE FROM mysql.user WHERE user = 'user1';
 SET GLOBAL super_read_only=1;
 FLUSH PRIVILEGES;
+Warnings:
+Warning	1681	'FLUSH PRIVILEGES' is deprecated and will be removed in a future release.
 FLUSH STATUS;
 FLUSH USER_RESOURCES;
 FLUSH TABLES;

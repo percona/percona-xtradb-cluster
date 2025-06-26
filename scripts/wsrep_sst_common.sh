@@ -327,6 +327,17 @@ get_mysqld_path()
         MYSQLD_PATH=$(which ${MYSQLD_NAME})
     fi
 
+    if [[ $MYSQLD_PATH == *"memcheck"* ]]; then
+      wsrep_log_debug "Detected valgrind, adjusting mysqld path accordingly"
+      while read -r line
+      do
+        if [[ ${line::1} != "-" ]]; then
+          MYSQLD_PATH=$line
+          wsrep_log_debug "Adjusted mysqld to $line"
+        fi
+      done < <(cat /proc/${WSREP_SST_OPT_PARENT}/cmdline | strings -1)
+    fi
+
     if [[ -z $MYSQLD_PATH ]]; then
         wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "Could not locate ${MYSQLD_NAME} (needed for post-processing)"
@@ -699,16 +710,6 @@ function run_post_processing_steps()
     fi
 
     local mysqld_path=$MYSQLD_PATH
-    if [[ $mysqld_path == *"memcheck"* ]]; then
-      wsrep_log_debug "Detected valgrind, adjusting mysqld path accordingly"
-      while read -r line
-      do
-        if [[ ${line::1} != "-" ]]; then
-          mysqld_path=$line
-          wsrep_log_debug "Adjusted mysqld to $line"
-        fi
-      done < <(cat /proc/${WSREP_SST_OPT_PARENT}/cmdline | strings -1)
-    fi
 
     # Verify any other needed programs
     wsrep_check_program "${MYSQLADMIN_NAME}"
