@@ -1,0 +1,2 @@
+--let $ist_check_log_message = xtrabackup_ist received from donor: Running IST
+--source galera_sst_timeout.inc

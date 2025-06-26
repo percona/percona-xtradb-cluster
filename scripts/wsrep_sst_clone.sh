@@ -94,8 +94,9 @@ set -o nounset -o errexit
 
 readonly EINVAL=22
 readonly EPIPE=32
-readonly ETIMEDOUT=110
 readonly ENODATA=61
+readonly ETIMEDOUT=110
+readonly EALREADY=114
 CLEANUP_CLONE_PLUGIN=""
 CLONE_USER=""
 NC_PID=""
@@ -489,7 +490,7 @@ monitor_sst_progress() {
 
 # This is the script execution start point
 
-if test -z "$WSREP_SST_OPT_HOST"; then wsrep_log_error "HOST cannot be empty"; exit $EINVAL; fi
+if test -z "$WSREP_SST_OPT_HOST"; then wsrep_log_error "HOST cannot be empty"; safe_exit $EINVAL; fi
 
 # MySQL client does not seem to agree to [] around IPv6 addresses
 wsrep_check_programs sed
@@ -518,10 +519,10 @@ then
     wsrep_log_debug "-> SST_HOST_STRIPPED = $SST_HOST_STRIPPED "
 
     # Split auth string at the last ':'
-    if test -z "$WSREP_SST_OPT_USER";   then wsrep_log_error "USER cannot be empty";   exit $EINVAL; fi
-    if test -z "$WSREP_SST_OPT_REMOTE_JOINER_USER"; then wsrep_log_error "REMOTE_USER cannot be empty"; exit $EINVAL; fi
-    if test -z "$WSREP_SST_OPT_PORT";   then wsrep_log_error "PORT cannot be empty";   exit $EINVAL; fi
-    if test -z "$WSREP_SST_OPT_SOCKET"; then wsrep_log_error "SOCKET cannot be empty"; exit $EINVAL; fi
+    if test -z "$WSREP_SST_OPT_USER";   then wsrep_log_error "USER cannot be empty";   safe_exit $EINVAL; fi
+    if test -z "$WSREP_SST_OPT_REMOTE_JOINER_USER"; then wsrep_log_error "REMOTE_USER cannot be empty"; safe_exit $EINVAL; fi
+    if test -z "$WSREP_SST_OPT_PORT";   then wsrep_log_error "PORT cannot be empty";   safe_exit $EINVAL; fi
+    if test -z "$WSREP_SST_OPT_SOCKET"; then wsrep_log_error "SOCKET cannot be empty"; safe_exit $EINVAL; fi
 
     CLIENT_VERSION=$($MYSQL_CLIENT --version | grep -vi MariaDB | cut -d ' ' -f 4)
     check_client_version $CLIENT_VERSION
@@ -582,7 +583,7 @@ EOF
         then
             wsrep_log_error "Donor prepare returned code $RC"
             cat $CLONE_PREPARE_SQL >> /dev/stderr
-            exit $RC
+            safe_exit $RC
         fi
 
         # Before waiting for the Joiner Clone mysql we send out the message this is a SST
@@ -592,21 +593,31 @@ EOF
 
         # We stay on hold now, waiting for the Joiner to expose the service
         wsrep_log_info "-> WAIT for Joiner MySQL to be available nc -w 1 -i 1 $SST_HOST_STRIPPED $WSREP_SST_OPT_REMOTE_HOSTPORT"
+        tmt=$DONOR_TIMEOUT_WAIT_JOINER_CLONE_INSTANCE
         while [ true ]; do
+            if [ "$tmt" == "0" ]; then
+                wsrep_log_error "************ FATAL ERROR ************"
+                wsrep_log_error "TIMEOUT Waiting for the Joiner to setup MySQL clone instance $LINENO"
+                wsrep_log_error "Within the last $DONOR_TIMEOUT_WAIT_JOINER_CLONE_INSTANCE seconds (defined by donor-timeout-wait-joiner variable),"
+                wsrep_log_error "the SST process on the Donor (this node) didn't find clone instance"
+                wsrep_log_error "ready on Joiner instance."
+                wsrep_log_error "This error could be caused by broken network connectivity between"
+                wsrep_log_error "the Donor (this node) and the Joiner."
+                wsrep_log_error "Check the network connection and restart the Joiner node."
+                wsrep_log_error "*************************************"
+                safe_exit $EPIPE
+            fi
+
         	NCPING=`nc -w 1 -i 1 $SST_HOST_STRIPPED $WSREP_SST_OPT_REMOTE_HOSTPORT 2> /dev/null | tr -d '\0'` || :
             if [ "$NCPING" == "" ]; then
-                wsrep_log_info "[second(s) to timeout: $DONOR_TIMEOUT_WAIT_JOINER_CLONE_INSTANCE]"
+                wsrep_log_info "[second(s) to timeout: $tmt]"
             else
                 wsrep_log_info "Joiner instance available at $SST_HOST_STRIPPED:$WSREP_SST_OPT_REMOTE_HOSTPORT"
                 break
             fi
-            if [ "$DONOR_TIMEOUT_WAIT_JOINER_CLONE_INSTANCE" == "0" ]; then
-                    wsrep_log_error "TIMEOUT Waiting for the Joiner to setup MySQL clone instance $LINENO"
-                    break ;
-            fi
 
             sleep 1
-            ((DONOR_TIMEOUT_WAIT_JOINER_CLONE_INSTANCE-=1))
+            tmt=$((tmt-1))
         done
         # Wait is over
         wsrep_log_debug "-> Wait is over"
@@ -659,7 +670,7 @@ EOF
             *)  RC=255 # unknown error
                 ;;
             esac
-            exit $RC
+            safe_exit $RC
         fi
     else # BYPASS
         wsrep_log_info "Bypassing state dump."
@@ -697,8 +708,8 @@ then
     wsrep_check_programs ps
     wsrep_check_programs find
 
-    if test -z "$WSREP_SST_OPT_DATA";   then wsrep_log_error "DATA cannot be empty";   exit $EINVAL; fi
-    if test -z "$WSREP_SST_OPT_PARENT"; then wsrep_log_error "PARENT cannot be empty"; exit $EINVAL; fi
+    if test -z "$WSREP_SST_OPT_DATA";   then wsrep_log_error "DATA cannot be empty";   safe_exit $EINVAL; fi
+    if test -z "$WSREP_SST_OPT_PARENT"; then wsrep_log_error "PARENT cannot be empty"; safe_exit $EINVAL; fi
 
     #
     #  Find binary to run
@@ -711,7 +722,7 @@ then
     if [ ! -x "$CLONE_BINARY" ]
     then
         wsrep_log_error "Could not determine binary to run: $CLONE_BINARY"
-        exit $EINVAL
+        safe_exit $EINVAL
     fi
 
     #
@@ -787,7 +798,7 @@ then
     then
         CLONE_PID=`cat $CLONE_PID_FILE`
         wsrep_log_error "cloning daemon already running (PID: $CLONE_PID)"
-        exit 114 # EALREADY
+        safe_exit $EALREADY
     fi
     rm -rf "$CLONE_PID_FILE"
 
@@ -829,7 +840,7 @@ then
                         "'$CLONE_X_SOCK' is greater than commonly acceptable"\
                         "limit of 104 bytes."
                         # Linux: 108, FreeBSD: 104
-        exit $EINVAL
+        safe_exit $EINVAL
     fi
 
     [ -z "$WSREP_SST_OPT_CONF" ] \
@@ -893,35 +904,44 @@ then
     wsrep_log_info "-> NETCAT PID $NC_PID"
     if [ $NC_PID == "" ];then
         wsrep_log_error "-> Cannot open Netcat at given port $JOINER_CLONE_HOST $JOINER_CLONE_PORT check if the port is already taken"
-        exit 1
+        safe_exit 1
     fi
 
+    # Send "ready" message to the application.
+    # Application forms SST request from "ready" data and marks grastate.dat
+    # as 'unsafe'. From now till the point when we delete data directory,
+    # grastate.dat can be turned back to 'safe' state. This will prevent forced
+    # SST in case something goes wrong before datadir deletion.
+    # Fail "soft" until we delete datadir.
+    SAFE_EXIT_CODE_OVERRIDE=${EAGAIN}
     # Report clone credentials/address to the caller
     wsrep_log_debug "-> ready passing string |$CLONE_USER:CLONE_PSWD@$JOINER_CLONE_HOST:$JOINER_CLONE_PORT|"
     echo "ready $CLONE_USER:$CLONE_PSWD@$JOINER_CLONE_HOST:$JOINER_CLONE_PORT"
 
     # WAIT for Donor message
-    wsrep_log_debug "-> wait $JOINER_TIMEOUT_WAIT_DONOR_MESSAGE"
+    tmt=$JOINER_TIMEOUT_WAIT_DONOR_MESSAGE
+    wsrep_log_debug "-> wait $tmt"
 
     until grep -q ".*<EOF>$" "$WSREP_SST_OPT_DATA/XST_FILE.txt" &> /dev/null
     do
-         if [ "$JOINER_TIMEOUT_WAIT_DONOR_MESSAGE" == "0" ]; then
+         if [ "$tmt" == "0" ]; then
             wsrep_log_error "************ FATAL ERROR ************"
             wsrep_log_error "TIMEOUT Waiting for the DONOR MESSAGE"
             wsrep_log_error "Donor message was either incomplete or not sent"
+            wsrep_log_error "within ${JOINER_TIMEOUT_WAIT_DONOR_MESSAGE} seconds (defined by joiner-timeout-wait-donor-message variable)"
             donor_message=`cat $WSREP_SST_OPT_DATA/XST_FILE.txt`
             wsrep_log_error "donor message received: $donor_message"
             wsrep_log_error "*************************************"
-            exit 1 ;
+            safe_exit $EPIPE
          fi
          sleep 1
-
-        ((JOINER_TIMEOUT_WAIT_DONOR_MESSAGE-=1))
+         tmt=$((tmt-1))
     done
 
     wsrep_log_debug "-> WAIT DIR DONOR MESSAGE DONE"
 
     if ! grep -q "SST@" "$WSREP_SST_OPT_DATA/XST_FILE.txt"; then
+        SAFE_EXIT_CODE_OVERRIDE=
         wsrep_log_info "DONOR SAY IST"
         wsrep_log_debug "-> RECOVER POSITION TO SEND OUT DONOR IST"
         RP_PURGED=`cat $WSREP_SST_OPT_DATA/XST_FILE.txt`
@@ -930,7 +950,7 @@ then
         rm -f  $WSREP_SST_OPT_DATA/XST_FILE.txt || :
 
         echo $RP_PURGED
-        exit 0
+        safe_exit 0
     else
         RP_PURGED=`cat $WSREP_SST_OPT_DATA/XST_FILE.txt`
         wsrep_log_info "DONOR SAY SST ($RP_PURGED)"
@@ -964,9 +984,16 @@ then
             wsrep_log_error "$mainfest_config_type"
             wsrep_log_error "Line $LINENO"
             wsrep_log_error "****************************************************** "
-            exit 1
+            safe_exit $EPIPE
         fi
     fi
+
+    # Up to this point, if anything happened that prevented SST (eg. network
+    # issue, wrong keyring configuration), datadir was not touched, so we should
+    # leave the node as it was (grastate.dat)
+    # From now on, there is no way back: we will receive SST, or the node won't
+    # work.
+    SAFE_EXIT_CODE_OVERRIDE=
 
     # If we need to SST in any case we must remove the data, so let us do it here and be sure we work on a clean directory
     wsrep_log_info "Cleaning Data directory $WSREP_SST_OPT_DATA"
@@ -1016,7 +1043,7 @@ then
           wsrep_log_error "> $msg"
       done
       wsrep_log_error "Full log at $CLONE_ERR"
-      exit 1 )
+      safe_exit 1 )
 
     # Move initialized data directory structure to real datadir and cleanup
     mv -n "$tmp_datadir"/* "$WSREP_SST_OPT_DATA/"
@@ -1056,7 +1083,7 @@ EOF
         wsrep_log_error "-> User Creation on Joiner node failed, possible permission denied. Check permissions for "
         #we will try to silently shutdown the instance
         `$MYSQL_ACLIENT -e "SHUTDOWN" 2> /dev/null` || :
-        exit 1
+        safe_exit 1
     fi
 
     # Wait for the receiver process to start
@@ -1083,7 +1110,7 @@ EOF
         if [ $to_wait -eq 0 ]
         then
             wsrep_log_error "Timeout waiting for clone recipient daemon"
-            exit $ETIMEDOUT
+            safe_exit $ETIMEDOUT
         fi
         to_wait=$((to_wait - 1))
         sleep 1
@@ -1102,7 +1129,7 @@ EOF
     if [ $status -eq 1 ]; then
         # parent process died, we need to exit as well
         wsrep_log_error "Parent mysqld process (PID:$WSREP_SST_OPT_PARENT) terminated unexpectedly."
-        exit $EPIPE
+        safe_exit $EPIPE
     fi
     if [ $status -eq 2 ]; then
         # Stale SST, no progress
@@ -1115,7 +1142,7 @@ EOF
         wsrep_log_error "Check the network connection and restart the joiner node."
         wsrep_log_error "Line $LINENO"
         wsrep_log_error "****************************************************** "
-        exit $ETIMEDOUT
+        safe_exit $ETIMEDOUT
     fi
 
     wsrep_log_info "clone recepient daemon finished"
@@ -1185,7 +1212,7 @@ EOF
         wsrep_log_debug "Invalid Recovery position. Exiting with error $ENODATA (No data available)"
         # We terminate but save the log for inspections given the failure
         CLEANUP_FILES=0
-        exit $ENODATA
+        safe_exit $ENODATA
     fi
 
     echo $RP_PURGED
@@ -1193,7 +1220,7 @@ EOF
     # exit 0 is at the end of the script, after printing the message
 else
     wsrep_log_error "Unrecognized role: '$WSREP_SST_OPT_ROLE'"
-    exit $EINVAL
+    safe_exit $EINVAL
 fi
 
 wsrep_log_debug "-> SST PROCESS FINISHED for $WSREP_SST_OPT_ROLE"
