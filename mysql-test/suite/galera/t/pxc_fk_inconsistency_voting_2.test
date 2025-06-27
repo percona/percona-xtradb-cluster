@@ -1,0 +1,94 @@
+#
+# Test that FK add error in session of the user with limited
+# tables grants trigger inconsistency voting with the error code
+# compatible with other nodes.
+# WSREP applier thread works in context of root user, so it has
+# full grants. When FK constraint check fails, ER_NO_REFERENCED_ROW_2
+# is generated and used for voting.
+# On the other hand, when FK constraint check fails in session with
+# limited grants, ER_NO_REFERENCED_ROW is generated (with limited
+# error message). Both ER_NO_REFERENCED_ROW and ER_NO_REFERENCED_ROW_2
+# indicate the same error from inconsistency voting viewpoint.
+# The consequence is that it should not matter which error is generated,
+# nodes should agree during voting.
+#
+# The same situation is for ER_ROW_IS_REFERENCED and ER_ROW_IS_REFERENCED_2
+# error codes when deleting referenced row from the parent table.
+#
+
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+CREATE USER testuser identified by 'testpass';
+GRANT ALTER, REFERENCES, DELETE, SELECT ON *.* TO testuser;
+
+# MTR framework adds all grants for 'test' database (mysql-test-run.pl inserts
+# a row into mysql.db). Let's use another db.
+CREATE DATABASE test2;
+USE test2;
+CREATE TABLE parent ( id INT PRIMARY KEY ) ;
+CREATE TABLE child ( id INT PRIMARY KEY, parent_id INT, INDEX par_ind (parent_id));
+INSERT INTO child VALUES (1,1);
+
+CALL mtr.add_suppression("\[ERROR\].*Cannot add or update a child row");
+--connection node_2
+CALL mtr.add_suppression("\[ERROR\].*Cannot add or update a child row");
+--connection node_1
+
+#
+# ER_NO_REFERENCED_ROW / ER_NO_REFERENCED_ROW_2
+#
+
+#
+# The following query will fail because of FK constraint violation.
+# root user has full grants for 'parent' and 'child' tables
+# so we expect ER_NO_REFERENCED_ROW_2 error.
+#
+--error ER_NO_REFERENCED_ROW_2
+ALTER TABLE child add FOREIGN KEY (parent_id) REFERENCES parent(id);
+
+#
+# The following query will fail because of FK constraint violation.
+# testuser has limited grants for 'parent' and 'child' tables
+# so we expect ER_NO_REFERENCED_ROW error.
+#
+--connect node_1a, 127.0.0.1, testuser, testpass, test2, $NODE_MYPORT_1
+--connection node_1a
+--error ER_NO_REFERENCED_ROW
+ALTER TABLE child add FOREIGN KEY (parent_id) REFERENCES parent(id);
+
+
+#
+# ER_ROW_IS_REFERENCED / ER_ROW_IS_REFERENCED_2
+#
+--connection node_1
+INSERT INTO parent VALUES (1);
+ALTER TABLE child add FOREIGN KEY (parent_id) REFERENCES parent(id) ;
+
+#
+# The following query will fail, because 'parent' table row is referenced
+# by 'child' table. root user has full grants, so we expect
+# ER_ROW_IS_REFERENCED_2
+#
+--error ER_ROW_IS_REFERENCED_2
+DELETE FROM parent WHERE id = 1;
+
+#
+# The following query will fail, because 'parent' table row is referenced
+# by 'child' table. testuser user has limited grants, so we expect
+# ER_ROW_IS_REFERENCED
+#
+--connection node_1a
+--error ER_ROW_IS_REFERENCED
+DELETE FROM parent WHERE id = 1;
+
+
+#
+# cleanup
+#
+--connection node_1
+DROP DATABASE test2;
+DROP USER testuser;
+--disconnect node_1a
+--source include/wait_until_count_sessions.inc
+

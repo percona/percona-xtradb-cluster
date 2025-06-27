@@ -25,11 +25,11 @@
 #include "sql/binlog_reader.h"
 #include "sql/sql_lex.h"
 
+#include <unordered_map>
 #include "service_wsrep.h"
 #include "wsrep_priv.h"
 #include "wsrep_thd.h"
 #include "wsrep_trans_observer.h"
-
 /*
   read the first event from (*buf). The size of the (*buf) is (*buf_len).
   At the end (*buf) is shitfed to point to the following event or NULL and
@@ -78,6 +78,26 @@ Format_description_log_event *wsrep_get_apply_format(THD *thd) {
   return thd->wsrep_rli->get_rli_description_event();
 }
 
+static uint wsrep_errno_for_voting(uint err) {
+  /* errno_map keeps pairs of error codes that mean
+   the same from inconsistency voting point of view. */
+  static std::unordered_map<uint, uint> errno_map = {
+      /* Use ER_NO_REFERENCED_ROW_2 and ER_ROW_IS_REFERENCED_2 for voting
+       because commit e6dbb7d0 in 8.4 branch changed the behavior to always
+       report _2 code, so it is used for voting. This way voting in mixed
+       version cluster (8.0 and 8.4) will be compatible. */
+      {ER_NO_REFERENCED_ROW, ER_NO_REFERENCED_ROW_2},
+      {ER_ROW_IS_REFERENCED, ER_ROW_IS_REFERENCED_2}};
+
+  if (errno_map.count(err)) {
+    auto res = errno_map[err];
+    WSREP_DEBUG("Overriding ambiguous error code %u -> %u for voting", err,
+                res);
+    return res;
+  }
+  return err;
+}
+
 void wsrep_store_error(const THD *const thd, wsrep::mutable_buffer &dst) {
   Diagnostics_area::Sql_condition_iterator it =
       thd->get_stmt_da()->sql_conditions();
@@ -93,12 +113,15 @@ void wsrep_store_error(const THD *const thd, wsrep::mutable_buffer &dst) {
 
   auto da = thd->get_stmt_da();
   if (da->cond_count() == 0 && da->is_set()) {
+    uint const err_code = wsrep_errno_for_voting(da->mysql_errno());
+    const char *const err_str = da->message_text();
+
     slider += snprintf(slider, buf_end - slider, " %s, Error_code: %d;",
-                       da->message_text(), da->mysql_errno());
+                       err_str, err_code);
   }
 
   for (cond = it++; cond && slider < buf_end; cond = it++) {
-    uint const err_code = cond->mysql_errno();
+    uint const err_code = wsrep_errno_for_voting(cond->mysql_errno());
     const char *const err_str = cond->message_text();
 
     slider += snprintf(slider, buf_end - slider, " %s, Error_code: %d;",
