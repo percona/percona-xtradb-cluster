@@ -650,9 +650,7 @@ This package contains ICU data files needer by MySQL regular expressions.
 # Optional package files
 touch optional-files-devel
 
-%if "%{_arch}" == "ia64"
 RPM_OPT_FLAGS=
-%endif
 #
 %if %{with tokudb}
 RPM_OPT_FLAGS=
@@ -757,6 +755,7 @@ mkdir debug
   # XXX: install_layout so we can't just set it based on INSTALL_LAYOUT=RPM
   ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
            -DDOWNLOAD_BOOST=1 -DWITH_BOOST=build-ps/boost \
+           -DWITH_PACKAGE_FLAGS=OFF \
            -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=%{_prefix} \
            -DWITH_EMBEDDED_SERVER=OFF \
            -DWITH_INNODB_MEMCACHED=ON \
@@ -805,6 +804,7 @@ mkdir release
   # XXX: install_layout so we can't just set it based on INSTALL_LAYOUT=RPM
   ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
            -DDOWNLOAD_BOOST=1 -DWITH_BOOST=build-ps/boost \
+           -DWITH_PACKAGE_FLAGS=OFF \
            -DCMAKE_BUILD_TYPE=RelWithDebInfo  -DCMAKE_INSTALL_PREFIX=%{_prefix} \
            -DMINIMAL_RELWITHDEBINFO=OFF \
            -DWITH_EMBEDDED_SERVER=OFF \
@@ -1975,6 +1975,7 @@ rm -rf %{pxc_telemetry}
 %{_libdir}/mysqlrouter/private/libmysqlrouter_mysqlclient.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_mysqlxclient.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_utils.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_routing_guidelines.*
 %{_libdir}/mysqlrouter/private/libprotobuf.so.*
 %dir %{_libdir}/mysqlrouter
 %dir %{_libdir}/mysqlrouter/private
