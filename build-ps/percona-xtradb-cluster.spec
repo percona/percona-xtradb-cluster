@@ -809,7 +809,7 @@ mkdir release
   # XXX: install_layout so we can't just set it based on INSTALL_LAYOUT=RPM
   ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
            -DDOWNLOAD_BOOST=1 -DWITH_BOOST=build-ps/boost \
-           -DWITH_PACKAGE_FLAGS=OFF
+           -DWITH_PACKAGE_FLAGS=OFF \
            -DCMAKE_BUILD_TYPE=RelWithDebInfo  -DCMAKE_INSTALL_PREFIX=%{_prefix} \
            -DMINIMAL_RELWITHDEBINFO=OFF \
            -DWITH_EMBEDDED_SERVER=OFF \
