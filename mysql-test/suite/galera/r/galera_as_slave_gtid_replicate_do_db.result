@@ -88,14 +88,14 @@ mysqld-bin.000001	#	Delete_rows	#	#	table_id: # flags: STMT_END_F
 mysqld-bin.000001	#	Xid	#	#	COMMIT /* XID */
 mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	BEGIN
+mysqld-bin.000001	#	Query	#	#	COMMIT
+mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
+mysqld-bin.000001	#	Query	#	#	BEGIN
 mysqld-bin.000001	#	Table_map	#	#	table_id: # (test1.t1)
 mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F
 mysqld-bin.000001	#	Table_map	#	#	table_id: # (test1.t1)
 mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F
 mysqld-bin.000001	#	Xid	#	#	COMMIT /* XID */
-mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
-mysqld-bin.000001	#	Query	#	#	BEGIN
-mysqld-bin.000001	#	Query	#	#	COMMIT
 mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	BEGIN
 mysqld-bin.000001	#	Table_map	#	#	table_id: # (test1.t1)
@@ -155,14 +155,14 @@ mysqld-bin.000001	#	Delete_rows	#	#	table_id: # flags: STMT_END_F
 mysqld-bin.000001	#	Xid	#	#	COMMIT /* XID */
 mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	BEGIN
+mysqld-bin.000001	#	Query	#	#	COMMIT
+mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
+mysqld-bin.000001	#	Query	#	#	BEGIN
 mysqld-bin.000001	#	Table_map	#	#	table_id: # (test1.t1)
 mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F
 mysqld-bin.000001	#	Table_map	#	#	table_id: # (test1.t1)
 mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F
 mysqld-bin.000001	#	Xid	#	#	COMMIT /* XID */
-mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
-mysqld-bin.000001	#	Query	#	#	BEGIN
-mysqld-bin.000001	#	Query	#	#	COMMIT
 mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	BEGIN
 mysqld-bin.000001	#	Table_map	#	#	table_id: # (test1.t1)

@@ -138,7 +138,7 @@
 #include "sql/sql_lex.h"
 #include "sql/sql_list.h"
 #include "sql/sql_parse.h"  // sqlcom_can_generate_row_events
-#include "sql/sql_show.h"   // append_identifier
+#include "sql/sql_show.h"   // append_identifier_*
 #include "sql/system_variables.h"
 #include "sql/table.h"
 #include "sql/transaction_info.h"
@@ -11535,7 +11535,7 @@ int prepend_binlog_control_event(THD *const thd) {
 
   int ret = 0;
   Intvar_log_event ev(
-      (uchar)mysql::binlog::event::Intvar_event::BINLOG_CONTROL_EVENT, 0);
+      thd, (uchar)mysql::binlog::event::Intvar_event::BINLOG_CONTROL_EVENT, 0);
   if (ev.write(&tmp_io_cache)) {
     ret = ER_ERROR_ON_WRITE;
     goto cleanup;

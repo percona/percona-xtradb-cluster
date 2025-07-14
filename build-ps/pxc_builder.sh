@@ -172,7 +172,7 @@ get_sources(){
     export MYSQL_VERSION="$MYSQL_VERSION_MAJOR.$MYSQL_VERSION_MINOR.$MYSQL_VERSION_PATCH"
     export MYSQL_RELEASE="$(echo $MYSQL_VERSION_EXTRA | sed 's/^-//')"
 
-    PRODUCT=Percona-XtraDB-Cluster-91
+    PRODUCT=Percona-XtraDB-Cluster-92
     PRODUCT_FULL=Percona-XtraDB-Cluster-${MYSQL_VERSION}
 
     echo "WSREP_VERSION=${WSREP_VERSION}" > ${WORKDIR}/pxc-9x.properties
@@ -462,9 +462,8 @@ install_deps() {
         percona-release enable pxb-80 release
         if [ x"${DIST}" = xjammy ]; then
             percona-release enable pxb-9x-innovation experimental
-        else
-            percona-release enable pxb-84-lts release
-        fi 
+        fi
+        percona-release enable pxb-84-lts release
         # (2) PXB compatible with previous PXC version (note: it may be LTS as well)
         # percona-release enable pxc-8x-innovation testing
         # (3) PXB compatible with this PXC version (LTS or Innovative)
@@ -527,12 +526,11 @@ install_deps() {
         apt-get -y install libtool libnuma-dev scons libboost-dev libboost-program-options-dev check
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
-        apt-get -y install --download-only percona-xtrabackup-80=8.0.35-32-1.${DIST}
+        #apt-get -y install --download-only percona-xtrabackup-80=8.0.35-33-1.${DIST}
         if [ x"${DIST}" = xjammy ]; then
             apt-get -y install --download-only percona-xtrabackup-91=9.1.0-1-1.${DIST}
-        else
-            apt-get -y install --download-only percona-xtrabackup-84=8.4.0-2-1.${DIST}
         fi
+        apt-get -y install --download-only percona-xtrabackup-84=8.4.0-3-1.${DIST}
     fi
     return;
 }
@@ -921,24 +919,25 @@ build_deb(){
     cd ${DIRNAME} || exit
 
     # (1) PXB compatible with previous PXC LTS version
-    mkdir -p pxb-8.0
+    #mkdir -p pxb-8.0
     # (2) PXB compatible with this PXC version (LTS or Innovative)
     if [ x"${DEBIAN_VERSION}" = xjammy ]; then
         mkdir -p pxb-9.1
-    else
-        mkdir -p pxb-8.4
+        mkdir -p pxb-9.2
     fi
+    mkdir -p pxb-8.4
 
 
-    dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-80* pxb-8.0
+    #dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-80* pxb-8.0
     if [ x"${DEBIAN_VERSION}" = xjammy ]; then
         dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-91* pxb-9.1
-    else
-        dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-84* pxb-8.4
+        dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-91* pxb-9.2
     fi
 
+    dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-84* pxb-8.4
+
     #  (1)
-    cd pxb-8.0 || exit
+    cd pxb-8.4 || exit
         mv usr/bin ./
         mv usr/lib* ./
         rm -rf usr *.deb DEBIAN
@@ -946,13 +945,15 @@ build_deb(){
     # (2)
     if [ x"${DEBIAN_VERSION}" = xjammy ]; then
         cd ../pxb-9.1 || exit
-    else
-        cd ../pxb-8.4 || exit
-    fi
         mv usr/bin ./
         mv usr/lib* ./
         rm -rf usr *.deb DEBIAN
 
+        cd ../pxb-9.2 || exit
+        mv usr/bin ./
+        mv usr/lib* ./
+        rm -rf usr *.deb DEBIAN
+    fi
     cd ../ || exit
 
     if [[ "x$DEBIAN_VERSION" == "xbionic" || "x$DEBIAN_VERSION" == "xstretch" || "x$DEBIAN_VERSION" == "xfocal" || "x$DEBIAN_VERSION" == "xbullseye" || "x$DEBIAN_VERSION" == "xjammy" || "x$DEBIAN_VERSION" == "xbookworm" || "x$DEBIAN_VERSION" == "xnoble" ]]; then
@@ -992,8 +993,8 @@ build_deb(){
         sed -i 's/export CXXFLAGS=/export CXXFLAGS=-Wno-error=nonnull-compare /' debian/rules
     fi
 
-    if [ ${DEBIAN_VERSION} = "jammy" ]; then
-        sed -i 's/pxb-8.4/pxb-9.1/g' debian/rules
+    if [ ${DEBIAN_VERSION} != "jammy" ]; then
+       sed -i '196,201d' debian/rules
     fi
 
     GALERA_REVNO="${GALERA_REVNO}" SCONS_ARGS=' strict_build_flags=0'  MAKE_JFLAG=-j4  dpkg-buildpackage -rfakeroot -uc -us -b
@@ -1106,18 +1107,19 @@ build_tarball(){
         mkdir pxb-8.0
         if [ x"${DEBIAN_VERSION}" = xjammy ]; then
             mkdir pxb-9.1
+            mkdir pxb-9.2
         else
             mkdir pxb-8.4
         fi
-        dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-80* pxb-8.0
+        #dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-80* pxb-8.0
         if [ x"${DEBIAN_VERSION}" = xjammy ]; then
             dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-91* pxb-9.1
-        else
-            dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-84* pxb-8.4
+            dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-91* pxb-9.2
         fi
+        dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-84* pxb-8.4
         
         # (1)
-        pushd pxb-8.0
+        pushd pxb-8.4
             mv usr/bin ./
             mv usr/lib* ./
             rm -rf usr *.deb DEBIAN
@@ -1126,25 +1128,23 @@ build_tarball(){
         # (2)
         if [ x"${DEBIAN_VERSION}" = xjammy ]; then
             pushd pxb-9.1
-        else
-            pushd pxb-8.4
+                mv usr/bin ./
+                mv usr/lib* ./
+                rm -rf usr *.deb DEBIAN
+            popd
         fi
-            mv usr/bin ./
-            mv usr/lib* ./
-            rm -rf usr *.deb DEBIAN
-        popd
         
-        tar -zcvf  percona-xtrabackup-8.0.tar.gz pxb-8.0
+        #tar -zcvf  percona-xtrabackup-8.0.tar.gz pxb-8.0
         if [ x"${DEBIAN_VERSION}" = xjammy ]; then
             tar -zcvf  percona-xtrabackup-9.1.tar.gz pxb-9.1
-        else
-            tar -zcvf  percona-xtrabackup-8.4.tar.gz pxb-8.4
         fi
+
+        tar -zcvf  percona-xtrabackup-8.4.tar.gz pxb-8.4
     fi
     mkdir -p ${BUILD_ROOT}/target/pxc_extra/
     cp *.tar.gz ${BUILD_ROOT}/target/pxc_extra/
     cp *.tar.gz ${BUILD_ROOT}/target
-    rm -rf pxb-8.0 pxb-8.4 pxb-9.1 || true
+    rm -rf pxb-8.0 pxb-8.4 pxb-9.1 pxb-9.2 || true
     cd ${CURDIR} || exit
     rm -rf jemalloc
     wget https://github.com/jemalloc/jemalloc/releases/download/$JVERSION/jemalloc-$JVERSION.tar.bz2

@@ -7,7 +7,6 @@ CREATE USER 'testme'@'%' IDENTIFIED BY 'secret';
 GRANT SELECT ON testdb.* TO 'testme'@'%';
 GRANT INSERT ON testdb.counter TO 'testme'@'%';
 CREATE USER 'testother'@'%' IDENTIFIED BY 'secret2';
-FLUSH PRIVILEGES;
 # connection node_1
 use testdb;
 SET GLOBAL debug= 'd,sql_cmd.before_toi_begin.log_command';
@@ -179,7 +178,6 @@ DROP FUNCTION hello2;
 #
 # connection node_1
 GRANT SELECT ON testdb.t1 TO 'testother'@'%';
-FLUSH PRIVILEGES;
 # connection node_1
 SHOW GRANTS FOR 'testother';
 Grants for testother@%
@@ -277,7 +275,6 @@ include/assert.inc [User testother still exists on node 2]
 #
 # connection node_1
 GRANT SELECT ON testdb.t1 TO 'testother'@'%';
-FLUSH PRIVILEGES;
 # connection node_1
 SHOW GRANTS FOR 'testother';
 Grants for testother@%

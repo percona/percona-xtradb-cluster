@@ -442,6 +442,7 @@ fi
             -DWITH_NUMA=ON \
             -DWITH_LDAP=system \
             -DWITH_BOOST="$TARGETDIR/libboost" \
+            -DWITH_PACKAGE_FLAGS=OFF \
             -DMYSQL_SERVER_SUFFIX=".$TAG" \
             -DWITH_WSREP=ON \
             -DWITH_UNIT_TESTS=0 \
@@ -481,6 +482,7 @@ fi
             -DWITH_NUMA=ON \
             -DWITH_LDAP=system \
             -DWITH_BOOST="$TARGETDIR/libboost" \
+            -DWITH_PACKAGE_FLAGS=OFF \
             -DMYSQL_SERVER_SUFFIX=".$TAG" \
             -DWITH_WSREP=ON \
             -DWITH_PERCONA_TELEMETRY=ON \
@@ -541,12 +543,12 @@ fi
         ln -s ./${pxb_basename} pxb-9.1
     ) || exit 1
 
-    # Look for the pxb 8.0 tarball
+    # Look for the pxb 8.4 tarball
     (
         cd "$TARGETDIR"
-        pxb_tar=$(ls -1td percona-xtrabackup-8.0.* | grep ".tar" | sort --version-sort | tail -n1)
+        pxb_tar=$(ls -1td percona-xtrabackup-8.4.* | grep ".tar" | sort --version-sort | tail -n1)
         if [[ -z $pxb_tar ]]; then
-            echo "Could not find percona-xtrabackup-8.0 tarball in $TARGETDIR.  Terminating."
+            echo "Could not find percona-xtrabackup-8.4 tarball in $TARGETDIR.  Terminating."
             exit 1
         fi
         # Remove the .tar.gz extension
@@ -555,22 +557,22 @@ fi
         if [[ $pxb_basename =~ x86_64 ]]; then
             pxb_basename="${pxb_basename%x86_64*}x86_64"
         fi
-        pxb_dir="pxb-8.0"
+        pxb_dir="pxb-8.4"
 
         mkdir -p pxc_extra
         cd pxc_extra
         if [[ -d ${pxb_basename} ]]; then
-            echo "Using existing pxb 8.0 directory : ${pxb_basename}"
+            echo "Using existing pxb 8.4 directory : ${pxb_basename}"
         else
-            echo "Removing existing percona-xtrabackup-8.0 basedir (if found)"
+            echo "Removing existing percona-xtrabackup-8.4 basedir (if found)"
             find . -maxdepth 1 -type d -name 'percona-xtrabackup-8.*' -exec rm -rf {} \+
 
-            echo "Extracting pxb 8.0 tarball"
+            echo "Extracting pxb 8.4 tarball"
             tar -xzf "../$pxb_tar"
         fi
         echo "Creating symlink $pxb_dir --> $pxb_basename"
-        rm -f pxb-8.0
-        ln -s ./${pxb_basename} pxb-8.0
+        rm -f pxb-8.4
+        ln -s ./${pxb_basename} pxb-8.4
     ) || exit 1
 
     # Only copy over the bin and lib portions of the xtrabackup packages
@@ -579,16 +581,20 @@ fi
     (cp -v -r $TARGETDIR/pxc_extra/pxb-9.1/bin/  $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-9.1) || true
     (cp -v -r $TARGETDIR/pxc_extra/pxb-9.1/lib/  $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-9.1) || true
 
-    mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-8.0"
-    (cp -v -r $TARGETDIR/pxc_extra/pxb-8.0/bin/ $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-8.0) || true
-    (cp -v -r $TARGETDIR/pxc_extra/pxb-8.0/lib/ $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-8.0) || true
+    mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-9.2"
+    (cp -v -r $TARGETDIR/pxc_extra/pxb-9.2/bin/  $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-9.2) || true
+    (cp -v -r $TARGETDIR/pxc_extra/pxb-9.2/lib/  $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-9.2) || true
+
+    mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-8.4"
+    (cp -v -r $TARGETDIR/pxc_extra/pxb-8.4/bin/ $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-8.4) || true
+    (cp -v -r $TARGETDIR/pxc_extra/pxb-8.4/lib/ $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-8.4) || true
 
 ) || exit 1
 
 # Patch needed libraries
 (
     LIBLIST="libnuma.so libgssapi.so libldap_r-2.4.so.2 liblber-2.4.so.2 libaio.so libprocps.so libgcrypt.so libtinfo.so libsasl2.so libbrotlidec.so libbrotlicommon.so librtmp.so libfreebl3.so libssl3.so libsmime3.so libnss3.so libnssutil3.so libplds4.so libplc4.so libnspr4.so libtirpc.so libncurses.so.5 libboost_program_options"
-    DIRLIST="bin bin/pxc_extra/pxb-8.0/bin bin/pxc_extra/pxb-9.1/bin lib bin/pxc_extra/pxb-8.0/lib/plugin bin/pxc_extra/pxb-9.1/lib/plugin lib/private lib/plugin lib/mysqlrouter/plugin lib/mysqlrouter/private"
+    DIRLIST="bin bin/pxc_extra/pxb-8.4/bin bin/pxc_extra/pxb-9.1/bin lib bin/pxc_extra/pxb-8.4/lib/plugin bin/pxc_extra/pxb-9.1/lib/plugin lib/private lib/plugin lib/mysqlrouter/plugin lib/mysqlrouter/private"
 
     LIBPATH=""
     OVERRIDE=false
@@ -681,10 +687,10 @@ fi
         # Set proper runpath
         export override=false
         set_runpath bin '$ORIGIN/../lib/private/'
-        set_runpath bin/pxc_extra/pxb-8.0/bin '$ORIGIN/../../../../lib/private/'
+        set_runpath bin/pxc_extra/pxb-8.4/bin '$ORIGIN/../../../../lib/private/'
         set_runpath bin/pxc_extra/pxb-9.1/bin '$ORIGIN/../../../../lib/private/'
         set_runpath lib '$ORIGIN/private/'
-        set_runpath bin/pxc_extra/pxb-8.0/lib/plugin '$ORIGIN/../../../../../lib/private/'
+        set_runpath bin/pxc_extra/pxb-8.4/lib/plugin '$ORIGIN/../../../../../lib/private/'
         set_runpath bin/pxc_extra/pxb-9.1/lib/plugin '$ORIGIN/../../../../../lib/private/'
         set_runpath lib/plugin '$ORIGIN/../private/'
         set_runpath lib/private '$ORIGIN'
@@ -697,8 +703,8 @@ fi
         unset override && export override=true && set_runpath bin/mysqlrouter '$ORIGIN/../lib/mysqlrouter/private/:$ORIGIN/../lib/mysqlrouter/plugin/:$ORIGIN/../lib/private/'
         unset override && export override=true && set_runpath bin/mysqlrouter_keyring '$ORIGIN/../lib/mysqlrouter/private/:$ORIGIN/../lib/mysqlrouter/plugin/:$ORIGIN/../lib/private/'
         #  BINS XTRABACKUP
-        unset override && export override=true && set_runpath bin/pxc_extra/pxb-8.0/bin/xtrabackup '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'
-        unset override && export override=true && set_runpath bin/pxc_extra/pxb-8.0/bin/xtrabackup-debug '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'
+        unset override && export override=true && set_runpath bin/pxc_extra/pxb-8.4/bin/xtrabackup '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'
+        unset override && export override=true && set_runpath bin/pxc_extra/pxb-8.4/bin/xtrabackup-debug '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'
         unset override && export override=true && set_runpath bin/pxc_extra/pxb-9.1/bin/xtrabackup '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'
         unset override && export override=true && set_runpath bin/pxc_extra/pxb-9.1/bin/xtrabackup-debug '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'
 

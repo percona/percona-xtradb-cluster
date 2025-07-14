@@ -91,6 +91,7 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 		-DWITH_UNIT_TESTS=0 \
 		-DFORCE_INSOURCE_BUILD=1 \
 		-DDOWNLOAD_BOOST=1 \
+		-DWITH_PACKAGE_FLAGS=OFF \
 		-DWITH_BOOST=libboost \
 		-DWITH_SYSTEM_LIBS=ON \
 		-DWITH_PROTOBUF=bundled \
@@ -143,6 +144,7 @@ endif
 		-DWITH_ROCKSDB=0 \
 		-DWITH_UNIT_TESTS=0 \
 		-DDOWNLOAD_BOOST=1 \
+		-DWITH_PACKAGE_FLAGS=OFF \
 		-DWITH_BOOST=libboost \
 		-DWITH_SYSTEM_LIBS=ON \
 		-DWITH_PROTOBUF=bundled \
@@ -191,12 +193,15 @@ override_dh_auto_install:
 	(cd $(builddir)/$(galeradir) && cp libgalera_smm.so $(TMP)/)
 	(cd $(galeradir) && cp packages/rpm/README $(TMP)/)
 	mkdir -p $(TMP)/usr/bin/pxc_extra/
+	(cp -r pxb-9.2 $(TMP)/usr/bin/pxc_extra/)
+	(mv $(TMP)/usr/bin/pxc_extra/pxb-9.2/lib/xtrabackup/* $(TMP)/usr/bin/pxc_extra/pxb-9.2/lib/)
+	(rm -rf $(TMP)/usr/bin/pxc_extra/pxb-9.2/lib/xtrabackup)
+	(cp -r pxb-9.1 $(TMP)/usr/bin/pxc_extra/)
+	(mv $(TMP)/usr/bin/pxc_extra/pxb-9.1/lib/xtrabackup/* $(TMP)/usr/bin/pxc_extra/pxb-9.1/lib/)
+	(rm -rf $(TMP)/usr/bin/pxc_extra/pxb-9.1/lib/xtrabackup)
 	(cp -r pxb-8.4 $(TMP)/usr/bin/pxc_extra/)
 	(mv $(TMP)/usr/bin/pxc_extra/pxb-8.4/lib/xtrabackup/* $(TMP)/usr/bin/pxc_extra/pxb-8.4/lib/)
 	(rm -rf $(TMP)/usr/bin/pxc_extra/pxb-8.4/lib/xtrabackup)
-	(cp -r pxb-8.0 $(TMP)/usr/bin/pxc_extra/)
-	(mv $(TMP)/usr/bin/pxc_extra/pxb-8.0/lib/xtrabackup/* $(TMP)/usr/bin/pxc_extra/pxb-8.0/lib/)
-	(rm -rf $(TMP)/usr/bin/pxc_extra/pxb-8.0/lib/xtrabackup)
 
 
 	# add PXC configuration file my.cnf to mysql-common package

@@ -218,6 +218,5 @@ alter user xplugin@localhost password expire;
 ## Cleanup
 drop user xplugin@localhost;
 update mysql.user set password_last_changed = @passwordchanged where host = 'localhost' and user='x_root';
-flush privileges;
 --source ../include/xplugin_cleanup.inc
 

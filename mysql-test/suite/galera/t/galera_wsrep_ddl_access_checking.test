@@ -159,8 +159,6 @@ GRANT INSERT ON testdb.counter TO 'testme'@'%';
 
 CREATE USER 'testother'@'%' IDENTIFIED BY 'secret2';
 
-FLUSH PRIVILEGES;
-
 --connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
 
 --echo # connection node_1
@@ -677,7 +675,6 @@ DROP FUNCTION hello2;
 --echo # connection node_1
 --connection node_1
 GRANT SELECT ON testdb.t1 TO 'testother'@'%';
-FLUSH PRIVILEGES;
 
 --echo # connection node_1
 --connection node_1
@@ -958,7 +955,6 @@ RENAME USER 'testother'@'%' TO 'testwho'@'%';
 --echo # connection node_1
 --connection node_1
 GRANT SELECT ON testdb.t1 TO 'testother'@'%';
-FLUSH PRIVILEGES;
 
 --echo # connection node_1
 --connection node_1
