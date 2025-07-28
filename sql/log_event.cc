@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2000, 2024, Oracle and/or its affiliates.
+   Copyright (c) 2000, 2025, Oracle and/or its affiliates.
    Copyright (c) 2018, Percona and/or its affiliates.
    Copyright (c) 2009, 2016, MariaDB
 
@@ -9653,7 +9653,8 @@ int Rows_log_event::do_scan_and_update(Relay_log_info const *rli) {
           }
         } while (this->get_general_type_code() ==
                      mysql::binlog::event::UPDATE_ROWS_EVENT &&
-                 !is_pk_present && (entry = m_hash.get(table, &m_local_cols)));
+                 !is_pk_present && entry &&
+                 (entry = m_hash.get(table, &m_local_cols)));
       } break;
 
       case HA_ERR_RECORD_DELETED:
@@ -11162,12 +11163,17 @@ static enum_tbl_map_status check_table_map(Relay_log_info const *rli,
       rli->info_thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER &&
       !thd_is_wsrep_applier && res == FILTERED_OUT) {
     Slave_worker *sw =
-        static_cast<Slave_worker *>(const_cast<Relay_log_info *>(rli));
-    Wsrep_async_monitor *wsrep_async_monitor{sw->get_wsrep_async_monitor()};
-    if (wsrep_async_monitor) {
-      auto seqno = sw->sequence_number();
-      assert(seqno > 0);
-      wsrep_async_monitor->skip(seqno);
+        dynamic_cast<Slave_worker *>(const_cast<Relay_log_info *>(rli));
+    // It should never happen. If this is SYSTEM_THREAD_SLAVE_WORKER, but it
+    // is not wsrep applier, it has to be Slave_worker.
+    assert(sw != nullptr);
+    if (sw) {
+      Wsrep_async_monitor *wsrep_async_monitor{sw->get_wsrep_async_monitor()};
+      if (wsrep_async_monitor) {
+        auto seqno = sw->sequence_number();
+        assert(seqno > 0);
+        wsrep_async_monitor->skip(seqno);
+      }
     }
   }
 #endif /* WITH_WSREP */

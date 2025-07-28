@@ -465,6 +465,7 @@ fi
             -DWITH_NUMA=ON \
             -DWITH_LDAP=system \
             -DWITH_BOOST="$TARGETDIR/libboost" \
+            -DWITH_PACKAGE_FLAGS=OFF \
             -DMYSQL_SERVER_SUFFIX=".$TAG" \
             -DWITH_WSREP=ON \
             -DWITH_UNIT_TESTS=0 \
@@ -508,6 +509,7 @@ fi
             -DWITH_NUMA=ON \
             -DWITH_LDAP=system \
             -DWITH_BOOST="$TARGETDIR/libboost" \
+            -DWITH_PACKAGE_FLAGS=OFF \
             -DMYSQL_SERVER_SUFFIX=".$TAG" \
             -DWITH_WSREP=ON \
             -DWITH_PERCONA_TELEMETRY=ON \

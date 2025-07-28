@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2000, 2024, Oracle and/or its affiliates.
+   Copyright (c) 2000, 2025, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -32,11 +32,6 @@
    of the log; if it is the 3rd then there is this combination:
    Format_desc_of_slave, Rotate_of_master, Format_desc_of_master.
 */
-
-#ifdef WITH_WSREP
-#undef WITH_WSREP
-#endif
-
 #include "client/mysqlbinlog.h"
 
 #include <fcntl.h>
