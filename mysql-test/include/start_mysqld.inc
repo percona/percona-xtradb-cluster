@@ -3,11 +3,25 @@ if (!$restart_parameters)
   let $restart_parameters = restart;
 }
 
+<<<<<<< HEAD
 if ($galera_wsrep_start_position != '') {
    --echo Using --wsrep-start-position when starting mysqld ...
    --let $restart_parameters = restart:$start_mysqld_params --wsrep-start-position=$galera_wsrep_start_position
    --let $galera_wsrep_start_position = 0
+||||||| 9dc49998c46
+# We use --exec echo instead of simple "--echo" because
+# replace_result works on --exec
+if (!$do_not_echo_parameters)
+{
+  --exec echo "# $restart_parameters"
+=======
+# We use --exec echo instead of simple "--echo" because
+# replace_result works on --exec
+if (!$do_not_echo_parameters) {
+  --exec echo "# $restart_parameters"
+>>>>>>> yura/ps/release-8.0.43-34
 }
+<<<<<<< HEAD
 
 if ($galera_wsrep_start_position == '') {
    if ($start_mysqld_params != '') {
@@ -26,6 +40,15 @@ if ($suppress_print_params == '') {
     --echo # restart:<hidden args>
     let $do_not_echo_parameters=;
   }
+||||||| 9dc49998c46
+if ($do_not_echo_parameters)
+{
+  --echo # restart:<hidden args>
+  let $do_not_echo_parameters=;
+=======
+if ($do_not_echo_parameters) {
+  --exec echo "# restart"
+>>>>>>> yura/ps/release-8.0.43-34
 }
 
 # A common bug in our tests was that people tried to call start_mysqld.inc
