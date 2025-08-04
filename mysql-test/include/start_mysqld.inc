@@ -3,25 +3,11 @@ if (!$restart_parameters)
   let $restart_parameters = restart;
 }
 
-<<<<<<< HEAD
 if ($galera_wsrep_start_position != '') {
    --echo Using --wsrep-start-position when starting mysqld ...
    --let $restart_parameters = restart:$start_mysqld_params --wsrep-start-position=$galera_wsrep_start_position
    --let $galera_wsrep_start_position = 0
-||||||| 9dc49998c46
-# We use --exec echo instead of simple "--echo" because
-# replace_result works on --exec
-if (!$do_not_echo_parameters)
-{
-  --exec echo "# $restart_parameters"
-=======
-# We use --exec echo instead of simple "--echo" because
-# replace_result works on --exec
-if (!$do_not_echo_parameters) {
-  --exec echo "# $restart_parameters"
->>>>>>> yura/ps/release-8.0.43-34
 }
-<<<<<<< HEAD
 
 if ($galera_wsrep_start_position == '') {
    if ($start_mysqld_params != '') {
@@ -29,26 +15,13 @@ if ($galera_wsrep_start_position == '') {
    }
 }
 
-if ($suppress_print_params == '') {
-  # We use --exec echo instead of simple "--echo" because
-  # replace_result works on --exec
-  if (!$do_not_echo_parameters) {
-    --replace_regex /--wsrep-start-position=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:[0-9]*/--wsrep-start-position=<WSREP_START_POSITION>/ /127\.0\.0\.1:[0-9]{1,5}/127.0.0.1:<PORT>/ /socket\.ssl_ca=\/[-_\/[:alnum:]\.]*/socket.ssl_ca=<SSL_CA>/ /socket\.ssl_cert=\/[-_\/[:alnum:]\.]*/socket.ssl_cert=<SSL_CERT>/ /socket\.ssl_key=\/[-_\/[:alnum:]\.]*/socket.ssl_key=<SSL_KEY>/ /base_port=[0-9]{5}/base_port=<PORT>/
-    --exec echo "# $restart_parameters"
-  }
-  if ($do_not_echo_parameters) {
-    --echo # restart:<hidden args>
-    let $do_not_echo_parameters=;
-  }
-||||||| 9dc49998c46
-if ($do_not_echo_parameters)
-{
-  --echo # restart:<hidden args>
-  let $do_not_echo_parameters=;
-=======
+# We use --exec echo instead of simple "--echo" because
+# replace_result works on --exec
+if (!$do_not_echo_parameters) {
+  --exec echo "# $restart_parameters"
+}
 if ($do_not_echo_parameters) {
   --exec echo "# restart"
->>>>>>> yura/ps/release-8.0.43-34
 }
 
 # A common bug in our tests was that people tried to call start_mysqld.inc
