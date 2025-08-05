@@ -1,11 +1,11 @@
-# restart:<hidden args>
+# restart
 CREATE DATABASE test2;
 USE test2;
 include/assert_grep.inc [Assert that GCache off page is not encrypted]
 DROP DATABASE test2;
-# restart:<hidden args>
+# restart
 CREATE DATABASE test2;
 USE test2;
 include/assert_grep.inc [Assert that GCache off page is encrypted]
-# restart:<hidden args>
+# restart
 DROP DATABASE test2;
