@@ -196,9 +196,14 @@ enum options_client {
   OPT_INIT_COMMAND_ADD,
   OPT_OUTPUT_AS_VERSION,
   OPT_AUTHENTICATION_WEBAUTHN_CLIENT_PRESERVE_PRIVACY,
+<<<<<<< HEAD
 #ifdef WITH_WSREP
   OPT_USE_SET_PASSWORD,
 #endif /* WITH_WSREP */
+||||||| 4c75f4461f3
+=======
+  OPT_MYSQL_COMMANDS,
+>>>>>>> ps/release-8.4.6-6
   /* Add new option above this */
   OPT_MAX_CLIENT_OPTION
 };
