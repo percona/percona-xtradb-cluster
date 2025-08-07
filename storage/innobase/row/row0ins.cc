@@ -67,6 +67,11 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
+
+dberr_t wsrep_append_foreign_key(trx_t *trx, dict_foreign_t *foreign,
+                                 const rec_t *clust_rec,
+                                 dict_index_t *clust_index, bool referenced,
+                                 Wsrep_service_key_type key_type);
 #endif /* WITH_WSREP */
 
 /*************************************************************************
@@ -851,16 +856,6 @@ static void row_ins_foreign_report_add_err(
   mutex_exit(&dict_foreign_err_mutex);
 }
 
-<<<<<<< HEAD
-#ifdef WITH_WSREP
-dberr_t wsrep_append_foreign_key(trx_t *trx, dict_foreign_t *foreign,
-                                 const rec_t *clust_rec,
-                                 dict_index_t *clust_index, bool referenced,
-                                 Wsrep_service_key_type key_type);
-#endif /* WITH_WSREP */
-
-||||||| 4c75f4461f3
-=======
 #ifdef UNIV_DEBUG
 
 /* Check that a referential update action of a foreign key (changing key
@@ -937,7 +932,6 @@ static void assert_nonvirtual_cascade_fields_are_populated(
 
 #endif /* UNIV_DEBUG */
 
->>>>>>> ps/release-8.4.6-6
 /** Fill virtual column information in cascade node for the child table.
 @param[out]     cascade         child update node
 @param[in]      rec             clustered rec of child table
