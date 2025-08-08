@@ -10,4 +10,4 @@ SET SESSION wsrep_sync_wait = 0;
 SELECT 1;
 1
 1
-# restart:<hidden args>
+# restart
