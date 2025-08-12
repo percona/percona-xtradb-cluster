@@ -4416,12 +4416,18 @@ sub have_wsrep() {
 #
 sub wsrep_on($) {
   my $mysqld= shift;
-  #check if wsrep_on=  is set in configuration
-  if ($mysqld->if_exist('wsrep-on')) {
-    my $on= "".$mysqld->value('wsrep-on');
-    if ($on eq "1" || $on eq "ON") {
-      return 1;
-    }
+
+  my $name= $mysqld->name();
+  my $outfile= "$opt_vardir/tmp/$name.wsrep_on";
+  my $query= "SHOW VARIABLES LIKE 'wsrep_on'";
+
+  if (run_query_output($mysqld, $query, $outfile) == 0) {
+      my $on = mtr_grab_file($outfile);
+      mtr_verbose("Server " .$name . " wsrep_on: ". $on);
+    if ($on =~ /ON$/ || $on =~ /1$/) {
+        unlink($outfile);
+        return 1;
+      }
   }
   return 0;
 }
@@ -4954,6 +4960,27 @@ sub run_query_output {
   return $res
 }
 
+sub wait_server_ready($$) {
+  my ($tinfo, $mysqld)= @_;
+  my $sleeptime= 100; # Milliseconds
+  my $loops= ($opt_start_timeout * 1000) / $sleeptime;
+
+  my $name= $mysqld->name();
+  my $query= "SELECT 1";
+
+  for (my $loop= 1; $loop <= $loops; $loop++)
+  {
+    if (run_query($mysqld, $query) == 0)
+    {
+      mtr_verbose("Server " . $name . " ready to accept queries");
+      return 1;
+    }
+    mtr_milli_sleep($sleeptime);
+  }
+
+  $tinfo->{logfile}= "Server not ready to accept queries";
+  return 0;
+}
 
 sub wait_wsrep_ready($$) {
   my ($tinfo, $mysqld)= @_;
@@ -5622,6 +5649,8 @@ sub run_testcase ($) {
       report_failure_and_restart($tinfo);
       return 1;
     }
+
+    mtr_verbose("SERVERS STARTED");
   }
   mark_time_used('restart');
 
@@ -7928,12 +7957,19 @@ sub start_servers($) {
     # starting other servers.The bootsrap server in the
     # configuration should always be the first which has
     # wsrep_on = ON
-    if (wsrep_on($mysqld) && wsrep_is_bootstrap_server($mysqld)) {
-      mtr_verbose("WSREP waiting for first server to bootstrap cluster");
-      if (!wait_wsrep_ready($tinfo, $mysqld)) {
+    if (wsrep_is_bootstrap_server($mysqld)) {
+      if (!wait_server_ready($tinfo, $mysqld)) {
         return 1;
       }
+
+      if(wsrep_on($mysqld)) {
+        mtr_verbose("WSREP waiting for first server to bootstrap cluster");
+        if (!wait_wsrep_ready($tinfo, $mysqld)) {
+          return 1;
+        }
+      }
     }
+
     # KH: Why?
     # mtr_milli_sleep(3000);
   }
@@ -7973,13 +8009,20 @@ sub start_servers($) {
       return 1;
     }
 
+    if (!wait_server_ready($tinfo, $mysqld)) {
+      return 1;
+    }
+    mtr_verbose("Server " . $mysqld->name() . " started");
+
     if (wsrep_on($mysqld))
     {
       mtr_verbose("Waiting for wsrep server " . $mysqld->name() . " to be ready");
       if (!wait_wsrep_ready($tinfo, $mysqld))
       {
+        mtr_verbose("Server " . $mysqld->name() . " failed to wait for wsrep_ready");
         return 1;
       }
+      mtr_verbose("Server " . $mysqld->name() . " wsrep_ready");
     }
   }
 
