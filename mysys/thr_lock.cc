@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2024, Oracle and/or its affiliates.
+/* Copyright (c) 2000, 2025, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -82,12 +82,12 @@ lock at the same time as multiple read locks.
 
 #include "my_config.h"
 
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/types.h>
-#include <time.h>
+#include <cerrno>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -149,11 +149,10 @@ void wsrep_thr_lock_init(wsrep_thd_is_brute_force_func bf_func,
 LIST *thr_lock_thread_list; /* List of threads in use */
 ulong max_write_lock_count = ~(ulong)0L;
 
-static void (*before_lock_wait)(void) = nullptr;
-static void (*after_lock_wait)(void) = nullptr;
+static void (*before_lock_wait)() = nullptr;
+static void (*after_lock_wait)() = nullptr;
 
-void thr_set_lock_wait_callback(void (*before_wait)(void),
-                                void (*after_wait)(void)) {
+void thr_set_lock_wait_callback(void (*before_wait)(), void (*after_wait)()) {
   before_lock_wait = before_wait;
   after_lock_wait = after_wait;
 }
@@ -1213,7 +1212,7 @@ static void thr_print_lock(const char *name, struct st_lock_list *list) {
   }
 }
 
-void thr_print_locks(void) {
+void thr_print_locks() {
   LIST *list;
   uint count = 0;
 
@@ -1221,7 +1220,7 @@ void thr_print_locks(void) {
   puts("Current locks:");
   for (list = thr_lock_thread_list; list && count++ < MAX_THREADS;
        list = list_rest(list)) {
-    THR_LOCK *lock = (THR_LOCK *)list->data;
+    auto *lock = (THR_LOCK *)list->data;
     mysql_mutex_lock(&lock->mutex);
     printf("lock: %p:", lock);
     if ((lock->write_wait.data || lock->read_wait.data) &&
@@ -1357,7 +1356,7 @@ static void *test_thread(void *arg) {
     thr_multi_lock(multi_locks, lock_counts[param], &lock_info, TEST_TIMEOUT);
     mysql_mutex_lock(&LOCK_thread_count);
     {
-      int tmp = rand() & 7; /* Do something from 0-2 sec */
+      int const tmp = rand() & 7; /* Do something from 0-2 sec */
       if (tmp == 0)
         sleep(1);
       else if (tmp == 1)

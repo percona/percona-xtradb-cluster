@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2002, 2024, Oracle and/or its affiliates.
+   Copyright (c) 2002, 2025, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -133,6 +133,8 @@ static bool create_library_string(THD *thd, String *buf, const char *db,
                                   bool if_not_exists, const char *dollar_quote,
                                   size_t dollar_quote_len,
                                   size_t language_length);
+
+static bool is_import_missing(THD *thd, const sp_name_with_alias &import);
 
 /**************************************************************************
   Fetch stored routines and events creation_ctx for upgrade.
@@ -1149,8 +1151,8 @@ bool sp_update_routine(THD *thd, enum_sp_type type, sp_name *name,
              ("type: %d  name: %.*s", static_cast<int>(type),
               static_cast<int>(name->m_name.length), name->m_name.str));
 
-  // Altering Library is not supported for now.
-  assert(type == enum_sp_type::PROCEDURE || type == enum_sp_type::FUNCTION);
+  assert(type == enum_sp_type::PROCEDURE || type == enum_sp_type::FUNCTION ||
+         type == enum_sp_type::LIBRARY);
 
   /* Grab an exclusive MDL lock. */
   const MDL_key::enum_mdl_namespace mdl_type = get_mdl_type(type);
@@ -1168,6 +1170,9 @@ bool sp_update_routine(THD *thd, enum_sp_type type, sp_name *name,
         name->m_db.str, name->m_name.str, &routine);
   else if (type == enum_sp_type::PROCEDURE)
     error = thd->dd_client()->acquire_for_modification<dd::Procedure>(
+        name->m_db.str, name->m_name.str, &routine);
+  else if (type == enum_sp_type::LIBRARY)
+    error = thd->dd_client()->acquire_for_modification<dd::Library>(
         name->m_db.str, name->m_name.str, &routine);
   if (error) {
     // Error is reported by DD API framework.
@@ -1207,7 +1212,7 @@ bool sp_update_routine(THD *thd, enum_sp_type type, sp_name *name,
             system_charset_info, invalid_sub_str)) {
       // Provide contextual information
       my_error(
-          ER_COMMENT_CONTAINS_INVALID_STRING, MYF(0), "stored routine",
+          ER_COMMENT_CONTAINS_INVALID_STRING, MYF(0), SP_TYPE_STRING(type),
           (std::string(name->m_db.str) + "." + std::string(name->m_name.str))
               .c_str(),
           system_charset_info->csname, invalid_sub_str.c_str());
@@ -1224,12 +1229,32 @@ bool sp_update_routine(THD *thd, enum_sp_type type, sp_name *name,
     }
   }
 
+<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL)) {
     return true;
   }
 #endif /* WITH_WSREP */
 
+||||||| f02c4125d4c
+=======
+  // Validate the list of the imported libraries.
+  const mem_root_deque<sp_name_with_alias> *imported_libraries =
+      chistics->get_imported_libraries();
+  if (imported_libraries != nullptr && !imported_libraries->empty()) {
+    for (auto &library : *imported_libraries) {
+      auto library_name = sp_name{library.m_db, library.m_name, true};
+      if (check_routine_access(thd, EXECUTE_ACL, library.m_db.str,
+                               library.m_name.str, Acl_type::LIBRARY, true) ||
+          sp_exists_library(thd, &library_name)) {
+        // Could't find the library or it lacks the permissions.
+        my_error(ER_SP_DOES_NOT_EXIST, MYF(0), "LIBRARY", library.m_name.str);
+        return true;
+      }
+    }
+  }
+
+>>>>>>> Percona-Server-9.3.0-1
   // Alter stored routine.
   if (DBUG_EVALUATE_IF("simulate_alter_routine_failure", true, false) ||
       dd::alter_routine(thd, routine, chistics))
@@ -2530,6 +2555,11 @@ static bool create_stored_procedure_and_function_string(
         buf->append(" AS ");
         append_identifier(thd, buf, import.m_alias.str, import.m_alias.length);
       }
+      if (is_import_missing(thd, import)) {
+        push_warning_printf(thd, Sql_condition::SL_WARNING, ER_LIBRARY_INVALID,
+                            ER_THD(thd, ER_LIBRARY_INVALID), name,
+                            import.m_db.str, import.m_name.str);
+      }
     }
     buf->append(")\n");
   }
@@ -2577,6 +2607,11 @@ static bool create_library_string(THD *thd, String *buf, const char *db,
   }
   append_identifier(thd, buf, name, namelen);
   buf->append('\n');
+  if (chistics->comment.length) {
+    buf->append(STRING_WITH_LEN("    COMMENT "));
+    append_unescaped(buf, chistics->comment.str, chistics->comment.length);
+    buf->append('\n');
+  }
   buf->append(STRING_WITH_LEN("    LANGUAGE "));
   buf->append(chistics->language.str, chistics->language.length);
   buf->append('\n');
@@ -2590,6 +2625,23 @@ static bool create_library_string(THD *thd, String *buf, const char *db,
   }
 
   return false;
+}
+
+/**
+  Verify the imported library is present and the user has proper access.
+
+  @param thd      Thread context.
+  @param import   The imported library.
+
+  @return true if the library is missing or the user lacks access permissions.
+          false on success.
+*/
+bool is_import_missing(THD *thd, const sp_name_with_alias &import) {
+  auto import_name = sp_name{import.m_db, import.m_name, true};
+  if (check_routine_access(thd, EXECUTE_ACL, import.m_db.str, import.m_name.str,
+                           Acl_type::LIBRARY, true))
+    return true;
+  return sp_exists_library(thd, &import_name);
 }
 
 /**
@@ -2712,6 +2764,7 @@ uint sp_get_flags_for_command(LEX *lex) {
     case SQLCOM_SHOW_STATUS:
     case SQLCOM_SHOW_STATUS_FUNC:
     case SQLCOM_SHOW_STATUS_PROC:
+    case SQLCOM_SHOW_STATUS_LIBRARY:
     case SQLCOM_SHOW_STORAGE_ENGINES:
     case SQLCOM_SHOW_TABLES:
     case SQLCOM_SHOW_TABLE_STATUS:
@@ -2790,6 +2843,7 @@ uint sp_get_flags_for_command(LEX *lex) {
     case SQLCOM_CREATE_SPFUNCTION:
     case SQLCOM_ALTER_PROCEDURE:
     case SQLCOM_ALTER_FUNCTION:
+    case SQLCOM_ALTER_LIBRARY:
     case SQLCOM_DROP_PROCEDURE:
     case SQLCOM_DROP_FUNCTION:
     case SQLCOM_CREATE_EVENT:

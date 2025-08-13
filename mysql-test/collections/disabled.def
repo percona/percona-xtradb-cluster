@@ -96,7 +96,6 @@ innodb.innodb_autoextend_upgrade           : Bug#36312666 Several InnoDB testcas
 innodb.instant_ddl_recovery_old_2          : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
 innodb.log_8_0_11_case1                    : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
 innodb.log_8_0_19_case1                    : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
-innodb.log_deprecated_params_upgrade       : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
 innodb.partition_upgrade_8013              : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
 innodb.partition_upgrade_8013_debug        : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
 innodb.partition_upgrade_8015              : Bug#36312666 Several InnoDB testcases fail after the change to 9.0
@@ -311,6 +310,7 @@ group_replication.gr_xa_commit_failure_before_gtid_externalization @windows : BU
 group_replication.gr_xa_commit_one_phase_failure_before_gtid_externalization @windows : BUG#34155238 Disabled until bug is fixed
 group_replication.gr_xa_prepare_failure_before_gtid_externalization @windows : BUG#34155238 Disabled until bug is fixed
 group_replication.gr_xa_rollback_failure_before_gtid_externalization @windows : BUG#34155238 Disabled until bug is fixed
+<<<<<<< HEAD
 
 # galera-x underfinished tests
 galera-x.connection_unixsocket_rpl : BUG#0 PXC-4154 underfinished test
@@ -331,3 +331,8 @@ galera-x.connection_openssl_unixsocket : BUG#0 PXC-4154 TLS version is invalid (
 galera-x.connection_tls_version : BUG#0 PXC-4154 TLS version is invalid (code 2026)
 galera-x.admin_list_objects_case_insensitive_names : BUG#0 PXC-4154 unexpected case value
 galera-x.admin_list_objects_case_insensitive_names_forced : BUG#0 PXC-4154 unexpected case value
+||||||| f02c4125d4c
+=======
+
+rpl_nogtid.rpl_nogtid_rollback_on_anonymous_gtid : Bug#37582501 Replication tests break MTA asserts with user viable scenarios
+>>>>>>> Percona-Server-9.3.0-1

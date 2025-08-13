@@ -1,4 +1,4 @@
--- Copyright (c) 2008, 2024, Oracle and/or its affiliates.
+-- Copyright (c) 2008, 2025, Oracle and/or its affiliates.
 --
 -- This program is free software; you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License, version 2.0,
@@ -228,6 +228,7 @@ BEGIN
   -- Also (in similar fashion as above) exclude all 'Daemon' threads, they will
   -- not give consistent result either.
   --
+<<<<<<< HEAD
   -- SELECT /*+SET_VAR(use_secondary_engine=OFF)*/ USER, HOST, DB, COMMAND, INFO FROM INFORMATION_SCHEMA.PROCESSLIST
   --  WHERE COMMAND NOT IN ('Sleep', 'Daemon', 'Killed')
   --    AND USER NOT IN ('unauthenticated user','mysql.session', 'event_scheduler')
@@ -255,14 +256,24 @@ BEGIN
   DELETE FROM mysql.global_grants WHERE user = 'mysql.pxc.sst.user';
   COMMIT;
   SET SESSION wsrep_on = ON;
+||||||| f02c4125d4c
+  SELECT /*+SET_VAR(use_secondary_engine=OFF)*/ USER, HOST, DB, COMMAND, INFO FROM INFORMATION_SCHEMA.PROCESSLIST
+    WHERE COMMAND NOT IN ('Sleep', 'Daemon', 'Killed')
+      AND USER NOT IN ('unauthenticated user','mysql.session', 'event_scheduler')
+        ORDER BY COMMAND;
+=======
+  SELECT /*+SET_VAR(use_secondary_engine=OFF)*/ USER, HOST, DB, COMMAND, INFO FROM INFORMATION_SCHEMA.PROCESSLIST
+    WHERE COMMAND NOT IN ('Sleep', 'Daemon', 'Killed')
+      AND USER NOT IN ('unauthenticated user','mysql.session', 'event_scheduler', 'mysqlrouter')
+        ORDER BY COMMAND;
+>>>>>>> Percona-Server-9.3.0-1
 
   -- Ensure that libraries are all dropped at the end of test-runs.
   SELECT * FROM INFORMATION_SCHEMA.LIBRARIES
   ORDER BY LIBRARY_CATALOG, LIBRARY_SCHEMA, LIBRARY_NAME;
   -- Ensure that stored program imports are also cleared at the end of test-runs.
-  # BUG#37382579 The SELECT * FROM INFORMATION_SCHEMA.ROUTINE_LIBRARIES fails when a queried from the hypergraph.
-  # SELECT * FROM INFORMATION_SCHEMA.ROUTINE_LIBRARIES
-  # ORDER BY ROUTINE_CATALOG, ROUTINE_SCHEMA, ROUTINE_NAME, ROUTINE_TYPE, LIBRARY_CATALOG, LIBRARY_SCHEMA, LIBRARY_NAME, LIBRARY_VERSION;
+  SELECT * FROM INFORMATION_SCHEMA.ROUTINE_LIBRARIES
+  ORDER BY ROUTINE_CATALOG, ROUTINE_SCHEMA, ROUTINE_NAME, ROUTINE_TYPE, LIBRARY_CATALOG, LIBRARY_SCHEMA, LIBRARY_NAME, LIBRARY_VERSION;
 
   -- During the installation of Percona Telemetry Component we create 'percona.telemetry'.
   -- It happens during the server startup, so servers started during the test will have the same user

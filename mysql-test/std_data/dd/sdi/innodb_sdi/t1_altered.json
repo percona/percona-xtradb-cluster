@@ -84,7 +84,13 @@
                 "generation_expression": "",
                 "generation_expression_utf8": "",
                 "options": "interval_count=0;",
+<<<<<<< HEAD
                 "se_private_data": "default_null=1;physical_pos=4;table_id=1066;version_added=1;",
+||||||| f02c4125d4c
+                "se_private_data": "default_null=1;physical_pos=4;table_id=1063;version_added=1;",
+=======
+                "se_private_data": "default_null=1;physical_pos=4;table_id=Y;version_added=1;",
+>>>>>>> Percona-Server-9.3.0-1
                 "engine_attribute": "",
                 "secondary_engine_attribute": "",
                 "column_key": 1,
