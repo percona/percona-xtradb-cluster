@@ -1229,15 +1229,6 @@ bool sp_update_routine(THD *thd, enum_sp_type type, sp_name *name,
     }
   }
 
-<<<<<<< HEAD
-#ifdef WITH_WSREP
-  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL)) {
-    return true;
-  }
-#endif /* WITH_WSREP */
-
-||||||| f02c4125d4c
-=======
   // Validate the list of the imported libraries.
   const mem_root_deque<sp_name_with_alias> *imported_libraries =
       chistics->get_imported_libraries();
@@ -1254,8 +1245,13 @@ bool sp_update_routine(THD *thd, enum_sp_type type, sp_name *name,
     }
   }
 
->>>>>>> Percona-Server-9.3.0-1
-  // Alter stored routine.
+#ifdef WITH_WSREP
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL)) {
+    return true;
+  }
+#endif /* WITH_WSREP */
+
+// Alter stored routine.
   if (DBUG_EVALUATE_IF("simulate_alter_routine_failure", true, false) ||
       dd::alter_routine(thd, routine, chistics))
     goto err_report_with_rollback;

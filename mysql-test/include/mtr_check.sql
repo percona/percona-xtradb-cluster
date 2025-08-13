@@ -228,9 +228,8 @@ BEGIN
   -- Also (in similar fashion as above) exclude all 'Daemon' threads, they will
   -- not give consistent result either.
   --
-<<<<<<< HEAD
   -- SELECT /*+SET_VAR(use_secondary_engine=OFF)*/ USER, HOST, DB, COMMAND, INFO FROM INFORMATION_SCHEMA.PROCESSLIST
-  --  WHERE COMMAND NOT IN ('Sleep', 'Daemon', 'Killed')
+  --  WHERE COMMAND NOT IN ('Sleep', 'Daemon', 'Killed', 'mysqlrouter')
   --    AND USER NOT IN ('unauthenticated user','mysql.session', 'event_scheduler')
   --      ORDER BY COMMAND;
 
@@ -256,17 +255,6 @@ BEGIN
   DELETE FROM mysql.global_grants WHERE user = 'mysql.pxc.sst.user';
   COMMIT;
   SET SESSION wsrep_on = ON;
-||||||| f02c4125d4c
-  SELECT /*+SET_VAR(use_secondary_engine=OFF)*/ USER, HOST, DB, COMMAND, INFO FROM INFORMATION_SCHEMA.PROCESSLIST
-    WHERE COMMAND NOT IN ('Sleep', 'Daemon', 'Killed')
-      AND USER NOT IN ('unauthenticated user','mysql.session', 'event_scheduler')
-        ORDER BY COMMAND;
-=======
-  SELECT /*+SET_VAR(use_secondary_engine=OFF)*/ USER, HOST, DB, COMMAND, INFO FROM INFORMATION_SCHEMA.PROCESSLIST
-    WHERE COMMAND NOT IN ('Sleep', 'Daemon', 'Killed')
-      AND USER NOT IN ('unauthenticated user','mysql.session', 'event_scheduler', 'mysqlrouter')
-        ORDER BY COMMAND;
->>>>>>> Percona-Server-9.3.0-1
 
   -- Ensure that libraries are all dropped at the end of test-runs.
   SELECT * FROM INFORMATION_SCHEMA.LIBRARIES

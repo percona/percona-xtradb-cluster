@@ -13718,7 +13718,21 @@ SHOW_VAR status_vars[] = {
     {"Deprecated_use_fk_on_non_standard_key_last_timestamp",
      (char *)&show_deprecated_use_fk_on_non_standard_key_last_timestamp,
      SHOW_FUNC, SHOW_SCOPE_GLOBAL},
-<<<<<<< HEAD
+    {"option_tracker_usage:Binary Log",
+     reinterpret_cast<char *>(
+         &Rpl_opt_tracker::m_opt_option_tracker_usage_binary_log),
+     SHOW_LONGLONG, SHOW_SCOPE_GLOBAL},
+    {"option_tracker_usage:Replication Replica",
+     reinterpret_cast<char *>(
+         &Rpl_opt_tracker::m_opt_option_tracker_usage_replication_replica),
+     SHOW_LONGLONG, SHOW_SCOPE_GLOBAL},
+    {"option_tracker_usage:Traditional Optimizer",
+     reinterpret_cast<char *>(
+         &option_tracker_traditional_optimizer_usage_count),
+     SHOW_LONGLONG, SHOW_SCOPE_GLOBAL},
+    {"option_tracker_usage:Hypergraph Optimizer",
+     reinterpret_cast<char *>(&option_tracker_hypergraph_optimizer_usage_count),
+     SHOW_LONGLONG, SHOW_SCOPE_GLOBAL},
 #ifdef WITH_WSREP
     {"wsrep_connected", (char *)&wsrep_connected, SHOW_BOOL, SHOW_SCOPE_GLOBAL},
     {"wsrep_ready", (char *)&wsrep_show_ready, SHOW_FUNC, SHOW_SCOPE_GLOBAL},
@@ -13748,24 +13762,6 @@ SHOW_VAR status_vars[] = {
      SHOW_CHAR_PTR, SHOW_SCOPE_GLOBAL},
     {"wsrep", (char *)&wsrep_show_status, SHOW_FUNC, SHOW_SCOPE_ALL},
 #endif /* WITH_WSREP */
-||||||| f02c4125d4c
-=======
-    {"option_tracker_usage:Binary Log",
-     reinterpret_cast<char *>(
-         &Rpl_opt_tracker::m_opt_option_tracker_usage_binary_log),
-     SHOW_LONGLONG, SHOW_SCOPE_GLOBAL},
-    {"option_tracker_usage:Replication Replica",
-     reinterpret_cast<char *>(
-         &Rpl_opt_tracker::m_opt_option_tracker_usage_replication_replica),
-     SHOW_LONGLONG, SHOW_SCOPE_GLOBAL},
-    {"option_tracker_usage:Traditional Optimizer",
-     reinterpret_cast<char *>(
-         &option_tracker_traditional_optimizer_usage_count),
-     SHOW_LONGLONG, SHOW_SCOPE_GLOBAL},
-    {"option_tracker_usage:Hypergraph Optimizer",
-     reinterpret_cast<char *>(&option_tracker_hypergraph_optimizer_usage_count),
-     SHOW_LONGLONG, SHOW_SCOPE_GLOBAL},
->>>>>>> Percona-Server-9.3.0-1
     {NullS, NullS, SHOW_FUNC, SHOW_SCOPE_ALL}};
 
 void add_terminator(vector<my_option> *options) {

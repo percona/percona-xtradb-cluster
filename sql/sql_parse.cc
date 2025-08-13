@@ -5822,8 +5822,8 @@ int mysql_execute_command(THD *thd, bool first_level) {
     case SQLCOM_CREATE_SRS:
     case SQLCOM_DROP_SRS:
     case SQLCOM_CREATE_LIBRARY:
-<<<<<<< HEAD
-    case SQLCOM_DROP_LIBRARY: {
+    case SQLCOM_DROP_LIBRARY:
+    case SQLCOM_ALTER_LIBRARY: {
 #ifdef WITH_WSREP
       if (lex->sql_command == SQLCOM_SELECT)
         WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_READ)
@@ -5871,13 +5871,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
         }
       }
 #endif /* WITH_WSREP */
-
-||||||| f02c4125d4c
-    case SQLCOM_DROP_LIBRARY: {
-=======
-    case SQLCOM_DROP_LIBRARY:
-    case SQLCOM_ALTER_LIBRARY: {
->>>>>>> Percona-Server-9.3.0-1
       assert(lex->m_sql_cmd != nullptr);
 
       res = lex->m_sql_cmd->execute(thd);

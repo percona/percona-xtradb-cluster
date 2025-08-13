@@ -728,55 +728,6 @@ static Check_result check_for_upgrade(THD *thd, dd::String_type &sname,
   return {false, result_code};
 }
 
-<<<<<<< HEAD
-#ifdef WITH_WSREP
-/*
-   OPTIMIZE, REPAIR and ALTER may take MDL locks not only for the affected
-   table, but also for the table referenced by foreign key constraint.
-   ALTER additionally may take MDL lock of the tables that are referencing
-   altered table.
-   This wsrep_toi_replication() function handles TOI replication for OPTIMIZE
-   and REPAIR so that certification keys for potential FK parent tables are
-   also appended in the write set.
-   ALTER TABLE case is handled in alter table execution path.
-*/
-static bool wsrep_toi_replication(THD *thd, Table_ref *tables) {
-  if (!WSREP(thd) || !WSREP_CLIENT(thd)) return false;
-
-  LEX *lex = thd->lex;
-  /* only handle OPTIMIZE and REPAIR here */
-  switch (lex->sql_command) {
-    case SQLCOM_OPTIMIZE:
-    case SQLCOM_REPAIR:
-      break;
-    default:
-      return false;
-  }
-
-  wsrep::key_array keys;
-
-  if (wsrep_append_fk_parent_table(thd, tables, &keys)) {
-    return true;
-  }
-
-  /* now TOI replication, with no locks held */
-  if (keys.empty()) {
-    WSREP_TO_ISOLATION_BEGIN_WRTCHK(NULL, NULL, tables);
-  } else {
-    WSREP_TO_ISOLATION_BEGIN_FK_TABLES_IF_WRTCHK(NULL, NULL, tables, &keys) {
-      return true;
-    }
-  }
-  return false;
-
-wsrep_error_label:
-  return true;
-}
-
-#endif /* WITH_WSREP */
-
-||||||| f02c4125d4c
-=======
 /**
   Run analyze in secondary engine.
 
@@ -837,7 +788,52 @@ static bool secondary_engine_analyze(THD *thd, Table_ref *table) {
   return protocol->end_row();
 }
 
->>>>>>> Percona-Server-9.3.0-1
+#ifdef WITH_WSREP
+/*
+   OPTIMIZE, REPAIR and ALTER may take MDL locks not only for the affected
+   table, but also for the table referenced by foreign key constraint.
+   ALTER additionally may take MDL lock of the tables that are referencing
+   altered table.
+   This wsrep_toi_replication() function handles TOI replication for OPTIMIZE
+   and REPAIR so that certification keys for potential FK parent tables are
+   also appended in the write set.
+   ALTER TABLE case is handled in alter table execution path.
+*/
+static bool wsrep_toi_replication(THD *thd, Table_ref *tables) {
+  if (!WSREP(thd) || !WSREP_CLIENT(thd)) return false;
+
+  LEX *lex = thd->lex;
+  /* only handle OPTIMIZE and REPAIR here */
+  switch (lex->sql_command) {
+    case SQLCOM_OPTIMIZE:
+    case SQLCOM_REPAIR:
+      break;
+    default:
+      return false;
+  }
+
+  wsrep::key_array keys;
+
+  if (wsrep_append_fk_parent_table(thd, tables, &keys)) {
+    return true;
+  }
+
+  /* now TOI replication, with no locks held */
+  if (keys.empty()) {
+    WSREP_TO_ISOLATION_BEGIN_WRTCHK(NULL, NULL, tables);
+  } else {
+    WSREP_TO_ISOLATION_BEGIN_FK_TABLES_IF_WRTCHK(NULL, NULL, tables, &keys) {
+      return true;
+    }
+  }
+  return false;
+
+wsrep_error_label:
+  return true;
+}
+
+#endif /* WITH_WSREP */
+
 /*
   RETURN VALUES
     false Message sent to net (admin operation went ok)
