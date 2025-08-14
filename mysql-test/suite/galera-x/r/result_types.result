@@ -18,7 +18,7 @@ RUN insert into test_d values (1234567890.1234567890,1234567890.1234567890)
 1 rows affected
 RUN select * from test_d
 f	d
-0.0123457	0.012345679
+0.01235	0.01235
 1234570000	1234567890.1234567
 0 rows affected
 send Mysqlx.Sql.StmtExecute {

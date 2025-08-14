@@ -57,12 +57,10 @@ let $total_global_vars=`SELECT COUNT(*)
    WHERE variable_name NOT LIKE 'ndb_%'
    AND variable_name NOT LIKE 'debug_%'
    AND variable_name NOT LIKE '%telemetry%'`;
-<<<<<<< HEAD
-let $total_persistent_vars=532;
-||||||| f02c4125d4c
-let $total_persistent_vars=491;
-=======
 let $total_persistent_vars= `SELECT $total_global_vars - 223`;
+
+# Exclude wsrep variables
+let $total_persistent_vars= `SELECT $total_persistent_vars - 15`;
 
 # If mysqlx is not present, increment the persisted count by $no_mysqlx * count
 let $no_mysqlx=`SELECT COUNT(*) = 0 FROM performance_schema.global_variables WHERE variable_name LIKE 'mysqlx_%'`;
@@ -124,7 +122,6 @@ let $total_included_vars=`SELECT COUNT(*) FROM performance_schema.global_variabl
 '_list_end_'
 )`;
 let $total_persistent_vars= `SELECT $total_persistent_vars + $total_included_vars`;
->>>>>>> Percona-Server-9.3.0-1
 
 --echo ***************************************************************
 --echo * 0. Verify that variables present in performance_schema.global
