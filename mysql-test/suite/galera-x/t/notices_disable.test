@@ -15,7 +15,7 @@ call mtr.add_suppression("Unknown table 'demo.oops_it_is_not_here'");
 --connection node_1
 
 ## Test starts here
---let $xtest_result= $MYSQL_TMP_DIR/stmtexecute_query_result_mysqlx.tmp
+--let $xtest_result= $MYSQL_TMP_DIR/stmtexecute_query_result_mysqlx.xpl
 --write_file $xtest_result 
 -->quiet
 
@@ -106,7 +106,7 @@ call mtr.add_suppression("Unknown table 'demo.oops_it_is_not_here'");
 -->stmtsql SET sql_mode = 'NO_ENGINE_SUBSTITUTION';
 -->recvresult
 
--->stmtsql prepare stmt from 'create table test.t1 (a varchar(10) character set utf8)';
+-->stmtsql prepare stmt from 'create table test.t1 (a varchar(10) character set utf8mb3)';
 -->recvresult
 
 -->stmtsql execute stmt;
@@ -277,7 +277,7 @@ Mysqlx.Sql.StmtExecute {
 -->stmtsql use test;
 -->recvresult
 
--->stmtsql create table t1 as select 5.05 / 0.014;
+-->stmtsql create table t1 as select 5.05000000000000000000000123456789 + 1;
 -->recvresult
 
 -->stmtsql drop table t1;
@@ -551,7 +551,7 @@ use test;
 
 EOF
 
---let $xtest_warnings= $MYSQL_TMP_DIR/stmtexecute_proc_warnings_mysqlx.tmp
+--let $xtest_warnings= $MYSQL_TMP_DIR/stmtexecute_proc_warnings_mysqlx.xpl
 --write_file $xtest_warnings
 -->quiet
 -->stmtadmin disable_notices	{"notice":"warnings"}
@@ -705,7 +705,7 @@ drop table worklog5743_8;
 
 EOF
 
---let $xtest_readonly = $MYSQL_TMP_DIR/disable_notices_readonly.tmp
+--let $xtest_readonly = $MYSQL_TMP_DIR/disable_notices_readonly.xpl
 --write_file $xtest_readonly
 -->quiet
 -->echo Try Disable warnings
@@ -739,7 +739,7 @@ show status like 'Mysqlx%notice%';
 
 EOF
 
---let $xtest_notices= $MYSQL_TMP_DIR/disable_multiple_notices_mysqlx.tmp
+--let $xtest_notices= $MYSQL_TMP_DIR/disable_multiple_notices_mysqlx.xpl
 --write_file $xtest_notices
 -->quiet
 -->echo Disable multiple notices both read-only and read-write with single StmtExecute,expect error from the first error is sees
@@ -761,7 +761,7 @@ EOF
 
 EOF
 
---let $xtest_disable= $MYSQL_TMP_DIR/stats_disablenoti_mysqlx.tmp
+--let $xtest_disable= $MYSQL_TMP_DIR/stats_disablenoti_mysqlx.xpl
 --write_file $xtest_disable
 -->quiet
 -->echo Disable warnings notice and observe stats
@@ -802,9 +802,4 @@ create user xplugin@localhost identified by 'xplugin';
 
 ## Cleanup
 drop user xplugin@localhost;
---remove_file $xtest_result
---remove_file $xtest_readonly
---remove_file $xtest_warnings
---remove_file $xtest_notices
---remove_file $xtest_disable
---source include/xplugin_drop_user.inc
+--source ../include/xplugin_cleanup.inc
