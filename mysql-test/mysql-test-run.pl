@@ -264,8 +264,8 @@ our $opt_summary_report;
 our $opt_vardir;
 our $opt_xml_report;
 
-# We need at least 63 ports per worker in PXC as every worker needs to support
-# upto 9 servers and each server needs 7 ports.
+# We need at least 70 ports per worker in PXC as every worker needs to support
+# upto 10 servers and each server needs 7 ports.
 my $ports_per_thread   = 70;
 
 #
@@ -2794,12 +2794,63 @@ sub set_build_thread_ports($) {
 
   $ENV{MTR_BUILD_THREAD} = $build_thread;
 
+  # There can be up to 10 servers started
+  # Each PXC server allocates the following 6 ports:
+  # port=<base_port>
+  # galera_port=<base_port+1>
+  # ist_port=<base_port+2>
+  # sst_port=<base_port+3>
+  # admin-port=<base_port+5>
+  #
+  # Optionally, each server allocates group replication port
+  # (actually it allocates it always. See ConfigFactory.pm)
+  # group_replication_port=<base_port+4>
+  #
+  # Optionally, we need a port for router
+  #
+  # Optionally we need a port for mysqlx
+  #
+  # The layout of ports is:
+  # base_port=N (usually N=13000)
+  # for (server = 0; server < 10; server++) {
+  #   port = base_port++;
+  #   galera_port = base_port++;
+  #   ist_port = base_port++;
+  #   sst_port = base_port++;
+  #   group_replication_port = base_port++;
+  #   admin_port = base_port++;
+  # }
+  # // here base_port = N + 10 * 6 (13600)
+  # for (server = 0; server < 10; server++) {
+  #   router_port
+  # }
+  # // here base_port = N + 10 * 6 + 10 * 1 (13610)
+  # // or base_port = N + 10 * 6 (13600)
+  # for (server = 0; server < 10; server++) {
+  #   mysqlx-port
+  # }
+  # --------------------------------------------
+  # | mandatory area (standard ports):
+  # | N
+  # | ...
+  # | N + 10*6 - 1
+  # | optional area (router ports):
+  # | N + 10*6
+  # | ...
+  # | N + 10*6 + 9
+  # | mandatory area (mysqlx ports)
+  # | N + 10*6 ( + 10 )
+  # | ...
+  # | N + 10*6 ( + 10 ) + 9
+  # --------------------------------------------
+
   # Calculate baseport
   $baseport= $build_thread * $opt_port_group_size + 10000;
-
-  # First set of 20 ports is reserved for mysqld servers (10 each for
-  # standard and admin connections)
-  my $baseport_offset = 20;
+  # 10 servers, 6 ports at least for each
+  # group replication ports are counted below conditionally, but are allocated
+  # always. It looks like below 'if' is not correct and should be removed.
+  # On the other hand, it doesn't cause any harm, so let it be here for now.
+  my $baseport_offset = 10 * 6;
 
   # Next set of 10 ports is reserver for Group Replication if used
   if ($group_replication) {
