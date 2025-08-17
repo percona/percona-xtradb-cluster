@@ -705,8 +705,9 @@ pushd pxb-8.4
 yumdownloader percona-xtrabackup-84-8.4.0
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
-mv usr/lib* ./
+mv usr/lib64 ./
 mv lib64 lib
+mv usr/lib/private lib/
 mv lib/xtrabackup/* lib/ || true
 rm -rf lib/xtrabackup
 rm -rf usr
