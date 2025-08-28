@@ -183,13 +183,13 @@ RUN drop table test.t1
 RUN SET sql_mode = 'NO_ENGINE_SUBSTITUTION'
 
 0 rows affected
-RUN prepare stmt from 'create table test.t1 (a varchar(10) character set utf8)'
+RUN prepare stmt from 'create table test.t1 (a varchar(10) character set utf8mb3)'
 
 0 rows affected
 Statement prepared
 Warnings generated:
-WARNING | 3719 | 'utf8' is currently an alias for the character set UTF8MB3, but will be an alias for UTF8MB4 in a future release. Please consider using UTF8MB4 in order to be unambiguous.
-Got expected warning: 3719 
+WARNING | 1287 | 'utf8mb3' is deprecated and will be removed in a future release. Please use utf8mb4 instead
+Got expected warning: 1287 
 RUN execute stmt
 
 0 rows affected
@@ -700,12 +700,12 @@ RUN drop table t1
 RUN use test
 
 0 rows affected
-RUN create table t1 as select 5.05 / 0.014
+RUN create table t1 as select 5.05000000000000000000000123456789 + 1
 
 1 rows affected
 Records: 1  Duplicates: 0  Warnings: 1
 Warnings generated:
-NOTE | 1265 | Data truncated for column '5.05 / 0.014' at row 1
+NOTE | 1265 | Data truncated for column '5.05000000000000000000000123456789 + 1' at row 1
 Got expected warning: 1265 
 RUN drop table t1
 

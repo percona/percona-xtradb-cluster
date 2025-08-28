@@ -23,7 +23,10 @@
 #include <memory>
 #include <utility>
 
+#include <mysqld_error.h>
+
 #include "rocksdb/sst_partitioner.h"
+#include "rocksdb/utilities/transaction_db.h"
 
 #include "./rdb_cf_manager.h"
 #include "./rdb_datadic.h"

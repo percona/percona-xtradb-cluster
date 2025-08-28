@@ -109,7 +109,7 @@ SET SESSION wsrep_sync_wait = 0;
 
 --echo #
 --echo # 8. Verify that the reason for the shutdown is logged in the error log.
---let $assert_select= State transfer request failed unrecoverably.* Most likely it is due to inability to communicate with the cluster primary component. Restart required.
+--let $assert_select= State transfer request failed unrecoverably.* Most likely it is due to inability to communicate with the cluster primary component. Please check the error log for details. Restart required.
 --let $assert_text= Appropriate message has been written to the error log explaining the reason for the shutdown.
 --let $assert_count= 1
 --let $assert_file= $ERROR_LOG_FILE

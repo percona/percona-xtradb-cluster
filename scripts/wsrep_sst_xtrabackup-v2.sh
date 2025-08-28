@@ -35,6 +35,7 @@
 # encryption specific variables.
 encrypt=0
 xbstream_opts=""
+lock_ddl_opt=""
 
 nproc=1
 ecode=0
@@ -144,12 +145,12 @@ DATA="${WSREP_SST_OPT_DATA}"
 XTRABACKUP_PATH_PREFIX="$(dirname $0)/pxc_extra/pxb-"
 
 # XB path compatible with the current version of PXC
-XTRABACKUP_THIS_VER_PATH="$(dirname $0)/pxc_extra/pxb-9.2"
+XTRABACKUP_THIS_VER_PATH="$(dirname $0)/pxc_extra/pxb-9.3"
 
 # XB path compatible with prev PXC version. It may be prev Innovative release or LTS
 # if current PXC version is 1st Innovative.
 # Note that this can be the same as XTRABACKUP_PREV_LTS_VER_PATH
-XTRABACKUP_PREV_VER_PATH="$(dirname $0)/pxc_extra/pxb-9.1"
+XTRABACKUP_PREV_VER_PATH="$(dirname $0)/pxc_extra/pxb-9.2"
 
 # XB path compatible previous PXC LTS version
 XTRABACKUP_PREV_LTS_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.4"
@@ -166,7 +167,7 @@ XB_PREV_LTS_REQUIRED_VERSION="8.4.0"
 REQUIRED_DONOR_MYSQL_LTS_VERSION="8.4"
 # ...or to be this previous version (note that it may be LTS as well if this is
 # 1st innovative)
-REQUIRED_DONOR_MYSQL_PREV_VERSION="9.1"
+REQUIRED_DONOR_MYSQL_PREV_VERSION="9.2"
 
 # These files carry some important information in form of GTID of the data
 # that is being backed up.
@@ -808,6 +809,7 @@ read_cnf()
     fi
 
     xbstream_opts=$(parse_cnf sst xbstream-opts "")
+    lock_ddl_opt=$(parse_cnf xtrabackup lock-ddl "")
 }
 
 #
@@ -1562,6 +1564,7 @@ function initialize_pxb_commands()
 
     local disver=""
     local pxb_root pxb_bin_path pxb_plugin_dir
+    local lock_ddl="--lock-ddl"
 
     # We need to use PXB compatible with donor
     pxb_root="${XTRABACKUP_PATH_PREFIX}${donor_version_str}"
@@ -1590,6 +1593,27 @@ function initialize_pxb_commands()
 
     if ${pxb_bin_path} --help 2>/dev/null | grep -q -- '--version-check'; then
         disver="--no-version-check"
+    fi
+
+    #
+    # --lock-ddl option
+    #
+    # Use user-provided option if set
+    [[ -n "$lock_ddl_opt" ]] && lock_ddl="--lock-ddl=$lock_ddl_opt"
+
+    # Check if xtrabackup (PXB) Pro version is used (supports --lock-ddl=REDUCED)
+    if ${pxb_bin_path} --version 2>&1 | grep -q -- '-pro'; then
+        if [[ -z "$lock_ddl_opt" ]]; then
+            lock_ddl="--lock-ddl=REDUCED"
+            wsrep_log_info "PXB Pro detected; using default --lock-ddl=REDUCED for SST"
+        fi
+    elif [[ "${lock_ddl_opt^^}" == "REDUCED" ]]; then
+        # If REDUCED is requested but not supported, exit with error
+        wsrep_log_error "******************* FATAL ERROR **********************"
+        wsrep_log_error "The xtrabackup version does not support --lock-ddl=REDUCED option."
+        wsrep_log_error "Line $LINENO"
+        wsrep_log_error "******************************************************"
+        safe_exit 2
     fi
 
     local xb_version=$(${pxb_bin_path} --version 2>&1 | grep -oe ' [0-9]\.[0-9][\.0-9]*' | head -n1)
@@ -1650,7 +1674,7 @@ function initialize_pxb_commands()
                 --target-dir=\${DATA} 2>&1 | logger -p daemon.err -t ${ssystag}innobackupex-move "
             INNOBACKUP="${pxb_bin_path} --defaults-file=${WSREP_SST_OPT_CONF} \
                 --defaults-group=mysqld${WSREP_SST_OPT_CONF_SUFFIX} $disver $iopts \
-                \$INNOEXTRA \$keyringbackupopt --lock-ddl --backup --galera-info \
+                \$INNOEXTRA \$keyringbackupopt $lock_ddl --backup --galera-info \
                 \$encrypt_backup_options --stream=\$sfmt \
                 --xtrabackup-plugin-dir="$pxb_plugin_dir" \
                 --target-dir=\$itmpdir 2> >(logger -p daemon.err -t ${ssystag}innobackupex-backup)"
@@ -1673,7 +1697,7 @@ function initialize_pxb_commands()
             --target-dir=\${DATA} &>\${DATA}/innobackup.move.log"
         INNOBACKUP="${pxb_bin_path} --defaults-file=${WSREP_SST_OPT_CONF} \
             --defaults-group=mysqld${WSREP_SST_OPT_CONF_SUFFIX} $disver $iopts \
-            \$INNOEXTRA \$keyringbackupopt --lock-ddl --backup --galera-info \
+            \$INNOEXTRA \$keyringbackupopt $lock_ddl --backup --galera-info \
             \$encrypt_backup_options --stream=\$sfmt \
             --xtrabackup-plugin-dir="$pxb_plugin_dir" \
             --target-dir=\$itmpdir 2>\${DATA}/innobackup.backup.log"

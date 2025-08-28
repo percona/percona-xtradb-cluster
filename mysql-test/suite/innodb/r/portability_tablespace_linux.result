@@ -20,9 +20,6 @@ DATA_HOME_DIR/data_home
 SELECT @@innodb_data_file_path;
 @@innodb_data_file_path
 data01:20M;data02:20M:autoextend
-SELECT @@innodb_undo_tablespaces;
-@@innodb_undo_tablespaces
-2
 SHOW CREATE TABLE tab3;
 Table	Create Table
 tab3	CREATE TABLE `tab3` (
@@ -90,9 +87,6 @@ DATA_HOME_DIR/data_home
 SELECT @@innodb_data_file_path;
 @@innodb_data_file_path
 data01:20M;data02:20M:autoextend
-SELECT @@innodb_undo_tablespaces;
-@@innodb_undo_tablespaces
-2
 SHOW CREATE TABLE tab3;
 Table	Create Table
 tab3	CREATE TABLE `tab3` (
@@ -193,9 +187,6 @@ DATA_HOME_DIR/data_home
 SELECT @@innodb_data_file_path;
 @@innodb_data_file_path
 data01:20M;data02:20M:autoextend
-SELECT @@innodb_undo_tablespaces;
-@@innodb_undo_tablespaces
-2
 SHOW CREATE TABLE tab3;
 Table	Create Table
 tab3	CREATE TABLE `tab3` (
@@ -247,9 +238,6 @@ DATA_HOME_DIR/data_home
 SELECT @@innodb_data_file_path;
 @@innodb_data_file_path
 data01:20M;data02:20M:autoextend
-SELECT @@innodb_undo_tablespaces;
-@@innodb_undo_tablespaces
-2
 SHOW CREATE TABLE tab3;
 Table	Create Table
 tab3	CREATE TABLE `tab3` (

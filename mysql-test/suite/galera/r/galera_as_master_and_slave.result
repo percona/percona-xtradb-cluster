@@ -116,10 +116,10 @@ select @@replica_parallel_workers;
 2
 set global replica_parallel_workers=0;
 Warnings:
-Warning	1287	'0' is deprecated and will be removed in a future release. Please use 1 instead
+Warning	1292	Truncated incorrect replica_parallel_workers value: '0'
 select @@replica_parallel_workers;
 @@replica_parallel_workers
-0
+1
 STOP REPLICA;
 START REPLICA USER='root';
 Warnings:

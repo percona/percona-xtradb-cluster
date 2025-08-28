@@ -1,5 +1,4 @@
 !include ../galera_2nodes.cnf
 
 [mysqld]
-innodb_log_file_size=1G
 binlog-row-event-max-size=100M
