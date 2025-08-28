@@ -3,25 +3,11 @@ if (!$restart_parameters)
   let $restart_parameters = restart;
 }
 
-<<<<<<< HEAD
 if ($galera_wsrep_start_position != '') {
    --echo Using --wsrep-start-position when starting mysqld ...
    --let $restart_parameters = restart:$start_mysqld_params --wsrep-start-position=$galera_wsrep_start_position
    --let $galera_wsrep_start_position = 0
-||||||| a5997a95b15
-# We use --exec echo instead of simple "--echo" because
-# replace_result works on --exec
-if (!$do_not_echo_parameters)
-{
-  --exec echo "# $restart_parameters"
-=======
-# We use --exec echo instead of simple "--echo" because
-# replace_result works on --exec
-if (!$do_not_echo_parameters) {
-  --exec echo "# $restart_parameters"
->>>>>>> percona/ps/release-9.4.0-1
 }
-<<<<<<< HEAD
 
 if ($galera_wsrep_start_position == '') {
    if ($start_mysqld_params != '') {
@@ -29,26 +15,14 @@ if ($galera_wsrep_start_position == '') {
    }
 }
 
-if ($suppress_print_params == '') {
-  # We use --exec echo instead of simple "--echo" because
-  # replace_result works on --exec
-  if (!$do_not_echo_parameters) {
-    --replace_regex /--wsrep-start-position=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:[0-9]*/--wsrep-start-position=<WSREP_START_POSITION>/ /127\.0\.0\.1:[0-9]{1,5}/127.0.0.1:<PORT>/ /socket\.ssl_ca=\/[-_\/[:alnum:]\.]*/socket.ssl_ca=<SSL_CA>/ /socket\.ssl_cert=\/[-_\/[:alnum:]\.]*/socket.ssl_cert=<SSL_CERT>/ /socket\.ssl_key=\/[-_\/[:alnum:]\.]*/socket.ssl_key=<SSL_KEY>/ /base_port=[0-9]{5}/base_port=<PORT>/
-    --exec echo "# $restart_parameters"
-  }
-  if ($do_not_echo_parameters) {
-    --echo # restart:<hidden args>
-    let $do_not_echo_parameters=;
-  }
-||||||| a5997a95b15
-if ($do_not_echo_parameters)
-{
-  --echo # restart:<hidden args>
-  let $do_not_echo_parameters=;
-=======
+# We use --exec echo instead of simple "--echo" because
+# replace_result works on --exec
+if (!$do_not_echo_parameters) {
+  --replace_regex /--wsrep-start-position=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:[0-9]*/--wsrep-start-position=<WSREP_START_POSITION>/ /127\.0\.0\.1:[0-9]{1,5}/127.0.0.1:<PORT>/ /socket\.ssl_ca=\/[-_\/[:alnum:]\.]*/socket.ssl_ca=<SSL_CA>/ /socket\.ssl_cert=\/[-_\/[:alnum:]\.]*/socket.ssl_cert=<SSL_CERT>/ /socket\.ssl_key=\/[-_\/[:alnum:]\.]*/socket.ssl_key=<SSL_KEY>/ /base_port=[0-9]{5}/base_port=<PORT>/
+  --exec echo "# $restart_parameters"
+}
 if ($do_not_echo_parameters) {
-  --exec echo "# restart"
->>>>>>> percona/ps/release-9.4.0-1
+  --echo "# restart"
 }
 
 # A common bug in our tests was that people tried to call start_mysqld.inc

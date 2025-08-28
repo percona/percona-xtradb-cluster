@@ -3283,17 +3283,10 @@ func_exit:
 
   index = node->table->first_index();
 
-<<<<<<< HEAD
-  auto referenced = row_upd_index_is_referenced(index);
 #ifdef WITH_WSREP
   bool foreign = wsrep_row_upd_index_is_foreign(index, trx);
 #endif /* WITH_WSREP */
 
-||||||| a5997a95b15
-  auto referenced = row_upd_index_is_referenced(index);
-
-=======
->>>>>>> percona/ps/release-9.4.0-1
   pcur = node->pcur;
 
   /* We have to restore the cursor to its position */
@@ -3367,18 +3360,12 @@ func_exit:
   if (node->is_delete) {
 #ifdef WITH_WSREP
     err = row_upd_del_mark_clust_rec(flags, node, index, offsets, thr,
-                                     referenced, foreign, &mtr);
+                                     row_upd_index_is_referenced(index),
+                                     foreign, &mtr);
 #else
     err = row_upd_del_mark_clust_rec(flags, node, index, offsets, thr,
-<<<<<<< HEAD
-                                     referenced, &mtr);
-#endif /* WITH_WSREP */
-||||||| a5997a95b15
-                                     referenced, &mtr);
-=======
                                      row_upd_index_is_referenced(index), &mtr);
->>>>>>> percona/ps/release-9.4.0-1
-
+#endif /* WITH_WSREP */
     if (err == DB_SUCCESS) {
       node->state = UPD_NODE_UPDATE_ALL_SEC;
       node->index = index->next();
@@ -3417,21 +3404,15 @@ func_exit:
     choosing records to update. MySQL solves now the problem
     externally! */
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
-    err = row_upd_clust_rec_by_insert(flags, node, index, thr, referenced,
+    err = row_upd_clust_rec_by_insert(flags, node, index, thr,
+                                      row_upd_index_is_referenced(index),
                                       foreign, &mtr);
 #else
     err =
-        row_upd_clust_rec_by_insert(flags, node, index, thr, referenced, &mtr);
+        row_upd_clust_rec_by_insert(flags, node, index, thr,
+                                    row_upd_index_is_referenced(index), &mtr);
 #endif /* WITH_WSREP */
-||||||| a5997a95b15
-    err =
-        row_upd_clust_rec_by_insert(flags, node, index, thr, referenced, &mtr);
-=======
-    err = row_upd_clust_rec_by_insert(flags, node, index, thr,
-                                      row_upd_index_is_referenced(index), &mtr);
->>>>>>> percona/ps/release-9.4.0-1
 
     if (err != DB_SUCCESS) {
       goto exit_func;

@@ -3276,7 +3276,6 @@ inline bool secondary_engine_supports_ddl(const handlerton *hton) {
   return (hton->flags & HTON_SECONDARY_ENGINE_SUPPORTS_DDL) != 0;
 }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 /**
   Engine support replication through wsrep-replication provider plugin
@@ -3284,15 +3283,12 @@ inline bool secondary_engine_supports_ddl(const handlerton *hton) {
 #define HTON_WSREP_REPLICATION (1 << 22)
 #endif /* WITH_WSREP */
 
-||||||| a5997a95b15
-=======
 /* Whether the secondary engine handlerton supports temporary tables. */
 inline bool secondary_engine_supports_temporary_tables(const handlerton *hton) {
   assert(hton->flags & HTON_IS_SECONDARY_ENGINE);
   return (hton->flags & HTON_SECONDARY_SUPPORTS_TEMPORARY_TABLE) != 0U;
 }
 
->>>>>>> percona/ps/release-9.4.0-1
 inline bool ddl_is_atomic(const handlerton *hton) {
   return (hton->flags & HTON_SUPPORTS_ATOMIC_DDL) != 0;
 }

@@ -1910,7 +1910,6 @@ class Item_func_internal_get_dd_column_extra final : public Item_str_func {
   String *val_str(String *) override;
 };
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 
 #include "wsrep_api.h"
@@ -1968,8 +1967,6 @@ class Item_func_wsrep_sync_wait_upto_gtid : public Item_bool_func {
 };
 #endif /* WITH_WSREP */
 
-||||||| a5997a95b15
-=======
 inline void tohex(char *to, uint64_t from, uint len) {
   to += len;
   while (len--) {
@@ -1978,5 +1975,4 @@ inline void tohex(char *to, uint64_t from, uint len) {
   }
 }
 
->>>>>>> percona/ps/release-9.4.0-1
 #endif /* ITEM_STRFUNC_INCLUDED */
