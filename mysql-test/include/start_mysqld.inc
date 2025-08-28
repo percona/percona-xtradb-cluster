@@ -3,11 +3,25 @@ if (!$restart_parameters)
   let $restart_parameters = restart;
 }
 
+<<<<<<< HEAD
 if ($galera_wsrep_start_position != '') {
    --echo Using --wsrep-start-position when starting mysqld ...
    --let $restart_parameters = restart:$start_mysqld_params --wsrep-start-position=$galera_wsrep_start_position
    --let $galera_wsrep_start_position = 0
+||||||| a5997a95b15
+# We use --exec echo instead of simple "--echo" because
+# replace_result works on --exec
+if (!$do_not_echo_parameters)
+{
+  --exec echo "# $restart_parameters"
+=======
+# We use --exec echo instead of simple "--echo" because
+# replace_result works on --exec
+if (!$do_not_echo_parameters) {
+  --exec echo "# $restart_parameters"
+>>>>>>> percona/ps/release-9.4.0-1
 }
+<<<<<<< HEAD
 
 if ($galera_wsrep_start_position == '') {
    if ($start_mysqld_params != '') {
@@ -26,6 +40,15 @@ if ($suppress_print_params == '') {
     --echo # restart:<hidden args>
     let $do_not_echo_parameters=;
   }
+||||||| a5997a95b15
+if ($do_not_echo_parameters)
+{
+  --echo # restart:<hidden args>
+  let $do_not_echo_parameters=;
+=======
+if ($do_not_echo_parameters) {
+  --exec echo "# restart"
+>>>>>>> percona/ps/release-9.4.0-1
 }
 
 # A common bug in our tests was that people tried to call start_mysqld.inc

@@ -198,9 +198,14 @@ enum options_client {
   OPT_AUTHENTICATION_WEBAUTHN_CLIENT_PRESERVE_PRIVACY,
   OPT_MYSQLDUMP_EXCLUDE_USER,
   OPT_MYSQLDUMP_INCLUDE_USER,
+<<<<<<< HEAD
 #ifdef WITH_WSREP
   OPT_USE_SET_PASSWORD,
 #endif /* WITH_WSREP */
+||||||| a5997a95b15
+=======
+  OPT_MYSQL_COMMANDS,
+>>>>>>> percona/ps/release-9.4.0-1
   /* Add new option above this */
   OPT_MAX_CLIENT_OPTION
 };
