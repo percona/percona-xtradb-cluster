@@ -17,7 +17,7 @@ BEGIN
         DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN END;
         SET SESSION wsrep_sync_wait = 0;
         WHILE 1 DO
-                UPDATE t1 SET f2 = LEFT(MD5(RAND()), 4);
+                UPDATE t1 SET f2 = LEFT(SHA2(RAND(), 256), 4);
         END WHILE;
 END|
 
