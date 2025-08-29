@@ -22,7 +22,7 @@ if (!$do_not_echo_parameters) {
   --exec echo "# $restart_parameters"
 }
 if ($do_not_echo_parameters) {
-  --echo "# restart"
+  --exec echo "# restart"
 }
 
 # A common bug in our tests was that people tried to call start_mysqld.inc
