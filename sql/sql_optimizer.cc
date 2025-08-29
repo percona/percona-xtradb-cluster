@@ -7060,11 +7060,12 @@ static uint get_semi_join_select_list_index(Item_field *item_field) {
   if (emb_sj_nest && emb_sj_nest->is_sj_or_aj_nest()) {
     const mem_root_deque<Item *> &items =
         emb_sj_nest->nested_join->sj_inner_exprs;
-    for (size_t i = 0; i < items.size(); i++) {
-      const Item *sel_item = items[i];
+    size_t i = 0;
+    for (auto sel_item : items) {
       if (sel_item->type() == Item::FIELD_ITEM &&
           down_cast<const Item_field *>(sel_item)->field->eq(item_field->field))
         return i;
+      i++;
     }
   }
   return UINT_MAX;
@@ -11630,8 +11631,15 @@ static double EstimateRowAccessesInItem(Item *item, double num_evaluations) {
       } else {
         path = subselect->unit->item->root_access_path();
       }
-      rows += EstimateRowAccesses(
-          path, query_block->is_cacheable() ? 1.0 : num_evaluations, kNoLimit);
+      // In some cases, for old optimizer, when subtitem is a
+      // Item_singlerow_subselect, its Query_expression::root_access_path has
+      // not been set, and Item_singlerow_subselect::root_access_path() always
+      // returns nullptr, so we need to check:
+      if (path != nullptr) {
+        rows += EstimateRowAccesses(
+            path, query_block->is_cacheable() ? 1.0 : num_evaluations,
+            kNoLimit);
+      }
     }
     return false;
   });

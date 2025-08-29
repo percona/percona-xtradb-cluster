@@ -24,7 +24,7 @@ function set_suites() {
   if [[ "$1" == "RelWithDebInfo" ]]; then
     echo "Setting WORKER_x_MTR_SUITES for BUILD_TYPE=RelWithDebInfo"
     # Unit tests will be executed by worker 1
-    WORKER_1_MTR_SUITES="innodb_undo,test_services,audit_null,service_sys_var_registration,connection_control,data_masking,binlog_57_decryption,service_udf_registration,service_status_var_registration,procfs,interactive_utilities,percona-pam-for-mysql"
+    WORKER_1_MTR_SUITES="innodb_undo,test_services,audit_null,service_sys_var_registration,connection_control,data_masking,binlog_57_decryption,service_udf_registration,service_status_var_registration,procfs,interactive_utilities,percona-pam-for-mysql,component_encryption_udf"
     WORKER_2_MTR_SUITES="galera_nbo,galera_3nodes,galera_sr,galera_3nodes_nbo,galera_3nodes_sr,galera_encryption,galera-x,wsrep"
     WORKER_3_MTR_SUITES="engines/funcs,innodb"
     WORKER_4_MTR_SUITES="main,rpl"
@@ -35,14 +35,14 @@ function set_suites() {
   else # Debug (and everything different from "RelWithDebInfo")
     echo "Setting WORKER_x_MTR_SUITES for BUILD_TYPE=Debug"
     # Unit tests will be executed by worker 1
-    WORKER_1_MTR_SUITES="innodb_undo,test_services,audit_null,service_sys_var_registration,connection_control,data_masking,binlog_57_decryption,service_udf_registration,service_status_var_registration,procfs,interactive_utilities,percona-pam-for-mysql"
+    WORKER_1_MTR_SUITES="innodb_undo,test_services,audit_null,service_sys_var_registration,connection_control,data_masking,binlog_57_decryption,service_udf_registration,service_status_var_registration,procfs,interactive_utilities,percona-pam-for-mysql,rpl|big,component_encryption_udf"
     WORKER_2_MTR_SUITES="galera_nbo,galera_3nodes,galera_sr,galera_3nodes_nbo,galera_3nodes_sr,galera_encryption,galera-x,wsrep"
-    WORKER_3_MTR_SUITES="engines/funcs,innodb"
-    WORKER_4_MTR_SUITES="main,rpl"
+    WORKER_3_MTR_SUITES="engines/funcs,innodb,clone"
+    WORKER_4_MTR_SUITES="main,rpl|nobig"
     WORKER_5_MTR_SUITES="rpl_nogtid,rpl_gtid,component_keyring_file,perfschema,binlog"
-    WORKER_6_MTR_SUITES="parts,group_replication,clone,innodb_gis"
-    WORKER_7_MTR_SUITES="stress,innodb_fts,sys_vars,innodb_zip,x,gcol,engines/iuds,encryption,federated,funcs_1,auth_sec,binlog_nogtid,binlog_gtid,funcs_2,jp,information_schema,rpl_encryption,sysschema,json,opt_trace,audit_log,audit_log_filter,collations,gis,query_rewrite_plugins,test_service_sql_api,secondary_engine,component_masking_functions"
-    WORKER_8_MTR_SUITES="galera"
+    WORKER_6_MTR_SUITES="parts,group_replication,innodb_gis"
+    WORKER_7_MTR_SUITES="galera|big,stress,innodb_fts,sys_vars,innodb_zip,x,gcol,engines/iuds,encryption,federated,funcs_1,auth_sec,binlog_nogtid,binlog_gtid,funcs_2,jp,information_schema,rpl_encryption,sysschema,json,opt_trace,audit_log,audit_log_filter,collations,gis,query_rewrite_plugins,test_service_sql_api,secondary_engine,component_masking_functions"
+    WORKER_8_MTR_SUITES="galera|nobig"
   fi
 }
 
