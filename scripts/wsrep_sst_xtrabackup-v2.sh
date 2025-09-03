@@ -2364,9 +2364,14 @@ then
         wsrep_log_info "Proceeding with SST........."
 
         wsrep_log_debug "Cleaning the existing datadir and innodb-data/log directories"
+
+        # Deduplicate directories before 'find'. This step is not absolutely necessary
+        # but in case some variables point to the same directory, we can avoid searching
+        # through the same directory multiple times.
+        dirs=$(printf "%s\n" "$ib_home_dir" "$ib_log_dir" "$ib_undo_dir" "$DATA" | sort -u)
         # Avoid emitting the find command output to log file. It just fill the
         # with ever increasing number of files and achieve nothing.
-        find $ib_home_dir $ib_log_dir $ib_undo_dir $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>/dev/null \+
+        find $dirs -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>/dev/null \+
 
         if [[ -z $transition_key ]]; then
             if [[ -r "${keyring_file_data}.backup" ]];
