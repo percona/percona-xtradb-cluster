@@ -3552,7 +3552,7 @@ static int com_help(String *buffer [[maybe_unused]],
       "\nFor information about Percona products and services, visit:\n"
       "   http://www.percona.com/\n"
       "Percona XtraDB Cluster manual: "
-      "http://www.percona.com/doc/percona-xtradb-cluster/8.0/\n"
+      "https://docs.percona.com/percona-xtradb-cluster/8.4/\n"
       "For the MySQL Reference Manual: http://dev.mysql.com/\n"
       "To buy Percona support, training, or other products, visit:\n"
       "   https://www.percona.com/\n",
