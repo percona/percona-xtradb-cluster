@@ -1,0 +1,16 @@
+!include ../galera_2nodes.cnf
+
+[mysqld]
+wsrep_sst_method=xtrabackup-v2
+wsrep_debug=1
+
+[mysqld.1]
+wsrep_provider_options='base_port=@mysqld.1.#galera_port;gcache.size=1;pc.ignore_sb=true'
+
+[mysqld.2]
+wsrep_provider_options='base_port=@mysqld.2.#galera_port;gcache.size=1;pc.ignore_sb=true'
+datadir=@ENV.MYSQL_TMP_DIR/n2/mysql_data_directory
+innodb_data_home_dir=@ENV.MYSQL_TMP_DIR/n2/mysql_data_directory
+innodb_log_group_home_dir=@ENV.MYSQL_TMP_DIR/n2/mysql_data_directory
+innodb_undo_directory=@ENV.MYSQL_TMP_DIR/n2/mysql_data_directory
+
