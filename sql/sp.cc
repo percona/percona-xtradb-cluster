@@ -987,9 +987,13 @@ err_with_rollback:
   @return Error code. SP_OK is returned on success. Other SP_ constants are
   used to indicate about errors.
 */
-
+#ifdef WITH_WSREP
+enum_sp_return_code sp_drop_routine(THD *thd, enum_sp_type type, sp_name *name,
+                                    bool drop_if_exists) {
+#else
 enum_sp_return_code sp_drop_routine(THD *thd, enum_sp_type type,
                                     sp_name *name) {
+#endif /* WITH_WSREP */
   DBUG_TRACE;
   DBUG_PRINT("enter",
              ("type: %d  name: %.*s", static_cast<int>(type),
@@ -1024,7 +1028,7 @@ enum_sp_return_code sp_drop_routine(THD *thd, enum_sp_type type,
 
 #ifdef WITH_WSREP
   if (routine == nullptr) {
-    if (thd->lex->drop_if_exists) {
+    if (drop_if_exists) {
       /* If 'IF EXISTS' clause is present, we replicate always.
          In such a case binlogging part is done on the caller level. */
       if (WSREP(thd) &&

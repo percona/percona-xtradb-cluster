@@ -5641,9 +5641,13 @@ int mysql_execute_command(THD *thd, bool first_level) {
         goto error;
 
       /* Conditionally writes to binlog */
+#ifdef WITH_WSREP
+      const enum_sp_return_code sp_result =
+          sp_drop_routine(thd, sp_type, lex->spname, lex->drop_if_exists);
+#else
       const enum_sp_return_code sp_result =
           sp_drop_routine(thd, sp_type, lex->spname);
-
+#endif /* WITH_WSREP */
 #ifdef WITH_WSREP
       if (remove_automatic_sp_privileges(
               thd, sp_type, sp_result == SP_DOES_NOT_EXISTS, db, name,

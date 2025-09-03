@@ -786,6 +786,7 @@ THD::THD(bool enable_plugins)
       wsrep_TOI_pre_query_len(0),
       wsrep_po_handle(WSREP_PO_INITIALIZER),
       wsrep_po_cnt(0),
+      wsrep_po_in_trans(false),
       wsrep_apply_format(0),
       wsrep_rbr_buf(NULL),
       wsrep_affected_rows(0),
