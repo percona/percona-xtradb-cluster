@@ -482,7 +482,7 @@ be eligible for hot fixes, and boost your team's productivity.
 This package contains the standard Percona XtraDB Cluster client and administration tools.
 
 For a description of Percona XtraDB Cluster see
-http://www.percona.com/software/percona-xtradb-cluster/
+https://www.percona.com/mysql/software/percona-xtradb-cluster/
 
 # ----------------------------------------------------------------------------
 %package -n percona-xtradb-cluster-test
@@ -508,7 +508,7 @@ be eligible for hot fixes, and boost your team's productivity.
 This package contains the Percona XtraDB Cluster regression test suite.
 
 For a description of Percona XtraDB Cluster see
-http://www.percona.com/software/percona-xtradb-cluster/
+https://www.percona.com/mysql/software/percona-xtradb-cluster/
 
 # ----------------------------------------------------------------------------
 %package -n percona-xtradb-cluster-devel
@@ -536,7 +536,7 @@ This package contains the development header files and libraries necessary
 to develop Percona XtraDB Cluster client applications.
 
 For a description of Percona XtraDB Cluster see
-http://www.percona.com/software/percona-xtradb-cluster/
+https://www.percona.com/mysql/software/percona-xtradb-cluster/
 
 # ----------------------------------------------------------------------------
 %package -n percona-xtradb-cluster-shared
