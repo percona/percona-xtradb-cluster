@@ -1285,9 +1285,9 @@ static int tokudb_backup_plugin_init(MY_ATTRIBUTE((__unused__)) void *p) {
         "migrate to another storage engine, set the tokudb_enabled and "
         "tokudb_backup_enabled options to TRUE in your my.cnf file and restart "
         "your server instance. Please see this blog post for more information "
-        "https://www.percona.com/blog/2021/05/21/"
+        "https://www.percona.com/blog/"
         "tokudb-support-changes-and-future-removal-from-percona-server-for-"
-        "mysql-8-0");
+        "mysql-8-0/");
     DBUG_RETURN(true);
   }
 

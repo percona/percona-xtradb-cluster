@@ -53,7 +53,7 @@ fi
 
 function print_tokudb_removal()
 {
-  printf "ERROR: As of Percona Server 8.0.28-19, the TokuDB storage engine and backup plugins have been completely removed and are no longer supported or distributed with Percona Server. Please see this blog post for more information https://www.percona.com/blog/2021/05/21/tokudb-support-changes-and-future-removal-from-percona-server-for-mysql-8-0\n"
+  printf "ERROR: As of Percona Server 8.0.28-19, the TokuDB storage engine and backup plugins have been completely removed and are no longer supported or distributed with Percona Server. Please see this blog post for more information https://www.percona.com/blog/tokudb-support-changes-and-future-removal-from-percona-server-for-mysql-8-0/\n"
 }
 
 for arg
