@@ -1,0 +1,34 @@
+#
+# During the State Transfer, SST script cleans up:
+# datadir
+# innodb_data_home_dir
+# innodb_log_group_home_dir
+# innodb_undo_directory
+# This is to test the case if all above variables are set explicitly in my.cnf
+# to the same value.
+# 
+--source include/galera_cluster.inc
+
+--disable_query_log
+--connection node_1
+CALL mtr.add_suppression("Failed to remove page file");
+--connection node_2
+CALL mtr.add_suppression("Failed to remove page file");
+--enable_query_log
+
+# Stop node_2
+--connection node_2
+--let $node_2_datadir=`SELECT @@datadir`
+--source include/shutdown_mysqld.inc
+
+# Wait for 1-node cluster
+--connection node_1
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+# Start node_2 with forced SST
+--remove_file $node_2_datadir/grastate.dat
+--connection node_2
+--source include/start_mysqld.inc
+--source include/wait_until_connected_again.inc
+
