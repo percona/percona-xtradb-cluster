@@ -93,7 +93,7 @@ GRANT ALL PRIVILEGES ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT
 -- Create the PXC SST role
 -- This role is used by the SST user during an SST (on the donor)
 -- These are the permissions needed to backup the database (using Percona XtraBackup)
--- See https://www.percona.com/doc/percona-xtrabackup/8.0/using_xtrabackup/privileges.html
+-- See https://docs.percona.com/percona-xtrabackup/8.4/privileges.html#privileges-needed
 CREATE ROLE 'mysql.pxc.sst.role'@localhost;
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'mysql.pxc.sst.role'@localhost;
 

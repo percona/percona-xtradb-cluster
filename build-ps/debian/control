@@ -40,7 +40,7 @@ Build-Depends: libtool (>= 1.4.2-7),
                libcurl4-openssl-dev,
                libldap2-dev
 Standards-Version: 7.0.0
-Homepage: http://www.percona.com/software/percona-xtradb-cluster/
+Homepage: https://www.percona.com/mysql/software/percona-xtradb-cluster/
 Vcs-Git: https://github.com/percona/percona-xtradb-cluster
 
 Package: libperconaserverclient22
