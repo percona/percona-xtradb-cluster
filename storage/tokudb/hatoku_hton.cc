@@ -247,9 +247,9 @@ static int tokudb_init_func(void *p) {
         "loose-tokudb_backup_enabled options to TRUE in your my.cnf file. "
         "Please see this blog post for more "
         "information "
-        "https://www.percona.com/blog/2021/05/21/"
+        "https://www.percona.com/blog/"
         "tokudb-support-changes-and-future-removal-from-percona-server-for-"
-        "mysql-8-0");
+        "mysql-8-0/");
     goto error;
   }
 

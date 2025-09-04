@@ -201,8 +201,8 @@ void print_fatal_signal(int sig) {
       "%s",
       "You may download the Percona XtraDB Cluster operations manual by "
       "visiting\n"
-      "http://www.percona.com/software/percona-xtradb-cluster/. You may find "
-      "information\n"
+      "https://www.percona.com/mysql/software/percona-xtradb-cluster/. You may "
+      "find information\n"
       "in the manual which will help you identify the cause of the crash.\n");
 
 #endif /* HAVE_STACKTRACE */
