@@ -112,6 +112,8 @@
 
 #include <openssl/rand.h>  // RAND_bytes
 #ifdef WITH_WSREP
+#include "sql/error_handler.h"
+#include "sql/raii/sentry.h"
 #include "sql/wsrep_trans_observer.h"
 #endif /* WITH_WSREP */
 
@@ -1295,13 +1297,21 @@ error:
   @retval 0 ok
   @retval 1 ERROR;
 */
-
+#ifdef WITH_WSREP
+bool set_and_validate_user_attributes(
+    THD *thd, LEX_USER *Str, acl_table::Pod_user_what_to_update &what_to_set,
+    bool is_privileged_user, bool is_role, Table_ref *history_table,
+    bool *history_check_done, const char *cmd,
+    Userhostpassword_list &generated_passwords, I_multi_factor_auth **i_mfa,
+    bool if_not_exists, bool verify_passwd_history) {
+#else
 bool set_and_validate_user_attributes(
     THD *thd, LEX_USER *Str, acl_table::Pod_user_what_to_update &what_to_set,
     bool is_privileged_user, bool is_role, Table_ref *history_table,
     bool *history_check_done, const char *cmd,
     Userhostpassword_list &generated_passwords, I_multi_factor_auth **i_mfa,
     bool if_not_exists) {
+#endif /* WITH_WSREP */
   bool user_exists = false;
   ACL_USER *acl_user;
   plugin_ref plugin = nullptr;
@@ -1768,6 +1778,16 @@ bool set_and_validate_user_attributes(
                              std::string(Str->host.str), gen_password, 1};
       generated_passwords.push_back(p);
     }
+#ifdef WITH_WSREP
+    if (auth->generate_authentication_string(outbuf, &buflen, inbuf,
+                                             inbuflen) ||
+        (verify_passwd_history &&
+         auth_verify_password_history(thd, &Str->user, &Str->host,
+                                      Str->alter_status.password_history_length,
+                                      Str->alter_status.password_reuse_interval,
+                                      auth, inbuf, inbuflen, outbuf, buflen,
+                                      history_table, what_to_set.m_what))) {
+#else
     if (auth->generate_authentication_string(outbuf, &buflen, inbuf,
                                              inbuflen) ||
         auth_verify_password_history(thd, &Str->user, &Str->host,
@@ -1775,6 +1795,8 @@ bool set_and_validate_user_attributes(
                                      Str->alter_status.password_reuse_interval,
                                      auth, inbuf, inbuflen, outbuf, buflen,
                                      history_table, what_to_set.m_what)) {
+
+#endif
       plugin_unlock(nullptr, plugin);
       what_to_set.m_what = NONE_ATTR;
       /*
@@ -1852,7 +1874,12 @@ bool set_and_validate_user_attributes(
       Covers replication scenario too since the IDENTIFIED BY will get
       rewritten to IDENTIFIED ... WITH ... AS
     */
+#ifdef WITH_WSREP
+    if (verify_passwd_history &&
+        auth_verify_password_history(
+#else
     if (auth_verify_password_history(
+#endif
             thd, &Str->user, &Str->host,
             Str->alter_status.password_history_length,
             Str->alter_status.password_reuse_interval, auth, nullptr, 0,
@@ -2144,7 +2171,7 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
     buff[query_length_max - 1] = 0;
     thd->set_query(buff, query_length);
 
-    if ((ret = open_grant_tables(thd, tables, &transactional_tables,
+    if ((ret = open_grant_tables(thd, tables, &transactional_tables, false,
                                  WSREP_MYSQL_DB, "user"))) {
       thd->set_query(query_save);
       return (ret != 1);
@@ -2864,6 +2891,116 @@ static bool check_orphaned_definers(THD *thd, List<LEX_USER> &list) {
   return false;
 }
 
+#ifdef WITH_WSREP
+static LEX_USER *deep_copy(THD *thd, LEX_USER *src) {
+  LEX_USER *dest = LEX_USER::alloc(thd);
+  assert(dest);
+  *dest = *src;
+  dest->user = LexStringDupRootUnlessEmpty(thd->mem_root, src->user);
+  dest->host = LexStringDupRootUnlessEmpty(thd->mem_root, src->host);
+  dest->current_auth =
+      LexStringDupRootUnlessEmpty(thd->mem_root, src->current_auth);
+  dest->first_factor_auth_info.auth = LexStringDupRootUnlessEmpty(
+      thd->mem_root, src->first_factor_auth_info.auth);
+  return dest;
+}
+
+/*
+ Q: Why for CREATE/ALTER USER we don't stop the execution and return with error
+ collected there but continue the normal flow and skip TOI?
+ A: TOI is replicated before local execution. On replica side the execution is
+ from wsrep_applier (root) context, so it will succeed. But locally it may fail
+ which will trigger inconsistency voting. That's why we need to check the
+ execution against authentication policy before TOI.
+
+ CREATE/ALTER USER, does several checks under MDL lock, in particular:
+ 1. check if auth plugin is installed. If not => ER_PLUGIN_IS_NOT_LOADED
+ 2. check if authentication_policy allows CREATE/ALTER. In this case the result
+ depends on grants of executing user. We may end up with
+ ER_AUTHENTICATION_POLICY_MISMATCH which is error or warning. In case of warning
+ we need to continue, in case of error - do not replicate.
+
+ Inconsistency voting is based on all collected warnings and errors (but is
+ triggered only if there are any errors).
+ If we collected everything we would end with:
+ 1. Source: ER_AUTHENTICATION_POLICY_MISMATCH (warning) +
+ ER_PLUGIN_IS_NOT_LOADED
+ 2. Replica ER_PLUGIN_IS_NOT_LOADED
+ This will trigger inconsistency voting on both sides, but with different errors
+ so node will be evicted which is not correct, because on Source
+ ER_AUTHENTICATION_POLICY_MISMATCH was only warning.
+
+ That's why here we are only detecting if we should replicate or not and
+ letting the rest of the flow do the job. Let's consider a few cases. In
+ original flow which follows the call of wsrep_check_for_auth_policy() the check
+ order is: plugin then policy check. We return on first error, continue on
+ warning.
+
+ 1. Source: ER_AUTHENTICATION_POLICY_MISMATCH warning here => TOI
+    Replica: No warnings, no errors
+    Inconsistency voting: not triggered
+ 2. Source: ER_AUTHENTICATION_POLICY_MISMATCH error here => no TOI, continue
+            flow, return with ER_AUTHENTICATION_POLICY_MISMATCH
+    Inconsistency voting: not triggered
+ 3. Source: ER_AUTHENTICATION_POLICY_MISMATCH warning here => do TOI then return
+            with ER_PLUGIN_IS_NOT_LOADED
+    Replica: error with ER_PLUGIN_IS_NOT_LOADED
+    Inconsistency voting: triggered for both sides with ER_PLUGIN_IS_NOT_LOADED
+ */
+static bool wsrep_check_for_auth_policy(THD *thd, List<LEX_USER> &list,
+                                        const char *cmd) {
+  if (WSREP(thd) && !thd->wsrep_applier && list.size() > 0) {
+    // Accessing ACL cache requires lock. We get WRITE_MODE lock since the call
+    // to is_privileged_user_for_credential_change() below, might have to update
+    // part of ACL cache with DB-level privileges while it it checks if user has
+    // UPDATE privilege on 'mysql' database.
+    Acl_cache_lock_guard acl_cache_lock(thd, Acl_cache_lock_mode::WRITE_MODE);
+
+    if (!acl_cache_lock.lock()) {
+      return true;
+    }
+
+    LEX_USER *user_from, *tmp_user_from;
+    List_iterator<LEX_USER> user_list(list);
+    Dummy_error_handler error_handler;
+    bool is_privileged_user = is_privileged_user_for_credential_change(thd);
+
+    thd->push_internal_handler(&error_handler);
+    raii::Sentry<> error_handler_pop_guard{
+        [thd]() -> void { thd->pop_internal_handler(); }};
+
+    while ((tmp_user_from = user_list++)) {
+      acl_table::Pod_user_what_to_update dummy_what_to_alter;
+      I_multi_factor_auth *dummy_mfa = nullptr;
+      Userhostpassword_list dummy_generated_passwords;
+
+      if (!(user_from = get_current_user(thd, tmp_user_from))) {
+        // let the original flow do the job
+        return false;
+      }
+
+      /* set_and_validate_user_attributes() will hash provided password and
+       wipe-out its plaintext version in
+       user_from_tmp.first_factor_auth_info.auth.str.
+       LEX_CSTRING holds just a pointer, so we need to do a deep copy of
+       LEX_USER for original flow to work properly. */
+      LEX_USER *user_from_tmp = deep_copy(thd, user_from);
+
+      /* Skip password verification. It would append keys to writeset, but TOI
+       is not started yet, so it is not allowed. We don't need it now. Original
+       flow will handle it */
+      if (set_and_validate_user_attributes(
+              thd, user_from_tmp, dummy_what_to_alter, is_privileged_user,
+              false, nullptr, nullptr, cmd, dummy_generated_passwords,
+              &dummy_mfa, false, false)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+#endif /* WITH_WSREP */
+
 /*
   Create a list of users.
 
@@ -2901,6 +3038,7 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
   if (wsrep_check_system_user_privilege(thd, list)) {
     return true;
   }
+  bool block_toi = wsrep_check_for_auth_policy(thd, list, "CREATE USER");
 #endif
 
   /*
@@ -2912,9 +3050,14 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
 
   /* CREATE USER may be skipped on replication client. */
+#ifdef WITH_WSREP
+  if ((result =
+           open_grant_tables(thd, tables, &transactional_tables, block_toi)))
+    return result != 1;
+#else
   if ((result = open_grant_tables(thd, tables, &transactional_tables)))
     return result != 1;
-
+#endif
   { /* Critical section */
     Acl_cache_lock_guard acl_cache_lock(thd, Acl_cache_lock_mode::WRITE_MODE);
 
@@ -3619,6 +3762,7 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
   if (wsrep_check_system_user_privilege(thd, list)) {
     return true;
   }
+  bool block_toi = wsrep_check_for_auth_policy(thd, list, "ALTER USER");
 #endif
 
   /*
@@ -3628,9 +3772,14 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
     values when we are out of this function scope
   */
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
+#ifdef WITH_WSREP
+  if ((result =
+           open_grant_tables(thd, tables, &transactional_tables, block_toi)))
+    return result != 1;
+#else
   if ((result = open_grant_tables(thd, tables, &transactional_tables)))
     return result != 1;
-
+#endif
   { /* Critical section */
     Acl_cache_lock_guard acl_cache_lock(thd, Acl_cache_lock_mode::WRITE_MODE);
 

@@ -98,6 +98,11 @@ static uint wsrep_errno_for_voting(uint err) {
   return err;
 }
 
+/* KH: We trigger inconsistency voting if there is an error (thd->is_error())
+ but then calculate a vote using errors and warnings. Is it OK?
+ Eg. It may happen that source node issues some warnings because of executing
+ user privileges, and then fail with error. On replica side it can fail without
+ preceding warnings as we execute with root privileges */
 void wsrep_store_error(const THD *const thd, wsrep::mutable_buffer &dst) {
   Diagnostics_area::Sql_condition_iterator it =
       thd->get_stmt_da()->sql_conditions();

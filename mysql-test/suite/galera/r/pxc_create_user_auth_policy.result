@@ -1,0 +1,16 @@
+CALL mtr.add_suppression("Error 'Plugin 'nonexistent_plugin' is not loaded' on query.");
+CALL mtr.add_suppression("Error 'Plugin 'nonexistent_plugin' is not loaded' on query.");
+CREATE USER 'testuser'@'%' IDENTIFIED BY 'pass';
+GRANT ALL ON *.* TO testuser;
+REVOKE AUTHENTICATION_POLICY_ADMIN ON *.*  FROM 'testuser';
+CREATE USER 'new_user_1'@'%' IDENTIFIED BY 'pass';
+CREATE USER 'new_user_2'@'%' IDENTIFIED BY 'pass', 'new_user_3'@'%' IDENTIFIED WITH mysql_native_password BY 'pass';
+ERROR HY000: 1 factor authentication method does not match against authentication policy. Please refer @@authentication_policy system variable.
+ALTER USER 'new_user_1'@'%' IDENTIFIED WITH mysql_native_password BY 'newpass';
+ERROR HY000: 1 factor authentication method does not match against authentication policy. Please refer @@authentication_policy system variable.
+CREATE USER 'new_user_4'@'%' IDENTIFIED WITH 'nonexistent_plugin' BY 'pass';
+ERROR HY000: Plugin 'nonexistent_plugin' is not loaded
+CREATE USER 'new_user_4'@'%' IDENTIFIED WITH 'nonexistent_plugin' BY 'pass';
+ERROR HY000: Plugin 'nonexistent_plugin' is not loaded
+DROP USER 'new_user_1'@'%';
+DROP USER 'testuser'@'%';
