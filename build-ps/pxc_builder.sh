@@ -315,8 +315,13 @@ install_deps() {
         yum install -y https://repo.percona.com/yum/percona-release-latest.noarch.rpm
         percona-release enable tools testing
         percona-release enable pxb-24 testing
-        if [ "x$RHEL" = "x8" -o "x$RHEL" = "x9" ]; then
-            yum -y install dnf-plugins-core epel-release
+        if [ "x$RHEL" = "x8" -o "x$RHEL" = "x9" -o "x${RHEL}" = "x10" ]; then
+            yum -y install dnf-plugins-core
+            if [ "x${RHEL}" = "x10" ]; then
+                dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm
+            else
+                yum -y install epel-release
+            fi
             yum config-manager --set-enabled powertools
 	    yum -y install git
             yum -y install python2-pip python36-devel
@@ -458,8 +463,9 @@ install_deps() {
         apt-get -y install libudev-dev
 
         if [ x"${DIST}" = xnoble ]; then
-            apt-get -y install gcc-11 g++-11
-            update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100 --slave /usr/bin/g++ g++ /usr/bin/g++-11
+            apt-get -y install gcc-13 g++-13
+            update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100 --slave /usr/bin/g++ g++ /usr/bin/g++-13
+            update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-13 100
         fi
 
         if [ x"${DIST}" = xfocal -o x"${DIST}" = xbullseye -o x"${DIST}" = xjammy -o x"${DIST}" = xbookworm -o x"${DIST}" = xnoble ]; then
