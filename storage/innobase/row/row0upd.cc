@@ -3409,9 +3409,8 @@ func_exit:
                                       row_upd_index_is_referenced(index),
                                       foreign, &mtr);
 #else
-    err =
-        row_upd_clust_rec_by_insert(flags, node, index, thr,
-                                    row_upd_index_is_referenced(index), &mtr);
+    err = row_upd_clust_rec_by_insert(flags, node, index, thr,
+                                      row_upd_index_is_referenced(index), &mtr);
 #endif /* WITH_WSREP */
 
     if (err != DB_SUCCESS) {
