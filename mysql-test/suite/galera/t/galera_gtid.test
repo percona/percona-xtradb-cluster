@@ -55,6 +55,16 @@ SET SESSION wsrep_sync_wait = 7;
 # --connection node_1
 # COMMIT;
 
+#
+# Test tagged gtid
+#
+--connection node_1
+SET @@session.GTID_NEXT='1ed6b5f2-9091-11ef-b382-13ba123de7b3:abc124:1';
+INSERT INTO t1 VALUES (100);
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM t1 WHERE f1 = 100
+--source include/wait_condition.inc
+
 
 # cleanup
 DROP TABLE t1;
