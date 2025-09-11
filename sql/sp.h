@@ -217,7 +217,12 @@ bool sp_create_routine(THD *thd, sp_head *sp, const LEX_USER *definer,
 bool sp_update_routine(THD *thd, enum_sp_type type, sp_name *name,
                        st_sp_chistics *chistics);
 
+#ifdef WITH_WSREP
+enum_sp_return_code sp_drop_routine(THD *thd, enum_sp_type type, sp_name *name,
+                                    bool drop_if_exists);
+#else
 enum_sp_return_code sp_drop_routine(THD *thd, enum_sp_type type, sp_name *name);
+#endif
 
 /**
   Structure that represents element in the set of stored routines

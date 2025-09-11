@@ -3,7 +3,7 @@ SELECT 1;
 1
 [connection node_2]
 "# restarting node2 (no SST)"
-# restart:<hidden args>
+# restart
 SET SESSION wsrep_sync_wait = 0;
 SELECT 1;
 1
@@ -12,7 +12,7 @@ include/assert_grep.inc [Could not find warnings about super-read-only]
 "# shutting down node2"
 SET SESSION wsrep_sync_wait = 0;
 "# restarting node2 (with SST)"
-# restart:<hidden args>
+# restart
 SET SESSION wsrep_sync_wait = 0;
 SELECT 1;
 1
@@ -25,7 +25,7 @@ SET SESSION wsrep_sync_wait = 0;
 [connection node_1]
 SET SESSION wsrep_sync_wait = 0;
 "# restarting node1 (bootstrapped with super-read-only)"
-# restart:<hidden args>
+# restart
 SET SESSION wsrep_sync_wait = 0;
 SELECT 1;
 1
@@ -33,7 +33,7 @@ SELECT 1;
 include/assert_grep.inc [Could not find warnings about super-read-only in the logs]
 [connection node_2]
 "# starting node2 (no SST)"
-# restart:<hidden args>
+# restart
 SET SESSION wsrep_sync_wait = 0;
 SELECT 1;
 1
@@ -44,7 +44,7 @@ include/assert_grep.inc [Could not find warnings about super-read-only in the jo
 "# shutting down node2"
 SET SESSION wsrep_sync_wait = 0;
 "# restarting node2 (with SST)"
-# restart:<hidden args>
+# restart
 SET SESSION wsrep_sync_wait = 0;
 SELECT 1;
 1
@@ -54,7 +54,7 @@ include/assert_grep.inc [Could not find warnings about super-read-only in the do
 "# restarting node1"
 [connection node_1]
 SET SESSION wsrep_sync_wait = 0;
-# restart:<hidden args>
+# restart
 "# restarting node2"
 [connection node_2]
-# restart:<hidden args>
+# restart

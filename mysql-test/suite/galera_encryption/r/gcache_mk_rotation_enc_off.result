@@ -1,8 +1,8 @@
 call mtr.add_suppression("Encryption header CRC mismatch");
-# restart:<hidden args>
+# restart
 CREATE TABLE t1(a INT PRIMARY KEY);
 INSERT INTO t1 VALUES (0);
-# restart:<hidden args>
+# restart
 INSERT INTO t1 VALUES (1);
 INSERT INTO t1 VALUES (2);
 ALTER INSTANCE ROTATE GCACHE MASTER KEY;

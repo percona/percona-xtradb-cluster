@@ -394,7 +394,7 @@ DROP USER user_localhost@localhost;
 DROP USER user_localhost_8_8_8_8@localhost;
 DROP USER user_localhost_8_8_8_8@8.8.8.8;
 DROP USER user_requires_ssl;
-# restart:<hidden args>
+# restart
 RUN SELECT CONNECTION_TYPE from performance_schema.threads where processlist_command='Query' and PROCESSLIST_ID=connection_id();
 CONNECTION_TYPE
 Socket
