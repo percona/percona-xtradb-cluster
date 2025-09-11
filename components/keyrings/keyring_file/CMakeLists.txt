@@ -85,7 +85,7 @@ MYSQL_ADD_COMPONENT(keyring_file
   MODULE_ONLY
 )
 
-DOWNGRADE_STRINGOP_WARNINGS(component_keyring_file)
+MY_TARGET_LINK_OPTIONS(component_keyring_file "${LINK_FLAG_NO_UNDEFINED}")
 
 IF(APPLE)
   SET_TARGET_PROPERTIES(component_keyring_file PROPERTIES
