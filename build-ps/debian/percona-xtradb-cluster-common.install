@@ -1,6 +1,21 @@
+# localized error msgs
+usr/share/mysql/*/errmsg.sys
+usr/share/mysql/messages_to_clients.txt
+usr/share/mysql/messages_to_error_log.txt
+usr/share/mysql/dictionary.txt
+# charsets
+usr/share/mysql/charsets/*.xml
+usr/share/mysql/charsets/README
 # configuration files
 debian/extra/conf.d  etc/mysql/
 debian/extra/my.cnf.fallback etc/mysql/
 #coredumper
 usr/include/coredumper/coredumper.h
 usr/lib/libcoredumper.a
+# other
+usr/share/mysql/audit_log_filter_linux_install.sql
+usr/share/mysql/install_rewriter.sql
+usr/share/mysql/uninstall_rewriter.sql
+usr/share/mysql/mysql.server
+usr/share/mysql/mysqld_multi.server
+usr/share/mysql/mysql-log-rotate

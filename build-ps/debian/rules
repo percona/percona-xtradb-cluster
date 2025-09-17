@@ -4,9 +4,9 @@
 	dh $@
 
 export DH_VERBOSE=1
-export CFLAGS=
-export CXXFLAGS=
-export CPPFLAGS=
+export CFLAGS=-Wno-error=free-nonheap-object
+export CXXFLAGS=-Wno-error=free-nonheap-object
+export CPPFLAGS=-Wno-error=free-nonheap-object
 
 PACKAGE=percona-xtradb-cluster
 PS_VERSION_EXTRA = $(shell echo "Percona XtraDB Cluster (GPL), $(DEBVERSION)")
@@ -104,6 +104,7 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 		-DWITH_LIBEVENT=bundled \
 		-DWITH_FIDO=bundled \
 		-DWITH_NUMA=ON \
+		-DWITH_LTO=ON \
 		-DWITH_PERCONA_TELEMETRY=ON \
 		-DWITH_EXTRA_CHARSETS=all ..
 endif
@@ -157,6 +158,7 @@ endif
 		-DWITH_LIBEVENT=bundled \
 		-DWITH_FIDO=bundled \
 		-DWITH_NUMA=ON \
+		-DWITH_LTO=ON \
 		-DWITH_PERCONA_TELEMETRY=ON \
 		-DWITH_EXTRA_CHARSETS=all ..
 
@@ -172,7 +174,8 @@ override_dh_auto_build:
 	--transform="s,^\./,percona-xtradb-cluster-8.0/,"
 
 ifeq ($(SKIP_DEBUG_BINARY),)
-	cd $(builddebug) && $(MAKE) -j$(NCPU)  VERBOSE=1
+	# limited to 4 due to WITH_LTO=ON
+	cd $(builddebug) && $(MAKE) -j4 VERBOSE=1
 endif
 
 	cd $(builddir) && $(MAKE) -j$(NCPU) VERBOSE=1
@@ -193,12 +196,14 @@ override_dh_auto_install:
 	(cd $(builddir)/$(galeradir) && cp libgalera_smm.so $(TMP)/)
 	(cd $(galeradir) && cp packages/rpm/README $(TMP)/)
 	mkdir -p $(TMP)/usr/bin/pxc_extra/
-	(cp -r pxb-9.2 $(TMP)/usr/bin/pxc_extra/)
-	(mv $(TMP)/usr/bin/pxc_extra/pxb-9.2/lib/xtrabackup/* $(TMP)/usr/bin/pxc_extra/pxb-9.2/lib/)
-	(rm -rf $(TMP)/usr/bin/pxc_extra/pxb-9.2/lib/xtrabackup)
-	(cp -r pxb-9.1 $(TMP)/usr/bin/pxc_extra/)
-	(mv $(TMP)/usr/bin/pxc_extra/pxb-9.1/lib/xtrabackup/* $(TMP)/usr/bin/pxc_extra/pxb-9.1/lib/)
-	(rm -rf $(TMP)/usr/bin/pxc_extra/pxb-9.1/lib/xtrabackup)
+ifeq ($(DISTRELEASE),noble)
+	(cp -r pxb-9.3 $(TMP)/usr/bin/pxc_extra/)
+	(mv $(TMP)/usr/bin/pxc_extra/pxb-9.3/lib/xtrabackup/* $(TMP)/usr/bin/pxc_extra/pxb-9.3/lib/)
+	(rm -rf $(TMP)/usr/bin/pxc_extra/pxb-9.3/lib/xtrabackup)
+	(cp -r pxb-9.4 $(TMP)/usr/bin/pxc_extra/)
+	(mv $(TMP)/usr/bin/pxc_extra/pxb-9.4/lib/xtrabackup/* $(TMP)/usr/bin/pxc_extra/pxb-9.4/lib/)
+	(rm -rf $(TMP)/usr/bin/pxc_extra/pxb-9.4/lib/xtrabackup)
+endif
 	(cp -r pxb-8.4 $(TMP)/usr/bin/pxc_extra/)
 	(mv $(TMP)/usr/bin/pxc_extra/pxb-8.4/lib/xtrabackup/* $(TMP)/usr/bin/pxc_extra/pxb-8.4/lib/)
 	(rm -rf $(TMP)/usr/bin/pxc_extra/pxb-8.4/lib/xtrabackup)
