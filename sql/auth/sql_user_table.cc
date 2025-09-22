@@ -2391,7 +2391,7 @@ static bool acl_tables_setup_for_write_and_acquire_mdl(THD *thd,
 
 #ifdef WITH_WSREP
 int open_grant_tables(THD *thd, Table_ref *tables, bool *transactional_tables,
-                      const char *db [[maybe_unused]],
+                      bool block_toi, const char *db [[maybe_unused]],
                       const char *table [[maybe_unused]]) {
 #else
 int open_grant_tables(THD *thd, Table_ref *tables, bool *transactional_tables) {
@@ -2450,7 +2450,8 @@ int open_grant_tables(THD *thd, Table_ref *tables, bool *transactional_tables) {
   bool skip_toi = (thd->lex->sql_command == SQLCOM_CREATE_SPFUNCTION ||
                    thd->lex->sql_command == SQLCOM_CREATE_PROCEDURE ||
                    thd->lex->sql_command == SQLCOM_DROP_FUNCTION ||
-                   thd->lex->sql_command == SQLCOM_DROP_PROCEDURE);
+                   thd->lex->sql_command == SQLCOM_DROP_PROCEDURE) ||
+                  block_toi;
   /*
     Perform the TOI after the replication filter check to avoid
     replicating commands that won't be applied locally (due to a filter).
