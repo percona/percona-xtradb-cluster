@@ -217,7 +217,7 @@ int replace_routine_table(THD *thd, GRANT_NAME *grant_name, TABLE *table,
                           bool all_current_privileges);
 #ifdef WITH_WSREP
 int open_grant_tables(THD *thd, Table_ref *tables, bool *transactional_tables,
-                      const char *db = WSREP_MYSQL_DB,
+                      bool block_toi = false, const char *db = WSREP_MYSQL_DB,
                       const char *table = nullptr);
 #else
 int open_grant_tables(THD *thd, Table_ref *tables, bool *transactional_tables);
@@ -324,11 +324,20 @@ Auth_id_ref create_authid_from(const LEX_CSTRING &user,
                                const LEX_CSTRING &host);
 bool roles_rename_authid(THD *thd, TABLE *edge_table, TABLE *defaults_table,
                          LEX_USER *user_from, LEX_USER *user_to);
+#ifdef WITH_WSREP
+bool set_and_validate_user_attributes(
+    THD *thd, LEX_USER *Str, acl_table::Pod_user_what_to_update &what_to_set,
+    bool is_privileged_user, bool is_role, Table_ref *history_table,
+    bool *history_check_done, const char *cmd, Userhostpassword_list &,
+    I_multi_factor_auth **mfa = nullptr, bool if_not_exists = false,
+    bool verify_passwd_history = true);
+#else
 bool set_and_validate_user_attributes(
     THD *thd, LEX_USER *Str, acl_table::Pod_user_what_to_update &what_to_set,
     bool is_privileged_user, bool is_role, Table_ref *history_table,
     bool *history_check_done, const char *cmd, Userhostpassword_list &,
     I_multi_factor_auth **mfa = nullptr, bool if_not_exists = false);
+#endif /* WITH_WSREP */
 typedef std::pair<std::string, bool> Grant_privilege;
 typedef std::unordered_multimap<Role_id, Grant_privilege, role_id_hash>
     User_to_dynamic_privileges_map;
