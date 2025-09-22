@@ -8,4 +8,6 @@ UPDATE t1 SET f1 = 2;
 SET SESSION wsrep_sync_wait = 7;
 gtid_executed_equal
 1
+SET @@session.GTID_NEXT='1ed6b5f2-9091-11ef-b382-13ba123de7b3:abc124:1';
+INSERT INTO t1 VALUES (100);
 DROP TABLE t1;

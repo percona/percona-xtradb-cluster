@@ -154,6 +154,7 @@ int wsrep_apply_events(THD *thd, Relay_log_info *rli __attribute__((unused)),
         continue;
       /* If gtid_mode=OFF then async master-slave will generate ANONYMOUS GTID.
        */
+      case mysql::binlog::event::GTID_TAGGED_LOG_EVENT:
       case mysql::binlog::event::GTID_LOG_EVENT:
       case mysql::binlog::event::ANONYMOUS_GTID_LOG_EVENT: {
         Gtid_log_event *gev = (Gtid_log_event *)ev;
