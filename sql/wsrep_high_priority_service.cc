@@ -79,7 +79,9 @@ static Relay_log_info *wsrep_relay_log_init(const char *) {
     WSREP_ERROR("Failed to create Relay-Log for wsrep thread, aborting");
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
-  rli->set_rli_description_event(new Format_description_log_event());
+  auto ev = new Format_description_log_event();
+  ev->footer()->checksum_alg = mysql::binlog::event::BINLOG_CHECKSUM_ALG_OFF;
+  rli->set_rli_description_event(ev);
 
   rli->current_mts_submode = new Mts_submode_wsrep();
   return (rli);
