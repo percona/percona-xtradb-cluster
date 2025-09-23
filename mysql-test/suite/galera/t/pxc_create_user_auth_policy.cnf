@@ -1,0 +1,7 @@
+!include ../galera_2nodes.cnf
+
+[mysqld.1]
+authentication_policy=caching_sha2_password,,
+
+[mysqld.2]
+authentication_policy=caching_sha2_password,,
