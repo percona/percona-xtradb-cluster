@@ -1,0 +1,56 @@
+#
+# Test that CREATE/ALTER USER statement that fails on source node
+# is not replicated.
+# If it was replicated, it would be executed from wsrep_applier thread context
+# on replica node. It would not fail there, because wsrep_applier works in root
+# user context. As the result, inconsistency voting protocol would detect
+# inconsistency between nodes and evict one node.
+#
+
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+--connection node_1
+CALL mtr.add_suppression("Error 'Plugin 'nonexistent_plugin' is not loaded' on query.");
+--connection node_2
+CALL mtr.add_suppression("Error 'Plugin 'nonexistent_plugin' is not loaded' on query.");
+
+# Create the user we will use during the test
+CREATE USER 'testuser'@'%' IDENTIFIED BY 'pass';
+GRANT ALL ON *.* TO testuser;
+
+# revoke AUTHENTICATION_POLICY_ADMIN, so CREATE/ALTER USER that mismatch
+# authentication_policy will cause error (not only warning)
+REVOKE AUTHENTICATION_POLICY_ADMIN ON *.*  FROM 'testuser';
+
+# Create the user we will try to ALTER
+CREATE USER 'new_user_1'@'%' IDENTIFIED BY 'pass';
+
+--connect(con_node_1_testuser, localhost, testuser, pass,,$NODE_MYPORT_1) 
+
+# Because of authentication_policy=caching_sha2_password,,
+# creation of new_user_3 is not allowed, so the following statement is expected
+# to fail
+--error ER_AUTHENTICATION_POLICY_MISMATCH
+CREATE USER 'new_user_2'@'%' IDENTIFIED BY 'pass', 'new_user_3'@'%' IDENTIFIED WITH mysql_native_password BY 'pass';
+
+# Because of authentication_policy=caching_sha2_password,,
+# altering new_user_1 to use mysql_native_password is expected to fail
+--error ER_AUTHENTICATION_POLICY_MISMATCH
+ALTER USER 'new_user_1'@'%' IDENTIFIED WITH mysql_native_password BY 'newpass';
+
+#
+# Try with nonexistent auth plugin
+#
+--error ER_PLUGIN_IS_NOT_LOADED
+CREATE USER 'new_user_4'@'%' IDENTIFIED WITH 'nonexistent_plugin' BY 'pass';
+--connection node_1
+--error ER_PLUGIN_IS_NOT_LOADED
+CREATE USER 'new_user_4'@'%' IDENTIFIED WITH 'nonexistent_plugin' BY 'pass';
+
+# cleanup
+--disconnect con_node_1_testuser
+--connection node_1
+DROP USER 'new_user_1'@'%';
+DROP USER 'testuser'@'%';
+--source include/wait_until_count_sessions.inc
