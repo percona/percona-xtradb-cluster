@@ -512,8 +512,8 @@ install_deps() {
         apt-get -y install libtool libnuma-dev scons libboost-dev libboost-program-options-dev check
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
-        apt-get -y install --download-only percona-xtrabackup-80=8.0.35-31-1.${DIST}
-        apt-get -y install --download-only percona-xtrabackup-84=8.4.0-1-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-80=8.0.35-34-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-84=8.4.0-4-1.${DIST}
     fi
     return;
 }
