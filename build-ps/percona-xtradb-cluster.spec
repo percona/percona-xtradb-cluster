@@ -301,7 +301,7 @@ Prefix: %{_sysconfdir}
 %global compatver             5.6.28
 %global percona_compatver     25.14
 %global compatlib             18
-%global compatsrc             https://www.percona.com/downloads/Percona-XtraDB-Cluster-56/Percona-XtraDB-Cluster-%{compatver}-%{percona_compatver}/binary/redhat/6/x86_64/Percona-XtraDB-Cluster-shared-56-%{compatver}-%{percona_compatver}.1.el6.x86_64.rpm
+%global compatsrc             https://downloads.percona.com/downloads/Percona-XtraDB-Cluster-56/Percona-XtraDB-Cluster-%{compatver}-%{percona_compatver}/binary/redhat/6/x86_64/Percona-XtraDB-Cluster-shared-56-%{compatver}-%{percona_compatver}.1.el6.x86_64.rpm
 %endif
 
 
@@ -329,7 +329,7 @@ Release:        %{release}
 
 Distribution:   %{distro_description}
 License:        Copyright (c) 2000, 2010, %{mysql_vendor}.  All rights reserved.  Use is subject to license terms. Under the GNU General Public License (http://www.gnu.org/licenses/).
-Source:         http://www.percona.com/redir/downloads/Percona-XtraDB-Cluster/LATEST/source/%{src_dir}.tar.gz
+Source:         http://downloads.percona.com/redir/downloads/Percona-XtraDB-Cluster/LATEST/source/%{src_dir}.tar.gz
 Source999:      call-home.sh
 URL:            http://www.percona.com/
 Packager:       Percona MySQL Development Team <mysqldev@percona.com>
@@ -648,6 +648,11 @@ This package contains ICU data files needer by MySQL regular expressions.
 ##############################################################################
 %prep
 %setup -n %{src_dir}
+%if 0%{?rhel} == 9 || 0%{?rhel} == 10
+# Ensure getpid is declared
+grep -q unistd.h extra/coredumper/src/thread_lister.c || \
+    sed -i '1i #include <unistd.h>' extra/coredumper/src/thread_lister.c
+%endif
 ##############################################################################
 %build
 
@@ -666,11 +671,11 @@ RPM_OPT_FLAGS=$(echo ${RPM_OPT_FLAGS} | sed -e 's|-march=i386|-march=i686|g')
 export PATH=${MYSQL_BUILD_PATH:-$PATH}
 export CC=${MYSQL_BUILD_CC:-${CC:-gcc}}
 export CXX=${MYSQL_BUILD_CXX:-${CXX:-g++}}
-export CFLAGS=${MYSQL_BUILD_CFLAGS:-${CFLAGS:-$RPM_OPT_FLAGS}}
-export CXXFLAGS=${MYSQL_BUILD_CXXFLAGS:-${CXXFLAGS:-$RPM_OPT_FLAGS -felide-constructors}}
+export CFLAGS=${MYSQL_BUILD_CFLAGS:-${CFLAGS:-$RPM_OPT_FLAGS -Wno-error=free-nonheap-object}}
+export CXXFLAGS=${MYSQL_BUILD_CXXFLAGS:-${CXXFLAGS:-$RPM_OPT_FLAGS -felide-constructors -Wno-error=free-nonheap-object}}
 export LDFLAGS=${MYSQL_BUILD_LDFLAGS:-${LDFLAGS:-}}
 
-%if 0%{?rhel} == 8 || 0%{?rhel} == 9
+%if 0%{?rhel} == 8 || 0%{?rhel} == 9 || 0%{?rhel} == 10
 export CMAKE=${MYSQL_BUILD_CMAKE:-${CMAKE:-/usr/bin/cmake}}
 %else
 export CMAKE=${MYSQL_BUILD_CMAKE:-${CMAKE:-/usr/bin/cmake3}}
@@ -739,7 +744,9 @@ mkdir debug
             sed -e 's/ -unroll2 / /' \
 %if 0%{?rhel} < 9
                 -e 's/ -O[0-9]* / /' \
-                -e 's/-Wp,-D_FORTIFY_SOURCE=2/ -Wno-missing-field-initializers -Wno-error /' \
+                -e 's/-Wp,-D_FORTIFY_SOURCE=2/ -Wno-missing-field-initializers -Wno-error/' \
+%else
+                -e 's/-D_FORTIFY_SOURCE=3/-D_FORTIFY_SOURCE=3 -Wno-error=stringop-overread -Wno-error=stringop-overflow -Wno-error=free-nonheap-object -Wno-error=stringop-truncation -Wno-error=maybe-uninitialized -Wno-error=odr/' \
 %endif
                 -e 's/ -ip / /' \
                 -e 's/^ //' \
@@ -748,9 +755,9 @@ mkdir debug
             sed -e 's/ -unroll2 / /' \
 %if 0%{?rhel} < 9
                 -e 's/ -O[0-9]* / /' \
-                -e 's/-Wp,-D_FORTIFY_SOURCE=2/ -Wno-missing-field-initializers -Wno-error /' \
+                -e 's/-Wp,-D_FORTIFY_SOURCE=2/ -Wno-missing-field-initializers -Wno-error/' \
 %else
-                -e 's/-D_FORTIFY_SOURCE=2/-D_FORTIFY_SOURCE=2 -Wno-error=stringop-truncation -Wno-error=maybe-uninitialized -Wno-error=odr/' \
+                -e 's/-D_FORTIFY_SOURCE=3/-D_FORTIFY_SOURCE=3 -Wno-error=stringop-overread -Wno-error=stringop-overflow -Wno-error=free-nonheap-object -Wno-error=stringop-truncation -Wno-error=maybe-uninitialized -Wno-error=odr/' \
 %endif
                 -e 's/ -ip / /' \
                 -e 's/^ //' \
@@ -761,6 +768,8 @@ mkdir debug
            -DDOWNLOAD_BOOST=1 -DWITH_BOOST=build-ps/boost \
            -DWITH_PACKAGE_FLAGS=OFF \
            -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=%{_prefix} \
+           -DCMAKE_C_FLAGS="$CFLAGS" \
+           -DCMAKE_CXX_FLAGS="$CXXFLAGS" \
            -DWITH_EMBEDDED_SERVER=OFF \
            -DWITH_INNODB_MEMCACHED=ON \
            -DUSE_LD_LLD=0 \
@@ -795,8 +804,8 @@ mkdir debug
            -DWITH_UNIT_TESTS=0 \
            -DWITH_SCALABILITY_METRICS=ON \
            -DMYSQL_SERVER_SUFFIX=".%{rel}" \
-%if 0%{?enable_fipsmode}
-           -DPROBUILD=1 \
+%if 0%{?rhel} > 8
+           -DWITH_LTO=ON \
 %endif
            %{?mecab_option} \
            -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_ON} %{ROCKSDB_FLAGS}
@@ -813,6 +822,8 @@ mkdir release
            -DWITH_PACKAGE_FLAGS=OFF \
            -DCMAKE_BUILD_TYPE=RelWithDebInfo  -DCMAKE_INSTALL_PREFIX=%{_prefix} \
            -DMINIMAL_RELWITHDEBINFO=OFF \
+           -DCMAKE_C_FLAGS="$CFLAGS" \
+           -DCMAKE_CXX_FLAGS="$CXXFLAGS" \
            -DWITH_EMBEDDED_SERVER=OFF \
            -DWITH_INNODB_MEMCACHED=ON \
            -DUSE_LD_LLD=0 \
@@ -846,8 +857,8 @@ mkdir release
 %endif
            -DWITH_UNIT_TESTS=0 \
            -DWITH_SCALABILITY_METRICS=ON \
-%if 0%{?enable_fipsmode}
-           -DPROBUILD=1 \
+%if 0%{?rhel} > 8
+           -DWITH_LTO=ON \
 %endif
            %{?mecab_option} \
            -DMYSQL_SERVER_SUFFIX=".%{rel}" \
@@ -1763,6 +1774,41 @@ fi
 %config(noreplace) %{_sysconfdir}/my.cnf
 %dir %{_sysconfdir}/my.cnf.d
 
+%attr(644, root, root) %{_datadir}/percona-xtradb-cluster/audit_log_filter_linux_install.sql
+%attr(644, root, root) %{_datadir}/percona-xtradb-cluster/dictionary.txt
+%attr(644, root, root) %{_datadir}/percona-xtradb-cluster/messages_to_clients.txt
+%attr(644, root, root) %{_datadir}/percona-xtradb-cluster/messages_to_error_log.txt
+%attr(644, root, root) %{_datadir}/percona-xtradb-cluster/mysql-log-rotate
+%attr(644, root, root) %{_datadir}/percona-xtradb-cluster/mysql.server
+%attr(644, root, root) %{_datadir}/percona-xtradb-cluster/mysqld_multi.server
+%attr(644, root, root) %{_datadir}/percona-xtradb-cluster/install_rewriter.sql
+%attr(644, root, root) %{_datadir}/percona-xtradb-cluster/uninstall_rewriter.sql
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/charsets/
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/bulgarian/
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/czech/
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/danish/
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/dutch/
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/english/
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/estonian/
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/french/
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/german/
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/greek/
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/hungarian/
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/italian/
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/japanese/
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/korean/
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/norwegian-ny/
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/norwegian/
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/polish/
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/portuguese/
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/romanian/
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/russian/
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/serbian/
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/slovak/
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/spanish/
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/swedish/
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/ukrainian/
+
 %dir %attr(755, root, root) %{_datadir}/percona-xtradb-cluster/selinux
 %attr(644, root, root) %{_datadir}/percona-xtradb-cluster/selinux/percona-xtradb-cluster.pp
 %attr(644, root, root) %{_datadir}/percona-xtradb-cluster/selinux/wsrep-sst-xtrabackup-v2.pp
@@ -1945,7 +1991,7 @@ rm -rf %{pxc_telemetry}
 
 %files -n percona-xtradb-cluster-mysql-router
 %defattr(-, root, root, -)
-%doc $RPM_BUILD_DIR/%{src_dir}/router/README.router  $RPM_BUILD_DIR/%{src_dir}/router/LICENSE.router
+%doc router/README.router  router/LICENSE.router
 %dir %{_sysconfdir}/mysqlrouter
 %config(noreplace) %{_sysconfdir}/mysqlrouter/mysqlrouter.conf
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/logrotate.d/mysqlrouter
@@ -1991,9 +2037,9 @@ rm -rf %{pxc_telemetry}
 %files -n percona-xtradb-cluster-icu-data-files
 %defattr(-, root, root, -)
 %doc %{?license_files_server}
-%dir %attr(755, root, root) %{_libdir}/mysql/private/icudt73l
-%{_libdir}/mysql/private/icudt73l/*.icu
-%{_libdir}/mysql/private/icudt73l/brkitr
+%dir %attr(755, root, root) %{_libdir}/mysql/private/icudt77l
+%{_libdir}/mysql/private/icudt77l/*.icu
+%{_libdir}/mysql/private/icudt77l/brkitr
 
 
 ##############################################################################

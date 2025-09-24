@@ -5,9 +5,9 @@
 
 export DH_VERBOSE=1
 export FIPSFLAGS=
-export CFLAGS=
-export CXXFLAGS=
-export CPPFLAGS=
+export CFLAGS=-Wno-error=free-nonheap-object
+export CXXFLAGS=-Wno-error=free-nonheap-object
+export CPPFLAGS=-Wno-error=free-nonheap-object
 
 PACKAGE=percona-xtradb-cluster
 PS_VERSION_EXTRA = $(shell echo "Percona XtraDB Cluster (GPL), $(DEBVERSION)")
@@ -48,6 +48,15 @@ EXPORTED_SOURCE_TARBALL = debian/percona-xtradb-cluster-source-8.0.tar.gz
 
 DISTRIBUTION = $(shell lsb_release -i -s)
 DISTRELEASE = $(shell lsb_release -c -s)
+
+# Disable LTO only for focal and bullseye
+ifeq ($(DISTRELEASE),focal)
+	LTO_FLAG = -DWITH_LTO=OFF
+else ifeq ($(DISTRELEASE),bullseye)
+	LTO_FLAG = -DWITH_LTO=OFF
+else
+	LTO_FLAG = -DWITH_LTO=ON
+endif
 
 MYSQL_SRC = $(shell pwd)
 
@@ -110,7 +119,8 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 		-DWITH_LIBEVENT=bundled \
 		-DWITH_FIDO=bundled \
 		-DWITH_NUMA=ON \
-		-DWITH_PERCONA_TELEMETRY=ON $(FIPSFLAGS)\
+		-DWITH_PERCONA_TELEMETRY=ON \
+		$(LTO_FLAG) \
 		-DWITH_EXTRA_CHARSETS=all ..
 endif
 
@@ -163,7 +173,8 @@ endif
 		-DWITH_LIBEVENT=bundled \
 		-DWITH_FIDO=bundled \
 		-DWITH_NUMA=ON \
-		-DWITH_PERCONA_TELEMETRY=ON $(FIPSFLAGS)\
+		-DWITH_PERCONA_TELEMETRY=ON \
+		$(LTO_FLAG) \
 		-DWITH_EXTRA_CHARSETS=all ..
 
 #	cd $(galeradir) &&  scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) psi=1 libgalera_smm.so $(SCONS_ARGS) && scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) garb/garbd $(SCONS_ARGS)
@@ -178,7 +189,8 @@ override_dh_auto_build:
 	--transform="s,^\./,percona-xtradb-cluster-8.0/,"
 
 ifeq ($(SKIP_DEBUG_BINARY),)
-	cd $(builddebug) && $(MAKE) -j$(NCPU)  VERBOSE=1
+	# limited to 4 due to WITH_LTO=ON
+	cd $(builddebug) && $(MAKE) -j4 VERBOSE=1
 endif
 
 	cd $(builddir) && $(MAKE) -j$(NCPU) VERBOSE=1
