@@ -1,8 +1,4 @@
-SET @@global.keyring_vault_config='MYSQLTEST_VARDIR/keyring_vault1.conf';
-ERROR HY000: Unknown system variable 'keyring_vault_config'
-INSTALL PLUGIN keyring_vault SONAME 'keyring_vault.so';
-Warnings:
-Warning	42000	keyring_vault initialization failure. Please check the server log.
+# restart:<hidden args>
 SET @@global.keyring_vault_config='MYSQLTEST_VARDIR/keyring_vault2.conf';
 SET @@global.keyring_vault_config='MYSQLTEST_VARDIR/keyring_vault1.conf';
 CREATE TABLE t1(c1 INT, c2 char(20)) ENCRYPTION="Y" ENGINE=InnoDB;

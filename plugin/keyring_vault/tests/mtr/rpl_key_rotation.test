@@ -43,14 +43,34 @@ call mtr.add_suppression("for being a mount point successful - identified kv-v2 
 --enable_query_log
 
 --connection slave
---replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
-eval SET @@global.keyring_vault_config='$conf_file2';
+--let $rpl_server_number= 2
+--source include/rpl_stop_server.inc
+
+--connection master
+--let $rpl_server_number= 1
+--source include/rpl_stop_server.inc
 
 --connection master
 --echo [On Master]
---replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
-eval SET @@global.keyring_vault_config='$conf_file1';
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR $KEYRING_PLUGIN keyring_vault.so $KEYRING_VAULT_PLUGIN_OPT KEYRING_VAULT_PLUGIN_OPT
+--let $rpl_server_parameters= $KEYRING_VAULT_PLUGIN_LOAD $KEYRING_VAULT_PLUGIN_OPT --keyring_vault_config=$conf_file1
+--let $rpl_server_number= 1
+--let $rpl_omit_print_server_parameters= 1
+--source include/rpl_start_server.inc
 
+--connection slave
+--echo [On Slave]
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR $KEYRING_PLUGIN keyring_vault.so $KEYRING_VAULT_PLUGIN_OPT KEYRING_VAULT_PLUGIN_OPT
+--let $rpl_server_parameters= $KEYRING_VAULT_PLUGIN_LOAD $KEYRING_VAULT_PLUGIN_OPT --keyring_vault_config=$conf_file2 --master-retry-count=60
+--let $rpl_server_number= 2
+--let $rpl_omit_print_server_parameters= 1
+--source include/rpl_start_server.inc
+--source include/start_slave.inc
+
+--let $rpl_omit_print_server_parameters= 0
+--let $rpl_server_parameters=
+
+--connection master
 CHANGE REPLICATION SOURCE TO SOURCE_CONNECT_RETRY = 100;
 
 --echo
@@ -151,6 +171,7 @@ UNINSTALL PLUGIN keyring_vault;
 --source include/rpl_restart_server.inc
 
 --connection master
+--error ER_UNKNOWN_SYSTEM_VARIABLE
 SELECT @@global.keyring_vault_config;
 --source include/sync_slave_sql_with_master.inc
 
@@ -163,6 +184,7 @@ UNINSTALL PLUGIN keyring_vault;
 
 --connection slave
 START REPLICA;
+--error ER_UNKNOWN_SYSTEM_VARIABLE
 SELECT @@global.keyring_vault_config;
 
 --connection master
