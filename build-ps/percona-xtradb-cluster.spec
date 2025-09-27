@@ -906,7 +906,7 @@ mv $RBR%{_libdir} $RPM_BUILD_DIR/%{_libdir}
 ##############################################################################
 %install
 
-%if 0%{?rhel} == 9
+%if 0%{?rhel} > 8
     sed -i 's/python2$/python3/' scripts/pyclustercheck.py.in
 %endif
 
