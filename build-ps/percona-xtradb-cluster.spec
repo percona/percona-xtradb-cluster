@@ -400,7 +400,7 @@ Requires:	      percona-telemetry-agent
 Requires(pre):        policycoreutils
 Requires(post):       policycoreutils
 Requires(postun):     policycoreutils
-%if 0%{?rhel} == 8 || 0%{?rhel} == 9
+%if 0%{?rhel} == 8 || 0%{?rhel} == 9 || 0%{?rhel} == 10
 Requires:             policycoreutils-python-utils
 Requires(pre):        policycoreutils-python-utils
 Requires(post):       policycoreutils-python-utils
@@ -435,7 +435,7 @@ Requires(preun):  /sbin/chkconfig
 Requires(preun):  /sbin/service
 %endif
 Provides:       mysql-server MySQL-server
-%if 0%{?rhel} == 8 || 0%{?rhel} == 9
+%if 0%{?rhel} == 8 || 0%{?rhel} == 9 || 0%{?rhel} == 10
 Obsoletes:      mariadb-connector-c-config
 %endif
 Conflicts:      Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56 Percona-Server-server-57
