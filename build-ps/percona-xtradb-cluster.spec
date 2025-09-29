@@ -43,9 +43,6 @@ Prefix: %{_sysconfdir}
 %define revision @@REVISION@@
 %define distribution  rhel%{redhatversion}  
 
-# By default a build will be done in normal mode
-%{?enable_fipsmode: %global enable_fipsmode 1}
-
 %if 0%{?rhel} >= 8
 %global pxc_telemetry          /usr/local/percona/telemetry/pxc
 %endif
@@ -169,18 +166,10 @@ Prefix: %{_sysconfdir}
 %endif
 
 %if %{undefined compilation_comment_debug}
-%if 0%{?enable_fipsmode}
-    %define compilation_comment_debug       Percona XtraDB Cluster Pro - Debug (GPL), Release rel%{percona_server_version}, Revision %{revision}, WSREP version %{wsrep_version}
-%else
-    %define compilation_comment_debug       Percona XtraDB Cluster - Debug (GPL), Release rel%{percona_server_version}, Revision %{revision}, WSREP version %{wsrep_version}
-%endif
+%define compilation_comment_debug       Percona XtraDB Cluster - Debug (GPL), Release rel%{percona_server_version}, Revision %{revision}, WSREP version %{wsrep_version}
 %endif
 %if %{undefined compilation_comment_release}
-%if 0%{?enable_fipsmode}
-    %define compilation_comment_release     Percona XtraDB Cluster Pro (GPL), Release rel%{percona_server_version}, Revision %{revision}, WSREP version %{wsrep_version}
-%else
-    %define compilation_comment_release     Percona XtraDB Cluster (GPL), Release rel%{percona_server_version}, Revision %{revision}, WSREP version %{wsrep_version}
-%endif
+%define compilation_comment_release     Percona XtraDB Cluster (GPL), Release rel%{percona_server_version}, Revision %{revision}, WSREP version %{wsrep_version}
 %endif
 
 #%define server_suffix -80
@@ -300,7 +289,7 @@ Prefix: %{_sysconfdir}
 %global compatver             5.6.28
 %global percona_compatver     25.14
 %global compatlib             18
-%global compatsrc             https://www.percona.com/downloads/Percona-XtraDB-Cluster-56/Percona-XtraDB-Cluster-%{compatver}-%{percona_compatver}/binary/redhat/6/x86_64/Percona-XtraDB-Cluster-shared-56-%{compatver}-%{percona_compatver}.1.el6.x86_64.rpm
+%global compatsrc             https://downloads.percona.com/downloads/Percona-XtraDB-Cluster-56/Percona-XtraDB-Cluster-%{compatver}-%{percona_compatver}/binary/redhat/6/x86_64/Percona-XtraDB-Cluster-shared-56-%{compatver}-%{percona_compatver}.1.el6.x86_64.rpm
 %endif
 
 
@@ -661,8 +650,8 @@ RPM_OPT_FLAGS=$(echo ${RPM_OPT_FLAGS} | sed -e 's|-march=i386|-march=i686|g')
 export PATH=${MYSQL_BUILD_PATH:-$PATH}
 export CC=${MYSQL_BUILD_CC:-${CC:-gcc}}
 export CXX=${MYSQL_BUILD_CXX:-${CXX:-g++}}
-export CFLAGS=${MYSQL_BUILD_CFLAGS:-${CFLAGS:-$RPM_OPT_FLAGS}}
-export CXXFLAGS=${MYSQL_BUILD_CXXFLAGS:-${CXXFLAGS:-$RPM_OPT_FLAGS -felide-constructors}}
+export CFLAGS=${MYSQL_BUILD_CFLAGS:-${CFLAGS:-$RPM_OPT_FLAGS -Wno-error=free-nonheap-object}}
+export CXXFLAGS=${MYSQL_BUILD_CXXFLAGS:-${CXXFLAGS:-$RPM_OPT_FLAGS -felide-constructors -Wno-error=free-nonheap-object}}
 export LDFLAGS=${MYSQL_BUILD_LDFLAGS:-${LDFLAGS:-}}
 
 %if 0%{?rhel} == 8 || 0%{?rhel} == 9
@@ -745,7 +734,7 @@ mkdir debug
                 -e 's/ -O[0-9]* / /' \
                 -e 's/-Wp,-D_FORTIFY_SOURCE=2/ -Wno-missing-field-initializers -Wno-error /' \
 %else
-                -e 's/-D_FORTIFY_SOURCE=2/-D_FORTIFY_SOURCE=2 -Wno-error=stringop-truncation -Wno-error=maybe-uninitialized -Wno-error=odr/' \
+                -e 's/-D_FORTIFY_SOURCE=2/-D_FORTIFY_SOURCE=2 -Wno-error=free-nonheap-object -Wno-error=stringop-truncation -Wno-error=maybe-uninitialized -Wno-error=odr/' \
 %endif
                 -e 's/ -ip / /' \
                 -e 's/^ //' \
@@ -754,6 +743,8 @@ mkdir debug
   # XXX: install_layout so we can't just set it based on INSTALL_LAYOUT=RPM
   ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
            -DDOWNLOAD_BOOST=1 -DWITH_BOOST=build-ps/boost \
+           -DCMAKE_C_FLAGS="${CFLAGS}" \
+           -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
            -DWITH_PACKAGE_FLAGS=OFF \
            -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=%{_prefix} \
            -DWITH_EMBEDDED_SERVER=OFF \
@@ -790,8 +781,8 @@ mkdir debug
            -DWITH_UNIT_TESTS=0 \
            -DWITH_SCALABILITY_METRICS=ON \
            -DMYSQL_SERVER_SUFFIX=".%{rel}" \
-%if 0%{?enable_fipsmode}
-           -DPROBUILD=1 \
+%if 0%{?rhel} > 8
+           -DWITH_LTO=ON \
 %endif
            %{?mecab_option} \
            -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_ON} %{ROCKSDB_FLAGS}
@@ -806,6 +797,8 @@ mkdir release
   ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
            -DDOWNLOAD_BOOST=1 -DWITH_BOOST=build-ps/boost \
            -DWITH_PACKAGE_FLAGS=OFF \
+           -DCMAKE_C_FLAGS="${CFLAGS}" \
+           -DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
            -DCMAKE_BUILD_TYPE=RelWithDebInfo  -DCMAKE_INSTALL_PREFIX=%{_prefix} \
            -DMINIMAL_RELWITHDEBINFO=OFF \
            -DWITH_EMBEDDED_SERVER=OFF \
@@ -841,8 +834,8 @@ mkdir release
 %endif
            -DWITH_UNIT_TESTS=0 \
            -DWITH_SCALABILITY_METRICS=ON \
-%if 0%{?enable_fipsmode}
-           -DPROBUILD=1 \
+%if 0%{?rhel} > 8
+           -DWITH_LTO=ON \
 %endif
            %{?mecab_option} \
            -DMYSQL_SERVER_SUFFIX=".%{rel}" \
@@ -1905,9 +1898,9 @@ rm -rf %{pxc_telemetry}
 %files -n percona-xtradb-cluster-icu-data-files
 %defattr(-, root, root, -)
 %doc %{?license_files_server}
-%dir %attr(755, root, root) %{_libdir}/mysql/private/icudt73l
-%{_libdir}/mysql/private/icudt73l/*.icu
-%{_libdir}/mysql/private/icudt73l/brkitr
+%dir %attr(755, root, root) %{_libdir}/mysql/private/icudt77l
+%{_libdir}/mysql/private/icudt77l/*.icu
+%{_libdir}/mysql/private/icudt77l/brkitr
 
 
 ##############################################################################

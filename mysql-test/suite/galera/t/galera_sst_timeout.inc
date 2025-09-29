@@ -71,7 +71,7 @@ INSERT INTO t1 VALUES (0);
 --source include/start_mysqld_expecting_crash.inc
 
 #
-# sleep to avoid checking the file if it was not created yet.
+# sleep to avoid checking the error log file if it was not created yet.
 #
 --sleep 5
 
@@ -80,6 +80,25 @@ INSERT INTO t1 VALUES (0);
 # In cnf file we have sst-initial-timeout=10, so waiting for 20 secs is enough.
 #
 --let $grep_pattern = .*Saving node state to retry with IST instead of full SST after restart.*
+--let $grep_file = $ofile
+--let $wait_timeout = 20
+--source include/wait_for_pattern_in_file.inc
+
+#
+# Wait for node_2 process to be finished. It exists by ReplicatorSMM::abort().
+# In sucha case IST receiver thread is not joined gracefuly, and its networking architecutre
+# is terminated immediately so it is random when it happens.
+# If we don't wait here we can hit one of the following cases:
+# 1. Joiner's IST receiver is still listening -> node_1 will send IST
+# 2. Joiner's IST receiver is down -> node_1's IST sender will fail to connect to node_2's IST receiver
+# While case 1 handled by SocketWatchdog introduced in commit fb7fe369,
+# case 2 was hit during 8.0.43 merge. Let's force it here by waiting.
+#
+# 'Terminating SST process.' is the last log. wait_proc_to_finish.inc doesn't work, because
+# node_2 is starting and is expecting to terminate immediately, so there are low chances we
+# will be able to access pid file from wait_for_pattern_in_file.inc to get pid of the process.
+
+--let $grep_pattern = .*Terminating SST process.*
 --let $grep_file = $ofile
 --let $wait_timeout = 20
 --source include/wait_for_pattern_in_file.inc
