@@ -100,6 +100,7 @@
 #include "sql/discrete_interval.h"
 #include "sql/error_handler.h"  // Strict_error_handler
 #include "sql/events.h"         // Events
+#include "sql/external_table_const.h"
 #include "sql/field.h"
 #include "sql/gis/srid.h"
 #include "sql/item.h"
@@ -3659,6 +3660,10 @@ int mysql_execute_command(THD *thd, bool first_level) {
 
   CONDITIONAL_SYNC_POINT_FOR_TIMESTAMP("before_execute_command");
 
+  if (!first_level) {
+    DEBUG_SYNC(thd, "execute_command_next_level");
+  }
+
   /*
     If there is a CREATE TABLE...START TRANSACTION command which
     is not yet committed or rollbacked, then we should allow only
@@ -5431,8 +5436,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
 
       assert(lex->sphead != nullptr);
 
-      bool library_import_supported =
-          native_strcasecmp(lex->sp_chistics.language.str, "JAVASCRIPT") == 0;
       auto imported_libraries = lex->sp_chistics.get_imported_libraries();
       bool imports_library =
           imported_libraries != nullptr && !imported_libraries->empty();
@@ -5458,13 +5461,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
             goto error;
           }
 
-          // Check that libraries are supported before parsing the code
-          if (!library_import_supported && imports_library) {
-            my_error(ER_LIBRARIES_NOT_SUPPORTED, MYF(0),
-                     lex->sp_chistics.language.str);
-            goto error;
-          }
-
           my_service<SERVICE_TYPE(external_program_execution)> sp_service(
               "external_program_execution", srv_registry);
           if (!sp_service.is_valid())
@@ -5474,13 +5470,14 @@ int mysql_execute_command(THD *thd, bool first_level) {
         } else {
           push_warning(thd, ER_LANGUAGE_COMPONENT_NOT_AVAILABLE);
         }
-      }
-
-      // Also do this check for SQL and when language service is not available
-      if (!library_import_supported && imports_library) {
-        my_error(ER_LIBRARIES_NOT_SUPPORTED, MYF(0),
-                 lex->sp_chistics.language.str);
-        goto error;
+      } else {
+        // Also do this check for SQL and when language service is not
+        // available
+        if (imports_library) {
+          my_error(ER_LIBRARIES_NOT_SUPPORTED, MYF(0),
+                   lex->sp_chistics.language.str);
+          goto error;
+        }
       }
 
       assert(lex->sphead->m_db.str); /* Must be initialized in the parser */
@@ -5644,9 +5641,13 @@ int mysql_execute_command(THD *thd, bool first_level) {
         goto error;
 
       /* Conditionally writes to binlog */
+#ifdef WITH_WSREP
+      const enum_sp_return_code sp_result =
+          sp_drop_routine(thd, sp_type, lex->spname, lex->drop_if_exists);
+#else
       const enum_sp_return_code sp_result =
           sp_drop_routine(thd, sp_type, lex->spname);
-
+#endif /* WITH_WSREP */
 #ifdef WITH_WSREP
       if (remove_automatic_sp_privileges(
               thd, sp_type, sp_result == SP_DOES_NOT_EXISTS, db, name,
@@ -6513,6 +6514,7 @@ void THD::reset_for_next_command() {
   thd->set_trans_pos(nullptr, 0);
   thd->derived_tables_processing = false;
   thd->parsing_system_view = false;
+  thd->parsing_json_duality_view = false;
 
   // Need explicit setting, else demand all privileges to a table.
   thd->want_privilege = ALL_ACCESS;
@@ -6964,6 +6966,37 @@ bool Alter_info::add_field(
 
   for (const auto &a : cf_appliers) {
     if (a(new_field, this)) return true;
+  }
+
+  if (new_field->m_external_format.length > 0) {
+    // Add format to m_engine_attribute if it is not already set
+    if (new_field->m_engine_attribute.length == 0) {
+      std::string json_key;
+      switch (type) {
+        case MYSQL_TYPE_DATE:
+          json_key = external_table::kDateFormatParam;
+          break;
+        case MYSQL_TYPE_TIME2:
+          json_key = external_table::kTimeFormatParam;
+          break;
+        case MYSQL_TYPE_TIMESTAMP2:
+        case MYSQL_TYPE_DATETIME2:
+          json_key = external_table::kTimestampFormatParam;
+          break;
+        default:
+          my_error(ER_EXTERNAL_FORMAT_NOT_SUPPORTED, MYF(0), field_name->str);
+          return true;
+      }
+      std::string format(new_field->m_external_format.str,
+                         new_field->m_external_format.length);
+      std::string json_obj = "{ \"" + json_key + "\": \"" + format + "\" }";
+      LEX_CSTRING engine_attribute = {.str = json_obj.data(),
+                                      .length = json_obj.length()};
+      new_field->m_engine_attribute = thd->strmake(engine_attribute);
+    } else {
+      my_error(ER_ENGINE_ATTRIBUTE_CONFLICT, MYF(0), "EXTERNAL_FORMAT",
+               "specification");
+    }
   }
 
   create_list.push_back(new_field);

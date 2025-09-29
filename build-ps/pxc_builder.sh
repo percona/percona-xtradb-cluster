@@ -314,6 +314,7 @@ install_deps() {
             switch_to_vault_repo
         fi
         ARCH=$(echo $(uname -m) | sed -e 's:i686:i386:g')
+        yum-config-manager --enable ol"${RHEL}"_codeready_builder
         yum update -y
         yum install -y perl
         yum install -y https://repo.percona.com/yum/percona-release-latest.noarch.rpm
@@ -323,7 +324,10 @@ install_deps() {
             yum -y install dnf-plugins-core epel-release
             yum config-manager --set-enabled powertools
         fi
-        if [ "x$RHEL" = "x8" -o "x$RHEL" = "x9" -o "x$RHEL" = "x2023" ]; then
+        if [ $RHEL = 10 ]; then
+            yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm
+        fi
+        if [ "x$RHEL" = "x8" -o "x$RHEL" = "x9" -o "x$RHEL" = "x2023" -o "x$RHEL" = "x10" ]; then
 	    yum -y install git
             yum -y install python2-scons || true
             yum -y install python2-pip python36-devel
@@ -351,12 +355,16 @@ install_deps() {
                 yum -y install gperf rpcgen
 	    fi
 
-            if [ "x${RHEL}" = "x9" -o "x${RHEL}" = "x2023" ]; then
+            if [ "x${RHEL}" = "x9" -o "x${RHEL}" = "x2023" -o "x${RHEL}" = "x10" ]; then
                 if [ "x${RHEL}" != "x2023" ]; then
                      yum install -y https://yum.oracle.com/repo/OracleLinux/OL9/distro/builder/${ARCH}/getPackage/procps-ng-devel-3.3.17-8.el9.x86_64.rpm
                      yum -y install dnf-utils
                      dnf config-manager --enable ol9_codeready_builder
                      yum -y install gcc-toolset-12-gcc gcc-toolset-12-gcc-c++ gcc-toolset-12-binutils gcc-toolset-12-annobin-annocheck gcc-toolset-12-annobin-plugin-gcc gcc-toolset-12-libatomic-devel
+                fi
+                if [ "x${RHEL}" = "x10" ]; then
+                     yum -y install gcc gcc-c++
+                     yum -y install libatomic
                 fi
                 yum -y install libedit-devel
                 yum -y install libtirpc-devel
@@ -460,7 +468,7 @@ install_deps() {
         
         # (1) PXB compatible with previous PXC LTS version
         percona-release enable pxb-80 release
-        if [ x"${DIST}" = xjammy ]; then
+        if [ x"${DIST}" = xnoble ]; then
             percona-release enable pxb-9x-innovation experimental
         fi
         percona-release enable pxb-84-lts release
@@ -488,8 +496,9 @@ install_deps() {
         apt-get -y install libudev-dev
 
         if [ x"${DIST}" = xnoble ]; then
-            apt-get -y install gcc-11 g++-11
-            update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100 --slave /usr/bin/g++ g++ /usr/bin/g++-11
+            apt-get -y install gcc-13 g++-13
+            update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100 --slave /usr/bin/g++ g++ /usr/bin/g++-13
+            update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-13 100
         fi
 
         if [ x"${DIST}" = xfocal -o x"${DIST}" = xbullseye -o x"${DIST}" = jammy -o x"${DIST}" = bookworm -o x"${DIST}" = xnoble ]; then
@@ -527,10 +536,10 @@ install_deps() {
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
         #apt-get -y install --download-only percona-xtrabackup-80=8.0.35-33-1.${DIST}
-        if [ x"${DIST}" = xjammy ]; then
+        if [ x"${DIST}" = xnoble ]; then
             apt-get -y install --download-only percona-xtrabackup-91=9.1.0-1-1.${DIST}
         fi
-        apt-get -y install --download-only percona-xtrabackup-84=8.4.0-3-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-84=8.4.0-4-1.${DIST}
     fi
     return;
 }
@@ -684,7 +693,7 @@ build_mecab_lib(){
     wget ${MECAB_LINK}
     tar xf ${MECAB_TARBAL}
     if [ x"$ARCH" = "xaarch64" ]; then
-        git clone git://git.savannah.gnu.org/config.git
+        git clone https://git.savannah.gnu.org/git/config.git
         unalias cp
         cp config/config.guess ${MECAB_DIR}
         cp config/config.sub ${MECAB_DIR}
@@ -706,8 +715,11 @@ build_mecab_dict(){
     wget ${MECAB_IPADIC_LINK}
     tar xf ${MECAB_IPADIC_TARBAL}
     cd ${MECAB_IPADIC_DIR} || exit
-    # these two lines should be removed if proper packages are created and used for builds
-    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${MECAB_INSTALL_DIR}/usr/lib
+    # next five lines should be removed if proper packages are created and used for builds
+    [ -d "${MECAB_INSTALL_DIR}/usr/lib" ] && \
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${MECAB_INSTALL_DIR}/usr/lib
+    [ -d "${MECAB_INSTALL_DIR}/usr/lib64" ] && \
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${MECAB_INSTALL_DIR}/usr/lib64
     sed -i "/MECAB_DICT_INDEX=\"/c\MECAB_DICT_INDEX=\"${MECAB_INSTALL_DIR}\/usr\/libexec\/mecab\/mecab-dict-index\"" configure
     #
     ./configure --with-mecab-config=${MECAB_INSTALL_DIR}/usr/bin/mecab-config
@@ -716,7 +728,8 @@ build_mecab_dict(){
     cd ../  || exit
     cd ${MECAB_INSTALL_DIR}  || exit
     if [ -d usr/lib64 ]; then
-        mv usr/lib64/* usr/lib
+        mkdir usr/lib
+        cp -r usr/lib64/* usr/lib
     fi
     cd ${WORKDIR}  || exit
 }
@@ -921,17 +934,17 @@ build_deb(){
     # (1) PXB compatible with previous PXC LTS version
     #mkdir -p pxb-8.0
     # (2) PXB compatible with this PXC version (LTS or Innovative)
-    if [ x"${DEBIAN_VERSION}" = xjammy ]; then
-        mkdir -p pxb-9.1
-        mkdir -p pxb-9.2
+    if [ x"${DEBIAN_VERSION}" = xnoble ]; then
+        mkdir -p pxb-9.3
+        mkdir -p pxb-9.4
     fi
     mkdir -p pxb-8.4
 
 
     #dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-80* pxb-8.0
-    if [ x"${DEBIAN_VERSION}" = xjammy ]; then
-        dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-91* pxb-9.1
-        dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-91* pxb-9.2
+    if [ x"${DEBIAN_VERSION}" = xnoble ]; then
+        dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-91* pxb-9.3
+        dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-91* pxb-9.4
     fi
 
     dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-84* pxb-8.4
@@ -943,13 +956,13 @@ build_deb(){
         rm -rf usr *.deb DEBIAN
 
     # (2)
-    if [ x"${DEBIAN_VERSION}" = xjammy ]; then
-        cd ../pxb-9.1 || exit
+    if [ x"${DEBIAN_VERSION}" = xnoble ]; then
+        cd ../pxb-9.3 || exit
         mv usr/bin ./
         mv usr/lib* ./
         rm -rf usr *.deb DEBIAN
 
-        cd ../pxb-9.2 || exit
+        cd ../pxb-9.4 || exit
         mv usr/bin ./
         mv usr/lib* ./
         rm -rf usr *.deb DEBIAN
@@ -993,9 +1006,9 @@ build_deb(){
         sed -i 's/export CXXFLAGS=/export CXXFLAGS=-Wno-error=nonnull-compare /' debian/rules
     fi
 
-    if [ ${DEBIAN_VERSION} != "jammy" ]; then
-       sed -i '196,201d' debian/rules
-    fi
+   # if [ ${DEBIAN_VERSION} != "noble" ]; then
+   #    sed -i '196,201d' debian/rules
+   # fi
 
     GALERA_REVNO="${GALERA_REVNO}" SCONS_ARGS=' strict_build_flags=0'  MAKE_JFLAG=-j4  dpkg-buildpackage -rfakeroot -uc -us -b
     #
@@ -1105,16 +1118,15 @@ build_tarball(){
     else
         DEBIAN_VERSION="$(lsb_release -sc)"
         mkdir pxb-8.0
-        if [ x"${DEBIAN_VERSION}" = xjammy ]; then
-            mkdir pxb-9.1
-            mkdir pxb-9.2
-        else
-            mkdir pxb-8.4
+        mkdir pxb-8.4
+        if [ x"${DEBIAN_VERSION}" = xnoble ]; then
+            mkdir pxb-9.3
+            mkdir pxb-9.4
         fi
         #dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-80* pxb-8.0
         if [ x"${DEBIAN_VERSION}" = xjammy ]; then
-            dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-91* pxb-9.1
-            dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-91* pxb-9.2
+            dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-91* pxb-9.3
+            dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-91* pxb-9.4
         fi
         dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-84* pxb-8.4
         
@@ -1126,8 +1138,13 @@ build_tarball(){
         popd
 
         # (2)
-        if [ x"${DEBIAN_VERSION}" = xjammy ]; then
-            pushd pxb-9.1
+        if [ x"${DEBIAN_VERSION}" = xnoble ]; then
+            pushd pxb-9.3
+                mv usr/bin ./
+                mv usr/lib* ./
+                rm -rf usr *.deb DEBIAN
+            popd
+            pushd pxb-9.4
                 mv usr/bin ./
                 mv usr/lib* ./
                 rm -rf usr *.deb DEBIAN
@@ -1135,8 +1152,9 @@ build_tarball(){
         fi
         
         #tar -zcvf  percona-xtrabackup-8.0.tar.gz pxb-8.0
-        if [ x"${DEBIAN_VERSION}" = xjammy ]; then
-            tar -zcvf  percona-xtrabackup-9.1.tar.gz pxb-9.1
+        if [ x"${DEBIAN_VERSION}" = xnoble ]; then
+            tar -zcvf percona-xtrabackup-9.1.tar.gz pxb-9.3
+            tar -zcvf percona-xtrabackup-9.1.tar.gz pxb-9.4
         fi
 
         tar -zcvf  percona-xtrabackup-8.4.tar.gz pxb-8.4
@@ -1144,7 +1162,7 @@ build_tarball(){
     mkdir -p ${BUILD_ROOT}/target/pxc_extra/
     cp *.tar.gz ${BUILD_ROOT}/target/pxc_extra/
     cp *.tar.gz ${BUILD_ROOT}/target
-    rm -rf pxb-8.0 pxb-8.4 pxb-9.1 pxb-9.2 || true
+    rm -rf pxb-8.0 pxb-8.4 pxb-9.3 pxb-9.4 || true
     cd ${CURDIR} || exit
     rm -rf jemalloc
     wget https://github.com/jemalloc/jemalloc/releases/download/$JVERSION/jemalloc-$JVERSION.tar.bz2

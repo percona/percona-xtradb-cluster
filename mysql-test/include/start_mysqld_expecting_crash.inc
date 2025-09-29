@@ -69,8 +69,7 @@ if (!$do_not_echo_parameters) {
   --exec echo "# restart_abort: $restart_parameters"
 }
 if ($do_not_echo_parameters) {
-  --echo # restart_abort:<hidden args>
-  let $do_not_echo_parameters=;
+  --exec echo "# restart_abort:<hidden args>"
 }
 
 # Write file to make mysql-test-run.pl start up the server again

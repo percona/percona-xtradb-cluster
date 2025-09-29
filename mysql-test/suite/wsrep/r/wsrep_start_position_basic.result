@@ -16,7 +16,7 @@ ERROR HY000: wsrep_start_position can be set during server boot or before loadin
 SELECT @@global.wsrep_start_position;
 @@global.wsrep_start_position
 00000000-0000-0000-0000-000000000000:-1
-# restart:<hidden args>
+# restart
 
 # valid values
 SET @@global.wsrep_start_position='00000000-0000-0000-0000-000000000000:-2';
@@ -53,5 +53,5 @@ SET @@global.wsrep_start_position=NULL;
 ERROR 42000: Variable 'wsrep_start_position' can't be set to the value of 'NULL'
 SET @@global.wsrep_start_position='junk';
 ERROR 42000: Variable 'wsrep_start_position' can't be set to the value of 'junk'
-# restart:<hidden args>
+# restart
 # End of test
