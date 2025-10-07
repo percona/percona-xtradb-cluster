@@ -351,9 +351,14 @@ install_deps() {
         yum -y install yum-utils patchelf
         yum -y install cyrus-sasl-devel cyrus-sasl-scram krb5-devel
     else
-        apt-get -y update
-        DEBIAN_FRONTEND=noninteractive apt-get -y install curl gnupg2 lsb-release wget apt-transport-https software-properties-common
+        export DEBIAN_FRONTEND="noninteractive"
+        export DIST="$(grep '^PRETTY_NAME=' /etc/os-release | cut -d= -f2 | tr -d '"' | sed -E 's/.*\(([^)]+)\).*/\1/')"
+        if [ "x${DIST}" = "xbuster" ]; then
+            sed -i 's|http://deb.debian.org/debian|http://archive.debian.org/debian|g; s|http://deb.debian.org/debian-security|http://archive.debian.org/debian-security|g' /etc/apt/sources.list
+            echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99ignore-valid-until
+        fi
         apt-get update
+        apt-get -y install curl gnupg2 lsb-release wget apt-transport-https software-properties-common
         wget https://repo.percona.com/apt/percona-release_latest.$(lsb_release -sc)_all.deb && dpkg -i percona-release_latest.$(lsb_release -sc)_all.deb
         percona-release enable tools testing
         export DEBIAN_FRONTEND="noninteractive"
@@ -457,8 +462,8 @@ build_srpm(){
     cd ${WORKDIR}/rpmbuild/SPECS || exit
     tar vxzf ${WORKDIR}/${TARFILE} --wildcards '*/build-ps/*.spec' --strip=2
     #
-    sed -i "/^%changelog/a - Release ${VERSION}-${RELEASE}" percona-xtradb-cluster.spec
-    sed -i "/^%changelog/a * $(date "+%a") $(date "+%b") $(date "+%d") $(date "+%Y") Percona Development Team <info@percona.com> - ${VERSION}-${RELEASE}" percona-xtradb-cluster.spec
+    sed -i "/^%changelog/a - Release ${VERSION}-${RELEASE}-${RPM_RELEASE}" percona-xtradb-cluster.spec
+    sed -i "/^%changelog/a * $(date "+%a") $(date "+%b") $(date "+%d") $(date "+%Y") Percona Development Team <info@percona.com> - ${VERSION}-${RELEASE}-${RPM_RELEASE}" percona-xtradb-cluster.spec
     #
     cd ${WORKDIR} || exit
     #
