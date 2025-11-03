@@ -308,7 +308,7 @@ my $opt_build_thread= $ENV{'MTR_BUILD_THREAD'} || "auto";
 my $opt_port_base= $ENV{'MTR_PORT_BASE'} || "auto";
 my $build_thread= 0;
 
-my $ports_per_thread= 10;
+my $ports_per_thread= 70;
 our $group_replication= 0;
 our $xplugin= 0;
 
@@ -2214,18 +2214,18 @@ sub set_build_thread_ports($) {
   # Calculate baseport
   $baseport= $build_thread * $opt_port_group_size + 10000;
 
+  my $baseport_offset = 10 * 6;
+
+  # Next set of 10 ports is reserver for Group Replication if used
+  if ($group_replication) {
+    $baseport_offset = $baseport_offset + 10;
+  }
+
   if (lc($opt_mysqlx_baseport) eq "auto")
   {
-    if ($ports_per_thread > 10)
-    {
-      # Reserving last 10 ports in the current port range for X plugin.
-      $mysqlx_baseport= $baseport + $ports_per_thread - 10;
-    }
-    else
-    {
-      # Reserving the last port in the range for X plugin
-      $mysqlx_baseport= $baseport + 9;
-    }
+    # Reserving last 10 ports in the current port range for X plugin.
+    $mysqlx_baseport = $baseport + $baseport_offset;
+    $baseport_offset = $baseport_offset + 10;
   }
   else
   {
