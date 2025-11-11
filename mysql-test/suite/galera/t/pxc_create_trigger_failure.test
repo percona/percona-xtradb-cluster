@@ -1,0 +1,155 @@
+################################################################################
+# This test proves that trigger failure on 1 node causes trigger failure on all
+# nodes.
+#
+# Test:
+# 0. The test requires two servers: node1 and node2
+# 1. Create user u1 and u2 and grant required privileges. Revoke SUPER from u2.
+# 2. Connect using u1 and create table t1 and t2.
+#    Create trigger trg_t1_insert with definer u1. trg_t1_insert is created.
+# 3. Assert TRIGGER table is in synch across cluster.
+# 4. Perform some operations and ensure cluster is in synch.
+# 5. Connect using u2.
+#    Create trigger trg_t1_insert_fail with definer u1.
+#    trg_t1_insert_fail is not created.
+# 6. Assert TRIGGER table does not contain trg_t1_insert_fail in any node.
+# 7. Cleanup.
+################################################################################
+
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+--echo
+--echo # 1. Create user u1 and u2 and grant required privileges. Revoke SUPER from u2.
+--echo
+
+CREATE USER u1@localhost IDENTIFIED BY '';
+## u1 will be the DEFINER user for the trigger, granting system user might not be needed here.
+GRANT ALL PRIVILEGES ON test.* TO u1@localhost;
+
+
+CREATE USER u2@localhost IDENTIFIED BY '';
+## u2 will try to create the trigger, but won't have the necessary privileges
+GRANT ALL PRIVILEGES ON test.* to u2@localhost;
+## Revoke a SUPER privilege.
+REVOKE SUPER ON *.* FROM u2@localhost;
+
+
+--echo
+--echo # 2. Connect using u1 and create table t1 and t2.
+--echo #    Create trigger trg_t1_insert with definer u1. trg_t1_insert is created.
+--echo
+
+--connect (u1_connection,localhost,u1,,test, $NODE_MYPORT_1)
+CREATE TABLE t1(i INT PRIMARY KEY, n VARCHAR(9));
+
+## Create a simple table t2 which the trigger will update
+CREATE TABLE t2(log_message VARCHAR(100));
+
+
+## User u1 creates a trigger successfully (u1 is the DEFINER)
+DELIMITER $$;
+CREATE DEFINER=u1@`localhost` TRIGGER trg_t1_insert
+AFTER INSERT ON t1
+FOR EACH ROW
+BEGIN
+    INSERT INTO t2 VALUES (CONCAT('Row inserted by: ', USER()));
+END$$
+DELIMITER ;$$
+
+--echo
+--echo # 3. Assert TRIGGER table is in synch across cluster.
+--echo
+
+# Assert trigger exists on node_1
+--connection node_1
+--let $assert_text= 'Trigger trg_t1_insert exists on node_1'
+--let $assert_cond= [SELECT COUNT(*) AS count FROM information_schema.TRIGGERS WHERE TRIGGER_NAME = "trg_t1_insert" AND EVENT_OBJECT_TABLE = "t1", count, 1] = 1
+--source include/assert.inc
+
+# Assert trigger exists on node_2
+--connection node_2
+--echo 'Trigger trg_t1_insert exists on node_2'
+--let $wait_condition= SELECT COUNT(*)=1 FROM information_schema.TRIGGERS WHERE TRIGGER_NAME = "trg_t1_insert" AND EVENT_OBJECT_TABLE = "t1"
+--source include/wait_condition.inc
+
+--echo
+--echo # 4. Perform some operations and ensure cluster is in synch.
+--echo
+
+--connect (u2_connection,localhost,u2,,test, $NODE_MYPORT_1)
+## u2 tries to perform an operation on t1 which fires the trigger.
+## The trigger itself should execute successfully because the DEFINER (u1) has the necessary privileges.
+INSERT INTO t1 VALUES (1, 'test');
+
+--connection node_1
+--let $assert_text= 'Check t1 was updated.'
+--let $assert_cond= [SELECT COUNT(*) FROM t1 WHERE i = 1] = 1
+--source include/assert.inc
+
+--let $assert_text= 'Check t2 was updated by the trigger'
+--let $assert_cond= [SELECT COUNT(*) FROM t2 WHERE log_message LIKE "Row inserted by: u2%"] = 1
+--source include/assert.inc
+
+--connection node_2
+--echo 'Check t1 was updated.'
+--let $wait_condition= SELECT COUNT(*)=1 FROM t1 WHERE i = 1
+--source include/wait_condition.inc
+
+--let $assert_text= 'Check t2 was updated by the trigger'
+--let $assert_cond= [SELECT COUNT(*) FROM t2 WHERE log_message LIKE "Row inserted by: u2%"] = 1
+--source include/assert.inc
+
+--echo
+--echo # 5. Connect using u2.
+--echo #    Create trigger trg_t1_insert_fail with definer u1.
+--echo #    trg_t1_insert_fail is not created.
+--echo
+
+--connection u2_connection
+## Create a new trigger as u2, defining it as u1.
+## This requires the SUPER privilege.
+## Since u2 doesn't have SUPER, this should fail.
+DELIMITER $$;
+--error ER_SPECIFIC_ACCESS_DENIED_ERROR
+CREATE DEFINER=u1@`localhost` TRIGGER trg_t1_insert_fail
+AFTER INSERT ON t1
+FOR EACH ROW
+BEGIN
+    INSERT INTO t2 VALUES ('This should fail');
+END$$
+DELIMITER ;$$
+
+--echo
+--echo # 6. Assert TRIGGER table does not contain trg_t1_insert_fail in any node.
+--echo
+
+# Assert trigger does not exists on node_1
+--connection node_1
+--let $assert_text= 'Trigger trg_t1_insert_fail was not created on node_1'
+--let $assert_cond= [SELECT COUNT(*) AS count FROM information_schema.TRIGGERS WHERE TRIGGER_NAME = "trg_t1_insert_fail", count, 1] = 0
+--source include/assert.inc
+
+# Assert trigger does not exists on node_2
+--connection node_2
+--let $assert_text= 'Trigger trg_t1_insert_fail was not created on node_2'
+--let $assert_cond= [SELECT COUNT(*) AS count FROM information_schema.TRIGGERS WHERE TRIGGER_NAME = "trg_t1_insert_fail", count, 1] = 0
+--source include/assert.inc
+
+--echo
+--echo # 7. Cleanup.
+--echo
+
+--connection u1_connection
+DROP TRIGGER trg_t1_insert;
+DROP TABLE t1;
+DROP TABLE t2;
+
+--disconnect u1_connection
+--disconnect u2_connection
+
+--connection node_1
+DROP USER u1@localhost;
+DROP USER u2@localhost;
+
+--source include/wait_until_count_sessions.inc
