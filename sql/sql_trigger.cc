@@ -407,26 +407,46 @@ bool Sql_cmd_create_trigger::execute(THD *thd) {
   */
   Security_context *sctx = thd->security_context();
 #ifdef WITH_WSREP
-  if (!trust_function_creators &&
-      (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open()) &&
-      !(sctx->check_access(SUPER_ACL) ||
-        sctx->has_global_grant(STRING_WITH_LEN("SET_USER_ID")).first)) {
-    /*
-      If WSREP is enabled, then we are ALWAYS doing binlog
-      replication of some sort, and we always require the SUPER
-      privilege (or trust_function_creators).
-      So there is no need to mention anything about the binlog.
-    */
-    if (WSREP(thd))
+  LEX *lex = thd->lex;
+  bool definer_is_current_user =
+      !lex->definer || /* If definer is not specified, consider current user */
+      (strcmp(lex->definer->user.str, sctx->priv_user().str) == 0 &&
+       my_strcasecmp(system_charset_info, lex->definer->host.str,
+                     sctx->priv_host().str) == 0);
+  bool binlog_requires_super =
+      !trust_function_creators &&
+      (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open());
+  bool has_super_or_set_user_id =
+      sctx->check_access(SUPER_ACL) ||
+      sctx->has_global_grant(STRING_WITH_LEN("SET_USER_ID")).first;
+
+  // Definer check: If a definer is specified and is different from the current
+  // user, then we need to check for SUPER or SET_USER_ID privileges.
+  if ((!definer_is_current_user || binlog_requires_super) &&
+      !has_super_or_set_user_id) {
+    if (!definer_is_current_user) {
+      my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0), "SUPER or SET_USER_ID");
+    } else if (WSREP(thd)) {
+      /*
+        If WSREP is enabled, then we are ALWAYS doing binlog
+        replication of some sort, and we always require the SUPER
+        privilege (or trust_function_creators).
+        So there is no need to mention anything about the binlog.
+      */
       my_message(ER_BINLOG_CREATE_ROUTINE_NEED_SUPER,
-                 "You do not have the SUPER privilege"
-                 " (you *might* want to use the less safe "
-                 "log_bin_trust_function_creators variable)",
+                 "You do not have the SUPER privilege (you *might* want to use "
+                 "the less safe log_bin_trust_function_creators variable)",
                  MYF(0));
-    else
+    } else {
       my_error(ER_BINLOG_CREATE_ROUTINE_NEED_SUPER, MYF(0));
+    }
     return true;
   }
+
+  if (lex->definer && sctx->can_operate_with(lex->definer, consts::system_user,
+                                             true /* report_error */))
+    return true;
+
 #else
   if (!trust_function_creators && mysql_bin_log.is_open() &&
       !(sctx->check_access(SUPER_ACL) ||
