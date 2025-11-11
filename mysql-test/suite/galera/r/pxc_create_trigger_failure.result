@@ -1,0 +1,60 @@
+
+# 1. Create user u1 and u2 and grant required privileges. Revoke SUPER from u2.
+
+CREATE USER u1@localhost IDENTIFIED BY '';
+GRANT ALL PRIVILEGES ON test.* TO u1@localhost;
+CREATE USER u2@localhost IDENTIFIED BY '';
+GRANT ALL PRIVILEGES ON test.* to u2@localhost;
+REVOKE SUPER ON *.* FROM u2@localhost;
+Warnings:
+Warning	1287	The SUPER privilege identifier is deprecated
+
+# 2. Connect using u1 and create table t1 and t2.
+#    Create trigger trg_t1_insert with definer u1. trg_t1_insert is created.
+
+CREATE TABLE t1(i INT PRIMARY KEY, n VARCHAR(9));
+CREATE TABLE t2(log_message VARCHAR(100));
+CREATE DEFINER=u1@`localhost` TRIGGER trg_t1_insert
+AFTER INSERT ON t1
+FOR EACH ROW
+BEGIN
+INSERT INTO t2 VALUES (CONCAT('Row inserted by: ', USER()));
+END$$
+
+# 3. Assert TRIGGER table is in synch across cluster.
+
+include/assert.inc ['Trigger trg_t1_insert exists on node_1']
+'Trigger trg_t1_insert exists on node_2'
+
+# 4. Perform some operations and ensure cluster is in synch.
+
+INSERT INTO t1 VALUES (1, 'test');
+include/assert.inc ['Check t1 was updated.']
+include/assert.inc ['Check t2 was updated by the trigger']
+'Check t1 was updated.'
+include/assert.inc ['Check t2 was updated by the trigger']
+
+# 5. Connect using u2.
+#    Create trigger trg_t1_insert_fail with definer u1.
+#    trg_t1_insert_fail is not created.
+
+CREATE DEFINER=u1@`localhost` TRIGGER trg_t1_insert_fail
+AFTER INSERT ON t1
+FOR EACH ROW
+BEGIN
+INSERT INTO t2 VALUES ('This should fail');
+END$$
+ERROR 42000: Access denied; you need (at least one of) the SUPER or SET_USER_ID privilege(s) for this operation
+
+# 6. Assert TRIGGER table does not contain trg_t1_insert_fail in any node.
+
+include/assert.inc ['Trigger trg_t1_insert_fail was not created on node_1']
+include/assert.inc ['Trigger trg_t1_insert_fail was not created on node_2']
+
+# 7. Cleanup.
+
+DROP TRIGGER trg_t1_insert;
+DROP TABLE t1;
+DROP TABLE t2;
+DROP USER u1@localhost;
+DROP USER u2@localhost;
