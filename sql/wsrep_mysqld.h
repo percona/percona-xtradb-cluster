@@ -253,8 +253,8 @@ extern enum wsrep::provider::status wsrep_sync_wait_upto_gtid(
 extern void wsrep_last_committed_id(wsrep_gtid_t *gtid);
 extern int wsrep_check_opts(int argc, char *const *argv);
 extern void wsrep_prepend_PATH(const char *path);
-bool wsrep_append_fk_parent_table(THD *thd, Table_ref *table,
-                                  wsrep::key_array *keys);
+bool wsrep_append_parent_tables(THD *thd, Table_ref *table,
+                                wsrep::key_array *keys);
 bool wsrep_append_child_tables(THD *thd, Table_ref *tables,
                                wsrep::key_array *keys);
 

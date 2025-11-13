@@ -72,6 +72,7 @@ extern "C" const char *wsrep_thd_query(const THD *thd);
 extern "C" query_id_t wsrep_thd_transaction_id(const THD *thd);
 
 extern "C" long long wsrep_thd_trx_seqno(const THD *thd);
+extern "C" long long wsrep_thd_trx_depends_on_seqno(const THD *thd);
 
 /* Mark thd own transaction as aborted */
 extern "C" void wsrep_thd_self_abort(THD *thd);

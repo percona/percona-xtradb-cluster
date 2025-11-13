@@ -1788,76 +1788,78 @@ wsrep::key_array wsrep_prepare_keys_for_toi(const char *db, const char *table,
 }
 
 /*
- * Iterate over the list of tables and for each non-temporary invoke the
- * action function.
+ * Do the provided action for a given table. If table is not found in DD,
+ * do a fallback action directly on a provided Table_ref.
+ * Skip temporary tables during processing.
  */
 using action_fn = std::function<void(const dd::Table *)>;
-static bool wsrep_do_action_for_tables(THD *thd, Table_ref *tables,
-                                       action_fn action) {
+using fallback_action_fn = std::function<void(Table_ref *)>;
+static bool wsrep_do_action_for_table(
+    THD *thd, Table_ref *table, action_fn action,
+    fallback_action_fn fallback_action = nullptr) {
   if (!WSREP(thd) || !WSREP_CLIENT(thd)) return false;
 
   // If we fail to collect FK meta data, we set the error and return true.
   // That will trigger retry logic inside wsrep_dispatch_sql_command()
-  for (auto table = tables; table; table = table->next_local) {
-    if (!is_temporary_table(table)) {
-      DBUG_EXECUTE_IF("wsrep_do_action_for_tables_lock_fail", {
-        my_error(ER_LOCK_DEADLOCK, MYF(0));
-        return true;
-      });
+  if (!is_temporary_table(table)) {
+    DBUG_EXECUTE_IF("wsrep_do_action_for_table_lock_fail", {
+      my_error(ER_LOCK_DEADLOCK, MYF(0));
+      return true;
+    });
 
-      MDL_ticket *mdl_ticket = nullptr;
-      if (dd::acquire_shared_table_mdl(thd, table->db, table->table_name, false,
-                                       &mdl_ticket)) {
-        WSREP_WARN(
-            "Unable to acquire shared lock on db: %s, table: %s for FKs "
-            "collection",
-            table->db, table->table_name);
-        my_error(ER_LOCK_DEADLOCK, MYF(0));
-        return true;
-      }
+    MDL_ticket *mdl_ticket = nullptr;
+    if (dd::acquire_shared_table_mdl(thd, table->db, table->table_name, false,
+                                     &mdl_ticket)) {
+      WSREP_WARN(
+          "Unable to acquire shared lock on db: %s, table: %s for FKs "
+          "collection",
+          table->db, table->table_name);
+      my_error(ER_LOCK_DEADLOCK, MYF(0));
+      return true;
+    }
 
-      DEBUG_SYNC(thd, "wsrep_do_action_for_tables_after_lock");
+    DEBUG_SYNC(thd, "wsrep_do_action_for_table_after_lock");
+
+    {
+      /*
+        Dictionary_client does aggressive validation against MDLs locked
+        during the time when DD objects are acquired.
+        Keep the MDL lock as long as the Auto_releaser is alive
+        and unlock just after Auto_releaser destruction.
+      */
+      raii::Sentry<> mdl_release_guard{
+          [thd, mdl_ticket]() -> void { dd::release_mdl(thd, mdl_ticket); }};
 
       {
-        /*
-          Dictionary_client does aggressive validation against MDLs locked
-          during the time when DD objects are acquired.
-          Keep the MDL lock as long as the Auto_releaser is alive
-          and unlock just after Auto_releaser destruction.
-        */
-        raii::Sentry<> mdl_release_guard{
-            [thd, mdl_ticket]() -> void { dd::release_mdl(thd, mdl_ticket); }};
+        const dd::Table *table_obj = nullptr;
+        dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+        if (thd->dd_client()->acquire(dd::String_type(table->db),
+                                      dd::String_type(table->table_name),
+                                      &table_obj)) {
+          WSREP_WARN(
+              "Unable to acquire dd_client for db: %s, table: %s for FKs "
+              "collection",
+              table->db, table->table_name);
+          my_error(ER_LOCK_DEADLOCK, MYF(0));
+          return true;
+        }
 
-        {
-          const dd::Table *table_obj = nullptr;
-          dd::cache::Dictionary_client::Auto_releaser releaser(
-              thd->dd_client());
-          if (thd->dd_client()->acquire(dd::String_type(table->db),
-                                        dd::String_type(table->table_name),
-                                        &table_obj)) {
-            WSREP_WARN(
-                "Unable to acquire dd_client for db: %s, table: %s for FKs "
-                "collection",
-                table->db, table->table_name);
-            my_error(ER_LOCK_DEADLOCK, MYF(0));
-            return true;
-          }
+        if (table_obj != nullptr) {
+          action(table_obj);
+        } else if (fallback_action) {
+          fallback_action(table);
+        }
+      }  // The end of Dictionary_client::Auto_releaser scope
+    }    // The end of mdl_release_guard scope
 
-          if (table_obj != nullptr) {
-            action(table_obj);
-          }
-        }  // The end of Dictionary_client::Auto_releaser scope
-      }    // The end of mdl_release_guard scope
-
-      // We might have been aborted in the meantime by some other TOI
-      if (thd->killed == THD::KILL_QUERY) {
-        WSREP_WARN(
-            "Unable to collect FKs metadata for db: %s, table: %s for FKs "
-            "collection",
-            table->db, table->table_name);
-        my_error(ER_LOCK_DEADLOCK, MYF(0));
-        return true;
-      }
+    // We might have been aborted in the meantime by some other TOI
+    if (thd->killed == THD::KILL_QUERY) {
+      WSREP_WARN(
+          "Unable to collect FKs metadata for db: %s, table: %s for FKs "
+          "collection",
+          table->db, table->table_name);
+      my_error(ER_LOCK_DEADLOCK, MYF(0));
+      return true;
     }
   }
 
@@ -1865,47 +1867,65 @@ static bool wsrep_do_action_for_tables(THD *thd, Table_ref *tables,
 }
 
 /*
- * Collect wsrep keys corresponding to child tables
+ * Collect wsrep keys corresponding to child tables of the provided table
  */
-bool wsrep_append_child_tables(THD *thd, Table_ref *tables,
+bool wsrep_append_child_tables(THD *thd, Table_ref *table,
                                wsrep::key_array *keys) {
   auto populate_child_tables = [thd](const dd::Table *table_def) {
     for (const auto fk : table_def->foreign_key_parents()) {
-      std::pair<std::string, std::string> table = std::make_pair(
-          fk->child_schema_name().c_str(), fk->child_table_name().c_str());
-
-      thd->wsrep_thd_context.get_fk_child_tables().push_back(table);
+      thd->wsrep_thd_context.get_fk_child_tables().insert(
+          {fk->child_schema_name().c_str(), fk->child_table_name().c_str()});
     }
   };
 
-  if (wsrep_do_action_for_tables(thd, tables, populate_child_tables))
+  auto populate_child_tables_fallback = [thd](const Table_ref *table_ref) {
+    std::vector<dd::String_type> children_dbs;
+    std::vector<dd::String_type> children_names;
+
+    if (thd->dd_client()->fetch_fk_children_uncached(
+            table_ref->get_db_name(), table_ref->get_table_name(), "InnoDB",
+            true, &children_dbs, &children_names)) {
+      return;
+    }
+
+    for (size_t i = 0; i < children_names.size(); ++i) {
+      thd->wsrep_thd_context.get_fk_child_tables().insert(
+          {children_dbs[i].c_str(), children_names[i].c_str()});
+    }
+  };
+
+  if (wsrep_do_action_for_table(thd, table, populate_child_tables,
+                                populate_child_tables_fallback)) {
+    WSREP_DEBUG("Failed to collect child tables of table db: %s, table: %s",
+                table->db, table->table_name);
     return true;
+  }
 
   for (const auto &table_obj : thd->wsrep_thd_context.get_fk_child_tables()) {
     keys->push_back(wsrep_prepare_key_for_toi(
         table_obj.first.c_str(), table_obj.second.c_str(), wsrep::key::shared));
   }
-
   return false;
 }
 
 /*
- * Collect wsrep keys corresponding to parent  tables
+ * Collect wsrep keys corresponding to parent tables of the provided table
  */
-bool wsrep_append_fk_parent_table(THD *thd, Table_ref *tables,
-                                  wsrep::key_array *keys) {
+bool wsrep_append_parent_tables(THD *thd, Table_ref *table,
+                                wsrep::key_array *keys) {
   auto populate_parent_tables = [thd](const dd::Table *table_def) {
     for (const auto fk : table_def->foreign_keys()) {
-      std::pair<std::string, std::string> table =
-          std::make_pair(fk->referenced_table_schema_name().c_str(),
-                         fk->referenced_table_name().c_str());
-
-      thd->wsrep_thd_context.get_fk_parent_tables().push_back(table);
+      thd->wsrep_thd_context.get_fk_parent_tables().insert(
+          {fk->referenced_table_schema_name().c_str(),
+           fk->referenced_table_name().c_str()});
     }
   };
 
-  if (wsrep_do_action_for_tables(thd, tables, populate_parent_tables))
+  if (wsrep_do_action_for_table(thd, table, populate_parent_tables)) {
+    WSREP_DEBUG("Failed to collect parent tables of table db: %s, table: %s",
+                table->db, table->table_name);
     return true;
+  }
 
   for (const auto &table_obj : thd->wsrep_thd_context.get_fk_parent_tables()) {
     keys->push_back(wsrep_prepare_key_for_toi(
@@ -3111,29 +3131,34 @@ void wsrep_to_isolation_end(THD *thd) {
   DEBUG_SYNC(thd, "wsrep_to_isolation_end_after_wsrep_skip_wsrep_hton");
 }
 
-#define WSREP_MDL_LOG(severity, msg, schema, schema_len, req, gra)           \
-  WSREP_##severity(                                                          \
-      "%s\n\n"                                                               \
-      "schema:  %.*s\n"                                                      \
-      "request: (thd-tid:%u \tseqno:%lld \texec-mode:%s, query-state:%s,"    \
-      " conflict-state:%s)\n          cmd-code:%d %d \tquery:%s)\n\n"        \
-      "granted: (thd-tid:%u \tseqno:%lld \texec-mode:%s, query-state:%s,"    \
-      " conflict-state:%s)\n          cmd-code:%d %d \tquery:%s)\n",         \
-      msg, schema_len, schema, req->thread_id(),                             \
-                                                                             \
-      (long long)wsrep_thd_trx_seqno(req), wsrep_thd_client_mode_str(req),   \
-      wsrep_thd_client_state_str(req), wsrep_thd_transaction_state_str(req), \
-      req->get_command(), req->lex->sql_command,                             \
-      (req->rewritten_query().length()                                       \
-           ? wsrep_thd_rewritten_query(req).c_ptr_safe()                     \
-           : req->query().str),                                              \
-                                                                             \
-      gra->thread_id(), (long long)wsrep_thd_trx_seqno(gra),                 \
-      wsrep_thd_client_mode_str(gra), wsrep_thd_client_state_str(gra),       \
-      wsrep_thd_transaction_state_str(gra), gra->get_command(),              \
-      gra->lex->sql_command,                                                 \
-      (gra->rewritten_query().length()                                       \
-           ? wsrep_thd_rewritten_query(gra).c_ptr_safe()                     \
+#define WSREP_MDL_LOG(severity, msg, schema, schema_len, req, gra)          \
+  WSREP_##severity(                                                         \
+      "%s\n\n"                                                              \
+      "schema:  %.*s\n"                                                     \
+      "request: (thd-tid:%u \tseqno:%lld \tdep_seqno:%lld \texec-mode:%s, " \
+      "query-state:%s,"                                                     \
+      " conflict-state:%s)\n          cmd-code:%d %d \tquery:%s)\n\n"       \
+      "granted: (thd-tid:%u \tseqno:%lld \tdep_seqno:%lld \texec-mode:%s, " \
+      "query-state:%s,"                                                     \
+      " conflict-state:%s)\n          cmd-code:%d %d \tquery:%s)\n",        \
+      msg, schema_len, schema, req->thread_id(),                            \
+                                                                            \
+      (long long)wsrep_thd_trx_seqno(req),                                  \
+      (long long)wsrep_thd_trx_depends_on_seqno(req),                       \
+      wsrep_thd_client_mode_str(req), wsrep_thd_client_state_str(req),      \
+      wsrep_thd_transaction_state_str(req), req->get_command(),             \
+      req->lex->sql_command,                                                \
+      (req->rewritten_query().length()                                      \
+           ? wsrep_thd_rewritten_query(req).c_ptr_safe()                    \
+           : req->query().str),                                             \
+                                                                            \
+      gra->thread_id(), (long long)wsrep_thd_trx_seqno(gra),                \
+      (long long)wsrep_thd_trx_depends_on_seqno(gra),                       \
+      wsrep_thd_client_mode_str(gra), wsrep_thd_client_state_str(gra),      \
+      wsrep_thd_transaction_state_str(gra), gra->get_command(),             \
+      gra->lex->sql_command,                                                \
+      (gra->rewritten_query().length()                                      \
+           ? wsrep_thd_rewritten_query(gra).c_ptr_safe()                    \
            : gra->query().str));
 
 /* Returns true if BF-abort was done, false otherwise */
