@@ -858,7 +858,7 @@ function run_post_processing_steps()
     local sst_password="aA!9$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)"
 
     local -i timeout_threshold
-    timeout_threshold=300
+    timeout_threshold=$(parse_cnf sst post-processing-timeout 300)
 
     #-----------------------------------------------------------------------
     # Reuse the SST User (use it to run mysql_upgrade)
