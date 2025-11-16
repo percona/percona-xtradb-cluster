@@ -164,11 +164,11 @@ SELECT SUBSTRING_INDEX(SUBSTR(@@wsrep_provider_options, LOCATE('repl.max_ws_size
 --echo # Shutting down node2
 --source include/shutdown_mysqld.inc
 
---let $suppress_print_params=1
+--let $do_not_echo_parameters=1
 --let $start_mysqld_params = --wsrep_provider_options=base_port=$NODE_GALERAPORT_2;repl.max_ws_size=102400;
 --source include/start_mysqld.inc
 --source include/wait_until_connected_again.inc
---let $suppress_print_params=0
+--let $do_not_echo_parameters=0
 
 # Check that the cluster started correctly.
 SET SESSION wsrep_sync_wait = 0;
@@ -213,11 +213,11 @@ EOF
 --source include/shutdown_mysqld.inc
 
 --echo # restarting node2 with repl.max_ws_size=204800
---let $suppress_print_params=1
+--let $do_not_echo_parameters=1
 --let $start_mysqld_params =  --defaults-file=$CONFIG_FILE --wsrep_provider_options=base_port=$NODE_GALERAPORT_2;repl.max_ws_size=204800;
 --source include/start_mysqld.inc
 --source include/wait_until_connected_again.inc
---let $suppress_print_params=0
+--let $do_not_echo_parameters=0
 
 # Check that the cluster started correctly.
 SET SESSION wsrep_sync_wait = 0;

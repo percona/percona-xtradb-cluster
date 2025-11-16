@@ -316,11 +316,15 @@ install_deps() {
         yum install -y perl
         yum install -y https://repo.percona.com/yum/percona-release-latest.noarch.rpm
         percona-release enable tools testing
-	if [ x"$ARCH" = "xaarch64" ]; then
-	    percona-release enable pxb-84-lts testing
-	fi
-        if [ "x$RHEL" = "x8" -o "x$RHEL" = "x9" ]; then
-            yum -y install dnf-plugins-core epel-release
+        percona-release enable pxb-80 testing
+        percona-release enable pxb-84-lts
+        if [ "x$RHEL" = "x8" -o "x$RHEL" = "x9" -o "x$RHEL" = "x10" ]; then
+            yum -y install dnf-plugins-core
+            if [ "x${RHEL}" = "x10" ]; then
+                dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm
+            else
+                yum -y install epel-release
+            fi
             yum config-manager --set-enabled powertools
 	    yum -y install git
             yum -y install python2-scons || true
@@ -343,14 +347,22 @@ install_deps() {
 		yum -y install gperf rpcgen
 	    fi
 
-            if [ "x${RHEL}" = "x9" ]; then
+            if [ "x${RHEL}" = "x9" -o "x${RHEL}" = "x10" ]; then
                 yum install -y https://yum.oracle.com/repo/OracleLinux/OL9/distro/builder/${ARCH}/getPackage/procps-ng-devel-3.3.17-8.el9.x86_64.rpm
                 yum -y install dnf-utils
-                dnf config-manager --enable ol9_codeready_builder
+                dnf config-manager --enable ol${RHEL}_codeready_builder
                 yum -y install libedit-devel
                 yum -y install libtirpc-devel
                 yum -y install gcc
-                yum -y install gcc-toolset-12-gcc gcc-toolset-12-gcc-c++ gcc-toolset-12-binutils gcc-toolset-12-annobin-annocheck gcc-toolset-12-annobin-plugin-gcc gcc-toolset-12-libatomic-devel
+                if [ "x${RHEL}" = "x9" ]; then
+                    yum -y install gcc-toolset-12-gcc gcc-toolset-12-gcc-c++ gcc-toolset-12-binutils gcc-toolset-12-annobin-annocheck gcc-toolset-12-annobin-plugin-gcc gcc-toolset-12-libatomic-devel
+                else
+                    yum -y install gcc
+                    yum -y install libatomic
+                    if [ x"$ARCH" = "xx86_64" ]; then
+                        yum -y install gcc-gfortran
+                    fi
+                fi
                 yum -y install scons pip python3-devel
                 pip install --user typing pyyaml regex Cheetah3
             else
@@ -442,17 +454,8 @@ install_deps() {
         percona-release enable tools release
         
         # (1) PXB compatible with previous PXC LTS version
-	if [ x"$ARCH" = "xx86_64" ]; then
-            percona-release enable pxb-80 release
-	else
-	    percona-release enable pxb-80 testing
-	fi
-        if [ x"${DIST}" = xnoble ]; then
-            percona-release enable pxb-8x-innovation experimental
-        else
-            percona-release enable pxb-8x-innovation release
-        fi
-        percona-release enable pxb-84-lts testing
+        percona-release enable pxb-80
+        percona-release enable pxb-84-lts
         # (2) PXB compatible with previous PXC version (note: it may be LTS as well)
         percona-release enable pxc-8x-innovation testing
         # (3) PXB compatible with this PXC version (LTS or Innovative)
@@ -476,22 +479,10 @@ install_deps() {
         apt-get -y install stunnel libkrb5-dev
         apt-get -y install libudev-dev
 
-        if [ x"${DIST}" = xnoble ]; then
-            apt-get -y install gcc-11 g++-11
-            update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100 --slave /usr/bin/g++ g++ /usr/bin/g++-11
-        fi
-
         if [ x"${DIST}" = xfocal -o x"${DIST}" = xbullseye -o x"${DIST}" = jammy -o x"${DIST}" = bookworm -o x"${DIST}" = xnoble ]; then
             apt-get -y install python3-mysqldb
         else
             apt-get -y install python-mysqldb
-        fi
-        if [ x"${DIST}" = xbionic ]; then
-            apt-get -y install gcc-8 g++-8
-            wget https://downloads.percona.com/downloads/packaging/libfido2-1/libcbor0.6_0.6.0-0ubuntu1_amd64.deb
-            wget https://downloads.percona.com/downloads/packaging/libfido2-1/libfido2-1_1.3.1-1ubuntu2_amd64.deb
-            dpkg -i libcbor0.6_0.6.0-0ubuntu1_amd64.deb
-            dpkg -i libfido2-1_1.3.1-1ubuntu2_amd64.deb
         fi
         if [ x"${DIST}" = xbuster ]; then
             wget https://downloads.percona.com/downloads/packaging/libfido2-1/libfido2-1_1.5.0-2~bpo10+1_amd64.deb
@@ -502,12 +493,18 @@ install_deps() {
             apt update
             apt -y install cmake/buster-backports
         fi
-        if [ x"${DIST}" = xfocal ]; then
-            apt-get -y install gcc-10 g++-10
-            update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 100
-            update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 100
-            update-alternatives --config gcc
-            update-alternatives --config g++
+        if [ x"${DIST}" = xnoble ]; then
+            apt-get -y install gcc-13 g++-13
+            update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100 --slave /usr/bin/g++ g++ /usr/bin/g++-13
+            update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-13 100
+        elif [ x"${DIST}" = xjammy ]; then
+            apt-get -y install gcc-11 g++-11 cpp-11
+            update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100 --slave /usr/bin/g++ g++ /usr/bin/g++-11 --slave /usr/bin/gcov gcov /usr/bin/gcov-11
+            update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-11 100
+        else
+            apt-get -y install gcc-10 g++-10 cpp-10
+            update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 100 --slave /usr/bin/g++ g++ /usr/bin/g++-10 --slave /usr/bin/gcov gcov /usr/bin/gcov-10
+            update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-10 100
         fi
         apt-get -y install libmecab2 mecab mecab-ipadic
         apt-get -y install build-essential devscripts
@@ -515,8 +512,8 @@ install_deps() {
         apt-get -y install libtool libnuma-dev scons libboost-dev libboost-program-options-dev check
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
-        apt-get -y install --download-only percona-xtrabackup-80=8.0.35-31-1.${DIST}
-        apt-get -y install --download-only percona-xtrabackup-84=8.4.0-1-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-80=8.0.35-34-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-84=8.4.0-4-1.${DIST}
     fi
     return;
 }
@@ -706,7 +703,7 @@ build_mecab_lib(){
     wget ${MECAB_LINK}
     tar xf ${MECAB_TARBAL}
     if [ x"$ARCH" = "xaarch64" ]; then
-        git clone git://git.savannah.gnu.org/config.git
+        git clone https://git.savannah.gnu.org/git/config.git
         unalias cp
         cp config/config.guess ${MECAB_DIR}
         cp config/config.sub ${MECAB_DIR}

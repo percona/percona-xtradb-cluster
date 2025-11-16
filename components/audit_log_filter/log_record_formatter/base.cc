@@ -28,6 +28,8 @@
 #include <mysql/components/services/defs/event_tracking_stored_program_defs.h>
 #include <mysql/components/services/defs/event_tracking_table_access_defs.h>
 
+#include <boost/date_time/c_time.hpp>
+
 #include <cassert>
 #include <iomanip>
 #include <iostream>
@@ -130,20 +132,28 @@ uint64_t LogRecordFormatterBase::make_record_id() const noexcept {
 }
 
 std::string LogRecordFormatterBase::make_escaped_string(
-    const std::string &in) const noexcept {
+    const char *in) const noexcept {
   std::string out;
-  const auto &escape_rules = get_escape_rules();
+  if (in != nullptr) {
+    const auto &escape_rules = get_escape_rules();
 
-  for (const char &c : in) {
-    const auto it = escape_rules.find(c);
-    if (it == escape_rules.end()) {
-      out.append(&c, 1);
-    } else {
-      out.append(it->second);
+    for (const char *ptr = in; *ptr != '\0'; ++ptr) {
+      const auto it = escape_rules.find(*ptr);
+      if (it == escape_rules.end()) {
+        out.append(ptr, 1);
+      } else {
+        out.append(it->second);
+      }
     }
   }
 
   return out;
+}
+
+std::string LogRecordFormatterBase::make_escaped_string(
+    const std::string &in) const noexcept {
+  const mysql_cstring_with_length wrapper{in.data(), in.size()};
+  return make_escaped_string(&wrapper);
 }
 
 std::string LogRecordFormatterBase::make_escaped_string(
@@ -153,10 +163,11 @@ std::string LogRecordFormatterBase::make_escaped_string(
   if (in != nullptr && in->str != nullptr && in->length != 0) {
     const auto &escape_rules = get_escape_rules();
 
-    for (size_t i = 0; i < in->length; ++i) {
-      const auto it = escape_rules.find(in->str[i]);
+    for (const char *ptr = in->str, *en = in->str + in->length; ptr < en;
+         ++ptr) {
+      const auto it = escape_rules.find(*ptr);
       if (it == escape_rules.end()) {
-        out.append(&in->str[i], 1);
+        out.append(ptr, 1);
       } else {
         out.append(it->second);
       }
@@ -480,10 +491,16 @@ const EscapeRulesContainer &LogRecordFormatterBaseXml::get_escape_rules()
 std::string LogRecordFormatterBaseXml::make_timestamp(
     const std::chrono::system_clock::time_point time_point) const noexcept {
   std::time_t t = std::chrono::system_clock::to_time_t(time_point);
-  std::stringstream timestamp;
-  timestamp << std::put_time(std::localtime(&t), "%FT%T");
+  std::tm tm;
+  static constexpr std::size_t max_buffer_size{32};
+  std::string result(max_buffer_size, '\0');
 
-  return timestamp.str();
+  boost::date_time::c_time::localtime(&t, &tm);
+  const std::size_t len =
+      std::strftime(result.data(), result.size(), "%FT%T", &tm);
+  result.resize(len);
+
+  return result;
 }
 
 }  // namespace audit_log_filter::log_record_formatter

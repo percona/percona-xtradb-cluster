@@ -197,7 +197,11 @@ SET(INSTALL_SECURE_FILE_PRIVDIR_TARGZ ${secure_file_priv_path})
 # RPM layout
 #
 SET(INSTALL_BINDIR_RPM                  "bin")
-SET(INSTALL_SBINDIR_RPM                 "sbin")
+IF(LINUX_FEDORA_SBIN_MERGE)
+  SET(INSTALL_SBINDIR_RPM                 "bin")
+ELSE()
+  SET(INSTALL_SBINDIR_RPM                 "sbin")
+ENDIF()
 #
 
 # WITH_WSREP
