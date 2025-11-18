@@ -138,6 +138,9 @@
 #include "mysql_com_server.h"
 #include "sql/client_settings.h"
 #include "sql/server_component/mysql_command_services_imp.h"
+#ifdef WITH_WSREP
+#include "sql/srv_session.h"
+#endif
 /* mysql_command_service_extn */
 #include "sql/mysqld.h"  // srv_registry
 #else
@@ -3513,6 +3516,12 @@ static void mysql_command_service_extn_free(MYSQL_EXTENSION *ext) {
       // Detached session: detach then close
       srv_session_detach(mcs_ext->session_svc);
       srv_session_close(mcs_ext->session_svc);
+#ifdef WITH_WSREP
+    // To be rolledback during next merge/release. Added to solve leak issue.
+    } else {
+      // Locally created/owned session: delete it
+      delete mcs_ext->session_svc;
+#endif
     }
     // THD-associated session: do not detach/close here (owner will close it)
     mcs_ext->session_svc = nullptr;
