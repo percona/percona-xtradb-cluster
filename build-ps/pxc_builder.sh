@@ -444,7 +444,7 @@ install_deps() {
         yum -y install cyrus-sasl-devel cyrus-sasl-scram krb5-devel
     else
         apt-get -y update
-        DEBIAN_FRONTEND=noninteractive apt-get -y install curl lsb-release gnupg2 wget apt-transport-https software-properties-common
+        DEBIAN_FRONTEND=noninteractive apt-get -y install curl lsb-release gnupg2 wget apt-transport-https
         apt-get -y install dirmngr || true
         apt-get update
         apt-get -y install dirmngr || true
@@ -473,13 +473,13 @@ install_deps() {
         apt-get -y install dh-systemd || true
         apt-get -y install curl bison cmake perl libssl-dev libaio-dev libldap2-dev libwrap0-dev gdb unzip gawk
         apt-get -y install lsb-release libmecab-dev libncurses5-dev libreadline-dev libpam-dev zlib1g-dev libcurl4-gnutls-dev
-        apt-get -y install libldap2-dev libnuma-dev libjemalloc-dev libeatmydata libc6-dbg valgrind libjson-perl libsasl2-dev
+        apt-get -y install libldap2-dev libnuma-dev libjemalloc-dev libc6-dbg valgrind libjson-perl libsasl2-dev
         apt-get -y install patchelf
         apt-get -y install libsasl2-dev libsasl2-modules-gssapi-mit
         apt-get -y install stunnel libkrb5-dev
         apt-get -y install libudev-dev
 
-        if [ x"${DIST}" = xfocal -o x"${DIST}" = xbullseye -o x"${DIST}" = jammy -o x"${DIST}" = bookworm -o x"${DIST}" = xnoble ]; then
+        if [ x"${DIST}" = xfocal -o x"${DIST}" = xbullseye -o x"${DIST}" = jammy -o x"${DIST}" = bookworm -o x"${DIST}" = xnoble -o x"${DIST}" = xtrixie ]; then
             apt-get -y install python3-mysqldb
         else
             apt-get -y install python-mysqldb
@@ -493,7 +493,13 @@ install_deps() {
             apt update
             apt -y install cmake/buster-backports
         fi
-        if [ x"${DIST}" = xnoble ]; then
+        apt-get -y install libmecab2 mecab mecab-ipadic
+        apt-get -y install build-essential devscripts
+        apt-get -y install cmake autotools-dev autoconf automake build-essential devscripts debconf debhelper fakeroot
+        apt-get -y install libtool libnuma-dev scons libboost-dev libboost-program-options-dev check libeatmydata1
+        apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
+        apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
+        if [ x"${DIST}" = xnoble -o x"${DIST}" = xtrixie ]; then
             apt-get -y install gcc-13 g++-13
             update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100 --slave /usr/bin/g++ g++ /usr/bin/g++-13
             update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-13 100
@@ -506,12 +512,7 @@ install_deps() {
             update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 100 --slave /usr/bin/g++ g++ /usr/bin/g++-10 --slave /usr/bin/gcov gcov /usr/bin/gcov-10
             update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-10 100
         fi
-        apt-get -y install libmecab2 mecab mecab-ipadic
-        apt-get -y install build-essential devscripts
-        apt-get -y install cmake autotools-dev autoconf automake build-essential devscripts debconf debhelper fakeroot
-        apt-get -y install libtool libnuma-dev scons libboost-dev libboost-program-options-dev check
-        apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
-        apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
+
         apt-get -y install --download-only percona-xtrabackup-80=8.0.35-34-1.${DIST}
         apt-get -y install --download-only percona-xtrabackup-84=8.4.0-4-1.${DIST}
     fi
@@ -1079,7 +1080,7 @@ build_deb(){
 
     cd ../ || exit
 
-    if [[ "x$DEBIAN_VERSION" == "xbionic" || "x$DEBIAN_VERSION" == "xstretch" || "x$DEBIAN_VERSION" == "xfocal" || "x$DEBIAN_VERSION" == "xbullseye" || "x$DEBIAN_VERSION" == "xjammy" || "x$DEBIAN_VERSION" == "xbookworm" || "x$DEBIAN_VERSION" == "xnoble" ]]; then
+    if [[ "x$DEBIAN_VERSION" == "xbionic" || "x$DEBIAN_VERSION" == "xstretch" || "x$DEBIAN_VERSION" == "xfocal" || "x$DEBIAN_VERSION" == "xbullseye" || "x$DEBIAN_VERSION" == "xjammy" || "x$DEBIAN_VERSION" == "xbookworm" || "x$DEBIAN_VERSION" == "xnoble" || "x$DEBIAN_VERSION" == "xtrixie" ]]; then
         sed -i 's/fabi-version=2/fabi-version=2 -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -Wno-error=literal-suffix -Wno-misleading-indentation/' cmake/build_configurations/compiler_options.cmake
         sed -i 's/gnu++11/gnu++11 -Wno-virtual-move-assign/' cmake/build_configurations/compiler_options.cmake
     fi
@@ -1089,7 +1090,7 @@ build_deb(){
     export MYSQL_BUILD_CFLAGS="$CFLAGS"
     export MYSQL_BUILD_CXXFLAGS="$CXXFLAGS"
 
-    if [[ "x$DEBIAN_VERSION" == "xfocal" || "x${DEBIAN_VERSION}" == "xbionic" || "x${DEBIAN_VERSION}" == "xbuster" || "x$DEBIAN_VERSION" == "xbullseye" || "x$DEBIAN_VERSION" == "xjammy" || "x$DEBIAN_VERSION" == "xbookworm" || "x$DEBIAN_VERSION" == "xnoble" ]]; then
+    if [[ "x$DEBIAN_VERSION" == "xfocal" || "x${DEBIAN_VERSION}" == "xbionic" || "x${DEBIAN_VERSION}" == "xbuster" || "x$DEBIAN_VERSION" == "xbullseye" || "x$DEBIAN_VERSION" == "xjammy" || "x$DEBIAN_VERSION" == "xbookworm" || "x$DEBIAN_VERSION" == "xnoble" || "x$DEBIAN_VERSION" == "xtrixie" ]]; then
         sed -i "s:iproute:iproute2:g" debian/control
     fi
     sed -i "s:libcurl4-gnutls-dev:libcurl4-openssl-dev:g" debian/control
@@ -1116,9 +1117,9 @@ build_deb(){
         rm -f call-home.sh
     cd ../
 
-    if [ ${DEBIAN_VERSION} = "noble" ]; then
-        sed -i 's/export CFLAGS=/export CFLAGS=-Wno-error=nonnull-compare /' debian/rules
-        sed -i 's/export CXXFLAGS=/export CXXFLAGS=-Wno-error=nonnull-compare /' debian/rules
+    if [ ${DEBIAN_VERSION} = "noble" -o ${DEBIAN_VERSION} = "trixie" ]; then
+        sed -i 's/export CFLAGS=/export CFLAGS=-Wno-error=nonnull-compare -Wno-error=deprecated-declarations -Wno-error=unused-function -Wno-error=unused-variable -Wno-error=unused-parameter -Wno-error=date-time /' debian/rules
+        sed -i 's/export CXXFLAGS=/export CXXFLAGS=-Wno-error=nonnull-compare -Wno-error=deprecated-declarations -Wno-error=unused-function -Wno-error=unused-variable -Wno-error=unused-parameter -Wno-error=date-time /' debian/rules
     fi
 
     GALERA_REVNO="${GALERA_REVNO}" SCONS_ARGS=' strict_build_flags=0'  MAKE_JFLAG=-j4  dpkg-buildpackage -rfakeroot -uc -us -b
