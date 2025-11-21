@@ -57,7 +57,6 @@
 %global __brp_strip_static_archive %{nil}
 
 %{!?product_suffix:              %global product_suffix community}
-%{!?feature_set:                 %global feature_set community}
 %{!?compilation_comment_release: %global compilation_comment_release MySQL Community - GPL}
 %{!?compilation_comment_debug:   %global compilation_comment_debug MySQL Community - GPL - Debug}
 %{!?compilation_comment_server_release: %global compilation_comment_server_release MySQL Community Server - GPL}
@@ -80,8 +79,8 @@ Name:           mysql%{?cluster:-cluster}-%{product_suffix}-minimal
 Summary:        A very fast and reliable SQL database server
 Group:          Applications/Databases
 Version:        @MYSQL_NO_DASH_VERSION@
-Release:        %{?cluster:0.}1@MYSQL_VERSION_EXTRA_DOT@%{?commercial:.1}%{?dist}
-License:        Copyright (c) 2000, @MYSQL_COPYRIGHT_YEAR@, %{mysql_vendor}. All rights reserved. Under %{?license_type} license as shown in the Description field.
+Release:        1@MYSQL_VERSION_EXTRA_DOT@%{?commercial:.1}%{?dist}
+License:        Copyright (c) 2000, @MYSQL_COPYRIGHT_YEAR@, %{mysql_vendor}. Under %{?license_type} license as shown in the Description field.
 URL:            http://www.mysql.com/
 Packager:       MySQL Release Engineering <mysql-build@oss.oracle.com>
 Vendor:         %{mysql_vendor}
@@ -121,14 +120,17 @@ BuildRequires:  cmake3 >= 3.11.2
 %{?el9:BuildRequires:  gcc-toolset-12-gcc}
 BuildRequires:  bison >= 3.0.4
 BuildRequires:  elfutils
+BuildRequires:  patchelf
 BuildRequires:  time
 BuildRequires:  cyrus-sasl-devel
 BuildRequires:  libaio-devel
 %if 0%{?commercial}
-BuildRequires:  libcurl-devel
+BuildRequires:  krb5-devel
 %endif
+BuildRequires:  libcurl-devel
 BuildRequires:  ncurses-devel
 BuildRequires:  numactl-devel
+BuildRequires:  openldap-devel
 BuildRequires:  openssl-devel
 BuildRequires:  zlib-devel
 BuildRoot:      %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
@@ -219,11 +221,11 @@ mkdir release
            -DWITH_BOOST=.. \
            -DCMAKE_C_FLAGS="%{optflags}" \
            -DCMAKE_CXX_FLAGS="%{optflags}" \
+           -DUSE_LD_LLD=0 \
            -DWITH_INNODB_MEMCACHED=1 \
            -DINSTALL_MYSQLTESTDIR="" \
            -DMYSQL_UNIX_ADDR="%{mysqldatadir}/mysql.sock" \
            -DMYSQLX_UNIX_ADDR="/var/run/mysqld/mysqlx.sock" \
-           -DFEATURE_SET="%{feature_set}" \
            -DWITH_ROUTER=OFF \
            -DWITH_NUMA=OFF \
            %{?mecab_option} \
@@ -232,7 +234,7 @@ mkdir release
            -DNDB_UTILS_LINK_DYNAMIC=1 \
 %endif
 %if 0%{?commercial}
-           -DWITH_MEB=1 \
+           -DWITH_MEB=%{with_meb} \
            -DWITH_CURL=system \
            %{?aws_sdk_option} \
 %endif
@@ -316,7 +318,7 @@ for f in innochecksum ibd2sdi myisamchk myisam_ftdump myisamlog myisampack \
          my_safe_process %{!?cluster:mysqlbinlog} mysqlcheck mysql_client_test \
          mysql_config_editor mysqld_multi mysqld_safe mysqldumpslow mysqlimport \
          mysql_secure_installation mysqlshow mysqlslap mysqltest mysqltest_safe_process mysqlxtest \
-         perror lz4_decompress zlib_decompress ; do
+         comp_err perror lz4_decompress zlib_decompress mysql_keyring_encryption_test; do
     rm -f %{buildroot}%{_bindir}/$f
 done
 
@@ -331,8 +333,6 @@ done
 
 #  Remove test plugins, please keep alphabetical order
 for p in \
-         authentication_ldap_sasl.so \
-         authentication_ldap_simple.so \
          auth.so \
          auth_test_plugin.so \
          component_example_component1.so \
@@ -375,6 +375,7 @@ for p in \
          component_test_sys_var_service_str.so \
          component_test_table_access.so \
          component_test_udf_registration.so \
+         component_test_udf_services.so \
          component_udf_reg_3_func.so \
          component_udf_reg_avg_func.so \
          component_udf_reg_int_func.so \
@@ -470,13 +471,11 @@ rm -r $(readlink var) var
 %attr(755, root, root) %{_bindir}/ndb_waiter
 %attr(755, root, root) %{_bindir}/ndb_mgm
 %attr(755, root, root) %{_bindir}/ndb_top
+%attr(755, root, root) %{_bindir}/ndbxfrm
 %attr(755, root, root) %{_sbindir}/ndb_mgmd
 %attr(755, root, root) %{_sbindir}/ndbd
 %attr(755, root, root) %{_sbindir}/ndbmtd
-%attr(755, root, root) %{_bindir}/memclient
-%attr(755, root, root) %{_sbindir}/memcached
-%attr(755, root, root) %{_libdir}/mysql/ndb_engine.so
-%{_datadir}/mysql-*/memcache-api/
+%attr(755, root, root) %{_libdir}/mysql/libndbclient.so.6.1.0
 %endif
 
 %attr(755, root, root) %{_sbindir}/mysqld
@@ -489,6 +488,7 @@ rm -r $(readlink var) var
 %attr(755, root, root) %{_bindir}/mysql_tzinfo_to_sql
 %attr(755, root, root) %{_bindir}/mysql_upgrade
 %attr(755, root, root) %{_bindir}/my_print_defaults
+%attr(755, root, root) %{_bindir}/mysql_migrate_keyring
 
 %dir %{_libdir}/mysql/private
 %attr(755, root, root) %{_libdir}/mysql/private/libprotobuf-lite.so.24.4.0
@@ -538,6 +538,7 @@ rm -r $(readlink var) var
 %attr(755, root, root) %{_libdir}/mysql/plugin/semisync_replica.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/validate_password.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/version_token.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/component_keyring_file.so
 %dir %{_datadir}/mysql-*/
 %{_datadir}/mysql-*/charsets/
 %{_datadir}/mysql-*/bulgarian/
@@ -564,7 +565,8 @@ rm -r $(readlink var) var
 %{_datadir}/mysql-*/spanish/
 %{_datadir}/mysql-*/swedish/
 %{_datadir}/mysql-*/ukrainian/
-%attr(644, root, root) %{_datadir}/mysql-*/errmsg-utf8.txt
+%attr(644, root, root) %{_datadir}/mysql-*/messages_to_error_log.txt
+%attr(644, root, root) %{_datadir}/mysql-*/messages_to_clients.txt
 %attr(644, root, root) %{_datadir}/mysql-*/dictionary.txt
 %attr(644, root, root) %{_datadir}/mysql-*/innodb_memcached_config.sql
 %attr(644, root, root) %{_datadir}/mysql-*/install_rewriter.sql
@@ -578,7 +580,9 @@ rm -r $(readlink var) var
 %{_libdir}/mysql/private/icudt77l/brkitr
 
 %if 0%{?commercial}
+%if 0%{?with_meb}
 %attr(755, root, root) %{_bindir}/mysqlbackup
+%endif # with_meb
 %attr(755, root, root) %{_libdir}/mysql/plugin/audit_log.so
 %attr(644, root, root) %{_datadir}/mysql-*/audit_log_filter_linux_install.sql
 %attr(644, root, root) %{_datadir}/mysql-*/audit_log_filter_uninstall.sql
@@ -590,6 +594,7 @@ rm -r $(readlink var) var
 %attr(755, root, root) %{_libdir}/mysql/plugin/keyring_okv.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/keyring_encrypted_file.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/keyring_hashicorp.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/keyring_oci.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/thread_pool.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/openssl_udf.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/firewall.so
@@ -646,7 +651,12 @@ rm -r $(readlink var) var
 * Wed Sep 09 2020 Joro Kodinov <georgi.kodinov@oracle.com> - 8.0.23-1
 - Add a new component_query_attributes
 
-* Wed May 18 2020 Ivo Roylev <ivo.roylev@oracle.com> - 8.0.20-1
+* Mon Aug 03 2020 Harin Vadodaria <harin.vadodaria@oracle.com> - 8.0.22-1
+- Added component_keyring_file component
+- Added component_keyring_encrypted_file component
+- Added mysql_migrate_keyring
+
+* Mon May 18 2020 Ivo Roylev <ivo.roylev@oracle.com> - 8.0.20-1
 - added keyring_oci plugin
 
 * Wed Jan 8 2020 Piotr Obrzut <piotr.obrzut@oracle.com> - 8.0.20-1
@@ -1061,8 +1071,7 @@ rm -r $(readlink var) var
 
 * Mon Nov 16 2009 Joerg Bruehe <joerg.bruehe@sun.com>
 
-- Fix some problems with the directives around "tcmalloc" (experimental),
-  remove erroneous traces of the InnoDB plugin (that is 5.1 only).
+- remove erroneous traces of the InnoDB plugin (that is 5.1 only).
 
 * Tue Oct 06 2009 Magnus Blaudd <mvensson@mysql.com>
 
