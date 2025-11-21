@@ -166,17 +166,13 @@ def	mysql	time_zone_transition_type	mysql	PRIMARY
 def	mysql	time_zone_transition_type	mysql	PRIMARY
 def	mysql	user	mysql	PRIMARY
 def	mysql	user	mysql	PRIMARY
-<<<<<<< HEAD
 def	mysql	wsrep_cluster	mysql	PRIMARY
 def	mysql	wsrep_cluster_members	mysql	PRIMARY
 def	mysql	wsrep_streaming_log	mysql	PRIMARY
 def	mysql	wsrep_streaming_log	mysql	PRIMARY
 def	mysql	wsrep_streaming_log	mysql	PRIMARY
-||||||| e2841f91d54
-=======
 def	performance_schema	account_failed_login_lock_status	performance_schema	ACCOUNT
 def	performance_schema	account_failed_login_lock_status	performance_schema	ACCOUNT
->>>>>>> percona/ps/release-8.0.44-35
 def	performance_schema	accounts	performance_schema	ACCOUNT
 def	performance_schema	accounts	performance_schema	ACCOUNT
 def	performance_schema	cond_instances	performance_schema	NAME
