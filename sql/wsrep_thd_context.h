@@ -18,10 +18,8 @@
 #ifndef WSREP_THD_CONTEXT_H
 #define WSREP_THD_CONTEXT_H
 
+#include <map>
 #include <string>
-#include <vector>
-
-using wsrep_table_t = std::pair<std::string, std::string>;
 
 /*
   This class encapsulates the wsrep context associated with the THD
@@ -29,8 +27,16 @@ using wsrep_table_t = std::pair<std::string, std::string>;
  */
 class Wsrep_thd_context {
  private:
-  std::vector<wsrep_table_t> fk_parent_tables;
-  std::vector<wsrep_table_t> fk_child_tables;
+  /*
+    We cache keys related to parent/child tables for some TOIs.
+    We need this cache, because of what is said in comment of
+    wsrep::key::append_key_part():
+    "The caller is supposed to take
+     care that the pointer remains valid over the lifetime
+     if the key object"
+  */
+  std::multimap<std::string, std::string> fk_parent_tables;
+  std::multimap<std::string, std::string> fk_child_tables;
 
   Wsrep_thd_context(const Wsrep_thd_context &) = delete;  // copy constructor
   Wsrep_thd_context operator=(Wsrep_thd_context &&) =
@@ -42,8 +48,8 @@ class Wsrep_thd_context {
   Wsrep_thd_context() {}
   void clear();
 
-  std::vector<wsrep_table_t> &get_fk_parent_tables();
-  std::vector<wsrep_table_t> &get_fk_child_tables();
+  std::multimap<std::string, std::string> &get_fk_parent_tables();
+  std::multimap<std::string, std::string> &get_fk_child_tables();
 };
 
 #endif /* WSREP_THD_CONTEXT_H */

@@ -688,10 +688,13 @@ bool Sql_cmd_create_or_drop_index_base::execute(THD *thd) {
 
 #ifdef WITH_WSREP
   wsrep::key_array keys;
-  if (wsrep_append_fk_parent_table(thd, first_table, &keys) ||
-      wsrep_append_child_tables(thd, first_table, &keys)) {
-    WSREP_DEBUG("TOI replication for CREATE/DROP INDEX failed");
-    return true;
+  for (Table_ref *table = first_table; table; table = table->next_global) {
+    if (wsrep_append_parent_tables(thd, table, &keys) ||
+        wsrep_append_child_tables(thd, table, &keys)) {
+      WSREP_DEBUG("TOI replication for CREATE/DROP INDEX failed. Query: %s",
+                  WSREP_QUERY(thd));
+      return true;
+    }
   }
   if (keys.empty()) {
     WSREP_TO_ISOLATION_BEGIN_IF(first_table->db, first_table->table_name,

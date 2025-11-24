@@ -386,17 +386,21 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
     wsrep::key_array keys;
     // append tables referenced by this table
     // append tables that are referencing this table
-    if (wsrep_append_fk_parent_table(thd, first_table, &keys) ||
-        wsrep_append_child_tables(thd, first_table, &keys)) {
-      WSREP_DEBUG("TOI replication for ALTER failed");
-      return true;
+    for (Table_ref *table = first_table; table; table = table->next_global) {
+      if (wsrep_append_parent_tables(thd, table, &keys) ||
+          wsrep_append_child_tables(thd, table, &keys)) {
+        WSREP_DEBUG("TOI replication for ALTER failed. Query: %s",
+                    WSREP_QUERY(thd));
+        return true;
+      }
     }
 
     WSREP_TO_ISOLATION_BEGIN_ALTER(
         ((lex->name.str) ? lex->query_block->db : NULL),
         ((lex->name.str) ? lex->name.str : NULL), first_table, &alter_info,
         &keys) {
-      WSREP_DEBUG("TOI replication for ALTER failed");
+      WSREP_DEBUG("TOI replication for ALTER failed. Query: %s",
+                  WSREP_QUERY(thd));
       return true;
     }
   }

@@ -504,7 +504,7 @@ void Sql_cmd_truncate_table::truncate_base(THD *thd, Table_ref *table_ref) {
 #ifdef WITH_WSREP
   if (wsrep_should_replicate_for_table(table_ref)) {
     wsrep::key_array keys;
-    if (wsrep_append_fk_parent_table(thd, table_ref, &keys)) {
+    if (wsrep_append_parent_tables(thd, table_ref, &keys)) {
       return;
     }
     if (keys.empty()) {
