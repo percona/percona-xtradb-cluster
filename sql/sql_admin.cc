@@ -722,8 +722,10 @@ static bool wsrep_toi_replication(THD *thd, Table_ref *tables) {
 
   wsrep::key_array keys;
 
-  if (wsrep_append_fk_parent_table(thd, tables, &keys)) {
-    return true;
+  for (Table_ref *table = tables; table; table = table->next_global) {
+    if (wsrep_append_parent_tables(thd, table, &keys)) {
+      return true;
+    }
   }
 
   /* now TOI replication, with no locks held */
