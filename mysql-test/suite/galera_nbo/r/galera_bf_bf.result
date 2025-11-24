@@ -1,3 +1,4 @@
+########## CASE 1 ########## 
 SET SESSION wsrep_sync_wait = 0;
 CREATE TABLE p1 (pk INTEGER PRIMARY KEY, f2 INTEGER);
 INSERT INTO p1 VALUES (1,1);
@@ -29,6 +30,7 @@ ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 SET SESSION wsrep_osu_method=TOI;
 DROP TABLE c1;
 DROP TABLE p1;
+########## CASE 2 ########## 
 CREATE TABLE p1 (pk INTEGER PRIMARY KEY, f2 INTEGER, KEY f2_key (f2));
 CREATE TABLE c1 (pk INTEGER PRIMARY KEY, data INTEGER, fk INTEGER, FOREIGN KEY (fk) REFERENCES p1(pk));
 INSERT INTO p1 VALUES (0, 0);
@@ -43,17 +45,22 @@ SET GLOBAL wsrep_provider_options = 'dbug=d,apply_monitor_master_enter_sync';
 BEGIN;
 UPDATE c1 SET data = 1 WHERE pk = 0;
 COMMIT;
+SET SESSION wsrep_sync_wait=0;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
 SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_master_enter_sync';
 SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_master_enter_sync';
 SET GLOBAL wsrep_provider_options = 'dbug=';
 ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 DROP TABLE c1;
 DROP TABLE p1;
+########## CASE 3 ########## 
 CALL mtr.add_suppression(".*Unable to collect FKs metadata.*");
 SET wsrep_retry_autocommit = 1;
 CREATE TABLE t1 (a INT PRIMARY KEY);
 SET SESSION wsrep_osu_method=NBO;
-SET DEBUG_SYNC='wsrep_do_action_for_tables_after_lock SIGNAL reached WAIT_FOR continue';
+SET DEBUG_SYNC='wsrep_do_action_for_table_after_lock SIGNAL reached WAIT_FOR continue';
 ALTER TABLE t1 ADD (b INT);
 SET DEBUG_SYNC='now WAIT_FOR reached';
 ALTER TABLE t1 ADD (c INT);
@@ -67,10 +74,11 @@ t1	CREATE TABLE `t1` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 SET SESSION wsrep_osu_method=TOI;
 DROP TABLE t1;
+########## CASE 4 ########## 
 SET wsrep_retry_autocommit = 0;
 CREATE TABLE t1 (a INT PRIMARY KEY);
 SET SESSION wsrep_osu_method=NBO;
-SET DEBUG_SYNC='wsrep_do_action_for_tables_after_lock SIGNAL reached WAIT_FOR continue';
+SET DEBUG_SYNC='wsrep_do_action_for_table_after_lock SIGNAL reached WAIT_FOR continue';
 ALTER TABLE t1 ADD (b INT);
 SET DEBUG_SYNC='now WAIT_FOR reached';
 ALTER TABLE t1 ADD (c INT);
@@ -84,13 +92,14 @@ t1	CREATE TABLE `t1` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 SET SESSION wsrep_osu_method=TOI;
 DROP TABLE t1;
+########## CASE 5 ########## 
 SET wsrep_retry_autocommit = 2;
 CREATE TABLE t1 (a INT PRIMARY KEY);
 SET SESSION wsrep_osu_method=NBO;
-SET GLOBAL debug="+d,wsrep_do_action_for_tables_lock_fail";
+SET GLOBAL debug="+d,wsrep_do_action_for_table_lock_fail";
 ALTER TABLE t1 ADD (b INT);
 ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
-SET GLOBAL debug="-d,wsrep_do_action_for_tables_lock_fail";
+SET GLOBAL debug="-d,wsrep_do_action_for_table_lock_fail";
 SHOW CREATE TABLE t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (

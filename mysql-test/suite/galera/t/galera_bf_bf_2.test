@@ -87,3 +87,41 @@
 --let $after_test_table_check = SELECT COUNT(*) = 1 FROM t2 WHERE d=2
 --let $drop_query = DROP TABLE t1, t2
 --source galera_bf_bf_2.inc
+
+#
+# Test that
+# DROP TABLE <parent_table> and concurrent UPDATE <child_table>
+# are properly ordered.
+# Originally there is a relation between parent_table and child_table.
+# However the test creates parent_table_new from parent_table and drops parent_table.
+# At the same time child table keeps the reference to the parent_table.
+#
+--let $test_case = DROP TABLE <parent_table> and concurrent UPDATE <child_table>
+--let $setup_query = CREATE TABLE parent (id INT PRIMARY KEY); CREATE TABLE child (id INT PRIMARY KEY, parent_id INT, data INT, FOREIGN KEY(parent_id) REFERENCES parent(id) ON DELETE CASCADE ON UPDATE CASCADE); INSERT INTO parent values (0); INSERT INTO child values (0, 0, 0); CREATE TABLE parent_new LIKE parent; INSERT INTO parent_new SELECT * FROM parent;
+--let $setup_check = SELECT COUNT(*) = 1 FROM parent_new
+--let $ddl_query = SET foreign_key_checks=0; DROP TABLE parent;
+--let $dml_query = UPDATE child SET data = 1 WHERE id = 0
+# After the test we expect child table to be updated
+--let $after_test_table_check = SELECT COUNT(*) = 1 FROM child WHERE id =0
+--let $drop_query = DROP TABLE parent_new, child
+--source galera_bf_bf_2.inc
+
+#
+# Test that
+# RENAME TABLE <parent_table_new> and concurrent UPDATE <child_table>
+# are properly ordered.
+# Originally there is a relation between parent_table and child_table.
+# However the test creates parent_table_new from parent_table and drops parent_table.
+# Then it renames parent_table_new back to parent_table.
+# At the same time child table keeps the reference to the parent_table.
+#
+--let $test_case = RENAME TABLE <parent_table_new> and concurrent UPDATE <child_table>
+--let $setup_query = CREATE TABLE parent (id INT PRIMARY KEY); CREATE TABLE child (id INT PRIMARY KEY, parent_id INT, data INT, FOREIGN KEY(parent_id) REFERENCES parent(id) ON DELETE CASCADE ON UPDATE CASCADE); INSERT INTO parent values (0); INSERT INTO child values (0, 0, 0); CREATE TABLE parent_new LIKE parent; INSERT INTO parent_new SELECT * FROM parent; SET foreign_key_checks=0; DROP TABLE parent;
+--let $setup_check = SELECT COUNT(*) = 1 FROM parent_new
+--let $ddl_query = RENAME TABLE parent_new TO parent
+--let $dml_query = UPDATE child SET data = 1 WHERE id = 0
+# After the test we expect child table to be updated
+--let $after_test_table_check = SELECT COUNT(*) = 1 FROM child WHERE id =0
+--let $drop_query = DROP TABLE parent, child
+--source galera_bf_bf_2.inc
+

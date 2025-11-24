@@ -114,3 +114,61 @@ SET DEBUG_SYNC = "now SIGNAL signal.ordered_commit_continue";
 SET GLOBAL wsrep_provider_options = 'dbug=';
 SET GLOBAL wsrep_provider_options = 'signal=after_cert_and_catch';
 DROP TABLE t1, t2;
+############################################################
+# Testcase:
+# DROP TABLE <parent_table> and concurrent UPDATE <child_table>
+############################################################
+SET SESSION wsrep_sync_wait = 0;
+SET SESSION wsrep_sync_wait = 0;
+SET SESSION wsrep_sync_wait = 0;
+CREATE TABLE parent (id INT PRIMARY KEY); CREATE TABLE child (id INT PRIMARY KEY, parent_id INT, data INT, FOREIGN KEY(parent_id) REFERENCES parent(id) ON DELETE CASCADE ON UPDATE CASCADE); INSERT INTO parent values (0); INSERT INTO child values (0, 0, 0); CREATE TABLE parent_new LIKE parent; INSERT INTO parent_new SELECT * FROM parent;;
+SET GLOBAL wsrep_provider_options = 'dbug=d,after_cert_and_catch';
+SET SESSION wsrep_sync_wait = 0;
+SET GLOBAL wsrep_applier_threads = 2;
+SET GLOBAL debug = "+d,ordered_commit_blocked";
+SET foreign_key_checks=0; DROP TABLE parent;;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET DEBUG_SYNC = "now WAIT_FOR signal.ordered_commit_waiting";
+SET GLOBAL debug = "-d,ordered_commit_blocked";
+SET GLOBAL wsrep_provider_options = 'dbug=d,sync.apply_trx.start_of_apply_trx';
+UPDATE child SET data = 1 WHERE id = 0;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=sync.apply_trx.start_of_apply_trx';
+SET DEBUG_SYNC = "now SIGNAL signal.ordered_commit_continue";
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=after_cert_and_catch';
+DROP TABLE parent_new, child;
+############################################################
+# Testcase:
+# RENAME TABLE <parent_table_new> and concurrent UPDATE <child_table>
+############################################################
+SET SESSION wsrep_sync_wait = 0;
+SET SESSION wsrep_sync_wait = 0;
+SET SESSION wsrep_sync_wait = 0;
+CREATE TABLE parent (id INT PRIMARY KEY); CREATE TABLE child (id INT PRIMARY KEY, parent_id INT, data INT, FOREIGN KEY(parent_id) REFERENCES parent(id) ON DELETE CASCADE ON UPDATE CASCADE); INSERT INTO parent values (0); INSERT INTO child values (0, 0, 0); CREATE TABLE parent_new LIKE parent; INSERT INTO parent_new SELECT * FROM parent; SET foreign_key_checks=0; DROP TABLE parent;;
+SET GLOBAL wsrep_provider_options = 'dbug=d,after_cert_and_catch';
+SET SESSION wsrep_sync_wait = 0;
+SET GLOBAL wsrep_applier_threads = 2;
+SET GLOBAL debug = "+d,ordered_commit_blocked";
+RENAME TABLE parent_new TO parent;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET DEBUG_SYNC = "now WAIT_FOR signal.ordered_commit_waiting";
+SET GLOBAL debug = "-d,ordered_commit_blocked";
+SET GLOBAL wsrep_provider_options = 'dbug=d,sync.apply_trx.start_of_apply_trx';
+UPDATE child SET data = 1 WHERE id = 0;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=sync.apply_trx.start_of_apply_trx';
+SET DEBUG_SYNC = "now SIGNAL signal.ordered_commit_continue";
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=after_cert_and_catch';
+DROP TABLE parent, child;

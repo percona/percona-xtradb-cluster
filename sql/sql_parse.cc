@@ -4290,9 +4290,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
     case SQLCOM_RENAME_TABLE: {
       assert(first_table == all_tables && first_table != nullptr);
       Table_ref *table;
-#ifdef WITH_WSREP
-      wsrep::key_array keys;
-#endif
+
       for (table = first_table; table; table = table->next_local->next_local) {
         if (check_access(thd, ALTER_ACL | DROP_ACL, table->db,
                          &table->grant.privilege, &table->grant.m_internal,
@@ -4301,16 +4299,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
                          &table->next_local->grant.privilege,
                          &table->next_local->grant.m_internal, false, false))
           goto error;
-
-#ifdef WITH_WSREP
-        // append tables referenced by this table
-        // append tables that are referencing this table
-        if (wsrep_append_fk_parent_table(thd, table, &keys) ||
-            wsrep_append_child_tables(thd, table, &keys)) {
-          WSREP_DEBUG("TOI replication for RENAME TABLE failed");
-          goto error;
-        }
-#endif
 
         Table_ref old_list = table[0];
         Table_ref new_list = table->next_local[0];
@@ -4332,6 +4320,28 @@ int mysql_execute_command(THD *thd, bool first_level) {
       }
 
 #ifdef WITH_WSREP
+      wsrep::key_array keys;
+      for (table = first_table; table; table = table->next_global) {
+        // append tables referenced by this table
+        // append tables that are referencing this table
+        /* first_table list contains series of old_name-new_name tables.
+           Below call to wsrep_append_child_tables() will try to figure out
+           all children of a given table.
+           pt-osc does the following:
+           1. CREATE TABLE parent_new LIKE parent;
+           2. INSERT INTO parent_new SELECT * FROM parent;
+           3. SET foreign_key_checks=0;
+           4. DROP TABLE parent;
+           5. RENAME TABLE parent_new TO parent;
+
+           Here we are when executing step 5. */
+        if (wsrep_append_parent_tables(thd, table, &keys) ||
+            wsrep_append_child_tables(thd, table, &keys)) {
+          WSREP_DEBUG("TOI replication for RENAME TABLE failed. Query: %s",
+                      WSREP_QUERY(thd));
+          goto error;
+        }
+      }
       if (WSREP(thd) &&
           wsrep_to_isolation_begin(thd, nullptr, nullptr, first_table, nullptr,
                                    nullptr, &keys)) {
@@ -4423,18 +4433,24 @@ int mysql_execute_command(THD *thd, bool first_level) {
       }
 
 #ifdef WITH_WSREP
+      wsrep::key_array keys;
+      bool replicate = false;
       for (Table_ref *table = all_tables; table; table = table->next_global) {
         if (!lex->drop_temporary &&
             (!thd->is_current_stmt_binlog_format_row() ||
              !find_temporary_table(thd, table))) {
-          wsrep::key_array keys;
-          if (wsrep_append_fk_parent_table(thd, all_tables, &keys)) {
+          if (wsrep_append_parent_tables(thd, table, &keys) ||
+              wsrep_append_child_tables(thd, table, &keys)) {
+            WSREP_DEBUG("TOI replication for DROP TABLE failed. Query: %s",
+                        WSREP_QUERY(thd));
             return true;
           }
-          WSREP_TO_ISOLATION_BEGIN_FK_TABLES_IF(NULL, NULL, all_tables, &keys) {
-            goto error;
-          }
-          break;
+          replicate = true;
+        }
+      }
+      if (replicate) {
+        WSREP_TO_ISOLATION_BEGIN_FK_TABLES_IF(NULL, NULL, all_tables, &keys) {
+          goto error;
         }
       }
 #endif /* WITH_WSREP */
