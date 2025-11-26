@@ -4457,6 +4457,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
 
 #ifdef WITH_WSREP
       wsrep::key_array keys;
+      bool replicate = false;
       for (Table_ref *table = all_tables; table; table = table->next_global) {
         if (!lex->drop_temporary &&
             (!thd->is_current_stmt_binlog_format_row() ||
@@ -4467,11 +4468,13 @@ int mysql_execute_command(THD *thd, bool first_level) {
                         WSREP_QUERY(thd));
             return true;
           }
-          break;
+          replicate = true;
         }
       }
-      WSREP_TO_ISOLATION_BEGIN_FK_TABLES_IF(NULL, NULL, all_tables, &keys) {
-        goto error;
+      if (replicate) {
+        WSREP_TO_ISOLATION_BEGIN_FK_TABLES_IF(NULL, NULL, all_tables, &keys) {
+          goto error;
+        }
       }
 #endif /* WITH_WSREP */
 
