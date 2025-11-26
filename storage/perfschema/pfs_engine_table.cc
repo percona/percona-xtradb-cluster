@@ -54,6 +54,7 @@
 #include "sql/table.h"
 /* For show status */
 #include "storage/perfschema/pfs_column_values.h"
+#include "storage/perfschema/table_account_failed_login_lock_status.h"
 #include "storage/perfschema/table_accounts.h"
 #include "storage/perfschema/table_binary_log_transaction_compression_stats.h"
 #include "storage/perfschema/table_data_lock_waits.h"
@@ -614,9 +615,15 @@ static PFS_engine_table_share *all_shares[] = {
 
     &table_keyring_component_status::m_share,
 
+<<<<<<< HEAD
 #ifdef WITH_WSREP
     &table_pxc_cluster_view::m_share,
 #endif /* WITH_WSREP */
+||||||| e2841f91d54
+=======
+    &table_account_failed_login_lock_status::m_share,
+
+>>>>>>> percona/ps/release-8.0.44-35
     nullptr};
 
 static PSI_mutex_key key_LOCK_pfs_share_list;
