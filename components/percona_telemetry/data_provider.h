@@ -111,15 +111,11 @@ class DataProvider {
 
   std::string database_instance_id_cache_;
   std::string version_cache_;
-<<<<<<< HEAD
+  bool js_lang_component_present_;
 #ifdef WITH_WSREP
   int gcache_encryption_enabled_cache_;
   int ws_cache_encryption_enabled_cache_;
 #endif
-||||||| merged common ancestors
-=======
-  bool js_lang_component_present_;
->>>>>>> percona/ps/release-8.4.7-7
 };
 
 #endif /* PERCONA_TELEMETRY_DATA_PROVIDER_H */

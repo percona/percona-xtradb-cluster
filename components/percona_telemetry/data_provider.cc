@@ -60,19 +60,15 @@ const char *is_source = "is_source";
 const char *is_semisync_replica = "is_semisync_replica";
 const char *is_replica = "is_replica";
 const char *replication_info = "replication_info";
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 const char *gcache_encryption_enabled = "gcache_encryption_enabled";
 const char *ws_cache_encryption_enabled = "ws_cache_encryption_enabled";
 const char *galera_replication_info = "galera_replication_info";
 #endif
-||||||| merged common ancestors
-=======
 const char *stored_program_call_count = "stored_program_call_count";
 const char *contexts_count = "contexts_count";
 const char *routines_cnt = "routines_cnt";
 const char *js_lang_component_info = "js_lang_component_info";
->>>>>>> percona/ps/release-8.4.7-7
 }  // namespace JSONKey
 }  // namespace
 
@@ -133,20 +129,14 @@ DataProvider::DataProvider(
       command_error_info_service_(command_error_info_service),
       command_thread_service_(command_thread_service),
       logger_(logger),
-<<<<<<< HEAD
-#ifdef WITH_WSREP
       db_replication_id_solver_(std::make_shared<DbReplicationIdSolver>()),
+#ifdef WITH_WSREP
+      js_lang_component_present_(false),
       gcache_encryption_enabled_cache_(-1),
       ws_cache_encryption_enabled_cache_(-1) {}
 #else
-      db_replication_id_solver_(std::make_shared<DbReplicationIdSolver>()) {}
-#endif
-||||||| merged common ancestors
-      db_replication_id_solver_(std::make_shared<DbReplicationIdSolver>()) {}
-=======
-      db_replication_id_solver_(std::make_shared<DbReplicationIdSolver>()),
       js_lang_component_present_(false) {}
->>>>>>> percona/ps/release-8.4.7-7
+#endif
 
 void DataProvider::thread_access_begin() { command_thread_service_.init(); }
 
