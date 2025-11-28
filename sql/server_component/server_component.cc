@@ -93,6 +93,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 #include "mysql_string_service_imp.h"
 #include "mysql_system_variable_update_imp.h"
 #include "mysql_thd_attributes_imp.h"
+#include "mysql_thd_kill_handler_imp.h"
 #include "mysql_thd_store_imp.h"
 #include "mysql_transaction_delegate_control_imp.h"
 #include "mysqld_error.h"
@@ -172,6 +173,9 @@ mysql_string_imp::convert_from_buffer,
 BEGIN_SERVICE_IMPLEMENTATION(mysql_server, mysql_string_charset_converter)
 mysql_string_imp::convert_from_buffer_v2,
     mysql_string_imp::convert_to_buffer_v2 END_SERVICE_IMPLEMENTATION();
+
+BEGIN_SERVICE_IMPLEMENTATION(mysql_server, mysql_string_copy_converter)
+mysql_string_imp::copy_convert END_SERVICE_IMPLEMENTATION();
 
 BEGIN_SERVICE_IMPLEMENTATION(mysql_server, mysql_string_character_access)
 mysql_string_imp::get_char,
@@ -583,6 +587,9 @@ END_SERVICE_IMPLEMENTATION();
 BEGIN_SERVICE_IMPLEMENTATION(mysql_server, mysql_status_variable_string)
 mysql_status_variable_reader_imp::get END_SERVICE_IMPLEMENTATION();
 
+BEGIN_SERVICE_IMPLEMENTATION(mysql_server, mysql_thd_kill_handler)
+Mysql_thd_kill_handler_imp::set END_SERVICE_IMPLEMENTATION();
+
 BEGIN_SERVICE_IMPLEMENTATION(mysql_server, mysql_thd_store)
 Mysql_thd_store_service_imp::register_slot,
     Mysql_thd_store_service_imp::unregister_slot,
@@ -724,6 +731,11 @@ mysql_stored_program_runtime_argument_string_imp::get,
     mysql_stored_program_runtime_argument_string_imp::set
     END_SERVICE_IMPLEMENTATION();
 
+BEGIN_SERVICE_IMPLEMENTATION(
+    mysql_server, mysql_stored_program_runtime_argument_string_charset)
+mysql_stored_program_runtime_argument_string_charset_imp::set
+END_SERVICE_IMPLEMENTATION();
+
 BEGIN_SERVICE_IMPLEMENTATION(mysql_server,
                              mysql_stored_program_runtime_argument_int)
 mysql_stored_program_runtime_argument_int_imp::get,
@@ -771,6 +783,11 @@ mysql_stored_program_return_value_null_imp::set, END_SERVICE_IMPLEMENTATION();
 BEGIN_SERVICE_IMPLEMENTATION(mysql_server,
                              mysql_stored_program_return_value_string)
 mysql_stored_program_return_value_string_imp::set END_SERVICE_IMPLEMENTATION();
+
+BEGIN_SERVICE_IMPLEMENTATION(mysql_server,
+                             mysql_stored_program_return_value_string_charset)
+mysql_stored_program_return_value_string_charset_imp::set
+END_SERVICE_IMPLEMENTATION();
 
 BEGIN_SERVICE_IMPLEMENTATION(mysql_server,
                              mysql_stored_program_return_value_int)
@@ -873,6 +890,7 @@ PROVIDES_SERVICE(mysql_server_path_filter, dynamic_loader_scheme_file),
     PROVIDES_SERVICE(mysql_server, mysql_string_case),
     PROVIDES_SERVICE(mysql_server, mysql_string_converter),
     PROVIDES_SERVICE(mysql_server, mysql_string_charset_converter),
+    PROVIDES_SERVICE(mysql_server, mysql_string_copy_converter),
     PROVIDES_SERVICE(mysql_server, mysql_string_character_access),
     PROVIDES_SERVICE(mysql_server, mysql_string_byte_access),
     PROVIDES_SERVICE(mysql_server, mysql_string_iterator),
@@ -1035,6 +1053,7 @@ PROVIDES_SERVICE(mysql_server_path_filter, dynamic_loader_scheme_file),
     PROVIDES_SERVICE(mysql_server, mysql_text_consumer_get_string_v1),
     PROVIDES_SERVICE(mysql_server, mysql_text_consumer_client_capabilities_v1),
     PROVIDES_SERVICE(mysql_server, mysql_status_variable_string),
+    PROVIDES_SERVICE(mysql_server, mysql_thd_kill_handler),
     PROVIDES_SERVICE(mysql_server, mysql_thd_store),
     PROVIDES_SERVICE(mysql_server, mysql_command_field_metadata),
     PROVIDES_SERVICE(mysql_server, dynamic_loader_services_loaded_notification),
@@ -1056,6 +1075,8 @@ PROVIDES_SERVICE(mysql_server_path_filter, dynamic_loader_scheme_file),
     PROVIDES_SERVICE(mysql_server, mysql_stored_program_runtime_argument_null),
     PROVIDES_SERVICE(mysql_server,
                      mysql_stored_program_runtime_argument_string),
+    PROVIDES_SERVICE(mysql_server,
+                     mysql_stored_program_runtime_argument_string_charset),
     PROVIDES_SERVICE(mysql_server, mysql_stored_program_runtime_argument_int),
     PROVIDES_SERVICE(mysql_server,
                      mysql_stored_program_runtime_argument_unsigned_int),
@@ -1067,6 +1088,8 @@ PROVIDES_SERVICE(mysql_server_path_filter, dynamic_loader_scheme_file),
     PROVIDES_SERVICE(mysql_server, mysql_stored_program_return_value_timestamp),
     PROVIDES_SERVICE(mysql_server, mysql_stored_program_return_value_null),
     PROVIDES_SERVICE(mysql_server, mysql_stored_program_return_value_string),
+    PROVIDES_SERVICE(mysql_server,
+                     mysql_stored_program_return_value_string_charset),
     PROVIDES_SERVICE(mysql_server, mysql_stored_program_return_value_int),
     PROVIDES_SERVICE(mysql_server,
                      mysql_stored_program_return_value_unsigned_int),

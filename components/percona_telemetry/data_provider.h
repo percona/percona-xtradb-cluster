@@ -80,6 +80,7 @@ class DataProvider {
   bool collect_product_version_info(rapidjson::Document *document);
   bool collect_plugins_info(rapidjson::Document *document);
   bool collect_components_info(rapidjson::Document *document);
+  bool collect_js_lang_component_info(rapidjson::Document *document);
   bool collect_uptime_info(rapidjson::Document *document);
   bool collect_dbs_number_info(rapidjson::Document *document);
   bool collect_dbs_size_info(rapidjson::Document *document);
@@ -110,10 +111,15 @@ class DataProvider {
 
   std::string database_instance_id_cache_;
   std::string version_cache_;
+<<<<<<< HEAD
 #ifdef WITH_WSREP
   int gcache_encryption_enabled_cache_;
   int ws_cache_encryption_enabled_cache_;
 #endif
+||||||| merged common ancestors
+=======
+  bool js_lang_component_present_;
+>>>>>>> percona/ps/release-8.4.7-7
 };
 
 #endif /* PERCONA_TELEMETRY_DATA_PROVIDER_H */
