@@ -159,8 +159,8 @@ int Rdb_convert_to_record_key_decoder::decode(
 */
 int Rdb_convert_to_record_key_decoder::skip(
     const Rdb_field_packing *fpi, const Field *field MY_ATTRIBUTE((__unused__)),
-    Rdb_string_reader *reader, Rdb_string_reader *unp_reader,
-    bool covered_bitmap_format_enabled) {
+    bool has_unpack_info, Rdb_string_reader *reader,
+    Rdb_string_reader *unp_reader, bool covered_bitmap_format_enabled) {
   /* It is impossible to unpack the column. Skip it. */
   if (fpi->m_field_is_nullable) {
     const char *nullp;
@@ -178,6 +178,23 @@ int Rdb_convert_to_record_key_decoder::skip(
   }
   if ((fpi->m_skip_func)(fpi, reader)) {
     return HA_ERR_ROCKSDB_CORRUPT_DATA;
+  }
+
+  const uint len_bytes = fpi->m_varlength_bytes;
+  if (fpi->m_unpack_func == &Rdb_key_def::unpack_unknown_varlength &&
+      unp_reader && has_unpack_info && len_bytes > 0) {
+    const uchar *ptr = (uchar *)unp_reader->read(len_bytes);
+    if (!ptr) return HA_ERR_ROCKSDB_CORRUPT_DATA;
+
+    uint len = 0;
+    if (fpi->m_field_real_type == MYSQL_TYPE_VARCHAR) {
+      len = len_bytes == 1 ? (uint)*ptr : uint2korr(ptr);
+    } else {
+      len = Field_blob::get_length(ptr, fpi->m_varlength_bytes);
+    }
+
+    ptr = (const uchar *)unp_reader->read(len);
+    if (!ptr) return HA_ERR_ROCKSDB_CORRUPT_DATA;
   }
 
   // If this is a space padded varchar, we need to skip the indicator
@@ -257,7 +274,7 @@ int Rdb_key_field_iterator::next() {
     } else {
       auto field = fpi->get_field_in_table(m_table);
       status = Rdb_convert_to_record_key_decoder::skip(
-          fpi, field, m_reader, m_unp_reader,
+          fpi, field, m_has_unpack_info, m_reader, m_unp_reader,
           this->m_key_def->use_covered_bitmap_format());
       if (status) {
         return status;
@@ -2216,7 +2233,8 @@ int Rdb_key_def::unpack_record(TABLE *const table, uchar *const buf,
     Check checksum values if present
   */
   const char *ptr;
-  if (unlikely((ptr = unp_reader.read(1)) && *ptr == RDB_CHECKSUM_DATA_TAG)) {
+  if (unlikely(unp_reader.remaining_bytes() == RDB_CHECKSUM_CHUNK_SIZE &&
+               (ptr = unp_reader.read(1)) && *ptr == RDB_CHECKSUM_DATA_TAG)) {
     if (verify_row_debug_checksums) {
       uint32_t stored_key_chksum = rdb_netbuf_to_uint32(
           (const uchar *)unp_reader.read(RDB_CHECKSUM_SIZE));
@@ -5004,6 +5022,33 @@ bool Rdb_ddl_manager::init(Rdb_dict_manager *const dict_arg,
     i++;
   }
 
+  if (max_dd_index_id_in_dict < Rdb_key_def::END_DICT_INDEX_ID) {
+    max_dd_index_id_in_dict = Rdb_key_def::END_DICT_INDEX_ID;
+  }
+
+  // index ids used by applications should not conflict with
+  // data dictionary index ids
+  if (max_index_id_in_dict < Rdb_key_def::END_DICT_INDEX_ID) {
+    max_index_id_in_dict = Rdb_key_def::END_DICT_INDEX_ID;
+  }
+
+  // TODO: need to revisit the dd table id initialization value after enabling
+  // upgrade/downgrade
+  // data dictionary index id is allocated in system cf
+  // user table index id is allocated in non-system cf
+  m_dd_table_sequence.init(max_dd_index_id_in_dict + 1);
+  m_user_table_sequence.init(max_index_id_in_dict + 1);
+  m_tmp_table_sequence.init(1);
+  if (!it->status().ok()) {
+    rdb_log_status_error(it->status(), "Table_store load error");
+    return true;
+  }
+  delete it;
+  LogPluginErrMsg(INFORMATION_LEVEL, 0,
+                  "Table_store: loaded DDL data for %d tables", i);
+
+  initialized = true;
+
 #if defined(ROCKSDB_INCLUDE_VALIDATE_TABLES) && ROCKSDB_INCLUDE_VALIDATE_TABLES
   /*
     If validate_tables is greater than 0 run the validation.  Only fail the
@@ -5031,32 +5076,6 @@ bool Rdb_ddl_manager::init(Rdb_dict_manager *const dict_arg,
 #endif  // defined(ROCKSDB_INCLUDE_VALIDATE_TABLES) &&
         // ROCKSDB_INCLUDE_VALIDATE_TABLES
 
-  if (max_dd_index_id_in_dict < Rdb_key_def::END_DICT_INDEX_ID) {
-    max_dd_index_id_in_dict = Rdb_key_def::END_DICT_INDEX_ID;
-  }
-
-  // index ids used by applications should not conflict with
-  // data dictionary index ids
-  if (max_index_id_in_dict < Rdb_key_def::END_DICT_INDEX_ID) {
-    max_index_id_in_dict = Rdb_key_def::END_DICT_INDEX_ID;
-  }
-
-  // TODO: need to revisit the dd table id initialization value after enabling
-  // upgrade/downgrade
-  // data dictionary index id is allocated in system cf
-  // user table index id is allocated in non-system cf
-  m_dd_table_sequence.init(max_dd_index_id_in_dict + 1);
-  m_user_table_sequence.init(max_index_id_in_dict + 1);
-  m_tmp_table_sequence.init(1);
-  if (!it->status().ok()) {
-    rdb_log_status_error(it->status(), "Table_store load error");
-    return true;
-  }
-  delete it;
-  LogPluginErrMsg(INFORMATION_LEVEL, 0,
-                  "Table_store: loaded DDL data for %d tables", i);
-
-  initialized = true;
   return false;
 }
 

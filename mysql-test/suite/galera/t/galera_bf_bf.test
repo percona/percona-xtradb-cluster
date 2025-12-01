@@ -19,6 +19,7 @@
 --source include/galera_cluster.inc
 --source include/count_sessions.inc
 
+--echo ########## CASE 1 ########## 
 --connect node_1_toi, 127.0.0.1, root, , test, $NODE_MYPORT_1
 --connection node_1_toi
 SET SESSION wsrep_sync_wait = 0;
@@ -99,7 +100,7 @@ DROP TABLE p1;
 # (CREATE TABLE, DROP TABLE are affected).
 #
 
-
+--echo ########## CASE 2 ########## 
 --connection node_1_toi
 CREATE TABLE p1 (pk INTEGER PRIMARY KEY, f2 INTEGER);
 
@@ -109,6 +110,7 @@ CREATE TABLE p1 (pk INTEGER PRIMARY KEY, f2 INTEGER);
 --send CREATE TABLE c1 (pk INTEGER PRIMARY KEY, fk INTEGER, FOREIGN KEY (fk) REFERENCES p1(pk));
 
 --connection node_1
+# wait for CREATE TABLE to block
 SET SESSION wsrep_sync_wait=0;
 --let $galera_sync_point = apply_monitor_master_enter_sync
 --source include/galera_wait_sync_point.inc
@@ -124,6 +126,12 @@ INSERT INTO p1 VALUES (1,1);
 --send COMMIT
 
 --connection node_1a
+# wait for COMMIT to block
+SET SESSION wsrep_sync_wait=0;
+--let $galera_sync_point = apply_monitor_master_enter_sync apply_monitor_master_enter_sync
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
 # Now unblock CREATE TABLE. Without the fix it will BF-abort already certified
 # INSERT which will cause its replay.
 --let $galera_sync_point = apply_monitor_master_enter_sync
@@ -168,6 +176,7 @@ DROP TABLE p1;
 # of the writeset related to TOI done on child table.
 #
 
+--echo ########## CASE 3 ########## 
 --connection node_1_toi
 CREATE TABLE p1 (pk INTEGER PRIMARY KEY, f2 INTEGER, KEY f2_key (f2));
 CREATE TABLE c1 (pk INTEGER PRIMARY KEY, data INTEGER, fk INTEGER, FOREIGN KEY (fk) REFERENCES p1(pk));
@@ -181,6 +190,7 @@ INSERT INTO c1 VALUES (0, 0, 0);
 --send DROP INDEX f2_key ON p1;
 
 --connection node_1
+# wait for DROP INDEX to block
 SET SESSION wsrep_sync_wait=0;
 --let $galera_sync_point = apply_monitor_master_enter_sync
 --source include/galera_wait_sync_point.inc
@@ -196,6 +206,12 @@ UPDATE c1 SET data = 1 WHERE pk = 0;
 --send COMMIT
 
 --connection node_1a
+# wait for COMMIT to block
+SET SESSION wsrep_sync_wait=0;
+--let $galera_sync_point = apply_monitor_master_enter_sync apply_monitor_master_enter_sync
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
 # Now unblock DROP INDEX. Without the fix it will BF-abort already certified
 # UPDATE which will cause its replay.
 --let $galera_sync_point = apply_monitor_master_enter_sync
@@ -229,6 +245,7 @@ DROP TABLE p1;
 # Additionally we test multi table drop with temporary tables included.
 #
 
+--echo ########## CASE 4 ########## 
 --connection node_1_toi
 CREATE TABLE p1 (pk INTEGER PRIMARY KEY, f2 INTEGER);
 CREATE TABLE c1 (pk INTEGER PRIMARY KEY, fk INTEGER, FOREIGN KEY (fk) REFERENCES p1(pk));
@@ -241,6 +258,7 @@ CREATE TEMPORARY TABLE t2 (pk INTEGER PRIMARY KEY);
 --send DROP TABLE t1, c1, t2;
 
 --connection node_1
+# wait for DROP TABLE to block
 SET SESSION wsrep_sync_wait=0;
 --let $galera_sync_point = apply_monitor_master_enter_sync
 --source include/galera_wait_sync_point.inc
@@ -256,6 +274,12 @@ INSERT INTO p1 VALUES (1,1);
 --send COMMIT
 
 --connection node_1a
+# wait for COMMIT to block
+SET SESSION wsrep_sync_wait=0;
+--let $galera_sync_point = apply_monitor_master_enter_sync apply_monitor_master_enter_sync
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
 # Now unblock DROP TABLE. Without the fix it will BF-abort already certified
 # INSERT which will cause its replay.
 --let $galera_sync_point = apply_monitor_master_enter_sync
@@ -293,6 +317,8 @@ DROP TABLE p1;
 # may abort the current thread.
 # In such a case we rely on wsrep_retry_autocommit functionality.
 #
+
+--echo ########## CASE 5 ########## 
 --connection node_1
 --let $wsrep_retry_autocommit_saved = `SELECT @@wsrep_retry_autocommit`
 CALL mtr.add_suppression(".*Unable to collect FKs metadata.*");
@@ -300,7 +326,7 @@ CALL mtr.add_suppression(".*Unable to collect FKs metadata.*");
 SET wsrep_retry_autocommit = 1;
 
 CREATE TABLE t1 (a INT PRIMARY KEY);
-SET DEBUG_SYNC='wsrep_do_action_for_tables_after_lock SIGNAL reached WAIT_FOR continue';
+SET DEBUG_SYNC='wsrep_do_action_for_table_after_lock SIGNAL reached WAIT_FOR continue';
 --send ALTER TABLE t1 ADD (b INT)
 
 --connection node_1a
@@ -316,10 +342,12 @@ DROP TABLE t1;
 #
 # Now the same, but with wsrep_retry_autocommit = 0
 #
+
+--echo ########## CASE 6 ########## 
 SET wsrep_retry_autocommit = 0;
 
 CREATE TABLE t1 (a INT PRIMARY KEY);
-SET DEBUG_SYNC='wsrep_do_action_for_tables_after_lock SIGNAL reached WAIT_FOR continue';
+SET DEBUG_SYNC='wsrep_do_action_for_table_after_lock SIGNAL reached WAIT_FOR continue';
 --send ALTER TABLE t1 ADD (b INT)
 
 --connection node_1a
@@ -340,15 +368,17 @@ DROP TABLE t1;
 #
 # Simulate permanent MDL lock failure
 #
+
+--echo ########## CASE 7 ########## 
 SET wsrep_retry_autocommit = 2;
 
 CREATE TABLE t1 (a INT PRIMARY KEY);
-SET GLOBAL debug="+d,wsrep_do_action_for_tables_lock_fail";
+SET GLOBAL debug="+d,wsrep_do_action_for_table_lock_fail";
 
 --error ER_LOCK_DEADLOCK
 ALTER TABLE t1 ADD (b INT);
 
-SET GLOBAL debug="-d,wsrep_do_action_for_tables_lock_fail";
+SET GLOBAL debug="-d,wsrep_do_action_for_table_lock_fail";
 
 SHOW CREATE TABLE t1;
 DROP TABLE t1;
