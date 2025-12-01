@@ -200,6 +200,9 @@ sig_cleanup_joiner()
         kill -SIGKILL $NC_PID /dev/null 2>&1 ||:
     fi
 
+    wsrep_log_debug "Removing the sst_in_progress file"
+    wsrep_cleanup_progress_file
+
     rm -rf $CLONE_SOCK_DIR || :
     rm -rf $CLONE_PID_FILE || :
     rm -fr $tmp_datadir || :
@@ -692,6 +695,10 @@ then
     JOINER_CLONE_HOST=""
     JOINER_CLONE_PORT=""
 
+    # Write the SST_PROGRESS_FILE 
+    [[ -e $SST_PROGRESS_FILE ]] && wsrep_log_warning "Found a stale sst_in_progress file: $SST_PROGRESS_FILE"
+    [[ -n $SST_PROGRESS_FILE ]] && touch $SST_PROGRESS_FILE
+
     # These variables are used in sig_clean_joiner. Create here to avoid
     # potential unbound variable.
     CLEANUP_FILES=""
@@ -1001,7 +1008,7 @@ then
     ib_log_dir=$(parse_cnf mysqld innodb-log-group-home-dir "")
     ib_undo_dir=$(parse_cnf mysqld innodb-undo-directory "")
 
-    cpat=$(parse_cnf sst cpat '.*\.pem$\|.*init\.ok$\|.*galera\.cache$\|.*gvwstate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$\|.*component_keyring_.*\.cnf$\|.*mysqld.my$')
+    cpat=$(parse_cnf sst cpat '.*\.pem$\|.*init\.ok$\|.*galera\.cache$\|.*sst_in_progress$\|.*gvwstate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$\|.*component_keyring_.*\.cnf$\|.*mysqld.my$')
     find $ib_home_dir $ib_log_dir $ib_undo_dir $WSREP_SST_OPT_DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>/dev/null \+
 
     # Before starting let us be sure we remove Netcat given it is using same MySQL port
