@@ -1167,7 +1167,15 @@ int wsrep_init() {
   char buffer[buf_size];
 
   if (pxc_encrypt_cluster_traffic) {
-    if (!server_main_callback.is_wsrep_context_initialized()) {
+    /*
+      If pxc_encrypt_cluster_traffic is enabled, then it is mandatory
+      to define ssl-ca, ssl-cert, and ssl-key. However with --validate-config
+      complete initialization is not performed, so we skip this check.
+      --validate-config option enables the startup configuration to be
+      checked for problems without running the server in operational mode.
+    */
+    if (!server_main_callback.is_wsrep_context_initialized() &&
+        !opt_validate_config) {
       WSREP_ERROR(
           "ssl-ca, ssl-cert, and ssl-key must all be defined"
           " to use encrypted mode traffic. Unable to configure SSL."
