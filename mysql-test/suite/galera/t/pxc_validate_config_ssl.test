@@ -1,0 +1,164 @@
+################################################################################
+# This test validates server behavior with --validate-config and --help
+# when PXC encryption and SSL options are used.
+#
+# This test covers both '--validate-config' and '--help' options.
+#
+# Test:
+# 0. The test requires one server from a cluster.
+# 1. Shutdown the server and initialize some configurations
+# 2. Validate simple server configuration.
+# 3. Validate SSL with PXC Encryption ON.
+# 4. Validate SSL with PXC Encryption OFF.
+# 5. Validate PXC Encryption OFF.
+# 6. Validate PXC Encryption ON.
+# 7. Check SSL Failures.
+# 8. Check SSL Failures.
+# 9. Validate SSL with PXC Encryption ON with --help.
+# 10. Validate SSL with PXC Encryption OFF with --help.
+# 11. Cleanup.
+################################################################################
+--source include/galera_cluster.inc
+
+--echo
+--echo # 1. Shutdown the server and initialize some configurations
+--echo
+
+--connection node_2
+--let $wsrep_provider_node = `SELECT @@wsrep_provider`
+--let $datadir_node = `SELECT @@datadir`
+--source include/shutdown_mysqld.inc
+
+--let MYSQLD_LOG= $MYSQL_TMP_DIR/pxc_validate_config2.log
+--let DEFARGS= --validate-config --wsrep_provider=$wsrep_provider_node --log_error_verbosity=3 --datadir=$datadir_node
+--let DEFARGS_HELP= --help --wsrep_provider=$wsrep_provider_node --log_error_verbosity=3 --datadir=$datadir_node
+--let PXC_ENCRYPT_ON= --pxc-encrypt-cluster-traffic=ON
+--let PXC_ENCRYPT_OFF= --pxc-encrypt-cluster-traffic=OFF
+--let SSL_CONFIG= --ssl-ca=$MYSQL_TEST_DIR/std_data/cacert.pem --ssl-key=$MYSQL_TEST_DIR/std_data/server-key.pem --ssl-cert=$MYSQL_TEST_DIR/std_data/server-cert.pem 
+--let SSL_CONFIG_WRONG1= --ssl-ca=$MYSQL_TEST_DIR/std_data/ca.crt --ssl-key=$MYSQL_TEST_DIR/std_data/server-key.pem --ssl-cert=$MYSQL_TEST_DIR/std_data/server-cert.pem
+--let SSL_CONFIG_WRONG2= --ssl-ca=$MYSQL_TEST_DIR/std_data/cacert.pem --ssl-key=$MYSQL_TEST_DIR/std_data/server-key.pem --ssl-cert=$MYSQL_TEST_DIR/std_data/server-cert.pemm
+
+--echo
+--echo # 2. Validate simple server configuration.
+--echo
+
+--exec $MYSQLD --validate-config --log-error-verbosity=3 1>$MYSQLD_LOG 2>&1
+
+--echo "ERROR not seen simple configuration."
+--let $grep_file    = $MYSQLD_LOG
+--let $grep_pattern = \[ERROR\]
+--let $grep_output  = boolean
+--source include/grep_pattern.inc
+
+--echo
+--echo # 3. Validate SSL with PXC Encryption ON.
+--echo
+
+--exec $MYSQLD $DEFARGS $SSL_CONFIG $PXC_ENCRYPT_ON 1>$MYSQLD_LOG 2>&1
+
+--echo "ERROR not seen when SSL parameters are present and PXC Encryption is ON"
+--let $grep_pattern=\[ERROR\](?!.*Failed to shutdown components infrastructure\.)
+--let $grep_output  = boolean
+--source include/grep_pattern.inc
+
+--echo
+--echo # 4. Validate SSL with PXC Encryption OFF.
+--echo
+
+--echo "ERROR not seen when SSL parameters are present and PXC Encryption is OFF"
+--exec $MYSQLD $DEFARGS $SSL_CONFIG $PXC_ENCRYPT_OFF 1>$MYSQLD_LOG 2>&1
+
+--let $grep_file    = $MYSQLD_LOG
+--let $grep_pattern=\[ERROR\](?!.*Failed to shutdown components infrastructure\.)
+--let $grep_output  = boolean
+--source include/grep_pattern.inc
+
+--echo
+--echo # 5. Validate PXC Encryption OFF.
+--echo
+
+--exec $MYSQLD $DEFARGS $PXC_ENCRYPT_OFF 1>$MYSQLD_LOG 2>&1
+
+--echo "ERROR not seen when SSL parameters are NOT present and PXC Encryption is OFF"
+--let $grep_file    = $MYSQLD_LOG
+--let $grep_pattern=\[ERROR\](?!.*Failed to shutdown components infrastructure\.)
+--let $grep_output  = boolean
+--source include/grep_pattern.inc
+
+--echo
+--echo # 6. Validate PXC Encryption ON.
+--echo
+
+--error 1
+--exec $MYSQLD $DEFARGS $PXC_ENCRYPT_ON 1>$MYSQLD_LOG 2>&1
+
+--echo "ERROR seen when SSL parameters are NOT present and PXC Encryption is ON"
+--let $grep_file    = $MYSQLD_LOG
+--let $grep_pattern=\[ERROR\](?!.*Failed to shutdown components infrastructure\.)
+--let $grep_output  = boolean
+--source include/grep_pattern.inc
+
+--echo "BAD Value for SSL Parameter error is present"
+--let $grep_file    = $MYSQLD_LOG
+--let $grep_pattern=\[ERROR\].*\[Galera\].*Bad value '\(null\)' for SSL parameter 'socket\.ssl_cert'
+--let $grep_output  = boolean
+--source include/grep_pattern.inc
+
+--echo
+--echo # 7. Check SSL Failures.
+--echo
+
+--error 1
+--exec $MYSQLD $DEFARGS $SSL_CONFIG_WRONG1 $PXC_ENCRYPT_ON 1>$MYSQLD_LOG 2>&1
+
+--echo "Error BAD Value for socket.ssl_ca is present"
+--let $grep_file    = $MYSQLD_LOG
+--let $grep_pattern=\[ERROR\].*\[Galera\].*Bad value '.*' for SSL parameter 'socket\.ssl_ca'
+--let $grep_output  = boolean
+--source include/grep_pattern.inc
+
+--echo
+--echo # 8. Check SSL Failures.
+--echo
+
+--error 1
+--exec $MYSQLD $DEFARGS $SSL_CONFIG_WRONG2 $PXC_ENCRYPT_ON 1>$MYSQLD_LOG 2>&1
+
+--echo "Error BAD Value for socket.ssl_cert is present"
+--let $grep_file    = $MYSQLD_LOG
+--let $grep_pattern=\[ERROR\].*\[Galera\].*Bad value '.*' for SSL parameter 'socket\.ssl_cert'
+--let $grep_output  = boolean
+--source include/grep_pattern.inc
+
+## General usage of opt_validate_config is with is_help_or_validate_option
+## However --help does not reach wsrep_init->pxc_encrypt_cluster_traffic
+## So few condition check is enough.
+
+--echo
+--echo # 9. Validate SSL with PXC Encryption ON with --help.
+--echo
+
+--exec $MYSQLD $DEFARGS_HELP $SSL_CONFIG $PXC_ENCRYPT_ON 1>$MYSQLD_LOG 2>&1
+
+--let $grep_file    = $MYSQLD_LOG
+--let $grep_pattern = \[ERROR\]
+--let $grep_output  = boolean
+--source include/grep_pattern.inc
+
+--echo
+--echo # 10. Validate SSL with PXC Encryption OFF with --help.
+--echo
+
+--exec $MYSQLD $DEFARGS_HELP $SSL_CONFIG $PXC_ENCRYPT_OFF 1>$MYSQLD_LOG 2>&1
+
+--let $grep_file    = $MYSQLD_LOG
+--let $grep_pattern = \[ERROR\]
+--let $grep_output  = boolean
+--source include/grep_pattern.inc
+
+--echo
+--echo # 11. Cleanup.
+--echo
+
+--remove_file $MYSQLD_LOG
+--source include/start_mysqld.inc
