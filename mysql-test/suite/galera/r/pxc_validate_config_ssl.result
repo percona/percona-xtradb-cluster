@@ -1,0 +1,52 @@
+
+# 1. Shutdown the server and initialize some configurations
+
+
+# 2. Validate simple server configuration.
+
+"ERROR not seen simple configuration."
+Pattern not found.
+
+# 3. Validate SSL with PXC Encryption ON.
+
+"ERROR not seen when SSL parameters are present and PXC Encryption is ON"
+Pattern not found.
+
+# 4. Validate SSL with PXC Encryption OFF.
+
+"ERROR not seen when SSL parameters are present and PXC Encryption is OFF"
+Pattern not found.
+
+# 5. Validate PXC Encryption OFF.
+
+"ERROR not seen when SSL parameters are NOT present and PXC Encryption is OFF"
+Pattern not found.
+
+# 6. Validate PXC Encryption ON.
+
+"ERROR seen when SSL parameters are NOT present and PXC Encryption is ON"
+Pattern found.
+"BAD Value for SSL Parameter error is present"
+Pattern found.
+
+# 7. Check SSL Failures.
+
+"Error BAD Value for socket.ssl_ca is present"
+Pattern found.
+
+# 8. Check SSL Failures.
+
+"Error BAD Value for socket.ssl_cert is present"
+Pattern found.
+
+# 9. Validate SSL with PXC Encryption ON with --help.
+
+Pattern not found.
+
+# 10. Validate SSL with PXC Encryption OFF with --help.
+
+Pattern not found.
+
+# 11. Cleanup.
+
+# restart
