@@ -41,16 +41,21 @@ Prefix: %{_sysconfdir}
 %define percona_server_version @@PERCONA_VERSION@@
 %define rpm_release @@RPM_RELEASE@@
 %define revision @@REVISION@@
-%define distribution  rhel%{redhatversion}  
+%if 0%{?amzn} == 2023
+  %define distribution  amzn2023
+  %define rhel 9
+%else
+  %define distribution  rhel%{redhatversion}
+%endif
 
-%if 0%{?rhel} >= 8
+%if 0%{?rhel} >= 8 || 0%{?amzn} == 2023
 %global pxc_telemetry          /usr/local/percona/telemetry/pxc
 %endif
-%if 0%{?rhel} >= 8
+%if 0%{?rhel} >= 8 || 0%{?amzn} == 2023
 %global add_fido_plugins 1
 %else
 %global add_fido_plugins 0
-%endif # rhel8 or above
+%endif
 
 #
 %bcond_with tokudb
@@ -129,7 +134,7 @@ Prefix: %{_sysconfdir}
 %if %{with systemd}
   %define systemd 1
 %else
-  %if 0%{?rhel} > 6
+  %if 0%{?rhel} > 6 || 0%{?amzn} == 2023
     %define systemd 1
   %else
     %define systemd 0
@@ -174,7 +179,7 @@ Prefix: %{_sysconfdir}
 
 #%define server_suffix -80
 
-%if 0%{?rhel} > 6
+%if 0%{?rhel} > 6 || 0%{?amzn} == 2023
     %define distro_req           chkconfig nmap nc
 %else
     %define distro_req           chkconfig nc
@@ -245,6 +250,12 @@ Prefix: %{_sysconfdir}
         %endif
       %endif
     %else
+      %if %(test -f /etc/amazon-linux-release && echo 1 || echo 0)
+        %define distro_description    Amazon Linux 2023
+        %define distro_releasetag     amzn2023
+        %define distro_buildreq       gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake
+        %define distro_requires       chkconfig coreutils grep procps shadow-utils %distro_req
+      %endif
       %if %(test -f /etc/SuSE-release && echo 1 || echo 0)
         %define susever %(rpm -qf --qf '%%{version}\\n' /etc/SuSE-release)
         %if "%susever" == "10"
@@ -327,7 +338,11 @@ Requires:             percona-xtradb-cluster-server = %{version}-%{release}
 Requires:             percona-xtradb-cluster-client = %{version}-%{release}
 Provides:       mysql-server galera-57 galera-57-debuginfo
 BuildRequires:  %{distro_buildreq} pam-devel openssl-devel numactl-devel
+%if 0%{?amzn} == 2023
+BuildRequires:  check-devel glibc-devel %{gcc_req} openssl-devel %{boost_req} check-devel openldap-devel
+%else
 BuildRequires:  scons check-devel glibc-devel %{gcc_req} openssl-devel %{boost_req} check-devel openldap-devel
+%endif
 %if 0%{?systemd}
 BuildRequires:  systemd
 %endif
@@ -382,13 +397,13 @@ Requires:             percona-xtradb-cluster-icu-data-files = %{version}-%{relea
 Requires:             selinux-policy
 Requires:             policycoreutils
 Requires:             curl, nmap, nc
-%if 0%{?rhel} >= 8
+%if 0%{?rhel} >= 8 || 0%{?amzn} == 2023
 Requires:	      percona-telemetry-agent
 %endif
 Requires(pre):        policycoreutils
 Requires(post):       policycoreutils
 Requires(postun):     policycoreutils
-%if 0%{?rhel} == 8 || 0%{?rhel} == 9
+%if 0%{?rhel} == 8 || 0%{?rhel} == 9 || 0%{?amzn} == 2023
 Requires:             policycoreutils-python-utils
 Requires(pre):        policycoreutils-python-utils
 Requires(post):       policycoreutils-python-utils
@@ -421,7 +436,7 @@ Requires(preun):  /sbin/chkconfig
 Requires(preun):  /sbin/service
 %endif
 Provides:       mysql-server MySQL-server
-%if 0%{?rhel} == 8 || 0%{?rhel} == 9
+%if 0%{?rhel} == 8 || 0%{?rhel} == 9 || 0%{?amzn} == 2023
 Obsoletes:      mariadb-connector-c-config
 %endif
 Conflicts:      Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56 Percona-Server-server-57
@@ -533,7 +548,7 @@ Provides:       mysql-shared >= %{mysql_version} mysql-libs >= %{mysql_version}
 Conflicts:      Percona-Server-shared-56
 Conflicts:      Percona-Server-shared-57
 Conflicts:      percona-xtradb-cluster-shared-pro
-%if "%rhel" > "6"
+%if "%rhel" > "6" || "%amzn" == "2023"
 #Provides:       mariadb-libs >= 5.5.37
 Obsoletes:      mariadb-libs >= 5.5.37
 %endif
@@ -650,11 +665,11 @@ RPM_OPT_FLAGS=$(echo ${RPM_OPT_FLAGS} | sed -e 's|-march=i386|-march=i686|g')
 export PATH=${MYSQL_BUILD_PATH:-$PATH}
 export CC=${MYSQL_BUILD_CC:-${CC:-gcc}}
 export CXX=${MYSQL_BUILD_CXX:-${CXX:-g++}}
-export CFLAGS=${MYSQL_BUILD_CFLAGS:-${CFLAGS:-$RPM_OPT_FLAGS -Wno-error=free-nonheap-object}}
+export CFLAGS=${MYSQL_BUILD_CFLAGS:-${CFLAGS:-$RPM_OPT_FLAGS} -Wno-error=free-nonheap-object}
 export CXXFLAGS=${MYSQL_BUILD_CXXFLAGS:-${CXXFLAGS:-$RPM_OPT_FLAGS -felide-constructors -Wno-error=free-nonheap-object}}
 export LDFLAGS=${MYSQL_BUILD_LDFLAGS:-${LDFLAGS:-}}
 
-%if 0%{?rhel} == 8 || 0%{?rhel} == 9
+%if 0%{?rhel} == 8 || 0%{?rhel} == 9 || 0%{?amzn} >= 2023 || 0%{?rhel} == 10
 export CMAKE=${MYSQL_BUILD_CMAKE:-${CMAKE:-/usr/bin/cmake}}
 %else
 export CMAKE=${MYSQL_BUILD_CMAKE:-${CMAKE:-/usr/bin/cmake3}}
@@ -686,7 +701,11 @@ mkdir pxc_extra
 pushd pxc_extra
 mkdir pxb-2.4
 pushd pxb-2.4
+%if 0%{?amzn} == 2023
+yumdownloader percona-xtrabackup-24-2.4.29-1.amzn2023
+%else
 yumdownloader percona-xtrabackup-24-2.4.29
+%endif
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib* ./
@@ -700,7 +719,11 @@ popd
 
 mkdir pxb-8.0
 pushd pxb-8.0
+%if 0%{?amzn} == 2023
+yumdownloader percona-xtrabackup-80-8.0.35-34.1.amzn2023
+%else
 yumdownloader percona-xtrabackup-80-8.0.35
+%endif
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib64 ./
@@ -883,7 +906,7 @@ mv $RBR%{_libdir} $RPM_BUILD_DIR/%{_libdir}
 ##############################################################################
 %install
 
-%if 0%{?rhel} == 9
+%if 0%{?rhel} == 9 || 0%{?amzn} == 2023
     sed -i 's/python2$/python3/' scripts/pyclustercheck.py.in
 %endif
 
@@ -1388,7 +1411,7 @@ fi
   sleep 5
 fi
 
-%if 0%{?rhel} >= 8
+%if 0%{?rhel} >= 8 || 0%{?amzn} != 2023
 install -d -m 2775 -o mysql -g percona-telemetry %{pxc_telemetry}
 chcon -t mysqld_db_t %{pxc_telemetry} &>/dev/null || :
 chcon -u system_u %{pxc_telemetry} &>/dev/null || :
@@ -1645,7 +1668,7 @@ fi
     %attr(755, root, root) %{_datadir}/percona-xtradb-cluster/
 %endif
 
-%if "%rhel" >= "6"
+%if "%rhel" >= "6" || "%amzn" == "2023"
     %attr(755, root, root) %{_datarootdir}/percona-xtradb-cluster/
 %endif
 
@@ -1826,7 +1849,9 @@ else
                 echo "Not bootstrapping with $(( numint-1 )) nodes already in cluster PC"
                 echo "Restarting with mysql.service in its stead"
                 %if 0%{?rhel} < 9
-                    %systemd_postun
+                    %if 0%{?amzn} != 2023
+                        %systemd_postun
+                    %endif
                 %endif
                 /usr/bin/systemctl stop mysql@bootstrap.service
                 /usr/bin/systemctl start mysql.service
