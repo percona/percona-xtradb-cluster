@@ -1083,8 +1083,9 @@ bool Global_read_lock::lock_global_read_lock(THD *thd) {
     */
     if (thd->backup_tables_lock.abort_if_acquired()) return true;
 
+
 #ifdef WITH_WSREP
-    /* Take an explict lock that is not wsrep-preemptable. */
+  /* Take an explict lock that is not wsrep-preemptable. */
     MDL_EXPLICIT_LOCK_REQUEST_INIT(&mdl_request, MDL_key::GLOBAL, "", "",
                                    MDL_SHARED, MDL_EXPLICIT);
 #else
@@ -1151,7 +1152,7 @@ void Global_read_lock::unlock_global_read_lock(THD *thd) {
         wsrep_locked_seqno = WSREP_SEQNO_UNDEFINED;
         server_state.resume();
         pause_provider(false);
-      } else {
+      } else if (provider_paused) {
         server_state.resume_and_resync();
         pause_provider(false);
       }
@@ -1224,7 +1225,7 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd) {
 
   /* If node has left the cluster no point in pausing and resuming it. */
   if (server_state.state() != Wsrep_server_state::s_disconnected) {
-    wsrep::seqno paused_seqno;
+    wsrep::seqno paused_seqno = wsrep::seqno::undefined();
 
     /*
      Pause wsrep server even if current thread has disabled replication.
@@ -1232,14 +1233,61 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd) {
      */
     if (server_state.state() != Wsrep_server_state::s_synced) {
       paused_seqno = server_state.pause();
+    //} else if (thd->mdl_context.owns_equal_or_stronger_lock(MDL_key::BACKUP_LOCK, "", "",
+                                                   //MDL_SHARED)) {
+    //} else if (thd->mdl_context.has_locks(MDL_key::BACKUP_LOCK) && thd->global_read_lock.lock_global_read_lock(thd))
+    } else if (thd->mdl_context.has_locks(MDL_key::BACKUP_LOCK) && thd->mdl_context.has_locks(MDL_key::GLOBAL)) {
+      // Before going on with FTWRL, we have to apply and commit all replicated transactions (this is what pause() does).
+      // However, some of them may be waiting on GLOBAL lock (if lock instance for backup was executed)
+      // In such a case we would wait infinitely for pause causing a deadlock (no way for UNLOCK INSTANCE
+      // in a session that is actively waiting on pause())
+      // Here we will need to call something like 'try_desync_and_pause()', that would return
+      // immediately with -1 if it is not possible to pause right now (if there are any
+      // replicated transactions pending applying or commiting)
+
+      /* Problematic sequence:
+      1. session 1: LOCK INSTANCE FOR BACKUP - it acquires backup lock
+      2. applier thread: replicated TOI CREATE TABLE with seqno=N. It stops in CREATE TABLE trying to acquire
+         a backup lock
+      3. session 1: FTWRL - it desyncs and pauses Galera. It means: apply and commit all transactions
+         that were replicated and certified. So it waist for CREATE TABLE seqno=N to finish (and blocks)
+      4. We have a deadlock
+
+      If instead of unconditional pause() we just fail if it is not possible to pause now:
+      1. session 1: LOCK INSTANCE FOR BACKUP - it acquires backup lock
+      2. applier thread: replicated TOI CREATE TABLE with seqno=N. It stops in CREATE TABLE trying to acquire
+         a backup lock
+      3. session 1: FTWRL - it tries desync and pause Galera. It means: If any transactions are to be
+         applied/commited, the try fails
+      4. session 1: If the try has failed, return with error
+      */
+
+      /* However, there is a (small?) problem here as well. DMLs do not acquire a backup lock
+         so they won't cause any problem. Unfortunately there is no way to know what transactions
+         are waiting for apply/commit, so we have to assume the worst case scenario.
+         Even checking if any other thread is currently waiting on backup lock won't help - there
+         may be a thread in the queue that is going to do this in the future.
+         As the consequence, executing LOCK INSTANCE FOR BACKUP -> FTWRL may fail sometimes if FTWRL
+         is executed when any writesets are waiting to be processed.
+
+         Solution for this would be try_desync_and_pause(timeout)....
+         */
+
+      // Try non-blocking desync and pause. If it would block (e.g., due to
+      // pending transactions waiting on locks), it returns undefined seqno.
+      paused_seqno = server_state.try_desync_and_pause();
     } else {
       paused_seqno = server_state.desync_and_pause();
     }
-    WSREP_INFO("Server paused at: %lld", paused_seqno.get());
     if (paused_seqno.get() >= 0) {
       wsrep_locked_seqno = paused_seqno.get();
       pause_provider(true);
+    } else {
+      WSREP_INFO("Server pausing failed");
+      my_error(ER_QUERY_INTERRUPTED, MYF(0));
+      return true;
     }
+    WSREP_INFO("Server paused at: %lld", paused_seqno.get());
   }
 #endif /* WITH_WSREP */
 

@@ -1,0 +1,93 @@
+#
+# 1. Create database and table t1.
+#
+SET DEBUG_SYNC= 'RESET';
+SET DEBUG_SYNC= 'RESET';
+CREATE DATABASE db1;
+USE db1;
+CREATE TABLE t1 (id INT PRIMARY KEY, a INT);
+#
+# 2. Lock database and create a table.
+#    Confirm FTWRL error out due to LOCK INSTANCE command.
+#    Confirm DDL cannot be executed along with LOCK INSTANCE command.
+#    UNLOCK to restore the state.
+#
+LOCK INSTANCE FOR BACKUP;
+CREATE TABLE t2 (id INT PRIMARY KEY, a INT);
+FLUSH TABLES WITH READ LOCK;
+CREATE TABLE t3 (id INT PRIMARY KEY, a INT);
+ERROR HY000: Can't execute the query because you have a conflicting read lock
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+#
+# 3. Execute FTWRL and DDL fails.
+#
+FLUSH TABLES WITH READ LOCK;
+CREATE TABLE t5 (id INT PRIMARY KEY, a INT);
+ERROR HY000: Can't execute the query because you have a conflicting read lock
+UNLOCK TABLES;
+#
+# 4.A. Hold backup lock on node-2.
+#
+LOCK INSTANCE FOR BACKUP;
+#
+# 4.B. Execute DDL on node-1
+#
+CREATE TABLE t_synch1 (id INT PRIMARY KEY, a INT);;
+#
+# 4.C. Execute FTWRL on node-2 it fails.
+#      UNLOCK the instance.
+#
+FLUSH TABLES WITH READ LOCK;
+Got one of the listed errors
+#
+# 4.D. Let DDL finish on node1 and unlock node2.
+#
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+#
+# 5.A. Execute DDL on node-1
+#
+CREATE TABLE t_synch1_1 (id INT PRIMARY KEY, a INT);;
+#
+# 5.B. Execute FTWRL on node-2 it passed since LOCK INSTANCE was not executed.
+#
+FLUSH TABLES WITH READ LOCK;
+#
+# 5.C. Let DDL finish on node1 and unlock node2.
+#
+UNLOCK TABLES;
+#
+# 6.A. Add debug point in node2 to block DDL to ensure consistent test behavior.
+#      Execute DDL on node-1
+#
+SET GLOBAL debug = "+d,ordered_commit_blocked";
+CREATE TABLE t_synch2 (id INT PRIMARY KEY, a INT);;
+#
+# 6.B. Execute FTWRL on node-2 once DDL is blocked.
+#
+SET DEBUG_SYNC = "now WAIT_FOR signal.ordered_commit_waiting";
+SET GLOBAL debug = "-d,ordered_commit_blocked";
+FLUSH TABLES WITH READ LOCK;;
+SET DEBUG_SYNC = "now SIGNAL signal.ordered_commit_continue";
+#
+# 6.C. Let DDL finish on node1 and unlock node2.
+#
+UNLOCK TABLES;
+#
+# 7.A. Execute FTWRL on node-2.
+#
+FLUSH TABLES WITH READ LOCK;
+#
+# 7.B. Execute DDL on node-1
+#
+CREATE TABLE t_synch3 (id INT PRIMARY KEY, a INT);
+#
+# 7.C. DDL will be blocked until node2 releases the lock.
+#      Table is created once lock are released.
+#
+UNLOCK TABLES;
+#
+# 8. Cleanup.
+#
+DROP DATABASE db1;

@@ -1,0 +1,232 @@
+################################################################################
+#
+# This test proves that FTWRL and DDL can be executed in parallel with some
+# limitations.
+# In some conditions, FTWRL/DDL statement may be blocked, but they will finish
+# successfully, once the other statement completes successfully or UNLOCK is
+# executed.
+# This test assures that PXC will not go in in-consistent state.
+#
+################################################################################
+# 1. Create database and table t1.
+# 2. Lock database and create a table.
+#    Confirm FTWRL error out due to LOCK INSTANCE command.
+#    Confirm DDL cannot be executed along with LOCK INSTANCE command.
+#    UNLOCK to restore the state.
+# 3. Execute FTWRL and DDL fails.
+# 4.A. Hold backup lock on node-2.
+# 4.B. Execute DDL on node-1
+# 4.C. Execute FTWRL on node-2 it fails.
+#      UNLOCK the instance.
+# 4.D. Let DDL finish on node1 and unlock node2.
+# 5.A. Add debug point in node2 to block DDL to ensure consistent test behavior.
+#      Execute DDL on node-1
+# 5.B. Execute FTWRL on node-2 once DDL is blocked.
+# 5.C. Let DDL finish on node1 and unlock node2.
+# 6.A. Execute FTWRL on node-2.
+# 6.B. Execute DDL on node-1
+# 6.C. DDL will be blocked until node2 releases the lock.
+#      Table is created once lock are released.
+# 7. Cleanup.
+################################################################################
+--source include/galera_cluster.inc
+--source include/have_debug_sync.inc
+--source include/count_sessions.inc
+
+--echo #
+--echo # 1. Create database and table t1.
+--echo #
+--connection node_2
+--disable_warnings
+SET DEBUG_SYNC= 'RESET';
+--enable_warnings
+
+--connection node_1
+--disable_warnings
+SET DEBUG_SYNC= 'RESET';
+--enable_warnings
+
+CREATE DATABASE db1;
+USE db1;
+CREATE TABLE t1 (id INT PRIMARY KEY, a INT);
+
+--echo #
+--echo # 2. Lock database and create a table.
+--echo #    Confirm FTWRL error out due to LOCK INSTANCE command.
+--echo #    Confirm DDL cannot be executed along with LOCK INSTANCE command.
+--echo #    UNLOCK to restore the state.
+--echo #
+
+LOCK INSTANCE FOR BACKUP;
+CREATE TABLE t2 (id INT PRIMARY KEY, a INT);
+# You can still execute FTRWL if parallel TO isolation is not ongoing
+# pause will not block so FTRWL passes
+FLUSH TABLES WITH READ LOCK;
+# Due to FTRWL DDL will fail.
+--error ER_CANT_UPDATE_WITH_READLOCK
+CREATE TABLE t3 (id INT PRIMARY KEY, a INT);
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+
+--echo #
+--echo # 3. Execute FTWRL and DDL fails.
+--echo #
+
+FLUSH TABLES WITH READ LOCK;
+--error ER_CANT_UPDATE_WITH_READLOCK
+CREATE TABLE t5 (id INT PRIMARY KEY, a INT);
+UNLOCK TABLES;
+
+--echo #
+--echo # 4.A. Hold backup lock on node-2.
+--echo #
+
+--connection node_2
+LOCK INSTANCE FOR BACKUP;
+
+--echo #
+--echo # 4.B. Execute DDL on node-1
+--echo #
+
+--connection node_1
+--send CREATE TABLE t_synch1 (id INT PRIMARY KEY, a INT);
+
+--echo #
+--echo # 4.C. Execute FTWRL on node-2 it fails.
+--echo #      UNLOCK the instance.
+--echo #
+
+# Because of ongoing DDL/TO isolation pause will block
+# so FTRWL cannot be allowed since FTRWL will have conflicting
+# MDL locks
+--connection node_2
+--error ER_LOCK_OR_ACTIVE_TRANSACTION, 1317
+FLUSH TABLES WITH READ LOCK;
+
+--echo #
+--echo # 4.D. Let DDL finish on node1 and unlock node2.
+--echo #
+
+--connection node_1
+--reap
+
+--connection node_2
+# UNLOCK is not needed and can be removed since FTRWL failed.
+# However it has been added since pause failed and corresponding
+# resume is in UNLOCK TABLES, to prove pause-resume sequence number
+# are not impacted, below UNLOCK TABLES has been added.
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+
+#####
+# This test case section is specifically added to prove
+# LOCK INSTANCE FOR BACKUP and FLUSH TABLES WITH READ LOCK
+# both contrtibute to dead lock.
+# Single FTRWL without LOCK INSTANCE does not block and runs without error.
+#####
+--echo #
+--echo # 5.A. Execute DDL on node-1
+--echo #
+
+--connection node_1
+--send CREATE TABLE t_synch1_1 (id INT PRIMARY KEY, a INT);
+
+--echo #
+--echo # 5.B. Execute FTWRL on node-2 it passed since LOCK INSTANCE was not executed.
+--echo #
+
+--connection node_2
+FLUSH TABLES WITH READ LOCK;
+
+--echo #
+--echo # 5.C. Let DDL finish on node1 and unlock node2.
+--echo #
+
+--connection node_1
+--reap
+
+--connection node_2
+UNLOCK TABLES;
+
+--echo #
+--echo # 6.A. Add debug point in node2 to block DDL to ensure consistent test behavior.
+--echo #      Execute DDL on node-1
+--echo #
+
+--connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--connection node_2
+SET GLOBAL debug = "+d,ordered_commit_blocked";
+
+--connection node_1
+--send CREATE TABLE t_synch2 (id INT PRIMARY KEY, a INT);
+
+--echo #
+--echo # 6.B. Execute FTWRL on node-2 once DDL is blocked.
+--echo #
+
+
+--connection node_2
+SET DEBUG_SYNC = "now WAIT_FOR signal.ordered_commit_waiting";
+SET GLOBAL debug = "-d,ordered_commit_blocked";
+
+--send FLUSH TABLES WITH READ LOCK;
+--connection node_2a
+
+# FTWRL is blocked, waiting global read lock, reason for using send in FTWRL
+# SELECT queries are blocked so cannot have wait condition here.
+# SHOW PROCESSLIST is allowed.
+#11	root	localhost:54452	test	Query	0	Waiting for global read lock	FLUSH TABLES WITH READ LOCK	0	0	0
+
+SET DEBUG_SYNC = "now SIGNAL signal.ordered_commit_continue";
+--disconnect node_2a
+
+--echo #
+--echo # 6.C. Let DDL finish on node1 and unlock node2.
+--echo #
+
+--connection node_1
+--reap
+
+--connection node_2
+--reap
+UNLOCK TABLES;
+
+--let $wait_condition= SELECT COUNT(*)=1 FROM information_schema.tables WHERE TABLE_SCHEMA="db1" AND TABLE_NAME="t_synch2"
+--source include/wait_condition.inc
+
+--echo #
+--echo # 7.A. Execute FTWRL on node-2.
+--echo #
+
+--connection node_2
+FLUSH TABLES WITH READ LOCK;
+
+--echo #
+--echo # 7.B. Execute DDL on node-1
+--echo #
+
+--connection node_1
+CREATE TABLE t_synch3 (id INT PRIMARY KEY, a INT);
+
+--echo #
+--echo # 7.C. DDL will be blocked until node2 releases the lock.
+--echo #      Table is created once lock are released.
+--echo #
+
+--connection node_2
+# You cannot execute any SELECT query like query information_schema.tables
+# at this place which blocks us from asserting system condition like
+# e.g. table is created or not etc.
+# However SHOW PROCESSLIST and similar statements are allowed.
+UNLOCK TABLES;
+
+--connection node_2
+--let $wait_condition= SELECT COUNT(*)=1 FROM information_schema.tables WHERE TABLE_SCHEMA="db1" AND TABLE_NAME="t_synch3"
+--source include/wait_condition.inc
+
+--echo #
+--echo # 8. Cleanup.
+--echo #
+
+DROP DATABASE db1;
+--source include/wait_until_count_sessions.inc
