@@ -1,0 +1,300 @@
+#############################################################################
+# Test to verify that the audit_log_filter plugin replication works correctly
+# in a Galera cluster.
+#
+# 1. Install audit_log PLUGIN on ALL nodes
+# 2. Set up a filter and verify filter replication and filter working on all nodes
+# 3. Set up a filter to abort all access to a specific table t1
+#    but allowed on t2.
+# 4. Check the audit log filter system table insert and delete are working.
+# 5. Block access for user2 and verify operations are allowed from user1.
+# 6. Cleanup
+##############################################################################
+
+--source include/galera_cluster.inc
+# Since we install audit log filter for safety retart server after test finishes.
+--source include/force_restart.inc
+
+--echo #
+--echo # 1. Install audit_log PLUGIN on ALL nodes
+--echo #
+
+--connection node_1
+call mtr.add_suppression("Plugin audit_log_filter reported: 'Failed to get an opened audit_log_filter table");
+call mtr.add_suppression("Plugin audit_log_filter reported: 'Failed to load filtering rules");
+
+--echo # Create a database for audit testing
+CREATE DATABASE audit_testing;
+
+--source include/audit_setup.inc
+
+--connection node_2
+call mtr.add_suppression("Plugin audit_log_filter reported: 'Failed to get an opened audit_log_filter table");
+call mtr.add_suppression("Plugin audit_log_filter reported: 'Failed to load filtering rules");
+--echo # Setup audit plugin on node 2
+--source include/audit_setup.inc
+
+--connection node_1
+
+--let $replicate=1
+--let $diff_servers= 1 2
+CREATE TABLE t1 (c1 INT);
+CREATE TABLE t2 (c2 INT);
+INSERT INTO t1 VALUES (1);
+INSERT INTO t2 VALUES (1);
+
+--echo # Create users for testing
+--echo # user1: will be used to set audit rules.
+
+CREATE USER 'user1'@'localhost' IDENTIFIED BY '111';
+GRANT AUDIT_ADMIN ON *.* to 'user1'@'localhost';
+
+--echo # user2: has SYSTEM_USER and AUDIT_ABORT_EXEMPT privileges to test exemption.
+
+CREATE USER 'user2'@'localhost' IDENTIFIED BY '222';
+GRANT SYSTEM_USER ON *.* to 'user2'@'localhost';
+GRANT AUDIT_ABORT_EXEMPT ON *.* to 'user2'@'localhost';
+
+--echo # Open new connections for the created users
+--connect node_1a, 127.0.0.1, user1, 111, test, $NODE_MYPORT_1
+--connect node_1b, 127.0.0.1, user2, 222, test, $NODE_MYPORT_1
+--connection node_1a
+
+--echo #
+--echo # 2. Set up a filter and verify filter replication and filter working on all nodes
+
+let $filter = {
+  "filter": {
+    "class": {
+      "name": "table_access",
+      "event": {
+        "name": ["insert", "update", "delete"],
+        "abort": true
+      }
+    }
+  }
+};
+
+--echo # Set the filter and verify it's replicated to all nodes.
+--let $statement_executing_server=1
+--let $test_details= audit_log_filter_set_filter is replicated.
+--let $statement= SELECT audit_log_filter_set_filter('table_readonly', '$filter');
+--let $databases= audit_testing
+--let $table= audit_log_filter
+--let $order_by_column = NAME
+--source ../include/assert_table_are_same_in_cluster.inc
+
+--echo # Set the filter based on user and verify it's replicated to all nodes.
+--let $statement_executing_server=2
+--let $test_details= audit_log_filter_set_user is replicated.
+--let $statement= SELECT audit_log_filter_set_user('%', 'table_readonly');
+--let $databases= audit_testing
+--let $table= audit_log_user
+--let $order_by_column = FILTERNAME
+--source ../include/assert_table_are_same_in_cluster.inc
+
+--echo # Verify that INSERT statements are aborted on all nodes.
+--let $expected_error= ER_AUDIT_API_ABORT
+--let $statement=INSERT INTO t1 VALUES (2);
+--source ../include/assert_command_behave_same_across_cluster.inc
+
+--let $expected_error= ER_AUDIT_API_ABORT
+--let $statement=INSERT INTO t2 VALUES (2);
+--source ../include/assert_command_behave_same_across_cluster.inc
+
+--echo # Verify that UPDATE statements are aborted on all nodes.
+--let $expected_error= ER_AUDIT_API_ABORT
+--let $statement=UPDATE t1 SET c1 = 3 WHERE c1 = 2;
+--source ../include/assert_command_behave_same_across_cluster.inc
+
+--let $expected_error= ER_AUDIT_API_ABORT
+--let $statement=UPDATE t2 SET c2 = 3 WHERE c2 = 2;
+--source ../include/assert_command_behave_same_across_cluster.inc
+
+--echo # Verify that DELETE statements are aborted on all nodes.
+--let $expected_error= ER_AUDIT_API_ABORT
+--let $statement=DELETE FROM t1 WHERE c1 = 1;
+--source ../include/assert_command_behave_same_across_cluster.inc
+
+--let $expected_error= ER_AUDIT_API_ABORT
+--let $statement=DELETE FROM t2 WHERE c2 = 1;
+--source ../include/assert_command_behave_same_across_cluster.inc
+
+--echo # Check table contents to ensure no changes were made.
+SELECT * FROM t1;
+SELECT * FROM t2;
+
+--echo # Remove the user assignment and verify replication.
+--let $statement_executing_server=1
+--let $test_details= audit_log_filter_remove_user is replicated.
+--let $statement= SELECT audit_log_filter_remove_user('%');
+--let $databases= audit_testing
+--let $table= audit_log_user
+--let $order_by_column = FILTERNAME
+--source ../include/assert_table_are_same_in_cluster.inc
+
+--echo #
+--echo # 3. Set up a filter to abort all access to a specific table t1
+--echo #    but allowed on t2.
+--echo #
+
+let $filter = {
+  "filter": {
+    "class": {
+      "name": "table_access",
+      "event": {
+        "name": ["read", "insert", "update", "delete"],
+        "abort": {
+          "and": [
+            {"field": {"name": "table_database.str", "value": "test"}},
+            {"field": {"name": "table_name.str", "value": "t1"}}
+          ]
+        }
+      }
+    }
+  }
+};
+
+--echo # Set the filter for 'no_t1_access' and verify replication.
+--let $statement_executing_server=1
+--let $test_details= audit_log_filter_set_filter is replicated.
+--let $statement= SELECT audit_log_filter_set_filter('no_t1_access', '$filter');
+--let $databases= audit_testing
+--let $table= audit_log_filter
+--let $order_by_column = NAME
+--source ../include/assert_table_are_same_in_cluster.inc
+
+--echo # Assign the filter to all users and verify replication.
+--let $statement_executing_server=1
+--let $test_details= audit_log_filter_remove_user is replicated.
+--let $statement= SELECT audit_log_filter_set_user('%', 'no_t1_access');
+--let $databases= audit_testing
+--let $table= audit_log_user
+--let $order_by_column = FILTERNAME
+--source ../include/assert_table_are_same_in_cluster.inc
+
+--echo # Verify INSERT is aborted for t1.
+--let $expected_error= ER_AUDIT_API_ABORT
+--let $statement=INSERT INTO t1 VALUES (2);
+--source ../include/assert_command_behave_same_across_cluster.inc
+
+--echo # Verify INSERT is allowed for t2.
+--let $statement=INSERT INTO t2 VALUES (2);
+--source ../include/assert_command_behave_same_across_cluster.inc
+
+--echo # Verify UPDATE is aborted for t1.
+--let $expected_error= ER_AUDIT_API_ABORT
+--let $statement=UPDATE t1 SET c1 = 3 WHERE c1 = 2;
+--source ../include/assert_command_behave_same_across_cluster.inc
+
+--echo # Verify UPDATE is allowed for t2.
+--let $statement=UPDATE t2 SET c2 = 3 WHERE c2 = 2;
+--source ../include/assert_command_behave_same_across_cluster.inc
+
+--echo # Verify DELETE is aborted for t1.
+--let $expected_error= ER_AUDIT_API_ABORT
+--let $statement=DELETE FROM t1 WHERE c1 = 1;
+--source ../include/assert_command_behave_same_across_cluster.inc
+
+--echo # Verify DELETE is allowed for t2.
+--let $statement=DELETE FROM t2 WHERE c2 = 1;
+--source ../include/assert_command_behave_same_across_cluster.inc
+
+--echo # Verify SELECT is aborted for t1.
+--let $expected_error= ER_AUDIT_API_ABORT
+--let $statement=SELECT * FROM t1;
+--source ../include/assert_command_behave_same_across_cluster.inc
+
+--echo # Verify SELECT is allowed for t2.
+--let $statement=SELECT * FROM t2;
+--source ../include/assert_command_behave_same_across_cluster.inc
+
+--echo #
+--echo # 4. Check the audit log filter system table insert and delete are working.
+--echo #
+
+let $filter = {
+  "filter": {
+    "class": {
+      "name": "message",
+      "event": {
+        "name": "user",
+        "abort": true
+      }
+    }
+  }
+};
+
+--echo # Set and verify replication of the 'abort_message' filter.
+--let $statement_executing_server=2
+--let $test_details= audit_log_filter_remove_user is replicated.
+--let $statement= SELECT audit_log_filter_set_filter('abort_message', '$filter');
+--let $databases= audit_testing
+--let $table= audit_log_filter
+--let $order_by_column = NAME
+--source ../include/assert_table_are_same_in_cluster.inc
+
+--echo # Assign the filter and verify replication.
+--let $statement_executing_server=2
+--let $test_details= audit_log_filter_remove_user is replicated.
+--let $statement= SELECT audit_log_filter_set_user('%', 'abort_message');
+--let $databases= audit_testing
+--let $table= audit_log_filter
+--let $order_by_column = NAME
+--source ../include/assert_table_are_same_in_cluster.inc
+
+--echo # Remove the user assignment and verify replication.
+--let $statement_executing_server=2
+--let $test_details= audit_log_filter_remove_user is replicated.
+--let $statement= SELECT audit_log_filter_remove_user('%');
+--let $databases= audit_testing
+--let $table= audit_log_filter
+--let $order_by_column = NAME
+--source ../include/assert_table_are_same_in_cluster.inc
+
+--echo #
+--echo # 5. Block access for user2 and verify operations are allowed from user1.
+--echo #
+
+DELETE FROM t1;
+DELETE FROM t2;
+
+--echo # Assign the 'no_t1_access' filter to user2 (who has AUDIT_ABORT_EXEMPT).
+--let $statement_executing_server=1
+--let $test_details= audit_log_filter_remove_user is replicated.
+--let $statement= SELECT audit_log_filter_set_user('user2@localhost', 'no_t1_access');
+--let $databases= audit_testing
+--let $table= audit_log_filter
+--let $order_by_column = NAME
+--source ../include/assert_table_are_same_in_cluster.inc
+
+--echo # Connect as user2 and verify that all operations are allowed despite the filter.
+--connection node_1b
+
+INSERT INTO t1 VALUES (2);
+INSERT INTO t2 VALUES (2);
+
+UPDATE t1 SET c1 = 3 WHERE c1 = 2;
+UPDATE t2 SET c2 = 3 WHERE c2 = 2;
+
+DELETE FROM t1 WHERE c1 = 1;
+DELETE FROM t2 WHERE c2 = 1;
+
+SELECT * FROM t1;
+SELECT * FROM t2;
+
+disconnect node_1a;
+disconnect node_1b;
+connection default;
+
+--echo #
+--echo # 6. Cleanup
+--echo #
+
+DROP DATABASE audit_testing;
+
+DROP TABLE t1;
+DROP TABLE t2;
+
+DROP USER 'user1'@'localhost';
+DROP USER 'user2'@'localhost';
