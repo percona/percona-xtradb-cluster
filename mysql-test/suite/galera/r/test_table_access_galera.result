@@ -1,0 +1,254 @@
+#####################################################################
+#####          Replication across cluster is ON                 #####
+#####################################################################
+INSTALL COMPONENT 'file://component_test_table_access_galera';
+
+"Set replication across cluster ON"
+SELECT test_table_access_driver("REPLICATE_TRANSACTIONS_IN_GALERA");
+test_table_access_driver("REPLICATE_TRANSACTIONS_IN_GALERA")
+NULL
+
+SELECT test_table_access_driver("unknown test");
+test_table_access_driver("unknown test")
+NULL
+
+# Below will fail since tables do not exist.
+SELECT test_table_access_driver("INSERT-CUSTOMER-STRESS-1");
+test_table_access_driver("INSERT-CUSTOMER-STRESS-1")
+create() failed
+SELECT test_table_access_driver("INSERT-CUSTOMER-STRESS-2");
+test_table_access_driver("INSERT-CUSTOMER-STRESS-2")
+get() failed
+SELECT test_table_access_driver("INSERT-CUSTOMER");
+test_table_access_driver("INSERT-CUSTOMER")
+get() failed
+include/assert.inc ['Tables do not exist so above statements failed']
+CREATE SCHEMA shop;
+SELECT test_table_access_driver("INSERT-CUSTOMER");
+test_table_access_driver("INSERT-CUSTOMER")
+get() failed
+include/assert.inc ['Tables do not exist so above statements failed']
+CREATE TABLE shop.customer (x integer);
+
+##### START #####
+include/assert_table_are_same_in_cluster.inc [Different schema expect failure] [node_1: ]
+Connected to: node_1
+SELECT * FROM shop.customer ORDER BY x;
+x
+Connected to: node_2
+SELECT * FROM shop.customer ORDER BY x;
+x
+##### END #####
+
+
+##### START #####
+include/assert_table_are_same_in_cluster.inc [Different schema expect failure] [node_1: SELECT test_table_access_driver("INSERT-CUSTOMER-STRESS-3");]
+SELECT test_table_access_driver("INSERT-CUSTOMER-STRESS-3");;
+test_table_access_driver("INSERT-CUSTOMER-STRESS-3")
+get() failed
+Connected to: node_1
+SELECT * FROM shop.customer ORDER BY x;
+x
+Connected to: node_2
+SELECT * FROM shop.customer ORDER BY x;
+x
+##### END #####
+
+
+##### START #####
+include/assert_table_are_same_in_cluster.inc [Different schema expect failure] [node_1: SELECT test_table_access_driver("INSERT-CUSTOMER");]
+SELECT test_table_access_driver("INSERT-CUSTOMER");;
+test_table_access_driver("INSERT-CUSTOMER")
+check() failed
+Connected to: node_1
+SELECT * FROM shop.customer ORDER BY x;
+x
+Connected to: node_2
+SELECT * FROM shop.customer ORDER BY x;
+x
+##### END #####
+
+DROP TABLE shop.customer;
+CREATE TABLE shop.customer(x integer, y integer, z integer);
+
+##### START #####
+include/assert_table_are_same_in_cluster.inc [Different schema expect failure] [node_1: SELECT test_table_access_driver("INSERT-CUSTOMER");]
+SELECT test_table_access_driver("INSERT-CUSTOMER");;
+test_table_access_driver("INSERT-CUSTOMER")
+check() failed
+Connected to: node_1
+SELECT * FROM shop.customer ORDER BY x;
+x	y	z
+Connected to: node_2
+SELECT * FROM shop.customer ORDER BY x;
+x	y	z
+##### END #####
+
+DROP TABLE shop.customer;
+CREATE TABLE shop.customer(
+`ID` integer not null PRIMARY KEY,
+`NAME` varchar(50) not null,
+`ADDRESS` varchar(255));
+
+##### START #####
+include/assert_table_are_same_in_cluster.inc [No rows exist due to no commit.] [node_1: SELECT test_table_access_driver("INSERT-CUSTOMER-NO-COMMIT");]
+SELECT test_table_access_driver("INSERT-CUSTOMER-NO-COMMIT");;
+test_table_access_driver("INSERT-CUSTOMER-NO-COMMIT")
+OK, but forgot to commit
+Connected to: node_1
+SELECT * FROM shop.customer ORDER BY ID;
+ID	NAME	ADDRESS
+Connected to: node_2
+SELECT * FROM shop.customer ORDER BY ID;
+ID	NAME	ADDRESS
+##### END #####
+
+
+##### START #####
+include/assert_table_are_same_in_cluster.inc [No rows exist due to rollback.] [node_1: SELECT test_table_access_driver("INSERT-CUSTOMER-ROLLBACK");]
+SELECT test_table_access_driver("INSERT-CUSTOMER-ROLLBACK");;
+test_table_access_driver("INSERT-CUSTOMER-ROLLBACK")
+OK
+Connected to: node_1
+SELECT * FROM shop.customer ORDER BY ID;
+ID	NAME	ADDRESS
+Connected to: node_2
+SELECT * FROM shop.customer ORDER BY ID;
+ID	NAME	ADDRESS
+##### END #####
+
+
+##### START #####
+include/assert_table_are_same_in_cluster.inc [Commit.] [node_1: SELECT test_table_access_driver("INSERT-CUSTOMER");]
+SELECT test_table_access_driver("INSERT-CUSTOMER");;
+test_table_access_driver("INSERT-CUSTOMER")
+OK
+Connected to: node_1
+SELECT * FROM shop.customer ORDER BY ID;
+ID	NAME	ADDRESS
+1	John Doe	NULL
+Connected to: node_2
+SELECT * FROM shop.customer ORDER BY ID;
+ID	NAME	ADDRESS
+1	John Doe	NULL
+##### END #####
+
+
+##### START #####
+include/assert_table_are_same_in_cluster.inc [INSERT multiple records.] [node_1: SELECT test_table_access_driver("INSERT-CUSTOMER-INSERT-MULTIPLE");]
+SELECT test_table_access_driver("INSERT-CUSTOMER-INSERT-MULTIPLE");;
+test_table_access_driver("INSERT-CUSTOMER-INSERT-MULTIPLE")
+OK
+Connected to: node_1
+SELECT * FROM shop.customer ORDER BY ID;
+ID	NAME	ADDRESS
+1	John Doe	NULL
+2	Unknown Person - 2	NULL
+3	Unknown Person - 3	NULL
+4	Unknown Person - 4	NULL
+5	Unknown Person - 5	NULL
+6	Unknown Person - 6	NULL
+Connected to: node_2
+SELECT * FROM shop.customer ORDER BY ID;
+ID	NAME	ADDRESS
+1	John Doe	NULL
+2	Unknown Person - 2	NULL
+3	Unknown Person - 3	NULL
+4	Unknown Person - 4	NULL
+5	Unknown Person - 5	NULL
+6	Unknown Person - 6	NULL
+##### END #####
+
+
+##### START #####
+include/assert_table_are_same_in_cluster.inc [DELETE without commit fails.] [node_1: SELECT test_table_access_driver("DELETE-CUSTOMER-NO-COMMIT");]
+SELECT test_table_access_driver("DELETE-CUSTOMER-NO-COMMIT");;
+test_table_access_driver("DELETE-CUSTOMER-NO-COMMIT")
+OK, but forgot to commit
+Connected to: node_1
+SELECT * FROM shop.customer ORDER BY ID;
+ID	NAME	ADDRESS
+1	John Doe	NULL
+2	Unknown Person - 2	NULL
+3	Unknown Person - 3	NULL
+4	Unknown Person - 4	NULL
+5	Unknown Person - 5	NULL
+6	Unknown Person - 6	NULL
+Connected to: node_2
+SELECT * FROM shop.customer ORDER BY ID;
+ID	NAME	ADDRESS
+1	John Doe	NULL
+2	Unknown Person - 2	NULL
+3	Unknown Person - 3	NULL
+4	Unknown Person - 4	NULL
+5	Unknown Person - 5	NULL
+6	Unknown Person - 6	NULL
+##### END #####
+
+
+##### START #####
+include/assert_table_are_same_in_cluster.inc [DELETE with rollback.] [node_1: SELECT test_table_access_driver("DELETE-CUSTOMER-ROLLBACK");]
+SELECT test_table_access_driver("DELETE-CUSTOMER-ROLLBACK");;
+test_table_access_driver("DELETE-CUSTOMER-ROLLBACK")
+OK
+Connected to: node_1
+SELECT * FROM shop.customer ORDER BY ID;
+ID	NAME	ADDRESS
+1	John Doe	NULL
+2	Unknown Person - 2	NULL
+3	Unknown Person - 3	NULL
+4	Unknown Person - 4	NULL
+5	Unknown Person - 5	NULL
+6	Unknown Person - 6	NULL
+Connected to: node_2
+SELECT * FROM shop.customer ORDER BY ID;
+ID	NAME	ADDRESS
+1	John Doe	NULL
+2	Unknown Person - 2	NULL
+3	Unknown Person - 3	NULL
+4	Unknown Person - 4	NULL
+5	Unknown Person - 5	NULL
+6	Unknown Person - 6	NULL
+##### END #####
+
+
+##### START #####
+include/assert_table_are_same_in_cluster.inc [Single row delete.] [node_1: SELECT test_table_access_driver("DELETE-CUSTOMER-ID-2");]
+SELECT test_table_access_driver("DELETE-CUSTOMER-ID-2");;
+test_table_access_driver("DELETE-CUSTOMER-ID-2")
+OK
+Connected to: node_1
+SELECT * FROM shop.customer ORDER BY ID;
+ID	NAME	ADDRESS
+1	John Doe	NULL
+3	Unknown Person - 3	NULL
+4	Unknown Person - 4	NULL
+5	Unknown Person - 5	NULL
+6	Unknown Person - 6	NULL
+Connected to: node_2
+SELECT * FROM shop.customer ORDER BY ID;
+ID	NAME	ADDRESS
+1	John Doe	NULL
+3	Unknown Person - 3	NULL
+4	Unknown Person - 4	NULL
+5	Unknown Person - 5	NULL
+6	Unknown Person - 6	NULL
+##### END #####
+
+
+##### START #####
+include/assert_table_are_same_in_cluster.inc [All rows delete.] [node_1: SELECT test_table_access_driver("DELETE-ALL-CUSTOMERS");]
+SELECT test_table_access_driver("DELETE-ALL-CUSTOMERS");;
+test_table_access_driver("DELETE-ALL-CUSTOMERS")
+OK
+Connected to: node_1
+SELECT * FROM shop.customer ORDER BY ID;
+ID	NAME	ADDRESS
+Connected to: node_2
+SELECT * FROM shop.customer ORDER BY ID;
+ID	NAME	ADDRESS
+##### END #####
+
+DROP TABLE shop.customer;
+DROP SCHEMA shop;
+UNINSTALL COMPONENT 'file://component_test_table_access_galera';
