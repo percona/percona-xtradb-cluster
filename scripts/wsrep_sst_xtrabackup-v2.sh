@@ -123,6 +123,12 @@ fi
 pcmd=""
 declare -a RC
 
+# regex to extract pxb version from xtrabackup --version output
+# major - mandatory, multiple digits
+# minor - mandatory, multiple digits
+# patch - optional, multiple digits
+# build - optional, multiple digits
+xb_version_regex=' [0-9]\+\(\.[0-9]\+\)\{1,2\}\(-[0-9]\+\)\?'
 # default XB (xtrabackup-binary) to use.
 XTRABACKUP_BIN=xtrabackup
 DATA="${WSREP_SST_OPT_DATA}"
@@ -185,7 +191,7 @@ XTRABACKUP_PREV_LTS_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.0"
 
 # Minimum PXB required versions for this node to work
 # To be able to service this version
-XB_THIS_REQUIRED_VERSION="8.4.0"
+XB_THIS_REQUIRED_VERSION="8.4.0-5"
 # To be able to service previous version
 XB_PREV_REQUIRED_VERSION="8.3.0"
 # To be able to service previous LTS version
@@ -1626,25 +1632,15 @@ function initialize_pxb_commands()
     #
     # --lock-ddl option
     #
-    # Use user-provided option if set
+    # Use user-provided option if set, if not, use REDUCED by default.
+    # Starting from PXB 8.4.0-5, --lock-ddl=REDUCED is available in
+    # the community version. 8.4.0-5 is the minimum required version for this
+    # script to work (see XB_THIS_REQUIRED_VERSION))
+    lock_ddl="--lock-ddl=REDUCED"
     [[ -n "$lock_ddl_opt" ]] && lock_ddl="--lock-ddl=$lock_ddl_opt"
+    wsrep_log_info "Using PXB option ${lock_ddl} for SST"
 
-    # Check if xtrabackup (PXB) Pro version is used (supports --lock-ddl=REDUCED)
-    if ${pxb_bin_path} --version 2>&1 | grep -q -- '-pro'; then
-        if [[ -z "$lock_ddl_opt" ]]; then
-            lock_ddl="--lock-ddl=REDUCED"
-            wsrep_log_info "PXB Pro detected; using default --lock-ddl=REDUCED for SST"
-        fi
-    elif [[ "${lock_ddl_opt^^}" == "REDUCED" ]]; then
-        # If REDUCED is requested but not supported, exit with error
-        wsrep_log_error "******************* FATAL ERROR **********************"
-        wsrep_log_error "The xtrabackup version does not support --lock-ddl=REDUCED option."
-        wsrep_log_error "Line $LINENO"
-        wsrep_log_error "******************************************************"
-        safe_exit 2
-    fi
-
-    local xb_version=$(${pxb_bin_path} --version 2>&1 | grep -oe ' [0-9]\.[0-9][\.0-9]*' | head -n1)
+    local xb_version=$(${pxb_bin_path} --version 2>&1 | grep -oe ${xb_version_regex} | head -n1)
     xb_version=${xb_version# }
     wsrep_log_debug "pxb-version:$xb_version"
 
@@ -1749,7 +1745,7 @@ function verify_pxb_version()
         safe_exit 2
     fi
 
-    local xb_version=$($pxb_bin_path --version 2>&1 | grep -oe ' [0-9]\.[0-9]\.[0-9]*' | head -n1)
+    local xb_version=$($pxb_bin_path --version 2>&1 | grep -oe "${xb_version_regex}" | head -n1)
     xb_version=${xb_version# }
 
     if [[ -z "$xb_version" ]]; then
@@ -1848,7 +1844,7 @@ if [[ "$pxc_encrypt_cluster_traffic" == "on" ]]; then
             wsrep_log_error "* Please specify a CA file with the 'ssl-ca' option. "
             wsrep_log_error "* Line $LINENO"
             wsrep_log_error "**************************************************** "
-            save_exit 2
+            safe_exit 2
         fi
     fi
     if [[ -z "$ssl_cert" ]]; then
