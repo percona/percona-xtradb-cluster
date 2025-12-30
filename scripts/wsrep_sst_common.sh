@@ -430,19 +430,22 @@ function get_length_in_bytes()
 }
 
 # Returns the version string in a standardized format
-# Input "1.2.3" => echoes "010203"
+# Input "1.2.3-4" => echoes "01020304"
 # Wrongly formatted values => echoes "000000"
+# 1.2 are mandatory
+# 3-4 are optional. If not provided, the function will normalize each of them
+# as 00
 #
 # Globals:
 #   None
 #
 # Arguments:
 #   Parameter 1: a version string
-#                like "5.1.12"
-#                anything after the major.minor.revision is ignored
+#                like "8.4.0-5"
+#                anything after the major.minor.revision-build is ignored
 # Outputs:
 #   A string that can be used directly with string comparisons.
-#   So, the string "5.1.12" is transformed into "050112"
+#   So, the string "8.4.0-5" is transformed into "08040005"
 #   Note that individual version numbers can only go up to 99.
 #
 function normalize_version()
@@ -450,16 +453,17 @@ function normalize_version()
     local major=0
     local minor=0
     local patch=0
-
-    # Only parses purely numeric version numbers, 1.2.3
-    # Everything after the first three values are ignored
-    if [[ $1 =~ ^([0-9]+)\.([0-9]+)\.?([0-9]*)([^ ])* ]]; then
+    local build=0
+    # Only parses purely numeric version numbers, 1.2.3-4
+    # Everything after the first four values is ignored
+    if [[ $1 =~ ^([0-9]+)\.([0-9]+)\.?([0-9]*)\-?([0-9]*)([^ ])* ]]; then
         major=${BASH_REMATCH[1]}
         minor=${BASH_REMATCH[2]}
         patch=${BASH_REMATCH[3]}
+        build=${BASH_REMATCH[4]}
     fi
 
-    printf %02d%02d%02d $major $minor $patch
+    printf %02d%02d%02d%02d $major $minor $patch $build
 }
 
 # Compares two version strings
