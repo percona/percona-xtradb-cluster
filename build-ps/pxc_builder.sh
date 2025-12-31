@@ -197,9 +197,8 @@ get_sources(){
     echo "GALERA_REVNO=${GALERA_REVNO}" >>${WORKDIR}/pxc-80.properties
     DEST=${DESTINATION}
     echo "DEST=${DEST}" >> ${WORKDIR}/pxc-80.properties
-    if [ -f /etc/redhat-release ]; then
+    if [ "x$OS" = "xrpm" ]; then
       export OS_RELEASE="centos$(lsb_release -sr | awk -F'.' '{print $1}')"
-      RHEL=$(rpm --eval %rhel)
     if [ "x${RHEL}" = "x6" ]; then
         source /opt/rh/devtoolset-8/enable
     fi
@@ -283,6 +282,12 @@ get_system(){
         ARCH=$(echo $(uname -m) | sed -e 's:i686:i386:g')
         OS_NAME="el$RHEL"
         OS="rpm"
+    elif [ -f /etc/amazon-linux-release ]; then
+        GLIBC_VER_TMP="$(rpm glibc -qa --qf %{VERSION})"
+        RHEL=$(rpm --eval %amzn)
+        ARCH=$(echo $(uname -m) | sed -e 's:i686:i386:g')
+        OS_NAME="amzn$RHEL"
+        OS="rpm"
     else
         GLIBC_VER_TMP="$(dpkg-query -W -f='${Version}' libc6 | awk -F'-' '{print $1}')"
         ARCH=$(uname -m)
@@ -310,7 +315,6 @@ install_deps() {
         if [ "x${RHEL}" = "x8" -o "x${RHEL}" = "x7" ]; then
             switch_to_vault_repo
         fi
-        RHEL=$(rpm --eval %rhel)
         ARCH=$(echo $(uname -m) | sed -e 's:i686:i386:g')
         yum update -y
         yum install -y perl
@@ -318,7 +322,7 @@ install_deps() {
         percona-release enable tools testing
         percona-release enable pxb-80 testing
         percona-release enable pxb-84-lts
-        if [ "x$RHEL" = "x8" -o "x$RHEL" = "x9" -o "x$RHEL" = "x10" ]; then
+        if [ "x$RHEL" = "x8" -o "x$RHEL" = "x9" -o "x$RHEL" = "x2023" -o "x$RHEL" = "x10" ]; then
             yum -y install dnf-plugins-core
             if [ "x${RHEL}" = "x10" ]; then
                 dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm
@@ -338,33 +342,52 @@ install_deps() {
             yum -y install bison boost-devel check-devel cmake libaio-devel libcurl-devel libudev-devel
             yum -y install redhat-rpm-config
 	    if [ x"$ARCH" = "xx86_64" ]; then
-                wget https://downloads.percona.com/downloads/packaging/rpcgen-1.4-2.fc30.x86_64.rpm
-                wget https://downloads.percona.com/downloads/packaging/gperf-3.1-6.fc29.x86_64.rpm
-                yum -y install rpcgen-1.4-2.fc30.x86_64.rpm gperf-3.1-6.fc29.x86_64.rpm
+                if [ "x${RHEL}" != "x2023" ]; then
+                    wget https://downloads.percona.com/downloads/packaging/rpcgen-1.4-2.fc30.x86_64.rpm
+                    wget https://downloads.percona.com/downloads/packaging/gperf-3.1-6.fc29.x86_64.rpm
+                    yum -y install rpcgen-1.4-2.fc30.x86_64.rpm gperf-3.1-6.fc29.x86_64.rpm
+                else
+                    yum -y install gperf rpcgen annobin-plugin-gcc annobin-annocheck chkconfig nmap
+                fi
 	    else
 		yum -y install yum-utils
-		dnf config-manager --enable ol${RHEL}_codeready_builder
+                if [ "x${RHEL}" != "x2023" ]; then
+		    dnf config-manager --enable ol${RHEL}_codeready_builder
+                fi
 		yum -y install gperf rpcgen
 	    fi
-
-            if [ "x${RHEL}" = "x9" -o "x${RHEL}" = "x10" ]; then
-                yum install -y https://yum.oracle.com/repo/OracleLinux/OL9/distro/builder/${ARCH}/getPackage/procps-ng-devel-3.3.17-8.el9.x86_64.rpm
-                yum -y install dnf-utils
-                dnf config-manager --enable ol${RHEL}_codeready_builder
+            if [ "x${RHEL}" = "x2023" ]; then
+                 dnf install -y dnf-plugins-core
+                 dnf config-manager --enable amazonlinux
+            fi
+            if [ "${RHEL}" -ge 9 ]; then
+                if [ "x${RHEL}" != "x2023" ]; then
+                    if [ x"$ARCH" = "xx86_64" ]; then
+                        yum install -y https://yum.oracle.com/repo/OracleLinux/OL9/distro/builder/${ARCH}/getPackage/procps-ng-devel-3.3.17-8.el9.x86_64.rpm
+                    fi
+                    yum -y install dnf-utils
+                    dnf config-manager --enable ol${RHEL}_codeready_builder
+                    yum -y install gcc-toolset-12-gcc gcc-toolset-12-gcc-c++ gcc-toolset-12-binutils gcc-toolset-12-annobin-annocheck gcc-toolset-12-annobin-plugin-gcc gcc-toolset-12-libatomic-devel
+                    if [ "${RHEL}" = 10 ]; then
+                        yum -y install gcc
+                        yum -y install libatomic
+                        if [ x"$ARCH" = "xx86_64" ]; then
+                            yum -y install gcc-gfortran
+                        fi
+                    fi
+                fi
                 yum -y install libedit-devel
                 yum -y install libtirpc-devel
                 yum -y install gcc
-                if [ "x${RHEL}" = "x9" ]; then
-                    yum -y install gcc-toolset-12-gcc gcc-toolset-12-gcc-c++ gcc-toolset-12-binutils gcc-toolset-12-annobin-annocheck gcc-toolset-12-annobin-plugin-gcc gcc-toolset-12-libatomic-devel
+                yum -y install pip python3-devel
+                if [ "x${RHEL}" = "x2023" ]; then
+                    yum -y install libatomic annobin-annocheck annobin-plugin-gcc
+                    yum -y install procps-ng-devel python3-setuptools
+                    pip install --user typing scons pyyaml regex Cheetah3
                 else
-                    yum -y install gcc
-                    yum -y install libatomic
-                    if [ x"$ARCH" = "xx86_64" ]; then
-                        yum -y install gcc-gfortran
-                    fi
+                    yum -y install scons
+                    pip install --user typing pyyaml regex Cheetah3
                 fi
-                yum -y install scons pip python3-devel
-                pip install --user typing pyyaml regex Cheetah3
             else
                 wget https://downloads.percona.com/downloads/packaging/python2-scons-3.0.1-9.el8.noarch.rpm
                 yum -y install ./python2-scons-3.0.1-9.el8.noarch.rpm || true
@@ -454,8 +477,8 @@ install_deps() {
         percona-release enable tools release
         
         # (1) PXB compatible with previous PXC LTS version
-        percona-release enable pxb-80
-        percona-release enable pxb-84-lts
+        percona-release enable pxb-80 testing
+        percona-release enable pxb-84-lts testing
         # (2) PXB compatible with previous PXC version (note: it may be LTS as well)
         percona-release enable pxc-8x-innovation testing
         # (3) PXB compatible with this PXC version (LTS or Innovative)
@@ -514,7 +537,7 @@ install_deps() {
         fi
 
         apt-get -y install --download-only percona-xtrabackup-80=8.0.35-34-1.${DIST}
-        apt-get -y install --download-only percona-xtrabackup-84=8.4.0-4-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-84=8.4.0-5-1.${DIST}
     fi
     return;
 }
@@ -647,7 +670,6 @@ build_srpm(){
     fi
 
     SRCRPM=$(find . -name *.src.rpm)
-    RHEL=$(rpm --eval %rhel)
     #
     ARCH=$(uname -m)
     if [ ${ARCH} = i686 ]; then
@@ -775,7 +797,6 @@ build_rpm(){
     mkdir -vp rpmbuild/{SOURCES,SPECS,BUILD,SRPMS,RPMS}
     cp $SRC_RPM rpmbuild/SRPMS/
 
-    RHEL=$(rpm --eval %rhel)
     ARCH=$(echo $(uname -m) | sed -e 's:i686:i386:g')
     #
     echo "RHEL=${RHEL}" >> pxc-80.properties
@@ -814,15 +835,15 @@ build_rpm(){
     #
     if [ ${ARCH} = x86_64 ]; then
         if [[ "x${FIPSMODE}" == "x1" ]]; then
-            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "enable_fipsmode 1" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "enable_fipsmode 1" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
         else
-            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
         fi
     else
         if [[ "x${FIPSMODE}" == "x1" ]]; then
-            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "enable_fipsmode 1" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "enable_fipsmode 1" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
         else
-            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
         fi
     fi
     return_code=$?
