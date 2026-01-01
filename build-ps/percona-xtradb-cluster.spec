@@ -41,16 +41,20 @@ Prefix: %{_sysconfdir}
 %define percona_server_version @@PERCONA_VERSION@@
 %define rpm_release @@RPM_RELEASE@@
 %define revision @@REVISION@@
-%define distribution  rhel%{redhatversion}  
-
+%if 0%{?amzn} == 2023
+  %define distribution  amzn2023
+  %define rhel 9
+%else
+  %define distribution  rhel%{redhatversion}
+%endif
 # By default a build will be done in normal mode
 %{?enable_fipsmode: %global enable_fipsmode 1}
 
-%if 0%{?rhel} >= 8
+%if 0%{?rhel} >= 8 || 0%{?amzn} == 2023
 %global pxc_telemetry          /usr/local/percona/telemetry/pxc
 %endif
 
-%if 0%{?rhel} >= 8
+%if 0%{?rhel} >= 8 || 0%{?amzn} == 2023
 %global add_fido_plugins 1
 %else
 %global add_fido_plugins 0
@@ -133,7 +137,7 @@ Prefix: %{_sysconfdir}
 %if %{with systemd}
   %define systemd 1
 %else
-  %if 0%{?rhel} > 6
+  %if 0%{?rhel} > 6 || 0%{?amzn} == 2023
     %define systemd 1
   %else
     %define systemd 0
@@ -186,7 +190,7 @@ Prefix: %{_sysconfdir}
 
 #%define server_suffix -80
 
-%if 0%{?rhel} > 6
+%if 0%{?rhel} > 6 || 0%{?amzn} == 2023
     %define distro_req           chkconfig nmap nc
 %else
     %define distro_req           chkconfig nc
@@ -257,6 +261,12 @@ Prefix: %{_sysconfdir}
         %endif
       %endif
     %else
+      %if %(test -f /etc/amazon-linux-release && echo 1 || echo 0)
+        %define distro_description    Amazon Linux 2023
+        %define distro_releasetag     amzn2023
+        %define distro_buildreq       gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake
+        %define distro_requires       chkconfig coreutils grep procps shadow-utils %distro_req
+      %endif
       %if %(test -f /etc/SuSE-release && echo 1 || echo 0)
         %define susever %(rpm -qf --qf '%%{version}\\n' /etc/SuSE-release)
         %if "%susever" == "10"
@@ -339,7 +349,11 @@ Requires:             percona-xtradb-cluster-server = %{version}-%{release}
 Requires:             percona-xtradb-cluster-client = %{version}-%{release}
 Provides:       mysql-server galera-57 galera-57-debuginfo
 BuildRequires:  %{distro_buildreq} pam-devel openssl-devel numactl-devel
+%if 0%{?amzn} == 2023
+BuildRequires:  check-devel glibc-devel %{gcc_req} openssl-devel %{boost_req} check-devel openldap-devel
+%else
 BuildRequires:  scons check-devel glibc-devel %{gcc_req} openssl-devel %{boost_req} check-devel openldap-devel
+%endif
 %if 0%{?systemd}
 BuildRequires:  systemd
 %endif
@@ -394,13 +408,13 @@ Requires:             percona-xtradb-cluster-icu-data-files = %{version}-%{relea
 Requires:             selinux-policy
 Requires:             policycoreutils
 Requires:             curl, nmap, nc
-%if 0%{?rhel} >= 8
+%if 0%{?rhel} >= 8 || 0%{?amzn} == 2023
 Requires:	      percona-telemetry-agent
 %endif
 Requires(pre):        policycoreutils
 Requires(post):       policycoreutils
 Requires(postun):     policycoreutils
-%if 0%{?rhel} == 8 || 0%{?rhel} == 9 || 0%{?rhel} == 10
+%if 0%{?rhel} == 8 || 0%{?rhel} == 9 || 0%{?amzn} == 2023 || 0%{?rhel} == 10
 Requires:             policycoreutils-python-utils
 Requires(pre):        policycoreutils-python-utils
 Requires(post):       policycoreutils-python-utils
@@ -435,7 +449,7 @@ Requires(preun):  /sbin/chkconfig
 Requires(preun):  /sbin/service
 %endif
 Provides:       mysql-server MySQL-server
-%if 0%{?rhel} == 8 || 0%{?rhel} == 9 || 0%{?rhel} == 10
+%if 0%{?rhel} == 8 || 0%{?rhel} == 9 || 0%{?amzn} == 2023 || 0%{?rhel} == 10
 Obsoletes:      mariadb-connector-c-config
 %endif
 Conflicts:      Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56 Percona-Server-server-57
@@ -547,7 +561,7 @@ Provides:       mysql-shared >= %{mysql_version} mysql-libs >= %{mysql_version}
 Conflicts:      Percona-Server-shared-56
 Conflicts:      Percona-Server-shared-57
 Conflicts:      percona-xtradb-cluster-shared-pro
-%if "%rhel" > "6"
+%if "%rhel" > "6" || "%amzn" == "2023"
 #Provides:       mariadb-libs >= 5.5.37
 Obsoletes:      mariadb-libs >= 5.5.37
 %endif
@@ -675,7 +689,7 @@ export CFLAGS=${MYSQL_BUILD_CFLAGS:-${CFLAGS:-$RPM_OPT_FLAGS -Wno-error=free-non
 export CXXFLAGS=${MYSQL_BUILD_CXXFLAGS:-${CXXFLAGS:-$RPM_OPT_FLAGS -felide-constructors -Wno-error=free-nonheap-object}}
 export LDFLAGS=${MYSQL_BUILD_LDFLAGS:-${LDFLAGS:-}}
 
-%if 0%{?rhel} == 8 || 0%{?rhel} == 9 || 0%{?rhel} == 10
+%if 0%{?rhel} == 8 || 0%{?rhel} == 9 || 0%{?amzn} >= 2023 || 0%{?rhel} == 10
 export CMAKE=${MYSQL_BUILD_CMAKE:-${CMAKE:-/usr/bin/cmake}}
 %else
 export CMAKE=${MYSQL_BUILD_CMAKE:-${CMAKE:-/usr/bin/cmake3}}
@@ -742,22 +756,31 @@ mkdir debug
   # Attempt to remove any optimisation flags from the debug build
   CFLAGS=`echo " ${CFLAGS} " | \
             sed -e 's/ -unroll2 / /' \
-%if 0%{?rhel} < 9
+%if 0%{?amzn} == 2023
+                -e 's/-Wall -Werror=format-security//' \
+                -e 's/-Werror//' \
+%else
+    %if 0%{?rhel} < 9
                 -e 's/ -O[0-9]* / /' \
                 -e 's/-Wp,-D_FORTIFY_SOURCE=2/ -Wno-missing-field-initializers -Wno-error/' \
-%else
+    %else
                 -e 's/-D_FORTIFY_SOURCE=3/-D_FORTIFY_SOURCE=3 -Wno-error=stringop-overread -Wno-error=stringop-overflow -Wno-error=free-nonheap-object -Wno-error=stringop-truncation -Wno-error=maybe-uninitialized -Wno-error=odr/' \
+    %endif
 %endif
                 -e 's/ -ip / /' \
                 -e 's/^ //' \
                 -e 's/ $//'`
   CXXFLAGS=`echo " ${CXXFLAGS} " | \
             sed -e 's/ -unroll2 / /' \
-%if 0%{?rhel} < 9
+%if 0%{?amzn} == 2023
+                -e 's/-D_FORTIFY_SOURCE=2/-D_FORTIFY_SOURCE=2 -Wno-error=stringop-overread -Wno-error=stringop-overflow -Wno-error=free-nonheap-object -Wno-error=stringop-truncation -Wno-error=maybe-uninitialized -Wno-error=odr/' \
+%else
+    %if 0%{?rhel} < 9
                 -e 's/ -O[0-9]* / /' \
                 -e 's/-Wp,-D_FORTIFY_SOURCE=2/ -Wno-missing-field-initializers -Wno-error/' \
-%else
+    %else
                 -e 's/-D_FORTIFY_SOURCE=3/-D_FORTIFY_SOURCE=3 -Wno-error=stringop-overread -Wno-error=stringop-overflow -Wno-error=free-nonheap-object -Wno-error=stringop-truncation -Wno-error=maybe-uninitialized -Wno-error=odr/' \
+    %endif
 %endif
                 -e 's/ -ip / /' \
                 -e 's/^ //' \
@@ -906,7 +929,7 @@ mv $RBR%{_libdir} $RPM_BUILD_DIR/%{_libdir}
 ##############################################################################
 %install
 
-%if 0%{?rhel} > 8
+%if 0%{?rhel} == 9 || 0%{?amzn} == 2023 || 0%{?rhel} == 10
     sed -i 's/python2$/python3/' scripts/pyclustercheck.py.in
 %endif
 
@@ -1254,7 +1277,7 @@ fi
   %systemd_post mysql
 %endif
 
-if [ -d /etc/percona-xtradb-clister.conf.d ]; then
+if [ -d /etc/percona-xtradb-cluster.conf.d ]; then
     CONF_EXISTS=$(grep "percona-xtradb-cluster.conf.d" /etc/my.cnf | wc -l)
     if [ ${CONF_EXISTS} = 0 ]; then
         echo "!includedir /etc/percona-xtradb-cluster.conf.d/" >> /etc/my.cnf
@@ -1408,7 +1431,7 @@ fi
   sleep 5
 fi
 
-%if 0%{?rhel} >= 8
+%if 0%{?rhel} >= 8 || 0%{?amzn} == 2023
 install -d -m 2775 -o mysql -g percona-telemetry %{pxc_telemetry}
 chcon -t mysqld_db_t %{pxc_telemetry}
 chcon -u system_u %{pxc_telemetry}
@@ -1740,7 +1763,7 @@ fi
     %attr(755, root, root) %{_datadir}/percona-xtradb-cluster/
 %endif
 
-%if "%rhel" >= "6"
+%if "%rhel" >= "6" || "%amzn" == "2023"
     %attr(755, root, root) %{_datarootdir}/percona-xtradb-cluster/
 %endif
 
@@ -1976,7 +1999,7 @@ else
     fi
 fi
 %endif
-%if 0%{?rhel} >= 8
+%if 0%{?rhel} >= 8 || 0%{?amzn} == 2023
 rm -rf %{pxc_telemetry}
 %endif
 
