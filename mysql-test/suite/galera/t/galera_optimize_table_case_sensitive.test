@@ -1,0 +1,267 @@
+##############################################################################
+# This test case makes sure DDL and related admin commands are not logged
+# in binlog in RSU mode but are logged in TOI mode.
+##############################################################################
+# 1. Setup.
+# 2. Base table
+# 3. Base table
+# 4. ALL RSU DDL (must NOT be written to binlog)
+# 5. Admin / session commands (NOT binlogged)
+# 6. DML (MUST be written to binlog even in RSU)
+# 7. ALL TOI DDL (must be written to binlog)
+# 8. Admin / session commands (binlogged)
+# 9. Cleanup
+##############################################################################
+
+--source include/have_case_sensitive_file_system.inc
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+--echo ##############################################################################
+--echo # 1. Setup.
+--echo ##############################################################################
+
+CALL mtr.add_suppression("The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.");
+
+SELECT @@global.lower_case_table_names;
+
+CREATE DATABASE reproduction_lab;
+CREATE TABLE reproduction_lab.heavy_test (id int) ENGINE=InnoDB;
+
+--connect node_1a, 127.0.0.1, root,,reproduction_lab, $NODE_MYPORT_1
+--connection node_1a
+
+SET SESSION wsrep_OSU_method='RSU';
+
+--echo ##############################################################################
+--echo # 2. Optimize table should not be logged.
+--echo ##############################################################################
+
+FLUSH BINARY LOGS;
+--let $binlog_file= query_get_value(SHOW MASTER STATUS, File, 1)
+--replace_result $binlog_file <binlog_file>
+--eval PURGE BINARY LOGS TO '$binlog_file';
+
+# Below command actually succed but while looping tables Heavy_test will error.
+# Command status and table Heavy_test case failure are 2 different thingss
+OPTIMIZE TABLE Heavy_test, heavy_test;
+
+--let $binlog_file= query_get_value(SHOW MASTER STATUS, File, 1)
+--replace_result $binlog_file <binlog_file>
+--replace_column 2 # 5 #
+--replace_regex /\/\* xid=.* \*\//\/* XID *\// /table_id: [0-9]+/table_id: #/ /SET @@SESSION.GTID_NEXT=.*$/SET @@SESSION.GTID_NEXT= 'GTID';/ /GROUPS: .*:(.*,.*)/GROUPS: GTID:(X,X)/ / \/\* XID \*\/// /Xid/Query/
+--eval SHOW BINLOG EVENTS IN '$binlog_file' FROM 5
+
+--echo ##############################################################################
+--echo # 3. Base table
+--echo ##############################################################################
+CREATE TABLE t_rsu (
+  id INT PRIMARY KEY,
+  v  INT
+);
+
+--echo ##############################################################################
+--echo # 4. ALL RSU DDL (must NOT be written to binlog)
+--echo ##############################################################################
+
+## CREATE / ALTER / DROP / TRUNCATE
+ALTER TABLE t_rsu ADD COLUMN v2 INT;
+TRUNCATE TABLE t_rsu;
+
+## INDEX
+CREATE INDEX idx_v ON t_rsu(v);
+DROP INDEX idx_v ON t_rsu;
+
+## RENAME
+RENAME TABLE t_rsu TO t_rsu_new;
+RENAME TABLE t_rsu_new TO t_rsu;
+
+## VIEW
+CREATE VIEW v_rsu AS SELECT * FROM t_rsu;
+DROP VIEW v_rsu;
+
+## TRIGGER
+DELIMITER $$;
+CREATE TRIGGER trg_rsu
+BEFORE INSERT ON t_rsu
+FOR EACH ROW SET NEW.v2 = 10$$
+DROP TRIGGER trg_rsu$$
+DELIMITER ;$$
+
+## FUNCTION
+DELIMITER $$;
+CREATE FUNCTION f_rsu(x INT)
+RETURNS INT
+DETERMINISTIC
+RETURN x + 1$$
+DROP FUNCTION f_rsu$$
+DELIMITER ;$$
+
+## PROCEDURE
+DELIMITER $$;
+CREATE PROCEDURE p_rsu(IN x INT)
+BEGIN
+  SELECT x;
+END$$
+DROP PROCEDURE p_rsu$$
+DELIMITER ;$$
+
+## EVENT
+DELIMITER $$;
+CREATE EVENT ev_rsu
+ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 DAY
+DO
+  INSERT INTO t_rsu VALUES (100,100,100)$$
+DROP EVENT ev_rsu$$
+DELIMITER ;$$
+
+--let $binlog_file= query_get_value(SHOW MASTER STATUS, File, 1)
+--replace_result $binlog_file <binlog_file>
+--replace_column 2 # 5 #
+--replace_regex /\/\* xid=.* \*\//\/* XID *\// /table_id: [0-9]+/table_id: #/ /SET @@SESSION.GTID_NEXT=.*$/SET @@SESSION.GTID_NEXT= 'GTID';/ /GROUPS: .*:(.*,.*)/GROUPS: GTID:(X,X)/ / \/\* XID \*\/// /Xid/Query/
+--eval SHOW BINLOG EVENTS IN '$binlog_file' FROM 5
+
+--echo ##############################################################################
+--echo # 5. Admin / session commands (NOT binlogged)
+--echo ##############################################################################
+
+ANALYZE TABLE t_rsu;
+CHECK TABLE t_rsu;
+OPTIMIZE TABLE t_rsu;
+DROP TABLE t_rsu; # Cleanup
+
+SET SESSION autocommit=0;
+SET SESSION autocommit=1;
+
+--let $binlog_file= query_get_value(SHOW MASTER STATUS, File, 1)
+--replace_result $binlog_file <binlog_file>
+--replace_column 2 # 5 #
+--replace_regex /\/\* xid=.* \*\//\/* XID *\// /table_id: [0-9]+/table_id: #/ /SET @@SESSION.GTID_NEXT=.*$/SET @@SESSION.GTID_NEXT= 'GTID';/ /GROUPS: .*:(.*,.*)/GROUPS: GTID:(X,X)/ / \/\* XID \*\/// /Xid/Query/
+--eval SHOW BINLOG EVENTS IN '$binlog_file' FROM 5
+
+--echo ##############################################################################
+--echo # 6. DML (MUST be written to binlog even in RSU)
+--echo ##############################################################################
+
+INSERT INTO reproduction_lab.heavy_test VALUES (1);
+UPDATE reproduction_lab.heavy_test SET id=99 WHERE id=1;
+DELETE FROM reproduction_lab.heavy_test WHERE id=99;
+REPLACE INTO reproduction_lab.heavy_test VALUES (2);
+
+--let $binlog_file= query_get_value(SHOW MASTER STATUS, File, 1)
+--replace_result $binlog_file <binlog_file>
+--replace_column 2 # 5 #
+--replace_regex /\/\* xid=.* \*\//\/* XID *\// /table_id: [0-9]+/table_id: #/ /SET @@SESSION.GTID_NEXT=.*$/SET @@SESSION.GTID_NEXT= 'GTID';/ /GROUPS: .*:(.*,.*)/GROUPS: GTID:(X,X)/ / \/\* XID \*\/// /Xid/Query/
+--eval SHOW BINLOG EVENTS IN '$binlog_file' FROM 5
+
+--echo ##############################################################################
+--echo # 7. ALL TOI DDL (must be written to binlog)
+--echo ##############################################################################
+
+SET SESSION wsrep_OSU_method='TOI';
+
+FLUSH BINARY LOGS;
+--let $binlog_file= query_get_value(SHOW MASTER STATUS, File, 1)
+--replace_result $binlog_file <binlog_file>
+--eval PURGE BINARY LOGS TO '$binlog_file';
+
+CREATE TABLE t_rsu (
+  id INT PRIMARY KEY,
+  v  INT
+);
+
+## CREATE / ALTER / DROP / TRUNCATE
+ALTER TABLE t_rsu ADD COLUMN v2 INT;
+TRUNCATE TABLE t_rsu;
+
+## INDEX
+CREATE INDEX idx_v ON t_rsu(v);
+DROP INDEX idx_v ON t_rsu;
+
+## RENAME
+RENAME TABLE t_rsu TO t_rsu_new;
+RENAME TABLE t_rsu_new TO t_rsu;
+
+## VIEW
+CREATE VIEW v_rsu AS SELECT * FROM t_rsu;
+DROP VIEW v_rsu;
+
+## TRIGGER
+DELIMITER $$;
+CREATE TRIGGER trg_rsu
+BEFORE INSERT ON t_rsu
+FOR EACH ROW SET NEW.v2 = 10$$
+DROP TRIGGER trg_rsu$$
+DELIMITER ;$$
+
+## FUNCTION
+DELIMITER $$;
+CREATE FUNCTION f_rsu(x INT)
+RETURNS INT
+DETERMINISTIC
+RETURN x + 1$$
+DROP FUNCTION f_rsu$$
+DELIMITER ;$$
+
+## PROCEDURE
+DELIMITER $$;
+CREATE PROCEDURE p_rsu(IN x INT)
+BEGIN
+  SELECT x;
+END$$
+DROP PROCEDURE p_rsu$$
+DELIMITER ;$$
+
+## EVENT
+DELIMITER $$;
+CREATE EVENT ev_rsu
+ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 DAY
+DO
+  INSERT INTO t_rsu VALUES (100,100,100)$$
+DROP EVENT ev_rsu$$
+DELIMITER ;$$
+
+--let $binlog_file= query_get_value(SHOW MASTER STATUS, File, 1)
+--replace_result $binlog_file <binlog_file>
+--replace_column 2 # 5 #
+--replace_regex /\/\* xid=.* \*\//\/* XID *\// /table_id: [0-9]+/table_id: #/ /SET @@SESSION.GTID_NEXT=.*$/SET @@SESSION.GTID_NEXT= 'GTID';/ /GROUPS: .*:(.*,.*)/GROUPS: GTID:(X,X)/ / \/\* XID \*\/// /Xid/Query/
+--eval SHOW BINLOG EVENTS IN '$binlog_file' FROM 5
+
+--echo ##############################################################################
+--echo # 8. Admin / session commands (binlogged)
+--echo ##############################################################################
+FLUSH BINARY LOGS;
+--let $binlog_file= query_get_value(SHOW MASTER STATUS, File, 1)
+--replace_result $binlog_file <binlog_file>
+--eval PURGE BINARY LOGS TO '$binlog_file';
+
+ANALYZE TABLE t_rsu;
+# CHECK TABLE is not written to binlog.
+CHECK TABLE t_rsu;
+OPTIMIZE TABLE t_rsu;
+DROP TABLE t_rsu; # Cleanup
+
+SET SESSION autocommit=0;
+SET SESSION autocommit=1;
+
+--let $binlog_file= query_get_value(SHOW MASTER STATUS, File, 1)
+--replace_result $binlog_file <binlog_file>
+--replace_column 2 # 5 #
+--replace_regex /\/\* xid=.* \*\//\/* XID *\// /table_id: [0-9]+/table_id: #/ /SET @@SESSION.GTID_NEXT=.*$/SET @@SESSION.GTID_NEXT= 'GTID';/ /GROUPS: .*:(.*,.*)/GROUPS: GTID:(X,X)/ / \/\* XID \*\/// /Xid/Query/
+--eval SHOW BINLOG EVENTS IN '$binlog_file' FROM 5
+
+--echo ##############################################################################
+--echo # 9. Cleanup
+--echo ##############################################################################
+
+--disconnect node_1a
+
+--connection node_1
+--source include/wait_until_count_sessions.inc
+
+DROP DATABASE reproduction_lab;
+FLUSH BINARY LOGS;
+--let $binlog_file= query_get_value(SHOW MASTER STATUS, File, 1)
+--replace_result $binlog_file <binlog_file>
+--eval PURGE BINARY LOGS TO '$binlog_file';
+
