@@ -5217,8 +5217,8 @@ int mysql_execute_command(THD *thd, bool first_level) {
         handle_reload_request() will tell us if we are allowed to write to the
         binlog or not.
       */
-      if (!handle_reload_request(thd, lex->type, first_table,
-                                 &write_to_binlog)) {
+      if (!(res=handle_reload_request(thd, lex->type, first_table,
+                                 &write_to_binlog))) {
 #ifdef WITH_WSREP
         if ((lex->type & REFRESH_TABLES) &&
             !(lex->type & (REFRESH_FOR_EXPORT | REFRESH_READ_LOCK))) {

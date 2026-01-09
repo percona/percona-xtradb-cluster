@@ -399,8 +399,8 @@ struct MDL_key {
     treatment - waiting is aborted if connection to client is lost.
   */
   enum enum_mdl_namespace {
-    GLOBAL = 0,
-    BACKUP_LOCK, /* Oracle LOCK INSTANCE FOR BACKUP */
+    BACKUP_LOCK = 0, /* Oracle LOCK INSTANCE FOR BACKUP */
+    GLOBAL,
     TABLESPACE,
     SCHEMA,
     TABLE,
