@@ -448,10 +448,18 @@ Requires(post):   /sbin/chkconfig
 Requires(preun):  /sbin/chkconfig
 Requires(preun):  /sbin/service
 %endif
-Provides:       mysql-server MySQL-server
-%if 0%{?rhel} == 8 || 0%{?rhel} == 9 || 0%{?amzn} == 2023 || 0%{?rhel} == 10
+Obsoletes:      community-mysql-bench
+Obsoletes:      mysql-bench
 Obsoletes:      mariadb-connector-c-config
-%endif
+Obsoletes:      mariadb-backup
+Obsoletes:      mariadb-bench
+Obsoletes:      mariadb-server
+Obsoletes:      mariadb-server-galera
+Obsoletes:      mariadb-server-utils
+Obsoletes:      mariadb-galera-server
+Obsoletes:      mariadb-gssapi-server
+Obsoletes:      mariadb-oqgraph-engine
+Provides:       mysql-server MySQL-server
 Conflicts:      Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56 Percona-Server-server-57
 Conflicts:      percona-xtradb-cluster-server-pro
 
@@ -503,6 +511,7 @@ Requires:       percona-xtradb-cluster-client perl
 Summary:        Percona XtraDB Cluster - Test suite
 Group:          Applications/Databases
 Provides:       mysql-test
+Obsoletes:      mariadb-test
 Requires:       perl(Socket), perl(Time::HiRes), perl(Data::Dumper), perl(Test::More), perl(Env)
 Conflicts:      Percona-SQL-test-50 Percona-Server-test-51 Percona-Server-test-55 Percona-XtraDB-Cluster-test-55
 Conflicts:      percona-xtradb-cluster-test-pro
