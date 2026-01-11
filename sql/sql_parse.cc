@@ -2411,15 +2411,18 @@ done:
 #endif /* WITH_WSREP */
 
 #ifndef EMBEDDED_LIBRARY
-  if (!thd->is_error() && !thd->killed_errno())
-    mysql_audit_notify(thd,
-                       AUDIT_EVENT(MYSQL_AUDIT_GENERAL_RESULT), 0, NULL, 0);
+  if (command != COM_STMT_EXECUTE)
+  {
+    if (!thd->is_error() && !thd->killed_errno())
+      mysql_audit_notify(thd,
+                        AUDIT_EVENT(MYSQL_AUDIT_GENERAL_RESULT), 0, NULL, 0);
 
-  mysql_audit_notify(thd, AUDIT_EVENT(MYSQL_AUDIT_GENERAL_STATUS),
-                     thd->get_stmt_da()->is_error() ?
-                     thd->get_stmt_da()->mysql_errno() : 0,
-                     command_name[command].str,
-                     command_name[command].length);
+    mysql_audit_notify(thd, AUDIT_EVENT(MYSQL_AUDIT_GENERAL_STATUS),
+                      thd->get_stmt_da()->is_error() ?
+                      thd->get_stmt_da()->mysql_errno() : 0,
+                      command_name[command].str,
+                      command_name[command].length);
+  }
 
   /* command_end is informational only. The plugin cannot abort
      execution of the command at thie point. */
@@ -6358,6 +6361,7 @@ finish:
 #endif /* WITH_WSREP */
   }
 
+<<<<<<< HEAD
 #ifdef WITH_WSREP
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
   if (thd->wsrep_conflict_state != REPLAYED)
@@ -6370,6 +6374,24 @@ finish:
     LOCK_wsrep_thd too. */
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 #endif /* WITH_WSREP */
+||||||| f2649efdf72
+=======
+#ifndef EMBEDDED_LIBRARY
+  if (thd->get_command() == COM_STMT_EXECUTE)
+  {
+    if (!thd->is_error() && !thd->killed_errno())
+      mysql_audit_notify(thd,
+                        AUDIT_EVENT(MYSQL_AUDIT_GENERAL_RESULT), 0, NULL, 0);
+
+    mysql_audit_notify(thd, AUDIT_EVENT(MYSQL_AUDIT_GENERAL_STATUS),
+                      thd->get_stmt_da()->is_error() ?
+                      thd->get_stmt_da()->mysql_errno() : 0,
+                      command_name[thd->get_command()].str,
+                      command_name[thd->get_command()].length);
+  }
+#endif /* !EMBEDDED_LIBRARY */
+
+>>>>>>> Percona-Server-5.7.44-54
   lex->unit->cleanup(true);
 #ifdef WITH_WSREP
   }

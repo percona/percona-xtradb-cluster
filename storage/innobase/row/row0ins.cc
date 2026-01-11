@@ -2267,7 +2267,7 @@ row_ins_scan_sec_index_for_duplicate(
 end_scan:
 	/* Restore old value */
 	dtuple_set_n_fields_cmp(entry, n_fields_cmp);
-
+	btr_pcur_close(&pcur);
 	DBUG_RETURN(err);
 }
 
