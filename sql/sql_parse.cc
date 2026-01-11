@@ -6361,7 +6361,6 @@ finish:
 #endif /* WITH_WSREP */
   }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
   if (thd->wsrep_conflict_state != REPLAYED)
@@ -6374,8 +6373,7 @@ finish:
     LOCK_wsrep_thd too. */
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 #endif /* WITH_WSREP */
-||||||| f2649efdf72
-=======
+
 #ifndef EMBEDDED_LIBRARY
   if (thd->get_command() == COM_STMT_EXECUTE)
   {
@@ -6391,7 +6389,6 @@ finish:
   }
 #endif /* !EMBEDDED_LIBRARY */
 
->>>>>>> Percona-Server-5.7.44-54
   lex->unit->cleanup(true);
 #ifdef WITH_WSREP
   }
