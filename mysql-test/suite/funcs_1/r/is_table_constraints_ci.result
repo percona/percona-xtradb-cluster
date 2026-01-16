@@ -97,6 +97,7 @@ def	mysql	PRIMARY	mysql	user
 def	mysql	PRIMARY	mysql	wsrep_cluster
 def	mysql	PRIMARY	mysql	wsrep_cluster_members
 def	mysql	PRIMARY	mysql	wsrep_streaming_log
+def	performance_schema	ACCOUNT	performance_schema	account_failed_login_lock_status
 def	performance_schema	ACCOUNT	performance_schema	accounts
 def	performance_schema	PRIMARY	performance_schema	cond_instances
 def	performance_schema	PRIMARY	performance_schema	data_lock_waits

@@ -744,7 +744,7 @@ static ssize_t sst_prepare_other(const char *method, const char *addr_in,
                  mysql_home_ptr ? mysql_home_ptr : "",
                  opt_plugin_dir_ptr ? opt_plugin_dir_ptr : "",
                  wsrep_defaults_file, wsrep_defaults_group_suffix,
-                 (int)getpid(), MYSQL_SERVER_VERSION MYSQL_SERVER_SUFFIX_DEF,
+                 (int)getpid(), MYSQL_SERVER_VERSION,
                  binlog_opt, binlog_opt_val);
   my_free(binlog_opt_val);
 
@@ -1508,7 +1508,7 @@ static int sst_donate_other(const char *method, const char *addr,
       method, addr, mysqld_unix_port, mysql_real_data_home,
       mysql_home_ptr ? mysql_home_ptr : "",
       opt_plugin_dir_ptr ? opt_plugin_dir_ptr : "", wsrep_defaults_file,
-      wsrep_defaults_group_suffix, MYSQL_SERVER_VERSION MYSQL_SERVER_SUFFIX_DEF,
+      wsrep_defaults_group_suffix, MYSQL_SERVER_VERSION,
       binlog_opt, binlog_opt_val, uuid_oss.str().c_str(), gtid.seqno().get(),
       bypass ? " " WSREP_SST_OPT_BYPASS : "");
   DBUG_EXECUTE_IF("wsrep_sst_donor_skip", {
