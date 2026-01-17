@@ -70,7 +70,6 @@ case "$1" in
 		if [ ! -d /etc/mysql/mysql.conf.d ]; then
 			install -d /etc/mysql/mysql.conf.d
 		fi
-<<<<<<< HEAD:build-ps/debian/percona-xtradb-cluster-server.postinst
 		if [ ! -e "$OVERRIDEFILE" ];
 		then
 			db_input high percona-xtradb-cluster-server/default-auth-override || true
@@ -85,8 +84,6 @@ case "$1" in
 				fi
 			fi
 		fi
-=======
->>>>>>> repo2/release-9.5.0-1:build-ps/debian/percona-server-server.postinst
 
 		# Check if we should enable lowercase table names
 		OVERRIDEFILE="/etc/mysql/mysql.conf.d/lowercase-table-names.cnf"
