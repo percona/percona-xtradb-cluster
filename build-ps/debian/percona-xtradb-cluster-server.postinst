@@ -67,6 +67,8 @@ case "$1" in
 	if [ -z "$2" ];
 	then
 		set -e
+		# Check if we should override new default auth plugin
+		OVERRIDEFILE="/etc/mysql/mysql.conf.d/default-auth-override.cnf"
 		if [ ! -d /etc/mysql/mysql.conf.d ]; then
 			install -d /etc/mysql/mysql.conf.d
 		fi

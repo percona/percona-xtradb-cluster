@@ -4,9 +4,9 @@
 	dh $@
 
 export DH_VERBOSE=1
-export CFLAGS=-Wno-error=free-nonheap-object -Wno-error=implicit-function-declaration
-export CXXFLAGS=-Wno-error=free-nonheap-object -Wno-error=implicit-function-declaration
-export CPPFLAGS=-Wno-error=free-nonheap-object -Wno-error=implicit-function-declaration
+export CFLAGS=-Wno-error=free-nonheap-object
+export CXXFLAGS=-Wno-error=free-nonheap-object
+export CPPFLAGS=-Wno-error=free-nonheap-object
 
 PACKAGE=percona-xtradb-cluster
 PS_VERSION_EXTRA = $(shell echo "Percona XtraDB Cluster (GPL), $(DEBVERSION)")
@@ -21,7 +21,6 @@ compilation_comment_release="Percona XtraDB Cluster (GPL), Release rel$(percona_
 server_suffix=""
 prefix=/usr
 
-V8PWD=
 TMP=$(CURDIR)/debian/tmp/
 TMPD=$(CURDIR)/debian/tmp-debug/
 prefix=/usr
@@ -43,15 +42,6 @@ EXPORTED_SOURCE_TARBALL = debian/percona-xtradb-cluster-source-8.0.tar.gz
 
 DISTRIBUTION = $(shell lsb_release -i -s)
 DISTRELEASE = $(shell lsb_release -c -s)
-
-# Disable LTO only for focal and bullseye
-ifeq ($(DISTRELEASE),focal)
-	LTO_FLAG = -DWITH_LTO=OFF
-else ifeq ($(DISTRELEASE),bullseye)
-	LTO_FLAG = -DWITH_LTO=OFF
-else
-	LTO_FLAG = -DWITH_LTO=ON
-endif
 
 MYSQL_SRC = $(shell pwd)
 
@@ -116,9 +106,7 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 		-DWITH_NUMA=ON \
 		-DWITH_LTO=ON \
 		-DWITH_PERCONA_TELEMETRY=ON \
-		-DWITH_JS_LANG=ON -DV8_INCLUDE_DIR=$(V8PWD)/include -DV8_LIB_DIR=$(V8PWD)/out.gn/static/obj \
-		$(LTO_FLAG) \
-		-DWITH_EXTRA_CHARSETS=all $(TOKUDB_OPTS_DEBUG) ..
+		-DWITH_EXTRA_CHARSETS=all ..
 endif
 
 	( test -d $(builddir) || mkdir $(builddir) ) && cd $(builddir) && \
@@ -172,9 +160,9 @@ endif
 		-DWITH_NUMA=ON \
 		-DWITH_LTO=ON \
 		-DWITH_PERCONA_TELEMETRY=ON \
-		-DWITH_JS_LANG=ON -DV8_INCLUDE_DIR=$(V8PWD)/include -DV8_LIB_DIR=$(V8PWD)/out.gn/static/obj \
-		$(LTO_FLAG) \
-		-DWITH_EXTRA_CHARSETS=all $(TOKUDB_OPTS_RELEASE) ..
+		-DWITH_EXTRA_CHARSETS=all ..
+
+#	cd $(galeradir) &&  scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) psi=1 libgalera_smm.so $(SCONS_ARGS) && scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) garb/garbd $(SCONS_ARGS)
 
 	touch $@
 
@@ -380,10 +368,6 @@ endif
 
 override_dh_shlibdeps:
 	dh_shlibdeps -Lpercona-xtradb-cluster-server -l/usr/lib/mysql/private --dpkg-shlibdeps-params=--ignore-missing-info
-
-override_dh_install:
-	dh_install
-	cp js/LICENSE* debian/percona-server-js/usr/share/doc/percona-server-js/
 
 override_dh_installinit:
 	@echo "RULES.$@"

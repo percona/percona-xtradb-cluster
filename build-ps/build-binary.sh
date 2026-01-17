@@ -86,13 +86,8 @@ fi
 # parse input option and configure build enviornment acccordingly.
 if ! getopt --test
 then
-<<<<<<< HEAD
     go_out="$(getopt --options=iqGadvjmt: \
         --longoptions=i686,verbose,copygalera,asan,debug,valgrind,with-jemalloc:,with-mecab:,with-yassl,keep-build,with-ssl:,tag: \
-=======
-    go_out="$(getopt --options=iqdvj:m:t: \
-        --longoptions=i686,quiet,debug,valgrind,with-jemalloc:,with-mecab:,with-v8:,with-ssl:,tag: \
->>>>>>> repo2/release-9.5.0-1
         --name="$(basename "$0")" -- "$@")"
     test $? -eq 0 || exit 1
     eval set -- $go_out
@@ -142,7 +137,6 @@ do
         WITH_MECAB_OPTION="-DWITH_MECAB=$1"
         shift
         ;;
-<<<<<<< HEAD
     --with-yassl )
         shift
         WITH_SSL_TYPE="bundled"
@@ -150,12 +144,6 @@ do
     --keep-build )
         shift
         KEEP_BUILD=1
-=======
-    -v8 | --with-v8 )
-        shift
-        WITH_V8="$1"
-        shift
->>>>>>> repo2/release-9.5.0-1
         ;;
     --with-ssl )
         shift
@@ -326,52 +314,9 @@ if [[ $ENABLE_ASAN -eq 1 ]]; then
         fi
     fi
 fi
-<<<<<<< HEAD
 COMMON_FLAGS="-DPERCONA_INNODB_VERSION=$PERCONA_SERVER_EXTENSION"
 export CFLAGS=" $COMMON_FLAGS -static-libgcc $MACHINE_SPECS_CFLAGS ${CFLAGS:-}"
 export CXXFLAGS=" $COMMON_FLAGS $MACHINE_SPECS_CFLAGS ${CXXFLAGS:-}"
-=======
-
-# TokuDB cmake flags
-if test -d "$SOURCEDIR/storage/tokudb"
-then
-    CMAKE_OPTS="${CMAKE_OPTS:-} -DBUILD_TESTING=OFF -DUSE_GTAGS=OFF -DUSE_CTAGS=OFF -DUSE_ETAGS=OFF -DUSE_CSCOPE=OFF -DTOKUDB_BACKUP_PLUGIN_VERSION=${TOKUDB_BACKUP_VERSION}"
-
-    if test "x$CMAKE_BUILD_TYPE" != "xDebug"
-    then
-        CMAKE_OPTS="${CMAKE_OPTS:-} -DTOKU_DEBUG_PARANOID=OFF"
-    else
-        CMAKE_OPTS="${CMAKE_OPTS:-} -DTOKU_DEBUG_PARANOID=ON"
-    fi
-
-    if [[ $CMAKE_OPTS == *WITH_VALGRIND=ON* ]]
-    then
-        CMAKE_OPTS="${CMAKE_OPTS:-} -DUSE_VALGRIND=ON"
-    fi
-fi
-#
-# Attempt to remove any optimisation flags from the debug build
-# BLD-238 - bug1408232
-if [ -n "$(command -v rpm)" ]; then
-  export COMMON_FLAGS=$(rpm --eval %optflags | sed -e "s|march=i386|march=i686|g")
-  if test "x$CMAKE_BUILD_TYPE" = "xDebug"
-  then
-    COMMON_FLAGS=`echo " ${COMMON_FLAGS} " | \
-              sed -e 's/-Wall/-Wall -Wno-error=stringop-overflow -Wno-error=restrict -Wno-error=maybe-uninitialized -Wno-error=array-bounds -Wno-error=alloc-size-larger-than= -Wno-error=stringop-truncation/' \
-            #  sed -e 's/ -O[0-9]* / /' \
-                  -e 's/-Wp,-D_FORTIFY_SOURCE=2//' \
-                  -e 's/ -unroll2 / /' \
-                  -e 's/ -ip / /' \
-                  -e 's/^ //' \
-                  -e 's/ $//'`
-  fi
-fi
-#
-export COMMON_FLAGS="$COMMON_FLAGS -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION"
-export CFLAGS="$COMMON_FLAGS ${CFLAGS:-}"
-export CXXFLAGS="$COMMON_FLAGS ${CXXFLAGS:-}"
-#
->>>>>>> repo2/release-9.5.0-1
 export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
 
 #
@@ -388,63 +333,19 @@ then
 
 fi
 
-<<<<<<< HEAD
 #-------------------------------------------------------------------------------
 #
 # Step-4: Finally Build.
 #
 
-=======
-# Test V8 directory
-if test "x$WITH_V8" != "x"
-then
-    if ! test -d "$WITH_V8"
-    then
-        echo >&2 "V8 dir $WITH_V8 does not exist"
-        exit 1
-    fi
-
-    V8DIR="$(cd "$WITH_V8"; pwd)"
-fi
-
-# Build
->>>>>>> repo2/release-9.5.0-1
 (
     cd "$SOURCEDIR"
 
-<<<<<<< HEAD
     # Build/Copy galera as configured
     (
     if [[ $COPYGALERA -eq 0 ]];then
         export CC=${GALERA_CC:-gcc}
         export CXX=${GALERA_CXX:-g++}
-=======
-    cmake $SOURCEDIR ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
-        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
-        $DEBUG_EXTRA \
-        -DFEATURE_SET=community \
-        -DCMAKE_INSTALL_PREFIX="/usr/local/$PRODUCT_FULL" \
-        -DMYSQL_DATADIR="/usr/local/$PRODUCT_FULL/data" \
-        -DROUTER_INSTALL_LIBDIR="/usr/local/$PRODUCT_FULL/lib/mysqlrouter/private" \
-        -DROUTER_INSTALL_PLUGINDIR="/usr/local/$PRODUCT_FULL/lib/mysqlrouter/plugin" \
-        -DCOMPILATION_COMMENT="$COMMENT" \
-        -DWITH_PAM=ON \
-        -DWITH_ROCKSDB=ON \
-        -DROCKSDB_DISABLE_AVX2=1 \
-        -DROCKSDB_DISABLE_MARCH_NATIVE=1 \
-        -DWITH_INNODB_MEMCACHED=ON \
-        -DWITH_ZLIB=bundled \
-        -DWITH_CURL=bundled \
-        -DWITH_NUMA=ON \
-        -DWITH_LDAP=system \
-        -DWITH_PACKAGE_FLAGS=OFF \
-        -DFORCE_INSOURCE_BUILD=1 \
-        -DWITH_LIBEVENT=bundled \
-        -DWITH_ZSTD=bundled \
-	-DWITH_PERCONA_TELEMETRY=ON \
-        -DWITH_JS_LANG=ON -DV8_INCLUDE_DIR=${WITH_V8}/include -DV8_LIB_DIR=${WITH_V8}/out.gn/static/obj \
-        $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
->>>>>>> repo2/release-9.5.0-1
 
         # Look for boost_program_options static library
         # (use if possible to avoid additional installation requirements)
@@ -609,18 +510,6 @@ fi
 
     ) || exit 1
     fi
-<<<<<<< HEAD
-=======
-
-    if test "x$WITH_V8" != x
-    then
-    (
-        mv "$V8DIR"/LICENSE "$V8DIR"/LICENSE.v8.libraries
-        cp "$V8DIR"/LICENSE* "$INSTALLDIR/usr/local/$PRODUCT_FULL/"
-    )
-    fi
-)
->>>>>>> repo2/release-9.5.0-1
 
     # Look for the pxb 9.1 tarball
     (
