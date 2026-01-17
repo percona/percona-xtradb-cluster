@@ -24,14 +24,11 @@
 
 ADD_DEFINITIONS(-DMYSQL_SERVER)
 
-<<<<<<< HEAD
 IF(WITH_WSREP)
   INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/wsrep-lib/include)
   INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/wsrep-lib/wsrep-API/v26/)
 ENDIF()
-=======
 INCLUDE_DIRECTORIES(SYSTEM ${BOOST_PATCHES_DIR} ${BOOST_INCLUDE_DIR})
->>>>>>> repo2/release-9.5.0-1
 
 #
 # Maintainer: keep this list sorted, to avoid merge collisions.
@@ -399,13 +396,11 @@ table_binary_log_transaction_compression_stats.cc
 telemetry_pfs_metrics.cc
 table_malloc_stats.cc
 table_malloc_stats.h
-<<<<<<< HEAD
 # -- WITH_WSREP
 table_pxc_cluster_view.cc
-=======
+# -- WITH_WSREP
 table_account_failed_login_lock_status.cc
 table_account_failed_login_lock_status.h
->>>>>>> repo2/release-9.5.0-1
 )
 MYSQL_ADD_PLUGIN(perfschema ${PERFSCHEMA_SOURCES}
   STORAGE_ENGINE MANDATORY STATIC_ONLY

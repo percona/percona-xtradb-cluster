@@ -14923,18 +14923,12 @@ bool mysqld_get_one_option(int optid,
       }
 #endif  // _WIN32
       break;
-<<<<<<< HEAD
 #ifdef WITH_WSREP
     case OPT_WSREP_START_POSITION: {
       wsrep_start_position_init(argument);
       break;
     }
 #endif /* WITH_WSREP */
-    case OPT_REPLICA_PARALLEL_TYPE:
-      push_deprecated_warn_no_replacement(nullptr, "--replica-parallel-type");
-      break;
-=======
->>>>>>> repo2/release-9.5.0-1
 #ifndef DBUG_OFF
     case OPT_REPLICA_PARALLEL_WORKERS:
       assert(opt_mts_replica_parallel_workers != 0);
