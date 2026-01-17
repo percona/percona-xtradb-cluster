@@ -1325,6 +1325,16 @@ static void buf_pool_create(buf_pool_t *buf_pool, ulint buf_pool_size,
 
     buf_pool->chunks = reinterpret_cast<buf_chunk_t *>(ut::zalloc_withkey(
         UT_NEW_THIS_FILE_PSI_KEY, buf_pool->n_chunks * sizeof(*chunk)));
+
+    if (buf_pool->chunks == nullptr) {
+      ib::error(ER_IB_MSG_64) << "buffer pool " << instance_no
+                              << " : failed to allocate"
+                                 " the chunk array.";
+      err = DB_ERROR;
+      mutex_exit(&buf_pool->chunks_mutex);
+      return;
+    }
+
     buf_pool->chunks_old = nullptr;
 
     UT_LIST_INIT(buf_pool->LRU);
@@ -1580,13 +1590,15 @@ dberr_t buf_pool_init(ulint total_size, bool populate, ulint n_instances) {
       n = n_instances;
     }
 
-    std::vector<std::thread> threads;
+    std::vector<IB_thread> threads;
 
     std::mutex m;
 
     for (ulint id = i; id < n; ++id) {
-      threads.emplace_back(std::thread(buf_pool_create, &buf_pool_ptr[id], size,
-                                       id, &m, std::ref(errs[id]), populate));
+      threads.emplace_back(os_thread_create(
+          buf_pool_create_thread_key, 0, buf_pool_create, &buf_pool_ptr[id],
+          size, id, &m, std::ref(errs[id]), populate));
+      threads[id - i].start();
     }
 
     for (ulint id = i; id < n; ++id) {
@@ -4052,8 +4064,6 @@ dberr_t Buf_fetch<T>::zip_page_handler(buf_block_t *&fix_block) {
 
   mutex_exit(&m_buf_pool->zip_mutex);
 
-  const auto access_time = buf_page_is_accessed(&block->page);
-
   buf_page_mutex_exit(block);
 
   m_buf_pool->n_pend_unzip.fetch_add(1);
@@ -4071,13 +4081,21 @@ dberr_t Buf_fetch<T>::zip_page_handler(buf_block_t *&fix_block) {
   }
 
   if (!recv_recovery_is_on()) {
-    if (access_time != std::chrono::steady_clock::time_point{}) {
-#ifdef UNIV_IBUF_COUNT_DEBUG
-      ut_a(ibuf_count_get(m_page_id) == 0);
-#endif /* UNIV_IBUF_COUNT_DEBUG */
-    } else {
-      ibuf_merge_or_delete_for_page(block, m_page_id, &m_page_size, true);
-    }
+    /* All transitions to state of BUF_BLOCK_ZIP_PAGE or ZIP_DIRTY have
+     possibility of ibuf entries on the page.
+
+    unzip_LRU uncompressed frame evictions create a small window for ibuf
+    entries on the page. buf_LRU_block_remove_hashed() in buf_LRU_free_page()
+    releases page hash lock and block mutex. Before they are re-acquired, ibuf
+    is possible on the page
+
+    DISK->ZIP_PAGE : ibuf entry should be applied (page was out of BP)
+    FILE_PAGE->ZIP_PAGE: caused by unzip_LRU eviction
+    ZIP_PAGE -> ZIP_DIRTY: page dirty on unzip LRU eviction
+    ZIP_DIRTY->ZIP_PAGE: a dirty page (previously on unzip_LRU) is flushed.
+
+    So apply change-buffer merge on the page */
+    ibuf_merge_or_delete_for_page(block, m_page_id, &m_page_size, true);
   }
 
   buf_page_mutex_enter(block);

@@ -61,6 +61,7 @@
 #include "rpl_source.h"  // unregister_slave
 #include "scope_guard.h"
 #include "server_component/mysql_server_event_tracking_bridge_imp.h"
+#include "server_component/mysql_thd_kill_handler_imp.h"
 #include "sql/auth/sql_security_ctx.h"
 #include "sql/binlog.h"
 #include "sql/check_stack.h"
@@ -1048,7 +1049,6 @@ void THD::set_eligible_secondary_engine_handlerton(handlerton *hton) {
 
 void THD::cleanup_after_statement_execution() {
   set_secondary_engine_statement_context(nullptr);
-  m_eligible_secondary_engine_handlerton = nullptr;
 }
 
 bool THD::set_db(const LEX_CSTRING &new_db) {
@@ -1880,6 +1880,17 @@ void THD::awake(THD::killed_state state_to_set) {
   /* Interrupt target waiting inside a storage engine. */
   if (state_to_set != THD::NOT_KILLED) ha_kill_connection(this);
 
+  /*
+    If present invoke handler in a component to abort long-running or
+    blocking operation it might be executing.
+  */
+  if (state_to_set != THD::NOT_KILLED) {
+    if (m_kill_handler_fn != nullptr) {
+      Mysql_thd_kill_handler_imp::call_handler(this, m_kill_handler_fn,
+                                               m_kill_handler_data);
+    }
+  }
+
   if (state_to_set == THD::KILL_TIMEOUT) {
     assert(!status_var_aggregated);
     status_var.max_execution_time_exceeded++;
@@ -2302,6 +2313,8 @@ void THD::cleanup_after_query() {
   // Cleanup and free items that were created during this execution
   cleanup_items(item_list());
   free_items();
+  m_eligible_secondary_engine_handlerton = nullptr;
+
   /* Reset where. */
   where = THD::DEFAULT_WHERE;
   /* reset table map for multi-table update */
@@ -2311,7 +2324,9 @@ void THD::cleanup_after_query() {
   if (lex) {
     lex->mi.repl_ignore_server_ids.clear();
   }
-  if (rli_slave) rli_slave->cleanup_after_query();
+  if (rli_slave) {
+    rli_slave->cleanup_after_query();
+  }
   // Set the default "cute" mode for the execution environment:
   check_for_truncated_fields = CHECK_FIELD_IGNORE;
 
