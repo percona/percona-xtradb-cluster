@@ -2169,14 +2169,10 @@ int slave_worker_exec_job_group(Slave_worker *worker, Relay_log_info *rli) {
         (!seen_begin && !is_any_gtid_event(ev) &&
          (ev->get_type_code() == mysql::binlog::event::QUERY_EVENT ||
           /* break through by LC only in GTID off */
-<<<<<<< HEAD
-          (!seen_gtid && !is_mts_db_partitioned(rli)))))
+          !seen_gtid)))
 #ifdef WITH_WSREP
     {
       wsrep_after_statement(thd);
-=======
-          !seen_gtid)))
->>>>>>> repo2/release-9.5.0-1
       break;
     }
 #else
