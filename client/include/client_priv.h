@@ -199,9 +199,15 @@ enum options_client {
   OPT_MYSQLDUMP_EXCLUDE_USER,
   OPT_MYSQLDUMP_INCLUDE_USER,
   OPT_MYSQL_COMMANDS,
+<<<<<<< HEAD
 #ifdef WITH_WSREP
   OPT_USE_SET_PASSWORD,
 #endif
+=======
+  OPT_MFA_PASSWORD1,
+  OPT_MFA_PASSWORD2,
+  OPT_MFA_PASSWORD3,
+>>>>>>> repo2/release-9.5.0-1
   /* Add new option above this */
   OPT_MAX_CLIENT_OPTION
 };

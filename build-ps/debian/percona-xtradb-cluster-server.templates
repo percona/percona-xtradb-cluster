@@ -34,6 +34,7 @@ Description: Data directory found when no Percona Server package is installed
  It is highly recommended to take data backup. If you have not done so, now would be
  the time to take backup in another shell. Once completed, press 'Ok' to continue.
 
+<<<<<<< HEAD:build-ps/debian/percona-xtradb-cluster-server.templates
 Template: percona-xtradb-cluster-server/default-auth-override
 Type: select
 Choices: Use Strong Password Encryption (RECOMMENDED), Use Legacy Authentication Method (Retain MySQL 5.x Compatibility)
@@ -50,6 +51,9 @@ Description: Select default authentication plugin
  After installation, the default can be changed by setting the default_authentication_plugin server setting.
 
 Template: percona-xtradb-cluster-server/existing_config_file
+=======
+Template: percona-server-server/existing_config_file
+>>>>>>> repo2/release-9.5.0-1:build-ps/debian/percona-server-server.templates
 Type: select
 Choices: Use existent my.cnf (RECOMMENDED), Use NEW my.cnf
 Description: Select which my.cnf should be used

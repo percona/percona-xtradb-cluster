@@ -51,6 +51,7 @@ if (!$have_windows)
   --list_files $MYSQLTEST_VARDIR/tmp mysqld.$_server_id.expect
 }
 
+<<<<<<< HEAD
 # Wait for any connections opened by a previous testcase (or the testcase
 # warning checker) to finish closing. Exclude binlog dump threads as these may
 # linger around indefinitely.
@@ -78,6 +79,8 @@ if (!$have_windows)
   #  FIXED_ID ASC;
 #}
 
+=======
+>>>>>>> repo2/release-9.5.0-1
 # We want to ensure all slave configuration is restored. But SHOW
 # REPLICA STATUS returns nothing for servers not configured as slaves,
 # and (after BUG#28796 was fixed) there is no way to de-configure a
@@ -119,7 +122,7 @@ if ($tmp) {
   --echo Until_Condition	#
   --echo Until_Log_File	#
   --echo Until_Log_Pos	#
-  --echo Source_SSL_Allowed	No
+  --echo Source_SSL_Allowed	Yes
   --echo Source_SSL_CA_File	
   --echo Source_SSL_CA_Path	
   --echo Source_SSL_Cert	
