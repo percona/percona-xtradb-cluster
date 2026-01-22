@@ -475,7 +475,10 @@ static bool sst_cancelled = false;
 void wsrep_sst_cancel(bool call_wsrep_cb) {
   if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
   if (!sst_cancelled) {
-    WSREP_INFO("Initiating SST cancellation");
+    if (sst_process || (call_wsrep_cb && sst_awaiting_callback)) {
+      WSREP_INFO("Initiating SST cancellation");
+    }
+
     sst_cancelled = true;
     /*
       When we launched the SST process, then we need
