@@ -1,0 +1,272 @@
+##############################################################################
+# 1. Setup.
+##############################################################################
+CALL mtr.add_suppression("The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.");
+SELECT @@global.lower_case_table_names;
+@@global.lower_case_table_names
+0
+CREATE DATABASE reproduction_lab;
+CREATE TABLE reproduction_lab.heavy_test (id int) ENGINE=InnoDB;
+SET SESSION wsrep_OSU_method='RSU';
+##############################################################################
+# 2. Optimize table should not be logged.
+##############################################################################
+FLUSH BINARY LOGS;
+PURGE BINARY LOGS TO '<binlog_file>';;
+OPTIMIZE TABLE Heavy_test, heavy_test;
+Table	Op	Msg_type	Msg_text
+reproduction_lab.Heavy_test	optimize	Warning	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+reproduction_lab.Heavy_test	optimize	Error	Table 'reproduction_lab.Heavy_test' doesn't exist
+reproduction_lab.Heavy_test	optimize	status	Operation failed
+reproduction_lab.heavy_test	optimize	note	Table does not support optimize, doing recreate + analyze instead
+reproduction_lab.heavy_test	optimize	status	OK
+SHOW BINLOG EVENTS IN '<binlog_file>' FROM 5;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+<binlog_file>	#	Previous_gtids	1	#	
+##############################################################################
+# 3. Base table
+##############################################################################
+CREATE TABLE t_rsu (
+id INT PRIMARY KEY,
+v  INT
+);
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+##############################################################################
+# 4. ALL RSU DDL (must NOT be written to binlog)
+##############################################################################
+ALTER TABLE t_rsu ADD COLUMN v2 INT;
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+TRUNCATE TABLE t_rsu;
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+CREATE INDEX idx_v ON t_rsu(v);
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+DROP INDEX idx_v ON t_rsu;
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+RENAME TABLE t_rsu TO t_rsu_new;
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+RENAME TABLE t_rsu_new TO t_rsu;
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+CREATE VIEW v_rsu AS SELECT * FROM t_rsu;
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+DROP VIEW v_rsu;
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+CREATE TRIGGER trg_rsu
+BEFORE INSERT ON t_rsu
+FOR EACH ROW SET NEW.v2 = 10$$
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+DROP TRIGGER trg_rsu$$
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+CREATE FUNCTION f_rsu(x INT)
+RETURNS INT
+DETERMINISTIC
+RETURN x + 1$$
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+DROP FUNCTION f_rsu$$
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+CREATE PROCEDURE p_rsu(IN x INT)
+BEGIN
+SELECT x;
+END$$
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+DROP PROCEDURE p_rsu$$
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+CREATE EVENT ev_rsu
+ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 DAY
+DO
+INSERT INTO t_rsu VALUES (100,100,100)$$
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+DROP EVENT ev_rsu$$
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+SHOW BINLOG EVENTS IN '<binlog_file>' FROM 5;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+<binlog_file>	#	Previous_gtids	1	#	
+##############################################################################
+# 5. Admin / session commands (NOT binlogged)
+##############################################################################
+ANALYZE TABLE t_rsu;
+Table	Op	Msg_type	Msg_text
+reproduction_lab.t_rsu	analyze	Warning	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+reproduction_lab.t_rsu	analyze	status	OK
+CHECK TABLE t_rsu;
+Table	Op	Msg_type	Msg_text
+reproduction_lab.t_rsu	check	status	OK
+OPTIMIZE TABLE t_rsu;
+Table	Op	Msg_type	Msg_text
+reproduction_lab.t_rsu	optimize	Warning	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+reproduction_lab.t_rsu	optimize	note	Table does not support optimize, doing recreate + analyze instead
+reproduction_lab.t_rsu	optimize	status	OK
+DROP TABLE t_rsu;
+Warnings:
+Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
+SET SESSION autocommit=0;
+SET SESSION autocommit=1;
+SHOW BINLOG EVENTS IN '<binlog_file>' FROM 5;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+<binlog_file>	#	Previous_gtids	1	#	
+##############################################################################
+# 6. DML (MUST be written to binlog even in RSU)
+##############################################################################
+INSERT INTO reproduction_lab.heavy_test VALUES (1);
+UPDATE reproduction_lab.heavy_test SET id=99 WHERE id=1;
+DELETE FROM reproduction_lab.heavy_test WHERE id=99;
+REPLACE INTO reproduction_lab.heavy_test VALUES (2);
+SHOW BINLOG EVENTS IN '<binlog_file>' FROM 5;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+<binlog_file>	#	Previous_gtids	1	#	
+<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
+<binlog_file>	#	Query	1	#	BEGIN
+<binlog_file>	#	Table_map	1	#	table_id: # (reproduction_lab.heavy_test)
+<binlog_file>	#	Write_rows	1	#	table_id: # flags: STMT_END_F
+<binlog_file>	#	Query	1	#	COMMIT
+<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
+<binlog_file>	#	Query	1	#	BEGIN
+<binlog_file>	#	Table_map	1	#	table_id: # (reproduction_lab.heavy_test)
+<binlog_file>	#	Update_rows	1	#	table_id: # flags: STMT_END_F
+<binlog_file>	#	Query	1	#	COMMIT
+<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
+<binlog_file>	#	Query	1	#	BEGIN
+<binlog_file>	#	Table_map	1	#	table_id: # (reproduction_lab.heavy_test)
+<binlog_file>	#	Delete_rows	1	#	table_id: # flags: STMT_END_F
+<binlog_file>	#	Query	1	#	COMMIT
+<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
+<binlog_file>	#	Query	1	#	BEGIN
+<binlog_file>	#	Table_map	1	#	table_id: # (reproduction_lab.heavy_test)
+<binlog_file>	#	Write_rows	1	#	table_id: # flags: STMT_END_F
+<binlog_file>	#	Query	1	#	COMMIT
+##############################################################################
+# 7. ALL TOI DDL (must be written to binlog)
+##############################################################################
+SET SESSION wsrep_OSU_method='TOI';
+FLUSH BINARY LOGS;
+PURGE BINARY LOGS TO '<binlog_file>';;
+CREATE TABLE t_rsu (
+id INT PRIMARY KEY,
+v  INT
+);
+ALTER TABLE t_rsu ADD COLUMN v2 INT;
+TRUNCATE TABLE t_rsu;
+CREATE INDEX idx_v ON t_rsu(v);
+DROP INDEX idx_v ON t_rsu;
+RENAME TABLE t_rsu TO t_rsu_new;
+RENAME TABLE t_rsu_new TO t_rsu;
+CREATE VIEW v_rsu AS SELECT * FROM t_rsu;
+DROP VIEW v_rsu;
+CREATE TRIGGER trg_rsu
+BEFORE INSERT ON t_rsu
+FOR EACH ROW SET NEW.v2 = 10$$
+DROP TRIGGER trg_rsu$$
+CREATE FUNCTION f_rsu(x INT)
+RETURNS INT
+DETERMINISTIC
+RETURN x + 1$$
+DROP FUNCTION f_rsu$$
+CREATE PROCEDURE p_rsu(IN x INT)
+BEGIN
+SELECT x;
+END$$
+DROP PROCEDURE p_rsu$$
+CREATE EVENT ev_rsu
+ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 DAY
+DO
+INSERT INTO t_rsu VALUES (100,100,100)$$
+DROP EVENT ev_rsu$$
+SHOW BINLOG EVENTS IN '<binlog_file>' FROM 5;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+<binlog_file>	#	Previous_gtids	1	#	
+<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
+<binlog_file>	#	Query	1	#	use `reproduction_lab`; CREATE TABLE t_rsu (
+id INT PRIMARY KEY,
+v  INT
+)
+<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
+<binlog_file>	#	Query	1	#	use `reproduction_lab`; ALTER TABLE t_rsu ADD COLUMN v2 INT
+<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
+<binlog_file>	#	Query	1	#	use `reproduction_lab`; TRUNCATE TABLE t_rsu
+<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
+<binlog_file>	#	Query	1	#	use `reproduction_lab`; CREATE INDEX idx_v ON t_rsu(v)
+<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
+<binlog_file>	#	Query	1	#	use `reproduction_lab`; DROP INDEX idx_v ON t_rsu
+<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
+<binlog_file>	#	Query	1	#	use `reproduction_lab`; RENAME TABLE t_rsu TO t_rsu_new
+<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
+<binlog_file>	#	Query	1	#	use `reproduction_lab`; RENAME TABLE t_rsu_new TO t_rsu
+<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
+<binlog_file>	#	Query	1	#	use `reproduction_lab`; CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v_rsu` AS SELECT * FROM t_rsu
+<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
+<binlog_file>	#	Query	1	#	use `reproduction_lab`; DROP VIEW v_rsu
+<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
+<binlog_file>	#	Query	1	#	use `reproduction_lab`; CREATE DEFINER=`root`@`localhost` TRIGGER trg_rsu
+BEFORE INSERT ON t_rsu
+FOR EACH ROW SET NEW.v2 = 10
+<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
+<binlog_file>	#	Query	1	#	use `reproduction_lab`; DROP TRIGGER trg_rsu
+<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
+<binlog_file>	#	Query	1	#	use `reproduction_lab`; CREATE DEFINER=`root`@`localhost` FUNCTION `f_rsu`(x INT) RETURNS int
+    DETERMINISTIC
+RETURN x + 1
+<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
+<binlog_file>	#	Query	1	#	use `reproduction_lab`; DROP FUNCTION f_rsu
+<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
+<binlog_file>	#	Query	1	#	use `reproduction_lab`; CREATE DEFINER=`root`@`localhost` PROCEDURE `p_rsu`(IN x INT)
+BEGIN
+SELECT x;
+END
+<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
+<binlog_file>	#	Query	1	#	use `reproduction_lab`; DROP PROCEDURE p_rsu
+<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
+<binlog_file>	#	Query	1	#	use `reproduction_lab`; CREATE DEFINER=`root`@`localhost` EVENT ev_rsu
+ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 DAY
+DO
+INSERT INTO t_rsu VALUES (100,100,100)
+<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
+<binlog_file>	#	Query	1	#	use `reproduction_lab`; DROP EVENT ev_rsu
+##############################################################################
+# 8. Admin / session commands (binlogged)
+##############################################################################
+FLUSH BINARY LOGS;
+PURGE BINARY LOGS TO '<binlog_file>';;
+ANALYZE TABLE t_rsu;
+Table	Op	Msg_type	Msg_text
+reproduction_lab.t_rsu	analyze	status	OK
+CHECK TABLE t_rsu;
+Table	Op	Msg_type	Msg_text
+reproduction_lab.t_rsu	check	status	OK
+OPTIMIZE TABLE t_rsu;
+Table	Op	Msg_type	Msg_text
+reproduction_lab.t_rsu	optimize	note	Table does not support optimize, doing recreate + analyze instead
+reproduction_lab.t_rsu	optimize	status	OK
+DROP TABLE t_rsu;
+SET SESSION autocommit=0;
+SET SESSION autocommit=1;
+SHOW BINLOG EVENTS IN '<binlog_file>' FROM 5;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+<binlog_file>	#	Previous_gtids	1	#	
+<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
+<binlog_file>	#	Query	1	#	use `reproduction_lab`; ANALYZE TABLE t_rsu
+<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
+<binlog_file>	#	Query	1	#	use `reproduction_lab`; OPTIMIZE TABLE t_rsu
+<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
+<binlog_file>	#	Query	1	#	use `reproduction_lab`; DROP TABLE `t_rsu` /* generated by server */
+##############################################################################
+# 9. Cleanup
+##############################################################################
+DROP DATABASE reproduction_lab;
+FLUSH BINARY LOGS;
+PURGE BINARY LOGS TO '<binlog_file>';;
