@@ -1,0 +1,21 @@
+# Test the table_access_service
+--source include/big_test.inc
+--source include/galera_cluster.inc
+
+--echo #####################################################################
+--echo #####          Replication across cluster is ON                 #####
+--echo #####################################################################
+INSTALL COMPONENT 'file://component_test_table_access_galera';
+
+--echo
+--echo "Set replication across cluster ON"
+SELECT test_table_access_driver("REPLICATE_TRANSACTIONS_IN_GALERA");
+
+--let $replicate=1
+--let $statement_executing_server=1
+--source test_table_access_galera.inc
+
+UNINSTALL COMPONENT 'file://component_test_table_access_galera';
+
+--let $replicate=
+--let $statement_executing_server=
