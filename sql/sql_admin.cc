@@ -800,7 +800,11 @@ static bool secondary_engine_analyze(THD *thd, Table_ref *table) {
    ALTER TABLE case is handled in alter table execution path.
 */
 static bool wsrep_toi_replication(THD *thd, Table_ref *tables) {
-  if (!WSREP(thd) || !WSREP_CLIENT(thd)) return false;
+  bool async_replica_applier =
+      (thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER) ||
+      (thd->system_thread == SYSTEM_THREAD_SLAVE_SQL);
+  if (!WSREP(thd) || !(WSREP_CLIENT(thd) || async_replica_applier))
+    return false;
 
   LEX *lex = thd->lex;
   /* only handle OPTIMIZE and REPAIR here */
