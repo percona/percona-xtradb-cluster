@@ -179,9 +179,16 @@ class Disable_binlog_guard {
         m_wsrep_on(thd->variables.wsrep_on),
         m_binlog_internal_off_at_entry(thd->variables.option_bits &
                                        OPTION_BIN_LOG_INTERNAL_OFF),
+        m_no_write_to_binlog(thd->lex ? thd->lex->no_write_to_binlog : false),
         m_binlog_disabled(thd->variables.option_bits & OPTION_BIN_LOG) {
     thd->variables.option_bits &= ~OPTION_BIN_LOG;
     thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+    /*
+     * no_write_to_binlog is a cleaner method and works, Disable_binlog_guard
+     * is actually not a guard since lifetime and variables are not perfectly
+     * maintained as stack so this caused old value being overwritten.
+     */
+    if (thd->lex) thd->lex->no_write_to_binlog = true;
     if (turn_off_wsrep) {
       thd->variables.wsrep_on = false;
     }
@@ -197,6 +204,7 @@ class Disable_binlog_guard {
   ~Disable_binlog_guard() {
     if (m_binlog_disabled) m_thd->variables.option_bits |= OPTION_BIN_LOG;
 #ifdef WITH_WSREP
+    if (m_thd->lex) m_thd->lex->no_write_to_binlog = m_no_write_to_binlog;
     if (!m_binlog_internal_off_at_entry) {
       m_thd->variables.option_bits &= ~OPTION_BIN_LOG_INTERNAL_OFF;
     }
@@ -209,6 +217,7 @@ class Disable_binlog_guard {
 #ifdef WITH_WSREP
   const bool m_wsrep_on;
   const bool m_binlog_internal_off_at_entry;
+  const bool m_no_write_to_binlog;
 #endif /* WITH_WSREP */
   const bool m_binlog_disabled;
 };
