@@ -28,6 +28,18 @@ Warnings:
 Level	Warning
 Code	1287
 Message	'SHOW SLAVE STATUS' is deprecated and will be removed in a future release. Please use SHOW REPLICA STATUS instead
+CREATE TABLE t1 (a INT PRIMARY KEY);
+INSERT INTO t1 VALUES (0);
+OPTIMIZE TABLE t1;
+Table	Op	Msg_type	Msg_text
+test.t1	optimize	note	Table does not support optimize, doing recreate + analyze instead
+test.t1	optimize	status	OK
+INSERT INTO t1 VALUES (1);
+REPAIR TABLE t1;
+Table	Op	Msg_type	Msg_text
+test.t1	repair	note	The storage engine for the table doesn't support repair
+INSERT INTO t1 VALUES (2);
+DROP TABLE t1;
 # connection node_2
 STOP SLAVE;
 Warnings:

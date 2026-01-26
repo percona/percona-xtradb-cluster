@@ -75,6 +75,29 @@ query_vertical SHOW SLAVE STATUS;
 
 # ==== PXC-761 TEST END ====
 
+#
+# PXC-4823: Async PXC replica stalls replication when replicates OPTIMIZE TABLE
+#
+--connection node_1
+CREATE TABLE t1 (a INT PRIMARY KEY);
+INSERT INTO t1 VALUES (0);
+OPTIMIZE TABLE t1;
+INSERT INTO t1 VALUES (1);
+REPAIR TABLE t1;
+INSERT INTO t1 VALUES (2);
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+--source include/wait_condition.inc
+--let $wait_condition = SELECT COUNT(*) = 3 FROM t1;
+--source include/wait_condition.inc
+
+--connection node_1
+DROP TABLE t1;
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+--source include/wait_condition.inc
+
+# ==== PXC-4823 TEST END ====
 
 # Test cleanup
 --connection node_2
