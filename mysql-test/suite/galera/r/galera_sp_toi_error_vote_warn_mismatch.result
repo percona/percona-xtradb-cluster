@@ -1,0 +1,36 @@
+##############################################################################
+# 1. Setup
+##############################################################################
+CREATE DATABASE IF NOT EXISTS my_database;
+USE my_database;
+CREATE PROCEDURE testCrashGaleraNode()
+BEGIN
+ALTER TABLE non_existing_table ADD somecolumn tinyint(1);
+END$$
+Warnings:
+Warning	1681	Integer display width is deprecated and will be removed in a future release.
+USE my_database;
+##############################################################################
+# 2. 1146 and 1681 error, all nodes send only 1146. Cluster stays healthy.
+##############################################################################
+ALTER TABLE non_existing_table ADD somecolumn tinyint(1);
+ERROR 42S02: Table 'my_database.non_existing_table' doesn't exist
+CALL testCrashGaleraNode();
+ERROR 42S02: Table 'my_database.non_existing_table' doesn't exist
+CALL testCrashGaleraNode();
+ERROR 42S02: Table 'my_database.non_existing_table' doesn't exist
+include/assert.inc [Assert node-1 is part of cluster.]
+include/assert.inc [Cluster size remains 2 on node1.]
+include/assert.inc [Assert node-2 is part of cluster.]
+include/assert.inc [Cluster size remains 2 on node2.]
+##############################################################################
+# 3. Assert error log. Only 1146 appears in error log. 1681 does not exist.
+##############################################################################
+include/assert.inc [Node1 vote recompute must not include warning 1681.]
+include/assert.inc [Node2 vote recompute must not include warning 1681.]
+##############################################################################
+# 4. Cleanup
+##############################################################################
+CALL mtr.add_suppression('Replica SQL: Error .*');
+CALL mtr.add_suppression('Replica SQL: Error .*');
+DROP DATABASE my_database;
