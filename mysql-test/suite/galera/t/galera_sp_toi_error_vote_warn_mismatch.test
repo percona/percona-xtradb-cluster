@@ -1,0 +1,108 @@
+##############################################################################
+# This test case makes sure when additional warning 1681 is logged in one of
+# the node in cluster, cluster remains healthy.
+#
+# NOTE: 1146+1681 is generated on the client side.
+# 1146 is generated at the applier side.
+# 1681(ER_WARN_DEPRECATED_SYNTAX_NO_REPLACEMENT) is deprecated with no replacement.
+#
+##############################################################################
+# 1. Setup
+# 2. 1146 and 1681 error, all nodes send only 1146. Cluster stays healthy.
+# 3. Assert error log. Only 1146 appears in error log. 1681 does not exist.
+# 4. Cleanup
+##############################################################################
+
+--source include/galera_cluster.inc
+
+--echo ##############################################################################
+--echo # 1. Setup
+--echo ##############################################################################
+
+CREATE DATABASE IF NOT EXISTS my_database;
+USE my_database;
+
+## Procedure that can produce 1146+1681 (deprecated display width).
+--delimiter $$
+CREATE PROCEDURE testCrashGaleraNode()
+BEGIN
+  ALTER TABLE non_existing_table ADD somecolumn tinyint(1);
+END$$
+--delimiter ;
+
+--connection node_2
+USE my_database;
+
+--echo ##############################################################################
+--echo # 2. 1146 and 1681 error, all nodes send only 1146. Cluster stays healthy.
+--echo ##############################################################################
+
+## ALTER TABLE does not show 1681 warning.
+--connection node_1
+--error ER_NO_SUCH_TABLE
+ALTER TABLE non_existing_table ADD somecolumn tinyint(1);
+
+--error ER_NO_SUCH_TABLE
+CALL testCrashGaleraNode();
+
+## Test from node_2.
+--connection node_2
+--error ER_NO_SUCH_TABLE
+CALL testCrashGaleraNode();
+
+# We are not able to do cross version testing but in cross version testing
+# done manually it was observed that when one of the member is OLD, atleast 1
+# server leaves the cluster.
+
+## Assert both nodes still in PRIMARY, size 2.
+
+--connection node_1
+--let $assert_text = Assert node-1 is part of cluster.
+--let $assert_cond = "[SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME=\"wsrep_cluster_status\", VARIABLE_VALUE, 1]" = "Primary"
+--source include/assert.inc
+
+--let $assert_text = Cluster size remains 2 on node1.
+--let $assert_cond = "[SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME=\"wsrep_cluster_size\", VARIABLE_VALUE, 1]" = 2
+--source include/assert.inc
+
+--connection node_2
+--let $assert_text = Assert node-2 is part of cluster.
+--let $assert_cond = "[SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME=\"wsrep_cluster_status\", VARIABLE_VALUE, 1]" = "Primary"
+--source include/assert.inc
+--let $assert_text = Cluster size remains 2 on node2.
+--let $assert_cond = "[SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME=\"wsrep_cluster_size\", VARIABLE_VALUE, 1]" = 2
+--source include/assert.inc
+
+--echo ##############################################################################
+--echo # 3. Assert error log. Only 1146 appears in error log. 1681 does not exist.
+--echo ##############################################################################
+
+## Vote recomputation must use real error code only (1146), not warning 1681.
+--connection node_1
+--let $wait_condition= SELECT COUNT(*) >= 1 FROM performance_schema.error_log WHERE DATA LIKE "%Recomputed vote based on error codes: 1146%"
+--source include/wait_condition.inc
+
+--let $assert_text = Node1 vote recompute must not include warning 1681.
+--let $assert_cond = [SELECT COUNT(*) FROM performance_schema.error_log WHERE DATA LIKE "%Recomputed vote based on error codes: 1146, 1681%"] = 0
+--source include/assert.inc
+
+--connection node_2
+--let $wait_condition= SELECT COUNT(*) >= 1 FROM performance_schema.error_log WHERE DATA LIKE "%Recomputed vote based on error codes: 1146%"
+--source include/wait_condition.inc
+
+--let $assert_text = Node2 vote recompute must not include warning 1681.
+--let $assert_cond = [SELECT COUNT(*) FROM performance_schema.error_log WHERE DATA LIKE "%Recomputed vote based on error codes: 1146, 1681%"] = 0
+--source include/assert.inc
+
+--echo ##############################################################################
+--echo # 4. Cleanup
+--echo ##############################################################################
+
+--connection node_1
+CALL mtr.add_suppression('Replica SQL: Error .*');
+
+--connection node_2
+CALL mtr.add_suppression('Replica SQL: Error .*');
+
+--connection node_1
+DROP DATABASE my_database;
