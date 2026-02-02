@@ -276,6 +276,9 @@ const char *common_insert_customer_insert_multiple(char * /* out */,
   result = "OK";
 
 cleanup:
+  if (name_value != nullptr) {
+    string_factory_srv->destroy(name_value);
+  }
   if (access != nullptr) {
     ta_factory_srv->destroy(access);
   }
