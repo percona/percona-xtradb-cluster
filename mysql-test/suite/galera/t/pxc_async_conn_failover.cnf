@@ -26,7 +26,7 @@ keyring_file_data=@ENV.MYSQL_TMP_DIR/mysqld.1/keyring.1
 
 wsrep_provider=@ENV.WSREP_PROVIDER
 wsrep_cluster_address='gcomm://'
-wsrep_provider_options='repl.causal_read_timeout=PT90S;base_port=@mysqld.1.#galera_port;gmcast.peer_timeout=PT10S;evs.suspect_timeout=PT12S;evs.inactive_timeout=PT30S;evs.install_timeout=PT15S'
+wsrep_provider_options='base_port=@mysqld.1.#galera_port;@ENV.WSREP_PROVIDER_TIMEOUTS'
 
 # enforce read-committed characteristics across the cluster
 wsrep_causal_reads=ON
@@ -51,7 +51,7 @@ keyring_file_data=@ENV.MYSQL_TMP_DIR/mysqld.2/keyring.2
 
 wsrep_provider=@ENV.WSREP_PROVIDER
 wsrep_cluster_address='gcomm://'
-wsrep_provider_options='repl.causal_read_timeout=PT90S;base_port=@mysqld.2.#galera_port;gmcast.peer_timeout=PT10S;evs.suspect_timeout=PT12S;evs.inactive_timeout=PT30S;evs.install_timeout=PT15S'
+wsrep_provider_options='base_port=@mysqld.2.#galera_port;@ENV.WSREP_PROVIDER_TIMEOUTS'
 
 # enforce read-committed characteristics across the cluster
 wsrep_causal_reads=ON
@@ -76,7 +76,7 @@ keyring_file_data=@ENV.MYSQL_TMP_DIR/mysqld.3/keyring.3
 
 wsrep_provider=@ENV.WSREP_PROVIDER
 wsrep_cluster_address='gcomm://'
-wsrep_provider_options='repl.causal_read_timeout=PT90S;base_port=@mysqld.3.#galera_port;gmcast.peer_timeout=PT10S;evs.suspect_timeout=PT12S;evs.inactive_timeout=PT30S;evs.install_timeout=PT15S'
+wsrep_provider_options='base_port=@mysqld.3.#galera_port;@ENV.WSREP_PROVIDER_TIMEOUTS'
 
 # enforce read-committed characteristics across the cluster
 wsrep_causal_reads=ON
@@ -101,7 +101,7 @@ keyring_file_data=@ENV.MYSQL_TMP_DIR/mysqld.4/keyring.4
 
 wsrep_provider=@ENV.WSREP_PROVIDER
 wsrep_cluster_address='gcomm://'
-wsrep_provider_options='repl.causal_read_timeout=PT90S;base_port=@mysqld.4.#galera_port;gmcast.peer_timeout=PT10S;evs.suspect_timeout=PT12S;evs.inactive_timeout=PT30S;evs.install_timeout=PT15S'
+wsrep_provider_options='base_port=@mysqld.4.#galera_port;@ENV.WSREP_PROVIDER_TIMEOUTS'
 
 # enforce read-committed characteristics across the cluster
 wsrep_causal_reads=ON

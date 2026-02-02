@@ -39,7 +39,9 @@ ORDER BY VARIABLE_NAME;
 # wsrep_provider_options
 #
 # We replace the ones that vary from run to run with placeholders
-
+# evs.inactive_timeout, evs.suspect_timeout, evs.inactive_check_period,
+# gmcast.peer_timeout, pc.wait_prim_timeout are increased interally by Galera for Valgrind build
+#
 --let _WSREP_PROVIDER_OPTIONS = `SELECT @@wsrep_provider_options`
 --perl
 	use strict;
@@ -57,6 +59,11 @@ ORDER BY VARIABLE_NAME;
 	$wsrep_provider_options =~ s/dbug = .*?;\s*//sgio;
 	$wsrep_provider_options =~ s/gcs.recv_q_hard_limit = .*?;\s*/<RECV_Q_HARD_LIMIT>;/sgio;
 	$wsrep_provider_options =~ s/repl.proto_max = .*?;\s*/<REPL_PROTO_MAX>;/sgio;
+	$wsrep_provider_options =~ s/evs\.inactive_timeout = .*?;\s*/<EVS_INACTIVE_TIMEOUT>;/sgio;
+	$wsrep_provider_options =~ s/evs\.suspect_timeout = .*?;\s*/<EVS_SUSPECT_TIMEOUT>;/sgio;
+	$wsrep_provider_options =~ s/evs\.inactive_check_period = .*?;\s*/<EVS_INACTIVE_CHECK_PERIOD>;/sgio;
+	$wsrep_provider_options =~ s/gmcast\.peer_timeout = .*?;\s*/<GMCAST_PEER_TIMEOUT>;/sgio;
+	$wsrep_provider_options =~ s/pc\.wait_prim_timeout = .*?;\s*/<PC_WAIT_PRIM_TIMEOUT>;/sgio;
 	print $wsrep_provider_options."\n";
 EOF
 
