@@ -1,4 +1,6 @@
+SET SESSION wsrep_on=OFF;
 RESET BINARY LOGS AND GTIDS;
+SET SESSION wsrep_on=ON;
 SET GLOBAL wsrep_sync_wait = 0;
 CREATE TABLE t1 (a INTEGER PRIMARY KEY);
 # --------------------------------
@@ -15,11 +17,13 @@ SET DEBUG_SYNC = 'RESET';
 SELECT * FROM t1;
 a
 10
-include/rpl/assert_binlog_events.inc [Anonymous_Gtid # Query/.*CREATE TABLE.* # Anonymous_Gtid # Query/.*ALTER TABLE.* # Anonymous_Gtid # Query/.*BEGIN # Table_map # Write_rows # Xid]
+include/rpl/assert_binlog_events.inc [!Gtid_or_anon # Query/.*CREATE TABLE.* # !Gtid_or_anon # Query/.*ALTER TABLE.* # !Gtid_or_anon # Query/.*BEGIN # Table_map # Write_rows # Xid]
 # --------------------------------
 # Test 2: Execute ALTER TABLE on node1 (Local)
 # --------------------------------
+SET SESSION wsrep_on=OFF;
 RESET BINARY LOGS AND GTIDS;
+SET SESSION wsrep_on=ON;
 ALTER TABLE t1 ENGINE = InnoDB;;
 SET DEBUG_SYNC = 'now WAIT_FOR alter_table_inplace_after_downgrade';
 INSERT INTO test.t1 VALUES(11);
@@ -31,11 +35,13 @@ SELECT * FROM t1;
 a
 10
 11
-include/rpl/assert_binlog_events.inc [Anonymous_Gtid # Query/.*ALTER TABLE.* # Anonymous_Gtid # Query/.*BEGIN # Table_map # Write_rows # Xid]
+include/rpl/assert_binlog_events.inc [!Gtid_or_anon # Query/.*ALTER TABLE.* # !Gtid_or_anon # Query/.*BEGIN # Table_map # Write_rows # Xid]
 # --------------------------------
 # Test 3: Testing with wsrep_OSU_method = "RSU"
 # --------------------------------
+SET SESSION wsrep_on=OFF;
 RESET BINARY LOGS AND GTIDS;
+SET SESSION wsrep_on=ON;
 SET SESSION wsrep_OSU_method = "RSU";
 ALTER TABLE t1 ENGINE = InnoDB;;
 SET DEBUG_SYNC = 'now WAIT_FOR alter_table_inplace_after_downgrade';

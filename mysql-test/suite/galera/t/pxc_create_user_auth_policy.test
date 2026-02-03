@@ -28,16 +28,38 @@ CREATE USER 'new_user_1'@'%' IDENTIFIED BY 'pass';
 
 --connect(con_node_1_testuser, localhost, testuser, pass,,$NODE_MYPORT_1) 
 
-# Because of authentication_policy=caching_sha2_password,,
-# creation of new_user_3 is not allowed, so the following statement is expected
-# to fail
---error ER_AUTHENTICATION_POLICY_MISMATCH
-CREATE USER 'new_user_2'@'%' IDENTIFIED BY 'pass', 'new_user_3'@'%' IDENTIFIED WITH mysql_native_password BY 'pass';
+#
+# Negative tests: authentication_policy on the source node should reject CREATE/ALTER USER
+# (and therefore not replicate anything to applier threads).
+#
+# Prefer testing ER_AUTHENTICATION_POLICY_MISMATCH with a loaded authentication plugin
+# that is not allowed by authentication_policy=caching_sha2_password.
+# Some builds (e.g. MySQL 9.5) may not have mysql_native_password loaded, in which case
+# we fall back to expecting ER_PLUGIN_IS_NOT_LOADED (still a failure on the source).
+#
+--let $alt_auth_plugin= `SELECT PLUGIN_NAME FROM INFORMATION_SCHEMA.PLUGINS WHERE PLUGIN_TYPE='AUTHENTICATION' AND PLUGIN_STATUS='ACTIVE' AND PLUGIN_NAME IN ('mysql_native_password','sha256_password') ORDER BY (PLUGIN_NAME='mysql_native_password') DESC LIMIT 1`
 
-# Because of authentication_policy=caching_sha2_password,,
-# altering new_user_1 to use mysql_native_password is expected to fail
---error ER_AUTHENTICATION_POLICY_MISMATCH
-ALTER USER 'new_user_1'@'%' IDENTIFIED WITH mysql_native_password BY 'newpass';
+--disable_query_log
+--disable_result_log
+if ($alt_auth_plugin)
+{
+  --error ER_AUTHENTICATION_POLICY_MISMATCH
+  --eval CREATE USER 'new_user_2'@'%' IDENTIFIED BY 'pass', 'new_user_3'@'%' IDENTIFIED WITH $alt_auth_plugin BY 'pass';
+
+  --error ER_AUTHENTICATION_POLICY_MISMATCH
+  --eval ALTER USER 'new_user_1'@'%' IDENTIFIED WITH $alt_auth_plugin BY 'newpass';
+}
+if (!$alt_auth_plugin)
+{
+  --error ER_PLUGIN_IS_NOT_LOADED
+  CREATE USER 'new_user_2'@'%' IDENTIFIED BY 'pass', 'new_user_3'@'%' IDENTIFIED WITH mysql_native_password BY 'pass';
+
+  --error ER_PLUGIN_IS_NOT_LOADED
+  ALTER USER 'new_user_1'@'%' IDENTIFIED WITH mysql_native_password BY 'newpass';
+}
+--enable_result_log
+--enable_query_log
+--echo auth_policy_negative_tests_done
 
 #
 # Try with nonexistent auth plugin

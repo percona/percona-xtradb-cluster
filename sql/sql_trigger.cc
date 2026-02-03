@@ -419,14 +419,14 @@ bool Sql_cmd_create_trigger::execute(THD *thd) {
       (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open());
   bool has_super_or_set_user_id =
       sctx->check_access(SUPER_ACL) ||
-      sctx->has_global_grant(STRING_WITH_LEN("SET_USER_ID")).first;
+      sctx->has_global_grant(STRING_WITH_LEN("SET_ANY_DEFINER")).first;
 
   // Definer check: If a definer is specified and is different from the current
-  // user, then we need to check for SUPER or SET_USER_ID privileges.
+  // user, then we need to check for SUPER or SET_ANY_DEFINER privileges.
   if ((!definer_is_current_user || binlog_requires_super) &&
       !has_super_or_set_user_id) {
     if (!definer_is_current_user) {
-      my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0), "SUPER or SET_USER_ID");
+      my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0), "SUPER or SET_ANY_DEFINER");
     } else if (WSREP(thd)) {
       /*
         If WSREP is enabled, then we are ALWAYS doing binlog

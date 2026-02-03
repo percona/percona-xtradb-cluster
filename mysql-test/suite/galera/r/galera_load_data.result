@@ -1,13 +1,21 @@
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+SET SESSION WSREP_ON=OFF;
 RESET BINARY LOGS AND GTIDS;
+SET SESSION WSREP_ON=ON;
+SET SESSION WSREP_ON=OFF;
 RESET BINARY LOGS AND GTIDS;
+SET SESSION WSREP_ON=ON;
 wsrep_last_applied_correct
 1
 include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	#	Previous_gtids	#	#	
+SET SESSION WSREP_ON=OFF;
 RESET BINARY LOGS AND GTIDS;
+SET SESSION WSREP_ON=ON;
+SET SESSION WSREP_ON=OFF;
 RESET BINARY LOGS AND GTIDS;
+SET SESSION WSREP_ON=ON;
 wsrep_last_applied_correct
 1
 SELECT COUNT(*) = 1 FROM t1;
@@ -19,7 +27,7 @@ COUNT(*) = 1
 include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	#	Previous_gtids	#	#	
-mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	BEGIN
 mysqld-bin.000001	#	Table_map	#	#	table_id: # (test.t1)
 mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F
@@ -27,13 +35,15 @@ mysqld-bin.000001	#	Xid	#	#	COMMIT /* XID */
 include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	#	Previous_gtids	#	#	
-mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	BEGIN
 mysqld-bin.000001	#	Table_map	#	#	table_id: # (test.t1)
 mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F
 mysqld-bin.000001	#	Xid	#	#	COMMIT /* XID */
 TRUNCATE TABLE t1;
+SET SESSION WSREP_ON=OFF;
 RESET BINARY LOGS AND GTIDS;
+SET SESSION WSREP_ON=ON;
 ERROR 23000: Duplicate entry '1' for key 't1.PRIMARY'
 wsrep_last_applied_correct
 1

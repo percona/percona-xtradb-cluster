@@ -98,7 +98,10 @@ let INIT_FILE=$MYSQLTEST_VARDIR/tmp/schema_read_only.sql;
 write_file $INIT_FILE;
   CREATE SCHEMA schema_read_only;
   ALTER SCHEMA schema_read_only READ ONLY=1;
-  ALTER SCHEMA schema_read_only COLLATE utf8_bin;
+  # MySQL 9.x does not necessarily provide legacy `utf8_*` collations.
+  # Use an explicit utf8mb4 collation to avoid init-file aborting early, which
+  # would leave `schema_read_only` behind and make subsequent assertions flaky.
+  ALTER SCHEMA schema_read_only COLLATE utf8mb4_bin;
   CREATE TABLE schema_read_only.t(i INT) TABLESPACE innodb_system;
   DROP SCHEMA schema_read_only;
   CREATE TABLE S.init_file(i INT);

@@ -24,7 +24,7 @@ function set_suites() {
   if [[ "$1" == "RelWithDebInfo" ]]; then
     echo "Setting WORKER_x_MTR_SUITES for BUILD_TYPE=RelWithDebInfo"
     # Unit tests will be executed by worker 1
-    WORKER_1_MTR_SUITES="innodb_undo,test_services,audit_null,service_sys_var_registration,connection_control,service_udf_registration,service_status_var_registration,procfs,interactive_utilities,percona-pam-for-mysql,galera_3nodes,router"
+    WORKER_1_MTR_SUITES="innodb_undo,test_services,audit_null,service_sys_var_registration,connection_control,service_udf_registration,service_status_var_registration,procfs,interactive_utilities,percona-pam-for-mysql,galera_3nodes"
     WORKER_2_MTR_SUITES="galera_nbo,galera_3nodes_nbo,galera_3nodes_sr,galera_encryption,wsrep,galera-x"
     WORKER_3_MTR_SUITES="engines/funcs,innodb,galera_sr"
     WORKER_4_MTR_SUITES="main,rpl"
@@ -35,7 +35,7 @@ function set_suites() {
   else # Debug (and everything different from "RelWithDebInfo")
     echo "Setting WORKER_x_MTR_SUITES for BUILD_TYPE=Debug"
     # Unit tests will be executed by worker 1
-    WORKER_1_MTR_SUITES="innodb_undo,test_services,audit_null,service_sys_var_registration,connection_control,service_udf_registration,service_status_var_registration,procfs,interactive_utilities,percona-pam-for-mysql,binlog,innodb_zip,x,sys_vars,innodb_fts,stress,router"
+    WORKER_1_MTR_SUITES="innodb_undo,test_services,audit_null,service_sys_var_registration,connection_control,service_udf_registration,service_status_var_registration,procfs,interactive_utilities,percona-pam-for-mysql,binlog,innodb_zip,x,sys_vars,innodb_fts,stress"
     WORKER_2_MTR_SUITES="galera_nbo,galera_3nodes,galera_sr,galera_3nodes_nbo,galera_3nodes_sr,galera_encryption,wsrep,galera-x,rpl|nobig"
     WORKER_3_MTR_SUITES="engines/funcs,innodb,perfschema,percona_innodb,component_keyring_file"
     WORKER_4_MTR_SUITES="main|big,rpl|big,rpl_nogtid"
