@@ -1,0 +1,114 @@
+#
+# 1. Install audit_log PLUGIN on ALL nodes
+#
+call mtr.add_suppression("Plugin audit_log_filter reported: 'Failed to get an opened audit_log_filter table");
+call mtr.add_suppression("Plugin audit_log_filter reported: 'Failed to load filtering rules");
+CREATE DATABASE audit_testing;
+call mtr.add_suppression("Plugin audit_log_filter reported: 'Failed to get an opened audit_log_filter table");
+call mtr.add_suppression("Plugin audit_log_filter reported: 'Failed to load filtering rules");
+#
+# 2. audit_log_filter_set_filter is replicated.
+#
+
+##### START #####
+include/assert_table_are_same_in_cluster.inc [audit_log_filter_set_filter is replicated.] [node_1: SELECT audit_log_filter_set_filter('table_readonly', '{
+"filter": {
+"class": {
+"name": "table_access",
+"event": {
+"name": ["insert", "update", "delete"],
+"abort": true
+}
+}
+}
+}');]
+SELECT audit_log_filter_set_filter('table_readonly', '{
+"filter": {
+"class": {
+"name": "table_access",
+"event": {
+"name": ["insert", "update", "delete"],
+"abort": true
+}
+}
+}
+}');;
+audit_log_filter_set_filter('table_readonly', '{
+"filter": {
+"class": {
+"name": "table_access",
+"event": {
+"name": ["insert", "update", "delete"],
+"abort": true
+}
+}
+}
+}')
+OK
+Connected to: node_1
+SELECT * FROM audit_testing.audit_log_filter ORDER BY NAME;
+filter_id	name	filter
+1	table_readonly	{"filter": {"class": {"name": "table_access", "event": {"name": ["insert", "update", "delete"], "abort": true}}}}
+Connected to: node_2
+SELECT * FROM audit_testing.audit_log_filter ORDER BY NAME;
+filter_id	name	filter
+1	table_readonly	{"filter": {"class": {"name": "table_access", "event": {"name": ["insert", "update", "delete"], "abort": true}}}}
+##### END #####
+
+#
+# 3. audit_log_filter_set_user is replicated.
+#
+
+##### START #####
+include/assert_table_are_same_in_cluster.inc [audit_log_filter_set_user is replicated.] [node_1: SELECT audit_log_filter_set_user('%', 'table_readonly');]
+SELECT audit_log_filter_set_user('%', 'table_readonly');;
+audit_log_filter_set_user('%', 'table_readonly')
+OK
+Connected to: node_1
+SELECT * FROM audit_testing.audit_log_user ORDER BY FILTERNAME;
+username	userhost	filtername
+%	%	table_readonly
+Connected to: node_2
+SELECT * FROM audit_testing.audit_log_user ORDER BY FILTERNAME;
+username	userhost	filtername
+%	%	table_readonly
+##### END #####
+
+#
+# 4. audit_log_filter_remove_filter is replicated.
+#
+
+##### START #####
+include/assert_table_are_same_in_cluster.inc [audit_log_filter_remove_filter is replicated.] [node_1: SELECT audit_log_filter_remove_filter('table_readonly');]
+SELECT audit_log_filter_remove_filter('table_readonly');;
+audit_log_filter_remove_filter('table_readonly')
+OK
+Connected to: node_1
+SELECT * FROM audit_testing.audit_log_filter ORDER BY NAME;
+filter_id	name	filter
+Connected to: node_2
+SELECT * FROM audit_testing.audit_log_filter ORDER BY NAME;
+filter_id	name	filter
+##### END #####
+
+#
+# 5. audit_log_filter_remove_user is replicated.
+#
+
+##### START #####
+include/assert_table_are_same_in_cluster.inc [audit_log_filter_remove_user is replicated.] [node_1: SELECT audit_log_filter_remove_user('%');]
+SELECT audit_log_filter_remove_user('%');;
+audit_log_filter_remove_user('%')
+OK
+Connected to: node_1
+SELECT * FROM audit_testing.audit_log_user ORDER BY FILTERNAME;
+username	userhost	filtername
+Connected to: node_2
+SELECT * FROM audit_testing.audit_log_user ORDER BY FILTERNAME;
+username	userhost	filtername
+##### END #####
+
+#
+# 6. Cleanup
+#
+DROP DATABASE audit_testing;
