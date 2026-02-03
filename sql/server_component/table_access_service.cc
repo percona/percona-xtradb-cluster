@@ -41,7 +41,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 #include "sql/table_trigger_dispatcher.h"
 #include "sql/transaction.h"
 #include "thr_lock.h"
-
+#ifdef WITH_WSREP
+#include "sql/wsrep_trans_observer.h"
+#endif /* WITH_WSREP */
 /* clang-format off */
 /**
   @page PAGE_TABLE_ACCESS_SERVICE Table Access service
@@ -492,6 +494,146 @@ static String *from_api(my_h_string api) {
 
 class TA_table_impl;
 
+#ifdef WITH_WSREP
+/**
+  @class PXC_wsrep_dml_replicator
+
+  @brief Manages wsrep DML replication for a given THD.
+
+  This class is a RAII wrapper that ensures wsrep replication is correctly
+  initialized and torn down for DML operations performed through the
+  table access service. It handles starting and ending transactions,
+  and cleans up the wsrep state in the THD upon destruction.
+*/
+class PXC_wsrep_dml_replicator {
+ private:
+  THD *m_thd{nullptr};
+  bool m_replicate_transactions{true};
+
+ public:
+  /**
+    Constructor.
+    @param thd The thread context to manage.
+  */
+  explicit PXC_wsrep_dml_replicator(THD *thd, bool replicate_transaction)
+      : m_thd(thd), m_replicate_transactions(replicate_transaction) {
+    assert(m_thd != nullptr);
+    set_replication_operations();
+  }
+
+  /** Destructor. Cleans up wsrep state if replication was active. */
+  ~PXC_wsrep_dml_replicator() {
+    if (m_replicate_transactions && m_thd) {
+      end_trx();
+      wsrep_close(m_thd);
+      m_thd->wsrep_client_thread = false;
+    }
+  }
+
+  // This class manages a unique resource (THD state), so it should not be
+  // copyable or movable.
+  PXC_wsrep_dml_replicator(const PXC_wsrep_dml_replicator &) = delete;
+  PXC_wsrep_dml_replicator &operator=(const PXC_wsrep_dml_replicator &) =
+      delete;
+  PXC_wsrep_dml_replicator(PXC_wsrep_dml_replicator &&) = delete;
+  PXC_wsrep_dml_replicator &operator=(PXC_wsrep_dml_replicator &&) = delete;
+
+  /**
+    Enable and prepare for wsrep replication.
+    @param replicate_transactions If true, enables replication for the session.
+    @return 0 on success, 1 on failure.
+  */
+  int set_replication_operations() {
+    assert(m_thd != nullptr);
+    if (m_replicate_transactions) {
+      m_thd->variables.wsrep_on = true;  // Needed for WSREP(thd) to work
+      wsrep_open(m_thd);
+      if (wsrep_before_command(m_thd)) {
+        WSREP_WARN(
+            "PXC_wsrep_dml_replicator wsrep_before_command failed, will not be "
+            "able to replicate the transactions.");
+        m_thd->variables.wsrep_on = false;
+        m_replicate_transactions = false;
+        return 1;
+      }
+      m_replicate_transactions = true;
+      m_thd->wsrep_non_replicating_atomic_ddl = false;
+    } else {
+      m_thd->variables.wsrep_on = false;
+    }
+    return 0;
+  }
+
+  /**
+    Starts a wsrep transaction if one has not already been started.
+    @return 0 on success, non-zero on error.
+  */
+  int start_trx_if_not_started() {
+    int error = 0;
+    if (m_replicate_transactions &&
+        m_thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID) {
+      error = wsrep_before_statement(m_thd);
+      if (!error) {
+        m_thd->set_wsrep_next_trx_id(m_thd->query_id);
+        error = wsrep_start_trx_if_not_started(m_thd);
+      } else {
+        WSREP_WARN(
+            "PXC_wsrep_dml_replicator wsrep_before_statement failed, will not "
+            "be able to replicate the transactions.  ");
+        m_thd->variables.wsrep_on = false;
+        m_replicate_transactions = false;
+        assert(false);  // should not reach here
+      }
+    }
+    return error;
+  }
+
+  /**
+    Ends the current wsrep transaction.
+    @return 0 on success, non-zero on error.
+  */
+  int end_trx() {
+    if (m_thd->wsrep_cs().state() == wsrep::client_state::s_exec)
+      return close_statement();
+    return 0;
+  }
+
+  /**
+    @brief Closes the current wsrep statement.
+
+    This method is responsible for properly closing a wsrep transaction
+    statement that was initiated for DML operations. It calls
+    `wsrep_after_statement` to reset the transaction ID and
+    `wsrep_after_command_ignore_result` for cleanup.
+    @return 0 on success, non-zero on error.
+  */
+  int close_statement() {
+    if (!m_replicate_transactions || !m_thd || !m_thd->variables.wsrep_on) {
+      return 0;
+    }
+    /*
+     * We generated the transaction using wsrep_start_trx_if_not_started when
+     * some INSERT/UPDATE/DELETE was done. We need to properly close it.
+     * To close the transaction properly, we need to call the
+     * wsrep_after_statement, this will reset the transaction ID post which we
+     * can call wsrep_close needed to cleanup the wsrep state in THD.
+     * Otherwise, we might hit asserts in wsrep code stating transaction is
+     * still active at the time of THD cleanup/release resources.
+     */
+    m_thd->run_wsrep_commit_hooks = true;
+    int error = wsrep_after_statement(m_thd);
+    if (error) {
+      WSREP_WARN(
+          "PXC_wsrep_dml_replicator wsrep_after_statement failed during "
+          "close_statement.  ");
+      assert(false);  // Failure should not in internal services.
+    }
+    wsrep_after_command_ignore_result(m_thd);
+    return error;
+  }
+};
+#endif  // end of WITH_WSREP
+
 struct Table_state {
   char m_schema_name[NAME_LEN + 1];
   size_t m_schema_name_length;
@@ -519,6 +661,9 @@ class Table_access_impl {
   int commit();
   int rollback();
   TABLE *get_table(size_t index);
+#ifdef WITH_WSREP
+  std::unique_ptr<PXC_wsrep_dml_replicator> m_wsrep_replicator;
+#endif  // end of WITH_WSREP
 
   bool binlog_get();
   void binlog_set(bool binlog);
@@ -610,7 +755,10 @@ Table_access_impl::Table_access_impl(THD *thd, size_t count)
     this->m_clear_mysys = !my_thread_is_inited();
     my_thread_init();
   }
-
+#ifdef WITH_WSREP
+  m_wsrep_replicator =
+      std::make_unique<PXC_wsrep_dml_replicator>(m_child_thd, true);
+#endif
   m_child_thd->real_id = my_thread_self();
   m_child_thd->set_new_thread_id();
 
@@ -644,6 +792,9 @@ Table_access_impl::~Table_access_impl() {
     */
     close_cached_tables(m_child_thd, m_table_array, false, LONG_TIMEOUT);
   }
+#ifdef WITH_WSREP
+  m_wsrep_replicator.reset();
+#endif /* WITH_WSREP */
 
   m_child_thd->release_resources();
 
@@ -826,7 +977,13 @@ int Table_access_impl::begin() {
   if (!is_access_to_tables_supported(m_table_array)) {
     return TA_ERROR_OPEN;
   }
-
+#ifdef WITH_WSREP
+  // We can keep it in set_transaction however it is better to start the trx
+  // here due to begin
+  if (m_wsrep_replicator->start_trx_if_not_started()) {
+    return TA_ERROR_OPEN;
+  }
+#endif /* WITH_WSREP */
   return 0;
 }
 
@@ -862,6 +1019,15 @@ int Table_access_impl::commit() {
   if (trans_commit_stmt(m_child_thd)) {
     return 1;
   }
+#ifdef WITH_WSREP
+  // For some reason this call is not made here, so we do it explicitly in
+  // destructor.
+  // It is safe to call end_trx() multiple times due to
+  // wsrep::client_state::s_exec check present in end_trx()
+  if (m_wsrep_replicator->end_trx()) {
+    return 1;
+  }
+#endif /* WITH_WSREP */
   return 0;
 }
 
@@ -871,6 +1037,11 @@ int Table_access_impl::rollback() {
   if (trans_rollback_stmt(m_child_thd)) {
     return 1;
   }
+#ifdef WITH_WSREP
+  if (m_wsrep_replicator->end_trx()) {
+    return 1;
+  }
+#endif /* WITH_WSREP */
   return 0;
 }
 

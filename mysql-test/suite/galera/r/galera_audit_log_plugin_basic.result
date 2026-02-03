@@ -1,0 +1,535 @@
+#
+# 1. Install audit_log PLUGIN on ALL nodes
+#
+call mtr.add_suppression("Plugin audit_log_filter reported: 'Failed to get an opened audit_log_filter table");
+call mtr.add_suppression("Plugin audit_log_filter reported: 'Failed to load filtering rules");
+call mtr.add_suppression("Plugin audit_log_filter reported: 'Failed to get an opened audit_log_filter table");
+call mtr.add_suppression("Plugin audit_log_filter reported: 'Failed to load filtering rules");
+# Setup audit plugin on node 2
+CREATE TABLE t1 (c1 INT);
+CREATE TABLE t2 (c2 INT);
+INSERT INTO t1 VALUES (1);
+INSERT INTO t2 VALUES (1);
+# Create users for testing
+# user1: will be used to set audit rules.
+CREATE USER 'user1'@'localhost' IDENTIFIED BY '111';
+GRANT AUDIT_ADMIN ON *.* to 'user1'@'localhost';
+# user2: has SYSTEM_USER and AUDIT_ABORT_EXEMPT privileges to test exemption.
+CREATE USER 'user2'@'localhost' IDENTIFIED BY '222';
+GRANT SYSTEM_USER ON *.* to 'user2'@'localhost';
+GRANT AUDIT_ABORT_EXEMPT ON *.* to 'user2'@'localhost';
+# Open new connections for the created users
+#
+# 2. Set up a filter and verify filter replication and filter working on all nodes
+# Set the filter and verify it's replicated to all nodes.
+
+##### START #####
+include/assert_table_are_same_in_cluster.inc [audit_log_filter_set_filter is replicated.] [node_1: SELECT audit_log_filter_set_filter('table_readonly', '{
+"filter": {
+"class": {
+"name": "table_access",
+"event": {
+"name": ["insert", "update", "delete"],
+"abort": true
+}
+}
+}
+}');]
+SELECT audit_log_filter_set_filter('table_readonly', '{
+"filter": {
+"class": {
+"name": "table_access",
+"event": {
+"name": ["insert", "update", "delete"],
+"abort": true
+}
+}
+}
+}');;
+audit_log_filter_set_filter('table_readonly', '{
+"filter": {
+"class": {
+"name": "table_access",
+"event": {
+"name": ["insert", "update", "delete"],
+"abort": true
+}
+}
+}
+}')
+OK
+Connected to: node_1
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
+filter_id	name	filter
+1	table_readonly	{"filter": {"class": {"name": "table_access", "event": {"name": ["insert", "update", "delete"], "abort": true}}}}
+Connected to: node_2
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
+filter_id	name	filter
+1	table_readonly	{"filter": {"class": {"name": "table_access", "event": {"name": ["insert", "update", "delete"], "abort": true}}}}
+##### END #####
+
+# Set the filter based on user and verify it's replicated to all nodes.
+
+##### START #####
+include/assert_table_are_same_in_cluster.inc [audit_log_filter_set_user is replicated.] [node_2: SELECT audit_log_filter_set_user('%', 'table_readonly');]
+SELECT audit_log_filter_set_user('%', 'table_readonly');;
+audit_log_filter_set_user('%', 'table_readonly')
+OK
+Connected to: node_1
+SELECT * FROM mysql.audit_log_user ORDER BY FILTERNAME;
+username	userhost	filtername
+%	%	table_readonly
+Connected to: node_2
+SELECT * FROM mysql.audit_log_user ORDER BY FILTERNAME;
+username	userhost	filtername
+%	%	table_readonly
+##### END #####
+
+# Verify that INSERT statements are aborted on all nodes.
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_1
+INSERT INTO t1 VALUES (2);;
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_INSERT';1).
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_2
+INSERT INTO t1 VALUES (2);;
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_INSERT';1).
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_1
+INSERT INTO t2 VALUES (2);;
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_INSERT';1).
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_2
+INSERT INTO t2 VALUES (2);;
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_INSERT';1).
+# Verify that UPDATE statements are aborted on all nodes.
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_1
+UPDATE t1 SET c1 = 3 WHERE c1 = 2;;
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_UPDATE';1).
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_2
+UPDATE t1 SET c1 = 3 WHERE c1 = 2;;
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_UPDATE';1).
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_1
+UPDATE t2 SET c2 = 3 WHERE c2 = 2;;
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_UPDATE';1).
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_2
+UPDATE t2 SET c2 = 3 WHERE c2 = 2;;
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_UPDATE';1).
+# Verify that DELETE statements are aborted on all nodes.
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_1
+DELETE FROM t1 WHERE c1 = 1;;
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_DELETE';1).
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_2
+DELETE FROM t1 WHERE c1 = 1;;
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_DELETE';1).
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_1
+DELETE FROM t2 WHERE c2 = 1;;
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_DELETE';1).
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_2
+DELETE FROM t2 WHERE c2 = 1;;
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_DELETE';1).
+# Check table contents to ensure no changes were made.
+SELECT * FROM t1;
+c1
+1
+SELECT * FROM t2;
+c2
+1
+# Remove the user assignment and verify replication.
+
+##### START #####
+include/assert_table_are_same_in_cluster.inc [audit_log_filter_remove_user is replicated.] [node_1: SELECT audit_log_filter_remove_user('%');]
+SELECT audit_log_filter_remove_user('%');;
+audit_log_filter_remove_user('%')
+OK
+Connected to: node_1
+SELECT * FROM mysql.audit_log_user ORDER BY FILTERNAME;
+username	userhost	filtername
+Connected to: node_2
+SELECT * FROM mysql.audit_log_user ORDER BY FILTERNAME;
+username	userhost	filtername
+##### END #####
+
+#
+# 3. Set up a filter to abort all access to a specific table t1
+#    but allowed on t2.
+#
+# Set the filter for 'no_t1_access' and verify replication.
+
+##### START #####
+include/assert_table_are_same_in_cluster.inc [audit_log_filter_set_filter is replicated.] [node_1: SELECT audit_log_filter_set_filter('no_t1_access', '{
+"filter": {
+"class": {
+"name": "table_access",
+"event": {
+"name": ["read", "insert", "update", "delete"],
+"abort": {
+"and": [
+{"field": {"name": "table_database.str", "value": "test"}},
+{"field": {"name": "table_name.str", "value": "t1"}}
+]
+}
+}
+}
+}
+}');]
+SELECT audit_log_filter_set_filter('no_t1_access', '{
+"filter": {
+"class": {
+"name": "table_access",
+"event": {
+"name": ["read", "insert", "update", "delete"],
+"abort": {
+"and": [
+{"field": {"name": "table_database.str", "value": "test"}},
+{"field": {"name": "table_name.str", "value": "t1"}}
+]
+}
+}
+}
+}
+}');;
+audit_log_filter_set_filter('no_t1_access', '{
+"filter": {
+"class": {
+"name": "table_access",
+"event": {
+"name": ["read", "insert", "update", "delete"],
+"abort": {
+"and": [
+{"field": {"name": "table_database.str", "value": "test"}},
+{"field": {"name": "ta
+OK
+Connected to: node_1
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
+filter_id	name	filter
+2	no_t1_access	{"filter": {"class": {"name": "table_access", "event": {"name": ["read", "insert", "update", "delete"], "abort": {"and": [{"field": {"name": "table_database.str", "value": "test"}}, {"field": {"name": "table_name.str", "value": "t1"}}]}}}}}
+1	table_readonly	{"filter": {"class": {"name": "table_access", "event": {"name": ["insert", "update", "delete"], "abort": true}}}}
+Connected to: node_2
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
+filter_id	name	filter
+2	no_t1_access	{"filter": {"class": {"name": "table_access", "event": {"name": ["read", "insert", "update", "delete"], "abort": {"and": [{"field": {"name": "table_database.str", "value": "test"}}, {"field": {"name": "table_name.str", "value": "t1"}}]}}}}}
+1	table_readonly	{"filter": {"class": {"name": "table_access", "event": {"name": ["insert", "update", "delete"], "abort": true}}}}
+##### END #####
+
+# Assign the filter to all users and verify replication.
+
+##### START #####
+include/assert_table_are_same_in_cluster.inc [audit_log_filter_remove_user is replicated.] [node_1: SELECT audit_log_filter_set_user('%', 'no_t1_access');]
+SELECT audit_log_filter_set_user('%', 'no_t1_access');;
+audit_log_filter_set_user('%', 'no_t1_access')
+OK
+Connected to: node_1
+SELECT * FROM mysql.audit_log_user ORDER BY FILTERNAME;
+username	userhost	filtername
+%	%	no_t1_access
+Connected to: node_2
+SELECT * FROM mysql.audit_log_user ORDER BY FILTERNAME;
+username	userhost	filtername
+%	%	no_t1_access
+##### END #####
+
+# Verify INSERT is aborted for t1.
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_1
+INSERT INTO t1 VALUES (2);;
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_INSERT';1).
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_2
+INSERT INTO t1 VALUES (2);;
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_INSERT';1).
+# Verify INSERT is allowed for t2.
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_1
+INSERT INTO t2 VALUES (2);;
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_2
+INSERT INTO t2 VALUES (2);;
+# Verify UPDATE is aborted for t1.
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_1
+UPDATE t1 SET c1 = 3 WHERE c1 = 2;;
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_UPDATE';1).
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_2
+UPDATE t1 SET c1 = 3 WHERE c1 = 2;;
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_UPDATE';1).
+# Verify UPDATE is allowed for t2.
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_1
+UPDATE t2 SET c2 = 3 WHERE c2 = 2;;
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_2
+UPDATE t2 SET c2 = 3 WHERE c2 = 2;;
+# Verify DELETE is aborted for t1.
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_1
+DELETE FROM t1 WHERE c1 = 1;;
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_DELETE';1).
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_2
+DELETE FROM t1 WHERE c1 = 1;;
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_DELETE';1).
+# Verify DELETE is allowed for t2.
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_1
+DELETE FROM t2 WHERE c2 = 1;;
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_2
+DELETE FROM t2 WHERE c2 = 1;;
+# Verify SELECT is aborted for t1.
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_1
+SELECT * FROM t1;;
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_READ';1).
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_2
+SELECT * FROM t1;;
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_READ';1).
+# Verify SELECT is allowed for t2.
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_1
+SELECT * FROM t2;;
+c2
+3
+3
+SELECT audit_log_filter_flush();
+audit_log_filter_flush()
+OK
+
+Executing statement on: node_2
+SELECT * FROM t2;;
+c2
+3
+3
+#
+# 4. Check the audit log filter system table insert and delete are working.
+#
+# Set and verify replication of the 'abort_message' filter.
+
+##### START #####
+include/assert_table_are_same_in_cluster.inc [audit_log_filter_remove_user is replicated.] [node_2: SELECT audit_log_filter_set_filter('abort_message', '{
+"filter": {
+"class": {
+"name": "message",
+"event": {
+"name": "user",
+"abort": true
+}
+}
+}
+}');]
+SELECT audit_log_filter_set_filter('abort_message', '{
+"filter": {
+"class": {
+"name": "message",
+"event": {
+"name": "user",
+"abort": true
+}
+}
+}
+}');;
+audit_log_filter_set_filter('abort_message', '{
+"filter": {
+"class": {
+"name": "message",
+"event": {
+"name": "user",
+"abort": true
+}
+}
+}
+}')
+OK
+Connected to: node_1
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
+filter_id	name	filter
+3	abort_message	{"filter": {"class": {"name": "message", "event": {"name": "user", "abort": true}}}}
+2	no_t1_access	{"filter": {"class": {"name": "table_access", "event": {"name": ["read", "insert", "update", "delete"], "abort": {"and": [{"field": {"name": "table_database.str", "value": "test"}}, {"field": {"name": "table_name.str", "value": "t1"}}]}}}}}
+1	table_readonly	{"filter": {"class": {"name": "table_access", "event": {"name": ["insert", "update", "delete"], "abort": true}}}}
+Connected to: node_2
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
+filter_id	name	filter
+3	abort_message	{"filter": {"class": {"name": "message", "event": {"name": "user", "abort": true}}}}
+2	no_t1_access	{"filter": {"class": {"name": "table_access", "event": {"name": ["read", "insert", "update", "delete"], "abort": {"and": [{"field": {"name": "table_database.str", "value": "test"}}, {"field": {"name": "table_name.str", "value": "t1"}}]}}}}}
+1	table_readonly	{"filter": {"class": {"name": "table_access", "event": {"name": ["insert", "update", "delete"], "abort": true}}}}
+##### END #####
+
+# Assign the filter and verify replication.
+
+##### START #####
+include/assert_table_are_same_in_cluster.inc [audit_log_filter_remove_user is replicated.] [node_2: SELECT audit_log_filter_set_user('%', 'abort_message');]
+SELECT audit_log_filter_set_user('%', 'abort_message');;
+audit_log_filter_set_user('%', 'abort_message')
+OK
+Connected to: node_1
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
+filter_id	name	filter
+3	abort_message	{"filter": {"class": {"name": "message", "event": {"name": "user", "abort": true}}}}
+2	no_t1_access	{"filter": {"class": {"name": "table_access", "event": {"name": ["read", "insert", "update", "delete"], "abort": {"and": [{"field": {"name": "table_database.str", "value": "test"}}, {"field": {"name": "table_name.str", "value": "t1"}}]}}}}}
+1	table_readonly	{"filter": {"class": {"name": "table_access", "event": {"name": ["insert", "update", "delete"], "abort": true}}}}
+Connected to: node_2
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
+filter_id	name	filter
+3	abort_message	{"filter": {"class": {"name": "message", "event": {"name": "user", "abort": true}}}}
+2	no_t1_access	{"filter": {"class": {"name": "table_access", "event": {"name": ["read", "insert", "update", "delete"], "abort": {"and": [{"field": {"name": "table_database.str", "value": "test"}}, {"field": {"name": "table_name.str", "value": "t1"}}]}}}}}
+1	table_readonly	{"filter": {"class": {"name": "table_access", "event": {"name": ["insert", "update", "delete"], "abort": true}}}}
+##### END #####
+
+# Remove the user assignment and verify replication.
+
+##### START #####
+include/assert_table_are_same_in_cluster.inc [audit_log_filter_remove_user is replicated.] [node_2: SELECT audit_log_filter_remove_user('%');]
+SELECT audit_log_filter_remove_user('%');;
+audit_log_filter_remove_user('%')
+OK
+Connected to: node_1
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
+filter_id	name	filter
+3	abort_message	{"filter": {"class": {"name": "message", "event": {"name": "user", "abort": true}}}}
+2	no_t1_access	{"filter": {"class": {"name": "table_access", "event": {"name": ["read", "insert", "update", "delete"], "abort": {"and": [{"field": {"name": "table_database.str", "value": "test"}}, {"field": {"name": "table_name.str", "value": "t1"}}]}}}}}
+1	table_readonly	{"filter": {"class": {"name": "table_access", "event": {"name": ["insert", "update", "delete"], "abort": true}}}}
+Connected to: node_2
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
+filter_id	name	filter
+3	abort_message	{"filter": {"class": {"name": "message", "event": {"name": "user", "abort": true}}}}
+2	no_t1_access	{"filter": {"class": {"name": "table_access", "event": {"name": ["read", "insert", "update", "delete"], "abort": {"and": [{"field": {"name": "table_database.str", "value": "test"}}, {"field": {"name": "table_name.str", "value": "t1"}}]}}}}}
+1	table_readonly	{"filter": {"class": {"name": "table_access", "event": {"name": ["insert", "update", "delete"], "abort": true}}}}
+##### END #####
+
+#
+# 5. Block access for user2 and verify operations are allowed from user1.
+#
+DELETE FROM t1;
+DELETE FROM t2;
+# Assign the 'no_t1_access' filter to user2 (who has AUDIT_ABORT_EXEMPT).
+
+##### START #####
+include/assert_table_are_same_in_cluster.inc [audit_log_filter_remove_user is replicated.] [node_1: SELECT audit_log_filter_set_user('user2@localhost', 'no_t1_access');]
+SELECT audit_log_filter_set_user('user2@localhost', 'no_t1_access');;
+audit_log_filter_set_user('user2@localhost', 'no_t1_access')
+OK
+Connected to: node_1
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
+filter_id	name	filter
+3	abort_message	{"filter": {"class": {"name": "message", "event": {"name": "user", "abort": true}}}}
+2	no_t1_access	{"filter": {"class": {"name": "table_access", "event": {"name": ["read", "insert", "update", "delete"], "abort": {"and": [{"field": {"name": "table_database.str", "value": "test"}}, {"field": {"name": "table_name.str", "value": "t1"}}]}}}}}
+1	table_readonly	{"filter": {"class": {"name": "table_access", "event": {"name": ["insert", "update", "delete"], "abort": true}}}}
+Connected to: node_2
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
+filter_id	name	filter
+3	abort_message	{"filter": {"class": {"name": "message", "event": {"name": "user", "abort": true}}}}
+2	no_t1_access	{"filter": {"class": {"name": "table_access", "event": {"name": ["read", "insert", "update", "delete"], "abort": {"and": [{"field": {"name": "table_database.str", "value": "test"}}, {"field": {"name": "table_name.str", "value": "t1"}}]}}}}}
+1	table_readonly	{"filter": {"class": {"name": "table_access", "event": {"name": ["insert", "update", "delete"], "abort": true}}}}
+##### END #####
+
+# Connect as user2 and verify that all operations are allowed despite the filter.
+INSERT INTO t1 VALUES (2);
+INSERT INTO t2 VALUES (2);
+UPDATE t1 SET c1 = 3 WHERE c1 = 2;
+UPDATE t2 SET c2 = 3 WHERE c2 = 2;
+DELETE FROM t1 WHERE c1 = 1;
+DELETE FROM t2 WHERE c2 = 1;
+SELECT * FROM t1;
+c1
+3
+SELECT * FROM t2;
+c2
+3
+#
+# 6. Cleanup
+#
+DROP TABLE t1;
+DROP TABLE t2;
+DROP USER 'user1'@'localhost';
+DROP USER 'user2'@'localhost';
