@@ -218,7 +218,7 @@ SELECT PROCESSLIST_STATE
 FROM performance_schema.threads
 WHERE name='thread/sql/event_scheduler';
 PROCESSLIST_STATE
-Waiting for global read lock
+Waiting for backup lock
 
 # Unlock tables. Scheduler should restart.
 UNLOCK INSTANCE;
