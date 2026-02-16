@@ -1,0 +1,4 @@
+!include ../galera_2nodes.cnf
+
+[mysqld]
+wsrep_desync_pause_retry_timeout=0

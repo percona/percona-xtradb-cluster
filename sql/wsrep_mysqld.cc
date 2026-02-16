@@ -69,6 +69,7 @@
 
 #include "debug_sync.h"
 
+#include "sql/sql_backup_lock.h"
 #include "wsrep_master_key_manager.h"
 static bool wsrep_init_master_key();
 static void wsrep_deinit_master_key();
@@ -127,6 +128,9 @@ ulonglong wsrep_mode = 0;
 /* wait for x micro-secs to allow active connection to commit before
 starting RSU */
 ulong wsrep_RSU_commit_timeout = 5000;
+
+/* Time to wait for try_desync_and_pause to succed */
+ulong wsrep_desync_pause_retry_timeout = 30;
 
 /* pxc-strict-mode help control behavior of experimental features like
 myisam table replication, etc... */
@@ -3019,6 +3023,40 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
   if (wsrep_debug && thd->mdl_context.has_locks()) {
     WSREP_DEBUG("Thread holds MDL locks at TOI begin: %s %u", WSREP_QUERY(thd),
                 thd->thread_id());
+  }
+  /*
+    KH: why this function name is 'acquire shared'? It acquires exclusive lock.
+    This part is executed only for local threads. Applier thread bailed out at
+    the beginning of this function. As we are going to acquire a global read
+    lock, we first need to acquire a backup lock. Why?
+    1. session 1: LOCK INSTANCE FOR BACKUP (acquires backup lock)
+    2. session 2: CREATE TABLE ... - this would acquire a global read lock
+    (below), replicate and then wait for backup lock in CREATE TABLE
+    3. session 1: FTWRL. It will attempt to acquire global read lock. But
+    session 2 holds this lock FTWRL can not block, because that would create a
+    deadlock (no way to UNLOCK INSTANCE)
+    4. FTWRL aborts session 2, but it is not what we want, because it was
+    already replicated
+    To avoid this deadlock, TOI will acquire backup lock, then global read
+    lock. The sequence will be
+    1. session 1: LOCK INSTANCE FOR BACKUP (acquires backup lock)
+    2. session 2: CREATE TABLE... -> will block on backup lock
+    3. session 1: FTWRL - acquire global read lock. Noone is holding it
+    4. session 1: UNLOCK TABLES
+    5. session 1: UNLOCK INSTANCE
+    6. session 2: continue
+    Anyways, before entering TOI be sure that there is no LOCK INSTANCE FOR
+    BACKUP active. We need to acquire a backup lock here. If not, TOI will be
+    replicated and then IF LOCK INSTANCE FOR BACKUP is active it will be
+    blocked inside CREATE TABLE on backup lock. Then FTWRL will try to pause
+    the provider, but it will fail (see the other comment)
+    */
+  /**
+    On failure, abort TOI(not replicated) to make sure session does not
+    hold partial locks.
+    */
+  if (acquire_shared_backup_lock(thd, thd->variables.lock_wait_timeout, true)) {
+    return -1;
   }
 
   /*

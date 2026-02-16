@@ -1,0 +1,182 @@
+#
+# 1. Create database and table t1.
+#
+SET DEBUG_SYNC= 'RESET';
+SET DEBUG_SYNC= 'RESET';
+CREATE DATABASE db1;
+USE db1;
+CREATE TABLE t1 (id INT PRIMARY KEY, a INT);
+#
+# 2. Lock database and create a table.
+#    Confirm FTWRL error out due to LOCK INSTANCE command.
+#    Confirm DDL cannot be executed along with LOCK INSTANCE command.
+#    UNLOCK to restore the state.
+#
+LOCK INSTANCE FOR BACKUP;
+CREATE TABLE t2 (id INT PRIMARY KEY, a INT);
+FLUSH TABLES WITH READ LOCK;
+CREATE TABLE t3 (id INT PRIMARY KEY, a INT);
+ERROR HY000: Can't execute the query because you have a conflicting read lock
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+#
+# 3. Execute FTWRL and DDL fails.
+#
+FLUSH TABLES WITH READ LOCK;
+CREATE TABLE t5 (id INT PRIMARY KEY, a INT);
+ERROR HY000: Can't execute the query because you have a conflicting read lock
+UNLOCK TABLES;
+#
+# 3b. Table backup lock (LOCK TABLES ... FOR BACKUP) then FTWRL fails.
+#
+LOCK TABLES FOR BACKUP;
+FLUSH TABLES WITH READ LOCK;
+ERROR HY000: Can't execute the query because you have a conflicting backup lock
+UNLOCK TABLES;
+#
+# 4.A. Hold backup lock on node-2.
+#
+LOCK INSTANCE FOR BACKUP;
+#
+# 4.B. Execute DDL on node-1
+#
+CREATE TABLE t_synch1 (id INT PRIMARY KEY, a INT);;
+#
+# 4.C. Execute FTWRL on node-2 it fails.
+#      UNLOCK the instance.
+#
+FLUSH TABLES WITH READ LOCK;
+Got one of the listed errors
+#
+# 4.D. Let DDL finish on node1 and unlock node2.
+#
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+#
+# 5.A. Add debug point in node2 to block DDL to ensure consistent test behavior.
+#      Execute DDL on node-1
+#
+SET GLOBAL debug = "+d,ordered_commit_blocked";
+CREATE TABLE t_synch2 (id INT PRIMARY KEY, a INT);;
+#
+# 5.B. Execute FTWRL on node-2 once DDL is blocked.
+#
+SET DEBUG_SYNC = "now WAIT_FOR signal.ordered_commit_waiting";
+SET GLOBAL debug = "-d,ordered_commit_blocked";
+FLUSH TABLES WITH READ LOCK;;
+SET DEBUG_SYNC = "now SIGNAL signal.ordered_commit_continue";
+#
+# 5.C. Let DDL finish on node1 and unlock node2.
+#
+UNLOCK TABLES;
+#
+# 6.A. Execute FTWRL on node-2.
+#
+FLUSH TABLES WITH READ LOCK;
+#
+# 6.B. Execute DDL on node-1
+#
+CREATE TABLE t_synch3 (id INT PRIMARY KEY, a INT);
+#
+# 6.C. DDL will be blocked(GRL) until node2 releases the lock.
+#      Table is created once lock are released.
+#
+UNLOCK TABLES;
+#
+# 7. Session 1: LOCK INSTANCE FOR BACKUP,
+#    Session 2: CREATE TABLE
+#    Session 1: FTWRL
+#
+LOCK INSTANCE FOR BACKUP;
+CREATE TABLE db1.t_synch4 (id INT PRIMARY KEY, a INT);
+include/assert.inc [Table t_synch4 should not replicate to node_1]
+FLUSH TABLES WITH READ LOCK;
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+include/assert.inc [Table t_synch4 is created]
+#
+# 8. Session 1: LOCK INSTANCE FOR BACKUP, FTRWL
+#    Session 2: CREATE TABLE
+#
+LOCK INSTANCE FOR BACKUP;
+FLUSH TABLES WITH READ LOCK;
+CREATE TABLE db1.t_synch5 (id INT PRIMARY KEY, a INT);
+include/assert.inc [Table t_synch5 should not replicate to node_1]
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+include/assert.inc [Table t_synch5 is created]
+#
+# 9. NODE 2: LOCK INSTANCE FOR BACKUP, FTRWL
+#    NODE 1: CREATE TABLE and sleep(let DDL acquire locks)
+#    NODE 2: FTRWL and UNLOCK
+#
+LOCK INSTANCE FOR BACKUP;
+CREATE TABLE db1.t_synch6 (id INT PRIMARY KEY, a INT);;
+FLUSH TABLES WITH READ LOCK;
+ERROR 70100: Query execution was interrupted
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+include/assert.inc [Table t_synch6 is created]
+#
+# 10. NODE 1: LOCK INSTANCE FOR BACKUP, FTRWL
+#     NODE 2: CREATE TABLE
+#
+LOCK INSTANCE FOR BACKUP;
+FLUSH TABLES WITH READ LOCK;
+CREATE TABLE db1.t_synch7 (id INT PRIMARY KEY, a INT);;
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+include/assert.inc [Table t_synch7 is created]
+#
+# 11. 2nd FTWRL after desync/resync (try_pause local_monitor fix).
+#     Without fix: 2nd FTWRL hangs in local_monitor.
+#     With fix: try_pause returns undefined when seqno != last_left+1,
+#     retry loop retries until success.
+#     Replication traffic between 1st and 2nd FTWRL increases likelihood
+#     of local_seqno != last_left+1 condition.
+#
+SET GLOBAL wsrep_desync_pause_retry_timeout = 10;
+LOCK INSTANCE FOR BACKUP;
+FLUSH TABLES WITH READ LOCK;
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+INSERT INTO db1.t1 VALUES (99, 99);
+LOCK INSTANCE FOR BACKUP;
+FLUSH TABLES WITH READ LOCK;
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+SET GLOBAL wsrep_desync_pause_retry_timeout = 0;
+#
+# 11b. wsrep_desync_pause_retry_timeout=0: fail fast, no hang.
+#     With timeout=0, try_desync_and_pause does single try.
+#     When condition not met, returns immediately (no retry, no hang).
+#
+SET GLOBAL wsrep_desync_pause_retry_timeout = 0;
+LOCK INSTANCE FOR BACKUP;
+FLUSH TABLES WITH READ LOCK;
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+INSERT INTO db1.t1 VALUES (98, 98);
+LOCK INSTANCE FOR BACKUP;
+FLUSH TABLES WITH READ LOCK;
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+#
+# 11c. 3rd and 4th FTWRL - multiple desync/resync cycles.
+#     Ensure fix works for repeated consecutive FTWRLs.
+#
+SET GLOBAL wsrep_desync_pause_retry_timeout = 10;
+LOCK INSTANCE FOR BACKUP;
+FLUSH TABLES WITH READ LOCK;
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+INSERT INTO db1.t1 VALUES (97, 97);
+LOCK INSTANCE FOR BACKUP;
+FLUSH TABLES WITH READ LOCK;
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+SET GLOBAL wsrep_desync_pause_retry_timeout = 0;
+#
+# 12. Cleanup.
+#
+DROP DATABASE db1;
