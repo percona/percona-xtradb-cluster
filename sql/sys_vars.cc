@@ -8514,6 +8514,16 @@ static Sys_var_ulong Sys_wsrep_RSU_commit_timeout(
     VALID_RANGE(5000, (LONG_TIMEOUT * 1000000)), DEFAULT(5000), BLOCK_SIZE(1),
     NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(0));
 
+/* 31536000 value is inline with lock_wait_timeout. */
+static Sys_var_ulong Sys_wsrep_desync_pause_retry_timeout(
+    "wsrep_desync_pause_retry_timeout",
+    "When session holds LOCK INSTANCE FOR BACKUP and runs FLUSH TABLES WITH "
+    "READ LOCK, maximum time (seconds) to retry try_desync_and_pause every "
+    "100ms before failing.",
+    GLOBAL_VAR(wsrep_desync_pause_retry_timeout), CMD_LINE(OPT_ARG),
+    VALID_RANGE(0, 31536000), DEFAULT(30), BLOCK_SIZE(1), NO_MUTEX_GUARD,
+    NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(0));
+
 static PolyLock_mutex PLock_wsrep_desync(&LOCK_wsrep_desync);
 static Sys_var_bool Sys_wsrep_desync(
     "wsrep_desync", "To desynchronize the node from the cluster",
