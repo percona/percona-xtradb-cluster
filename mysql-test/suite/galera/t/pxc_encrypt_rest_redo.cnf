@@ -10,12 +10,12 @@ innodb_log_file_size=100M
 ssl-dhparams=@ENV.MYSQL_TEST_DIR/std_data/dhparams.pem
 
 [mysqld.1]
-wsrep_provider_options='base_port=@mysqld.1.#galera_port;pc.ignore_sb=true'
+wsrep_provider_options='base_port=@mysqld.1.#galera_port;pc.ignore_sb=true;@ENV.WSREP_PROVIDER_TIMEOUTS'
 server_id=1
 #!run-suite-setup-sh
 
 [mysqld.2]
-wsrep_provider_options='base_port=@mysqld.2.#galera_port;pc.ignore_sb=true'
+wsrep_provider_options='base_port=@mysqld.2.#galera_port;pc.ignore_sb=true;@ENV.WSREP_PROVIDER_TIMEOUTS'
 server_id=2
 #!run-suite-setup-sh
 
