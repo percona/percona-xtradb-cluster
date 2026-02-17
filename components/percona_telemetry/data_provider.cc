@@ -819,14 +819,10 @@ bool DataProvider::collect_metrics(rapidjson::Document *document) {
   res |= collect_se_info(document);
   res |= collect_group_replication_info(document);
   res |= collect_async_replication_info(document);
-<<<<<<< HEAD
+  res |= collect_server_config(document);
 #ifdef WITH_WSREP
   res |= collect_galera_replication_info(document);
 #endif
-||||||| 9a19f1fd3bf
-=======
-  res |= collect_server_config(document);
->>>>>>> oleksiy/ps/release-8.4.8-8
 
   /* The requirement is to have db_replication_id key at the top of JSON
   structure. But it may originate from the different places. The above
