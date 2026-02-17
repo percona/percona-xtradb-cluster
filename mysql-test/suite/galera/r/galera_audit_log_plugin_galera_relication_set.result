@@ -3,7 +3,6 @@
 #
 call mtr.add_suppression("Plugin audit_log_filter reported: 'Failed to get an opened audit_log_filter table");
 call mtr.add_suppression("Plugin audit_log_filter reported: 'Failed to load filtering rules");
-CREATE DATABASE audit_testing;
 call mtr.add_suppression("Plugin audit_log_filter reported: 'Failed to get an opened audit_log_filter table");
 call mtr.add_suppression("Plugin audit_log_filter reported: 'Failed to load filtering rules");
 #
@@ -46,11 +45,11 @@ audit_log_filter_set_filter('table_readonly', '{
 }')
 OK
 Connected to: node_1
-SELECT * FROM audit_testing.audit_log_filter ORDER BY NAME;
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
 filter_id	name	filter
 1	table_readonly	{"filter": {"class": {"name": "table_access", "event": {"name": ["insert", "update", "delete"], "abort": true}}}}
 Connected to: node_2
-SELECT * FROM audit_testing.audit_log_filter ORDER BY NAME;
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
 filter_id	name	filter
 1	table_readonly	{"filter": {"class": {"name": "table_access", "event": {"name": ["insert", "update", "delete"], "abort": true}}}}
 ##### END #####
@@ -65,11 +64,11 @@ SELECT audit_log_filter_set_user('%', 'table_readonly');;
 audit_log_filter_set_user('%', 'table_readonly')
 OK
 Connected to: node_1
-SELECT * FROM audit_testing.audit_log_user ORDER BY FILTERNAME;
+SELECT * FROM mysql.audit_log_user ORDER BY FILTERNAME;
 username	userhost	filtername
 %	%	table_readonly
 Connected to: node_2
-SELECT * FROM audit_testing.audit_log_user ORDER BY FILTERNAME;
+SELECT * FROM mysql.audit_log_user ORDER BY FILTERNAME;
 username	userhost	filtername
 %	%	table_readonly
 ##### END #####
@@ -84,10 +83,10 @@ SELECT audit_log_filter_remove_filter('table_readonly');;
 audit_log_filter_remove_filter('table_readonly')
 OK
 Connected to: node_1
-SELECT * FROM audit_testing.audit_log_filter ORDER BY NAME;
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
 filter_id	name	filter
 Connected to: node_2
-SELECT * FROM audit_testing.audit_log_filter ORDER BY NAME;
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
 filter_id	name	filter
 ##### END #####
 
@@ -101,14 +100,13 @@ SELECT audit_log_filter_remove_user('%');;
 audit_log_filter_remove_user('%')
 OK
 Connected to: node_1
-SELECT * FROM audit_testing.audit_log_user ORDER BY FILTERNAME;
+SELECT * FROM mysql.audit_log_user ORDER BY FILTERNAME;
 username	userhost	filtername
 Connected to: node_2
-SELECT * FROM audit_testing.audit_log_user ORDER BY FILTERNAME;
+SELECT * FROM mysql.audit_log_user ORDER BY FILTERNAME;
 username	userhost	filtername
 ##### END #####
 
 #
 # 6. Cleanup
 #
-DROP DATABASE audit_testing;
