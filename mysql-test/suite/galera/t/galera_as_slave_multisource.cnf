@@ -28,7 +28,7 @@ log_slave_updates=ON
 
 wsrep_provider=@ENV.WSREP_PROVIDER
 wsrep_cluster_address='gcomm://'
-wsrep_provider_options='base_port=@mysqld.3.#galera_port'
+wsrep_provider_options='base_port=@mysqld.3.#galera_port;@ENV.WSREP_PROVIDER_TIMEOUTS'
 
 # enforce read-committed characteristics across the cluster
 wsrep_sync_wait = 7
@@ -47,7 +47,7 @@ binlog-format=row
 
 wsrep_provider=@ENV.WSREP_PROVIDER
 wsrep_cluster_address='gcomm://127.0.0.1:@mysqld.3.#galera_port'
-wsrep_provider_options='base_port=@mysqld.4.#galera_port'
+wsrep_provider_options='base_port=@mysqld.4.#galera_port;@ENV.WSREP_PROVIDER_TIMEOUTS'
 
 # enforce read-committed characteristics across the cluster
 wsrep_sync_wait = 7
