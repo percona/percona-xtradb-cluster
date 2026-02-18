@@ -3,8 +3,6 @@
 #
 call mtr.add_suppression("Plugin audit_log_filter reported: 'Failed to get an opened audit_log_filter table");
 call mtr.add_suppression("Plugin audit_log_filter reported: 'Failed to load filtering rules");
-# Create a database for audit testing
-CREATE DATABASE audit_testing;
 call mtr.add_suppression("Plugin audit_log_filter reported: 'Failed to get an opened audit_log_filter table");
 call mtr.add_suppression("Plugin audit_log_filter reported: 'Failed to load filtering rules");
 # Setup audit plugin on node 2
@@ -61,11 +59,11 @@ audit_log_filter_set_filter('table_readonly', '{
 }')
 OK
 Connected to: node_1
-SELECT * FROM audit_testing.audit_log_filter ORDER BY NAME;
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
 filter_id	name	filter
 1	table_readonly	{"filter": {"class": {"name": "table_access", "event": {"name": ["insert", "update", "delete"], "abort": true}}}}
 Connected to: node_2
-SELECT * FROM audit_testing.audit_log_filter ORDER BY NAME;
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
 filter_id	name	filter
 1	table_readonly	{"filter": {"class": {"name": "table_access", "event": {"name": ["insert", "update", "delete"], "abort": true}}}}
 ##### END #####
@@ -78,11 +76,11 @@ SELECT audit_log_filter_set_user('%', 'table_readonly');;
 audit_log_filter_set_user('%', 'table_readonly')
 OK
 Connected to: node_1
-SELECT * FROM audit_testing.audit_log_user ORDER BY FILTERNAME;
+SELECT * FROM mysql.audit_log_user ORDER BY FILTERNAME;
 username	userhost	filtername
 %	%	table_readonly
 Connected to: node_2
-SELECT * FROM audit_testing.audit_log_user ORDER BY FILTERNAME;
+SELECT * FROM mysql.audit_log_user ORDER BY FILTERNAME;
 username	userhost	filtername
 %	%	table_readonly
 ##### END #####
@@ -94,28 +92,28 @@ OK
 
 Executing statement on: node_1
 INSERT INTO t1 VALUES (2);;
-ERROR HY000: Aborted by Audit API ('MYSQL_AUDIT_TABLE_ACCESS_INSERT';1).
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_INSERT';1).
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_2
 INSERT INTO t1 VALUES (2);;
-ERROR HY000: Aborted by Audit API ('MYSQL_AUDIT_TABLE_ACCESS_INSERT';1).
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_INSERT';1).
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_1
 INSERT INTO t2 VALUES (2);;
-ERROR HY000: Aborted by Audit API ('MYSQL_AUDIT_TABLE_ACCESS_INSERT';1).
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_INSERT';1).
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_2
 INSERT INTO t2 VALUES (2);;
-ERROR HY000: Aborted by Audit API ('MYSQL_AUDIT_TABLE_ACCESS_INSERT';1).
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_INSERT';1).
 # Verify that UPDATE statements are aborted on all nodes.
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
@@ -123,28 +121,28 @@ OK
 
 Executing statement on: node_1
 UPDATE t1 SET c1 = 3 WHERE c1 = 2;;
-ERROR HY000: Aborted by Audit API ('MYSQL_AUDIT_TABLE_ACCESS_UPDATE';1).
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_UPDATE';1).
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_2
 UPDATE t1 SET c1 = 3 WHERE c1 = 2;;
-ERROR HY000: Aborted by Audit API ('MYSQL_AUDIT_TABLE_ACCESS_UPDATE';1).
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_UPDATE';1).
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_1
 UPDATE t2 SET c2 = 3 WHERE c2 = 2;;
-ERROR HY000: Aborted by Audit API ('MYSQL_AUDIT_TABLE_ACCESS_UPDATE';1).
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_UPDATE';1).
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_2
 UPDATE t2 SET c2 = 3 WHERE c2 = 2;;
-ERROR HY000: Aborted by Audit API ('MYSQL_AUDIT_TABLE_ACCESS_UPDATE';1).
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_UPDATE';1).
 # Verify that DELETE statements are aborted on all nodes.
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
@@ -152,28 +150,28 @@ OK
 
 Executing statement on: node_1
 DELETE FROM t1 WHERE c1 = 1;;
-ERROR HY000: Aborted by Audit API ('MYSQL_AUDIT_TABLE_ACCESS_DELETE';1).
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_DELETE';1).
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_2
 DELETE FROM t1 WHERE c1 = 1;;
-ERROR HY000: Aborted by Audit API ('MYSQL_AUDIT_TABLE_ACCESS_DELETE';1).
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_DELETE';1).
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_1
 DELETE FROM t2 WHERE c2 = 1;;
-ERROR HY000: Aborted by Audit API ('MYSQL_AUDIT_TABLE_ACCESS_DELETE';1).
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_DELETE';1).
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_2
 DELETE FROM t2 WHERE c2 = 1;;
-ERROR HY000: Aborted by Audit API ('MYSQL_AUDIT_TABLE_ACCESS_DELETE';1).
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_DELETE';1).
 # Check table contents to ensure no changes were made.
 SELECT * FROM t1;
 c1
@@ -189,10 +187,10 @@ SELECT audit_log_filter_remove_user('%');;
 audit_log_filter_remove_user('%')
 OK
 Connected to: node_1
-SELECT * FROM audit_testing.audit_log_user ORDER BY FILTERNAME;
+SELECT * FROM mysql.audit_log_user ORDER BY FILTERNAME;
 username	userhost	filtername
 Connected to: node_2
-SELECT * FROM audit_testing.audit_log_user ORDER BY FILTERNAME;
+SELECT * FROM mysql.audit_log_user ORDER BY FILTERNAME;
 username	userhost	filtername
 ##### END #####
 
@@ -247,12 +245,12 @@ audit_log_filter_set_filter('no_t1_access', '{
 {"field": {"name": "ta
 OK
 Connected to: node_1
-SELECT * FROM audit_testing.audit_log_filter ORDER BY NAME;
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
 filter_id	name	filter
 2	no_t1_access	{"filter": {"class": {"name": "table_access", "event": {"name": ["read", "insert", "update", "delete"], "abort": {"and": [{"field": {"name": "table_database.str", "value": "test"}}, {"field": {"name": "table_name.str", "value": "t1"}}]}}}}}
 1	table_readonly	{"filter": {"class": {"name": "table_access", "event": {"name": ["insert", "update", "delete"], "abort": true}}}}
 Connected to: node_2
-SELECT * FROM audit_testing.audit_log_filter ORDER BY NAME;
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
 filter_id	name	filter
 2	no_t1_access	{"filter": {"class": {"name": "table_access", "event": {"name": ["read", "insert", "update", "delete"], "abort": {"and": [{"field": {"name": "table_database.str", "value": "test"}}, {"field": {"name": "table_name.str", "value": "t1"}}]}}}}}
 1	table_readonly	{"filter": {"class": {"name": "table_access", "event": {"name": ["insert", "update", "delete"], "abort": true}}}}
@@ -266,11 +264,11 @@ SELECT audit_log_filter_set_user('%', 'no_t1_access');;
 audit_log_filter_set_user('%', 'no_t1_access')
 OK
 Connected to: node_1
-SELECT * FROM audit_testing.audit_log_user ORDER BY FILTERNAME;
+SELECT * FROM mysql.audit_log_user ORDER BY FILTERNAME;
 username	userhost	filtername
 %	%	no_t1_access
 Connected to: node_2
-SELECT * FROM audit_testing.audit_log_user ORDER BY FILTERNAME;
+SELECT * FROM mysql.audit_log_user ORDER BY FILTERNAME;
 username	userhost	filtername
 %	%	no_t1_access
 ##### END #####
@@ -282,14 +280,14 @@ OK
 
 Executing statement on: node_1
 INSERT INTO t1 VALUES (2);;
-ERROR HY000: Aborted by Audit API ('MYSQL_AUDIT_TABLE_ACCESS_INSERT';1).
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_INSERT';1).
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_2
 INSERT INTO t1 VALUES (2);;
-ERROR HY000: Aborted by Audit API ('MYSQL_AUDIT_TABLE_ACCESS_INSERT';1).
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_INSERT';1).
 # Verify INSERT is allowed for t2.
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
@@ -310,14 +308,14 @@ OK
 
 Executing statement on: node_1
 UPDATE t1 SET c1 = 3 WHERE c1 = 2;;
-ERROR HY000: Aborted by Audit API ('MYSQL_AUDIT_TABLE_ACCESS_UPDATE';1).
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_UPDATE';1).
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_2
 UPDATE t1 SET c1 = 3 WHERE c1 = 2;;
-ERROR HY000: Aborted by Audit API ('MYSQL_AUDIT_TABLE_ACCESS_UPDATE';1).
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_UPDATE';1).
 # Verify UPDATE is allowed for t2.
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
@@ -338,14 +336,14 @@ OK
 
 Executing statement on: node_1
 DELETE FROM t1 WHERE c1 = 1;;
-ERROR HY000: Aborted by Audit API ('MYSQL_AUDIT_TABLE_ACCESS_DELETE';1).
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_DELETE';1).
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_2
 DELETE FROM t1 WHERE c1 = 1;;
-ERROR HY000: Aborted by Audit API ('MYSQL_AUDIT_TABLE_ACCESS_DELETE';1).
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_DELETE';1).
 # Verify DELETE is allowed for t2.
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
@@ -366,14 +364,14 @@ OK
 
 Executing statement on: node_1
 SELECT * FROM t1;;
-ERROR HY000: Aborted by Audit API ('MYSQL_AUDIT_TABLE_ACCESS_READ';1).
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_READ';1).
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_2
 SELECT * FROM t1;;
-ERROR HY000: Aborted by Audit API ('MYSQL_AUDIT_TABLE_ACCESS_READ';1).
+ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_READ';1).
 # Verify SELECT is allowed for t2.
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
@@ -434,13 +432,13 @@ audit_log_filter_set_filter('abort_message', '{
 }')
 OK
 Connected to: node_1
-SELECT * FROM audit_testing.audit_log_filter ORDER BY NAME;
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
 filter_id	name	filter
 3	abort_message	{"filter": {"class": {"name": "message", "event": {"name": "user", "abort": true}}}}
 2	no_t1_access	{"filter": {"class": {"name": "table_access", "event": {"name": ["read", "insert", "update", "delete"], "abort": {"and": [{"field": {"name": "table_database.str", "value": "test"}}, {"field": {"name": "table_name.str", "value": "t1"}}]}}}}}
 1	table_readonly	{"filter": {"class": {"name": "table_access", "event": {"name": ["insert", "update", "delete"], "abort": true}}}}
 Connected to: node_2
-SELECT * FROM audit_testing.audit_log_filter ORDER BY NAME;
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
 filter_id	name	filter
 3	abort_message	{"filter": {"class": {"name": "message", "event": {"name": "user", "abort": true}}}}
 2	no_t1_access	{"filter": {"class": {"name": "table_access", "event": {"name": ["read", "insert", "update", "delete"], "abort": {"and": [{"field": {"name": "table_database.str", "value": "test"}}, {"field": {"name": "table_name.str", "value": "t1"}}]}}}}}
@@ -455,13 +453,13 @@ SELECT audit_log_filter_set_user('%', 'abort_message');;
 audit_log_filter_set_user('%', 'abort_message')
 OK
 Connected to: node_1
-SELECT * FROM audit_testing.audit_log_filter ORDER BY NAME;
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
 filter_id	name	filter
 3	abort_message	{"filter": {"class": {"name": "message", "event": {"name": "user", "abort": true}}}}
 2	no_t1_access	{"filter": {"class": {"name": "table_access", "event": {"name": ["read", "insert", "update", "delete"], "abort": {"and": [{"field": {"name": "table_database.str", "value": "test"}}, {"field": {"name": "table_name.str", "value": "t1"}}]}}}}}
 1	table_readonly	{"filter": {"class": {"name": "table_access", "event": {"name": ["insert", "update", "delete"], "abort": true}}}}
 Connected to: node_2
-SELECT * FROM audit_testing.audit_log_filter ORDER BY NAME;
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
 filter_id	name	filter
 3	abort_message	{"filter": {"class": {"name": "message", "event": {"name": "user", "abort": true}}}}
 2	no_t1_access	{"filter": {"class": {"name": "table_access", "event": {"name": ["read", "insert", "update", "delete"], "abort": {"and": [{"field": {"name": "table_database.str", "value": "test"}}, {"field": {"name": "table_name.str", "value": "t1"}}]}}}}}
@@ -476,13 +474,13 @@ SELECT audit_log_filter_remove_user('%');;
 audit_log_filter_remove_user('%')
 OK
 Connected to: node_1
-SELECT * FROM audit_testing.audit_log_filter ORDER BY NAME;
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
 filter_id	name	filter
 3	abort_message	{"filter": {"class": {"name": "message", "event": {"name": "user", "abort": true}}}}
 2	no_t1_access	{"filter": {"class": {"name": "table_access", "event": {"name": ["read", "insert", "update", "delete"], "abort": {"and": [{"field": {"name": "table_database.str", "value": "test"}}, {"field": {"name": "table_name.str", "value": "t1"}}]}}}}}
 1	table_readonly	{"filter": {"class": {"name": "table_access", "event": {"name": ["insert", "update", "delete"], "abort": true}}}}
 Connected to: node_2
-SELECT * FROM audit_testing.audit_log_filter ORDER BY NAME;
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
 filter_id	name	filter
 3	abort_message	{"filter": {"class": {"name": "message", "event": {"name": "user", "abort": true}}}}
 2	no_t1_access	{"filter": {"class": {"name": "table_access", "event": {"name": ["read", "insert", "update", "delete"], "abort": {"and": [{"field": {"name": "table_database.str", "value": "test"}}, {"field": {"name": "table_name.str", "value": "t1"}}]}}}}}
@@ -502,13 +500,13 @@ SELECT audit_log_filter_set_user('user2@localhost', 'no_t1_access');;
 audit_log_filter_set_user('user2@localhost', 'no_t1_access')
 OK
 Connected to: node_1
-SELECT * FROM audit_testing.audit_log_filter ORDER BY NAME;
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
 filter_id	name	filter
 3	abort_message	{"filter": {"class": {"name": "message", "event": {"name": "user", "abort": true}}}}
 2	no_t1_access	{"filter": {"class": {"name": "table_access", "event": {"name": ["read", "insert", "update", "delete"], "abort": {"and": [{"field": {"name": "table_database.str", "value": "test"}}, {"field": {"name": "table_name.str", "value": "t1"}}]}}}}}
 1	table_readonly	{"filter": {"class": {"name": "table_access", "event": {"name": ["insert", "update", "delete"], "abort": true}}}}
 Connected to: node_2
-SELECT * FROM audit_testing.audit_log_filter ORDER BY NAME;
+SELECT * FROM mysql.audit_log_filter ORDER BY NAME;
 filter_id	name	filter
 3	abort_message	{"filter": {"class": {"name": "message", "event": {"name": "user", "abort": true}}}}
 2	no_t1_access	{"filter": {"class": {"name": "table_access", "event": {"name": ["read", "insert", "update", "delete"], "abort": {"and": [{"field": {"name": "table_database.str", "value": "test"}}, {"field": {"name": "table_name.str", "value": "t1"}}]}}}}}
@@ -531,7 +529,6 @@ c2
 #
 # 6. Cleanup
 #
-DROP DATABASE audit_testing;
 DROP TABLE t1;
 DROP TABLE t2;
 DROP USER 'user1'@'localhost';
