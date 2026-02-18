@@ -15,6 +15,8 @@
 ###
 
 --source include/galera_cluster.inc
+# Since we install audit log filter for safety retart server after test finishes.
+--source include/force_restart.inc
 
 --echo #
 --echo # 1. Install audit_log PLUGIN on ALL nodes
@@ -24,14 +26,12 @@
 call mtr.add_suppression("Plugin audit_log_filter reported: 'Failed to get an opened audit_log_filter table");
 call mtr.add_suppression("Plugin audit_log_filter reported: 'Failed to load filtering rules");
 
-CREATE DATABASE audit_testing;
-
---source include/audit_setup.inc
+--source suite/component_audit_log_filter/inc/audit_tables_init.inc
+--source suite/component_audit_log_filter/inc/audit_comp_install.inc
 
 --connection node_2
 call mtr.add_suppression("Plugin audit_log_filter reported: 'Failed to get an opened audit_log_filter table");
 call mtr.add_suppression("Plugin audit_log_filter reported: 'Failed to load filtering rules");
---source include/audit_setup.inc
 
 --connection node_1
 
@@ -58,7 +58,7 @@ let $filter = {
 --let $statement_executing_server=1
 --let $test_details= audit_log_filter_set_filter is replicated.
 --let $statement= SELECT audit_log_filter_set_filter('table_readonly', '$filter');
---let $databases= audit_testing
+--let $databases= mysql
 --let $table= audit_log_filter
 --let $order_by_column = NAME
 --source ../include/assert_table_are_same_in_cluster.inc
@@ -70,7 +70,7 @@ let $filter = {
 --let $statement_executing_server=1
 --let $test_details= audit_log_filter_set_user is replicated.
 --let $statement= SELECT audit_log_filter_set_user('%', 'table_readonly');
---let $databases= audit_testing
+--let $databases= mysql
 --let $table= audit_log_user
 --let $order_by_column = FILTERNAME
 --source ../include/assert_table_are_same_in_cluster.inc
@@ -82,7 +82,7 @@ let $filter = {
 --let $statement_executing_server=1
 --let $test_details= audit_log_filter_remove_filter is replicated.
 --let $statement= SELECT audit_log_filter_remove_filter('table_readonly');
---let $databases= audit_testing
+--let $databases= mysql
 --let $table= audit_log_filter
 --let $order_by_column = NAME
 --source ../include/assert_table_are_same_in_cluster.inc
@@ -94,7 +94,7 @@ let $filter = {
 --let $statement_executing_server=1
 --let $test_details= audit_log_filter_remove_user is replicated.
 --let $statement= SELECT audit_log_filter_remove_user('%');
---let $databases= audit_testing
+--let $databases= mysql
 --let $table= audit_log_user
 --let $order_by_column = FILTERNAME
 --source ../include/assert_table_are_same_in_cluster.inc
@@ -103,4 +103,20 @@ let $filter = {
 --echo # 6. Cleanup
 --echo #
 
-DROP DATABASE audit_testing;
+# Test cleanup
+#
+
+# Copy pasted comment from galera_wsrep_ddl_access_checking.test
+#
+# We will not uninstall component now.
+# For detailed explanation about the problem with uninstalling componets caused by internal
+# reference counting, please see the comment in galera_wsrep_ddl_access_checking2.test
+# I left it "as is" here intentionally to be able to easy demonstrate the problem by uncommenting
+# the following part of the test.
+#
+
+#--echo # connection node_1
+#--connection node_1
+#--source suite/component_audit_log_filter/inc/audit_comp_uninstall.inc
+#--source suite/component_audit_log_filter/inc/audit_tables_cleanup.inc
+
