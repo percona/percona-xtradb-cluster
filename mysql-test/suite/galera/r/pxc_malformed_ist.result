@@ -1,0 +1,14 @@
+# Populate nodes with data
+# Shut down node_2 
+# Wait for node_2 to be down
+# Execute some transactions on node_1 for node_2 to rejoin with IST
+# Setup node_1 to server minimal IST range
+SET GLOBAL wsrep_provider_options = 'dbug=d,serve_mimimal_ist';
+# Start node_2 in background. Force wrong IST starting seqno and wait after detection of malformed IST.
+# Wait for node_2 to join the cluster
+# Execute some transactions on node_1 while node_2 is blocked in IST. This will cause node_2 receive queue to grow up
+# Wait for node_1 to continue (it should abort after detecting malformed IST)
+include/assert_grep.inc [Ensure that Joiner aborted after receiving wrong IST]
+# Start node_2 without forcing malformed IST
+# restart
+DROP TABLE t1;
