@@ -1,0 +1,83 @@
+--echo #
+--echo # PS-10347: AuditJsonHandler used by audit_log_read UDF returns malformed JSON
+--echo # https://perconadev.atlassian.net/browse/PS-10347
+--echo #
+
+--source audit_tables_init.inc
+
+--let $audit_filter_log_path = `SELECT @@global.datadir`
+
+CREATE TABLE t1 (c1 INT);
+CREATE USER user1@localhost IDENTIFIED BY 'pass';
+GRANT ALL ON *.* TO user1@localhost;
+
+SELECT audit_log_filter_set_filter('filter_que_gen_com_tab', '{"filter": { "class": [
+  { "name": "query" },
+  { "name": "general" },
+  { "name": "command" },
+  { "name": "table_access" }
+] } }');
+
+
+--echo Turn on audit log
+SELECT audit_log_filter_set_user('user1@localhost', 'filter_que_gen_com_tab');
+# Rotate to get rid of fixed "class": "audit" event at plugin start
+--let $audit_filter_rotate_name=`SELECT audit_log_rotate()`
+SET @start_bookmark := audit_log_read_bookmark();
+
+connect (con1,localhost,user1,pass,,,,);
+INSERT INTO t1 VALUES (1);
+
+connection default;
+disconnect con1;
+
+--echo Turn off audit log
+SELECT audit_log_filter_remove_filter('filter_que_gen_com_tab');
+
+--echo Rotate to close a log file and get access to it
+--let $audit_filter_rotate_name=`SELECT audit_log_rotate()`
+
+--echo Print audit log filter output
+--replace_regex /"connection_id": \d*/"connection_id": <id>/ /"timestamp":\s*"[^"]*"/"timestamp": "<hidden>"/
+--cat_file $audit_filter_log_path/$audit_filter_rotate_name
+
+--echo Validate audit log filter output
+--let $audit_filter_log_check_one = $audit_filter_rotate_name
+--let $audit_filter_log_format = json
+--source validate_logs_format.inc
+
+--echo Export output of audit_log_read('\$start_bookmark_esc') to a file
+SET @start_bookmark_esc := REPLACE(@start_bookmark, '"', '\\"');
+--let $start_bookmark_esc=`SELECT @start_bookmark_esc`
+--let $out_file=audit_read.out
+--exec $MYSQL --skip-column-names --raw -e "SELECT audit_log_read('$start_bookmark_esc');" > $audit_filter_log_path/$out_file
+# --cat_file $audit_filter_log_path/$out_file
+
+--echo Validate output of audit_log_read('\$start_bookmark_esc')
+--let $audit_filter_log_check_one = $out_file
+--let $audit_filter_log_format = json
+--source validate_logs_format.inc
+--remove_file $audit_filter_log_path/$out_file
+
+--echo Ignore first event as our bookmark points to the last event in the previous log
+--disable_result_log
+SELECT audit_log_read(JSON_SET(@start_bookmark, '$.max_array_length', 1));
+--enable_result_log
+
+--echo Start processing audit log from the beginning. Get 5 events from "audit_log_read"
+--replace_regex /"connection_id": \d*/"connection_id": <id>/ /"timestamp":\s*"[^"]*"/"timestamp": "<hidden>"/
+SELECT audit_log_read('{"max_array_length": 4}');
+
+--echo Get 8 events from "INSERT INTO t1 VALUES (1)"
+--replace_regex /"connection_id": \d*/"connection_id": <id>/ /"timestamp":\s*"[^"]*"/"timestamp": "<hidden>"/
+SELECT audit_log_read('{"max_array_length": 7}');
+
+--echo Get remaining events
+--replace_regex /"connection_id": \d*/"connection_id": <id>/ /"timestamp":\s*"[^"]*"/"timestamp": "<hidden>"/
+SELECT audit_log_read();
+
+--echo # Cleanup
+--source audit_tables_cleanup.inc
+
+DROP TABLE t1;
+DROP USER user1@localhost;

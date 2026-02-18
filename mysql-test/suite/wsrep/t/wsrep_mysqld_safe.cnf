@@ -9,7 +9,7 @@
 
 [mysqld]
 wsrep_provider=@env.WSREP_PROVIDER
-wsrep_provider_options='base_port=@mysqld.1.#galera_port;gcache.size=10M'
+wsrep_provider_options='base_port=@mysqld.1.#galera_port;gcache.size=10M;@ENV.WSREP_PROVIDER_TIMEOUTS'
 wsrep_cluster_address='gcomm://'
 wsrep_node_address=127.0.0.1
 
