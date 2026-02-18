@@ -1,0 +1,89 @@
+#
+# Test that after receiving IST that starts with seqno that is later than requested one
+# the proper message is written into the error log and node shuts down.
+#
+
+--source include/have_debug_sync.inc
+--source suite/galera/include/galera_have_debug_sync.inc
+--source include/galera_cluster.inc
+
+--let $pidfile= $MYSQLTEST_VARDIR/tmp/node2.pid
+--let $ofile= $MYSQLTEST_VARDIR/tmp/node.2.err
+
+--echo # Populate nodes with data
+--disable_query_log
+CREATE TABLE t1 (a INT PRIMARY KEY);
+INSERT INTO t1 VALUES (0);
+INSERT INTO t1 VALUES (1);
+INSERT INTO t1 VALUES (2);
+INSERT INTO t1 VALUES (3);
+INSERT INTO t1 VALUES (4);
+--enable_query_log
+
+--echo # Shut down node_2 
+--connection node_2
+--source include/shutdown_mysqld.inc
+
+--echo # Wait for node_2 to be down
+--connection node_1
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+-- echo # Execute some transactions on node_1 for node_2 to rejoin with IST
+--disable_query_log
+insert into t1 values (5);
+insert into t1 values (6);
+insert into t1 values (7);
+insert into t1 values (8);
+insert into t1 values (9);
+insert into t1 values (10);
+insert into t1 values (11);
+insert into t1 values (12);
+--enable_query_log
+
+--echo # Setup node_1 to server minimal IST range
+--let $galera_sync_point = serve_mimimal_ist
+--source include/galera_set_sync_point.inc
+
+--echo # Start node_2 in background. Force wrong IST starting seqno and wait after detection of malformed IST.
+--connection node_2
+--let $command = $MYSQLD
+--let $command_opt =  --defaults-group-suffix=.2 --defaults-file=$MYSQLTEST_VARDIR/my.cnf --wsrep_provider_options='base_port=$NODE_GALERAPORT_2;pc.wait_restored_prim_timeout=PT10S;dbug=d,sst_received_decrease_state_seqno,ist_receiver_wait_afterreceived_wrong_starting_seqno' --log-error=$ofile
+--let $pid_file = $pidfile
+--source include/start_proc_in_background.inc
+
+--echo # Wait for node_2 to join the cluster
+--connection node_1
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+--echo # Execute some transactions on node_1 while node_2 is blocked in IST. This will cause node_2 receive queue to grow up
+--let $count=100
+--disable_query_log
+while($count)
+{
+  --eval INSERT INTO t1 VALUES($count+100);
+  --dec $count
+}
+--enable_query_log
+
+-- echo # Wait for node_1 to continue (it should abort after detecting malformed IST)
+--connection node_1
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+--let $assert_select = Receiving IST failed, node restart required: IST receiver reported failure: 'IST started with wrong seqno
+--let $assert_text = Ensure that Joiner aborted after receiving wrong IST
+--let $assert_count = 1
+--let $assert_file = $ofile
+--source include/assert_grep.inc
+
+--echo # Start node_2 without forcing malformed IST
+--connection node_2
+--source include/start_mysqld.inc
+--source include/wait_until_connected_again.inc
+
+--connection node_1
+DROP TABLE t1;
+--remove_file $pidfile
+--remove_file $ofile
