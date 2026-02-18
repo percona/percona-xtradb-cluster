@@ -1,0 +1,33 @@
+CREATE DATABASE IF NOT EXISTS db_super_rd_load_event_test;
+USE db_super_rd_load_event_test;
+#
+# 1. Normal restart:
+#      create event on node1
+#      event replicates to node2
+#      node2 restarts with --super-read-only.
+#
+CREATE EVENT pxc_restart_ev ON SCHEDULE EVERY 1 MONTH
+STARTS '2026-06-01 00:00:01' ON COMPLETION NOT PRESERVE ENABLE
+DO SELECT 1;
+# restart:--super-read-only
+include/assert.inc [Event exists.]
+DROP EVENT IF EXISTS db_super_rd_load_event_test.pxc_restart_ev;
+#
+# 2. SST:
+#      shutdown node2
+#      remove grastate(for SST)
+#      create event on node1
+#      start node2 with --super-read-only (node2 does full SST)
+#
+SET SESSION wsrep_sync_wait = 0;
+CREATE EVENT pxc_sst_ev ON SCHEDULE EVERY 1 MONTH
+STARTS '2026-06-01 00:00:02' ON COMPLETION NOT PRESERVE ENABLE
+DO SELECT 2;
+# restart
+SET SESSION wsrep_sync_wait = 0;
+include/assert.inc [Event exists.]
+DROP EVENT IF EXISTS db_super_rd_load_event_test.pxc_sst_ev;
+#
+# Cleanup.
+#
+DROP DATABASE IF EXISTS db_super_rd_load_event_test;
