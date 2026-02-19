@@ -720,7 +720,7 @@ popd
 mkdir pxb-8.0
 pushd pxb-8.0
 %if 0%{?amzn} == 2023
-yumdownloader percona-xtrabackup-80-8.0.35-34.1.amzn2023
+yumdownloader percona-xtrabackup-80-8.0.35-35.1.amzn2023
 %else
 yumdownloader percona-xtrabackup-80-8.0.35
 %endif

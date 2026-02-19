@@ -467,7 +467,7 @@ install_deps() {
         apt-get update
         apt-get -y install dirmngr || true
         wget https://repo.percona.com/apt/percona-release_latest.$(lsb_release -sc)_all.deb && apt -y install gnupg2 lsb-release ./percona-release_latest.$(lsb_release -sc)_all.deb
-        percona-release enable tools release
+        percona-release enable pdps-8.0
         percona-release enable pxb-80 testing
         percona-release enable pxb-24 testing
         export DEBIAN_FRONTEND="noninteractive"
@@ -516,7 +516,7 @@ install_deps() {
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
         apt-get -y install --download-only percona-xtrabackup-24=2.4.29-1.${DIST}
-        apt-get -y install --download-only percona-xtrabackup-80=8.0.35-34-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-80=8.0.35-35-1.${DIST}
     fi
     return;
 }
