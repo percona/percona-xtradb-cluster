@@ -29,9 +29,6 @@
 # Ensure replica settings are correct (defaults are fine)
 #
 --connection node_2
---let $assert_text = replica_parallel_type is LOGICAL_CLOCK
---let $assert_cond = "[SHOW VARIABLES LIKE "replica_parallel_type", Value, 1]" = "LOGICAL_CLOCK"
---source include/assert.inc
 
 --let $assert_text = replica_parallel_workers > 1
 --let $assert_cond = "[SHOW VARIABLES LIKE "replica_parallel_workers", Value, 1]" > 1

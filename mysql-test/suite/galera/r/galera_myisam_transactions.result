@@ -7,34 +7,16 @@ CREATE TRIGGER tr1 BEFORE INSERT ON t1 FOR EACH ROW INSERT INTO t3 VALUES (NEW.f
 SET AUTOCOMMIT=OFF;
 START TRANSACTION;
 INSERT INTO t1 VALUES (1);
-Warnings:
-Warning	6414	Combining the storage engines MyISAM and InnoDB is deprecated, but the statement or transaction updates both the MyISAM table test.t3 and the InnoDB table test.t1.
-INSERT INTO t2 VALUES (1);
-COMMIT;
-SELECT COUNT(*) = 1 FROM t1;
-COUNT(*) = 1
-1
-SELECT COUNT(*) = 0 FROM t2;
-COUNT(*) = 0
-1
-SELECT COUNT(*) = 0 FROM t2;
-COUNT(*) = 0
-1
-START TRANSACTION;
-INSERT INTO t1 VALUES (1);
-Warnings:
-Warning	6414	Combining the storage engines MyISAM and InnoDB is deprecated, but the statement or transaction updates both the MyISAM table test.t3 and the InnoDB table test.t1.
-INSERT INTO t2 VALUES (1);
+ERROR HY000: Statement violates GTID consistency: Updates to non-transactional tables can only be done in either autocommitted statements or single-statement transactions, and never in the same statement as updates to transactional tables.
 ROLLBACK;
-Warnings:
-Warning	1196	Some non-transactional changed tables couldn't be rolled back
-SELECT COUNT(*) = 1 FROM t1;
-COUNT(*) = 1
+SET AUTOCOMMIT=ON;
+SELECT COUNT(*) = 0 FROM t1;
+COUNT(*) = 0
 1
 SELECT COUNT(*) = 0 FROM t2;
 COUNT(*) = 0
 1
-SELECT COUNT(*) = 0 FROM t2;
+SELECT COUNT(*) = 0 FROM t3;
 COUNT(*) = 0
 1
 DROP TABLE t1, t2, t3;

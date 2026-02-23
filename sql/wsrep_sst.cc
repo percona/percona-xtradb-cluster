@@ -23,6 +23,7 @@
 #include "log_event.h"
 #include "my_rnd.h"
 #include "mysql/components/services/log_builtins.h"
+#include "mysql_server_suffix.h"
 #include "mysql_version.h"
 #include "mysqld.h"
 #include "rpl_msr.h"  // channel_map

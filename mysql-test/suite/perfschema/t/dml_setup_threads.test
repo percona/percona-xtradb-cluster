@@ -12,7 +12,12 @@ select * from performance_schema.setup_threads;
 --enable_result_log
 
 select * from performance_schema.setup_threads
+  where name not like '%galera%'
   order by name limit 13;
+
+# PXC specific threads
+select * from performance_schema.setup_threads
+  where name like '%galera%';
 
 --disable_result_log
 select * from performance_schema.setup_threads

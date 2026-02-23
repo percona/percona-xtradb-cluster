@@ -1,5 +1,9 @@
+SET SESSION WSREP_ON=OFF;
 RESET BINARY LOGS AND GTIDS;
+SET SESSION WSREP_ON=ON;
+SET SESSION WSREP_ON=OFF;
 RESET BINARY LOGS AND GTIDS;
+SET SESSION WSREP_ON=ON;
 CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB;
 INSERT INTO t1 VALUES (1);
 CREATE TABLE t2 (id INT) ENGINE=InnoDB;
@@ -15,33 +19,33 @@ ALTER TABLE t1 ADD COLUMN f2 INTEGER;
 FLUSH LOGS;
 include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000002	#	Previous_gtids	#	#	
+mysqld-bin.000002	#	Previous_gtids	#	#	Gtid_set
 SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 't1';
 COUNT(*) = 2
 1
 include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	#	Previous_gtids	#	#	
-mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	use `test`; CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB
-mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	BEGIN
 mysqld-bin.000001	#	Table_map	#	#	table_id: # (test.t1)
 mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F
 mysqld-bin.000001	#	Xid	#	#	COMMIT /* XID */
-mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	use `test`; CREATE TABLE t2 (id INT) ENGINE=InnoDB
-mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	BEGIN
 mysqld-bin.000001	#	Table_map	#	#	table_id: # (test.t2)
 mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F
 mysqld-bin.000001	#	Xid	#	#	COMMIT /* XID */
-mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	BEGIN
 mysqld-bin.000001	#	Table_map	#	#	table_id: # (test.t2)
 mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F
 mysqld-bin.000001	#	Xid	#	#	COMMIT /* XID */
-mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	use `test`; ALTER TABLE t1 ADD COLUMN f2 INTEGER
 DROP TABLE t1;
 DROP TABLE t2;
@@ -49,8 +53,12 @@ DROP TABLE t2;
 # Test that disabling binlog does not prevent Galera replication,
 # but events are not recorded in the binlog
 #
+SET SESSION WSREP_ON=OFF;
 RESET BINARY LOGS AND GTIDS;
+SET SESSION WSREP_ON=ON;
+SET SESSION WSREP_ON=OFF;
 RESET BINARY LOGS AND GTIDS;
+SET SESSION WSREP_ON=ON;
 SET SESSION sql_log_bin = OFF;
 CREATE TABLE t1 (a int primary key);
 INSERT INTO t1 VALUES (1);
@@ -71,14 +79,14 @@ COMMIT;
 include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	#	Previous_gtids	#	#	
-mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	use `test`; CREATE TABLE t2 (a int primary key)
-mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	BEGIN
 mysqld-bin.000001	#	Table_map	#	#	table_id: # (test.t2)
 mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F
 mysqld-bin.000001	#	Xid	#	#	COMMIT /* XID */
-mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	BEGIN
 mysqld-bin.000001	#	Table_map	#	#	table_id: # (test.t2)
 mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F
@@ -90,14 +98,14 @@ mysqld-bin.000001	#	Xid	#	#	COMMIT /* XID */
 include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	#	Previous_gtids	#	#	
-mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	use `test`; CREATE TABLE t2 (a int primary key)
-mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	BEGIN
 mysqld-bin.000001	#	Table_map	#	#	table_id: # (test.t2)
 mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F
 mysqld-bin.000001	#	Xid	#	#	COMMIT /* XID */
-mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	BEGIN
 mysqld-bin.000001	#	Table_map	#	#	table_id: # (test.t2)
 mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F
@@ -111,8 +119,12 @@ DROP TABLE t2;
 #
 # The same, but for streaming replication
 #
+SET SESSION WSREP_ON=OFF;
 RESET BINARY LOGS AND GTIDS;
+SET SESSION WSREP_ON=ON;
+SET SESSION WSREP_ON=OFF;
 RESET BINARY LOGS AND GTIDS;
+SET SESSION WSREP_ON=ON;
 SET SESSION sql_log_bin = OFF;
 SET SESSION wsrep_trx_fragment_size = 1;
 CREATE TABLE t1 (a int primary key);
@@ -132,9 +144,9 @@ COMMIT;
 include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	#	Previous_gtids	#	#	
-mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	use `test`; CREATE TABLE t2 (a int primary key)
-mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	BEGIN
 mysqld-bin.000001	#	Table_map	#	#	table_id: # (test.t2)
 mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F
@@ -146,9 +158,9 @@ mysqld-bin.000001	#	Xid	#	#	COMMIT /* XID */
 include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	#	Previous_gtids	#	#	
-mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	use `test`; CREATE TABLE t2 (a int primary key)
-mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	BEGIN
 mysqld-bin.000001	#	Table_map	#	#	table_id: # (test.t2)
 mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F
@@ -163,8 +175,12 @@ DROP TABLE t2;
 # Check that log-replica-updates=OFF block all PXC replicated binlogging on node_2
 #
 # restart:--log-replica-updates=OFF --log-bin
+SET SESSION WSREP_ON=OFF;
 RESET BINARY LOGS AND GTIDS;
+SET SESSION WSREP_ON=ON;
+SET SESSION WSREP_ON=OFF;
 RESET BINARY LOGS AND GTIDS;
+SET SESSION WSREP_ON=ON;
 SET SESSION sql_log_bin = OFF;
 CREATE TABLE t1 (a int primary key);
 INSERT INTO t1 VALUES (1);
@@ -174,9 +190,9 @@ INSERT INTO t2 VALUES (1);
 include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	#	Previous_gtids	#	#	
-mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	use `test`; CREATE TABLE t2 (a int primary key)
-mysqld-bin.000001	#	Anonymous_Gtid	#	#	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	BEGIN
 mysqld-bin.000001	#	Table_map	#	#	table_id: # (test.t2)
 mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F
@@ -187,4 +203,6 @@ Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	#	Previous_gtids	#	#	
 DROP TABLE t1;
 DROP TABLE t2;
+SET SESSION WSREP_ON=OFF;
 RESET BINARY LOGS AND GTIDS;
+SET SESSION WSREP_ON=ON;

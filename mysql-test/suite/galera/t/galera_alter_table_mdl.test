@@ -8,7 +8,9 @@
 --source include/count_sessions.inc
 
 # Clear the binlogs before starting the test
+SET SESSION wsrep_on=OFF;
 RESET BINARY LOGS AND GTIDS;
+SET SESSION wsrep_on=ON;
 
 # Don't make threads wait
 --let $wsrep_sync_wait_saved = `SELECT @@GLOBAL.wsrep_sync_wait`
@@ -60,7 +62,7 @@ SELECT * FROM t1;
 
 # Assert that INSERT query commits after the ALTER query
 --let $limit= 2,10
---let $event_sequence= Anonymous_Gtid # Query/.*CREATE TABLE.* # Anonymous_Gtid # Query/.*ALTER TABLE.* # Anonymous_Gtid # Query/.*BEGIN # Table_map # Write_rows # Xid
+--let $event_sequence= !Gtid_or_anon # Query/.*CREATE TABLE.* # !Gtid_or_anon # Query/.*ALTER TABLE.* # !Gtid_or_anon # Query/.*BEGIN # Table_map # Write_rows # Xid
 --source include/rpl/assert_binlog_events.inc
 
 --echo # --------------------------------
@@ -68,7 +70,9 @@ SELECT * FROM t1;
 --echo # --------------------------------
 
 # Clear the binlogs before starting the next test
+SET SESSION wsrep_on=OFF;
 RESET BINARY LOGS AND GTIDS;
+SET SESSION wsrep_on=ON;
 
 # Execute ALTER TABLE from node1
 --connection node_1
@@ -104,7 +108,7 @@ SELECT * FROM t1;
 
 # Assert that INSERT query commits after the ALTER query
 --let $limit= 2,10
---let $event_sequence= Anonymous_Gtid # Query/.*ALTER TABLE.* # Anonymous_Gtid # Query/.*BEGIN # Table_map # Write_rows # Xid
+--let $event_sequence= !Gtid_or_anon # Query/.*ALTER TABLE.* # !Gtid_or_anon # Query/.*BEGIN # Table_map # Write_rows # Xid
 --source include/rpl/assert_binlog_events.inc
 
 --echo # --------------------------------
@@ -112,7 +116,9 @@ SELECT * FROM t1;
 --echo # --------------------------------
 
 # Clear the binlogs before starting the next test
+SET SESSION wsrep_on=OFF;
 RESET BINARY LOGS AND GTIDS;
+SET SESSION wsrep_on=ON;
 
 --connection node_1
 SET SESSION wsrep_OSU_method = "RSU";

@@ -6,10 +6,14 @@
 --source include/galera_cluster.inc
 
 --connection node_1
+SET SESSION wsrep_on=OFF;
 RESET BINARY LOGS AND GTIDS;
+SET SESSION wsrep_on=ON;
 
 --connection node_2
+SET SESSION wsrep_on=OFF;
 RESET BINARY LOGS AND GTIDS;
+SET SESSION wsrep_on=ON;
 
 --connection node_1
 CREATE TEMPORARY TABLE t1 (f1 INTEGER, f2 INTEGER);

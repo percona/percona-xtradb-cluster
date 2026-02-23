@@ -100,6 +100,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 #include "mysql_system_variable_reader_imp.h"
 #include "mysql_system_variable_update_imp.h"
 #include "mysql_thd_attributes_imp.h"
+#include "mysql_thd_kill_handler_imp.h"
 #include "mysql_thd_store_imp.h"
 #include "mysql_transaction_delegate_control_imp.h"
 #include "mysqld_error.h"
@@ -179,6 +180,9 @@ mysql_string_imp::convert_from_buffer,
 BEGIN_SERVICE_IMPLEMENTATION(mysql_server, mysql_string_charset_converter)
 mysql_string_imp::convert_from_buffer_v2,
     mysql_string_imp::convert_to_buffer_v2 END_SERVICE_IMPLEMENTATION();
+
+BEGIN_SERVICE_IMPLEMENTATION(mysql_server, mysql_string_copy_converter)
+mysql_string_imp::copy_convert END_SERVICE_IMPLEMENTATION();
 
 BEGIN_SERVICE_IMPLEMENTATION(mysql_server, mysql_string_character_access)
 mysql_string_imp::get_char,
@@ -445,6 +449,9 @@ mysql_query_attributes_imp::string_get END_SERVICE_IMPLEMENTATION();
 BEGIN_SERVICE_IMPLEMENTATION(mysql_server, mysql_query_attribute_isnull)
 mysql_query_attributes_imp::isnull_get END_SERVICE_IMPLEMENTATION();
 
+BEGIN_SERVICE_IMPLEMENTATION(mysql_server, mysql_first_query_attribute)
+mysql_query_attributes_imp::get_first_name_data END_SERVICE_IMPLEMENTATION();
+
 using namespace keyring_lockable::keyring_common::service_definition;
 
 BEGIN_SERVICE_IMPLEMENTATION(mysql_server, keyring_aes)
@@ -603,6 +610,9 @@ END_SERVICE_IMPLEMENTATION();
 
 BEGIN_SERVICE_IMPLEMENTATION(mysql_server, mysql_status_variable_string)
 mysql_status_variable_reader_imp::get END_SERVICE_IMPLEMENTATION();
+
+BEGIN_SERVICE_IMPLEMENTATION(mysql_server, mysql_thd_kill_handler)
+Mysql_thd_kill_handler_imp::set END_SERVICE_IMPLEMENTATION();
 
 BEGIN_SERVICE_IMPLEMENTATION(mysql_server, mysql_thd_store)
 Mysql_thd_store_service_imp::register_slot,
@@ -926,6 +936,7 @@ PROVIDES_SERVICE(mysql_server_path_filter, dynamic_loader_scheme_file),
     PROVIDES_SERVICE(mysql_server, mysql_string_case),
     PROVIDES_SERVICE(mysql_server, mysql_string_converter),
     PROVIDES_SERVICE(mysql_server, mysql_string_charset_converter),
+    PROVIDES_SERVICE(mysql_server, mysql_string_copy_converter),
     PROVIDES_SERVICE(mysql_server, mysql_string_character_access),
     PROVIDES_SERVICE(mysql_server, mysql_string_byte_access),
     PROVIDES_SERVICE(mysql_server, mysql_string_iterator),
@@ -1047,6 +1058,7 @@ PROVIDES_SERVICE(mysql_server_path_filter, dynamic_loader_scheme_file),
     PROVIDES_SERVICE(mysql_server, mysql_query_attributes_iterator),
     PROVIDES_SERVICE(mysql_server, mysql_query_attribute_string),
     PROVIDES_SERVICE(mysql_server, mysql_query_attribute_isnull),
+    PROVIDES_SERVICE(mysql_server, mysql_first_query_attribute),
 
     PROVIDES_SERVICE(mysql_server, keyring_aes),
     PROVIDES_SERVICE(mysql_server, keyring_generator),
@@ -1095,6 +1107,7 @@ PROVIDES_SERVICE(mysql_server_path_filter, dynamic_loader_scheme_file),
     PROVIDES_SERVICE(mysql_server, mysql_text_consumer_get_string_v1),
     PROVIDES_SERVICE(mysql_server, mysql_text_consumer_client_capabilities_v1),
     PROVIDES_SERVICE(mysql_server, mysql_status_variable_string),
+    PROVIDES_SERVICE(mysql_server, mysql_thd_kill_handler),
     PROVIDES_SERVICE(mysql_server, mysql_thd_store),
     PROVIDES_SERVICE(mysql_server, mysql_command_field_metadata),
     PROVIDES_SERVICE(mysql_server, dynamic_loader_services_loaded_notification),

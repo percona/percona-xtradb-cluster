@@ -40,6 +40,9 @@ SET SESSION wsrep_trx_fragment_unit=default;
 SET SESSION wsrep_trx_fragment_size=default;
 
 --replace_regex /table_id: [0-9]+/table_id: #/ /xid=[0-9]+/xid=#/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000002' FROM 359;
+--let $binlog_file = mysqld-bin.000002
+--let $binlog_start = 359
+--let $keep_gtid_events = 1
+--source include/rpl/deprecated/show_binlog_events.inc
 
 DROP TABLE t1;

@@ -3,6 +3,7 @@
 [mysqld]
 # Ignore native replications filters for galera cluster events
 wsrep_mode = IGNORE_NATIVE_REPLICATION_FILTER_RULES
+gtid_mode=OFF
 
 [mysqld.2]
 replicate-ignore-db=master_ignored_db

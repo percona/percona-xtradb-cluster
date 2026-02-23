@@ -1716,7 +1716,7 @@ static MYSQL_SYSVAR_INT(max_file_opening_threads,
                         "DBOptions::max_file_opening_threads for RocksDB",
                         nullptr, nullptr,
                         rocksdb_db_options->max_file_opening_threads,
-                        /* min */ 1, /* max */ INT_MAX, 0);
+                        /* min */ 1, /* max */ 1 << 18, 0);
 
 static MYSQL_SYSVAR_UINT64_T(max_total_wal_size,
                              rocksdb_db_options->max_total_wal_size,
@@ -1840,7 +1840,7 @@ static MYSQL_SYSVAR_ULONG(keep_log_file_num,
                           PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
                           "DBOptions::keep_log_file_num for RocksDB", nullptr,
                           nullptr, rocksdb_db_options->keep_log_file_num,
-                          /* min */ 0L, /* max */ LONG_MAX, 0);
+                          /* min */ 1L, /* max */ LONG_MAX, 0);
 
 static MYSQL_SYSVAR_UINT64_T(max_manifest_file_size,
                              rocksdb_db_options->max_manifest_file_size,
@@ -2063,7 +2063,7 @@ static MYSQL_SYSVAR_UINT64_T(block_size, rocksdb_tbl_options->block_size,
                              PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
                              "BlockBasedTableOptions::block_size for RocksDB",
                              nullptr, nullptr, rocksdb_tbl_options->block_size,
-                             /* min */ 1024L, /* max */ UINT64_MAX, 0);
+                             /* min */ 1024L, /* max */ std::numeric_limits<uint32_t>::max(), 0);
 
 static MYSQL_SYSVAR_BOOL(charge_memory, rocksdb_charge_memory,
                          PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
@@ -2214,7 +2214,7 @@ static MYSQL_SYSVAR_UINT(debug_cardinality_multiplier,
                          PLUGIN_VAR_RQCMDARG,
                          "Cardinality multiplier used in tests", nullptr,
                          nullptr, /* default */ 2,
-                         /* min */ 0, /* max */ INT_MAX, 0);
+                         /* min */ 1, /* max */ INT_MAX, 0);
 
 static MYSQL_SYSVAR_STR(compact_cf, rocksdb_compact_cf_name,
                         PLUGIN_VAR_RQCMDARG, "Compact column family",
@@ -6806,7 +6806,7 @@ static int rocksdb_init_internal(void *const p) {
     }
     if (!strlen(rocksdb_persistent_cache_path)) {
       LogPluginErrMsg(ERROR_LEVEL, 0,
-                      "Specify rocksdb_persistent_cache_size_path");
+                      "Specify rocksdb_persistent_cache_path");
       DBUG_RETURN(HA_EXIT_FAILURE);
     }
 
@@ -8041,6 +8041,42 @@ int ha_rocksdb::open(const char *const name, int mode, uint test_if_locked,
     queries like "UPDATE tbl SET pk=pk+100")
   */
   key_used_on_scan = table->s->primary_key;
+
+  uint n_keys = table->s->keys + (has_hidden_pk(*table) ? 1 : 0);
+
+  if (m_tbl_def->m_key_count != n_keys) {
+    LogPluginErrMsg(ERROR_LEVEL, 0,
+                    "Table '%s' definition mismatch between MyRocks "
+                    "(m_key_count=%d) and data dictionary (n_keys=%d)",
+                    m_tbl_def->full_tablename().c_str(), m_tbl_def->m_key_count,
+                    n_keys);
+
+    for (uint i = 0; i < table->s->keys; i++) {
+      const char *key_name;
+      assert((*table).key_info != nullptr);
+      assert((*table).key_info[i].name != nullptr);
+      key_name = (*table).key_info[i].name;
+
+      LogPluginErrMsg(
+          ERROR_LEVEL, 0,
+          "ha_rocksdb::open TABLE table_name=%s i=%d/%d key_name=%s",
+          table->s->table_name.str, i, table->s->keys, key_name);
+    }
+
+    uint pk = table->s->primary_key;
+    LogPluginErrMsg(
+        ERROR_LEVEL, 0, "ha_rocksdb::open TABLE PK key_name=%s",
+        pk == MAX_INDEXES ? HIDDEN_PK_NAME : (*table).key_info[pk].name);
+
+    for (uint i = 0; i < m_tbl_def->m_key_count; i++) {
+      const char *rdb_name = m_tbl_def->m_key_descr_arr[i]->m_name.c_str();
+      LogPluginErrMsg(
+          ERROR_LEVEL, 0,
+          "ha_rocksdb::open KEY_descr_arr table_name=%s i=%d/%d key_name=%s",
+          m_tbl_def->full_tablename().c_str(), i, m_tbl_def->m_key_count,
+          rdb_name);
+    }
+  }
 
   // close() above has already called free_key_buffers(). No need to do it here.
   err = alloc_key_buffers(*table, *m_tbl_def);
@@ -14478,7 +14514,7 @@ int ha_rocksdb::fill_virtual_columns() {
     THD *const thd = my_core::thd_get_current_thd();
     int ret = handler::my_eval_gcolumn_expr(
         thd, const_cast<TABLE *>(table), &column_map,
-        const_cast<uchar *>(table->record[0]), nullptr, nullptr);
+        const_cast<uchar *>(table->record[0]), nullptr, nullptr, false);
 
     return ret;
   }

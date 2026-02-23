@@ -31,10 +31,13 @@ SELECT count(1) FROM mysql.innodb_table_stats
 WHERE database_name='test' AND table_name='t1' FOR UPDATE;
 # The background thread will be chosen as a victim, which will cause an ERROR
 # to be reported to the error log:
+COMMIT;
+# `mtr.add_suppression()` updates `mtr.test_suppressions` (non-transactional).
+# With `enforce_gtid_consistency=ON`, calling it inside the open transaction
+# above can trigger ER_GTID_UNSAFE_NON_TRANSACTIONAL_TABLE (1785).
 call mtr.add_suppression(
   "Cannot save table statistics for table `test`.`t1`: Deadlock"
 );
-COMMIT;
 DROP TABLE t1;
 
 # The test below intends to check how our code reacts to a deadlock in an
