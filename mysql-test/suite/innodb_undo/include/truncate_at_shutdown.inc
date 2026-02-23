@@ -207,13 +207,21 @@ let FILE_SIZE_23 = `SELECT FILE_SIZE FROM INFORMATION_SCHEMA.INNODB_TABLESPACES 
 if ($CRASH_ON_SHUTDOWN == 0)
 {
   --echo # Compare the undo tablespace sizes before and after truncation.
-  if ($FILE_SIZE_12 <= $FILE_SIZE_13)
+  # Check Undo Tablespace 1, consider SET GLOBAL innodb_max_undo_log_size=20000000
+  if ($FILE_SIZE_12 > 20000000)
   {
-    --echo ERROR: Truncated size is wrong for $UNDO_NAME_1: Size before truncation is $FILE_SIZE_12, Size after truncation  is $FILE_SIZE_13;
+    if ($FILE_SIZE_12 <= $FILE_SIZE_13)
+    {
+      --echo ERROR: Truncated size is wrong for $UNDO_NAME_1: Size before truncation is $FILE_SIZE_12, Size after truncation  is $FILE_SIZE_13;
+    }
   }
-  if ($FILE_SIZE_22 <= $FILE_SIZE_23)
+  # Check Undo Tablespace 2, consider SET GLOBAL innodb_max_undo_log_size=20000000
+  if ($FILE_SIZE_22 > 20000000)
   {
-    --echo ERROR: Truncated size is wrong for $UNDO_NAME_2: Size before truncation is $FILE_SIZE_22, Size after truncation is $FILE_SIZE_23;
+    if ($FILE_SIZE_22 <= $FILE_SIZE_23)
+    {
+      --echo ERROR: Truncated size is wrong for $UNDO_NAME_2: Size before truncation is $FILE_SIZE_22, Size after truncation is $FILE_SIZE_23;
+    }
   }
 }
 

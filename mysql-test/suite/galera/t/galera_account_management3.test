@@ -20,8 +20,12 @@ CREATE USER 'user2'@'%' IDENTIFIED BY 'passwd';
 
 # Rotate binlogs to have the following events at fixed positions
 FLUSH BINARY LOGS;
+--source include/rpl/save_binlog_file_position.inc
+--let $binlog_file_node1 = $binlog_file
 --connection node_2
 FLUSH BINARY LOGS;
+--source include/rpl/save_binlog_file_position.inc
+--let $binlog_file_node2 = $binlog_file
 --connection node_1
 
 GRANT ALL PRIVILEGES ON *.* TO 'user1'@'%' WITH GRANT OPTION ;
@@ -38,30 +42,26 @@ GRANT ALL PRIVILEGES ON *.* TO 'user2'@'%' WITH GRANT OPTION ;
 SET ROLE 'writer';
 GRANT ALL PRIVILEGES ON *.* TO 'user1'@'%' WITH GRANT OPTION;
 
---let $binlog_file = mysqld-bin.000003
---let $binlog_position = 989
---let $limit = 1
+--let $binlog_file = $binlog_file_node1
+--let $somewhere = 1
 --let $event_sequence = .*GRANT ALL PRIVILEGES ON.*TO 'user2'.* WITH GRANT OPTION AS 'user1'.* WITH ROLE NONE.*
 --source include/rpl/assert_binlog_events.inc
 
---let $binlog_file = mysqld-bin.000003
---let $binlog_position = 1254
---let $limit = 1
+--let $binlog_file = $binlog_file_node1
+--let $somewhere = 1
 --let $event_sequence = .*GRANT ALL PRIVILEGES ON.*TO 'user1'.* WITH GRANT OPTION AS 'user2'.* WITH ROLE 'writer'.*
 --source include/rpl/assert_binlog_events.inc
 
 --disconnect node_1b
 
 --connection node_2
---let $binlog_file = mysqld-bin.000005
---let $binlog_position = 995
---let $limit = 1
+--let $binlog_file = $binlog_file_node2
+--let $somewhere = 1
 --let $event_sequence = .*GRANT ALL PRIVILEGES ON.*TO 'user2'.* WITH GRANT OPTION AS 'user1'.* WITH ROLE NONE.*
 --source include/rpl/assert_binlog_events.inc
 
---let $binlog_file = mysqld-bin.000005
---let $binlog_position = 1262
---let $limit = 1
+--let $binlog_file = $binlog_file_node2
+--let $somewhere = 1
 --let $event_sequence = .*GRANT ALL PRIVILEGES ON.*TO 'user1'.* WITH GRANT OPTION AS 'user2'.* WITH ROLE 'writer'.*
 --source include/rpl/assert_binlog_events.inc
 

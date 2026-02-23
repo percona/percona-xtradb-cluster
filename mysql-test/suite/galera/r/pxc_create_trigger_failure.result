@@ -44,7 +44,7 @@ FOR EACH ROW
 BEGIN
 INSERT INTO t2 VALUES ('This should fail');
 END$$
-ERROR 42000: Access denied; you need (at least one of) the SUPER or SET_USER_ID privilege(s) for this operation
+ERROR 42000: Access denied; you need (at least one of) the SUPER or SET_ANY_DEFINER privilege(s) for this operation
 
 # 6. Assert TRIGGER table does not contain trg_t1_insert_fail in any node.
 

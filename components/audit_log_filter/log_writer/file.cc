@@ -258,7 +258,7 @@ void LogWriterFile::prune() noexcept {
                                                      SysVars::get_file_name());
 
     ulonglong current_logs_size = std::accumulate(
-        log_file_list.begin(), log_file_list.end(), 0,
+        log_file_list.begin(), log_file_list.end(), ulonglong{0},
         [](const ulonglong &a, const PruneFileInfo &b) { return a + b.size; });
     current_logs_size += get_log_size();
 
@@ -289,7 +289,7 @@ void LogWriterFile::prune() noexcept {
                                                      SysVars::get_file_name());
 
     for (const auto &entry : log_file_list) {
-      if (entry.age > prune_seconds) {
+      if (entry.age > std::chrono::seconds(prune_seconds)) {
         FileHandle::remove_file(entry.path);
       }
     }

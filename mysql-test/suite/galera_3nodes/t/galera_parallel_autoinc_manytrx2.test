@@ -62,9 +62,20 @@ SELECT COUNT(DISTINCT f1) = 6000 FROM t1;
 --let $wait_condition = SELECT COUNT(*) = 4 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep: committed%';
 --source include/wait_condition.inc
 
-# Check against runaway auto-increment numbers
-SELECT MAX(f1) < 15000 FROM t1;
-SELECT AUTO_INCREMENT < 15000 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+# Guard against runaway AUTO_INCREMENT values.
+#
+# In Galera/PXC, `@@auto_increment_increment` is typically set to the
+# cluster size (or otherwise > 1) to avoid collisions for parallel writes
+# from multiple nodes. With an increment > 1, the maximum assigned value
+# after N inserts can be significantly larger than N (and larger than any
+# fixed bound like 15000), while still being correct.
+#
+# Use a bound that scales with `@@auto_increment_increment` so the test
+# remains stable across different cluster sizes/configs, yet still fails
+# if AUTO_INCREMENT values explode unexpectedly.
+SELECT MAX(f1) < (@@auto_increment_increment * 6000 + 1000) FROM t1;
+SELECT AUTO_INCREMENT < (@@auto_increment_increment * 6000 + 1000)
+  FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 
 --connection node_2
 SELECT COUNT(*) = 6000 FROM t1;
@@ -72,9 +83,10 @@ SELECT COUNT(DISTINCT f1) = 6000 FROM t1;
 --let $wait_condition = SELECT COUNT(*) = 4 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep: committed%';
 --source include/wait_condition.inc
 
-# Check against runaway auto-increment numbers
-SELECT MAX(f1) < 15000 FROM t1;
-SELECT AUTO_INCREMENT < 15000 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+# Same stability check on node_2 (see comment above).
+SELECT MAX(f1) < (@@auto_increment_increment * 6000 + 1000) FROM t1;
+SELECT AUTO_INCREMENT < (@@auto_increment_increment * 6000 + 1000)
+  FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 
 --connection node_3
 SELECT COUNT(*) = 6000 FROM t1;
@@ -82,9 +94,10 @@ SELECT COUNT(DISTINCT f1) = 6000 FROM t1;
 --let $wait_condition = SELECT COUNT(*) = 4 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep: committed%';
 --source include/wait_condition.inc
 
-# Check against runaway auto-increment numbers
-SELECT MAX(f1) < 15000 FROM t1;
-SELECT AUTO_INCREMENT < 15000 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+# Same stability check on node_3 (see comment above).
+SELECT MAX(f1) < (@@auto_increment_increment * 6000 + 1000) FROM t1;
+SELECT AUTO_INCREMENT < (@@auto_increment_increment * 6000 + 1000)
+  FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 
 --connection default
 DROP TABLE t1;

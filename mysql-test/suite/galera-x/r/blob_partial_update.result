@@ -24,19 +24,11 @@ mysqlxplugin.tab	analyze	status	OK
 RUN EXPLAIN FORMAT=JSON UPDATE tab SET j1 = JSON_SET(j1, '$[0]', 'VISWA')
 EXPLAIN
 {
-  "query_block": {
-    "select_id": 1,
-    "table": {
-      "update": true,
-      "table_name": "tab",
-      "access_type": "ALL",
-      "rows_examined_per_scan": 1,
-      "filtered": "100.00",
-      "partial_update_columns": [
-        "j1"
-      ]
-    }
-  }
+  "query_plan": {
+    "operation": "<not executable by iterator executor>"
+  },
+  "query_type": "update",
+  "json_schema_version": "2.0"
 }
 0 rows affected
 RUN UPDATE tab SET j1 = JSON_SET(j1, '$[0]', 'Viswa')

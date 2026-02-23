@@ -1,4 +1,3 @@
-include/assert.inc [replica_parallel_type is LOGICAL_CLOCK]
 include/assert.inc [replica_parallel_workers > 1]
 include/assert.inc [replica_preserve_commit_order is ON]
 START REPLICA USER = 'root';

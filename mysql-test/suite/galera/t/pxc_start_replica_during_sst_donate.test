@@ -106,5 +106,7 @@ SET SESSION wsrep_sync_wait = 0;
 --remove_file $PID_FILE
 --remove_file $ERROR_LOG_FILE
 DROP TABLE t1;
+SET SESSION wsrep_on=OFF;
 RESET BINARY LOGS AND GTIDS;
+SET SESSION wsrep_on=ON;
 RESET REPLICA ALL;

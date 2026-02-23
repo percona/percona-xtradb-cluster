@@ -172,6 +172,8 @@ def	mysql	wsrep_cluster_members	mysql	PRIMARY
 def	mysql	wsrep_streaming_log	mysql	PRIMARY
 def	mysql	wsrep_streaming_log	mysql	PRIMARY
 def	mysql	wsrep_streaming_log	mysql	PRIMARY
+def	performance_schema	account_failed_login_lock_status	performance_schema	ACCOUNT
+def	performance_schema	account_failed_login_lock_status	performance_schema	ACCOUNT
 def	performance_schema	accounts	performance_schema	ACCOUNT
 def	performance_schema	accounts	performance_schema	ACCOUNT
 def	performance_schema	cond_instances	performance_schema	NAME

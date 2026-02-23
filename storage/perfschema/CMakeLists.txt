@@ -24,6 +24,7 @@
 
 ADD_DEFINITIONS(-DMYSQL_SERVER)
 
+INCLUDE_DIRECTORIES(SYSTEM ${BOOST_PATCHES_DIR} ${BOOST_INCLUDE_DIR})
 IF(WITH_WSREP)
   INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/wsrep-lib/include)
   INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/wsrep-lib/wsrep-API/v26/)
@@ -395,8 +396,11 @@ table_binary_log_transaction_compression_stats.cc
 telemetry_pfs_metrics.cc
 table_malloc_stats.cc
 table_malloc_stats.h
+table_account_failed_login_lock_status.cc
+table_account_failed_login_lock_status.h
 # -- WITH_WSREP
 table_pxc_cluster_view.cc
+# -- WITH_WSREP
 )
 MYSQL_ADD_PLUGIN(perfschema ${PERFSCHEMA_SOURCES}
   STORAGE_ENGINE MANDATORY STATIC_ONLY
