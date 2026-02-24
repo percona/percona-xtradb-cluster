@@ -1,7 +1,7 @@
 --disable_query_log
 --disable_warnings
 # Make sure no telemetry component is already installed.
-let $have_component = `SELECT count(*)>=1 AS installed FROM performance_schema.global_variables WHERE variable_name like "%telemetry%";`;
+let $have_component = `SELECT count(*)>=1 AS installed FROM performance_schema.global_variables WHERE variable_name like "%telemetry%" and variable_name not like "percona_telemetry%";`;
 if ($have_component)
 {
   skip Requires no telemetry component already installed;

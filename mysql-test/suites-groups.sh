@@ -31,7 +31,7 @@ function set_suites() {
     WORKER_5_MTR_SUITES="rpl_nogtid,rpl_gtid,galera|big"
     WORKER_6_MTR_SUITES="parts,group_replication,clone,innodb_gis"
     WORKER_7_MTR_SUITES="stress,perfschema,component_keyring_file,binlog,innodb_fts,sys_vars,innodb_zip,x,gcol,engines/iuds,encryption,federated,funcs_1,auth_sec,binlog_nogtid,binlog_gtid,funcs_2,jp,information_schema,rpl_encryption,sysschema,json,opt_trace,collations,gis,query_rewrite_plugins,test_service_sql_api,secondary_engine,component_audit_log_filter,component_encryption_udf,percona,percona_innodb,component_masking_functions"
-    WORKER_8_MTR_SUITES="galera|nobig,component_connection_control"
+    WORKER_8_MTR_SUITES="galera|nobig,component_connection_control,jdv,component_js_lang"
   else # Debug (and everything different from "RelWithDebInfo")
     echo "Setting WORKER_x_MTR_SUITES for BUILD_TYPE=Debug"
     # Unit tests will be executed by worker 1
@@ -42,7 +42,7 @@ function set_suites() {
     WORKER_5_MTR_SUITES="rpl_gtid,galera|big,group_replication|nobig"
     WORKER_6_MTR_SUITES="parts,group_replication|big,clone|nobig,innodb_gis"
     WORKER_7_MTR_SUITES="clone|big,gcol,engines/iuds,encryption,federated,funcs_1,auth_sec,binlog_nogtid,binlog_gtid,funcs_2,jp,information_schema,rpl_encryption,sysschema,json,opt_trace,collations,gis,query_rewrite_plugins,test_service_sql_api,secondary_engine,component_audit_log_filter,component_encryption_udf,percona,component_masking_functions"
-    WORKER_8_MTR_SUITES="galera|nobig,main|nobig,component_connection_control"
+    WORKER_8_MTR_SUITES="galera|nobig,main|nobig,component_connection_control,jdv,component_js_lang"
   fi
 }
 

@@ -80,6 +80,10 @@ struct LEX_SOURCE_INFO;
 class Wsrep_async_monitor;
 #endif /* WITH_WSREP */
 
+#ifdef WITH_WSREP
+class Wsrep_async_monitor;
+#endif /* WITH_WSREP */
+
 extern uint sql_replica_skip_counter;
 
 typedef Prealloced_array<Slave_worker *, 4> Slave_worker_array;

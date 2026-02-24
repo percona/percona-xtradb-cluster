@@ -20,9 +20,8 @@ reproduction_lab.Heavy_test	optimize	Error	Table 'reproduction_lab.Heavy_test' d
 reproduction_lab.Heavy_test	optimize	status	Operation failed
 reproduction_lab.heavy_test	optimize	note	Table does not support optimize, doing recreate + analyze instead
 reproduction_lab.heavy_test	optimize	status	OK
-SHOW BINLOG EVENTS IN '<binlog_file>' FROM 5;
+include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-<binlog_file>	#	Previous_gtids	1	#	
 ##############################################################################
 # 3. Base table
 ##############################################################################
@@ -94,9 +93,8 @@ Warning	1105	The statement was neither written to the binary log nor any GTID wa
 DROP EVENT ev_rsu$$
 Warnings:
 Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
-SHOW BINLOG EVENTS IN '<binlog_file>' FROM 5;
+include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-<binlog_file>	#	Previous_gtids	1	#	
 ##############################################################################
 # 5. Admin / session commands (NOT binlogged)
 ##############################################################################
@@ -117,9 +115,8 @@ Warnings:
 Warning	1105	The statement was neither written to the binary log nor any GTID was generated as the statement was executed with wsrep_OSU_method = RSU.
 SET SESSION autocommit=0;
 SET SESSION autocommit=1;
-SHOW BINLOG EVENTS IN '<binlog_file>' FROM 5;
+include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-<binlog_file>	#	Previous_gtids	1	#	
 ##############################################################################
 # 6. DML (MUST be written to binlog even in RSU)
 ##############################################################################
@@ -127,29 +124,24 @@ INSERT INTO reproduction_lab.heavy_test VALUES (1);
 UPDATE reproduction_lab.heavy_test SET id=99 WHERE id=1;
 DELETE FROM reproduction_lab.heavy_test WHERE id=99;
 REPLACE INTO reproduction_lab.heavy_test VALUES (2);
-SHOW BINLOG EVENTS IN '<binlog_file>' FROM 5;
+include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-<binlog_file>	#	Previous_gtids	1	#	
-<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
-<binlog_file>	#	Query	1	#	BEGIN
-<binlog_file>	#	Table_map	1	#	table_id: # (reproduction_lab.heavy_test)
-<binlog_file>	#	Write_rows	1	#	table_id: # flags: STMT_END_F
-<binlog_file>	#	Query	1	#	COMMIT
-<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
-<binlog_file>	#	Query	1	#	BEGIN
-<binlog_file>	#	Table_map	1	#	table_id: # (reproduction_lab.heavy_test)
-<binlog_file>	#	Update_rows	1	#	table_id: # flags: STMT_END_F
-<binlog_file>	#	Query	1	#	COMMIT
-<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
-<binlog_file>	#	Query	1	#	BEGIN
-<binlog_file>	#	Table_map	1	#	table_id: # (reproduction_lab.heavy_test)
-<binlog_file>	#	Delete_rows	1	#	table_id: # flags: STMT_END_F
-<binlog_file>	#	Query	1	#	COMMIT
-<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
-<binlog_file>	#	Query	1	#	BEGIN
-<binlog_file>	#	Table_map	1	#	table_id: # (reproduction_lab.heavy_test)
-<binlog_file>	#	Write_rows	1	#	table_id: # flags: STMT_END_F
-<binlog_file>	#	Query	1	#	COMMIT
+mysqld-bin.000003	#	Query	#	#	BEGIN
+mysqld-bin.000003	#	Table_map	#	#	table_id: # (reproduction_lab.heavy_test)
+mysqld-bin.000003	#	Write_rows	#	#	table_id: # flags: STMT_END_F
+mysqld-bin.000003	#	Xid	#	#	COMMIT /* XID */
+mysqld-bin.000003	#	Query	#	#	BEGIN
+mysqld-bin.000003	#	Table_map	#	#	table_id: # (reproduction_lab.heavy_test)
+mysqld-bin.000003	#	Update_rows	#	#	table_id: # flags: STMT_END_F
+mysqld-bin.000003	#	Xid	#	#	COMMIT /* XID */
+mysqld-bin.000003	#	Query	#	#	BEGIN
+mysqld-bin.000003	#	Table_map	#	#	table_id: # (reproduction_lab.heavy_test)
+mysqld-bin.000003	#	Delete_rows	#	#	table_id: # flags: STMT_END_F
+mysqld-bin.000003	#	Xid	#	#	COMMIT /* XID */
+mysqld-bin.000003	#	Query	#	#	BEGIN
+mysqld-bin.000003	#	Table_map	#	#	table_id: # (reproduction_lab.heavy_test)
+mysqld-bin.000003	#	Write_rows	#	#	table_id: # flags: STMT_END_F
+mysqld-bin.000003	#	Xid	#	#	COMMIT /* XID */
 ##############################################################################
 # 7. ALL TOI DDL (must be written to binlog)
 ##############################################################################
@@ -187,56 +179,38 @@ ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 DAY
 DO
 INSERT INTO t_rsu VALUES (100,100,100)$$
 DROP EVENT ev_rsu$$
-SHOW BINLOG EVENTS IN '<binlog_file>' FROM 5;
+include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-<binlog_file>	#	Previous_gtids	1	#	
-<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
-<binlog_file>	#	Query	1	#	use `reproduction_lab`; CREATE TABLE t_rsu (
+mysqld-bin.000004	#	Query	#	#	use `reproduction_lab`; CREATE TABLE t_rsu (
 id INT PRIMARY KEY,
 v  INT
 )
-<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
-<binlog_file>	#	Query	1	#	use `reproduction_lab`; ALTER TABLE t_rsu ADD COLUMN v2 INT
-<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
-<binlog_file>	#	Query	1	#	use `reproduction_lab`; TRUNCATE TABLE t_rsu
-<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
-<binlog_file>	#	Query	1	#	use `reproduction_lab`; CREATE INDEX idx_v ON t_rsu(v)
-<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
-<binlog_file>	#	Query	1	#	use `reproduction_lab`; DROP INDEX idx_v ON t_rsu
-<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
-<binlog_file>	#	Query	1	#	use `reproduction_lab`; RENAME TABLE t_rsu TO t_rsu_new
-<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
-<binlog_file>	#	Query	1	#	use `reproduction_lab`; RENAME TABLE t_rsu_new TO t_rsu
-<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
-<binlog_file>	#	Query	1	#	use `reproduction_lab`; CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v_rsu` AS SELECT * FROM t_rsu
-<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
-<binlog_file>	#	Query	1	#	use `reproduction_lab`; DROP VIEW v_rsu
-<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
-<binlog_file>	#	Query	1	#	use `reproduction_lab`; CREATE DEFINER=`root`@`localhost` TRIGGER trg_rsu
+mysqld-bin.000004	#	Query	#	#	use `reproduction_lab`; ALTER TABLE t_rsu ADD COLUMN v2 INT
+mysqld-bin.000004	#	Query	#	#	use `reproduction_lab`; TRUNCATE TABLE t_rsu
+mysqld-bin.000004	#	Query	#	#	use `reproduction_lab`; CREATE INDEX idx_v ON t_rsu(v)
+mysqld-bin.000004	#	Query	#	#	use `reproduction_lab`; DROP INDEX idx_v ON t_rsu
+mysqld-bin.000004	#	Query	#	#	use `reproduction_lab`; RENAME TABLE t_rsu TO t_rsu_new
+mysqld-bin.000004	#	Query	#	#	use `reproduction_lab`; RENAME TABLE t_rsu_new TO t_rsu
+mysqld-bin.000004	#	Query	#	#	use `reproduction_lab`; CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v_rsu` AS SELECT * FROM t_rsu
+mysqld-bin.000004	#	Query	#	#	use `reproduction_lab`; DROP VIEW v_rsu
+mysqld-bin.000004	#	Query	#	#	use `reproduction_lab`; CREATE DEFINER=`root`@`localhost` TRIGGER trg_rsu
 BEFORE INSERT ON t_rsu
 FOR EACH ROW SET NEW.v2 = 10
-<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
-<binlog_file>	#	Query	1	#	use `reproduction_lab`; DROP TRIGGER trg_rsu
-<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
-<binlog_file>	#	Query	1	#	use `reproduction_lab`; CREATE DEFINER=`root`@`localhost` FUNCTION `f_rsu`(x INT) RETURNS int
+mysqld-bin.000004	#	Query	#	#	use `reproduction_lab`; DROP TRIGGER trg_rsu
+mysqld-bin.000004	#	Query	#	#	use `reproduction_lab`; CREATE DEFINER=`root`@`localhost` FUNCTION `f_rsu`(x INT) RETURNS int
     DETERMINISTIC
 RETURN x + 1
-<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
-<binlog_file>	#	Query	1	#	use `reproduction_lab`; DROP FUNCTION f_rsu
-<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
-<binlog_file>	#	Query	1	#	use `reproduction_lab`; CREATE DEFINER=`root`@`localhost` PROCEDURE `p_rsu`(IN x INT)
+mysqld-bin.000004	#	Query	#	#	use `reproduction_lab`; DROP FUNCTION f_rsu
+mysqld-bin.000004	#	Query	#	#	use `reproduction_lab`; CREATE DEFINER=`root`@`localhost` PROCEDURE `p_rsu`(IN x INT)
 BEGIN
 SELECT x;
 END
-<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
-<binlog_file>	#	Query	1	#	use `reproduction_lab`; DROP PROCEDURE p_rsu
-<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
-<binlog_file>	#	Query	1	#	use `reproduction_lab`; CREATE DEFINER=`root`@`localhost` EVENT ev_rsu
+mysqld-bin.000004	#	Query	#	#	use `reproduction_lab`; DROP PROCEDURE p_rsu
+mysqld-bin.000004	#	Query	#	#	use `reproduction_lab`; CREATE DEFINER=`root`@`localhost` EVENT ev_rsu
 ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 DAY
 DO
 INSERT INTO t_rsu VALUES (100,100,100)
-<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
-<binlog_file>	#	Query	1	#	use `reproduction_lab`; DROP EVENT ev_rsu
+mysqld-bin.000004	#	Query	#	#	use `reproduction_lab`; DROP EVENT ev_rsu
 ##############################################################################
 # 8. Admin / session commands (binlogged)
 ##############################################################################
@@ -255,15 +229,11 @@ reproduction_lab.t_rsu	optimize	status	OK
 DROP TABLE t_rsu;
 SET SESSION autocommit=0;
 SET SESSION autocommit=1;
-SHOW BINLOG EVENTS IN '<binlog_file>' FROM 5;
+include/rpl/deprecated/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-<binlog_file>	#	Previous_gtids	1	#	
-<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
-<binlog_file>	#	Query	1	#	use `reproduction_lab`; ANALYZE TABLE t_rsu
-<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
-<binlog_file>	#	Query	1	#	use `reproduction_lab`; OPTIMIZE TABLE t_rsu
-<binlog_file>	#	Anonymous_Gtid	1	#	SET @@SESSION.GTID_NEXT= 'GTID';
-<binlog_file>	#	Query	1	#	use `reproduction_lab`; DROP TABLE `t_rsu` /* generated by server */
+mysqld-bin.000005	#	Query	#	#	use `reproduction_lab`; ANALYZE TABLE t_rsu
+mysqld-bin.000005	#	Query	#	#	use `reproduction_lab`; OPTIMIZE TABLE t_rsu
+mysqld-bin.000005	#	Query	#	#	use `reproduction_lab`; DROP TABLE `t_rsu` /* generated by server */
 ##############################################################################
 # 9. Cleanup
 ##############################################################################
