@@ -29,6 +29,8 @@ user1	5	host.org	8
 user2	5	host.org	8
 user3	5	host.org	8
 mysql.infoschema	16	localhost	9
+mysql.pxc.internal.session	26	localhost	9
+mysql.pxc.sst.role	18	localhost	9
 mysql.session	13	localhost	9
 mysql.sys	9	localhost	9
 percona.telemetry	17	localhost	9

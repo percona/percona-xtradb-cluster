@@ -101,7 +101,7 @@ while ($count)
                 --source include/wait_condition.inc
                 UPDATE sig_t SET can_delete = 0;
         }
-        --let $signature = `SELECT LEFT(MD5(RAND()), 10)`
+        --let $signature = `SELECT LEFT(SHA2(RAND(), 256), 10)`
         --error 0,ER_LOCK_DEADLOCK
         --eval UPDATE t1 SET f2 = '$signature'
         --enable_query_log
