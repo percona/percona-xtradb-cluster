@@ -135,9 +135,29 @@ DATA="${WSREP_SST_OPT_DATA}"
 
 # Which rolling upgrade combinations do we support?
 # MySql supports following in-place upgrades:
-# 1. From previous version (it can be innovative or LTS)
-# 2. From previous LTS version
-# 3. From the same version
+# 1. 8.4.x (LTS) -> 9.i : 8.4 (LTS) to any 9 innovative
+# 2. 9.i -> 9.k : 9.i innovative to 9.k innovative
+# 3. 9.i -> 9.7 (LTS) : 9 innovative to 9.7 (LTS)
+# 4. 8.4.x (LTS) -> 9.7 (LTS) : LTS to LTS
+#
+# PXB 8.0.x supports prepare for 8.0 (LTS) only.
+# PXB 8.1 supports prepare for 8.1 innovative only.
+# PXB 8.2 supports prepare for 8.2 innovative only.
+# PXB 8.3 supports prepare for 8.3 innovative only.
+# PXB 8.4 supports prepare for 8.4 LTS only.
+#
+# If we wanted to support all possible upgrade paths in PXC we would have to
+# support:
+# 1. 8.4 (LTS) -> 9.i : LTS to any innovative
+# 2. 9.i -> 9.k : any innovative to any innovative
+# 3. 8.4 (LTS) -> 9.7 (LTS) : LTS to LTS
+#
+# To make things easier we will support the following paths, which require using
+# up to 3 versions of PXB:
+#
+# 1. 8.4.x (LTS) -> 9.i : 8.4 (LTS) to any 9 innovative
+# 2. 9.i -> 9.k : 9.i innovative to 9.k innovative
+# 3. 8.4.x (LTS) -> 9.7 (LTS) : LTS to LTS
 #
 # This way, every PXB version needs to understand:
 # 1. Previous LTS backup
@@ -147,6 +167,8 @@ DATA="${WSREP_SST_OPT_DATA}"
 # The upgrade from one innovative version to another innovative version does
 # not support skipping versions. The same is for upgrading to next LTS: only
 # upgrade from previous LTS or previous innovative is supported.
+# If the cluster is on 9.1 the only way to upgrade it to 9.7 is to go through
+# 9.2, 9.3, ...,  and 9.6
 
 XTRABACKUP_PATH_PREFIX="$(dirname $0)/pxc_extra/pxb-"
 

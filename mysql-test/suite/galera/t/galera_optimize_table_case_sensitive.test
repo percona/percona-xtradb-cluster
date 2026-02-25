@@ -47,10 +47,8 @@ FLUSH BINARY LOGS;
 OPTIMIZE TABLE Heavy_test, heavy_test;
 
 --let $binlog_file= query_get_value(SHOW BINARY LOG STATUS, File, 1)
---replace_result $binlog_file <binlog_file>
---replace_column 2 # 5 #
---replace_regex /\/\* xid=.* \*\//\/* XID *\// /table_id: [0-9]+/table_id: #/ /SET @@SESSION.GTID_NEXT=.*$/SET @@SESSION.GTID_NEXT= 'GTID';/ /GROUPS: .*:(.*,.*)/GROUPS: GTID:(X,X)/ / \/\* XID \*\/// /Xid/Query/
---eval SHOW BINLOG EVENTS IN '$binlog_file' FROM 5
+--source include/rpl/deprecated/show_binlog_events.inc
+
 
 --echo ##############################################################################
 --echo # 3. Base table
@@ -116,10 +114,7 @@ DROP EVENT ev_rsu$$
 DELIMITER ;$$
 
 --let $binlog_file= query_get_value(SHOW BINARY LOG STATUS, File, 1)
---replace_result $binlog_file <binlog_file>
---replace_column 2 # 5 #
---replace_regex /\/\* xid=.* \*\//\/* XID *\// /table_id: [0-9]+/table_id: #/ /SET @@SESSION.GTID_NEXT=.*$/SET @@SESSION.GTID_NEXT= 'GTID';/ /GROUPS: .*:(.*,.*)/GROUPS: GTID:(X,X)/ / \/\* XID \*\/// /Xid/Query/
---eval SHOW BINLOG EVENTS IN '$binlog_file' FROM 5
+--source include/rpl/deprecated/show_binlog_events.inc
 
 --echo ##############################################################################
 --echo # 5. Admin / session commands (NOT binlogged)
@@ -134,10 +129,7 @@ SET SESSION autocommit=0;
 SET SESSION autocommit=1;
 
 --let $binlog_file= query_get_value(SHOW BINARY LOG STATUS, File, 1)
---replace_result $binlog_file <binlog_file>
---replace_column 2 # 5 #
---replace_regex /\/\* xid=.* \*\//\/* XID *\// /table_id: [0-9]+/table_id: #/ /SET @@SESSION.GTID_NEXT=.*$/SET @@SESSION.GTID_NEXT= 'GTID';/ /GROUPS: .*:(.*,.*)/GROUPS: GTID:(X,X)/ / \/\* XID \*\/// /Xid/Query/
---eval SHOW BINLOG EVENTS IN '$binlog_file' FROM 5
+--source include/rpl/deprecated/show_binlog_events.inc
 
 --echo ##############################################################################
 --echo # 6. DML (MUST be written to binlog even in RSU)
@@ -149,10 +141,7 @@ DELETE FROM reproduction_lab.heavy_test WHERE id=99;
 REPLACE INTO reproduction_lab.heavy_test VALUES (2);
 
 --let $binlog_file= query_get_value(SHOW BINARY LOG STATUS, File, 1)
---replace_result $binlog_file <binlog_file>
---replace_column 2 # 5 #
---replace_regex /\/\* xid=.* \*\//\/* XID *\// /table_id: [0-9]+/table_id: #/ /SET @@SESSION.GTID_NEXT=.*$/SET @@SESSION.GTID_NEXT= 'GTID';/ /GROUPS: .*:(.*,.*)/GROUPS: GTID:(X,X)/ / \/\* XID \*\/// /Xid/Query/
---eval SHOW BINLOG EVENTS IN '$binlog_file' FROM 5
+--source include/rpl/deprecated/show_binlog_events.inc
 
 --echo ##############################################################################
 --echo # 7. ALL TOI DDL (must be written to binlog)
@@ -222,10 +211,7 @@ DROP EVENT ev_rsu$$
 DELIMITER ;$$
 
 --let $binlog_file= query_get_value(SHOW BINARY LOG STATUS, File, 1)
---replace_result $binlog_file <binlog_file>
---replace_column 2 # 5 #
---replace_regex /\/\* xid=.* \*\//\/* XID *\// /table_id: [0-9]+/table_id: #/ /SET @@SESSION.GTID_NEXT=.*$/SET @@SESSION.GTID_NEXT= 'GTID';/ /GROUPS: .*:(.*,.*)/GROUPS: GTID:(X,X)/ / \/\* XID \*\/// /Xid/Query/
---eval SHOW BINLOG EVENTS IN '$binlog_file' FROM 5
+--source include/rpl/deprecated/show_binlog_events.inc
 
 --echo ##############################################################################
 --echo # 8. Admin / session commands (binlogged)
@@ -245,10 +231,7 @@ SET SESSION autocommit=0;
 SET SESSION autocommit=1;
 
 --let $binlog_file= query_get_value(SHOW BINARY LOG STATUS, File, 1)
---replace_result $binlog_file <binlog_file>
---replace_column 2 # 5 #
---replace_regex /\/\* xid=.* \*\//\/* XID *\// /table_id: [0-9]+/table_id: #/ /SET @@SESSION.GTID_NEXT=.*$/SET @@SESSION.GTID_NEXT= 'GTID';/ /GROUPS: .*:(.*,.*)/GROUPS: GTID:(X,X)/ / \/\* XID \*\/// /Xid/Query/
---eval SHOW BINLOG EVENTS IN '$binlog_file' FROM 5
+--source include/rpl/deprecated/show_binlog_events.inc
 
 --echo ##############################################################################
 --echo # 9. Cleanup

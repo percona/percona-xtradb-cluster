@@ -67,6 +67,11 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
+
+dberr_t wsrep_append_foreign_key(trx_t *trx, dict_foreign_t *foreign,
+                                 const rec_t *clust_rec,
+                                 dict_index_t *clust_index, bool referenced,
+                                 Wsrep_service_key_type key_type);
 #endif /* WITH_WSREP */
 
 /*************************************************************************
@@ -853,13 +858,6 @@ static void row_ins_foreign_report_add_err(
 
   mutex_exit(&dict_foreign_err_mutex);
 }
-
-#ifdef WITH_WSREP
-dberr_t wsrep_append_foreign_key(trx_t *trx, dict_foreign_t *foreign,
-                                 const rec_t *clust_rec,
-                                 dict_index_t *clust_index, bool referenced,
-                                 Wsrep_service_key_type key_type);
-#endif /* WITH_WSREP */
 
 #ifdef UNIV_DEBUG
 

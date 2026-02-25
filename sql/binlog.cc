@@ -3143,7 +3143,7 @@ int MYSQL_BIN_LOG::rollback(THD *thd, bool all) {
       (void)RUN_HOOK(transaction, after_commit, (thd, all));
   }
 
-    /*
+  /*
     It should be impossible to have an incident here as all sessions with
     incident will call ordered_commit() and handle the incident during
     BGC. If that fails, error is handled by handle_binlog_flush_or_sync_error().

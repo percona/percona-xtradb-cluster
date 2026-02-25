@@ -8,7 +8,7 @@ SET GLOBAL wsrep_provider_options="pc.weight=0";
 CREATE TABLE t1 (a INT PRIMARY KEY);
 INSERT INTO t1 VALUES (0);
 # Adding debug point 'halt_before_sst_donate' to @@GLOBAL.debug
-# restart_abort:<hidden args>
+# restart_abort: <hidden args>
 include/wait_for_pattern_in_file.inc [.*Saving node state to retry with IST instead of full SST after restart.*]
 "continue with node 1"
 SET SESSION wsrep_sync_wait = 0;
