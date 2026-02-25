@@ -493,6 +493,7 @@ INSERT INTO global_suppressions VALUES
  */
  ("'--ssl-fips-mode' is deprecated and will be removed in a future release."),
 
+<<<<<<< HEAD
 
  /*
    Valgrind may issue some warning which are mixed with MySql warnings
@@ -508,6 +509,15 @@ INSERT INTO global_suppressions VALUES
  */
  (".*mlock failed. It will still work, but swap pages into the disk, so performance will be affected"),
 
+||||||| merged common ancestors
+=======
+ /*
+   Container awareness warning when running in an environment with cgroup
+   resource limits but --container_aware is OFF (the default)
+ */
+ ("Server ignores the discovered container restrictions as --container_aware is OFF"),
+
+>>>>>>> ps/release-9.6.0-1
  ("THE_LAST_SUPPRESSION");
 
 

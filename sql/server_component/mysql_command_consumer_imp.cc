@@ -441,6 +441,7 @@ DEFINE_METHOD(void, mysql_command_consumer_dom_imp::end,
   try {
     auto *ctx = reinterpret_cast<Dom_ctx *>(srv_ctx_h);
     if (ctx == nullptr) return;
+<<<<<<< HEAD
 #ifdef WITH_WSREP
     // To be rolledback during next merge/release. Added to solve leak issue.
     // Free MYSQL_FIELD buffer allocated in start_result_metadata()
@@ -452,6 +453,17 @@ DEFINE_METHOD(void, mysql_command_consumer_dom_imp::end,
     }
 #endif
 
+||||||| merged common ancestors
+=======
+    // Free MYSQL_FIELD buffer allocated in start_result_metadata()
+    if (ctx->m_mysql && ctx->m_mysql->field_alloc) {
+      ctx->m_mysql->field_alloc->Clear();
+      my_free(ctx->m_mysql->field_alloc);
+      ctx->m_mysql->field_alloc = nullptr;
+      ctx->m_mysql->fields = nullptr;
+    }
+
+>>>>>>> ps/release-9.6.0-1
     /* The m_result is freed by
        free_result->mysql_free_result()->free_rows() api.
        In non result cases, it has to be freed here. */

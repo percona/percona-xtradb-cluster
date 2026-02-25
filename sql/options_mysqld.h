@@ -114,6 +114,7 @@ enum options_mysqld {
   OPT_SYNC_RELAY_LOG_INFO,
   OPT_CHARACTER_SET_CLIENT_HANDSHAKE,
   OPT_PFS_METER,
+<<<<<<< HEAD
   OPT_PFS_LOGGER
 #ifdef WITH_WSREP
   ,
@@ -123,6 +124,12 @@ enum options_mysqld {
   OPT_WSREP_START_POSITION,
   OPT_WSREP_RECOVER
 #endif /* WITH_WSREP */
+||||||| merged common ancestors
+  OPT_PFS_LOGGER
+=======
+  OPT_PFS_LOGGER,
+  OPT_INNODB_FOREIGN_KEYS
+>>>>>>> ps/release-9.6.0-1
 };
 
 #endif  // OPTIONS_MYSQLD_INCLUDED

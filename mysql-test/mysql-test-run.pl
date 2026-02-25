@@ -445,7 +445,8 @@ use constant { MYSQLTEST_PASS        => 0,
                MYSQLTEST_FAIL        => 1,
                MYSQLTEST_SKIPPED     => 62,
                MYSQLTEST_NOSKIP_PASS => 63,
-               MYSQLTEST_NOSKIP_FAIL => 64 };
+               MYSQLTEST_NOSKIP_FAIL => 64,
+               MYSQLTEST_OPT_PASS => 66 };
 
 sub check_timeout ($) { return testcase_timeout($_[0]) / 10; }
 
@@ -5860,7 +5861,7 @@ if (!@procs && $test_timeout > $print_timeout)
         "condition check before modifying the system status.";
 
       if (($res == MYSQLTEST_PASS or $res == MYSQLTEST_NOSKIP_PASS) or
-          $res == MYSQLTEST_SKIPPED) {
+          $res == MYSQLTEST_SKIPPED or $res == MYSQLTEST_OPT_PASS) {
         if ($tinfo->{'no_result_file'}) {
           # Test case doesn't have it's corresponding result file, marking
           # the test case as failed.
@@ -5883,7 +5884,7 @@ if (!@procs && $test_timeout > $print_timeout)
         if ((($res == MYSQLTEST_PASS or $res == MYSQLTEST_NOSKIP_PASS) and
              !restart_forced_by_test('force_restart')
             ) or
-            ($res == MYSQLTEST_SKIPPED and
+            (($res == MYSQLTEST_SKIPPED or $res == MYSQLTEST_OPT_PASS) and
              !restart_forced_by_test('force_restart_if_skipped'))
           ) {
           $check_res = check_testcase($tinfo, "after");
@@ -5891,7 +5892,8 @@ if (!@procs && $test_timeout > $print_timeout)
           # Test run succeeded but failed in check-testcase, marking
           # the test case as failed.
           if (defined $check_res and $check_res == 1) {
-            $tinfo->{comment} .= "\n$message" if ($res == MYSQLTEST_SKIPPED);
+            $tinfo->{comment} .= "\n$message"
+              if ($res == MYSQLTEST_SKIPPED or $res == MYSQLTEST_OPT_PASS);
             $res = ($res == MYSQLTEST_NOSKIP_PASS) ? MYSQLTEST_NOSKIP_FAIL :
               MYSQLTEST_FAIL;
           }
@@ -5911,7 +5913,7 @@ if (!@procs && $test_timeout > $print_timeout)
           return 1;
         }
         mtr_report_test_passed($tinfo);
-      } elsif ($res == MYSQLTEST_SKIPPED) {
+      } elsif ($res == MYSQLTEST_SKIPPED or $res == MYSQLTEST_OPT_PASS) {
         if (defined $check_res and $check_res == 1) {
           # Test case had side effects, not fatal error, just continue
           $tinfo->{check} .= "\n$message";
@@ -5920,12 +5922,19 @@ if (!@procs && $test_timeout > $print_timeout)
           resfile_output($tinfo->{'check'}) if $opt_resfile;
           mtr_report_test_passed($tinfo);
         } else {
-          # Testcase itself tell us to skip this one
-          $tinfo->{skip_reason} = MTR_SKIP_BY_TEST;
+          if ($res == MYSQLTEST_OPT_PASS) {
+            # Extract reason from test log file and set comment, reuses
+            # pre-existing routine which does this for skipped tests
+            find_testcase_skipped_reason($tinfo);
+            mtr_report_test_opt_passed($tinfo);
+          } else {
+            # Testcase itself tell us to skip this one
+            $tinfo->{skip_reason} = MTR_SKIP_BY_TEST;
 
-          # Try to get reason from test log file
-          find_testcase_skipped_reason($tinfo);
-          mtr_report_test_skipped($tinfo);
+            # Try to get reason from test log file
+            find_testcase_skipped_reason($tinfo);
+            mtr_report_test_skipped($tinfo);
+         }
 
           # Restart if skipped due to missing perl, it may have had side effects
           if (restart_forced_by_test('force_restart_if_skipped') ||
@@ -5966,14 +5975,15 @@ if (!@procs && $test_timeout > $print_timeout)
 
       # Save info from this testcase run to mysqltest.log
       if (-f $path_current_testlog) {
-        if ($opt_resfile && $res && $res != MYSQLTEST_SKIPPED) {
+        if ($opt_resfile && $res &&
+            ($res != MYSQLTEST_SKIPPED && $res != MYSQLTEST_OPT_PASS)) {
           resfile_output_file($path_current_testlog);
         }
         mtr_appendfile_to_file($path_current_testlog, $path_testlog);
         unlink($path_current_testlog);
       }
 
-      return ($res == MYSQLTEST_SKIPPED) ? 0 : $res;
+      return ($res == MYSQLTEST_SKIPPED or $res == MYSQLTEST_OPT_PASS) ? 0 : $res;
     }
 
     # Check if it was an expected crash
@@ -6470,7 +6480,8 @@ sub wait_for_check_warnings ($$) {
 
       if ($res == MYSQLTEST_PASS or
           $res == MYSQLTEST_NOSKIP_PASS or
-          $res == MYSQLTEST_SKIPPED) {
+          $res == MYSQLTEST_SKIPPED or
+          $res == MYSQLTEST_OPT_PASS) {
         if ($res == MYSQLTEST_PASS or $res == MYSQLTEST_NOSKIP_PASS) {
           # Check completed with problem
           my $report = mtr_grab_file($err_file);

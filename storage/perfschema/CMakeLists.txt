@@ -24,6 +24,7 @@
 
 ADD_DEFINITIONS(-DMYSQL_SERVER)
 
+<<<<<<< HEAD
 INCLUDE_DIRECTORIES(SYSTEM ${BOOST_PATCHES_DIR} ${BOOST_INCLUDE_DIR})
 
 IF(WITH_WSREP)
@@ -31,6 +32,11 @@ IF(WITH_WSREP)
   INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/wsrep-lib/wsrep-API/v26/)
 ENDIF()
 
+||||||| merged common ancestors
+INCLUDE_DIRECTORIES(SYSTEM ${BOOST_PATCHES_DIR} ${BOOST_INCLUDE_DIR})
+
+=======
+>>>>>>> ps/release-9.6.0-1
 #
 # Maintainer: keep this list sorted, to avoid merge collisions.
 # Tip: ls -1 *.h, ls -1 *.cc
@@ -183,6 +189,7 @@ table_status_by_thread.h
 table_status_by_user.h
 table_sync_instances.h
 table_table_handles.h
+table_temporary_account_locks.h
 table_threads.h
 table_tiws_by_index_usage.h
 table_tiws_by_table.h
@@ -363,6 +370,7 @@ table_status_by_thread.cc
 table_status_by_user.cc
 table_sync_instances.cc
 table_table_handles.cc
+table_temporary_account_locks.cc
 table_threads.cc
 table_tiws_by_index_usage.cc
 table_tiws_by_table.cc
@@ -397,15 +405,22 @@ table_binary_log_transaction_compression_stats.cc
 telemetry_pfs_metrics.cc
 table_malloc_stats.cc
 table_malloc_stats.h
+<<<<<<< HEAD
 table_account_failed_login_lock_status.cc
 table_account_failed_login_lock_status.h
 # -- WITH_WSREP
 table_pxc_cluster_view.cc
 # -- WITH_WSREP
+||||||| merged common ancestors
+table_account_failed_login_lock_status.cc
+table_account_failed_login_lock_status.h
+=======
+>>>>>>> ps/release-9.6.0-1
 )
 MYSQL_ADD_PLUGIN(perfschema ${PERFSCHEMA_SOURCES}
   STORAGE_ENGINE MANDATORY STATIC_ONLY
-  LINK_LIBRARIES extra::rapidjson ext::zlib mysql_gtid extra::unordered_dense
+  LINK_LIBRARIES extra::rapidjson extra::boost
+    ext::zlib mysql_gtid extra::unordered_dense
   )
 IF(WITH_UNIT_TESTS)
   ADD_SUBDIRECTORY(unittest)
