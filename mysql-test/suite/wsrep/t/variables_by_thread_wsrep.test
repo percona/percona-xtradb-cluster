@@ -1,0 +1,49 @@
+# This test makes sure all wsrep THDs present in performance_schema.threads
+# appear in performance_schema.variables_by_thread and status_by_thread
+# (tables that use PFS thread's THD association set by mysql_thread_set_psi_THD).
+
+--source include/have_wsrep.inc
+
+--echo
+--echo # 1. List wsrep threads (this should catch any new wsrep thread addition).
+
+SELECT NAME FROM performance_schema.threads WHERE NAME LIKE '%wsrep%' ORDER BY NAME;
+
+--echo
+--echo # 2. Assert no wsrep THD is missing in variables_by_thread.
+
+--let $assert_text = wsrep THDs are present in variables_by_thread
+--let $assert_cond = COUNT(*)=0 FROM performance_schema.threads t WHERE t.NAME LIKE "%wsrep%" AND t.THREAD_ID NOT IN (SELECT DISTINCT THREAD_ID FROM performance_schema.variables_by_thread)
+--source include/assert.inc
+
+--echo
+--echo # 3. Assert wsrep threads have session variables stored (variables_by_thread).
+
+# Let's assume if one variable is present all will be present.
+--let $wsrep_thread_count = `SELECT COUNT(*) FROM performance_schema.threads WHERE NAME LIKE '%wsrep%'`
+--let $wsrep_thds_in_vbt_count = `SELECT COUNT(*) FROM performance_schema.variables_by_thread WHERE THREAD_ID IN (SELECT THREAD_ID FROM performance_schema.threads WHERE NAME LIKE '%wsrep%') AND VARIABLE_NAME = 'wsrep_on'`
+--let $assert_text = Wsrep thread count matches variables_by_thread and have session variable present.
+--let $assert_cond = $wsrep_thread_count = $wsrep_thds_in_vbt_count
+--source include/assert.inc
+
+# Global only variables are not present.
+--let $assert_text = Global only variables are not present.
+--let $wsrep_thds_in_vbt_count = `SELECT COUNT(*) FROM performance_schema.variables_by_thread WHERE THREAD_ID IN (SELECT THREAD_ID FROM performance_schema.threads WHERE NAME LIKE '%wsrep%') AND VARIABLE_NAME = 'wsrep_provider'`
+--let $assert_cond = $wsrep_thds_in_vbt_count = 0
+--source include/assert.inc
+
+--echo
+--echo # 4. Assert no wsrep THD is missing in status_by_thread.
+
+--let $assert_text = wsrep THDs are present in status_by_thread
+--let $assert_cond = COUNT(*)=0 FROM performance_schema.threads t WHERE t.NAME LIKE "%wsrep%" AND t.THREAD_ID NOT IN (SELECT DISTINCT THREAD_ID FROM performance_schema.status_by_thread)
+--source include/assert.inc
+
+--echo
+--echo # 5. Assert wsrep threads have session status stored (status_by_thread).
+
+# Let's assume if one status is present all will be present.
+--let $wsrep_thds_in_sbt_count = `SELECT COUNT(*) FROM performance_schema.status_by_thread WHERE THREAD_ID IN (SELECT THREAD_ID FROM performance_schema.threads WHERE NAME LIKE '%wsrep%') AND VARIABLE_NAME = 'wsrep_last_applied'`
+--let $assert_text = Wsrep thread count matches status_by_thread and have session status present.
+--let $assert_cond = $wsrep_thread_count = $wsrep_thds_in_sbt_count
+--source include/assert.inc
