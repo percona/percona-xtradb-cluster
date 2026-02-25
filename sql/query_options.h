@@ -130,19 +130,15 @@
 */
 #define OPTION_NO_SUBQUERY_DURING_OPTIMIZATION (1ULL << 39)  // intern
 
-<<<<<<< HEAD
+// Is set while thread is using SQL FOREIGN KEY handling instead of SE's.
+#define OPTION_USE_SQL_FOREIGN_KEY_HANDLING (1ULL << 40)  // THD, intern
+
 #ifdef WITH_WSREP
 /**
   If this flag is set it means that the server internally disabled binloggin
   with the intention to pause hold the replication.
 */
-#define OPTION_BIN_LOG_INTERNAL_OFF (1ULL << 40)  // disable binlog, intern
+#define OPTION_BIN_LOG_INTERNAL_OFF (1ULL << 41)  // disable binlog, intern
 #endif
 
-||||||| merged common ancestors
-=======
-// Is set while thread is using SQL FOREIGN KEY handling instead of SE's.
-#define OPTION_USE_SQL_FOREIGN_KEY_HANDLING (1ULL << 40)  // THD, intern
-
->>>>>>> ps/release-9.6.0-1
 #endif /* QUERY_OPTIONS_INCLUDED */

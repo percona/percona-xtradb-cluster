@@ -3,7 +3,7 @@
 
 #ifdef WITH_WSREP
 
-#include "my_md5.h"
+#include "sql/wsrep_md5.h"
 
 extern void wsrep_disable_fips_mode();
 

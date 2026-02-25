@@ -10834,15 +10834,12 @@ void tdc_remove_table(THD *thd, enum_tdc_remove_table_type remove_type,
   else
     table_cache_manager.assert_owner_all_and_tdc();
 
-<<<<<<< HEAD
-#ifdef WITH_WSREP
-    /* if thd was BF aborted, exclusive locks are cancelled */
-#else
-||||||| merged common ancestors
-=======
   DEBUG_SYNC_C("rm_table_tdc_locked");
 
->>>>>>> ps/release-9.6.0-1
+  #ifdef WITH_WSREP
+    /* if thd was BF aborted, exclusive locks are cancelled */
+#else
+
   assert(remove_type == TDC_RT_REMOVE_UNUSED ||
          remove_type == TDC_RT_MARK_FOR_REOPEN ||
          remove_type == TDC_RT_MARK_FOR_REOPEN_AND_INVALIDATE_SHARE ||

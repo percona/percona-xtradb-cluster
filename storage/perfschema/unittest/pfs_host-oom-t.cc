@@ -40,18 +40,10 @@
 #include "storage/perfschema/unittest/stub_telemetry_metrics.h"
 #include "unittest/mytap/tap.h"
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 #include "storage/perfschema/unittest/stub_pfs_defaults.h"
 #endif /* WITH_WSREP */
 
-extern struct PSI_bootstrap PFS_bootstrap;
-
-||||||| merged common ancestors
-extern struct PSI_bootstrap PFS_bootstrap;
-
-=======
->>>>>>> ps/release-9.6.0-1
 static void test_oom() {
   int rc;
   PFS_global_param param;

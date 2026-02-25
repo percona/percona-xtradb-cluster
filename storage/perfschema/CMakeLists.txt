@@ -24,19 +24,10 @@
 
 ADD_DEFINITIONS(-DMYSQL_SERVER)
 
-<<<<<<< HEAD
-INCLUDE_DIRECTORIES(SYSTEM ${BOOST_PATCHES_DIR} ${BOOST_INCLUDE_DIR})
-
 IF(WITH_WSREP)
   INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/wsrep-lib/include)
   INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/wsrep-lib/wsrep-API/v26/)
 ENDIF()
-
-||||||| merged common ancestors
-INCLUDE_DIRECTORIES(SYSTEM ${BOOST_PATCHES_DIR} ${BOOST_INCLUDE_DIR})
-
-=======
->>>>>>> ps/release-9.6.0-1
 #
 # Maintainer: keep this list sorted, to avoid merge collisions.
 # Tip: ls -1 *.h, ls -1 *.cc
@@ -405,17 +396,9 @@ table_binary_log_transaction_compression_stats.cc
 telemetry_pfs_metrics.cc
 table_malloc_stats.cc
 table_malloc_stats.h
-<<<<<<< HEAD
-table_account_failed_login_lock_status.cc
-table_account_failed_login_lock_status.h
 # -- WITH_WSREP
 table_pxc_cluster_view.cc
 # -- WITH_WSREP
-||||||| merged common ancestors
-table_account_failed_login_lock_status.cc
-table_account_failed_login_lock_status.h
-=======
->>>>>>> ps/release-9.6.0-1
 )
 MYSQL_ADD_PLUGIN(perfschema ${PERFSCHEMA_SOURCES}
   STORAGE_ENGINE MANDATORY STATIC_ONLY

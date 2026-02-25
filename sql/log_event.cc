@@ -12764,21 +12764,6 @@ int Delete_rows_log_event::do_exec_row(const Relay_log_info *const rli) {
     error = unpack_current_row(rli, &m_cols, &m_local_cols, false, false);
     if (error) return error;
   }
-<<<<<<< HEAD
-
-#ifdef WITH_WSREP
-  if (WSREP(thd)) {
-    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
-             "wsrep: deleting row for write-set (%lld)",
-             (long long)wsrep_thd_trx_seqno(thd));
-    WSREP_DEBUG("%s", thd->wsrep_info);
-    thd_proc_info(thd, thd->wsrep_info);
-    THD_STAGE_INFO(thd, stage_wsrep_deleting_rows);
-  }
-#endif /* WITH_WSREP */
-
-||||||| merged common ancestors
-=======
 
   /*
     OPTION_NO_FOREIGN_KEY_CHECKS is a table flag, value may be different per
@@ -12800,8 +12785,18 @@ int Delete_rows_log_event::do_exec_row(const Relay_log_info *const rli) {
     DBUG_PRINT("fk", ("SE FK - Delete log event on table %s", m_table->alias));
   }
 
->>>>>>> ps/release-9.6.0-1
-  /* m_table->record[0] contains the BI */
+#ifdef WITH_WSREP
+  if (WSREP(thd)) {
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
+             "wsrep: deleting row for write-set (%lld)",
+             (long long)wsrep_thd_trx_seqno(thd));
+    WSREP_DEBUG("%s", thd->wsrep_info);
+    thd_proc_info(thd, thd->wsrep_info);
+    THD_STAGE_INFO(thd, stage_wsrep_deleting_rows);
+  }
+#endif /* WITH_WSREP */
+
+/* m_table->record[0] contains the BI */
   m_table->mark_columns_per_binlog_row_image(thd);
   error = m_table->file->ha_delete_row(m_table->record[0]);
   m_table->default_column_bitmaps();

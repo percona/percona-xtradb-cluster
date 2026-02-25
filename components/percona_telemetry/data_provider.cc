@@ -64,14 +64,6 @@ const char *stored_program_call_count = "stored_program_call_count";
 const char *contexts_count = "contexts_count";
 const char *routines_cnt = "routines_cnt";
 const char *js_lang_component_info = "js_lang_component_info";
-<<<<<<< HEAD
-#ifdef WITH_WSREP
-const char *gcache_encryption_enabled = "gcache_encryption_enabled";
-const char *ws_cache_encryption_enabled = "ws_cache_encryption_enabled";
-const char *galera_replication_info = "galera_replication_info";
-#endif
-||||||| merged common ancestors
-=======
 const char *se_info = "se_info";
 const char *name = "name";
 const char *size = "size";
@@ -79,7 +71,12 @@ const char *size = "size";
 // server configuration variables
 const char *server_config_info = "server_config_info";
 const char *thread_handling = "thread_handling";
->>>>>>> ps/release-9.6.0-1
+
+#ifdef WITH_WSREP
+const char *gcache_encryption_enabled = "gcache_encryption_enabled";
+const char *ws_cache_encryption_enabled = "ws_cache_encryption_enabled";
+const char *galera_replication_info = "galera_replication_info";
+#endif
 }  // namespace JSONKey
 }  // namespace
 
@@ -821,14 +818,10 @@ bool DataProvider::collect_metrics(rapidjson::Document *document) {
   res |= collect_se_info(document);
   res |= collect_group_replication_info(document);
   res |= collect_async_replication_info(document);
-<<<<<<< HEAD
+  res |= collect_server_config(document);
 #ifdef WITH_WSREP
   res |= collect_galera_replication_info(document);
 #endif
-||||||| merged common ancestors
-=======
-  res |= collect_server_config(document);
->>>>>>> ps/release-9.6.0-1
 
   /* The requirement is to have db_replication_id key at the top of JSON
   structure. But it may originate from the different places. The above

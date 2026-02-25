@@ -211,10 +211,10 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "sql-common/json_dom.h"
 
 #ifdef WITH_WSREP
-#include "my_md5.h"
 #include "tc_log.h"
 #include "wsrep_api.h"
 #include "wsrep_mysqld.h"
+#include "wsrep_md5.h"
 
 /* Must always init to false. */
 static bool innobase_disallow_writes = false;
@@ -5915,15 +5915,10 @@ static int innodb_init(void *p) {
                          HTON_SUPPORTS_ONLINE_BACKUPS | HTON_SUPPORTS_COMPRESSED_COLUMNS;
   // TODO(WL9440): to be enabled when distance scan is implemented in innodb.
   //| HTON_SUPPORTS_DISTANCE_SCAN;
-<<<<<<< HEAD
-      HTON_SUPPORTS_ONLINE_BACKUPS | HTON_SUPPORTS_COMPRESSED_COLUMNS;
+
 #ifdef WITH_WSREP
   innobase_hton->flags |= HTON_WSREP_REPLICATION;
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-      HTON_SUPPORTS_ONLINE_BACKUPS | HTON_SUPPORTS_COMPRESSED_COLUMNS;
-=======
->>>>>>> ps/release-9.6.0-1
 
   innobase_hton->replace_native_transaction_in_thd = innodb_replace_trx_in_thd;
   innobase_hton->file_extensions = ha_innobase_exts;
@@ -12951,6 +12946,26 @@ inline const char *wsrep_key_type_to_str(Wsrep_service_key_type type) {
   return "unknown";
 }
 
+inline dict_table_t *dict_table_get_low(const char *table_name, THD* thd) {
+  dict_table_t *table;
+
+  ut_ad(table_name);
+  ut_ad(dict_sys_mutex_own());
+
+  table = dict_table_check_if_in_cache_low(table_name);
+  if (table == nullptr) {
+    /* MDL should already be held by server */
+    int error = 0;
+    table = dd_table_open_on_name(
+        thd, nullptr, table_name, true,
+        DICT_ERR_IGNORE_INDEX_ROOT | DICT_ERR_IGNORE_CORRUPT, &error);
+  }
+
+  ut_ad(!table || table->cached);
+
+  return (table);
+}
+
 extern dberr_t wsrep_append_foreign_key(
     trx_t *trx,                      /*!< in: trx */
     dict_foreign_t *foreign,         /*!< in: foreign key constraint */
@@ -12988,7 +13003,7 @@ extern dberr_t wsrep_append_foreign_key(
     mutex_enter(&(dict_sys->mutex));
     if (referenced) {
       foreign->referenced_table =
-          dict_table_get_low(foreign->referenced_table_name_lookup);
+          dict_table_get_low(foreign->referenced_table_name_lookup, thd);
       if (foreign->referenced_table) {
         foreign->referenced_index = wsrep_dict_foreign_find_index(
             foreign->referenced_table, NULL, foreign->referenced_col_names,
@@ -12996,7 +13011,7 @@ extern dberr_t wsrep_append_foreign_key(
       }
     } else {
       foreign->foreign_table =
-          dict_table_get_low(foreign->foreign_table_name_lookup);
+          dict_table_get_low(foreign->foreign_table_name_lookup, thd);
       if (foreign->foreign_table) {
         foreign->foreign_index = wsrep_dict_foreign_find_index(
             foreign->foreign_table, NULL, foreign->foreign_col_names,

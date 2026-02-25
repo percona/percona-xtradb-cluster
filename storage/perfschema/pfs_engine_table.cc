@@ -626,17 +626,10 @@ static PFS_engine_table_share *all_shares[] = {
 
     &table_keyring_component_status::m_share,
 
-<<<<<<< HEAD
-    &table_account_failed_login_lock_status::m_share,
 #ifdef WITH_WSREP
     &table_pxc_cluster_view::m_share,
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-    &table_account_failed_login_lock_status::m_share,
-
-=======
->>>>>>> ps/release-9.6.0-1
     nullptr};
 
 static PSI_mutex_key key_LOCK_pfs_share_list;

@@ -129,8 +129,8 @@
   @param comma   If true, append a ',' before the the user.
   @param reason for the failure
  */
-<<<<<<< HEAD
-void log_user(THD *thd, String *str, LEX_USER *user, bool comma = true) {
+void log_user(THD *thd, String *str, LEX_USER *user, bool comma,
+              const char *reason) {
 #ifdef WITH_WSREP
   /*
     PXC doesn't allow user functions viz. USER/CURRENT_USER
@@ -140,12 +140,6 @@ void log_user(THD *thd, String *str, LEX_USER *user, bool comma = true) {
   if (WSREP(thd) && !user) return;
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-void log_user(THD *thd, String *str, LEX_USER *user, bool comma = true) {
-=======
-void log_user(THD *thd, String *str, LEX_USER *user, bool comma,
-              const char *reason) {
->>>>>>> ps/release-9.6.0-1
   const String from_user(user->user.str, user->user.length,
                          system_charset_info);
   const String from_plugin(user->first_factor_auth_info.plugin.str,
@@ -3151,21 +3145,6 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
     }
 
     while ((tmp_user_name = user_list++)) {
-<<<<<<< HEAD
-      if (acl_is_utility_user(tmp_user_name->user.str, tmp_user_name->host.str,
-                              nullptr)) {
-        log_user(thd, &wrong_users, tmp_user_name, wrong_users.length() > 0);
-        result = true;
-        continue;
-      }
-||||||| merged common ancestors
-    if (acl_is_utility_user(tmp_user_name->user.str, tmp_user_name->host.str,
-                            nullptr)) {
-      log_user(thd, &wrong_users, tmp_user_name, wrong_users.length() > 0);
-      result = true;
-      continue;
-    }
-=======
       if (acl_is_utility_user(tmp_user_name->user.str, tmp_user_name->host.str,
                               nullptr)) {
         log_user(thd, &wrong_users, tmp_user_name, wrong_users.length() > 0,
@@ -3173,7 +3152,6 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
         result = true;
         continue;
       }
->>>>>>> ps/release-9.6.0-1
       bool history_check_done = false;
       I_multi_factor_auth *mfa = nullptr;
       /*

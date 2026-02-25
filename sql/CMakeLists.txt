@@ -826,6 +826,7 @@ IF(WITH_WSREP)
    wsrep_xid.cc
    service_wsrep.cc
    wsrep_master_key_manager.cc
+   wsrep_md5.cc
  )
  SET(WSREP_LIB wsrep-lib wsrep_api_v26)
 ENDIF()

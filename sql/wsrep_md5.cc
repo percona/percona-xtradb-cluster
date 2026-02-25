@@ -27,22 +27,20 @@
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 
 /**
-  @file mysys/my_md5.cc
+  @file mysys/wsrep_md5.cc
   Wrapper functions for OpenSSL.
 */
 
+#ifdef WITH_WSREP
 #include <openssl/err.h>
 #include <openssl/md5.h>
 #include <stddef.h>
 
 #include "my_compiler.h"
-#include "my_md5.h"
+#include "wsrep_md5.h"
 #include "my_ssl_algo_cache.h"
 #include "template_utils.h"
-
-#ifdef WITH_WSREP
 #include "md5.h"
-#endif
 
 // returns 1 for success and 0 for failure
 [[nodiscard]] int my_md5_hash(unsigned char *digest, unsigned const char *buf,
@@ -88,8 +86,6 @@ int compute_md5_hash(char *digest, const char *buf, size_t len) {
 
   return retval;
 }
-
-#ifdef WITH_WSREP
 
 /* For certification we need to identify each row uniquely.
 Generally this is done using PK but if table is created w/o PK
