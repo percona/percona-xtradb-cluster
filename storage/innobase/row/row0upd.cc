@@ -319,6 +319,8 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
 
   DBUG_ENTER("wsrep_row_upd_check_foreign_constraints");
 
+  assert(!thd_is_sql_fk_checks_enabled());
+
   /* TODO: NEWDD: WL#6049 Ignore FK on DD system tables for now */
   if (table->is_dd_table) {
     DBUG_RETURN(DB_SUCCESS);
@@ -2295,10 +2297,6 @@ code or DB_LOCK_WAIT */
 
   auto referenced = row_upd_index_is_referenced(index);
 
-#ifdef WITH_WSREP
-  bool foreign = wsrep_row_upd_index_is_foreign(index, trx);
-#endif /* WITH_WSREP */
-
   heap = mem_heap_create(1024, UT_LOCATION_HERE);
 
   if (!node->is_delete && dict_index_is_spatial(index) &&
@@ -2460,18 +2458,15 @@ code or DB_LOCK_WAIT */
       delete marked if we return after a lock wait in
       row_ins_sec_index_entry() below */
       if (!rec_get_deleted_flag(rec, dict_table_is_comp(index->table))) {
-#ifdef WITH_WSREP
-        que_node_t *parent = que_node_get_parent(node);
-#endif /* WITH_WSREP */
-
         err = btr_cur_del_mark_set_sec_rec(flags, btr_cur, true, thr, &mtr);
         if (err != DB_SUCCESS) {
           break;
         }
 #ifdef WITH_WSREP
-        if (wsrep_on(trx->mysql_thd) &&
+        if (!thd_is_sql_fk_checks_enabled() && wsrep_on(trx->mysql_thd) &&
             !wsrep_thd_is_BF(trx->mysql_thd, false) && err == DB_SUCCESS &&
-            !referenced && foreign && !row_upd_parent_has_cascade(parent)) {
+            !referenced && wsrep_row_upd_index_is_foreign(index, trx) &&
+            !row_upd_parent_has_cascade(que_node_get_parent(node))) {
           ulint *offsets =
               rec_get_offsets(rec, index, NULL, ULINT_UNDEFINED, UT_LOCATION_HERE, &heap);
           err = wsrep_row_upd_check_foreign_constraints(
@@ -2748,10 +2743,6 @@ static inline bool row_upd_clust_rec_by_insert_inherit(
   rec_t *rec;
   ulint *offsets = nullptr;
 
-#ifdef WITH_WSREP
-  que_node_t *parent = que_node_get_parent(node);
-#endif /* WITH_WSREP */
-
   ut_ad(node);
   ut_ad(index->is_clustered());
 
@@ -2840,8 +2831,9 @@ static inline bool row_upd_clust_rec_by_insert_inherit(
         }
       }
 #ifdef WITH_WSREP
-      else if (wsrep_on(trx->mysql_thd) && foreign &&
-               !row_upd_parent_has_cascade(parent)) {
+      else if (!thd_is_sql_fk_checks_enabled() && wsrep_on(trx->mysql_thd) &&
+               foreign &&
+               !row_upd_parent_has_cascade(que_node_get_parent(node))) {
         err = wsrep_row_upd_check_foreign_constraints(node, pcur, table, index,
                                                       offsets, thr, mtr);
         switch (err) {
@@ -3179,7 +3171,6 @@ func_exit:
   dberr_t err;
 
 #ifdef WITH_WSREP
-  que_node_t *parent = que_node_get_parent(node);
   trx_t *const trx = thr_get_trx(thr);
 #endif /* WITH_WSREP */
 
@@ -3209,8 +3200,9 @@ func_exit:
                                                offsets, thr, mtr);
   }
 #ifdef WITH_WSREP
-  else if (trx && wsrep_on(trx->mysql_thd) && err == DB_SUCCESS &&
-           !row_upd_parent_has_cascade(parent)) {
+  else if (!thd_is_sql_fk_checks_enabled() && trx && wsrep_on(trx->mysql_thd) &&
+           err == DB_SUCCESS &&
+           !row_upd_parent_has_cascade(que_node_get_parent(node))) {
     err = wsrep_row_upd_check_foreign_constraints(node, pcur, index->table,
                                                   index, offsets, thr, mtr);
     switch (err) {

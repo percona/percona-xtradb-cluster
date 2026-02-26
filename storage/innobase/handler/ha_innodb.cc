@@ -12981,6 +12981,10 @@ extern dberr_t wsrep_append_foreign_key(
   int cache_key_len;
   ut_a(trx);
 
+  if (thd_is_sql_fk_checks_enabled()) {
+    return DB_SUCCESS;
+  }
+
   if (!wsrep_do_replication(thd)) {
     return DB_SUCCESS;
   }

@@ -13,7 +13,7 @@ mysqld-bin.000002	#	Query	#	#	use `test`; CREATE TABLE t1 (f1 INTEGER PRIMARY KE
 mysqld-bin.000002	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000002	#	Query	#	#	BEGIN
 mysqld-bin.000002	#	Table_map	#	#	table_id: # (test.t1)
-mysqld-bin.000002	#	Write_rows	#	#	table_id: # flags: STMT_END_F
+mysqld-bin.000002	#	Write_rows	#	#	table_id: # flags: STMT_END_F USE_SQL_FOREIGN_KEY_F
 mysqld-bin.000002	#	Xid	#	#	COMMIT /* XID */
 INSERT INTO t1 VALUES(2);
 uuids_do_not_match
@@ -28,12 +28,12 @@ mysqld-bin.000004	#	Query	#	#	use `test`; CREATE TABLE t1 (f1 INTEGER PRIMARY KE
 mysqld-bin.000004	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000004	#	Query	#	#	BEGIN
 mysqld-bin.000004	#	Table_map	#	#	table_id: # (test.t1)
-mysqld-bin.000004	#	Write_rows	#	#	table_id: # flags: STMT_END_F
+mysqld-bin.000004	#	Write_rows	#	#	table_id: # flags: STMT_END_F USE_SQL_FOREIGN_KEY_F
 mysqld-bin.000004	#	Xid	#	#	COMMIT /* XID */
 mysqld-bin.000004	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000004	#	Query	#	#	BEGIN
 mysqld-bin.000004	#	Table_map	#	#	table_id: # (test.t1)
-mysqld-bin.000004	#	Write_rows	#	#	table_id: # flags: STMT_END_F
+mysqld-bin.000004	#	Write_rows	#	#	table_id: # flags: STMT_END_F USE_SQL_FOREIGN_KEY_F
 mysqld-bin.000004	#	Xid	#	#	COMMIT /* XID */
 uuids_do_not_match
 1
@@ -47,12 +47,12 @@ mysqld-bin.000001	#	Query	#	#	use `test`; CREATE TABLE t1 (f1 INTEGER PRIMARY KE
 mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	BEGIN
 mysqld-bin.000001	#	Table_map	#	#	table_id: # (test.t1)
-mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F
+mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F USE_SQL_FOREIGN_KEY_F
 mysqld-bin.000001	#	Xid	#	#	COMMIT /* XID */
 mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	BEGIN
 mysqld-bin.000001	#	Table_map	#	#	table_id: # (test.t1)
-mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F
+mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F USE_SQL_FOREIGN_KEY_F
 mysqld-bin.000001	#	Xid	#	#	COMMIT /* XID */
 SET SESSION sql_log_bin=0;
 INSERT INTO t1 VALUES (10);

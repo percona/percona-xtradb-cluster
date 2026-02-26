@@ -39,6 +39,13 @@
 #include "sql/sql_class.h"
 #include "sql/table.h"  // TABLE_SHARE_FOREIGN_KEY_INFO
 
+#ifdef WITH_WSREP
+#include "wsrep_api.h"
+#include "wsrep_mysqld.h"
+
+#define WSREP_MAX_SUPPORTED_KEY_LENGTH 3500
+#endif /* WITH_WSREP */
+
 /**
   With the ON CASCADE DELETE/UPDATE clause, deleting from the parent table
   can trigger recursive cascading calls. This defines the maximum number
@@ -184,9 +191,28 @@ static std::string build_fk_error_message(THD *thd, bool check_child_access,
       return str_buf.str();
   }
 
+#ifdef WITH_WSREP
+  /* We can still have 8.0 nodes in the cluster. Inconsistency voting protocol
+  used by such nodes uses the whole message string. Let's keep it consistent
+  with old message format (row0ins.cc::row_ins_set_detailed()) */
+  std::string foreign_table_name = tbl->s->table_name.str;
+  bool use_temp_name =
+      ((wsrep_on(thd) && (wsrep_thd_is_toi(thd) || wsrep_thd_is_in_nbo(thd))) &&
+       foreign_table_name.find("#sql-") != std::string::npos);
+
+  if (use_temp_name) {
+    str_buf << " (" << quote_char;
+  } else {
+    str_buf << " (" << quote_char << tbl->s->db.str;
+    str_buf << quote_char << "." << quote_char;
+  }
+  str_buf << (use_temp_name ? "temp_table" : tbl->s->table_name.str)
+          << quote_char << ", CONSTRAINT ";
+#else
   str_buf << " (" << quote_char << tbl->s->db.str;
   str_buf << quote_char << "." << quote_char;
   str_buf << tbl->s->table_name.str << quote_char << ", CONSTRAINT ";
+#endif
   str_buf << quote_char << fk->fk_name.str << quote_char;
   str_buf << " FOREIGN KEY (";
   for (uint k = 0; k < fk->columns; k++) {
@@ -1134,6 +1160,199 @@ static bool on_delete_on_update_set_null(THD *thd, const TABLE *table_p,
   return false;
 }
 
+#ifdef WITH_WSREP
+extern bool wsrep_prepare_key_for_innodb(const uchar *cache_key,
+                                         size_t cache_key_len,
+                                         const uchar *row_id, size_t row_id_len,
+                                         wsrep_buf_t *key, size_t *key_len);
+
+static bool wsrep_do_replication(THD *thd) {
+  return wsrep_on(thd) && wsrep_thd_is_local(thd) &&
+         !wsrep_consistency_check(thd) &&
+         thd->variables.binlog_format == BINLOG_FORMAT_ROW;
+}
+
+/* Inside wsrep_append_parent_fk_keys() and wsrep_append_child_fk_keys()
+   there is a logic moved from InnoDB wsrep_append_foreign_key() */
+static constexpr size_t MAX_CACHE_KEY_LENGTH = 512;
+static constexpr size_t WSREP_KEYPARTS_NUM = 3;
+/* Append writeset key related to the parent table row involved into this
+   operation */
+bool wsrep_append_parent_fk_keys(THD *thd, const TABLE *table_p,
+                                 const TABLE *table_c,
+                                 TABLE_SHARE_FOREIGN_KEY_INFO *fk,
+                                 enum_fk_dml_type dml_type) {
+  if (!wsrep_do_replication(thd)) {
+    return false;
+  }
+
+  uint child_key_idx =
+      get_key_index(table_c, fk->columns, fk->referencing_column_names);
+
+  uint parent_key_idx =
+      get_key_index(table_p, fk->columns, fk->referenced_column_names);
+
+  KEY *key_info_p = table_p->key_info + parent_key_idx;
+  KEY *key_info_c = table_c->key_info + child_key_idx;
+
+  char cache_key[MAX_CACHE_KEY_LENGTH + 1] = {'\0'};
+  int cache_key_len;
+
+  char *ptr = cache_key;
+  strncpy(ptr, table_p->s->db.str, sizeof(cache_key) - 1);
+  cache_key_len = strlen(ptr);
+  cache_key[cache_key_len] = '\0';
+  cache_key_len++;
+  ptr += cache_key_len;
+  strncpy(ptr, table_p->s->table_name.str,
+          sizeof(cache_key) - cache_key_len - 1);
+  cache_key_len += strlen(ptr);
+  cache_key[cache_key_len] = '\0';
+  cache_key_len++;
+
+  auto key_type = (dml_type == enum_fk_dml_type::FK_UPDATE &&
+                   wsrep_protocol_version < WsrepVersion::V4)
+                      ? WSREP_SERVICE_KEY_SHARED
+                      : WSREP_SERVICE_KEY_REFERENCE;
+
+  uchar key[WSREP_MAX_SUPPORTED_KEY_LENGTH + 1] = {'\0'};
+  size_t len = WSREP_MAX_SUPPORTED_KEY_LENGTH;
+  key[0] = (char)parent_key_idx;
+
+  uchar key_value[MAX_KEY_LENGTH];
+
+  int key_len = 0;
+  key_copy_fk(key_value, sizeof(key_value), table_c->record[0], key_info_c,
+              key_info_p, true, &key_len);
+
+  memcpy(key + 1, key_value, std::min((size_t)key_len, sizeof(key) - 1));
+  len = std::min(len, (size_t)key_len + 1);
+
+  wsrep_buf_t wkey_part[WSREP_KEYPARTS_NUM];
+  wsrep_key_t wkey = {wkey_part, WSREP_KEYPARTS_NUM};
+  if (!wsrep_prepare_key_for_innodb((const uchar *)cache_key, cache_key_len,
+                                    (const uchar *)key, len, wkey_part,
+                                    &wkey.key_parts_num)) {
+    WSREP_WARN("key prepare failed for cascaded FK: %s",
+               (wsrep_thd_query(thd)) ? wsrep_thd_query(thd) : "void");
+    return true;
+  }
+  auto rcode = wsrep_thd_append_key(thd, &wkey, 1, key_type);
+  if (rcode) {
+    DBUG_PRINT("wsrep", ("row key failed: %d", rcode));
+    WSREP_ERROR("Appending cascaded fk row key failed: %s, %d",
+                (wsrep_thd_query(thd)) ? wsrep_thd_query(thd) : "void", rcode);
+    return true;
+  }
+
+  // For update, we need to add keys for both rows in the parent table
+  if (dml_type == enum_fk_dml_type::FK_UPDATE) {
+    key_len = 0;
+    key_copy_fk(key_value, sizeof(key_value), table_c->record[1], key_info_c,
+                key_info_p, true, &key_len);
+
+    key[0] = (char)parent_key_idx;
+    memcpy(key + 1, key_value, std::min((size_t)key_len, sizeof(key) - 1));
+    len = std::min(len, (size_t)key_len + 1);
+
+    if (!wsrep_prepare_key_for_innodb((const uchar *)cache_key, cache_key_len,
+                                      (const uchar *)key, len, wkey_part,
+                                      &wkey.key_parts_num)) {
+      WSREP_WARN("key prepare failed for cascaded FK: %s",
+                 (wsrep_thd_query(thd)) ? wsrep_thd_query(thd) : "void");
+      return true;
+    }
+    rcode = wsrep_thd_append_key(thd, &wkey, 1, key_type);
+    if (rcode) {
+      DBUG_PRINT("wsrep", ("row key failed: %d", rcode));
+      WSREP_ERROR("Appending cascaded fk row key failed: %s, %d",
+                  (wsrep_thd_query(thd)) ? wsrep_thd_query(thd) : "void",
+                  rcode);
+      return true;
+    }
+  }
+  return false;
+}
+
+/* Append writeset keys related to the child tables rows involved into this
+   operation */
+bool wsrep_append_child_fk_keys(THD *thd, const TABLE *table_p,
+                                const TABLE *table_c,
+                                TABLE_SHARE_FOREIGN_KEY_INFO *fk,
+                                enum_fk_dml_type dml_type) {
+  /* We need to store key(s) related to the parent table rows involved into this
+       operation.
+      key_value - the new key value
+      old_key_value - the old key value. It is present only for update queries.
+     */
+
+  if (!wsrep_do_replication(thd)) {
+    return false;
+  }
+
+  uint child_key_idx =
+      get_key_index(table_c, fk->columns, fk->referencing_column_names);
+
+  uint parent_key_idx =
+      get_key_index(table_p, fk->columns, fk->referenced_column_names);
+
+  KEY *key_info_p = table_p->key_info + parent_key_idx;
+  KEY *key_info_c = table_c->key_info + child_key_idx;
+
+  char cache_key[MAX_CACHE_KEY_LENGTH + 1] = {'\0'};
+  int cache_key_len;
+
+  char *ptr = cache_key;
+  strncpy(ptr, table_c->s->db.str, sizeof(cache_key) - 1);
+  cache_key_len = strlen(ptr);
+  cache_key[cache_key_len] = '\0';
+  cache_key_len++;
+  ptr += cache_key_len;
+  strncpy(ptr, table_c->s->table_name.str,
+          sizeof(cache_key) - cache_key_len - 1);
+  cache_key_len += strlen(ptr);
+  cache_key[cache_key_len] = '\0';
+  cache_key_len++;
+
+  auto key_type = (dml_type == enum_fk_dml_type::FK_UPDATE &&
+                   wsrep_protocol_version < WsrepVersion::V4)
+                      ? WSREP_SERVICE_KEY_SHARED
+                      : WSREP_SERVICE_KEY_REFERENCE;
+
+  uchar key[WSREP_MAX_SUPPORTED_KEY_LENGTH + 1] = {'\0'};
+  size_t len = WSREP_MAX_SUPPORTED_KEY_LENGTH;
+  key[0] = (char)child_key_idx;
+
+  uchar key_value[MAX_KEY_LENGTH];
+
+  int key_len = 0;
+  key_copy_fk(key_value, sizeof(key_value), table_c->record[0], key_info_c,
+              key_info_p, true, &key_len);
+
+  memcpy(key + 1, key_value, std::min((size_t)key_len, sizeof(key) - 1));
+  len = std::min(len, (size_t)key_len + 1);
+
+  wsrep_buf_t wkey_part[WSREP_KEYPARTS_NUM];
+  wsrep_key_t wkey = {wkey_part, WSREP_KEYPARTS_NUM};
+  if (!wsrep_prepare_key_for_innodb((const uchar *)cache_key, cache_key_len,
+                                    (const uchar *)key, len, wkey_part,
+                                    &wkey.key_parts_num)) {
+    WSREP_WARN("key prepare failed for cascaded FK: %s",
+               (wsrep_thd_query(thd)) ? wsrep_thd_query(thd) : "void");
+    return true;
+  }
+  auto rcode = wsrep_thd_append_key(thd, &wkey, 1, key_type);
+  if (rcode) {
+    DBUG_PRINT("wsrep", ("row key failed: %d", rcode));
+    WSREP_ERROR("Appending cascaded fk row key failed: %s, %d",
+                (wsrep_thd_query(thd)) ? wsrep_thd_query(thd) : "void", rcode);
+    return true;
+  }
+
+  return false;
+}
+#endif /* WITH_WSREP */
+
 /**
  * @brief Checks foreign key constraint on child table.
  *
@@ -1312,6 +1531,10 @@ static bool check_child_fk_ref(THD *thd, const TABLE *table_p, TABLE *table_c,
       return true;
     }
 
+#ifdef WITH_WSREP
+    wsrep_append_child_fk_keys(thd, table_p, table_c, fk_c, dml_type);
+#endif
+
     if (on_delete_on_update_restrict_or_no_action(thd, table_c, fk_c,
                                                   dml_type) ||
         on_delete_cascade(thd, table_c, fk_c, dml_type, key_value, key_len,
@@ -1469,8 +1692,14 @@ static bool check_all_child_fk_ref(THD *thd, const TABLE *table_p,
 static bool check_parent_fk_ref(THD *thd, const TABLE *table_c, TABLE *table_p,
                                 TABLE_SHARE_FOREIGN_KEY_INFO *fk,
                                 enum_fk_dml_type dml_type) {
+#ifdef WITH_WSREP
+  assert(dml_type == enum_fk_dml_type::FK_UPDATE ||
+         dml_type == enum_fk_dml_type::FK_INSERT ||
+         dml_type == enum_fk_dml_type::FK_DELETE);
+#else
   assert(dml_type == enum_fk_dml_type::FK_UPDATE ||
          dml_type == enum_fk_dml_type::FK_INSERT);
+#endif
 
   DBUG_PRINT(
       "fk", ("check_parent_fk_ref(): child table = %s.%s, parent table "
@@ -1555,6 +1784,10 @@ static bool check_parent_fk_ref(THD *thd, const TABLE *table_c, TABLE *table_p,
                 table_p->s->db.str, table_p->s->table_name.str));
     return report_no_referenced_row_error(thd, table_c, fk);
   }
+
+#ifdef WITH_WSREP
+  wsrep_append_parent_fk_keys(thd, table_p, table_c, fk, dml_type);
+#endif /* WITH_WSREP */
 
   DBUG_PRINT("fk", ("check_parent_fk_ref(): Row found in parent table %s.%s",
                     table_p->s->db.str, table_p->s->table_name.str));

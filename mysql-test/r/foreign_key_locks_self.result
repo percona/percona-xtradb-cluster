@@ -105,6 +105,7 @@ lock_data FROM performance_schema.data_locks WHERE object_schema =
 object_schema	object_name	index_name	lock_type	lock_mode	lock_status	lock_data
 test	self	NULL	TABLE	IX	GRANTED	NULL
 test	self	fk1	RECORD	X,REC_NOT_GAP	GRANTED	2, 3
+test	self	PRIMARY	RECORD	S,REC_NOT_GAP	GRANTED	2
 test	self	PRIMARY	RECORD	X,REC_NOT_GAP	GRANTED	3
 COMMIT;
 SELECT object_schema, object_name, lock_type, lock_duration,
@@ -141,6 +142,7 @@ object_schema	object_name	index_name	lock_type	lock_mode	lock_status	lock_data
 test	self	NULL	TABLE	IX	GRANTED	NULL
 test	self	fk1	RECORD	X,REC_NOT_GAP	GRANTED	2, 3
 test	self	fk1	RECORD	X,REC_NOT_GAP	GRANTED	3, 4
+test	self	PRIMARY	RECORD	S,REC_NOT_GAP	GRANTED	1
 test	self	PRIMARY	RECORD	X,REC_NOT_GAP	GRANTED	2
 test	self	PRIMARY	RECORD	X,REC_NOT_GAP	GRANTED	3
 test	self	PRIMARY	RECORD	X,REC_NOT_GAP	GRANTED	4
@@ -332,6 +334,7 @@ lock_data FROM performance_schema.data_locks WHERE object_schema =
 object_schema	object_name	index_name	lock_type	lock_mode	lock_status	lock_data
 test	self	NULL	TABLE	IX	GRANTED	NULL
 test	self	fk1	RECORD	X,REC_NOT_GAP	GRANTED	2, 3
+test	self	PRIMARY	RECORD	S,REC_NOT_GAP	GRANTED	2
 test	self	PRIMARY	RECORD	X,REC_NOT_GAP	GRANTED	3
 COMMIT;
 SELECT object_schema, object_name, lock_type, lock_duration,
@@ -368,6 +371,7 @@ object_schema	object_name	index_name	lock_type	lock_mode	lock_status	lock_data
 test	self	NULL	TABLE	IX	GRANTED	NULL
 test	self	fk1	RECORD	X,REC_NOT_GAP	GRANTED	2, 3
 test	self	fk1	RECORD	X,REC_NOT_GAP	GRANTED	3, 4
+test	self	PRIMARY	RECORD	S,REC_NOT_GAP	GRANTED	1
 test	self	PRIMARY	RECORD	X,REC_NOT_GAP	GRANTED	2
 test	self	PRIMARY	RECORD	X,REC_NOT_GAP	GRANTED	3
 test	self	PRIMARY	RECORD	X,REC_NOT_GAP	GRANTED	4
@@ -564,6 +568,7 @@ object_schema	object_name	index_name	lock_type	lock_mode	lock_status	lock_data
 test	self	NULL	TABLE	IX	GRANTED	NULL
 test	self	fk1	RECORD	S	GRANTED	supremum pseudo-record
 test	self	fk1	RECORD	X,REC_NOT_GAP	GRANTED	2, 3
+test	self	PRIMARY	RECORD	S,REC_NOT_GAP	GRANTED	2
 test	self	PRIMARY	RECORD	X,REC_NOT_GAP	GRANTED	3
 COMMIT;
 SELECT object_schema, object_name, lock_type, lock_duration,
@@ -601,6 +606,7 @@ test	self	NULL	TABLE	IX	GRANTED	NULL
 test	self	fk1	RECORD	X	GRANTED	2, 3
 test	self	fk1	RECORD	X	GRANTED	3, 4
 test	self	fk1	RECORD	X	GRANTED	supremum pseudo-record
+test	self	PRIMARY	RECORD	S,REC_NOT_GAP	GRANTED	1
 test	self	PRIMARY	RECORD	X,REC_NOT_GAP	GRANTED	2
 test	self	PRIMARY	RECORD	X,REC_NOT_GAP	GRANTED	3
 test	self	PRIMARY	RECORD	X,REC_NOT_GAP	GRANTED	4
@@ -800,6 +806,7 @@ object_schema	object_name	index_name	lock_type	lock_mode	lock_status	lock_data
 test	self	NULL	TABLE	IX	GRANTED	NULL
 test	self	fk1	RECORD	S	GRANTED	supremum pseudo-record
 test	self	fk1	RECORD	X,REC_NOT_GAP	GRANTED	2, 3
+test	self	PRIMARY	RECORD	S,REC_NOT_GAP	GRANTED	2
 test	self	PRIMARY	RECORD	X,REC_NOT_GAP	GRANTED	3
 COMMIT;
 SELECT object_schema, object_name, lock_type, lock_duration,
@@ -837,6 +844,7 @@ test	self	NULL	TABLE	IX	GRANTED	NULL
 test	self	fk1	RECORD	X	GRANTED	2, 3
 test	self	fk1	RECORD	X	GRANTED	3, 4
 test	self	fk1	RECORD	X	GRANTED	supremum pseudo-record
+test	self	PRIMARY	RECORD	S,REC_NOT_GAP	GRANTED	1
 test	self	PRIMARY	RECORD	X,REC_NOT_GAP	GRANTED	2
 test	self	PRIMARY	RECORD	X,REC_NOT_GAP	GRANTED	3
 test	self	PRIMARY	RECORD	X,REC_NOT_GAP	GRANTED	4
