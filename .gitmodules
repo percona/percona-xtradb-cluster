@@ -1,11 +1,11 @@
 [submodule "percona-xtradb-cluster-galera"]
 	path = percona-xtradb-cluster-galera
-	url = https://github.com/jaideepkarande/galera
-	branch = PXC-4799-4x-80
+	url = https://github.com/kamil-holubicki/galera
+	branch = PXC-4799-PoC-v2
 [submodule "wsrep-lib"]
 	path = wsrep-lib
-	url = https://github.com/jaideepkarande/wsrep-lib.git
-	branch = PXC-4799-4x-80-3
+	url = https://github.com/kamil-holubicki/wsrep-lib.git
+	branch = PXC-4799-PoC-v2
 [submodule "extra/coredumper"]
 	path = extra/coredumper
 	url = https://github.com/Percona-Lab/coredumper.git
