@@ -10,7 +10,7 @@ ssl-dhparams=@ENV.MYSQL_TEST_DIR/std_data/dhparams.pem
 [mysqld.1]
 # Run the master.sh script before starting this process
 #!run-master-sh
-wsrep_provider_options='base_port=@mysqld.1.#galera_port;pc.ignore_sb=true'
+wsrep_provider_options='base_port=@mysqld.1.#galera_port;pc.ignore_sb=true;@ENV.WSREP_PROVIDER_TIMEOUTS'
 server_id=1
 early_plugin_load="keyring_vault=@ENV.KEYRING_VAULT_PLUGIN"
 keyring_vault_config=@ENV.MYSQLTEST_VARDIR/std_data/keyring_vault_confs/pxc_encrypt_rest_gt_vault_57_1.conf
@@ -18,7 +18,7 @@ keyring_vault_config=@ENV.MYSQLTEST_VARDIR/std_data/keyring_vault_confs/pxc_encr
 [mysqld.2]
 # Run the master.sh script before starting this process
 #!run-master-sh
-wsrep_provider_options='base_port=@mysqld.2.#galera_port;pc.ignore_sb=true'
+wsrep_provider_options='base_port=@mysqld.2.#galera_port;pc.ignore_sb=true;@ENV.WSREP_PROVIDER_TIMEOUTS'
 server_id=2
 early_plugin_load="keyring_vault=@ENV.KEYRING_VAULT_PLUGIN"
 keyring_vault_config=@ENV.MYSQLTEST_VARDIR/std_data/keyring_vault_confs/pxc_encrypt_rest_gt_vault_57_1.conf
