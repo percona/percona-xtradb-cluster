@@ -3006,7 +3006,7 @@ static LEX_USER *deep_copy(THD *thd, LEX_USER *src) {
     Inconsistency voting: triggered for both sides with ER_PLUGIN_IS_NOT_LOADED
  */
 static bool wsrep_check_for_auth_policy(THD *thd, List<LEX_USER> &list,
-                                        const char *cmd) {
+                                        const char *cmd, bool is_role) {
   if (WSREP(thd) && !thd->wsrep_applier && list.size() > 0) {
     // Accessing ACL cache requires lock. We get WRITE_MODE lock since the call
     // to is_privileged_user_for_credential_change() below, might have to update
@@ -3037,6 +3037,17 @@ static bool wsrep_check_for_auth_policy(THD *thd, List<LEX_USER> &list,
         return false;
       }
 
+      /*
+        get_current_user fetches the current user information.
+        Check if the user is a role or not.
+      */
+      bool is_role_validated = is_role;
+      if (!is_role) {
+        if (ACL_USER *au =
+                find_acl_user(user_from->host.str, user_from->user.str, true))
+          is_role_validated = au->is_role;
+      }
+
       /* set_and_validate_user_attributes() will hash provided password and
        wipe-out its plaintext version in
        user_from_tmp.first_factor_auth_info.auth.str.
@@ -3049,8 +3060,8 @@ static bool wsrep_check_for_auth_policy(THD *thd, List<LEX_USER> &list,
        flow will handle it */
       if (set_and_validate_user_attributes(
               thd, user_from_tmp, dummy_what_to_alter, is_privileged_user,
-              false, nullptr, nullptr, cmd, dummy_generated_passwords,
-              &dummy_mfa, false, false)) {
+              is_role_validated, nullptr, nullptr, cmd,
+              dummy_generated_passwords, &dummy_mfa, false, false)) {
         return true;
       }
     }
@@ -3095,7 +3106,11 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
   if (wsrep_check_system_user_privilege(thd, list)) {
     return true;
   }
-  bool block_toi = wsrep_check_for_auth_policy(thd, list, "CREATE USER");
+  bool block_toi = wsrep_check_for_auth_policy(
+      thd, list,
+      (thd->lex->sql_command == SQLCOM_CREATE_ROLE) ? "CREATE ROLE"
+                                                    : "CREATE USER",
+      is_role);
 #endif
 
   /*
@@ -3820,7 +3835,7 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
   if (wsrep_check_system_user_privilege(thd, list)) {
     return true;
   }
-  bool block_toi = wsrep_check_for_auth_policy(thd, list, "ALTER USER");
+  bool block_toi = wsrep_check_for_auth_policy(thd, list, "ALTER USER", false);
 #endif
 
   /*
