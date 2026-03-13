@@ -1873,8 +1873,23 @@ static void lock_reuse_for_next_key_lock(const lock_t *held_lock, ulint mode,
   that GAP Locks do not conflict with anything. Therefore a GAP Lock
   could be granted to us right now if we've requested: */
   mode |= LOCK_GAP;
+#ifdef WITH_WSREP
+#ifdef UNIV_DEBUG
+  /* The above does not hold for wsrep:
+     if a high-priority applier holds a lock on the same record,
+     rec_lock_check_conflict() will return Conflict::HAS_TO_WAIT
+     for any lock request from a local transaction (even if the
+     lock request is compatible). See rec_lock_check_conflict(). */
+  const auto conflicting =
+      lock_rec_other_has_conflicting(mode, block, heap_no, trx).wait_for;
+  ut_ad(conflicting == nullptr ||
+        (wsrep_on(trx->mysql_thd) && !wsrep_thd_is_BF(trx->mysql_thd, true) &&
+         wsrep_thd_is_BF(conflicting->trx->mysql_thd, true)));
+#endif /* UNIV_DEBUG */
+#else
   ut_ad(nullptr ==
         lock_rec_other_has_conflicting(mode, block, heap_no, trx).wait_for);
+#endif /* WITH_WSREP */
 
   /* It might be the case we already have one, so we first check that. */
   if (lock_rec_has_expl(mode, block, heap_no, trx) == nullptr) {
