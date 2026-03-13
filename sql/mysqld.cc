@@ -12341,7 +12341,7 @@ static int init_wsrep_thread(THD *thd) {
 }
 
 extern "C" void *start_wsrep_THD(void *arg) {
-  THD *thd;
+  THD *thd{nullptr};
   bool thd_added = false;
 
   Wsrep_thd_args *thd_args = (Wsrep_thd_args *)arg;
@@ -12380,6 +12380,12 @@ extern "C" void *start_wsrep_THD(void *arg) {
   /* wsrep_running_threads counter is managed in thd_manager */
   thd_manager->add_thd(thd);
   thd_added = true;
+
+  /*
+    Associate THD for instrumentation so performance_schema.variables_by_thread
+    and status_by_thread include this wsrep thread.
+  */
+  mysql_thread_set_psi_THD(thd);
 
 #ifndef SKIP_INNODB_HP
   /* set priority */
@@ -12434,6 +12440,8 @@ err:
     Therefore thd must only be deleted after info_thd is set
     to NULL.
   */
+  /* Dis-associate THD from PFS thread before destroying it. */
+  mysql_thread_set_psi_THD(nullptr);
   delete thd;
   delete static_cast<Wsrep_thd_args*>(arg);
 

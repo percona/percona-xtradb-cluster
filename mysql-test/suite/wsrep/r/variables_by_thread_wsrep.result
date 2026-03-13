@@ -1,0 +1,19 @@
+
+# 1. List wsrep threads (this should catch any new wsrep thread addition).
+SELECT NAME FROM performance_schema.threads WHERE NAME LIKE '%wsrep%' ORDER BY NAME;
+NAME
+thread/sql/THREAD_wsrep_applier
+thread/sql/THREAD_wsrep_rollbacker
+
+# 2. Assert no wsrep THD is missing in variables_by_thread.
+include/assert.inc [wsrep THDs are present in variables_by_thread]
+
+# 3. Assert wsrep threads have session variables stored (variables_by_thread).
+include/assert.inc [Wsrep thread count matches variables_by_thread and have session variable present.]
+include/assert.inc [Global only variables are not present.]
+
+# 4. Assert no wsrep THD is missing in status_by_thread.
+include/assert.inc [wsrep THDs are present in status_by_thread]
+
+# 5. Assert wsrep threads have session status stored (status_by_thread).
+include/assert.inc [Wsrep thread count matches status_by_thread and have session status present.]
