@@ -1,0 +1,137 @@
+#
+# mwb-1847: SKIP LOCKED option in SELECT FOR UPDATE
+# causes assertion
+#
+
+--source include/galera_cluster.inc
+
+--connection node_1
+--let $aborts_old = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_bf_aborts'`
+
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY);
+
+#
+# Start a local transaction on node 1.
+# This is going to be BFed later on...
+#
+--connection node_1
+START TRANSACTION;
+SELECT * FROM t1 FOR UPDATE;
+
+#
+# Issue a conflicting INSERT.
+# To simplify the test case, use streaming replication so that the
+# INSERT replicated immediately, while leaving the transaction active.
+#
+--connection node_2
+SET SESSION wsrep_trx_fragment_size=1;
+START TRANSACTION;
+INSERT INTO t1 VALUES (1);
+
+#
+# Wait for the local transaction to be BF aborted by INSERT.
+#
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1a
+SET SESSION wsrep_sync_wait=0;
+--let $wait_condition = SELECT VARIABLE_VALUE = $aborts_old + 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_bf_aborts'
+--source include/wait_condition.inc
+
+--connection node_1
+--error ER_LOCK_DEADLOCK
+COMMIT;
+
+#
+# INSERT leaves a "insert intention" type lock on supremum-record.
+# Notice that, without the conflict above, this lock wouldn't be here,
+# but it is necessary for reproducing the issue.
+#
+SELECT OBJECT_SCHEMA, OBJECT_NAME, LOCK_TYPE, LOCK_MODE, LOCK_STATUS, LOCK_DATA
+FROM performance_schema.data_locks
+WHERE LOCK_TYPE = "RECORD";
+
+#
+# If bug is present:
+# SELECT FOR UPDATE with SKIP LOCKED option will cause
+# "[ERROR] [InnoDB] Assertion failure: row0sel.cc:5034"
+# or
+# "[InnoDB] [FATAL] Unknown error code 21: Skip locked records"
+# in release builds
+#
+START TRANSACTION;
+--error ER_LOCK_DEADLOCK
+SELECT * FROM t1 FOR UPDATE SKIP LOCKED;
+
+--connection node_2
+COMMIT;
+
+DROP TABLE t1;
+
+
+#
+# mwb-1864: same assertion happens when
+# SELECT FOR UPDATE SKIP LOCKED with exact match
+#
+
+--connection node_1
+--let $aborts_old = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_bf_aborts'`
+
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY);
+INSERT INTO t1 VALUES (0);
+INSERT INTO t1 VALUES (2);
+
+#
+# Start a local transaction on node 1.
+# This is going to be BFed later on...
+#
+--connection node_1
+START TRANSACTION;
+SELECT * FROM t1 FOR UPDATE;
+
+#
+# Issue a conflicting INSERT.
+# To simplify the test case, use streaming replication so that the
+# INSERT replicated immediately, while leaving the transaction active.
+#
+--connection node_2
+SET SESSION wsrep_trx_fragment_size=1;
+START TRANSACTION;
+INSERT INTO t1 VALUES (1);
+
+#
+# Wait for the local transaction to be BF aborted by INSERT.
+#
+--connection node_1a
+SET SESSION wsrep_sync_wait=0;
+--let $wait_condition = SELECT VARIABLE_VALUE = $aborts_old + 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_bf_aborts'
+--source include/wait_condition.inc
+
+--connection node_1
+--error ER_LOCK_DEADLOCK
+COMMIT;
+
+#
+# INSERT leaves a "insert intention" type lock on supremum-record.
+# Notice that, without the conflict above, this lock wouldn't be here,
+# but it is necessary for reproducing the issue.
+#
+SELECT OBJECT_SCHEMA, OBJECT_NAME, LOCK_TYPE, LOCK_MODE, LOCK_STATUS, LOCK_DATA
+FROM performance_schema.data_locks
+WHERE LOCK_TYPE = "RECORD";
+
+#
+# If bug is present:
+# SELECT FOR UPDATE with SKIP LOCKED option will cause
+# "[ERROR] [InnoDB] Assertion failure: row0sel.cc:5034"
+# or
+# "[InnoDB] [FATAL] Unknown error code 21: Skip locked records"
+# in release builds
+#
+START TRANSACTION;
+--error ER_LOCK_DEADLOCK
+SELECT * FROM t1 WHERE f1 = 1 FOR UPDATE SKIP LOCKED;
+
+--connection node_2
+COMMIT;
+
+DROP TABLE t1;
