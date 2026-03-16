@@ -1290,6 +1290,10 @@ class Query_log_event : public virtual binary_log::Query_event,
  protected:
   Log_event_header::Byte *data_buf;
 
+#ifdef WITH_WSREP
+  std::string fixed_query;
+#endif
+
  public:
   /*
     For events created by Query_log_event::do_apply_event (and
