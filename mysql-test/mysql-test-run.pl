@@ -4339,6 +4339,13 @@ sub check_wsrep_support() {
         $ENV{'WSREP_PROVIDER'}= "none";
       }
     }
+    # for valgrind, extend Galera timeouts
+    if ($opt_valgrind_mysqld) {
+      $ENV{'WSREP_PROVIDER_TIMEOUTS'}= "pc.wait_prim_timeout=PT600S;evs.max_install_timeouts=1;repl.causal_read_timeout=PT900S;gmcast.peer_timeout=PT100S;evs.suspect_timeout=PT120S;evs.inactive_timeout=PT300S;evs.install_timeout=PT150S";
+    } else {
+      $ENV{'WSREP_PROVIDER_TIMEOUTS'}= "pc.wait_prim_timeout=PT60S;evs.max_install_timeouts=1;repl.causal_read_timeout=PT90S;gmcast.peer_timeout=PT10S;evs.suspect_timeout=PT12S;evs.inactive_timeout=PT30S;evs.install_timeout=PT15S";    
+    }  
+    
     if (not defined $ENV{'GALERA_GARBD'}) {
       my $dirname = dirname(abs_path($0));
       $dirname = "$dirname/..";

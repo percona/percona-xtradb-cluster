@@ -14,7 +14,7 @@ log_slave_updates=ON
 
 wsrep_provider=@ENV.WSREP_PROVIDER
 wsrep_cluster_address='gcomm://'
-wsrep_provider_options='base_port=@mysqld.1.#galera_port'
+wsrep_provider_options='base_port=@mysqld.1.#galera_port;@ENV.WSREP_PROVIDER_TIMEOUTS'
 
 # enforce read-committed characteristics across the cluster
 wsrep_causal_reads=ON
@@ -35,7 +35,7 @@ log_slave_updates=ON
 
 wsrep_provider=@ENV.WSREP_PROVIDER
 wsrep_cluster_address='gcomm://'
-wsrep_provider_options='base_port=@mysqld.2.#galera_port'
+wsrep_provider_options='base_port=@mysqld.2.#galera_port;@ENV.WSREP_PROVIDER_TIMEOUTS'
 
 # enforce read-committed characteristics across the cluster
 wsrep_causal_reads=ON
