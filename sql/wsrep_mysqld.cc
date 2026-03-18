@@ -35,6 +35,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <regex>
 #include <sstream>
 #include <string>
 
@@ -3481,6 +3482,7 @@ bool wsrep_keyring_component_loaded() {
   }
   return false;
 }
+
 bool wsrep_should_replicate_for_table(Table_ref * table_ref) {
   if (!table_ref) return false;
 
@@ -3498,4 +3500,108 @@ bool wsrep_should_replicate_for_table(Table_ref * table_ref) {
   //should never get here
   assert(0);
   return false;
+}
+
+static std::string sql_escape(const std::string &s) {
+  std::string out;
+  out.reserve(s.size() * 2);
+  for (char c : s) {
+    if (c == '\'')
+      out += "''";
+    else
+      out += c;
+  }
+  return out;
+}
+
+static const std::string SET_PASSWORD_FOR_PREFIX = "SET PASSWORD FOR";
+
+/* Rewrite SET PASSWORD query on the server side with the proper escaping */
+bool wsrep_rewrite_set_password_query(THD *thd, const LEX_USER *lex_user,
+                                      const char *new_password) {
+  std::string user =
+      sql_escape(lex_user->user.str
+                     ? std::string(lex_user->user.str, lex_user->user.length)
+                     : "");
+
+  std::string host =
+      sql_escape(lex_user->host.str
+                     ? std::string(lex_user->host.str, lex_user->host.length)
+                     : "");
+
+  std::string pass = sql_escape(new_password ? new_password : "");
+
+  std::string comment = " /* proper escaping */";
+
+  DBUG_EXECUTE_IF("set_password_simulate_no_pxc_4965", {
+    user = lex_user->user.str
+               ? std::string(lex_user->user.str, lex_user->user.length)
+               : "";
+    host = lex_user->host.str
+               ? std::string(lex_user->host.str, lex_user->host.length)
+               : "";
+    pass = new_password ? new_password : "";
+    comment = "";
+  });
+
+  std::string query = SET_PASSWORD_FOR_PREFIX + " '" + user + "'@'" + host +
+                      "'='" + pass + "'" + comment;
+
+  char *buff = (char *)thd->alloc(query.size() + 1);
+  if (!buff) {
+    my_error(ER_OUTOFMEMORY, MYF(ME_FATALERROR), 0);
+    return true;
+  }
+
+  memcpy(buff, query.c_str(), query.size() + 1);
+  thd->set_query(buff, query.size());
+  return false;
+}
+
+/* Versions <= 8.0.45 have a bug PXC-4965. Source when rewriting
+  the SET PASSWORD query, does not escape potential ' characters.
+  This causes the replicated query to be like e.g.
+  SET PASSWORD FOR 'user'@'host'='a'b'
+  which is not correct.
+  Handle the situation when received query originates from such a source.
+  If any other such queries are discovered in the future, here is the place
+  to fix them.
+  */
+static std::string rewrite_received_set_password_query(
+    const std::string &query) {
+  static const std::regex broken_re("^" + SET_PASSWORD_FOR_PREFIX +
+                                    R"(\s+'(.*?)'@'(.*?)'='(.*)'$)");
+
+  DBUG_EXECUTE_IF("set_password_simulate_no_pxc_4965", { return query; });
+
+  std::string query_ret = query;
+  std::smatch m;
+
+  std::string user, host, pass, rewritten;
+
+  /* Note that the query from fixed node has a trailing comment, so it will not
+     match the regex */
+  if (std::regex_match(query, m, broken_re)) {
+    // Broken sender (pre PXC-4965)
+    user = m[1];
+    host = m[2];
+    pass = m[3];
+
+    // Re-escape
+    query_ret = SET_PASSWORD_FOR_PREFIX + " '" + sql_escape(user) + "'@'" +
+                sql_escape(host) + "'='" + sql_escape(pass) + "'";
+  }
+
+  return query_ret;
+}
+
+std::string wsrep_fix_received_query(const char *query, size_t query_len) {
+  std::string query_str(query, query_len);
+  std::string query_ret = query_str;
+
+  if (query_str.find(SET_PASSWORD_FOR_PREFIX) == 0) {
+    query_ret = rewrite_received_set_password_query(query_str);
+  }
+
+  return query_ret;
 }

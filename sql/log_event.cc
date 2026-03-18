@@ -4017,6 +4017,16 @@ Query_log_event::Query_log_event(
     return;
   }
 
+#ifdef WITH_WSREP
+#ifdef MYSQL_SERVER
+  if (current_thd && current_thd->wsrep_applier && query && q_len > 0) {
+    fixed_query = wsrep_fix_received_query(query, q_len);
+    query = fixed_query.c_str();
+    q_len = fixed_query.length();
+  }
+#endif /* MYSQL_SERVER */
+#endif /* WITH_WSREP */
+
   common_header->set_is_valid(query != nullptr && q_len > 0);
 }
 
