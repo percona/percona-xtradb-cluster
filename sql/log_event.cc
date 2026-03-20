@@ -12796,7 +12796,7 @@ int Delete_rows_log_event::do_exec_row(const Relay_log_info *const rli) {
   }
 #endif /* WITH_WSREP */
 
-/* m_table->record[0] contains the BI */
+  /* m_table->record[0] contains the BI */
   m_table->mark_columns_per_binlog_row_image(thd);
   error = m_table->file->ha_delete_row(m_table->record[0]);
   m_table->default_column_bitmaps();

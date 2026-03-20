@@ -11,7 +11,4 @@ void wsrep_md5_update(void *ctx, char *buf, int len);
 void wsrep_compute_md5_hash(unsigned char *digest, void *ctx);
 void wsrep_enable_fips_mode();
 
-
-
-
 #endif /* WSREP_MD5 */

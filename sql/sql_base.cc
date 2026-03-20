@@ -10836,8 +10836,8 @@ void tdc_remove_table(THD *thd, enum_tdc_remove_table_type remove_type,
 
   DEBUG_SYNC_C("rm_table_tdc_locked");
 
-  #ifdef WITH_WSREP
-    /* if thd was BF aborted, exclusive locks are cancelled */
+#ifdef WITH_WSREP
+  /* if thd was BF aborted, exclusive locks are cancelled */
 #else
 
   assert(remove_type == TDC_RT_REMOVE_UNUSED ||

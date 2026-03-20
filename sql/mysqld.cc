@@ -986,9 +986,9 @@ MySQL clients support the protocol:
 #include "unicode/uclean.h"  // u_cleanup()
 
 #ifdef WITH_WSREP
-#include "wsrep_md5.h"  // wsrep_enable_fips_mode()
 #include "sql/protocol_classic.h"
 #include "sql_thd_internal_api.h"
+#include "wsrep_md5.h"  // wsrep_enable_fips_mode()
 #include "wsrep_mysqld.h"
 #include "wsrep_sst.h"
 #include "wsrep_thd.h"

@@ -213,8 +213,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #ifdef WITH_WSREP
 #include "tc_log.h"
 #include "wsrep_api.h"
-#include "wsrep_mysqld.h"
 #include "wsrep_md5.h"
+#include "wsrep_mysqld.h"
 
 /* Must always init to false. */
 static bool innobase_disallow_writes = false;
