@@ -11,7 +11,7 @@ You can install Percona XtraDB Cluster using the following methods:
 - from the Percona repository 
 - Build from the [source code](https://github.com/percona/percona-xtradb-cluster)
 
-You can find the installation instructions in the [official documentation](https://docs.percona.com/percona-xtradb-cluster/latest/install/index.html).
+You can find the installation instructions in the [official documentation](https://docs.percona.com/percona-xtradb-cluster/8.0/install-index.html).
 
 ## Release Notes
 
