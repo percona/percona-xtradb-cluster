@@ -1,5 +1,5 @@
 ##Test: Restart server and provide weak ssl-cipher at server startup
-# restart:--ssl-cipher=CAMELLIA256-SHA
+# restart:--ssl-cipher=DHE-RSA-CHACHA20-POLY1305
 in main, line 0:ERROR: Failed to set ciphers to use (code 2026)
 not ok
 RUN SHOW STATUS LIKE 'ssl_cipher'

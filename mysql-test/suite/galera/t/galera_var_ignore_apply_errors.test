@@ -244,6 +244,7 @@ CALL mtr.add_suppression("Error 'Can't drop database 's1'");
 CALL mtr.add_suppression("Error 'Can't DROP 'idx1'");
 CALL mtr.add_suppression("Error 'Can't DROP 'f2'");
 CALL mtr.add_suppression("'Table 't1' already exists' on query.");
+CALL mtr.add_suppression("Ignoring error 'Can't find record in 'child'' on Delete_rows event. Error_code: 1032");
 
 --connection node_2
 SET GLOBAL wsrep_ignore_apply_errors = 0;

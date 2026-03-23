@@ -15,6 +15,22 @@ set debug_sync='now SIGNAL cont_ins';
 commit;
 truncate user_session;
 set debug_sync = reset;
+"Phase 1.1: plain SQL statements"
+begin;
+update user set j = j + 1 WHERE id > 0;
+insert into user_session(id,fk1,fk2) values (2, 2, 3);
+commit;
+truncate user_session;
+set debug_sync = reset;
+"Phase 1.2: plain SQL statements"
+set wsrep_retry_autocommit=0;
+set debug_sync='ha_commit_trans_before_acquire_commit_lock SIGNAL ins_waiting WAIT_FOR cont_ins';
+insert into user_session(id,fk1,fk2) values (2, 2, 2);
+set debug_sync='now WAIT_FOR ins_waiting';
+insert into user_session(id,fk1,fk2) values (2, 2, 3);
+set debug_sync='now SIGNAL cont_ins';
+truncate user_session;
+set debug_sync = reset;
 "Phase 2: prepared statements"
 prepare upd  from 'update user set j = j + 1 WHERE id > 0';
 prepare ins1 from 'insert into user_session(id,fk1,fk2) values (2, 2, 2)';

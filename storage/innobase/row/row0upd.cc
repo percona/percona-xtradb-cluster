@@ -31,6 +31,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
  Created 12/27/1996 Heikki Tuuri
  *******************************************************/
 
+#include <sql/sql_thd_internal_api.h>
 #include <sys/types.h>
 
 #include "dict0dict.h"
@@ -317,6 +318,8 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
   bool opened = false;
 
   DBUG_ENTER("wsrep_row_upd_check_foreign_constraints");
+
+  assert(!thd_is_sql_fk_checks_enabled());
 
   /* TODO: NEWDD: WL#6049 Ignore FK on DD system tables for now */
   if (table->is_dd_table) {
@@ -2294,10 +2297,6 @@ code or DB_LOCK_WAIT */
 
   auto referenced = row_upd_index_is_referenced(index);
 
-#ifdef WITH_WSREP
-  bool foreign = wsrep_row_upd_index_is_foreign(index, trx);
-#endif /* WITH_WSREP */
-
   heap = mem_heap_create(1024, UT_LOCATION_HERE);
 
   if (!node->is_delete && dict_index_is_spatial(index) &&
@@ -2459,18 +2458,15 @@ code or DB_LOCK_WAIT */
       delete marked if we return after a lock wait in
       row_ins_sec_index_entry() below */
       if (!rec_get_deleted_flag(rec, dict_table_is_comp(index->table))) {
-#ifdef WITH_WSREP
-        que_node_t *parent = que_node_get_parent(node);
-#endif /* WITH_WSREP */
-
         err = btr_cur_del_mark_set_sec_rec(flags, btr_cur, true, thr, &mtr);
         if (err != DB_SUCCESS) {
           break;
         }
 #ifdef WITH_WSREP
-        if (wsrep_on(trx->mysql_thd) &&
+        if (!thd_is_sql_fk_checks_enabled() && wsrep_on(trx->mysql_thd) &&
             !wsrep_thd_is_BF(trx->mysql_thd, false) && err == DB_SUCCESS &&
-            !referenced && foreign && !row_upd_parent_has_cascade(parent)) {
+            !referenced && wsrep_row_upd_index_is_foreign(index, trx) &&
+            !row_upd_parent_has_cascade(que_node_get_parent(node))) {
           ulint *offsets =
               rec_get_offsets(rec, index, NULL, ULINT_UNDEFINED, UT_LOCATION_HERE, &heap);
           err = wsrep_row_upd_check_foreign_constraints(
@@ -2515,7 +2511,8 @@ code or DB_LOCK_WAIT */
 
       ut_ad(err == DB_SUCCESS);
 
-      if (referenced) {
+      if (!thd_is_sql_fk_checks_enabled() && referenced) {
+        DBUG_PRINT("fk", ("InnoDB FK on table %s", index->table->name.m_name));
         ulint *offsets;
 
         offsets = rec_get_offsets(rec, index, nullptr, ULINT_UNDEFINED,
@@ -2746,10 +2743,6 @@ static inline bool row_upd_clust_rec_by_insert_inherit(
   rec_t *rec;
   ulint *offsets = nullptr;
 
-#ifdef WITH_WSREP
-  que_node_t *parent = que_node_get_parent(node);
-#endif /* WITH_WSREP */
-
   ut_ad(node);
   ut_ad(index->is_clustered());
 
@@ -2825,7 +2818,8 @@ static inline bool row_upd_clust_rec_by_insert_inherit(
         }
       }
     check_fk:
-      if (referenced) {
+      if (!thd_is_sql_fk_checks_enabled() && referenced) {
+        DBUG_PRINT("fk", ("InnoDB FK on table %s", table->name.m_name));
         /* NOTE that the following call loses
         the position of pcur ! */
 
@@ -2837,8 +2831,9 @@ static inline bool row_upd_clust_rec_by_insert_inherit(
         }
       }
 #ifdef WITH_WSREP
-      else if (wsrep_on(trx->mysql_thd) && foreign &&
-               !row_upd_parent_has_cascade(parent)) {
+      else if (!thd_is_sql_fk_checks_enabled() && wsrep_on(trx->mysql_thd) &&
+               foreign &&
+               !row_upd_parent_has_cascade(que_node_get_parent(node))) {
         err = wsrep_row_upd_check_foreign_constraints(node, pcur, table, index,
                                                       offsets, thr, mtr);
         switch (err) {
@@ -3176,7 +3171,6 @@ func_exit:
   dberr_t err;
 
 #ifdef WITH_WSREP
-  que_node_t *parent = que_node_get_parent(node);
   trx_t *const trx = thr_get_trx(thr);
 #endif /* WITH_WSREP */
 
@@ -3198,15 +3192,17 @@ func_exit:
   err = btr_cur_del_mark_set_clust_rec(flags, btr_cur_get_block(btr_cur),
                                        btr_cur_get_rec(btr_cur), index, offsets,
                                        thr, node->row, mtr);
-  if (err == DB_SUCCESS && referenced) {
+  if (err == DB_SUCCESS && !thd_is_sql_fk_checks_enabled() && referenced) {
+    DBUG_PRINT("fk", ("InnoDB FK on table %s", index->table->name.m_name));
     /* NOTE that the following call loses the position of pcur ! */
 
     err = row_upd_check_references_constraints(node, pcur, index->table, index,
                                                offsets, thr, mtr);
   }
 #ifdef WITH_WSREP
-  else if (trx && wsrep_on(trx->mysql_thd) && err == DB_SUCCESS &&
-           !row_upd_parent_has_cascade(parent)) {
+  else if (!thd_is_sql_fk_checks_enabled() && trx && wsrep_on(trx->mysql_thd) &&
+           err == DB_SUCCESS &&
+           !row_upd_parent_has_cascade(que_node_get_parent(node))) {
     err = wsrep_row_upd_check_foreign_constraints(node, pcur, index->table,
                                                   index, offsets, thr, mtr);
     switch (err) {
@@ -3295,7 +3291,6 @@ func_exit:
   DEBUG_SYNC(trx->mysql_thd, "innodb_row_upd_clust_step_enter");
 
   if (dict_index_is_online_ddl(index)) {
-    ut_ad(node->table->id != DICT_INDEXES_ID);
     mode = BTR_MODIFY_LEAF | BTR_ALREADY_S_LATCHED;
     mtr_s_lock(dict_index_get_lock(index), &mtr, UT_LOCATION_HERE);
   } else {

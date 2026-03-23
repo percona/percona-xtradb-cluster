@@ -8,7 +8,7 @@ SET @@global.debug = '+d,has_global_grant_hold_lock';
 CREATE EVENT ev2 ON SCHEDULE EVERY 60 SECOND DO INSERT INTO t1(b) VALUES (1);
 SET @@global.debug = '-d,has_global_grant_hold_lock';
 DROP USER 'testuser'@'%';
-ERROR HY000: Operation DROP USER failed for 'testuser'@'%'
+ERROR HY000: Operation DROP USER failed for 'testuser'@'%' (User account does not exist)
 SET DEBUG_SYNC = 'now signal has_global_grant.release_lock';
 SET DEBUG_SYNC = 'RESET';
 DROP EVENT ev2;

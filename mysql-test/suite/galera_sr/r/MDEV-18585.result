@@ -16,20 +16,20 @@ Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000002	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000002	#	Query	#	#	BEGIN
 mysqld-bin.000002	#	Table_map	#	#	table_id: # (test.t1)
-mysqld-bin.000002	#	Write_rows	#	#	table_id: # flags: STMT_END_F
+mysqld-bin.000002	#	Write_rows	#	#	table_id: # flags: STMT_END_F USE_SQL_FOREIGN_KEY_F
 mysqld-bin.000002	#	Table_map	#	#	table_id: # (test.t1)
-mysqld-bin.000002	#	Write_rows	#	#	table_id: # flags: STMT_END_F
+mysqld-bin.000002	#	Write_rows	#	#	table_id: # flags: STMT_END_F USE_SQL_FOREIGN_KEY_F
 mysqld-bin.000002	#	Xid	#	#	COMMIT /* XID */
 mysqld-bin.000002	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000002	#	Query	#	#	BEGIN
 mysqld-bin.000002	#	Table_map	#	#	table_id: # (test.t1)
-mysqld-bin.000002	#	Write_rows	#	#	table_id: # flags: STMT_END_F
+mysqld-bin.000002	#	Write_rows	#	#	table_id: # flags: STMT_END_F USE_SQL_FOREIGN_KEY_F
 mysqld-bin.000002	#	Table_map	#	#	table_id: # (test.t1)
-mysqld-bin.000002	#	Write_rows	#	#	table_id: # flags: STMT_END_F
+mysqld-bin.000002	#	Write_rows	#	#	table_id: # flags: STMT_END_F USE_SQL_FOREIGN_KEY_F
 mysqld-bin.000002	#	Xid	#	#	COMMIT /* XID */
 mysqld-bin.000002	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000002	#	Query	#	#	BEGIN
 mysqld-bin.000002	#	Table_map	#	#	table_id: # (test.t1)
-mysqld-bin.000002	#	Write_rows	#	#	table_id: # flags: STMT_END_F
+mysqld-bin.000002	#	Write_rows	#	#	table_id: # flags: STMT_END_F USE_SQL_FOREIGN_KEY_F
 mysqld-bin.000002	#	Xid	#	#	COMMIT /* XID */
 DROP TABLE t1;

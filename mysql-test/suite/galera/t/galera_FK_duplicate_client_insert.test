@@ -82,8 +82,11 @@ insert into user_session(id,fk1,fk2) values (2, 2, 3);
 --connection node_1
 set debug_sync='now SIGNAL cont_ins';
 	
+# MySQL 9.6 moved FK handling to SQL layer. With innodb_native_foreign_keys=0, the INSERT will end up
+# with ER_DUP_ENTRY. This is because it is blocked during FK checkup phase, which is before inserting
+# the actual row. Once unblocked, it finds that replicated transaction already inserted the row.
 --connection node_1_i
---error 0,ER_LOCK_DEADLOCK
+--error 0,ER_DUP_ENTRY
 reap;
 
 --connection node_1_u
@@ -95,6 +98,56 @@ commit;
 truncate user_session;
 set debug_sync = reset;
 	
+#
+# test phase 1.1: plain SQL statements
+#
+--echo "Phase 1.1: plain SQL statements"
+
+--connection node_1_u
+begin;
+update user set j = j + 1 WHERE id > 0;
+
+--connection node_2_i
+insert into user_session(id,fk1,fk2) values (2, 2, 3);	
+	
+--connection node_1_u
+--error 0,ER_LOCK_DEADLOCK,ER_DUP_ENTRY
+commit;
+
+--connection node_1
+--error 0,ER_LOCK_DEADLOCK
+truncate user_session;
+set debug_sync = reset;
+
+
+#
+# test phase 1.2: plain SQL statements
+#
+--echo "Phase 1.2: plain SQL statements"
+
+--connection node_1_i
+set wsrep_retry_autocommit=0;
+set debug_sync='ha_commit_trans_before_acquire_commit_lock SIGNAL ins_waiting WAIT_FOR cont_ins';
+send insert into user_session(id,fk1,fk2) values (2, 2, 2);	
+
+--connection node_1
+set debug_sync='now WAIT_FOR ins_waiting';
+
+--connection node_2_i
+insert into user_session(id,fk1,fk2) values (2, 2, 3);	
+
+--connection node_1
+set debug_sync='now SIGNAL cont_ins';
+	
+--connection node_1_i
+--error 0,ER_LOCK_DEADLOCK
+reap;
+
+--connection node_1
+--error 0,ER_LOCK_DEADLOCK
+truncate user_session;
+set debug_sync = reset;
+
 #
 # test phase 2: prepared statements
 #

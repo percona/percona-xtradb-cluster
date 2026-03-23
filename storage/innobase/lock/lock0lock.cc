@@ -938,11 +938,7 @@ wsrep_kill_victim(const trx_t * const trx, trx_t *victim_trx) {
 
   if ((!bf_other) ||
       wsrep_thd_order_before(trx->mysql_thd, victim_trx->mysql_thd)) {
-    if (victim_trx->lock.que_state == TRX_QUE_LOCK_WAIT) {
-      WSREP_DEBUG("WSREP: BF victim waiting\n");
-      /* cannot release lock, until our lock
-      is in the queue*/
-    } else if (victim_trx != trx) {
+    auto print_conflict = [&]() {
       if (wsrep_log_conflicts) {
         ib::info() << "*** Priority TRANSACTION:";
         wsrep_trx_print_locking(stderr, trx, 3000);
@@ -953,11 +949,19 @@ wsrep_kill_victim(const trx_t * const trx, trx_t *victim_trx) {
           ib::info() << "*** Victim TRANSACTION:";
         }
         wsrep_trx_print_locking(stderr, victim_trx, 3000);
-        ib::info() << "*** WAITING FOR THIS LOCK TO BE GRANTED:";
-
         ib::info() << " SQL1: " << wsrep_thd_query(trx->mysql_thd);
         ib::info() << " SQL2: " << wsrep_thd_query(victim_trx->mysql_thd);
       }
+    };
+
+    if (victim_trx->lock.que_state == TRX_QUE_LOCK_WAIT) {
+      print_conflict();
+      WSREP_LOG_CONFLICT(trx->mysql_thd, victim_trx->mysql_thd, true);
+      WSREP_DEBUG("WSREP: BF victim waiting\n");
+      /* cannot release lock, until our lock
+      is in the queue*/
+    } else if (victim_trx != trx) {
+      print_conflict();
       if(wsrep_innobase_kill_one_trx(trx->mysql_thd, (const trx_t *)trx, victim_trx,
                                   true)) {
         return true;

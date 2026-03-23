@@ -44,8 +44,6 @@
 #include "storage/perfschema/unittest/stub_pfs_defaults.h"
 #endif /* WITH_WSREP */
 
-extern struct PSI_bootstrap PFS_bootstrap;
-
 static void test_oom() {
   int rc;
   PFS_global_param param;
