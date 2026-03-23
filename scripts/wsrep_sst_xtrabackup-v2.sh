@@ -185,10 +185,7 @@ XTRABACKUP_PREV_LTS_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.4"
 
 # Minimum PXB required versions for this node to work
 # To be able to service this version
-# Note: lock_ddl=REDUCED will be available in 9.1.0-2
-# For now, use 9.1.0-1. Once 9.1.0-2 is out, use it and revert this commit
-#XB_THIS_REQUIRED_VERSION="9.1.0-2"
-XB_THIS_REQUIRED_VERSION="9.1.0-1"
+XB_THIS_REQUIRED_VERSION="9.6.0-1"
 # To be able to service previous version
 XB_PREV_REQUIRED_VERSION="9.1.0"
 # To be able to service previous LTS version
@@ -1630,11 +1627,10 @@ function initialize_pxb_commands()
     # --lock-ddl option
     #
     # Use user-provided option if set, if not, use REDUCED by default.
-    # Starting from PXB 9.1.0-2, --lock-ddl=REDUCED is available in
-    # the community version. 9.1.0-2 is the minimum required version for this
+    # Starting from PXB 9.6.0-1, --lock-ddl=REDUCED is available in
+    # the community version. 9.6.0-1 is the minimum required version for this
     # script to work (see XB_THIS_REQUIRED_VERSION))
-    # lock_ddl="--lock-ddl=REDUCED"
-    lock_ddl=
+    lock_ddl="--lock-ddl=REDUCED"
     [[ -n "$lock_ddl_opt" ]] && lock_ddl="--lock-ddl=$lock_ddl_opt"
     wsrep_log_info "Using PXB option ${lock_ddl} for SST"
 
