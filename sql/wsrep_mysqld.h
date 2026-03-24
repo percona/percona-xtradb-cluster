@@ -96,6 +96,7 @@ extern ulonglong wsrep_mode;
 extern std::atomic<ulong> wsrep_running_threads;
 extern ulong wsrep_certification_rules;
 extern ulong wsrep_RSU_commit_timeout;
+extern ulong wsrep_desync_pause_retry_timeout;
 extern bool wsrep_allow_server_session;
 extern uint wsrep_min_log_verbosity;
 
