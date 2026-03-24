@@ -80,13 +80,18 @@ set debug_sync='now WAIT_FOR ins_waiting';
 insert into user_session(id,fk1,fk2) values (2, 2, 3);	
 
 --connection node_1
+# Wait for the replicated transaction to finish
+--let $wait_condition = SELECT COUNT(*) = 1 FROM user_session WHERE id = 2;
+--source include/wait_condition.inc
+
+# let the INSERT to continue
 set debug_sync='now SIGNAL cont_ins';
 	
 # MySQL 9.6 moved FK handling to SQL layer. With innodb_native_foreign_keys=0, the INSERT will end up
 # with ER_DUP_ENTRY. This is because it is blocked during FK checkup phase, which is before inserting
 # the actual row. Once unblocked, it finds that replicated transaction already inserted the row.
 --connection node_1_i
---error 0,ER_DUP_ENTRY
+--error ER_DUP_ENTRY
 reap;
 
 --connection node_1_u
