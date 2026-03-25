@@ -1,0 +1,485 @@
+################################################################################
+#
+# This test proves that FTWRL and DDL can be executed in parallel with some
+# limitations.
+# In some conditions, FTWRL/DDL statement may be blocked, but they will finish
+# successfully, once the other statement completes successfully or UNLOCK is
+# executed.
+# This test assures that PXC will not go in in-consistent state.
+#
+################################################################################
+# 1. Create database and table t1.
+# 2. Lock database and create a table.
+#    Confirm FTWRL error out due to LOCK INSTANCE command.
+#    Confirm DDL cannot be executed along with LOCK INSTANCE command.
+#    UNLOCK to restore the state.
+# 3. Execute FTWRL and DDL fails.
+# 3b. Table backup lock (LOCK TABLES ... FOR BACKUP) then FTWRL fails.
+# 4.A. Hold backup lock on node-2.
+# 4.B. Execute DDL on node-1
+# 4.C. Execute FTWRL on node-2 it fails.
+#      UNLOCK the instance.
+# 4.D. Let DDL finish on node1 and unlock node2.
+# 5.A. Add debug point in node2 to block DDL to ensure consistent test behavior.
+#      Execute DDL on node-1
+# 5.B. Execute FTWRL on node-2 once DDL is blocked.
+# 5.C. Let DDL finish on node1 and unlock node2.
+# 6.A. Execute FTWRL on node-2.
+# 6.B. Execute DDL on node-1
+# 6.C. DDL will be blocked until node2 releases the lock.
+#      Table is created once lock are released.
+# 7. Session 1: LOCK INSTANCE FOR BACKUP,
+#    Session 2: CREATE TABLE
+#    Session 1: FTWRL
+# 8. Session 1: LOCK INSTANCE FOR BACKUP, FTRWL
+#    Session 2: CREATE TABLE
+# 9. NODE 2: LOCK INSTANCE FOR BACKUP, FTRWL
+#    NODE 1: CREATE TABLE and sleep(let DDL acquire locks)
+#    NODE 2: FTRWL and UNLOCK
+# 10. NODE 1: LOCK INSTANCE FOR BACKUP, FTRWL
+#     NODE 2: CREATE TABLE
+# 11. 2nd FTWRL after desync/resync (try_pause local_monitor fix).
+#     Without fix: 2nd FTWRL hangs in local_monitor.
+#     With fix: try_pause returns undefined when seqno != last_left+1,
+#     retry loop retries until success.
+#     Replication traffic between 1st and 2nd FTWRL increases likelihood
+#     of local_seqno != last_left+1 condition.
+# 12. Cleanup.
+################################################################################
+--source include/galera_cluster.inc
+--source include/have_debug_sync.inc
+--source include/count_sessions.inc
+
+--echo #
+--echo # 1. Create database and table t1.
+--echo #
+
+# Expected while FTWRL retries try_desync_and_pause until the apply queue drains.
+--connection node_2
+--disable_query_log
+call mtr.add_suppression("Apply monitor not drained");
+call mtr.add_suppression("Commit monitor not drained");
+call mtr.add_suppression("GCS desync failed:");
+call mtr.add_suppression("GCS desync returned seqno");
+call mtr.add_suppression("Invalid local_seqno");
+--enable_query_log
+
+--connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
+
+--connection node_2
+--disable_warnings
+SET DEBUG_SYNC= 'RESET';
+--enable_warnings
+
+--connection node_1
+--disable_warnings
+SET DEBUG_SYNC= 'RESET';
+--enable_warnings
+
+CREATE DATABASE db1;
+USE db1;
+CREATE TABLE t1 (id INT PRIMARY KEY, a INT);
+
+--echo #
+--echo # 2. Lock database and create a table.
+--echo #    Confirm FTWRL error out due to LOCK INSTANCE command.
+--echo #    Confirm DDL cannot be executed along with LOCK INSTANCE command.
+--echo #    UNLOCK to restore the state.
+--echo #
+
+LOCK INSTANCE FOR BACKUP;
+CREATE TABLE t2 (id INT PRIMARY KEY, a INT);
+# You can still execute FTRWL if parallel TO isolation is not ongoing
+# pause will not block so FTRWL passes
+FLUSH TABLES WITH READ LOCK;
+# Due to FTRWL DDL will fail.
+--error ER_CANT_UPDATE_WITH_READLOCK
+CREATE TABLE t3 (id INT PRIMARY KEY, a INT);
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+
+--echo #
+--echo # 3. Execute FTWRL and DDL fails.
+--echo #
+
+FLUSH TABLES WITH READ LOCK;
+--error ER_CANT_UPDATE_WITH_READLOCK
+CREATE TABLE t5 (id INT PRIMARY KEY, a INT);
+UNLOCK TABLES;
+
+--echo #
+--echo # 3b. Table backup lock (LOCK TABLES ... FOR BACKUP) then FTWRL fails.
+--echo #
+
+LOCK TABLES FOR BACKUP;
+--error ER_CANT_EXECUTE_WITH_BACKUP_LOCK
+FLUSH TABLES WITH READ LOCK;
+UNLOCK TABLES;
+
+--echo #
+--echo # 4.A. Hold backup lock on node-2.
+--echo #
+
+--connection node_2
+LOCK INSTANCE FOR BACKUP;
+
+--echo #
+--echo # 4.B. Execute DDL on node-1
+--echo #
+
+--connection node_1
+--send CREATE TABLE t_synch1 (id INT PRIMARY KEY, a INT);
+
+--echo #
+--echo # 4.C. Execute FTWRL on node-2 it fails.
+--echo #      UNLOCK the instance.
+--echo #
+
+# Because of ongoing DDL/TO isolation pause will block
+# so FTRWL cannot be allowed since FTRWL will have conflicting
+# MDL locks, sleep for 5 seconds since DDL need to be replicated.
+--sleep 5
+--connection node_2
+--error ER_LOCK_OR_ACTIVE_TRANSACTION, ER_QUERY_INTERRUPTED
+FLUSH TABLES WITH READ LOCK;
+
+--echo #
+--echo # 4.D. Let DDL finish on node1 and unlock node2.
+--echo #
+
+--connection node_1
+--reap
+
+--connection node_2
+# UNLOCK is not needed and can be removed since FTRWL failed.
+# However it has been added since pause failed and corresponding
+# resume is in UNLOCK TABLES, to prove pause-resume sequence number
+# are not impacted, below UNLOCK TABLES has been added.
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+
+--echo #
+--echo # 5.A. Add debug point in node2 to block DDL to ensure consistent test behavior.
+--echo #      Execute DDL on node-1
+--echo #
+
+--connection node_2
+SET GLOBAL debug = "+d,ordered_commit_blocked";
+
+--connection node_1
+--send CREATE TABLE t_synch2 (id INT PRIMARY KEY, a INT);
+
+--echo #
+--echo # 5.B. Execute FTWRL on node-2 once DDL is blocked.
+--echo #
+
+
+--connection node_2
+SET DEBUG_SYNC = "now WAIT_FOR signal.ordered_commit_waiting";
+SET GLOBAL debug = "-d,ordered_commit_blocked";
+
+--send FLUSH TABLES WITH READ LOCK;
+--connection node_2a
+
+# FTWRL is blocked, waiting global read lock, reason for using send in FTWRL
+# SELECT queries are blocked so cannot have wait condition here.
+# SHOW PROCESSLIST is allowed.
+#11	root	localhost:54452	test	Query	0	Waiting for global read lock	FLUSH TABLES WITH READ LOCK	0	0	0
+
+SET DEBUG_SYNC = "now SIGNAL signal.ordered_commit_continue";
+
+--echo #
+--echo # 5.C. Let DDL finish on node1 and unlock node2.
+--echo #
+
+--connection node_1
+--reap
+
+--connection node_2
+--reap
+UNLOCK TABLES;
+
+--let $wait_condition= SELECT COUNT(*)=1 FROM information_schema.tables WHERE TABLE_SCHEMA="db1" AND TABLE_NAME="t_synch2"
+--source include/wait_condition.inc
+
+--echo #
+--echo # 6.A. Execute FTWRL on node-2.
+--echo #
+
+--connection node_2
+FLUSH TABLES WITH READ LOCK;
+
+--echo #
+--echo # 6.B. Execute DDL on node-1
+--echo #
+
+--connection node_1
+CREATE TABLE t_synch3 (id INT PRIMARY KEY, a INT);
+
+--echo #
+--echo # 6.C. DDL will be blocked(GRL) until node2 releases the lock.
+--echo #      Table is created once lock are released.
+--echo #
+
+--connection node_2
+# You cannot execute any SELECT query like query information_schema.tables
+# at this place which blocks us from asserting system condition like
+# e.g. table is created or not etc.
+# However SHOW PROCESSLIST and similar statements are allowed.
+UNLOCK TABLES;
+
+--connection node_2
+--let $wait_condition= SELECT COUNT(*)=1 FROM information_schema.tables WHERE TABLE_SCHEMA="db1" AND TABLE_NAME="t_synch3"
+--source include/wait_condition.inc
+
+--echo #
+--echo # 7. Session 1: LOCK INSTANCE FOR BACKUP,
+--echo #    Session 2: CREATE TABLE
+--echo #    Session 1: FTWRL
+--echo #
+
+# PXC-4799:
+# Session node_2: holds backup lock.
+# Session node_2a: runs CREATE TABLE and blocks in wsrep_to_isolation_begin()
+#                  waiting for backup lock.
+# Session node_2: runs FTWRL
+# We use try_desync_and_pause() when holding backup lock, so FTWRL does not
+# block.
+# DDL keeps waiting for UNLOCK TABLES/UNLOCK INSTANCE, or it fails with an
+# error to avoid deadlock.
+# (we UNLOCK immediately after FTRWL so failure does not happen)
+# Before PXC-4799: CREATE TABLE used to acquire Global Read Lock(GRL) first,
+# then replicate and wait for backup lock. So DDL would block on backup lock
+# while it has GRL and replicated.
+
+--connection node_2
+LOCK INSTANCE FOR BACKUP;
+
+--connection node_2a
+--send CREATE TABLE db1.t_synch4 (id INT PRIMARY KEY, a INT)
+
+--connection node_2
+--let $wait_condition=SELECT COUNT(*)=1 FROM performance_schema.processlist WHERE state LIKE "%Waiting for backup lock%" AND info lIKE "%CREATE TABLE%"
+--source include/wait_condition.inc
+
+--connection node_1
+--let $assert_text = Table t_synch4 should not replicate to node_1
+--let $assert_cond = COUNT(*) = 0 FROM information_schema.tables WHERE TABLE_SCHEMA="db1" AND TABLE_NAME="t_synch4"
+--source include/assert.inc
+
+--connection node_2
+FLUSH TABLES WITH READ LOCK;
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+
+--connection node_2a
+--reap
+
+--connection node_2
+--let $assert_text = Table t_synch4 is created
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.tables WHERE TABLE_SCHEMA="db1" AND TABLE_NAME="t_synch4"
+--source include/assert.inc
+
+--echo #
+--echo # 8. Session 1: LOCK INSTANCE FOR BACKUP, FTRWL
+--echo #    Session 2: CREATE TABLE
+--echo #
+
+--connection node_2
+LOCK INSTANCE FOR BACKUP;
+FLUSH TABLES WITH READ LOCK;
+
+--connection node_2a
+--send CREATE TABLE db1.t_synch5 (id INT PRIMARY KEY, a INT)
+
+--connection node_2
+--let $wait_condition=SELECT COUNT(*)=1 FROM performance_schema.processlist WHERE state LIKE "%Waiting for backup lock%" AND info lIKE "%CREATE TABLE%"
+
+--connection node_1
+--let $assert_text = Table t_synch5 should not replicate to node_1
+--let $assert_cond = COUNT(*) = 0 FROM information_schema.tables WHERE TABLE_SCHEMA="db1" AND TABLE_NAME="t_synch5"
+--source include/assert.inc
+
+--connection node_2
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+
+--connection node_2a
+--reap
+
+--connection node_2
+--let $assert_text = Table t_synch5 is created
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.tables WHERE TABLE_SCHEMA="db1" AND TABLE_NAME="t_synch5"
+--source include/assert.inc
+
+--connection node_1
+--let $wait_condition= SELECT COUNT(*)=1 FROM information_schema.tables WHERE TABLE_SCHEMA="db1" AND TABLE_NAME="t_synch5"
+--source include/wait_condition.inc
+
+--echo #
+--echo # 9. NODE 2: LOCK INSTANCE FOR BACKUP, FTRWL
+--echo #    NODE 1: CREATE TABLE and sleep(let DDL acquire locks)
+--echo #    NODE 2: FTRWL and UNLOCK
+--echo #
+
+--connection node_2
+LOCK INSTANCE FOR BACKUP;
+
+# Before PXC-4799: CREATE TABLE was not acquiring backup lock first in applier.
+# This means on NODE-2 applier will take GRL and deadlock on BACKUP lock.
+# Deadlock detection algorithm rolledback the transactions.
+# Eventually NODE-2 left the cluster due to inconsistency.
+--connection node_1
+--send CREATE TABLE db1.t_synch6 (id INT PRIMARY KEY, a INT);
+
+--sleep 5
+
+--connection node_2
+--error ER_QUERY_INTERRUPTED
+FLUSH TABLES WITH READ LOCK;
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+
+--connection node_1
+--reap
+
+--let $assert_text = Table t_synch6 is created
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.tables WHERE TABLE_SCHEMA="db1" AND TABLE_NAME="t_synch6"
+--source include/assert.inc
+
+--connection node_2
+--let $wait_condition= SELECT COUNT(*)=1 FROM information_schema.tables WHERE TABLE_SCHEMA="db1" AND TABLE_NAME="t_synch6"
+--source include/wait_condition.inc
+
+--echo #
+--echo # 10. NODE 1: LOCK INSTANCE FOR BACKUP, FTRWL
+--echo #     NODE 2: CREATE TABLE
+--echo #
+
+--connection node_2
+LOCK INSTANCE FOR BACKUP;
+FLUSH TABLES WITH READ LOCK;
+
+--connection node_1
+--send CREATE TABLE db1.t_synch7 (id INT PRIMARY KEY, a INT);
+
+--sleep 5
+
+--connection node_2
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+
+--connection node_1
+--reap
+
+--let $assert_text = Table t_synch7 is created
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.tables WHERE TABLE_SCHEMA="db1" AND TABLE_NAME="t_synch7"
+--source include/assert.inc
+
+--connection node_2
+--let $wait_condition= SELECT COUNT(*)=1 FROM information_schema.tables WHERE TABLE_SCHEMA="db1" AND TABLE_NAME="t_synch7"
+--source include/wait_condition.inc
+
+--echo #
+--echo # 11. 2nd FTWRL after desync/resync (try_pause local_monitor fix).
+--echo #     Without fix: 2nd FTWRL hangs in local_monitor.
+--echo #     With fix: try_pause returns undefined when seqno != last_left+1,
+--echo #     retry loop retries until success.
+--echo #     Replication traffic between 1st and 2nd FTWRL increases likelihood
+--echo #     of local_seqno != last_left+1 condition.
+--echo #
+
+--connection node_2
+SET GLOBAL wsrep_desync_pause_retry_timeout = 10;
+
+# 1st FTWRL: no DDL blocking, try_desync_and_pause succeeds, desync+pause
+LOCK INSTANCE FOR BACKUP;
+FLUSH TABLES WITH READ LOCK;
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+
+# Replication traffic between 1st and 2nd FTWRL (review comment)
+--connection node_1
+INSERT INTO db1.t1 VALUES (99, 99);
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM db1.t1 WHERE id = 99
+--source include/wait_condition.inc
+
+# 2nd FTWRL: after resume_and_resync + replication, try_pause would block in
+# local_monitor without the fix. With fix, retries until last_left advances.
+LOCK INSTANCE FOR BACKUP;
+FLUSH TABLES WITH READ LOCK;
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+
+--connection node_2
+SET GLOBAL wsrep_desync_pause_retry_timeout = 0;
+
+--echo #
+--echo # 11b. wsrep_desync_pause_retry_timeout=0: fail fast, no hang.
+--echo #     With timeout=0, try_desync_and_pause does single try.
+--echo #     When condition not met, returns immediately (no retry, no hang).
+--echo #
+
+--connection node_2
+SET GLOBAL wsrep_desync_pause_retry_timeout = 0;
+
+# 1st FTWRL
+LOCK INSTANCE FOR BACKUP;
+FLUSH TABLES WITH READ LOCK;
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+
+# Replication + 2nd FTWRL with timeout=0 - should succeed (queue drains)
+--connection node_1
+INSERT INTO db1.t1 VALUES (98, 98);
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM db1.t1 WHERE id = 98
+--source include/wait_condition.inc
+
+LOCK INSTANCE FOR BACKUP;
+FLUSH TABLES WITH READ LOCK;
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+
+--echo #
+--echo # 11c. 3rd and 4th FTWRL - multiple desync/resync cycles.
+--echo #     Ensure fix works for repeated consecutive FTWRLs.
+--echo #
+
+--connection node_2
+SET GLOBAL wsrep_desync_pause_retry_timeout = 10;
+
+# 3rd FTWRL
+LOCK INSTANCE FOR BACKUP;
+FLUSH TABLES WITH READ LOCK;
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+
+--connection node_1
+INSERT INTO db1.t1 VALUES (97, 97);
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM db1.t1 WHERE id = 97
+--source include/wait_condition.inc
+
+# 4th FTWRL
+LOCK INSTANCE FOR BACKUP;
+FLUSH TABLES WITH READ LOCK;
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+
+--connection node_2
+SET GLOBAL wsrep_desync_pause_retry_timeout = 0;
+
+--echo #
+--echo # 12. Cleanup.
+--echo #
+
+--disconnect node_2a
+
+--connection node_1
+DROP DATABASE db1;
+--source include/wait_until_count_sessions.inc

@@ -1145,7 +1145,7 @@ void Global_read_lock::unlock_global_read_lock(THD *thd) {
         wsrep_locked_seqno = WSREP_SEQNO_UNDEFINED;
         server_state.resume();
         pause_provider(false);
-      } else {
+      } else if (provider_paused) {
         server_state.resume_and_resync();
         pause_provider(false);
       }
@@ -1225,14 +1225,62 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd) {
      */
     if (server_state.state() != Wsrep_server_state::s_synced) {
       paused_seqno = server_state.pause();
+    } else if (thd->mdl_context.owns_equal_or_stronger_lock(
+                   MDL_key::BACKUP_LOCK, "", "", MDL_SHARED)) {
+      /*
+        lock_global_read_lock() is called before reaching here, so here we hold
+        MDL_key::GLOBAL and we have checked we are having a backup lock
+        (LOCK INSTANCE FOR BACKUP).
+        Before we can complete FTWRL, we must apply and commit all replicated
+        transactions (i.e. call pause()). Some of them may be waiting for the
+        backup lock we hold (we have observed DDLs on the applier). In that
+        case pause() would block indefinitely and we would have a deadlock.
+        So we use try_desync_and_pause() which returns immediately with failure
+        if pause would block.
+
+        Problem seen:
+        1. Session 1: LOCK INSTANCE FOR BACKUP (acquires backup lock)
+        2. Applier: replicated TOI CREATE TABLE with seqno=N; blocks in
+           CREATE TABLE trying to acquire backup lock
+        3. Session 1: FTWRL - desync and pause. Pause waits for all replicated
+           transactions to be applied/committed, so it waits for CREATE TABLE
+           seqno=N to finish (and blocks)
+        4. Deadlock: session 1 waiting in pause, applier waiting for backup lock
+
+        With try_desync_and_pause():
+        1. Session 1: LOCK INSTANCE FOR BACKUP (acquires backup lock)
+        2. Applier: replicated TOI CREATE TABLE blocks on backup lock
+        3. Session 1: FTWRL - try_desync_and_pause() sees pending apply/commit
+           and returns failure
+        4. Session 1: FTWRL fails with error; session can UNLOCK INSTANCE so
+           the applier can get backup lock and complete
+
+        TOI on the initiator node acquires backup lock before global read lock
+        (see wsrep_to_isolation_begin()) so that DDL blocks on backup lock
+        instead of holding global read lock and causing this situation when
+        possible.
+
+        Limitation: we cannot distinguish DDL (blocked on backup lock) from
+        other writesets waiting to be processed. So LOCK INSTANCE FOR BACKUP
+        followed by FTWRL may fail whenever any writesets are pending.
+        wsrep_desync_pause_retry_timeout (seconds) allows a the queue to drain.
+        We retry try_desync_and_pause every 100ms until success or timeout
+        specified in wsrep_desync_pause_retry_timeout.
+      */
+      paused_seqno = server_state.try_desync_and_pause(
+          wsrep_desync_pause_retry_timeout * 1000);
     } else {
       paused_seqno = server_state.desync_and_pause();
     }
-    WSREP_INFO("Server paused at: %lld", paused_seqno.get());
     if (paused_seqno.get() >= 0) {
       wsrep_locked_seqno = paused_seqno.get();
       pause_provider(true);
+    } else {
+      WSREP_INFO("Server pausing failed");
+      my_error(ER_QUERY_INTERRUPTED, MYF(0));
+      return true;
     }
+    WSREP_INFO("Server paused at: %lld", paused_seqno.get());
   }
 #endif /* WITH_WSREP */
 
