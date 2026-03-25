@@ -18,6 +18,7 @@
 #include "sql/mysqld_thd_manager.h"  // Global_THD_manager
 #include "sql/protocol_classic.h"
 #include "sql/rpl_info_factory.h"
+#include "sql/sql_backup_lock.h"  // acquire_shared_backup_lock
 #include "wsrep_applier.h"
 #include "wsrep_binlog.h"
 #include "wsrep_schema.h"
@@ -442,6 +443,17 @@ int Wsrep_high_priority_service::apply_toi(const wsrep::ws_meta &ws_meta,
 
   wsrep::client_state &client_state(thd->wsrep_cs());
   assert(client_state.in_toi());
+
+  /*
+    Acquire BACKUP_LOCK before any GRL is taken so that TOI applier follows
+    the same lock order as the initiator (wsrep_to_isolation_begin), avoiding
+    MDL deadlock with LOCK INSTANCE FOR BACKUP + FLUSH TABLES WITH READ LOCK.
+    Lock is transaction duration and released at commit/rollback.
+  */
+  if (acquire_shared_backup_lock(thd, thd->variables.lock_wait_timeout, true)) {
+    WSREP_ERROR("TOI apply failed: could not acquire backup lock.");
+    return 1;
+  }
 
   snprintf(m_thd->wsrep_info, sizeof(m_thd->wsrep_info),
            "wsrep: applying TOI write-set (%lld)",

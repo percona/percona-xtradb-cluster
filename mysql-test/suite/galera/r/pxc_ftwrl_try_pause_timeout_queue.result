@@ -1,0 +1,83 @@
+#
+# 1. Setup.
+#
+CREATE DATABASE IF NOT EXISTS db1;
+CREATE TABLE IF NOT EXISTS db1.t1 (id INT PRIMARY KEY, a INT);
+#
+# 2. Test with wsrep_desync_pause_retry_timeout FTWRL retries
+#    try_desync_and_pause instead of failing.
+#
+SET @wsrep_desync_pause_retry_timeout_save= @@GLOBAL.wsrep_desync_pause_retry_timeout;
+SET GLOBAL wsrep_desync_pause_retry_timeout = 3600;
+#
+# 3. Block applier using sync point apply_monitor_slave_enter_sync.
+#    for transaction queue.
+#    Galera queue we cannot distinguish DDL and DML so FTRWL waits for DML.
+#
+SET GLOBAL wsrep_provider_options = 'dbug=d,apply_monitor_slave_enter_sync';
+INSERT INTO db1.t1 VALUES (1, 1);
+SET SESSION wsrep_sync_wait = 0;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+#
+# 4. Test LOCK INSTANCE FOR BACKUP and FTRWL do not fail.
+#
+LOCK INSTANCE FOR BACKUP;
+FLUSH TABLES WITH READ LOCK;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_slave_enter_sync';
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+#
+# 5. Assert row exists.
+#
+include/assert.inc [Row exists in node-1]
+#
+# 6. Test with wsrep_desync_pause_retry_timeout set to -
+#     FTWRL fails due to try_desync_and_pause failure.
+#
+SET GLOBAL wsrep_desync_pause_retry_timeout = 0;
+#
+# 7. Block applier using sync point apply_monitor_slave_enter_sync.
+#    for transaction queue.
+#
+SET GLOBAL wsrep_provider_options = 'dbug=d,apply_monitor_slave_enter_sync';
+INSERT INTO db1.t1 VALUES (2, 2);
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+#
+# 8. Test LOCK INSTANCE FOR BACKUP passes and FTRWL fails.
+#
+LOCK INSTANCE FOR BACKUP;
+FLUSH TABLES WITH READ LOCK;
+ERROR 70100: Query execution was interrupted
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_slave_enter_sync';
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+#
+# 9. Assert row exists.
+#
+include/assert.inc [Row exists in node-1]
+#
+# 10. Timeout scenario: timeout 5 sec, block applier, FTWRL, wait 10 sec,
+#     unblock DML, FTWRL should fail (timeout).
+#
+SET GLOBAL wsrep_desync_pause_retry_timeout = 5;
+SET GLOBAL wsrep_provider_options = 'dbug=d,apply_monitor_slave_enter_sync';
+INSERT INTO db1.t1 VALUES (3, 3);
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+LOCK INSTANCE FOR BACKUP;
+FLUSH TABLES WITH READ LOCK;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_slave_enter_sync';
+ERROR 70100: Query execution was interrupted
+UNLOCK TABLES;
+UNLOCK INSTANCE;
+include/assert.inc [Row exists in node-1 after timeout scenario]
+#
+# 11. Cleanup.
+#
+SET @@GLOBAL.wsrep_desync_pause_retry_timeout = @wsrep_desync_pause_retry_timeout_save;
+DROP DATABASE db1;

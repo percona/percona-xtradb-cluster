@@ -214,6 +214,8 @@ wsrep_debug
 wsrep_debug
 wsrep_desync
 wsrep_desync
+wsrep_desync_pause_retry_timeout
+wsrep_desync_pause_retry_timeout
 wsrep_dirty_reads
 wsrep_dirty_reads
 wsrep_disk_pages_encrypt
