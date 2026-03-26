@@ -1,0 +1,57 @@
+################################################################################
+#
+# Test variable wsrep_desync_pause_retry_timeout.
+#
+# 1. Default value of wsrep_desync_pause_retry_timeout is 30.
+# 2. Test some valid values for wsrep_desync_pause_retry_timeout.
+# 3. Test some invalid values for wsrep_desync_pause_retry_timeout.
+# 4. Restore.
+################################################################################
+--source include/galera_cluster.inc
+
+--echo #
+--echo # 1. Default value of wsrep_desync_pause_retry_timeout is 30.
+--echo #
+
+SET @wsrep_desync_pause_retry_timeout_save= @@GLOBAL.wsrep_desync_pause_retry_timeout;
+SELECT @@GLOBAL.wsrep_desync_pause_retry_timeout;
+
+--echo #
+--echo # 2. Test some valid values for wsrep_desync_pause_retry_timeout.
+--echo #
+
+SET GLOBAL wsrep_desync_pause_retry_timeout = 0;
+SELECT @@GLOBAL.wsrep_desync_pause_retry_timeout;
+
+SET GLOBAL wsrep_desync_pause_retry_timeout = 5;
+SELECT @@GLOBAL.wsrep_desync_pause_retry_timeout;
+
+SET GLOBAL wsrep_desync_pause_retry_timeout = 31536000;
+SELECT @@GLOBAL.wsrep_desync_pause_retry_timeout;
+
+--echo #
+--echo # 3. Test some invalid values for wsrep_desync_pause_retry_timeout.
+--echo #
+
+# Value is set to 0
+SET GLOBAL wsrep_desync_pause_retry_timeout = -1;
+SELECT @@GLOBAL.wsrep_desync_pause_retry_timeout;
+
+# Value is set to 31536000
+SET GLOBAL wsrep_desync_pause_retry_timeout = 31536001;
+SELECT @@GLOBAL.wsrep_desync_pause_retry_timeout;
+
+--error ER_WRONG_TYPE_FOR_VAR
+SET GLOBAL wsrep_desync_pause_retry_timeout = 'A';
+SELECT @@GLOBAL.wsrep_desync_pause_retry_timeout;
+
+--error ER_WRONG_TYPE_FOR_VAR
+SET GLOBAL wsrep_desync_pause_retry_timeout = A;
+SELECT @@GLOBAL.wsrep_desync_pause_retry_timeout;
+
+--echo #
+--echo # 4. Restore.
+--echo #
+
+SET @@GLOBAL.wsrep_desync_pause_retry_timeout = @wsrep_desync_pause_retry_timeout_save;
+SELECT @@GLOBAL.wsrep_desync_pause_retry_timeout;
