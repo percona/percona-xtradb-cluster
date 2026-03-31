@@ -1,0 +1,102 @@
+# This test case proves that when super_read_only is set on a PXC member
+# and there are events on another PRIMARY Node load_events_from_db() updates
+# them to JOINER.
+#
+# 1. Normal restart:
+#      create event on node1
+#      event replicates to node2
+#      node2 restarts with --super-read-only.
+# 2. SST:
+#      shutdown node2
+#      remove grastate(for SST)
+#      create event on node1
+#      start node2 with --super-read-only (node2 does full SST)
+#
+
+--source include/force_restart.inc
+--source include/galera_cluster.inc
+
+--connection node_1
+# Lets do operation on some database so cleanup is easy,
+# just drop the database in the end.
+CREATE DATABASE IF NOT EXISTS db_super_rd_load_event_test;
+USE db_super_rd_load_event_test;
+
+--echo #
+--echo # 1. Normal restart:
+--echo #      create event on node1
+--echo #      event replicates to node2
+--echo #      node2 restarts with --super-read-only.
+--echo #
+
+--connection node_1
+CREATE EVENT pxc_restart_ev ON SCHEDULE EVERY 1 MONTH
+  STARTS '2026-06-01 00:00:01' ON COMPLETION NOT PRESERVE ENABLE
+  DO SELECT 1;
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM information_schema.events WHERE event_schema = 'db_super_rd_load_event_test' AND event_name = 'pxc_restart_ev'
+--source include/wait_condition.inc
+
+--connection node_2
+--let $restart_parameters = restart:--super-read-only
+--source include/restart_mysqld.inc
+
+--connection node_2
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+--let $assert_text = Event exists.
+--let $assert_cond = (SELECT COUNT(*) FROM information_schema.events WHERE event_schema = 'db_super_rd_load_event_test' AND event_name = 'pxc_restart_ev') = 1
+--let $assert_escape = 1
+--source include/assert.inc
+
+--connection node_1
+DROP EVENT IF EXISTS db_super_rd_load_event_test.pxc_restart_ev;
+
+--echo #
+--echo # 2. SST:
+--echo #      shutdown node2
+--echo #      remove grastate(for SST)
+--echo #      create event on node1
+--echo #      start node2 with --super-read-only (node2 does full SST)
+--echo #
+
+--connection node_2
+SET SESSION wsrep_sync_wait = 0;
+--source include/shutdown_mysqld.inc
+--remove_file $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
+
+--connection node_1
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+CREATE EVENT pxc_sst_ev ON SCHEDULE EVERY 1 MONTH
+  STARTS '2026-06-01 00:00:02' ON COMPLETION NOT PRESERVE ENABLE
+  DO SELECT 2;
+
+--connection node_2
+--let $_expect_file_name = $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
+--let $restart_parameters = restart:--super-read-only
+--let $do_not_echo_parameters = 1
+--source include/start_mysqld.inc
+
+--connection node_2
+SET SESSION wsrep_sync_wait = 0;
+--let $wait_condition= SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+--let $assert_text = Event exists.
+--let $assert_cond = (SELECT COUNT(*) FROM information_schema.events WHERE event_schema = 'db_super_rd_load_event_test' AND event_name = 'pxc_sst_ev') = 1
+--let $assert_escape = 1
+--source include/assert.inc
+
+--connection node_1
+DROP EVENT IF EXISTS db_super_rd_load_event_test.pxc_sst_ev;
+
+--echo #
+--echo # Cleanup.
+--echo #
+
+--connection node_1
+DROP DATABASE IF EXISTS db_super_rd_load_event_test;

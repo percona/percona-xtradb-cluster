@@ -965,6 +965,13 @@ bool Events::init(bool opt_noacl_or_bootstrap) {
   thd->thread_stack = (char *)&thd;
   thd->store_globals();
 
+#ifdef WITH_WSREP
+  /*
+   In PXC Event_db_repository::update_timing_fields_for_event may commit
+   DD changes creating internal transactions which can be blocked by read_only.
+   */
+  thd->set_skip_readonly_check();
+#endif
   assert(opt_event_scheduler == Events::EVENTS_ON ||
          opt_event_scheduler == Events::EVENTS_OFF);
 
