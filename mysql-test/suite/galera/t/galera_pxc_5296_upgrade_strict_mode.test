@@ -1,0 +1,197 @@
+################################################################################
+# PXC-5296: A PXC server upgrade must succeed when pxc_strict_mode is ENFORCING.
+#
+# pxc_strict_mode=ENFORCING/MASTER forces sql_require_primary_key=ON (PXC-5106)
+# and rejects any attempt to set it back to OFF. The server upgrade thread runs
+# the compiled-in upgrade script (mysql_system_tables_fix.sql), which
+#   a) temporarily sets sql_require_primary_key=OFF to rebuild the CSV log
+#      tables, which have no primary key (upstream bug#92988), and
+#   b) rebuilds the legacy firewall tables, which also have no primary key,
+#      *without* turning the policy off first.
+# Both were rejected, so the upgrade aborted with "Failed to upgrade server"
+# and the node could not start. Since ENFORCING forces the policy ON at
+# startup, this hit every upgrade of a node running in a strict mode.
+#
+# 1. Baseline.
+# 2. Seed node_2 with a legacy primary-key-less system table (the pre-8.0.22
+#    mysql.firewall_whitelist) and with user data that must survive.
+# 3. Regression guard: a normal client SET sql_require_primary_key=OFF is still
+#    blocked under ENFORCING.
+# 4. Restart node_2 with --pxc_strict_mode=ENFORCING --upgrade=FORCE.
+# 5. Post-upgrade checks: node rejoined, still ENFORCING, the primary-key-less
+#    system tables were rebuilt, log tables intact, user data intact.
+# 6. Cleanup.
+################################################################################
+
+--source include/galera_cluster.inc
+# Reference mysql_upgrade.test, due to the upgrade/restart this takes time.
+--source include/big_test.inc
+--source include/not_valgrind.inc
+
+--echo #
+--echo # 1. Baseline.
+--echo #
+
+--connection node_1
+call mtr.add_suppression("Cannot set sql_require_primary_key=OFF while pxc_strict_mode is");
+call mtr.add_suppression("Setting sql_require_primary_key=ON because pxc_strict_mode is ENFORCING or MASTER");
+--let $pxc_saved_1 = `SELECT @@global.pxc_strict_mode`
+
+--connection node_2
+# mtr.test_suppressions has no primary key, so these INSERTs must happen before
+# node_2 is switched to ENFORCING.
+call mtr.add_suppression("Cannot set sql_require_primary_key=OFF while pxc_strict_mode is");
+call mtr.add_suppression("Setting sql_require_primary_key=ON because pxc_strict_mode is ENFORCING or MASTER");
+--let $pxc_saved_2 = `SELECT @@global.pxc_strict_mode`
+
+--let $assert_text = pxc_strict_mode is DISABLED
+--let $assert_cond = "$pxc_saved_2" = "DISABLED"
+--source include/assert.inc
+
+--let $assert_text = sql_require_primary_key global is OFF.
+--let $assert_cond = [ SELECT @@global.sql_require_primary_key = 0 ]
+--source include/assert.inc
+
+--echo #
+--echo # 2. Seed node_2 with a legacy primary-key-less system table and user data.
+--echo #
+
+--connection node_2
+# mysql.firewall_whitelist as shipped before 8.0.22: no primary key. The
+# upgrade script runs "ALTER TABLE mysql.firewall_whitelist ENGINE=InnoDB" and
+# then adds the ID primary key. The ALTER is rejected while
+# sql_require_primary_key is ON, which is what aborted the upgrade.
+#
+# wsrep_on=OFF keeps the legacy table local to the node being upgraded, which
+# is how it would look in a real datadir, and keeps node_1 untouched.
+SET SESSION wsrep_on = OFF;
+CREATE TABLE mysql.firewall_whitelist (USERHOST VARCHAR(80) NOT NULL,
+                                       RULE text NOT NULL) ENGINE=InnoDB;
+SET SESSION wsrep_on = ON;
+
+--let $assert_text = seeded mysql.firewall_whitelist has no primary key
+--let $assert_cond = [ SELECT COUNT(*) = 0 FROM information_schema.table_constraints WHERE table_schema = "mysql" AND table_name = "firewall_whitelist" AND constraint_type = "PRIMARY KEY" ]
+--source include/assert.inc
+
+--connection node_1
+# Has a primary key, so it is valid under the sql_require_primary_key=ON that
+# pxc_strict_mode=ENFORCING implies.
+CREATE TABLE t1 (id INT PRIMARY KEY, val VARCHAR(32)) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1, 'before'), (2, 'upgrade'), (3, 'data');
+SELECT * FROM t1 ORDER BY id;
+
+--echo #
+--echo # 3. Regression guard: a client SET sql_require_primary_key=OFF is still
+--echo #    blocked under ENFORCING.
+--echo #
+
+# The fix must not weaken the user-facing guard. Only the server's own upgrade
+# thread is exempt; a normal session is not.
+--connection node_1
+SET GLOBAL pxc_strict_mode = 'ENFORCING';
+
+--error ER_WRONG_VALUE_FOR_VAR
+SET GLOBAL sql_require_primary_key = OFF;
+--error ER_WRONG_VALUE_FOR_VAR
+SET SESSION sql_require_primary_key = OFF;
+
+# Put node_1 back to the baseline; only node_2 is upgraded below. Degrading
+# pxc_strict_mode does not clear the global sql_require_primary_key that
+# ENFORCING turned ON, so reset it explicitly.
+SET GLOBAL pxc_strict_mode = 'DISABLED';
+SET GLOBAL sql_require_primary_key = OFF;
+
+--echo #
+--echo # 4. Restart node_2 with --pxc_strict_mode=ENFORCING --upgrade=FORCE.
+--echo #
+
+--connection node_2
+--source include/mysql_upgrade_preparation.inc
+
+# Before the fix this restart aborted during "Server upgrade from ... started"
+# with "Cannot set sql_require_primary_key=OFF while pxc_strict_mode is
+# ENFORCING" followed by "Failed to upgrade server", and the node never came
+# back. Reference mysql_upgrade.test: the upgrade takes a while.
+--let $restart_parameters = restart:--pxc_strict_mode=ENFORCING --upgrade=FORCE
+--let $wait_counter = 10000
+--source include/restart_mysqld.inc
+
+--source include/mysql_upgrade_cleanup.inc
+
+--echo #
+--echo # 5. Post-upgrade checks.
+--echo #
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+# Wait until node_2 is fully synced before reading replicated data below.
+--let $wait_condition = SELECT VARIABLE_VALUE = 'Synced' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
+--source include/wait_condition.inc
+
+--let $pxc_mode_upg = `SELECT @@global.pxc_strict_mode`
+--let $assert_text = node_2 is up and pxc_strict_mode is still ENFORCING
+--let $assert_cond = "$pxc_mode_upg" = "ENFORCING"
+--source include/assert.inc
+
+--let $assert_text = global sql_require_primary_key is ON under ENFORCING
+--let $assert_cond = [ SELECT @@global.sql_require_primary_key = 1 ]
+--source include/assert.inc
+
+# The upgrade script actually ran to completion over the primary-key-less
+# tables: firewall_whitelist gained its ID primary key, and the group-profile
+# tables were created -- including mysql.firewall_membership, which the script
+# creates without a primary key.
+--let $assert_text = mysql.firewall_whitelist gained its ID primary key
+--let $assert_cond = [ SELECT COUNT(*) = 1 FROM information_schema.table_constraints WHERE table_schema = "mysql" AND table_name = "firewall_whitelist" AND constraint_type = "PRIMARY KEY" ]
+--source include/assert.inc
+
+# The script creates firewall_membership without a primary key first and adds
+# the composite key later on, so both statements had to get through.
+--let $assert_text = mysql.firewall_membership was created by the upgrade
+--let $assert_cond = [ SELECT COUNT(*) = 1 FROM information_schema.tables WHERE table_schema = "mysql" AND table_name = "firewall_membership" ]
+--source include/assert.inc
+
+--let $assert_text = mysql.firewall_membership got its composite primary key
+--let $assert_cond = [ SELECT COUNT(*) = 1 FROM information_schema.table_constraints WHERE table_schema = "mysql" AND table_name = "firewall_membership" AND constraint_type = "PRIMARY KEY" ]
+--source include/assert.inc
+
+# The CSV log tables are the ones the script wraps in
+# sql_require_primary_key=OFF. They must still be there, and still without a
+# primary key.
+--let $assert_text = mysql.general_log and mysql.slow_log survived without a primary key
+--let $assert_cond = [ SELECT COUNT(*) = 2 FROM information_schema.tables t WHERE t.table_schema = "mysql" AND t.table_name IN ("general_log", "slow_log") AND NOT EXISTS (SELECT 1 FROM information_schema.table_constraints c WHERE c.table_schema = t.table_schema AND c.table_name = t.table_name AND c.constraint_type = "PRIMARY KEY") ]
+--source include/assert.inc
+
+# t1 was created on node_1; it must be present on the upgraded node_2, proving
+# the upgraded node is a working cluster member and the data survived.
+SELECT * FROM t1 ORDER BY id;
+
+--echo #
+--echo # 6. Cleanup.
+--echo #
+
+--connection node_2
+# Drop the node-local firewall tables while still under ENFORCING; DROP is not
+# affected by sql_require_primary_key.
+SET SESSION wsrep_on = OFF;
+DROP TABLE mysql.firewall_whitelist;
+DROP TABLE mysql.firewall_group_allowlist;
+DROP TABLE mysql.firewall_groups;
+DROP TABLE mysql.firewall_membership;
+SET SESSION wsrep_on = ON;
+
+# Restore node_2 to its suite defaults.
+--let $restart_parameters = restart
+--source include/restart_mysqld.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+--eval SET GLOBAL pxc_strict_mode = $pxc_saved_2
+SET GLOBAL sql_require_primary_key = OFF;
+
+--connection node_1
+DROP TABLE t1;
+--eval SET GLOBAL pxc_strict_mode = $pxc_saved_1
+SET GLOBAL sql_require_primary_key = OFF;
