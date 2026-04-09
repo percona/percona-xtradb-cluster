@@ -305,7 +305,7 @@ wsrep_node_address=
 wsrep_node_name=
    Human readable node name (for easier log reading only). Defaults to hostname.
 
-wsrep_slave_threads=1
+wsrep_applier_threads=1
    Number of threads dedicated to processing of writesets from other nodes.
    For best performance should be few per CPU core.
 

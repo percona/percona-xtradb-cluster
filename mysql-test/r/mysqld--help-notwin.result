@@ -1769,9 +1769,6 @@ The following options may be given as the first argument:
  To automatically control the assignment of autoincrement
  variables
  (Defaults to on; use --skip-wsrep-auto-increment-control to disable.)
- --wsrep-causal-reads 
- (DEPRECATED) setting this variable is equivalent to
- setting wsrep_sync_wait READ flag
  --wsrep-certification-rules=name 
  Certification rules to use in the cluster. Possible
  values are: "strict": stricter rules that could result in
@@ -2351,7 +2348,6 @@ wsrep-applier-FK-checks TRUE
 wsrep-applier-UK-checks FALSE
 wsrep-applier-threads 1
 wsrep-auto-increment-control TRUE
-wsrep-causal-reads FALSE
 wsrep-certification-rules strict
 wsrep-certify-nonPK TRUE
 wsrep-cluster-address 

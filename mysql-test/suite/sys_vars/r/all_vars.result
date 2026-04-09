@@ -194,8 +194,6 @@ wsrep_applier_threads
 wsrep_applier_threads
 wsrep_auto_increment_control
 wsrep_auto_increment_control
-wsrep_causal_reads
-wsrep_causal_reads
 wsrep_certification_rules
 wsrep_certification_rules
 wsrep_certify_nonPK

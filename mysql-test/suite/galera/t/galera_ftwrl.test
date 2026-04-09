@@ -38,7 +38,7 @@ SELECT COUNT(*) = 1 FROM t1;
 DROP TABLE t1;
 
 
-# 
+#
 # Test the scenario when the session on node_1 disables replication and acquires global read lock.
 # Another session on node_2 modifies the table. As the lock is not acquired on node_2 changes are applied
 # and replicated to the cluster.
@@ -86,7 +86,6 @@ SELECT * FROM t1;
 --enable_query_log
 
 # Disable causality checks
-SET SESSION wsrep_causal_reads = OFF;
 SET SESSION wsrep_sync_wait = 0;
 
 # node_1 is still no synced, but we can select. 1 row expeccted.

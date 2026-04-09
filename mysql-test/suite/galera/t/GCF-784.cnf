@@ -17,7 +17,6 @@ wsrep_cluster_address='gcomm://'
 wsrep_provider_options='base_port=@mysqld.2.#galera_port'
 
 # enforce read-committed characteristics across the cluster
-wsrep_causal_reads=ON
 wsrep_sync_wait = 7
 
 wsrep_node_address=127.0.0.1

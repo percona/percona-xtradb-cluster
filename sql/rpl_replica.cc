@@ -7695,7 +7695,7 @@ wsrep_restart_point :
         wsrep_node_dropped = false;
         mysql_mutex_unlock(&rli->run_lock);
         WSREP_INFO("Restarting Replica (conflict-state: %s)",
-                  wsrep_thd_client_state_str(thd));
+                   wsrep_thd_client_state_str(thd));
         goto wsrep_restart_point;
       } else {
         WSREP_INFO("Replica error due to node going non-primary");

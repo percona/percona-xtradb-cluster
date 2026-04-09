@@ -8,8 +8,6 @@ wsrep_provider=@ENV.WSREP_PROVIDER
 mysqlx=0
 
 # enforce read-committed characteristics across the cluster
-
-wsrep_causal_reads=ON
 wsrep_sync_wait = 15
 
 # Required for Galera

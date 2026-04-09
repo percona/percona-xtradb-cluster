@@ -16,7 +16,6 @@ wsrep_provider_options='repl.causal_read_timeout=PT90S;base_port=@mysqld.1.#gale
 
 # enforce read-committed characteristics across the cluster
 wsrep_sync_wait = 15
-wsrep_causal_reads = ON
 
 wsrep_node_address=127.0.0.1
 wsrep_sst_receive_address=127.0.0.2:@mysqld.1.#sst_port

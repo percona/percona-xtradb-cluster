@@ -39,7 +39,6 @@ id
 2
 SELECT * FROM t1;
 ERROR HY000: Lock wait timeout exceeded; try restarting transaction
-SET SESSION wsrep_causal_reads = OFF;
 SET SESSION wsrep_sync_wait = 0;
 SELECT * FROM t1;
 id
