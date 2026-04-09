@@ -999,6 +999,9 @@ install -d %{buildroot}%{_sysconfdir}/my.cnf.d
   install -D -m 0644 $MBD/build-ps/rpm/mysql.service $RBR%{_unitdir}/mysql.service
   install -D -m 0644 $MBD/build-ps/rpm/mysql@.service $RBR%{_unitdir}/mysql@.service
   install -D -m 0644 $MBD/build-ps/rpm/mysql.bootstrap $RBR%{_sysconfdir}/sysconfig/mysql.bootstrap
+  install -D -m 0644 $MBD/build-ps/rpm/clustercheck.socket $RBR%{_unitdir}/clustercheck.socket
+  install -D -m 0644 $MBD/build-ps/rpm/clustercheck@.service $RBR%{_unitdir}/clustercheck@.service
+  install -D -m 0644 $MBD/scripts/clustercheck.cnf.example $RBR%{_datadir}/mysql/clustercheck.cnf.example
 %else
   install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d/mysql
 %endif
@@ -1785,6 +1788,9 @@ fi
 %if 0%{?systemd}
 %attr(644, root, root) %{_unitdir}/mysql.service
 %attr(644, root, root) %{_unitdir}/mysql@.service
+%attr(644, root, root) %{_unitdir}/clustercheck.socket
+%attr(644, root, root) %{_unitdir}/clustercheck@.service
+%attr(644, root, root) %{_datadir}/mysql/clustercheck.cnf.example
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/sysconfig/mysql.bootstrap
 %attr(755, root, root) %{_bindir}/mysql-systemd
 %else
