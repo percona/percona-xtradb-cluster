@@ -253,16 +253,8 @@ wsrep_replicate_myisam
 wsrep_replicate_myisam
 wsrep_restart_replica
 wsrep_restart_replica
-wsrep_restart_slave
-wsrep_restart_slave
 wsrep_retry_autocommit
 wsrep_retry_autocommit
-wsrep_slave_FK_checks
-wsrep_slave_FK_checks
-wsrep_slave_UK_checks
-wsrep_slave_UK_checks
-wsrep_slave_threads
-wsrep_slave_threads
 wsrep_sst_allowed_methods
 wsrep_sst_allowed_methods
 wsrep_sst_donor

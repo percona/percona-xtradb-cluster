@@ -388,8 +388,8 @@ bool Persisted_variables_cache::set_variable(THD *thd, set_var *setvar) {
      * 2. aliases
      *
      * eg:
-     * wsrep_slave_FK_checks, wsrep_applier_FK_checks
-     * wsrep_slave_UK_checks, wsrep_applier_UK_checks
+     * wsrep_applier_FK_checks
+     * wsrep_applier_UK_checks
      *
      * SET PERSIST of these variables can result in multiple entries in the
      * performance_schema.persisted_variables. After server restart, any
@@ -2231,8 +2231,8 @@ bool Persisted_variables_cache::reset_persisted_variables(THD *thd,
        * 2. aliases
        *
        * e.g:
-       * wsrep_slave_FK_checks, wsrep_applier_FK_checks
-       * wsrep_slave_UK_checks, wsrep_applier_UK_checks
+       * wsrep_applier_FK_checks
+       * wsrep_applier_UK_checks
        *
        * SET PERSIST of these variables can result in multiple entries in the
        * performance_schema.persisted_variables. After server restart, any

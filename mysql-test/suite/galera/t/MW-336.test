@@ -1,5 +1,5 @@
 #
-# MW-336 Slave threads may leak if variable wsrep_slave_threads is set repeatedly
+# MW-336 Slave threads may leak if variable wsrep_applier_threads is set repeatedly
 #
 
 --source include/galera_cluster.inc
