@@ -1290,6 +1290,10 @@ class Query_log_event : public virtual mysql::binlog::event::Query_event,
  protected:
   mysql::binlog::event::Log_event_header::Byte *data_buf;
 
+#ifdef WITH_WSREP
+  std::string fixed_query;
+#endif
+
  public:
   // disable copy-move semantics
   Query_log_event(Query_log_event &&) noexcept = delete;

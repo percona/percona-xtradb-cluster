@@ -9,7 +9,7 @@ innodb_undo_log_encrypt=1
 ssl-dhparams=@ENV.MYSQL_TEST_DIR/std_data/dhparams.pem
 
 [mysqld.1]
-wsrep_provider_options='base_port=@mysqld.1.#galera_port;pc.ignore_sb=true'
+wsrep_provider_options='base_port=@mysqld.1.#galera_port;pc.ignore_sb=true;@ENV.WSREP_PROVIDER_TIMEOUTS'
 server_id=1
 #!run-suite-setup-sh
 
@@ -21,7 +21,7 @@ server_id=1
 # The statement failed once per 30sec, so the actual wait_until_connected_again.inc timeout was much longer than default 60s
 # so the test worked fine.
 [mysqld.2]
-wsrep_provider_options='base_port=@mysqld.2.#galera_port;pc.ignore_sb=true;repl.causal_read_timeout=PT10M'
+wsrep_provider_options='base_port=@mysqld.2.#galera_port;pc.ignore_sb=true;@ENV.WSREP_PROVIDER_TIMEOUTS'
 server_id=2
 #!run-suite-setup-sh
 

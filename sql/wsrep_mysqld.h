@@ -576,4 +576,15 @@ extern LEX_CSTRING PXC_INTERNAL_SESSION_HOST;
 
 bool wsrep_keyring_component_loaded();
 
+/**
+ * Rewrite the SET PASSWORD query into SET PASSWORD FOR before replication.
+ */
+bool wsrep_rewrite_set_password_query(THD *thd, const LEX_USER *lex_user,
+                                      const char *new_password);
+
+/**
+ * Fix replicated query string.
+ */
+std::string wsrep_fix_received_query(const char *query, size_t query_len);
+
 #endif /* WSREP_MYSQLD_H */

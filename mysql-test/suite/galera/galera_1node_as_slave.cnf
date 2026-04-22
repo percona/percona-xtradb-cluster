@@ -24,7 +24,7 @@ server-id=2
 
 wsrep_provider=@ENV.WSREP_PROVIDER
 wsrep_cluster_address='gcomm://'
-wsrep_provider_options='base_port=@mysqld.2.#galera_port;evs.install_timeout = PT15S; evs.max_install_timeouts=1;pc.ignore_sb=true'
+wsrep_provider_options='base_port=@mysqld.2.#galera_port;pc.ignore_sb=true;@ENV.WSREP_PROVIDER_TIMEOUTS'
 
 # enforce read-committed characteristics across the cluster
 wsrep_causal_reads=ON
