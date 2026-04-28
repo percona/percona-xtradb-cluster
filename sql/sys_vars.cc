@@ -387,6 +387,12 @@ static bool check_session_admin_no_super(sys_var *self, THD *thd,
   @param thd the session context
   @param setv the SET operations metadata
  */
+#ifdef WITH_WSREP
+static bool check_session_admin_and_sql_require_primary_key_on_check(sys_var *,
+                                                                     THD *,
+                                                                     set_var *);
+#endif /* WITH_WSREP */
+
 static bool check_session_admin(sys_var *self, THD *thd, set_var *setv) {
   Security_context *sctx = thd->security_context();
 
@@ -8179,7 +8185,11 @@ static Sys_var_bool Sys_sql_require_primary_key{
     DEFAULT(false),
     NO_MUTEX_GUARD,
     IN_BINLOG,
+#ifdef WITH_WSREP
+    ON_CHECK(check_session_admin_and_sql_require_primary_key_on_check)};
+#else
     ON_CHECK(check_session_admin)};
+#endif
 
 static Sys_var_bool Sys_sql_generate_invisible_primary_key(
     "sql_generate_invisible_primary_key",
@@ -8436,6 +8446,22 @@ static Sys_var_charptr Sys_protocol_compression_algorithms(
 #include "wsrep_binlog.h"
 #include "wsrep_sst.h"
 #include "wsrep_var.h"
+
+static bool check_session_admin_and_sql_require_primary_key_on_check(
+    sys_var *self, THD *thd, set_var *var) {
+  if (check_session_admin(self, thd, var)) return true;
+  if (pxc_strict_mode < PXC_STRICT_MODE_ENFORCING) return false;
+  if (var->save_result.ulonglong_value == 0) {
+    const char *strict_name =
+        (pxc_strict_mode == PXC_STRICT_MODE_MASTER) ? "MASTER" : "ENFORCING";
+    WSREP_ERROR(
+        "Cannot set sql_require_primary_key=OFF while pxc_strict_mode is %s.",
+        strict_name);
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), self->name.str, "OFF");
+    return true;
+  }
+  return false;
+}
 
 static PolyLock_mutex PLock_wsrep_cluster_config(&LOCK_wsrep_cluster_config);
 static Sys_var_charptr Sys_wsrep_provider(
@@ -8825,7 +8851,7 @@ static Sys_var_enum Sys_pxc_strict_mode(
     "PXC strict mode help control behavior of experimental features",
     GLOBAL_VAR(pxc_strict_mode), CMD_LINE(OPT_ARG), pxc_strict_modes,
     DEFAULT(PXC_STRICT_MODE_ENFORCING), NO_MUTEX_GUARD, NOT_IN_BINLOG,
-    ON_CHECK(pxc_strict_mode_check), ON_UPDATE(0));
+    ON_CHECK(pxc_strict_mode_check), ON_UPDATE(pxc_strict_mode_update));
 
 static const char *pxc_maint_modes[] = {"DISABLED", "SHUTDOWN", "MAINTENANCE",
                                         NullS};
