@@ -1,0 +1,55 @@
+# Files intentionally not installed in any package
+# (suppresses dh_missing warnings)
+
+# CMake helper files (used at build time only)
+usr/cmake/coredumper.cmake
+usr/cmake/coredumper-relwithdebinfo.cmake
+
+# KMIP — internal library, not exposed publicly
+usr/include/kmip.h
+usr/include/kmippp.h
+usr/lib/libkmip.a
+usr/lib/libkmippp.a
+usr/lib/*/pkgconfig/perconaserverclient.pc
+
+# License/README — handled via debian/copyright + .docs files
+usr/share/mysql/LICENSE
+usr/share/mysql/README.md
+usr/share/mysql/README
+
+# Legacy SysV init wrapper — replaced by systemd
+usr/share/mysql/mysql.server
+
+# Source tarball — only shipped in -source package
+usr/src/percona-xtradb-cluster/percona-xtradb-cluster-source.tar.gz
+
+# Test plugins — not for production binaries
+usr/lib/mysql/plugin/ha_mock.so
+usr/lib/mysql/plugin/debug/ha_mock.so
+usr/lib/mysql/plugin/ddl_rewriter.so
+usr/lib/mysql/plugin/debug/ddl_rewriter.so
+usr/lib/mysql/plugin/pfs_example_plugin_employee.so
+usr/lib/mysql/plugin/component_test_audit_api_message.so
+usr/lib/mysql/plugin/debug/component_test_audit_api_message.so
+usr/lib/mysql/plugin/component_test_host_application_signal.so
+usr/lib/mysql/plugin/debug/component_test_host_application_signal.so
+usr/lib/mysql/plugin/test_services_host_application_signal.so
+usr/lib/mysql/plugin/debug/test_services_host_application_signal.so
+usr/lib/mysql/plugin/component_test_sensitive_system_variables.so
+usr/lib/mysql/plugin/debug/component_test_sensitive_system_variables.so
+usr/lib/mysql/plugin/component_test_event_tracking_consumer.so
+usr/lib/mysql/plugin/debug/component_test_event_tracking_consumer.so
+usr/lib/mysql/plugin/component_test_event_tracking_consumer_a.so
+usr/lib/mysql/plugin/debug/component_test_event_tracking_consumer_a.so
+usr/lib/mysql/plugin/component_test_event_tracking_consumer_b.so
+usr/lib/mysql/plugin/debug/component_test_event_tracking_consumer_b.so
+usr/lib/mysql/plugin/component_test_event_tracking_consumer_c.so
+usr/lib/mysql/plugin/debug/component_test_event_tracking_consumer_c.so
+usr/lib/mysql/plugin/component_test_event_tracking_producer_a.so
+usr/lib/mysql/plugin/debug/component_test_event_tracking_producer_a.so
+usr/lib/mysql/plugin/component_test_event_tracking_producer_b.so
+usr/lib/mysql/plugin/debug/component_test_event_tracking_producer_b.so
+
+# Router plugins not in PXC distribution
+usr/lib/mysqlrouter/plugin/mysql_rest_service.so
+usr/lib/mysqlrouter/private/libprotobuf.so.*

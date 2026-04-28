@@ -416,38 +416,63 @@ fi
         add_fido_plugin="bundled"
     fi
 
+    # Profile-Guided Optimization toggle.
+    # Default = on. Set WITH_PGO=0 to disable. Auto-disabled for Debug builds
+    # (no value profiling unoptimized code).
+    WITH_PGO="${WITH_PGO:-1}"
     if [[ $CMAKE_BUILD_TYPE == 'Debug' ]]; then
-        cmake $SOURCEDIR/ ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
+        WITH_PGO=0
+    fi
+
+    # Suppress GCC false positives that fire during LTO link on Bison-generated
+    # parsers — distros add these via redhat-hardened-cc1/dpkg-buildflags;
+    # the standalone tarball build doesn't, so add them explicitly.
+    TARBALL_WARN_SUPPRESS="-Wno-free-nonheap-object -Wno-stringop-overflow -Wno-stringop-overread -Wno-alloc-size-larger-than -Wno-array-bounds"
+
+    # Common cmake flags shared across debug, release, and PGO 3-pass builds.
+    # Each invocation appends pass-specific flags (build type, profile flag,
+    # compilation comment).
+    CMAKE_COMMON_FLAGS=(
+        "$SOURCEDIR/"
+        ${CMAKE_OPTS:-}
+        -DBUILD_CONFIG=mysql_release
+        -DCMAKE_INSTALL_PREFIX="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME"
+        -DMYSQL_DATADIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/data"
+        -DCMAKE_C_FLAGS="${TARBALL_WARN_SUPPRESS}"
+        -DCMAKE_CXX_FLAGS="${TARBALL_WARN_SUPPRESS}"
+        -DWITH_PAM=ON
+        -DWITHOUT_ROCKSDB=ON
+        -DWITHOUT_TOKUDB=ON
+        -DWITH_INNODB_MEMCACHED=ON
+        -DDOWNLOAD_BOOST=1
+        -DFORCE_INSOURCE_BUILD=1
+        -DWITH_SYSTEM_LIBS=ON
+        -DWITH_PROTOBUF=bundled
+        -DWITH_RAPIDJSON=bundled
+        -DWITH_ICU=bundled
+        -DWITH_LZ4=bundled
+        -DWITH_EDITLINE=bundled
+        -DWITH_LIBEVENT=bundled
+        -DWITH_ZLIB=bundled
+        -DWITH_ZSTD=bundled
+        -DWITH_FIDO="$add_fido_plugin"
+        -DWITH_NUMA=ON
+        -DWITH_LDAP=system
+        -DWITH_BOOST="$TARGETDIR/libboost"
+        -DWITH_PACKAGE_FLAGS=OFF
+        -DMYSQL_SERVER_SUFFIX=".$TAG"
+        -DWITH_WSREP=ON
+        -DWITH_PERCONA_TELEMETRY=ON
+        -DWITH_UNIT_TESTS=0
+        -DWITH_LTO=ON
+    )
+
+    if [[ $CMAKE_BUILD_TYPE == 'Debug' ]]; then
+        cmake "${CMAKE_COMMON_FLAGS[@]}" \
             -DCMAKE_BUILD_TYPE=Debug \
             $DEBUG_EXTRA \
-            -DCMAKE_INSTALL_PREFIX="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" \
-            -DMYSQL_DATADIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/data" \
             -DCOMPILATION_COMMENT="$COMMENT - UNIV_DEBUG ON" \
-            -DWITH_PAM=ON \
-            -DWITHOUT_ROCKSDB=ON \
-            -DWITHOUT_TOKUDB=ON \
-            -DWITH_INNODB_MEMCACHED=ON \
-            -DDOWNLOAD_BOOST=1 \
-            -DFORCE_INSOURCE_BUILD=1 \
-            -DWITH_SYSTEM_LIBS=ON \
-            -DWITH_PROTOBUF=bundled \
-            -DWITH_RAPIDJSON=bundled \
-            -DWITH_ICU=bundled \
-            -DWITH_LZ4=bundled \
-            -DWITH_LIBEVENT=bundled \
-            -DWITH_EDITLINE=bundled \
-            -DWITH_ZLIB=bundled \
-            -DWITH_ZSTD=bundled \
-            -DWITH_FIDO="$add_fido_plugin" \
-            -DWITH_NUMA=ON \
-            -DWITH_LDAP=system \
-            -DWITH_BOOST="$TARGETDIR/libboost" \
-            -DWITH_PACKAGE_FLAGS=OFF \
-            -DMYSQL_SERVER_SUFFIX=".$TAG" \
-            -DWITH_WSREP=ON \
-            -DWITH_UNIT_TESTS=0 \
             -DWITH_DEBUG=ON \
-            -DWITH_PERCONA_TELEMETRY=ON \
             $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
         (make $MAKE_JFLAG $QUIET) || exit 1
@@ -455,41 +480,43 @@ fi
         (cp -v runtime_output_directory/mysqld-debug $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/mysqld) || true
         echo "mysqld in build in debug mode"
     else
-        cmake $SOURCEDIR/ ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
+        # Pass 1: configure (instrumentation pass if PGO enabled)
+        PGO_FIRST_FLAG=""
+        [ "${WITH_PGO}" = "1" ] && PGO_FIRST_FLAG="-DFPROFILE_GENERATE=1"
+
+        cmake "${CMAKE_COMMON_FLAGS[@]}" \
             -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
             -DMINIMAL_RELWITHDEBINFO=OFF \
-            -DCMAKE_INSTALL_PREFIX="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" \
-            -DMYSQL_DATADIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/data" \
+            $PGO_FIRST_FLAG \
             -DROUTER_INSTALL_LIBDIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib/mysqlrouter/private" \
             -DROUTER_INSTALL_PLUGINDIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib/mysqlrouter/plugin" \
             -DCOMPILATION_COMMENT="$COMMENT" \
-            -DWITH_PAM=ON \
-            -DWITHOUT_ROCKSDB=ON \
-            -DWITHOUT_TOKUDB=ON \
-            -DWITH_INNODB_MEMCACHED=ON \
-            -DDOWNLOAD_BOOST=1 \
-            -DFORCE_INSOURCE_BUILD=1 \
-            -DWITH_SYSTEM_LIBS=ON \
-            -DWITH_PROTOBUF=bundled \
-            -DWITH_RAPIDJSON=bundled \
-            -DWITH_ICU=bundled \
-            -DWITH_LZ4=bundled \
-            -DWITH_EDITLINE=bundled \
-            -DWITH_LIBEVENT=bundled \
-            -DWITH_ZLIB=bundled \
-            -DWITH_ZSTD=bundled \
-            -DWITH_FIDO="$add_fido_plugin" \
-            -DWITH_NUMA=ON \
-            -DWITH_LDAP=system \
-            -DWITH_BOOST="$TARGETDIR/libboost" \
-            -DWITH_PACKAGE_FLAGS=OFF \
-            -DMYSQL_SERVER_SUFFIX=".$TAG" \
-            -DWITH_WSREP=ON \
-            -DWITH_PERCONA_TELEMETRY=ON \
-            -DWITH_UNIT_TESTS=0 \
             $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
         (make $MAKE_JFLAG $QUIET) || exit 1
+
+        # Passes 2 & 3: profile + consume (skipped if WITH_PGO=0)
+        if [ "${WITH_PGO}" = "1" ]; then
+            echo "PGO: running MTR profile suite to generate .gcda profile data"
+            (make run-profile-suite) || exit 1
+
+            echo "PGO: rebuilding with profile data (-DFPROFILE_USE=1)"
+            cd "$TARGETDIR"
+            rm -rf bld
+            mkdir bld
+            cd bld
+            cmake "${CMAKE_COMMON_FLAGS[@]}" \
+                -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
+                -DMINIMAL_RELWITHDEBINFO=OFF \
+                -DFPROFILE_USE=1 \
+                -DROUTER_INSTALL_LIBDIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib/mysqlrouter/private" \
+                -DROUTER_INSTALL_PLUGINDIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib/mysqlrouter/plugin" \
+                -DCOMPILATION_COMMENT="$COMMENT" \
+                $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
+
+            (make $MAKE_JFLAG $QUIET) || exit 1
+        fi
+
         (make install) || exit 1
         echo "mysqld in build in release mode"
     fi

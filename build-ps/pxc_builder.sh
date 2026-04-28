@@ -22,6 +22,7 @@ Usage: $0 [OPTIONS]
         --deb_release       DEB version( default = 1)
         --bin_release       BIN version( default = 1)
         --debug             Build debug tarball
+        --enable_pgo        PGO (Profile-Guided Optimization) build (default = 1, set to 0 to disable)
         --help) usage ;;
 Example $0 --builddir=/tmp/PXC9x --get_sources=1 --build_src_rpm=1 --build_rpm=1
 EOF
@@ -59,7 +60,8 @@ parse_arguments() {
             --bin_release=*) BIN_RELEASE="$val" ;;
             --no_clone=*) NO_CLONE="$val" ;;
             --debug=*) DEBUG="$val" ;;
-            --help) usage ;;      
+            --enable_pgo=*) ENABLE_PGO="$val" ;;
+            --help) usage ;;
             *)
               if test -n "$pick_args"
               then
@@ -804,10 +806,17 @@ build_rpm(){
     source ${WORKDIR}/pxc-9x.properties
     source ${CURDIR}/srpm/pxc-9x.properties
     #
+    # Pass ENABLE_PGO through to rpmbuild as --define "with_pgo 1" so RPM build
+    # matches the PGO behavior of DEB and tarball artifacts. Use bash array for
+    # safe quoting of args containing spaces.
+    EXTRA_DEFINES=()
+    if [ "${ENABLE_PGO}" = "1" ]; then
+        EXTRA_DEFINES+=(--define "with_pgo 1")
+    fi
     if [ ${ARCH} = x86_64 ]; then
-        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" "${EXTRA_DEFINES[@]}" --rebuild rpmbuild/SRPMS/${SRCRPM}
     else
-        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" "${EXTRA_DEFINES[@]}" --rebuild rpmbuild/SRPMS/${SRCRPM}
     fi
     return_code=$?
     if [ $return_code != 0 ]; then
@@ -1010,6 +1019,11 @@ build_deb(){
    #    sed -i '196,201d' debian/rules
    # fi
 
+    # Pass ENABLE_PGO through to debian/rules as DEB_PGO so DEB build
+    # matches the PGO behavior of RPM and tarball artifacts.
+    if [ "${ENABLE_PGO}" = "1" ]; then
+        export DEB_PGO=1
+    fi
     GALERA_REVNO="${GALERA_REVNO}" SCONS_ARGS=' strict_build_flags=0'  MAKE_JFLAG=-j4  dpkg-buildpackage -rfakeroot -uc -us -b
     #
     cd ${WORKSPACE} || exit
@@ -1179,6 +1193,9 @@ build_tarball(){
     if [ -n "${REVISION}" ]; then
         sed -i "s:REVISION=\"\":REVISION=\"$REVISION\":g" ./build-ps/build-binary.sh
     fi
+    # Pass ENABLE_PGO through to build-binary.sh as WITH_PGO so tarball builds
+    # match the PGO behavior of RPM and DEB artifacts.
+    export WITH_PGO="${ENABLE_PGO}"
     if [[ ${DEBUG} == 1 ]]; then
         bash -x ./build-ps/build-binary.sh --debug --with-jemalloc=jemalloc/ -t $BIN_RELEASE $BUILD_ROOT
     else
@@ -1220,6 +1237,7 @@ RPM_RELEASE=1
 DEB_RELEASE=1
 BIN_RELEASE=1
 DEBUG=0
+ENABLE_PGO=1
 REVISION=0
 BRANCH="trunk"
 MECAB_INSTALL_DIR="${WORKDIR}/mecab-install"

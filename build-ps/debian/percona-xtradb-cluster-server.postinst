@@ -3,9 +3,10 @@
 . /usr/share/debconf/confmodule
 . /usr/share/mysql/mysql-helpers
 
-# Create directory for telemetry
-if [ -d /usr/local/percona/telemetry ]; then
-    install -d -m 2775 -o mysql -g percona-telemetry /usr/local/percona/telemetry/pxc
+# Set up Percona telemetry directory (factored into a shared helper script
+# so the same logic is used by RPM and DEB packages).
+if [ -x /usr/libexec/percona-xtradb-cluster/percona-telemetry-setup.sh ]; then
+    /usr/libexec/percona-xtradb-cluster/percona-telemetry-setup.sh || true
 fi
 
 MYSQLDATA=$(my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p' | tail -n 1)
