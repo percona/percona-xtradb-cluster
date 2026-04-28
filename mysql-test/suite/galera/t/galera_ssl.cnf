@@ -16,7 +16,6 @@ wsrep_cluster_address='gcomm://'
 wsrep_provider_options='base_port=@mysqld.1.#galera_port;socket.ssl=yes;socket.ssl_cert=@ENV.MYSQL_TEST_DIR/std_data/galera-cert.pem;socket.ssl_key=@ENV.MYSQL_TEST_DIR/std_data/galera-key.pem'
 
 # enforce read-committed characteristics across the cluster
-wsrep_causal_reads=ON
 wsrep_sync_wait = 15
 
 wsrep_node_address=127.0.0.1
@@ -34,7 +33,6 @@ wsrep_cluster_address='gcomm://127.0.0.1:@mysqld.1.#galera_port'
 wsrep_provider_options='base_port=@mysqld.2.#galera_port;socket.ssl=yes;socket.ssl_cert=@ENV.MYSQL_TEST_DIR/std_data/galera-cert.pem;socket.ssl_key=@ENV.MYSQL_TEST_DIR/std_data/galera-key.pem'
 
 # enforce read-committed characteristics across the cluster
-wsrep_causal_reads=ON
 wsrep_sync_wait = 15
 
 wsrep_node_address=127.0.0.1

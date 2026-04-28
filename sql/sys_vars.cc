@@ -8316,9 +8316,6 @@ static Sys_var_ulong Sys_wsrep_applier_threads(
     VALID_RANGE(1, 512), DEFAULT(1), BLOCK_SIZE(1), &PLock_wsrep_cluster_config,
     NOT_IN_BINLOG, ON_CHECK(NULL), ON_UPDATE(wsrep_slave_threads_update));
 
-static Sys_var_deprecated_alias Sys_wsrep_slave_threads(
-    "wsrep_slave_threads", Sys_wsrep_applier_threads);
-
 static Sys_var_charptr Sys_wsrep_dbug_option("wsrep_dbug_option",
                                              "DBUG options to provider library",
                                              GLOBAL_VAR(wsrep_dbug_option),
@@ -8471,14 +8468,6 @@ static Sys_var_enum Sys_wsrep_certification_rules(
     wsrep_certification_rules_names, DEFAULT(WSREP_CERTIFICATION_RULES_STRICT),
     NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(0));
 
-static Sys_var_bool Sys_wsrep_causal_reads(
-    "wsrep_causal_reads",
-    "(DEPRECATED) setting this variable is equivalent to setting "
-    "wsrep_sync_wait READ flag",
-    SESSION_VAR(wsrep_causal_reads), CMD_LINE(OPT_ARG), DEFAULT(false),
-    NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
-    ON_UPDATE(wsrep_causal_reads_update));
-
 static Sys_var_uint Sys_wsrep_sync_wait(
     "wsrep_sync_wait",
     "Ensure \"synchronous\" read view before executing an operation of the "
@@ -8486,8 +8475,8 @@ static Sys_var_uint Sys_wsrep_sync_wait(
     "TRANSACTION); 2 - UPDATE and DELETE; 4 - INSERT and REPLACE",
     HINT_UPDATEABLE SESSION_VAR(wsrep_sync_wait), CMD_LINE(OPT_ARG),
     VALID_RANGE(WSREP_SYNC_WAIT_NONE, WSREP_SYNC_WAIT_MAX),
-    DEFAULT(WSREP_SYNC_WAIT_NONE), BLOCK_SIZE(1), NO_MUTEX_GUARD, NOT_IN_BINLOG,
-    ON_CHECK(0), ON_UPDATE(wsrep_sync_wait_update));
+    DEFAULT(WSREP_SYNC_WAIT_NONE), BLOCK_SIZE(1), NO_MUTEX_GUARD,
+    NOT_IN_BINLOG);
 
 static const char *wsrep_mode_names[] = {
     "IGNORE_NATIVE_REPLICATION_FILTER_RULES", NullS};
@@ -8569,26 +8558,17 @@ static Sys_var_bool Sys_wsrep_applier_FK_checks(
     "foreign key constraint checks",
     GLOBAL_VAR(wsrep_slave_FK_checks), CMD_LINE(OPT_ARG), DEFAULT(true));
 
-static Sys_var_deprecated_alias Sys_wsrep_slave_FK_checks(
-    "wsrep_slave_FK_checks", Sys_wsrep_applier_FK_checks);
-
 static Sys_var_bool Sys_wsrep_applier_UK_checks(
     "wsrep_applier_UK_checks",
     "Should applier thread do "
     "secondary index uniqueness chesks",
     GLOBAL_VAR(wsrep_slave_UK_checks), CMD_LINE(OPT_ARG), DEFAULT(false));
 
-static Sys_var_deprecated_alias Sys_wsrep_slave_UK_checks(
-    "wsrep_slave_UK_checks", Sys_wsrep_applier_UK_checks);
-
 static Sys_var_bool Sys_wsrep_restart_replica(
     "wsrep_restart_replica",
     "Should MySQL replica be restarted automatically, when node joins back to "
     "cluster",
     GLOBAL_VAR(wsrep_restart_slave), CMD_LINE(OPT_ARG), DEFAULT(false));
-
-static Sys_var_deprecated_alias Sys_wsrep_restart_slave(
-    "wsrep_restart_slave", Sys_wsrep_restart_replica);
 
 static Sys_var_ulonglong Sys_wsrep_trx_fragment_size(
     "wsrep_trx_fragment_size",

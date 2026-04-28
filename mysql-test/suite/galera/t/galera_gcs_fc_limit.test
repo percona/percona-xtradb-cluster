@@ -15,10 +15,10 @@ SELECT COUNT(*) = 1 FROM t1;
 --sleep 1
 
 --let $wsrep_provider_options_orig = `SELECT @@wsrep_provider_options`
---let $wsrep_causal_reads_orig = `SELECT @@wsrep_causal_reads`
+--let $wsrep_sync_wait_orig = `SELECT @@wsrep_sync_wait`
 
 # Turn off causal reads, otherwise the 'SHOW STATUS' will block
---eval SET @@global.wsrep_causal_reads = 'OFF'
+--eval SET @@global.wsrep_sync_wait = 0
 
 #
 # Test that the wsrep_flow_control interval is set properly
@@ -93,7 +93,7 @@ SHOW STATUS LIKE 'wsrep_flow_control_status';
 
 --disable_query_log
 --eval SET GLOBAL wsrep_provider_options = '$wsrep_provider_options_orig';
---eval SET GLOBAL wsrep_causal_reads = $wsrep_causal_reads_orig;
+--eval SET GLOBAL wsrep_sync_wait = $wsrep_sync_wait_orig;
 --enable_query_log
 
 DROP TABLE t1;

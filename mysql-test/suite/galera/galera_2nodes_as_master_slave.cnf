@@ -34,7 +34,6 @@ wsrep_cluster_address='gcomm://'
 wsrep_provider_options='base_port=@mysqld.2.#galera_port;evs.install_timeout = PT15S; evs.max_install_timeouts=1;'
 
 # enforce read-committed characteristics across the cluster
-wsrep_causal_reads=ON
 wsrep_sync_wait = 15
 
 wsrep_node_address=127.0.0.1
@@ -55,7 +54,6 @@ wsrep_cluster_address='gcomm://127.0.0.1:@mysqld.2.#galera_port'
 wsrep_provider_options='base_port=@mysqld.3.#galera_port;evs.install_timeout = PT15S; evs.max_install_timeouts = 1;'
 
 # enforce read-committed characteristics across the cluster
-wsrep_causal_reads=ON
 wsrep_sync_wait = 15
 
 wsrep_node_address=127.0.0.1

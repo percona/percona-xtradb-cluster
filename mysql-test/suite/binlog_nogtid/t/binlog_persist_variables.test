@@ -62,18 +62,18 @@ INSERT INTO rplvars (varname, varvalue)
 # If this count differs, it means a variable has been added or removed.
 # In that case, this testcase needs to be updated accordingly.
 
-# While Percona Server has 117 persisted variables, PXC has 126 persisted
+# While Percona Server has 111 persisted variables, PXC has 116 persisted
 # variables.
 #
 # This is beacause of the following variables.
-# 1. wsrep_restart_slave      2. wsrep_restart_replica
-# 3. wsrep_slave_FK_checks    4. wsrep_applier_FK_checks
-# 5. wsrep_slave_threads      6. wsrep_applier_threads
-# 7. wsrep_slave_UK_checks    8. wsrep_applier_UK_checks
+# 2. wsrep_restart_replica
+# 4. wsrep_applier_FK_checks
+# 6. wsrep_applier_threads
+# 8. wsrep_applier_UK_checks
 # 9. wsrep_replicate_myisam
 
 --echo
---let $expected = 120
+--let $expected = 116
 --let $assert_text = Expect $expected variables in the table.
 --let $assert_cond = [SELECT COUNT(*) as count FROM rplvars, count, 1] = $expected
 --source include/assert.inc
@@ -96,7 +96,7 @@ while ( $varid <= $countvars )
 }
 
 --echo
---let $expected = 95
+--let $expected = 91
 --let $assert_text = Expect $expected persisted variables in persisted_variables table.
 --let $assert_cond = [SELECT COUNT(*) as count FROM performance_schema.persisted_variables, count, 1] = $expected
 --source include/assert.inc

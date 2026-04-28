@@ -1769,9 +1769,6 @@ The following options may be given as the first argument:
  To automatically control the assignment of autoincrement
  variables
  (Defaults to on; use --skip-wsrep-auto-increment-control to disable.)
- --wsrep-causal-reads 
- (DEPRECATED) setting this variable is equivalent to
- setting wsrep_sync_wait READ flag
  --wsrep-certification-rules=name 
  Certification rules to use in the cluster. Possible
  values are: "strict": stricter rules that could result in
@@ -1841,22 +1838,9 @@ The following options may be given as the first argument:
  --wsrep-restart-replica 
  Should MySQL replica be restarted automatically, when
  node joins back to cluster
- --wsrep-restart-slave 
- This option is deprecated. Use wsrep_restart_replica
- instead.
  --wsrep-retry-autocommit=# 
  Max number of times to retry a failed autocommit
  statement
- --wsrep-slave-FK-checks 
- This option is deprecated. Use wsrep_applier_FK_checks
- instead.
- (Defaults to on; use --skip-wsrep-slave-FK-checks to disable.)
- --wsrep-slave-UK-checks 
- This option is deprecated. Use wsrep_applier_UK_checks
- instead.
- --wsrep-slave-threads=# 
- This option is deprecated. Use wsrep_applier_threads
- instead.
  --wsrep-sst-allowed-methods=name 
  SST methods accepted by server
  --wsrep-sst-donor=name 
@@ -2364,7 +2348,6 @@ wsrep-applier-FK-checks TRUE
 wsrep-applier-UK-checks FALSE
 wsrep-applier-threads 1
 wsrep-auto-increment-control TRUE
-wsrep-causal-reads FALSE
 wsrep-certification-rules strict
 wsrep-certify-nonPK TRUE
 wsrep-cluster-address 
@@ -2393,11 +2376,7 @@ wsrep-recover FALSE
 wsrep-reject-queries NONE
 wsrep-replicate-myisam FALSE
 wsrep-restart-replica FALSE
-wsrep-restart-slave FALSE
 wsrep-retry-autocommit 1
-wsrep-slave-FK-checks TRUE
-wsrep-slave-UK-checks FALSE
-wsrep-slave-threads 1
 wsrep-sst-allowed-methods xtrabackup-v2,clone
 wsrep-sst-donor 
 wsrep-sst-donor-rejects-queries FALSE

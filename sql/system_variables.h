@@ -648,7 +648,6 @@ struct System_variables {
 
 #ifdef WITH_WSREP
   bool wsrep_on;
-  bool wsrep_causal_reads;
   bool wsrep_replicate_myisam;  // enable myisam replication
   uint wsrep_sync_wait;
   ulong wsrep_retry_autocommit;

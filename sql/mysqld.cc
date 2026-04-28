@@ -15122,36 +15122,6 @@ static int get_options(int *argc_ptr, char ***argv_ptr) {
   else
     global_system_variables.option_bits &= ~OPTION_BIG_SELECTS;
 
-#ifdef WITH_WSREP
-  if (global_system_variables.wsrep_causal_reads) {
-    WSREP_WARN(
-        "Option --wsrep-causal-reads is deprecated."
-        " Please start using --wsrep-sync-wait.");
-
-    if (!(global_system_variables.wsrep_sync_wait &
-          WSREP_SYNC_WAIT_BEFORE_READ)) {
-      WSREP_WARN(
-          "--wsrep-causal-reads=ON takes precedence over --wsrep-sync-wait=%u. "
-          "WSREP_SYNC_WAIT_BEFORE_READ is on",
-          global_system_variables.wsrep_sync_wait);
-      global_system_variables.wsrep_sync_wait |= WSREP_SYNC_WAIT_BEFORE_READ;
-    } else {
-      // they are turned on both.
-    }
-  } else {
-    if (global_system_variables.wsrep_sync_wait & WSREP_SYNC_WAIT_BEFORE_READ) {
-      WSREP_WARN(
-          "--wsrep-sync-wait=%u takes precedence over "
-          "--wsrep-causal-reads=OFF. "
-          "WSREP_SYNC_WAIT_BEFORE_READ is on",
-          global_system_variables.wsrep_sync_wait);
-      global_system_variables.wsrep_causal_reads = 1;
-    } else {
-      // they are turned off both.
-    }
-  }
-#endif /* WITH_WSREP */
-
   // reset the values of some variables that might affect initialize
   if ((opt_initialize || opt_initialize_insecure) && !opt_autocommit) {
     opt_autocommit = true;

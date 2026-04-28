@@ -194,8 +194,6 @@ wsrep_applier_threads
 wsrep_applier_threads
 wsrep_auto_increment_control
 wsrep_auto_increment_control
-wsrep_causal_reads
-wsrep_causal_reads
 wsrep_certification_rules
 wsrep_certification_rules
 wsrep_certify_nonPK
@@ -253,16 +251,8 @@ wsrep_replicate_myisam
 wsrep_replicate_myisam
 wsrep_restart_replica
 wsrep_restart_replica
-wsrep_restart_slave
-wsrep_restart_slave
 wsrep_retry_autocommit
 wsrep_retry_autocommit
-wsrep_slave_FK_checks
-wsrep_slave_FK_checks
-wsrep_slave_UK_checks
-wsrep_slave_UK_checks
-wsrep_slave_threads
-wsrep_slave_threads
 wsrep_sst_allowed_methods
 wsrep_sst_allowed_methods
 wsrep_sst_donor

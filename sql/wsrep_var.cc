@@ -169,32 +169,6 @@ bool wsrep_on_update(sys_var *, THD *thd, enum_var_type) {
   return false;
 }
 
-bool wsrep_causal_reads_update(sys_var *, THD *thd, enum_var_type) {
-  if (thd->variables.wsrep_causal_reads) {
-    thd->variables.wsrep_sync_wait |= WSREP_SYNC_WAIT_BEFORE_READ;
-  } else {
-    thd->variables.wsrep_sync_wait &= ~WSREP_SYNC_WAIT_BEFORE_READ;
-  }
-
-  // update global settings too.
-  if (global_system_variables.wsrep_causal_reads) {
-    global_system_variables.wsrep_sync_wait |= WSREP_SYNC_WAIT_BEFORE_READ;
-  } else {
-    global_system_variables.wsrep_sync_wait &= ~WSREP_SYNC_WAIT_BEFORE_READ;
-  }
-  return false;
-}
-
-bool wsrep_sync_wait_update(sys_var *, THD *thd, enum_var_type) {
-  thd->variables.wsrep_causal_reads =
-      thd->variables.wsrep_sync_wait & WSREP_SYNC_WAIT_BEFORE_READ;
-
-  // update global settings too
-  global_system_variables.wsrep_causal_reads =
-      global_system_variables.wsrep_sync_wait & WSREP_SYNC_WAIT_BEFORE_READ;
-  return false;
-}
-
 static int wsrep_start_position_verify(const char *start_str) {
   size_t start_len;
   wsrep_uuid_t uuid;

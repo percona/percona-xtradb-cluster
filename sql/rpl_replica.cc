@@ -7684,23 +7684,23 @@ wsrep_restart_point :
     delete thd;
 
 #ifdef WITH_WSREP
-    /* if slave stopped due to node going non primary, we set global flag to
+    /* if replica stopped due to node going non primary, we set global flag to
       trigger automatic restart of slave when node joins back to cluster
     */
     if (WSREP_ON && wsrep_node_dropped && wsrep_restart_slave) {
       if (wsrep_ready_get()) {
         WSREP_INFO(
-            "Slave error due to node temporarily went non-primary"
-            "SQL slave will continue");
+            "Replica error due to node temporarily went non-primary"
+            "SQL replica will continue");
         wsrep_node_dropped = false;
         mysql_mutex_unlock(&rli->run_lock);
-        WSREP_INFO("Restarting Slave (conflict-state: %s)",
-                  wsrep_thd_client_state_str(thd));
+        WSREP_INFO("Restarting Replica (conflict-state: %s)",
+                   wsrep_thd_client_state_str(thd));
         goto wsrep_restart_point;
       } else {
-        WSREP_INFO("Slave error due to node going non-primary");
+        WSREP_INFO("Replica error due to node going non-primary");
         WSREP_INFO(
-            "wsrep_restart_slave is set. Slave will automatically"
+            "wsrep_restart_replica is set. Replica will automatically"
             " restart when node joins back the cluster");
         wsrep_restart_slave_activated = true;
       }

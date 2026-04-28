@@ -14,7 +14,6 @@ mysqlx=0
 wsrep_debug=1
 
 wsrep_node_address=127.0.0.1
-wsrep_causal_reads=ON
 wsrep_sync_wait = 15
 
 [mysqld.1]
