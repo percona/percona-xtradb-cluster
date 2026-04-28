@@ -864,6 +864,10 @@ build_source_deb(){
     tar xzf ${NEWTAR}
     cd ${HNAME}-${VERSION}-${MYSQL_RELEASE} || exit
     cp -ap build-ps/debian/ .
+    # Defensive: ensure no stale debian/compat lingers from prior build state
+    # or other source paths. We use debhelper-compat (= 13) in debian/control,
+    # and dh refuses to start when both compat mechanisms are present.
+    rm -f debian/compat
     sed -i "s:@@MYSQL_VERSION@@:${VERSION}:g" debian/changelog
     sed -i "s:@@PERCONA_VERSION@@:${RELEASE}:g" debian/changelog
 
