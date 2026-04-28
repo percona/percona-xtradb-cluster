@@ -1,0 +1,99 @@
+# Core server binaries — split out of percona-xtradb-cluster-server
+# to mirror upstream MySQL package layout (mysql-server-core).
+# This package contains only binaries + libraries; configuration,
+# init scripts, and apparmor profiles stay in -server.
+
+# Server binaries
+usr/bin/comp_err
+usr/bin/ibd2sdi
+usr/bin/innochecksum
+usr/bin/myisamchk
+usr/bin/myisamlog
+usr/bin/myisampack
+usr/bin/my_print_defaults
+usr/bin/mysql_secure_installation
+usr/bin/mysql_tzinfo_to_sql
+usr/bin/mysqlbinlog
+usr/bin/mysqld_multi
+usr/bin/mysqld_safe
+usr/bin/mysql_keyring_encryption_test
+usr/bin/mysql_migrate_keyring
+usr/bin/mysqltest
+usr/bin/perror
+usr/bin/ps_mysqld_helper
+usr/sbin/mysqld
+
+# Server-side plugins (non-auth — auth client plugins go to -client-plugins)
+usr/lib/mysql/plugin/adt_null.so
+usr/lib/mysql/plugin/audit_log.so
+usr/lib/mysql/plugin/auth_socket.so
+usr/lib/mysql/plugin/component_audit_api_message_emit.so
+usr/lib/mysql/plugin/component_log_filter_dragnet.so
+usr/lib/mysql/plugin/component_log_sink_json.so
+usr/lib/mysql/plugin/component_log_sink_syseventlog.so
+usr/lib/mysql/plugin/component_mysqlbackup.so
+usr/lib/mysql/plugin/component_query_attributes.so
+usr/lib/mysql/plugin/component_reference_cache.so
+usr/lib/mysql/plugin/component_validate_password.so
+usr/lib/mysql/plugin/component_keyring_file.so
+usr/lib/mysql/plugin/component_keyring_vault.so
+usr/lib/mysql/plugin/component_masking.so
+usr/lib/mysql/plugin/component_masking_functions.so
+usr/lib/mysql/plugin/component_percona_telemetry.so
+usr/lib/mysql/plugin/component_scalability_metrics.so
+usr/lib/mysql/plugin/connection_control.so
+usr/lib/mysql/plugin/data_masking.so
+usr/lib/mysql/plugin/ha_archive.so
+usr/lib/mysql/plugin/ha_blackhole.so
+usr/lib/mysql/plugin/ha_example.so
+usr/lib/mysql/plugin/ha_federated.so
+usr/lib/mysql/plugin/ha_mock.so
+usr/lib/mysql/plugin/group_replication.so
+usr/lib/mysql/plugin/innodb_engine.so
+usr/lib/mysql/plugin/keyring_file.so
+usr/lib/mysql/plugin/keyring_udf.so
+usr/lib/mysql/plugin/locking_service.so
+usr/lib/mysql/plugin/mypluglib.so
+usr/lib/mysql/plugin/mysql_clone.so
+usr/lib/mysql/plugin/mysql_no_login.so
+usr/lib/mysql/plugin/percona_udf.so
+usr/lib/mysql/plugin/rewrite_example.so
+usr/lib/mysql/plugin/rewriter.so
+usr/lib/mysql/plugin/semisync_master.so
+usr/lib/mysql/plugin/semisync_replica.so
+usr/lib/mysql/plugin/semisync_slave.so
+usr/lib/mysql/plugin/semisync_source.so
+usr/lib/mysql/plugin/server_component_test.so
+usr/lib/mysql/plugin/test_udf_services.so
+usr/lib/mysql/plugin/validate_password.so
+usr/lib/mysql/plugin/version_token.so
+usr/lib/galera4/libgalera_smm.so
+
+# private shared libs (bundled abseil + protobuf)
+usr/lib/mysql/private/libprotobuf-lite.so.*
+usr/lib/mysql/private/libprotobuf.so.*
+usr/lib/mysql/private/libabsl_*.so
+
+# private data files (ICU)
+usr/lib/mysql/private/icudt77l/*.icu
+usr/lib/mysql/private/icudt77l/brkitr/*
+
+# Build provenance
+usr/share/mysql/INFO_BIN
+usr/share/mysql/INFO_SRC
+
+# Man pages for binaries shipped here
+usr/share/man/man1/comp_err.1
+usr/share/man/man1/ibd2sdi.1
+usr/share/man/man1/innochecksum.1
+usr/share/man/man1/myisamchk.1
+usr/share/man/man1/myisamlog.1
+usr/share/man/man1/myisampack.1
+usr/share/man/man1/my_print_defaults.1
+usr/share/man/man1/mysql_secure_installation.1
+usr/share/man/man1/mysql_tzinfo_to_sql.1
+usr/share/man/man1/mysqlbinlog.1
+usr/share/man/man1/mysqld_multi.1
+usr/share/man/man1/mysqld_safe.1
+usr/share/man/man1/perror.1
+usr/share/man/man8/mysqld.8

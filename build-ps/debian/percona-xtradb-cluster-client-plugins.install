@@ -1,0 +1,13 @@
+# Client-side authentication plugins — split out of -server
+# to mirror upstream MySQL package layout (mysql-client-plugins).
+# Both -client and -server depend on this package so the auth plugins
+# are available regardless of which is installed.
+
+usr/lib/mysql/plugin/authentication_ldap_sasl_client.so
+usr/lib/mysql/plugin/authentication_kerberos_client.so
+usr/lib/mysql/plugin/authentication_webauthn_client.so
+usr/lib/mysql/plugin/authentication_openid_connect_client.so
+usr/lib/mysql/plugin/authentication_oci_client.so
+usr/lib/mysql/plugin/mysql_native_password.so
+usr/lib/mysql/plugin/dialog.so
+usr/lib/*/private/libfido2.so.*

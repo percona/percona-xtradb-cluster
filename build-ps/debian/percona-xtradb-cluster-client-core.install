@@ -1,0 +1,10 @@
+# Core client binaries — split out of percona-xtradb-cluster-client
+# to mirror upstream MySQL package layout (mysql-client-core).
+# Contains the two most-used client tools; -client adds the rest.
+
+usr/bin/mysql
+usr/bin/mysqldump
+
+# Man pages
+usr/share/man/man1/mysql.1
+usr/share/man/man1/mysqldump.1

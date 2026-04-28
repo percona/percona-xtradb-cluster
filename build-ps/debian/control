@@ -122,6 +122,8 @@ Description: Percona XtraDB Cluster database common files (e.g. /etc/mysql/my.cn
 Package: percona-xtradb-cluster-client
 Architecture: any
 Depends: percona-xtradb-cluster-common (= ${binary:Version}),
+         percona-xtradb-cluster-client-core (= ${binary:Version}),
+         percona-xtradb-cluster-client-plugins (= ${binary:Version}),
          ${shlibs:Depends}, ${misc:Depends}
          debianutils (>=1.6),
          libdbi-perl,
@@ -192,7 +194,9 @@ Pre-Depends: percona-xtradb-cluster-common (= ${binary:Version}),
              adduser,
              libdbd-mysql-perl,
              debconf (>= 0.2.17)
-Depends: percona-xtradb-cluster-client (>= ${binary:Version}),
+Depends: percona-xtradb-cluster-server-core (= ${binary:Version}),
+         percona-xtradb-cluster-client (>= ${binary:Version}),
+         percona-xtradb-cluster-client-plugins (= ${binary:Version}),
 	 percona-telemetry-agent,
          libdbi-perl,
          perl (>= 5.6),
@@ -365,4 +369,65 @@ Conflicts: percona-galera-arbitrator-3-dbg
 Replaces: percona-galera-arbitrator-3-dbg
 Depends: percona-xtradb-cluster-garbd (= ${binary:Version}), ${misc:Depends}
 Description: Debugging package for Percona XtraDB Cluster Garbd.
+
+# ============================================================================
+# Split packages — introduced in 9.7.0 to mirror upstream MySQL package
+# layout (server-core / client-core / client-plugins). Existing -server and
+# -client packages now depend on these and contain only the non-binary
+# portions (config files, scripts, init).
+# ============================================================================
+
+Package: percona-xtradb-cluster-server-core
+Architecture: any
+Depends: percona-xtradb-cluster-common (= ${binary:Version}),
+         percona-xtradb-cluster-client-plugins (= ${binary:Version}),
+         ${shlibs:Depends}, ${misc:Depends}
+Provides: virtual-mysql-server-core,
+          mysql-server-core-8.0
+Conflicts: mysql-server-core-8.0,
+           virtual-mysql-server-core
+Replaces: mysql-server-core-8.0,
+          virtual-mysql-server-core
+Description: Percona XtraDB Cluster - Server core binaries
+ Percona XtraDB Cluster is based on the Percona Server database
+ server and provides a High Availability solution.
+ Percona XtraDB Cluster provides synchronous replication, supports
+ multi-master replication, parallel applying on slaves, automatic
+ node provisioning with primary focus on data consistency.
+ .
+ This package contains the server binaries (mysqld, myisamchk, etc.)
+ and shared libraries. Configuration files, init scripts, and AppArmor
+ profiles are in the percona-xtradb-cluster-server package.
+
+Package: percona-xtradb-cluster-client-core
+Architecture: any
+Depends: percona-xtradb-cluster-common (= ${binary:Version}),
+         percona-xtradb-cluster-client-plugins (= ${binary:Version}),
+         ${shlibs:Depends}, ${misc:Depends}
+Provides: virtual-mysql-client-core,
+          mysql-client-core-8.0
+Conflicts: mysql-client-core-8.0,
+           virtual-mysql-client-core
+Replaces: mysql-client-core-8.0,
+          virtual-mysql-client-core
+Description: Percona XtraDB Cluster - Core client binaries
+ Percona XtraDB Cluster is based on the Percona Server database
+ server and provides a High Availability solution.
+ .
+ This package contains the core client binaries: mysql and mysqldump.
+ Auxiliary client tools (mysqladmin, mysqlcheck, etc.) are in the
+ percona-xtradb-cluster-client package.
+
+Package: percona-xtradb-cluster-client-plugins
+Architecture: any
+Multi-Arch: same
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Percona XtraDB Cluster - Client plugins
+ Percona XtraDB Cluster is based on the Percona Server database
+ server and provides a High Availability solution.
+ .
+ This package contains the client-side authentication plugins
+ (LDAP, Kerberos, WebAuthn, OpenID Connect, OCI, native password,
+ dialog) and the bundled libfido2. Both client and server packages
+ depend on this package so the plugins are always available.
 
