@@ -1,0 +1,167 @@
+#
+# PXC-4844: stale Diagnostics_area carried over to the next ordered write set.
+#
+# A failed TOI on the applier leaves THD::get_stmt_da() in error state.
+# When the very next ordered write set arrives empty (buf_len == 0 in
+# wsrep_apply_events()), Rows_log_event::do_apply_event() never runs, so
+# mysql_reset_thd_for_next_command() is never called, the stale DA persists
+# into Wsrep_high_priority_service::commit() ->
+# Relay_log_info::cleanup_context() -> slave_close_thread_tables(), which
+# treats the leftover error as the empty statement's error and rolls back.
+# That moves the wsrep transaction state to s_aborted instead of leaving it
+# at s_executing, so the "Commit not finished for applier" branch in
+# Wsrep_high_priority_service::commit() is skipped and the commit-order
+# monitor is not released, eventually hanging the applier.
+#
+# Repro outline:
+#   1) Single applier thread on node_2 so consecutive write sets are
+#      processed by the same THD.
+#   2) First transaction is a REVOKE of a non-existent grant. Since
+#      wsrep_to_isolation_begin() broadcasts the TOI *before* the
+#      statement executes locally, the REVOKE fails identically on both
+#      nodes with ER_NONEXISTING_TABLE_GRANT - inconsistency voting is
+#      happy and node_2 stays in the cluster. On node_2's applier this
+#      leaves the THD Diagnostics_area in error state.
+#   3) Arm wsrep_force_empty_apply on node_2 so the next non-TOI write
+#      set is treated as empty (buf_len == 0). The DBUG knob skips TOI
+#      applies, so the failed REVOKE in step (2) is not affected.
+#   4) Run a DML on node_1; on node_2 it is applied as empty with the
+#      stale DA from step (2), exercising the bug path.
+#   5) Disarm the DBUG knob.
+#   6) Verify node_2 stays Synced and a follow-up DML on node_1
+#      propagates.
+#
+# Without the fix, step (4) hangs node_2's applier because the stale DA
+# steers cleanup_context() into a stmt-level rollback that flips the
+# wsrep transaction state from s_executing to s_aborted, skipping the
+# release of the commit-order monitor for that seqno; step (6) then
+# times out.
+#
+
+--source include/have_debug.inc
+--source include/galera_cluster.inc
+
+--connection node_1
+CALL mtr.add_suppression("There is no such grant defined for user");
+
+--connection node_2
+CALL mtr.add_suppression("There is no such grant defined for user");
+CALL mtr.add_suppression("Slave SQL: Error .ER_NONEXISTING_TABLE_GRANT");
+CALL mtr.add_suppression("Event apply failed");
+CALL mtr.add_suppression("Failed to apply TOI write set");
+
+#
+# Make sure exactly one applier thread is used so the failed TOI and the
+# empty write set are processed by the same THD.
+#
+--let $wsrep_applier_threads_saved = `SELECT @@GLOBAL.wsrep_applier_threads`
+SET GLOBAL wsrep_applier_threads = 1;
+
+--connection node_1
+CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB;
+CREATE USER 'dataloader'@'%';
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM mysql.user WHERE User = 'dataloader'
+--source include/wait_condition.inc
+
+--connection node_1
+#
+# Tx 1: REVOKE of a non-existent grant. wsrep_to_isolation_begin()
+# broadcasts the TOI before local execution, so the REVOKE fails with
+# ER_NONEXISTING_TABLE_GRANT identically on both nodes. On node_2's
+# applier this leaves the THD Diagnostics_area dirty.
+#
+--error ER_NONEXISTING_TABLE_GRANT
+REVOKE SELECT, INSERT ON test.t1 FROM 'dataloader'@'%';
+
+#
+# Fence: capture the seqno of the failed TOI on node_1 and wait on node_2
+# until its applier has reached it. wsrep_last_applied is updated only
+# after the seqno has been applied AND inconsistency voting has settled,
+# so this guarantees tx 1 is fully done on node_2 before we arm the
+# debug knob and let tx 2 in.
+#
+--disable_query_log
+--let $toi_seqno = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+--enable_query_log
+
+--connection node_2
+--disable_query_log
+--let $wait_condition = SELECT VARIABLE_VALUE >= $toi_seqno FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_last_applied'
+--source include/wait_condition.inc
+--enable_query_log
+
+#
+# Arm the DBUG knob: the next apply on this node sees buf_len==0,
+# exactly like an empty ordered write set.
+#
+--let $debug_point = wsrep_force_empty_apply
+--source include/add_debug_point.inc
+
+#
+# Tx 2: ordered DML write set originating on node_1, applied remotely on
+# node_2. The DBUG knob lives in wsrep_apply_events() and only fires on
+# remote applies, so tx 2 must NOT be issued on node_2 (where it would
+# go through the local commit path and bypass the knob entirely). On
+# node_2's applier this hits the empty-apply path while the THD's DA is
+# still dirty from tx 1. Without the fix, cleanup_context() rolls back,
+# the wsrep transaction state moves from s_executing to s_aborted, the
+# commit-order monitor for this seqno is never released and the applier
+# hangs.
+#
+--connection node_1
+INSERT INTO t1 VALUES (1);
+
+#
+# Fence: wait until node_2 has applied tx 2 before disarming the DBUG
+# knob. INSERT returns as soon as the local commit on node_1 succeeds;
+# without this fence we could race node_2's applier and clear the knob
+# before the empty-apply path actually fires.
+#
+--disable_query_log
+--let $tx2_seqno = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+--enable_query_log
+
+--connection node_2
+--disable_query_log
+SET SESSION wsrep_sync_wait=0;
+--let $wait_condition = SELECT VARIABLE_VALUE >= $tx2_seqno FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_last_applied'
+--source include/wait_condition.inc
+--enable_query_log
+
+#
+# Disarm the DBUG knob so subsequent applies behave normally again.
+#
+--let $debug_point = wsrep_force_empty_apply
+--source include/remove_debug_point.inc
+
+#
+# Cluster must still be Synced and accept further writes from node_1.
+#
+--let $wait_condition = SELECT VARIABLE_VALUE = 'Synced' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment'
+--source include/wait_condition.inc
+
+--connection node_1
+INSERT INTO t1 VALUES (2);
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM t1 WHERE id = 2
+--source include/wait_condition.inc
+
+# On node_2 row 1 was force-empty-applied (no rows in the binlog payload
+# from tx 2 reached the storage engine), so only row 2 is present. This
+# is the deliberate side-effect of the DBUG knob and proves the empty
+# apply path actually executed without hanging the applier.
+SELECT id FROM t1 ORDER BY id;
+
+#
+# Cleanup
+#
+--connection node_1
+DROP TABLE t1;
+DROP USER 'dataloader'@'%';
+
+--disable_query_log
+--eval SET GLOBAL wsrep_applier_threads = $wsrep_applier_threads_saved
+--enable_query_log
