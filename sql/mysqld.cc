@@ -7336,6 +7336,15 @@ int init_common_variables() {
   WSREP statements. */
   global_system_variables.wsrep_on = true;
 
+  if (wsrep_provider_loaded && !opt_initialize &&
+      pxc_strict_mode >= PXC_STRICT_MODE_ENFORCING &&
+      !global_system_variables.sql_require_primary_key) {
+    WSREP_WARN(
+        "Setting sql_require_primary_key=ON because pxc_strict_mode is "
+        "ENFORCING or MASTER.");
+    global_system_variables.sql_require_primary_key = true;
+  }
+
   if (wsrep_setup_allowed_sst_methods()) return 1;
 
   /*
