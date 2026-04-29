@@ -35,11 +35,11 @@ Prefix: %{_sysconfdir}
 %define mysql_vendor            Oracle and/or its affiliates
 %define percona_server_vendor   Percona, Inc
 
-%define mysql_version @@MYSQL_VERSION@@
+%define mysql_version @MYSQL_VERSION@
 %define redhatversion %(lsb_release -rs | awk -F. '{ print $1}')
-%define percona_server_version @@PERCONA_VERSION@@
-%define rpm_release @@RPM_RELEASE@@
-%define revision @@REVISION@@
+%define percona_server_version @PERCONA_VERSION@
+%define rpm_release @RPM_RELEASE@
+%define revision @REVISION@
 %define distribution  rhel%{redhatversion}  
 
 %if 0%{?amzn} == 2023
@@ -138,7 +138,7 @@ Prefix: %{_sysconfdir}
 %define mysqld_group    mysql
 %define mysqldatadir    /var/lib/mysql
 #
-%{!?wsrep_version:%global wsrep_version @@WSREP_VERSION@@}
+%{!?wsrep_version:%global wsrep_version @WSREP_VERSION@}
 #
 %if %{undefined rpm_version}
 %define rpm_version     1

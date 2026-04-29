@@ -614,7 +614,13 @@ build_srpm(){
     mkdir -vp rpmbuild/{SOURCES,SPECS,BUILD,SRPMS,RPMS}
     #
     cd ${WORKDIR}/rpmbuild/SPECS || exit
-    tar vxzf ${WORKDIR}/${TARFILE} --wildcards '*/build-ps/*.spec' --strip=2
+    # Extract the spec template (.spec.in) and rename to .spec for sed substitution.
+    # Migrated from .spec/@@VAR@@ to .spec.in/@VAR@ to match Percona Server pattern.
+    tar vxzf ${WORKDIR}/${TARFILE} --wildcards '*/build-ps/*.spec.in' --strip=2 \
+        || tar vxzf ${WORKDIR}/${TARFILE} --wildcards '*/build-ps/*.spec' --strip=2
+    if [ -f percona-xtradb-cluster.spec.in ]; then
+        mv percona-xtradb-cluster.spec.in percona-xtradb-cluster.spec
+    fi
     #
     sed -i "/^%changelog/a - Release ${VERSION}-${RELEASE}" percona-xtradb-cluster.spec
     sed -i "/^%changelog/a * $(date "+%a") $(date "+%b") $(date "+%d") $(date "+%Y") Percona Development Team <info@percona.com> - ${VERSION}-${RELEASE}" percona-xtradb-cluster.spec
@@ -636,11 +642,14 @@ build_srpm(){
     rm -rf ${PXCDIR}
     cd ${WORKDIR} || exit
     #
-    sed -i "s:@@MYSQL_VERSION@@:${VERSION}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
-    sed -i "s:@@PERCONA_VERSION@@:${RELEASE}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
-    sed -i "s:@@WSREP_VERSION@@:${WSREP_VERSION}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
-    sed -i "s:@@REVISION@@:${REVISION}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
-    sed -i "s:@@RPM_RELEASE@@:${RPM_RELEASE}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
+    # Substitute @VAR@ markers in spec template (mirrors PS @VAR@ pattern,
+    # the canonical spec.in template format consumed by cmake CONFIGURE_FILE
+    # @ONLY mode in build-ps/CMakeLists.txt).
+    sed -i "s:@MYSQL_VERSION@:${VERSION}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
+    sed -i "s:@PERCONA_VERSION@:${RELEASE}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
+    sed -i "s:@WSREP_VERSION@:${WSREP_VERSION}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
+    sed -i "s:@REVISION@:${REVISION}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
+    sed -i "s:@RPM_RELEASE@:${RPM_RELEASE}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
 
     #
 
@@ -874,13 +883,13 @@ build_source_deb(){
     # or other source paths. We use debhelper-compat (= 13) in debian/control,
     # and dh refuses to start when both compat mechanisms are present.
     rm -f debian/compat
-    sed -i "s:@@MYSQL_VERSION@@:${VERSION}:g" debian/changelog
-    sed -i "s:@@PERCONA_VERSION@@:${RELEASE}:g" debian/changelog
+    sed -i "s:@MYSQL_VERSION@:${VERSION}:g" debian/changelog
+    sed -i "s:@PERCONA_VERSION@:${RELEASE}:g" debian/changelog
 
-    sed -i "s:@@REVISION@@:${REVISION}:g" debian/rules
-    sed -i "s:@@PERCONA_VERSION@@:${RELEASE}:g" debian/rules
-    sed -i "s:@@WSREP_VERSION@@:${WSREP_VERSION}:g" debian/rules
-    sed -i "s:@@DEB_RELEASE@@:${DEB_RELEASE}:g" debian/rules
+    sed -i "s:@REVISION@:${REVISION}:g" debian/rules
+    sed -i "s:@PERCONA_VERSION@:${RELEASE}:g" debian/rules
+    sed -i "s:@WSREP_VERSION@:${WSREP_VERSION}:g" debian/rules
+    sed -i "s:@DEB_RELEASE@:${DEB_RELEASE}:g" debian/rules
 
     sed -i "s:libcurl4-gnutls-dev:libcurl4-openssl-dev:g" debian/control
 
