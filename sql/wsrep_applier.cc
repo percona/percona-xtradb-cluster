@@ -21,10 +21,11 @@
 #include "wsrep_xid.h"
 
 #include "debug_sync.h"
-#include "mysql/plugin.h"
 #include "mysql/binlog/event/binlog_event.h"
+#include "mysql/plugin.h"
 #include "sql/binlog_reader.h"
 #include "sql/sql_lex.h"
+#include "sql/sql_parse.h"  // mysql_reset_thd_for_next_command()
 
 #include "service_wsrep.h"
 #include "wsrep_priv.h"
@@ -134,9 +135,20 @@ int wsrep_apply_events(THD *thd, Relay_log_info *rli __attribute__((unused)),
 
   DBUG_ENTER("wsrep_apply_events");
 
-  if (!buf_len)
+  DBUG_EXECUTE_IF("wsrep_force_empty_apply", { buf_len = 0; });
+
+  if (!buf_len) {
     WSREP_DEBUG("Empty apply event found while processing write-set: %lld",
                 (long long)wsrep_thd_trx_seqno(thd));
+    /*
+      No row events run, so Rows_log_event::do_apply_event() never calls
+      mysql_reset_thd_for_next_command(). Reset THD (including Diagnostics_area)
+      the same way as the first event of a non-empty RBR statement would, so a
+      prior failed TOI (or other statement) cannot leave a stale DA for
+      commit-time relay cleanup.
+    */
+    mysql_reset_thd_for_next_command(thd);
+  }
 
   if (thd->wsrep_bin_log_flag_save == 0) {
     thd->wsrep_bin_log_flag_save = thd->variables.option_bits & OPTION_BIN_LOG;
