@@ -181,16 +181,19 @@ override_dh_auto_install:
 	(cd $(builddir)/$(galeradir) && cp libgalera_smm.so $(TMP)/)
 	(cd $(galeradir) && cp packages/rpm/README $(TMP)/)
 	mkdir -p $(TMP)/usr/bin/pxc_extra/
+	# Flatten lib/xtrabackup/ into lib/ for older PXB DEBs that use the
+	# nested layout. Newer PXB packages (9.x+) already ship binaries in
+	# lib/ directly; the mv/rm becomes a no-op in that case (|| true).
 ifeq ($(DISTRELEASE),noble)
 	(cp -r pxb-9.3 $(TMP)/usr/bin/pxc_extra/)
-	(mv $(TMP)/usr/bin/pxc_extra/pxb-9.3/lib/xtrabackup/* $(TMP)/usr/bin/pxc_extra/pxb-9.3/lib/)
+	(mv $(TMP)/usr/bin/pxc_extra/pxb-9.3/lib/xtrabackup/* $(TMP)/usr/bin/pxc_extra/pxb-9.3/lib/ 2>/dev/null || true)
 	(rm -rf $(TMP)/usr/bin/pxc_extra/pxb-9.3/lib/xtrabackup)
 	(cp -r pxb-9.4 $(TMP)/usr/bin/pxc_extra/)
-	(mv $(TMP)/usr/bin/pxc_extra/pxb-9.4/lib/xtrabackup/* $(TMP)/usr/bin/pxc_extra/pxb-9.4/lib/)
+	(mv $(TMP)/usr/bin/pxc_extra/pxb-9.4/lib/xtrabackup/* $(TMP)/usr/bin/pxc_extra/pxb-9.4/lib/ 2>/dev/null || true)
 	(rm -rf $(TMP)/usr/bin/pxc_extra/pxb-9.4/lib/xtrabackup)
 endif
 	(cp -r pxb-8.4 $(TMP)/usr/bin/pxc_extra/)
-	(mv $(TMP)/usr/bin/pxc_extra/pxb-8.4/lib/xtrabackup/* $(TMP)/usr/bin/pxc_extra/pxb-8.4/lib/)
+	(mv $(TMP)/usr/bin/pxc_extra/pxb-8.4/lib/xtrabackup/* $(TMP)/usr/bin/pxc_extra/pxb-8.4/lib/ 2>/dev/null || true)
 	(rm -rf $(TMP)/usr/bin/pxc_extra/pxb-8.4/lib/xtrabackup)
 
 
