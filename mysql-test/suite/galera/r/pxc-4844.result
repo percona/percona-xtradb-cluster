@@ -1,0 +1,19 @@
+CALL mtr.add_suppression("There is no such grant defined for user");
+CALL mtr.add_suppression("There is no such grant defined for user");
+CALL mtr.add_suppression("Slave SQL: Error .ER_NONEXISTING_TABLE_GRANT");
+CALL mtr.add_suppression("Event apply failed");
+CALL mtr.add_suppression("Failed to apply TOI write set");
+SET GLOBAL wsrep_applier_threads = 1;
+CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB;
+CREATE USER 'dataloader'@'%';
+REVOKE SELECT, INSERT ON test.t1 FROM 'dataloader'@'%';
+ERROR 42000: There is no such grant defined for user 'dataloader' on host '%' on table 't1'
+# Adding debug point 'wsrep_force_empty_apply' to @@GLOBAL.debug
+INSERT INTO t1 VALUES (1);
+# Removing debug point 'wsrep_force_empty_apply' from @@GLOBAL.debug
+INSERT INTO t1 VALUES (2);
+SELECT id FROM t1 ORDER BY id;
+id
+2
+DROP TABLE t1;
+DROP USER 'dataloader'@'%';
