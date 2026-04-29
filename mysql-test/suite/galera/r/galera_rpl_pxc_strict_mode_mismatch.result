@@ -1,0 +1,28 @@
+call mtr.add_suppression("Cannot set sql_require_primary_key=OFF while pxc_strict_mode is");
+call mtr.add_suppression("Replica SQL: Error .*Unable to create or change a table without a primary key");
+call mtr.add_suppression("Setting sql_require_primary_key=ON because pxc_strict_mode is ENFORCING or MASTER");
+call mtr.add_suppression("Pending to replicate MySQL GTID event .* Discarding it now");
+SET GLOBAL pxc_strict_mode = 'ENFORCING';
+SET GLOBAL pxc_strict_mode = 'ENFORCING';
+include/assert.inc [sql_require_primary_key global is OFF.]
+include/assert.inc [pxc_strict_mode is DISABLED]
+include/assert.inc [pxc_strict_mode is ENFORCING]
+include/assert.inc [sql_require_primary_key global is ON.]
+include/assert.inc [pxc_strict_mode is ENFORCING]
+include/assert.inc [sql_require_primary_key global is ON.]
+# Start replication on node-2
+START REPLICA USER = 'root';
+Warnings:
+Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
+include/wait_for_slave_io_to_start.inc
+include/wait_for_slave_sql_to_start.inc
+# Source runs DDL without PK; replica applier uses replicated session metadata
+CREATE TABLE t_rpl_nopk (c1 INT) ENGINE = InnoDB;
+INSERT INTO t_rpl_nopk VALUES (1);
+DROP TABLE t_rpl_nopk;
+SET GLOBAL pxc_strict_mode = DISABLED;
+SET GLOBAL sql_require_primary_key = 0;
+STOP REPLICA;
+RESET REPLICA ALL;
+SET GLOBAL pxc_strict_mode = DISABLED;
+SET GLOBAL sql_require_primary_key = 0;
