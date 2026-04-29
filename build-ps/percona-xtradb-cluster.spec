@@ -18,7 +18,6 @@
 # Some common macro definitions
 ##############################################################################
 
-%define _build_id_links none
 %undefine _missing_build_ids_terminate_build
 
 %define galera_src_dir percona-xtradb-cluster-galera
@@ -50,11 +49,11 @@ Prefix: %{_sysconfdir}
    %define distribution  rhel%{redhatversion}
 %endif
 
-%if 0%{?rhel} >= 8
+%if 0%{?rhel} >= 8 || 0%{?amzn} >= 2023
 %global pxc_telemetry          /usr/local/percona/telemetry/pxc
 %endif
 
-%if 0%{?rhel} >= 8
+%if 0%{?rhel} >= 8 || 0%{?amzn} >= 2023
 %global add_fido_plugins 1
 %else
 %global add_fido_plugins 0
@@ -65,6 +64,25 @@ Prefix: %{_sysconfdir}
 # When enabled, builds with -DFPROFILE_GENERATE=1 first, runs the MTR
 # profile suite to generate .gcda data, then rebuilds with -DFPROFILE_USE=1.
 %{?with_pgo: %global pgo 1}
+
+# Build-time customizable globals — match Percona Server's pattern so all
+# values can be overridden with rpmbuild --define. Defaults preserve the
+# previous hardcoded behavior.
+%{?with_ssl: %global ssl_option -DWITH_SSL=%{with_ssl}}
+%{!?with_ssl: %global ssl_option -DWITH_SSL=system}
+%{!?with_debuginfo:              %global nodebuginfo 0}
+%{!?feature_set:                 %global feature_set community}
+%{!?compilation_comment_release: %global compilation_comment_release Percona XtraDB Cluster (GPL), Release rel%{percona_server_version}, Revision %{revision}, WSREP version %{wsrep_version}}
+%{!?compilation_comment_debug:   %global compilation_comment_debug Percona XtraDB Cluster - Debug (GPL), Release rel%{percona_server_version}, Revision %{revision}, WSREP version %{wsrep_version}}
+%{!?src_base:                    %global src_base percona-xtradb-cluster}
+
+# dwz on EL8 (dwz-0.13) crashes with assertion failure when compressing
+# DWARF emitted by GCC with PGO+LTO. The crash leaves a core file in
+# BUILDROOT which then trips %check-buildroot. Skip dwz on EL8 — debuginfo
+# packages will be slightly larger but won't fail to build.
+%if 0%{?rhel} == 8
+%global _find_debuginfo_dwz_opts %{nil}
+%endif
 
 #
 %bcond_with tokudb
@@ -179,12 +197,8 @@ Prefix: %{_sysconfdir}
   %define feature_set community
 %endif
 
-%if %{undefined compilation_comment_debug}
-    %define compilation_comment_debug       Percona XtraDB Cluster - Debug (GPL), Release rel%{percona_server_version}, Revision %{revision}, WSREP version %{wsrep_version}
-%endif
-%if %{undefined compilation_comment_release}
-    %define compilation_comment_release     Percona XtraDB Cluster (GPL), Release rel%{percona_server_version}, Revision %{revision}, WSREP version %{wsrep_version}
-%endif
+# compilation_comment_release and compilation_comment_debug are defined
+# at the top of the spec via the fallback pattern (matches PS).
 
 #%define server_suffix -80
 
@@ -304,12 +318,23 @@ Prefix: %{_sysconfdir}
 %define WITH_TCMALLOC 0
 %endif
 
-# Version for compat libs
-%if 0%{?rhel} == 7 || 0%{?rhel} == 8
+# Version for compat libs.
+# EL7 keeps the old PXC-5.6 (libmysqlclient.so.18) compat shim.
+# EL8/EL9/EL10/AL2023 use PS-8.0 compat (libmysqlclient.so.21) sourced
+# from Percona's modern repo, with %{_arch} so aarch64 works alongside x86_64.
+%if 0%{?rhel} == 7
+%global compat_prefix         56
 %global compatver             5.6.28
 %global percona_compatver     25.14
 %global compatlib             18
 %global compatsrc             https://downloads.percona.com/downloads/Percona-XtraDB-Cluster-56/Percona-XtraDB-Cluster-%{compatver}-%{percona_compatver}/binary/redhat/6/x86_64/Percona-XtraDB-Cluster-shared-56-%{compatver}-%{percona_compatver}.1.el6.x86_64.rpm
+%endif
+%if 0%{?rhel} == 8 || 0%{?rhel} == 9 || 0%{?rhel} == 10 || 0%{?amzn} >= 2023
+%global compat_prefix         80
+%global compatver             8.0.37
+%global percona_compatver     29
+%global compatlib             21
+%global compatsrc             https://repo.percona.com/ps-80/yum/release/8/RPMS/%{_arch}/percona-server-shared-%{compatver}-%{percona_compatver}.1.el8.%{_arch}.rpm
 %endif
 
 
@@ -406,7 +431,7 @@ Requires:             percona-xtradb-cluster-icu-data-files = %{version}-%{relea
 Requires:             selinux-policy
 Requires:             policycoreutils
 Requires:             curl, nmap, nc
-%if 0%{?rhel} >= 8
+%if 0%{?rhel} >= 8 || 0%{?amzn} >= 2023
 Requires:	      percona-telemetry-agent
 %endif
 Requires(pre):        policycoreutils
@@ -1421,7 +1446,7 @@ fi
 
 # Set up Percona telemetry directory + UUID via shared helper script
 # (factored out so RPM and DEB packages share the same setup logic)
-%if 0%{?rhel} >= 8
+%if 0%{?rhel} >= 8 || 0%{?amzn} >= 2023
 %{_libexecdir}/percona-xtradb-cluster/percona-telemetry-setup.sh || :
 %endif
 
@@ -1988,7 +2013,7 @@ else
 fi
 %endif
 # Cleanup Percona telemetry directory via shared helper script
-%if 0%{?rhel} >= 8
+%if 0%{?rhel} >= 8 || 0%{?amzn} >= 2023
 %{_libexecdir}/percona-xtradb-cluster/percona-telemetry-cleanup.sh || :
 %endif
 
