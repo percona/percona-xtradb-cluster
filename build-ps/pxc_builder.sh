@@ -623,7 +623,11 @@ build_srpm(){
     #
     mv -fv ${TARFILE} ${WORKDIR}/rpmbuild/SOURCES
     cd ${WORKDIR}/rpmbuild/SOURCES || exit
-    wget https://raw.githubusercontent.com/Percona-Lab/telemetry-agent/phase-0/call-home.sh
+    # Extract telemetry helper scripts from the source tarball into SOURCES
+    # so the spec's Source11 / Source12 declarations resolve.
+    tar xzf ${TARFILE} --wildcards --strip-components=2 \
+        '*/build-ps/rpm/percona-telemetry-setup.sh' \
+        '*/build-ps/rpm/percona-telemetry-cleanup.sh' || true
     tar -xzf ${TARFILE}
     rm -rf ${TARFILE}
     PXCDIR=$(ls | grep 'Percona-XtraDB-Cluster*' | sort | tail -n1)

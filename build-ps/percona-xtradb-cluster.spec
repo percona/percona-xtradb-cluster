@@ -338,7 +338,8 @@ Release:        %{release}
 Distribution:   %{distro_description}
 License:        Copyright (c) 2000, 2010, %{mysql_vendor}.  All rights reserved.  Use is subject to license terms. Under the GNU General Public License (http://www.gnu.org/licenses/).
 Source:         http://downloads.percona.com/redir/downloads/Percona-XtraDB-Cluster/LATEST/source/%{src_dir}.tar.gz
-Source999:      call-home.sh
+Source11:       percona-telemetry-setup.sh
+Source12:       percona-telemetry-cleanup.sh
 URL:            http://www.percona.com/
 Packager:       Percona MySQL Development Team <mysqldev@percona.com>
 Vendor:         %{percona_server_vendor}
@@ -928,6 +929,10 @@ mv $RBR%{_libdir} $RPM_BUILD_DIR/%{_libdir}
 mkdir -p %{buildroot}%{_bindir}/
 cp -r pxc_extra %{buildroot}%{_bindir}/
 
+# Install Percona telemetry helper scripts (called from %post / %postun)
+install -D -m 0755 %{SOURCE11} %{buildroot}%{_libexecdir}/percona-xtradb-cluster/percona-telemetry-setup.sh
+install -D -m 0755 %{SOURCE12} %{buildroot}%{_libexecdir}/percona-xtradb-cluster/percona-telemetry-cleanup.sh
+
 RBR=$RPM_BUILD_ROOT
 MBD=$RPM_BUILD_DIR/%{src_dir}
 
@@ -1414,17 +1419,11 @@ fi
   sleep 5
 fi
 
+# Set up Percona telemetry directory + UUID via shared helper script
+# (factored out so RPM and DEB packages share the same setup logic)
 %if 0%{?rhel} >= 8
-install -d -m 2775 -o mysql -g percona-telemetry %{pxc_telemetry}
-chcon -t mysqld_db_t %{pxc_telemetry}
-chcon -u system_u %{pxc_telemetry}
+%{_libexecdir}/percona-xtradb-cluster/percona-telemetry-setup.sh || :
 %endif
-
-cp %SOURCE999 /tmp/ 2>/dev/null || :
-bash /tmp/call-home.sh -f "PRODUCT_FAMILY_PXC" -v %{mysql_version}-%{percona_server_version}-%{rpm_release} -d "PACKAGE" &>/dev/null || :
-chgrp percona-telemetry /usr/local/percona/telemetry_uuid &>/dev/null || :
-chmod 664 /usr/local/percona/telemetry_uuid &>/dev/null || :
-rm -f /tmp/call-home.sh
 
 echo "Percona XtraDB Cluster is distributed with several useful UDFs from Percona Toolkit."
 echo "Run the following commands to create these functions:"
@@ -1580,6 +1579,10 @@ fi
 
 %files -n percona-xtradb-cluster-server
 %defattr(-,root,root,0755)
+
+# Telemetry helper scripts (called from %post / %postun)
+%attr(0755, root, root) %{_libexecdir}/percona-xtradb-cluster/percona-telemetry-setup.sh
+%attr(0755, root, root) %{_libexecdir}/percona-xtradb-cluster/percona-telemetry-cleanup.sh
 
 %if %{defined license_files_server}
 %doc %{license_files_server}
@@ -1984,8 +1987,9 @@ else
     fi
 fi
 %endif
+# Cleanup Percona telemetry directory via shared helper script
 %if 0%{?rhel} >= 8
-rm -rf %{pxc_telemetry}
+%{_libexecdir}/percona-xtradb-cluster/percona-telemetry-cleanup.sh || :
 %endif
 
 # ----------------------------------------------------------------------------
