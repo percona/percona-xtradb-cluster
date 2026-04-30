@@ -1,0 +1,106 @@
+#
+# 1. Save the fresh-install state for the role 'mysql.pxc.sst.role'.
+#    We need to diff grants of fresh install with upgrade.
+#
+CREATE TABLE test.t_pxc_sst_user_fresh        AS SELECT * FROM mysql.user          WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost';
+CREATE TABLE test.t_pxc_sst_db_fresh          AS SELECT * FROM mysql.db            WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost';
+CREATE TABLE test.t_pxc_sst_tables_priv_fresh AS SELECT * FROM mysql.tables_priv   WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost';
+CREATE TABLE test.t_pxc_sst_procs_priv_fresh  AS SELECT * FROM mysql.procs_priv    WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost';
+CREATE TABLE test.t_pxc_sst_global_fresh      AS SELECT * FROM mysql.global_grants WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost';
+SHOW GRANTS FOR 'mysql.pxc.sst.role'@'localhost';
+Grants for mysql.pxc.sst.role@localhost
+GRANT RELOAD, SHUTDOWN, PROCESS, SUPER, LOCK TABLES, EXECUTE, REPLICATION CLIENT, CREATE USER, CREATE ROLE, DROP ROLE ON *.* TO `mysql.pxc.sst.role`@`localhost` WITH GRANT OPTION
+GRANT CLONE_ADMIN,CONNECTION_ADMIN,INNODB_REDO_LOG_ARCHIVE,SYSTEM_USER,SYSTEM_VARIABLES_ADMIN ON *.* TO `mysql.pxc.sst.role`@`localhost`
+GRANT BACKUP_ADMIN ON *.* TO `mysql.pxc.sst.role`@`localhost` WITH GRANT OPTION
+GRANT CREATE ON `PERCONA_SCHEMA`.* TO `mysql.pxc.sst.role`@`localhost`
+GRANT SELECT, INSERT, UPDATE ON `performance_schema`.* TO `mysql.pxc.sst.role`@`localhost` WITH GRANT OPTION
+GRANT SELECT, INSERT, CREATE, ALTER ON `PERCONA_SCHEMA`.`xtrabackup_history` TO `mysql.pxc.sst.role`@`localhost`
+GRANT INSERT, DELETE ON `mysql`.`plugin` TO `mysql.pxc.sst.role`@`localhost`
+include/assert.inc [Fresh install: mysql.user.Shutdown_priv = Y]
+include/assert.inc [Fresh install: mysql.user.Execute_priv = Y]
+include/assert.inc [Fresh install: mysql.user.Grant_priv = Y]
+include/assert.inc [Fresh install: mysql.user.Create_user_priv = Y]
+include/assert.inc [Fresh install: mysql.user.Create_role_priv = Y]
+include/assert.inc [Fresh install: mysql.user.Drop_role_priv = Y]
+include/assert.inc [Fresh install: mysql.db on performance_schema has Insert_priv = Y]
+include/assert.inc [Fresh install: mysql.db on performance_schema has Update_priv = Y]
+include/assert.inc [Fresh install: mysql.db on performance_schema has Grant_priv = Y]
+include/assert.inc [Fresh install: mysql.global_grants BACKUP_ADMIN has WITH_GRANT_OPTION = Y]
+#
+# 2. Create some tables with data; this will confirm the server
+#    post upgrade.
+#
+CREATE TABLE t1 (id INT PRIMARY KEY, val VARCHAR(32)) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1, 'fresh'), (2, 'install'), (3, 'data');
+SELECT * FROM t1 ORDER BY id;
+id	val
+1	fresh
+2	install
+3	data
+#
+# 3. Remove the privileges from the ACL rows to simulate the old version
+#    PXC members.
+#
+UPDATE mysql.user SET Shutdown_priv = 'N', Execute_priv = 'N', Grant_priv = 'N', Create_user_priv = 'N', Create_role_priv = 'N', Drop_role_priv = 'N' WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost';
+UPDATE mysql.global_grants SET WITH_GRANT_OPTION = 'N' WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost' AND priv = 'BACKUP_ADMIN';
+UPDATE mysql.db SET Insert_priv = 'N', Update_priv = 'N', Grant_priv = 'N' WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost' AND Db = 'performance_schema';
+FLUSH PRIVILEGES;
+Warnings:
+Warning	1681	'FLUSH PRIVILEGES' is deprecated and will be removed in a future release.
+#
+# 4. Assert the broken state.
+#
+include/assert.inc [Broken: mysql.user privileges all flipped to N]
+include/assert.inc [Broken: mysql.db on performance_schema has Insert/Update/Grant flipped to N]
+include/assert.inc [Broken: mysql.global_grants BACKUP_ADMIN has WITH_GRANT_OPTION = N]
+#
+# 5. Restart the server with --upgrade=FORCE.
+#    This re-runs mysql_system_tables_fix.sql.
+#
+# restart:--upgrade=FORCE
+#
+# 6. Check post --upgrade=FORCE state matches the fresh install.
+#
+CREATE TABLE test.t_pxc_sst_user_post        AS SELECT * FROM mysql.user          WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost';
+CREATE TABLE test.t_pxc_sst_db_post          AS SELECT * FROM mysql.db            WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost';
+CREATE TABLE test.t_pxc_sst_tables_priv_post AS SELECT * FROM mysql.tables_priv   WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost';
+CREATE TABLE test.t_pxc_sst_procs_priv_post  AS SELECT * FROM mysql.procs_priv    WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost';
+CREATE TABLE test.t_pxc_sst_global_post      AS SELECT * FROM mysql.global_grants WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost';
+SHOW GRANTS FOR 'mysql.pxc.sst.role'@'localhost';
+Grants for mysql.pxc.sst.role@localhost
+GRANT RELOAD, SHUTDOWN, PROCESS, SUPER, LOCK TABLES, EXECUTE, REPLICATION CLIENT, CREATE USER, CREATE ROLE, DROP ROLE ON *.* TO `mysql.pxc.sst.role`@`localhost` WITH GRANT OPTION
+GRANT CLONE_ADMIN,CONNECTION_ADMIN,INNODB_REDO_LOG_ARCHIVE,SYSTEM_USER,SYSTEM_VARIABLES_ADMIN ON *.* TO `mysql.pxc.sst.role`@`localhost`
+GRANT BACKUP_ADMIN ON *.* TO `mysql.pxc.sst.role`@`localhost` WITH GRANT OPTION
+GRANT CREATE ON `PERCONA_SCHEMA`.* TO `mysql.pxc.sst.role`@`localhost`
+GRANT SELECT, INSERT, UPDATE ON `performance_schema`.* TO `mysql.pxc.sst.role`@`localhost` WITH GRANT OPTION
+GRANT SELECT, INSERT, CREATE, ALTER ON `PERCONA_SCHEMA`.`xtrabackup_history` TO `mysql.pxc.sst.role`@`localhost`
+GRANT INSERT, DELETE ON `mysql`.`plugin` TO `mysql.pxc.sst.role`@`localhost`
+include/diff_tables.inc [default:test.t_pxc_sst_user_fresh, default:test.t_pxc_sst_user_post]
+include/diff_tables.inc [default:test.t_pxc_sst_db_fresh, default:test.t_pxc_sst_db_post]
+include/diff_tables.inc [default:test.t_pxc_sst_tables_priv_fresh, default:test.t_pxc_sst_tables_priv_post]
+include/diff_tables.inc [default:test.t_pxc_sst_procs_priv_fresh, default:test.t_pxc_sst_procs_priv_post]
+include/diff_tables.inc [default:test.t_pxc_sst_global_fresh, default:test.t_pxc_sst_global_post]
+include/assert.inc [Post upgrade: mysql.user.Shutdown_priv = Y]
+include/assert.inc [Post upgrade: mysql.user.Execute_priv = Y]
+include/assert.inc [Post upgrade: mysql.user.Grant_priv = Y]
+include/assert.inc [Post upgrade: mysql.user.Create_user_priv = Y]
+include/assert.inc [Post upgrade: mysql.user.Create_role_priv = Y]
+include/assert.inc [Post upgrade: mysql.user.Drop_role_priv = Y]
+include/assert.inc [Post upgrade: mysql.db on performance_schema has Insert_priv = Y]
+include/assert.inc [Post upgrade: mysql.db on performance_schema has Update_priv = Y]
+include/assert.inc [Post upgrade: mysql.db on performance_schema has Grant_priv = Y]
+include/assert.inc [Post upgrade: mysql.global_grants BACKUP_ADMIN has WITH_GRANT_OPTION = Y]
+#
+# 7. Confirm the table created before the upgrade still exists.
+#
+SELECT * FROM t1 ORDER BY id;
+id	val
+1	fresh
+2	install
+3	data
+#
+# 8. Cleanup.
+#
+DROP TABLE t1;
+DROP TABLE test.t_pxc_sst_user_fresh, test.t_pxc_sst_db_fresh, test.t_pxc_sst_tables_priv_fresh, test.t_pxc_sst_procs_priv_fresh, test.t_pxc_sst_global_fresh;
+DROP TABLE test.t_pxc_sst_user_post,  test.t_pxc_sst_db_post,  test.t_pxc_sst_tables_priv_post,  test.t_pxc_sst_procs_priv_post,  test.t_pxc_sst_global_post;
