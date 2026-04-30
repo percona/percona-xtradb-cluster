@@ -1,0 +1,224 @@
+################################################################################
+# PXC-4963: This test proves that GRANTS matches for user/role
+# 'mysql.pxc.sst.role' after inplace upgrade with the fresh install.
+#
+# 1. Save the fresh-install state for the role 'mysql.pxc.sst.role'.
+#    We need to diff grants of fresh install with upgrade.
+# 2. Create some tables with data; this will confirm the server
+#    post upgrade.
+# 3. Remove the privileges from the ACL rows to simulate the old version
+#    PXC members.
+# 4. Assert the broken state.
+# 5. Restart the server with --upgrade=FORCE.
+#    This re-runs mysql_system_tables_fix.sql.
+# 6. Check post --upgrade=FORCE state matches the fresh install.
+# 7. Confirm the table created before the upgrade still exists.
+# 8. Cleanup.
+################################################################################
+
+# Reference mysql_upgrade.test, due to upgrade/restart its going to take time
+--source include/big_test.inc
+--source include/not_valgrind.inc
+
+# If for some reason pxc roles are not present we cannot run the test.
+if (`SELECT COUNT(*) = 0 FROM mysql.user WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost'`)
+{
+  --skip PXC-only: requires mysql.pxc.sst.role (bootstrap).
+}
+
+--echo #
+--echo # 1. Save the fresh-install state for the role 'mysql.pxc.sst.role'.
+--echo #    We need to diff grants of fresh install with upgrade.
+--echo #
+
+# Snapshot every mysql.* ACL table that holds rows for the role so we can
+# do a row-by-row diff against the post-upgrade state in step 6.
+# This is to make sure permissions are same in fresh installation and post upgrade.
+CREATE TABLE test.t_pxc_sst_user_fresh        AS SELECT * FROM mysql.user          WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost';
+CREATE TABLE test.t_pxc_sst_db_fresh          AS SELECT * FROM mysql.db            WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost';
+CREATE TABLE test.t_pxc_sst_tables_priv_fresh AS SELECT * FROM mysql.tables_priv   WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost';
+CREATE TABLE test.t_pxc_sst_procs_priv_fresh  AS SELECT * FROM mysql.procs_priv    WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost';
+CREATE TABLE test.t_pxc_sst_global_fresh      AS SELECT * FROM mysql.global_grants WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost';
+
+SHOW GRANTS FOR 'mysql.pxc.sst.role'@'localhost';
+
+# PXC-4963
+# Below are some core privileges, so we have deliberately used assert to make sure core privileges are present.
+# In future if diff of fresh install and upgrade fail, its fine(we can remove table diff), but below asserts should not fail.
+# Table diff only shows upgrade matches the permission same as fresh install.
+
+--let $assert_text = Fresh install: mysql.user.Shutdown_priv = Y
+--let $assert_cond = "[SELECT Shutdown_priv FROM mysql.user WHERE user = \'mysql.pxc.sst.role\' AND host = \'localhost\']" = "Y"
+--source include/assert.inc
+
+--let $assert_text = Fresh install: mysql.user.Execute_priv = Y
+--let $assert_cond = "[SELECT Execute_priv FROM mysql.user WHERE user = \'mysql.pxc.sst.role\' AND host = \'localhost\']" = "Y"
+--source include/assert.inc
+
+--let $assert_text = Fresh install: mysql.user.Grant_priv = Y
+--let $assert_cond = "[SELECT Grant_priv FROM mysql.user WHERE user = \'mysql.pxc.sst.role\' AND host = \'localhost\']" = "Y"
+--source include/assert.inc
+
+--let $assert_text = Fresh install: mysql.user.Create_user_priv = Y
+--let $assert_cond = "[SELECT Create_user_priv FROM mysql.user WHERE user = \'mysql.pxc.sst.role\' AND host = \'localhost\']" = "Y"
+--source include/assert.inc
+
+--let $assert_text = Fresh install: mysql.user.Create_role_priv = Y
+--let $assert_cond = "[SELECT Create_role_priv FROM mysql.user WHERE user = \'mysql.pxc.sst.role\' AND host = \'localhost\']" = "Y"
+--source include/assert.inc
+
+--let $assert_text = Fresh install: mysql.user.Drop_role_priv = Y
+--let $assert_cond = "[SELECT Drop_role_priv FROM mysql.user WHERE user = \'mysql.pxc.sst.role\' AND host = \'localhost\']" = "Y"
+--source include/assert.inc
+
+--let $assert_text = Fresh install: mysql.db on performance_schema has Insert_priv = Y
+--let $assert_cond = "[SELECT Insert_priv FROM mysql.db WHERE user = \'mysql.pxc.sst.role\' AND host = \'localhost\' AND Db = \'performance_schema\']" = "Y"
+--source include/assert.inc
+
+--let $assert_text = Fresh install: mysql.db on performance_schema has Update_priv = Y
+--let $assert_cond = "[SELECT Update_priv FROM mysql.db WHERE user = \'mysql.pxc.sst.role\' AND host = \'localhost\' AND Db = \'performance_schema\']" = "Y"
+--source include/assert.inc
+
+--let $assert_text = Fresh install: mysql.db on performance_schema has Grant_priv = Y
+--let $assert_cond = "[SELECT Grant_priv FROM mysql.db WHERE user = \'mysql.pxc.sst.role\' AND host = \'localhost\' AND Db = \'performance_schema\']" = "Y"
+--source include/assert.inc
+
+--let $assert_text = Fresh install: mysql.global_grants BACKUP_ADMIN has WITH_GRANT_OPTION = Y
+--let $assert_cond = "[SELECT WITH_GRANT_OPTION FROM mysql.global_grants WHERE user = \'mysql.pxc.sst.role\' AND host = \'localhost\' AND priv = \'BACKUP_ADMIN\']" = "Y"
+--source include/assert.inc
+
+--echo #
+--echo # 2. Create some tables with data; this will confirm the server
+--echo #    post upgrade.
+--echo #
+
+# This is not important but proves that the server is same.
+CREATE TABLE t1 (id INT PRIMARY KEY, val VARCHAR(32)) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1, 'fresh'), (2, 'install'), (3, 'data');
+SELECT * FROM t1 ORDER BY id;
+
+--echo #
+--echo # 3. Remove the privileges from the ACL rows to simulate the old version
+--echo #    PXC members.
+--echo #
+
+UPDATE mysql.user SET Shutdown_priv = 'N', Execute_priv = 'N', Grant_priv = 'N', Create_user_priv = 'N', Create_role_priv = 'N', Drop_role_priv = 'N' WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost';
+UPDATE mysql.global_grants SET WITH_GRANT_OPTION = 'N' WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost' AND priv = 'BACKUP_ADMIN';
+UPDATE mysql.db SET Insert_priv = 'N', Update_priv = 'N', Grant_priv = 'N' WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost' AND Db = 'performance_schema';
+FLUSH PRIVILEGES;
+
+--echo #
+--echo # 4. Assert the broken state.
+--echo #
+
+--let $assert_text = Broken: mysql.user privileges all flipped to N
+--let $assert_cond = [SELECT COUNT(*) FROM mysql.user WHERE user = \'mysql.pxc.sst.role\' AND host = \'localhost\' AND Shutdown_priv = \'N\' AND Execute_priv = \'N\' AND Grant_priv = \'N\' AND Create_user_priv = \'N\' AND Create_role_priv = \'N\' AND Drop_role_priv = \'N\'] = 1
+--source include/assert.inc
+
+--let $assert_text = Broken: mysql.db on performance_schema has Insert/Update/Grant flipped to N
+--let $assert_cond = [SELECT COUNT(*) FROM mysql.db WHERE user = \'mysql.pxc.sst.role\' AND host = \'localhost\' AND Db = \'performance_schema\' AND Insert_priv = \'N\' AND Update_priv = \'N\' AND Grant_priv = \'N\'] = 1
+--source include/assert.inc
+
+--let $assert_text = Broken: mysql.global_grants BACKUP_ADMIN has WITH_GRANT_OPTION = N
+--let $assert_cond = "[SELECT WITH_GRANT_OPTION FROM mysql.global_grants WHERE user = \'mysql.pxc.sst.role\' AND host = \'localhost\' AND priv = \'BACKUP_ADMIN\']" = "N"
+--source include/assert.inc
+
+--echo #
+--echo # 5. Restart the server with --upgrade=FORCE.
+--echo #    This re-runs mysql_system_tables_fix.sql.
+--echo #
+
+# Reference mysql_upgrade.test, it takes time
+--let $restart_parameters = restart:--upgrade=FORCE
+--let $wait_counter= 10000
+--source include/restart_mysqld.inc
+
+--echo #
+--echo # 6. Check post --upgrade=FORCE state matches the fresh install.
+--echo #
+
+# Snapshot the post-upgrade rows so we can diff them against the
+# fresh-install baseline saved in step 1.
+CREATE TABLE test.t_pxc_sst_user_post        AS SELECT * FROM mysql.user          WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost';
+CREATE TABLE test.t_pxc_sst_db_post          AS SELECT * FROM mysql.db            WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost';
+CREATE TABLE test.t_pxc_sst_tables_priv_post AS SELECT * FROM mysql.tables_priv   WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost';
+CREATE TABLE test.t_pxc_sst_procs_priv_post  AS SELECT * FROM mysql.procs_priv    WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost';
+CREATE TABLE test.t_pxc_sst_global_post      AS SELECT * FROM mysql.global_grants WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost';
+
+SHOW GRANTS FOR 'mysql.pxc.sst.role'@'localhost';
+
+# Full row-by-row diff: every ACL row for the role must match what
+# mysql_system_users.sql produces on a fresh install.
+
+--let $diff_tables= default:test.t_pxc_sst_user_fresh, default:test.t_pxc_sst_user_post
+--source include/diff_tables.inc
+
+--let $diff_tables= default:test.t_pxc_sst_db_fresh, default:test.t_pxc_sst_db_post
+--source include/diff_tables.inc
+
+--let $diff_tables= default:test.t_pxc_sst_tables_priv_fresh, default:test.t_pxc_sst_tables_priv_post
+--source include/diff_tables.inc
+
+--let $diff_tables= default:test.t_pxc_sst_procs_priv_fresh, default:test.t_pxc_sst_procs_priv_post
+--source include/diff_tables.inc
+
+--let $diff_tables= default:test.t_pxc_sst_global_fresh, default:test.t_pxc_sst_global_post
+--source include/diff_tables.inc
+
+# PXC-4963
+# Below are some core privileges so we have deliberately used assert to make sure they are restored.
+# Otherwise in above asserts we make sure permission during fresh installation and post upgrade are same.
+
+--let $assert_text = Post upgrade: mysql.user.Shutdown_priv = Y
+--let $assert_cond = "[SELECT Shutdown_priv FROM mysql.user WHERE user = \'mysql.pxc.sst.role\' AND host = \'localhost\']" = "Y"
+--source include/assert.inc
+
+--let $assert_text = Post upgrade: mysql.user.Execute_priv = Y
+--let $assert_cond = "[SELECT Execute_priv FROM mysql.user WHERE user = \'mysql.pxc.sst.role\' AND host = \'localhost\']" = "Y"
+--source include/assert.inc
+
+--let $assert_text = Post upgrade: mysql.user.Grant_priv = Y
+--let $assert_cond = "[SELECT Grant_priv FROM mysql.user WHERE user = \'mysql.pxc.sst.role\' AND host = \'localhost\']" = "Y"
+--source include/assert.inc
+
+--let $assert_text = Post upgrade: mysql.user.Create_user_priv = Y
+--let $assert_cond = "[SELECT Create_user_priv FROM mysql.user WHERE user = \'mysql.pxc.sst.role\' AND host = \'localhost\']" = "Y"
+--source include/assert.inc
+
+--let $assert_text = Post upgrade: mysql.user.Create_role_priv = Y
+--let $assert_cond = "[SELECT Create_role_priv FROM mysql.user WHERE user = \'mysql.pxc.sst.role\' AND host = \'localhost\']" = "Y"
+--source include/assert.inc
+
+--let $assert_text = Post upgrade: mysql.user.Drop_role_priv = Y
+--let $assert_cond = "[SELECT Drop_role_priv FROM mysql.user WHERE user = \'mysql.pxc.sst.role\' AND host = \'localhost\']" = "Y"
+--source include/assert.inc
+
+--let $assert_text = Post upgrade: mysql.db on performance_schema has Insert_priv = Y
+--let $assert_cond = "[SELECT Insert_priv FROM mysql.db WHERE user = \'mysql.pxc.sst.role\' AND host = \'localhost\' AND Db = \'performance_schema\']" = "Y"
+--source include/assert.inc
+
+--let $assert_text = Post upgrade: mysql.db on performance_schema has Update_priv = Y
+--let $assert_cond = "[SELECT Update_priv FROM mysql.db WHERE user = \'mysql.pxc.sst.role\' AND host = \'localhost\' AND Db = \'performance_schema\']" = "Y"
+--source include/assert.inc
+
+--let $assert_text = Post upgrade: mysql.db on performance_schema has Grant_priv = Y
+--let $assert_cond = "[SELECT Grant_priv FROM mysql.db WHERE user = \'mysql.pxc.sst.role\' AND host = \'localhost\' AND Db = \'performance_schema\']" = "Y"
+--source include/assert.inc
+
+--let $assert_text = Post upgrade: mysql.global_grants BACKUP_ADMIN has WITH_GRANT_OPTION = Y
+--let $assert_cond = "[SELECT WITH_GRANT_OPTION FROM mysql.global_grants WHERE user = \'mysql.pxc.sst.role\' AND host = \'localhost\' AND priv = \'BACKUP_ADMIN\']" = "Y"
+--source include/assert.inc
+
+--echo #
+--echo # 7. Confirm the table created before the upgrade still exists.
+--echo #
+
+SELECT * FROM t1 ORDER BY id;
+
+--echo #
+--echo # 8. Cleanup.
+--echo #
+
+DROP TABLE t1;
+DROP TABLE test.t_pxc_sst_user_fresh, test.t_pxc_sst_db_fresh, test.t_pxc_sst_tables_priv_fresh, test.t_pxc_sst_procs_priv_fresh, test.t_pxc_sst_global_fresh;
+DROP TABLE test.t_pxc_sst_user_post,  test.t_pxc_sst_db_post,  test.t_pxc_sst_tables_priv_post,  test.t_pxc_sst_procs_priv_post,  test.t_pxc_sst_global_post;

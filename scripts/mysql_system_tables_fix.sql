@@ -1450,6 +1450,32 @@ INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost'
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'SYSTEM_VARIABLES_ADMIN', 'N');
 INSERT IGNORE INTO mysql.tables_priv VALUES ('localhost', 'mysql', 'mysql.pxc.sst.role', 'plugin', 'root\@localhost', CURRENT_TIMESTAMP, 'Insert,Delete', '');
 
+# PXC-4963: Discrepancy between GRANTs for in-place upgraded PXC binaries vs
+# fresh installed PXC binaries
+# mysql.pxc.sst.role: fix static global privileges left stale after in-place
+# upgrade.
+# INSERT IGNORE above does not change an existing row from older PXC.
+# A fresh install gets these from mysql_system_users.sql
+# (GRANT ... CREATE USER, SHUTDOWN, EXECUTE, ... WITH GRANT OPTION).
+UPDATE mysql.user SET
+  Shutdown_priv = 'Y',
+  Execute_priv = 'Y',
+  Grant_priv = 'Y',
+  Create_user_priv = 'Y',
+  Create_role_priv = 'Y',
+  Drop_role_priv = 'Y'
+WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost';
+
+UPDATE mysql.global_grants SET WITH_GRANT_OPTION = 'Y'
+WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost' AND priv = 'BACKUP_ADMIN';
+
+UPDATE mysql.db SET
+  Select_priv = 'Y',
+  Insert_priv = 'Y',
+  Update_priv = 'Y',
+  Grant_priv = 'Y'
+WHERE user = 'mysql.pxc.sst.role' AND host = 'localhost' AND `Db` = 'performance_schema';
+
 #! PXC_SECTION::END
 # flush privileges at this stage can cause problem with upgrade from 57 -> 80
 # FLUSH PRIVILEGES;
