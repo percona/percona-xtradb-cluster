@@ -238,11 +238,21 @@ get_sources(){
 
     sed -i 's:ROUTER_RUNTIMEDIR:/var/run/mysqlrouter/:g' ${PXCDIR}/packaging/rpm-common/*
     cd ${PXCDIR}/packaging/rpm-common || exit
+        # systemd unit + tmpfiles templates live under scripts/systemd/ in the
+        # source tree; copy them in if they're not already in rpm-common.
         if [ ! -f mysqlrouter.service ]; then
-            cp -p mysqlrouter.service.in mysqlrouter.service
+            if [ -f mysqlrouter.service.in ]; then
+                cp -p mysqlrouter.service.in mysqlrouter.service
+            elif [ -f ../../scripts/systemd/mysqlrouter.service.in ]; then
+                cp -p ../../scripts/systemd/mysqlrouter.service.in mysqlrouter.service
+            fi
         fi
         if [ ! -f mysqlrouter.tmpfiles.d ]; then
-            cp -p mysqlrouter.tmpfiles.d.in mysqlrouter.tmpfiles.d
+            if [ -f mysqlrouter.tmpfiles.d.in ]; then
+                cp -p mysqlrouter.tmpfiles.d.in mysqlrouter.tmpfiles.d
+            elif [ -f ../../scripts/systemd/mysqlrouter.tmpfiles.d.in ]; then
+                cp -p ../../scripts/systemd/mysqlrouter.tmpfiles.d.in mysqlrouter.tmpfiles.d
+            fi
         fi
         if [ ! -f mysqlrouter.conf ]; then
             cp -p mysqlrouter.conf.in mysqlrouter.conf
