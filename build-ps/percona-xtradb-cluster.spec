@@ -399,13 +399,13 @@ Requires:             percona-xtradb-cluster-icu-data-files = %{version}-%{relea
 Requires:             selinux-policy
 Requires:             policycoreutils
 Requires:             curl, nmap, nc
-%if 0%{?rhel} >= 8
+%if 0%{?rhel} >= 8 || 0%{?amzn} == 2023
 Requires:	      percona-telemetry-agent
 %endif
 Requires(pre):        policycoreutils
 Requires(post):       policycoreutils
 Requires(postun):     policycoreutils
-%if 0%{?rhel} == 8 || 0%{?rhel} == 9
+%if 0%{?rhel} == 8 || 0%{?rhel} == 9 || 0%{?amzn} == 2023 || 0%{?rhel} == 10
 Requires:             policycoreutils-python-utils
 Requires(pre):        policycoreutils-python-utils
 Requires(post):       policycoreutils-python-utils
@@ -438,9 +438,7 @@ Requires(preun):  /sbin/chkconfig
 Requires(preun):  /sbin/service
 %endif
 Provides:       mysql-server MySQL-server
-%if 0%{?rhel} == 8 || 0%{?rhel} == 9
 Obsoletes:      mariadb-connector-c-config
-%endif
 Conflicts:      Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56 Percona-Server-server-57
 
 %description -n percona-xtradb-cluster-server
@@ -670,7 +668,7 @@ export CFLAGS=${MYSQL_BUILD_CFLAGS:-${CFLAGS:-$RPM_OPT_FLAGS -Wno-implicit-funct
 export CXXFLAGS=${MYSQL_BUILD_CXXFLAGS:-${CXXFLAGS:-$RPM_OPT_FLAGS -felide-constructors -Wno-error=stringop-overflow -Wno-error=free-nonheap-object}}
 export LDFLAGS=${MYSQL_BUILD_LDFLAGS:-${LDFLAGS:-}}
 
-%if 0%{?rhel} == 8 || 0%{?rhel} == 9 || 0%{?rhel} == 10
+%if 0%{?rhel} == 8 || 0%{?rhel} == 9 || 0%{?amzn} >= 2023 || 0%{?rhel} == 10
 export CMAKE=${MYSQL_BUILD_CMAKE:-${CMAKE:-/usr/bin/cmake}}
 %else
 export CMAKE=${MYSQL_BUILD_CMAKE:-${CMAKE:-/usr/bin/cmake3}}
@@ -918,7 +916,7 @@ mv $RBR%{_libdir} $RPM_BUILD_DIR/%{_libdir}
 ##############################################################################
 %install
 
-%if 0%{?rhel} == 9
+%if 0%{?rhel} == 9 || 0%{?amzn} == 2023 || 0%{?rhel} == 10
     sed -i 's/python2$/python3/' scripts/pyclustercheck.py.in
 %endif
 
