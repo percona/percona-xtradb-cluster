@@ -728,7 +728,7 @@ popd
 
 mkdir pxb-9.6
 pushd pxb-9.6
-yumdownloader percona-xtrabackup-91-9.1.0
+yumdownloader percona-xtrabackup-96-9.6.0
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib64 ./
