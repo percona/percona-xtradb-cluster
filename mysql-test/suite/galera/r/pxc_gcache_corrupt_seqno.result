@@ -1,0 +1,35 @@
+
+# 1. Create table and populate 10 rows on the single node.
+
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 VARCHAR(64)) ENGINE=InnoDB;
+
+# 2. Cleanly shut the node down so the synced preamble is written to galera.cache.
+
+
+# 3. Corrupt the first buffer header's seqno_g on disk to an implausible value.
+
+
+# 4. Restart with gcache.recover=yes; scan() flags the implausible seqno.
+
+# restart
+
+# 5. GCache recovery is aborted and a full reset is forced.
+
+
+# 6. The node does not crash (no fatal signal) or OOM (no std::bad_alloc).
+
+
+# 7. Data is intact after recovery.
+
+SELECT COUNT(*) AS rows_post_recovery FROM t1;
+rows_post_recovery
+10
+
+# 8. Cleanup.
+
+CALL mtr.add_suppression("Skipped GCache ring buffer recovery");
+CALL mtr.add_suppression("Exception while mapping writeset");
+CALL mtr.add_suppression("Aborting GCache recovery");
+CALL mtr.add_suppression("Recovery failed, need to do full reset");
+CALL mtr.add_suppression("implausible seqno");
+DROP TABLE t1;
