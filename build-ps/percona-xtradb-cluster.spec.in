@@ -190,7 +190,7 @@ Prefix: %{_sysconfdir}
 # ----------------------------------------------------------------------------
 # src_base is defined above (lowercase, aligned with Percona Server
 # convention). The legacy CamelCase default has been removed because it
-# was dead code: %{!?src_base:...} above always wins, so this %if block
+# was dead code: %%{!?src_base:...} above always wins, so this %%if block
 # never executed and only created confusion about which casing was used.
 %define src_dir %{src_base}-%{mysql_version}
 
@@ -725,7 +725,11 @@ fi
     mkdir percona-compatlib
     pushd percona-compatlib
     wget %{compatsrc}
-    rpm2cpio Percona-XtraDB-Cluster-shared-56-%{compatver}-%{percona_compatver}.1.el6.x86_64.rpm | cpio --extract --make-directories --verbose
+    # Use *.rpm rather than hardcoding the filename: %{compatsrc} resolves
+    # to a different rpm name on EL7 (PXC-shared-56-...el6) vs EL8+
+    # (percona-server-shared-...el8). The directory only ever contains the
+    # one rpm we just downloaded, so the glob is unambiguous.
+    rpm2cpio *.rpm | cpio --extract --make-directories --verbose
     popd
   )
   %endif # 0%{?rhel} > 6
