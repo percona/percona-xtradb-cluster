@@ -1792,14 +1792,6 @@ fi
 %{_libdir}/mysql/mecab
 %endif
 
-%if "%rhel" == "5"
-    %attr(755, root, root) %{_datadir}/percona-xtradb-cluster/
-%endif
-
-%if "%rhel" >= "6"
-    %attr(755, root, root) %{_datarootdir}/percona-xtradb-cluster/
-%endif
-
 %if %{WITH_TCMALLOC}
 %attr(755, root, root) %{_libdir}/mysql/%{malloc_lib_target}
 %endif
@@ -1955,7 +1947,13 @@ fi
 %dir %attr(755, root, root) %{_libdir}/mysql
 %attr(644, root, root) %{_sysconfdir}/ld.so.conf.d/*
 %{_libdir}/mysql/libmysqlclient.so.%{compatlib}.*
+# libmysqlclient_r (the threadsafe variant) only existed up to MySQL 5.6.
+# MySQL 5.7 merged thread-safety into the main libmysqlclient and dropped
+# the _r shim, so EL7 (compatlib=18 from PXC-5.6) is the only distro that
+# still ships a separate _r library.
+%if 0%{?rhel} == 7
 %{_libdir}/mysql/libmysqlclient_r.so.%{compatlib}.*
+%endif
 %endif
 %endif
 
