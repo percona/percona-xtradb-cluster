@@ -606,16 +606,20 @@ Group:          Applications/Databases
 Provides:       mysql-libs-compat = %{version}-%{release}
 Provides:       mysql-libs-compat%{?_isa} = %{version}-%{release}
 Provides:       MySQL-shared-compat%{?_isa} = %{version}-%{release}
-%if 0%{?rhel} == 7 || 0%{?rhel} == 8
+%if 0%{?rhel} == 7
 Provides:       libmysqlclient.so.18()(64bit)
 Provides:       libmysqlclient.so.18(libmysqlclient_16)(64bit)
 Provides:       libmysqlclient.so.18(libmysqlclient_18)(64bit)
+%endif
+%if 0%{?rhel} >= 8 || 0%{?amzn} >= 2023
+Provides:       libmysqlclient.so.21()(64bit)
+Provides:       libmysqlclient.so.21(libmysqlclient_21)(64bit)
+%endif
 Obsoletes:      mariadb-libs Percona-XtraDB-Cluster-shared-compat-57
 Conflicts:      Percona-XtraDB-Cluster-shared-55
 Conflicts:      Percona-XtraDB-Cluster-shared-56
 Conflicts:      Percona-XtraDB-Cluster-shared-57
 Conflicts:      Percona-XtraDB-Cluster-shared-compat-57
-%endif
 
 %description -n percona-xtradb-cluster-shared-compat
 This package contains the shared compat libraries for Percona Server %{compatver}-%{percona_compatver} client
@@ -949,12 +953,25 @@ mv $RBR%{_libdir} $RPM_BUILD_DIR/%{_libdir}
 
 %ifarch x86_64
   %if 0%{?compatlib}
-  # Install compat libs
-    %if 0%{?rhel} > 6
-      install -D -m 0755 percona-compatlib/usr/lib64/libmysqlclient.so.18.1.0 %{buildroot}%{_libdir}/mysql/libmysqlclient.so.18.1.0
-      install -D -m 0755 percona-compatlib/usr/lib64/libmysqlclient_r.so.18.1.0 %{buildroot}%{_libdir}/mysql/libmysqlclient_r.so.18.1.0
-    %endif # 0%{?rhel} > 6
-  %endif # 0%{?compatlib}
+    # Install compat libs.
+    # EL7 uses the legacy PXC-5.6 shared rpm which extracts the libs flat
+    # under usr/lib64/ with a fully-deterministic libmysqlclient.so.18.1.0
+    # filename, so we install by exact path.
+    %if 0%{?rhel} == 7
+    install -D -m 0755 percona-compatlib/usr/lib64/libmysqlclient.so.18.1.0 %{buildroot}%{_libdir}/mysql/libmysqlclient.so.18.1.0
+    install -D -m 0755 percona-compatlib/usr/lib64/libmysqlclient_r.so.18.1.0 %{buildroot}%{_libdir}/mysql/libmysqlclient_r.so.18.1.0
+    %endif
+    # EL8+ uses percona-server-shared-8.0.37 which extracts under
+    # usr/lib64/mysql/ with a libmysqlclient.so.21.<minor>.<patch> filename
+    # whose exact suffix can change between rebuilds, so we glob-walk the
+    # directory and install whichever versioned files we find. Matches PS
+    # percona-server.spec.in lines 676-680.
+    %if 0%{?rhel} >= 8 || 0%{?amzn} >= 2023
+    for lib in percona-compatlib/usr/lib64/mysql/libmysqlclient.so.%{compatlib}*; do
+      install -D -m 0755 "$lib" %{buildroot}%{_libdir}/mysql/$(basename "$lib")
+    done
+    %endif
+  %endif
 %endif
 mkdir -p %{buildroot}%{_bindir}/
 cp -r pxc_extra %{buildroot}%{_bindir}/
@@ -1951,19 +1968,27 @@ fi
 %ifarch x86_64
 %if 0%{?compatlib}
 %post -n percona-xtradb-cluster-shared-compat
+# Only EL7 needs the .so.18 / _r.so.18 alias symlinks back to the
+# fully-versioned .so.18.1.0 file. The EL8+ percona-server-shared rpm
+# ships the .so.21 alias symlinks itself, so no post-install fixup is
+# needed there.
+%if 0%{?rhel} == 7
 for lib in libmysqlclient{.so.18.0.0,.so.18,_r.so.18.0.0,_r.so.18}; do
 if [ ! -f %{_libdir}/mysql/${lib} ]; then
   ln -s libmysqlclient.so.18.1.0 %{_libdir}/mysql/${lib};
 fi
 done
+%endif
 /sbin/ldconfig
 
 %postun -n percona-xtradb-cluster-shared-compat
+%if 0%{?rhel} == 7
 for lib in libmysqlclient{.so.18.0.0,.so.18,_r.so.18.0.0,_r.so.18}; do
 if [ -h %{_libdir}/mysql/${lib} ]; then
   rm -f %{_libdir}/mysql/${lib};
 fi
 done
+%endif
 /sbin/ldconfig
 %endif
 %endif
