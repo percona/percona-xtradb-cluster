@@ -905,12 +905,19 @@ build_source_deb(){
     sed -i "s:libcurl4-gnutls-dev:libcurl4-openssl-dev:g" debian/control
 
     dch -D UNRELEASED --force-distribution -v "$MYSQL_VERSION-$MYSQL_RELEASE-$DEB_RELEASE" "Update to new upstream release Percona XtraDB Cluster ${VERSION}-rel${RELEASE}"
-    # -d skips dpkg-checkbuilddeps. The source-only package (.dsc + .orig.tar +
-    # .debian.tar) does not require build-deps to be installed on this host
-    # because nothing is being compiled. The binary build runs build-deps
-    # checks separately when build_deb invokes dpkg-buildpackage -b on a
-    # properly-prepared host.
-    dpkg-buildpackage -S -d
+    # -d  skips dpkg-checkbuilddeps. The source-only package (.dsc +
+    #     .orig.tar + .debian.tar) does not require build-deps to be installed
+    #     on this host because nothing is being compiled.
+    # -nc skips the debian/rules clean pre-pass. The tree was just extracted
+    #     from $NEWTAR a few lines above and is already pristine — there is
+    #     nothing to clean. Also avoids invoking `dh clean` on Jenkins agents
+    #     whose debhelper is older than 12, which cannot honor the modern
+    #     `debhelper-compat (= 13)` Build-Depends and fails with:
+    #         dh: No compatibility level specified in debian/compat
+    #         dh: Compatibility levels before 4 are no longer supported
+    # The binary build (build_deb -> dpkg-buildpackage -b) runs on a separate
+    # host with the full build-deps and modern debhelper installed.
+    dpkg-buildpackage -S -d -nc
     #
     rm -fr ${HNAME}-${VERSION}-${RELEASE}
 
