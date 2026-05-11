@@ -437,8 +437,18 @@ Requires(post):   /sbin/chkconfig
 Requires(preun):  /sbin/chkconfig
 Requires(preun):  /sbin/service
 %endif
-Provides:       mysql-server MySQL-server
+Obsoletes:      community-mysql-bench
+Obsoletes:      mysql-bench
 Obsoletes:      mariadb-connector-c-config
+Obsoletes:      mariadb-backup
+Obsoletes:      mariadb-bench
+Obsoletes:      mariadb-server
+Obsoletes:      mariadb-server-galera
+Obsoletes:      mariadb-server-utils
+Obsoletes:      mariadb-galera-server
+Obsoletes:      mariadb-gssapi-server
+Obsoletes:      mariadb-oqgraph-engine
+Provides:       mysql-server MySQL-server
 Conflicts:      Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56 Percona-Server-server-57
 
 %description -n percona-xtradb-cluster-server
@@ -490,6 +500,8 @@ Group:          Applications/Databases
 Provides:       mysql-test
 Requires:       perl(Socket), perl(Time::HiRes), perl(Data::Dumper), perl(Test::More), perl(Env)
 Conflicts:      Percona-SQL-test-50 Percona-Server-test-51 Percona-Server-test-55 Percona-XtraDB-Cluster-test-55
+Obsoletes:      mysql-test < %{version}-%{release}
+Obsoletes:      mariadb-test
 AutoReqProv:    no
 
 %description -n percona-xtradb-cluster-test
@@ -518,6 +530,9 @@ Conflicts:      Percona-SQL-devel-50 Percona-Server-devel-51 Percona-Server-deve
 %else
 Conflicts:      Percona-SQL-devel-50 Percona-Server-devel-51 Percona-Server-devel-55 Percona-XtraDB-Cluster-devel-55
 %endif
+Obsoletes:      mariadb-devel
+Obsoletes:      mariadb-connector-c-devel
+Obsoletes:      mysql-connector-c-devel < 6.2
 
 %description -n percona-xtradb-cluster-devel
 Percona XtraDB Cluster is based on the Percona Server database server and
