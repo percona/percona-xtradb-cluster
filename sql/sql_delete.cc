@@ -76,6 +76,7 @@
 #include "sql/sql_const.h"
 #include "sql/sql_error.h"
 #include "sql/sql_executor.h"
+#include "sql/sql_foreign_key_constraint.h"
 #include "sql/sql_lex.h"
 #include "sql/sql_list.h"
 #include "sql/sql_opt_exec_shared.h"
@@ -123,6 +124,23 @@ bool DeleteCurrentRowAndProcessTriggers(THD *thd, TABLE *table,
       return true;
     }
   }
+
+  if (use_sql_fk_checks_for_table(thd, table)) {
+    if (check_all_child_fk_ref(thd, table, enum_fk_dml_type::FK_DELETE)) {
+      return thd->is_error();
+    }
+  }
+
+#ifdef WITH_WSREP
+  /* Append parent table keys */
+  if (use_sql_fk_checks_for_table(thd, table)) {
+    Dummy_error_handler error_handler;
+    thd->push_internal_handler(&error_handler);
+    bool ignored [[maybe_unused]];
+    ignored = check_all_parent_fk_ref(thd, table, enum_fk_dml_type::FK_DELETE);
+    thd->pop_internal_handler();
+  }
+#endif
 
   if (const int delete_error = table->file->ha_delete_row(table->record[0]);
       delete_error != 0) {

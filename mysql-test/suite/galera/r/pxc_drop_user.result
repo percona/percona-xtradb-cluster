@@ -40,7 +40,7 @@ ERROR 42000: Access denied; you need (at least one of) the SYSTEM_USER privilege
 SET PASSWORD FOR 'y'@'localhost' TO RANDOM;
 ERROR 42000: Access denied; you need (at least one of) the SYSTEM_USER privilege(s) for this operation
 DROP USER 'utilityuser'@'localhost';
-ERROR HY000: Operation DROP USER failed for 'utilityuser'@'localhost'
+ERROR HY000: Operation DROP USER failed for 'utilityuser'@'localhost' (Cannot drop utility user)
 CALL mtr.add_suppression(".*Operation DROP USER failed.*");
 CALL mtr.add_suppression(".*Fail to replicate: DROP USER.*");
 CALL mtr.add_suppression(".*Operation DROP USER failed.*");

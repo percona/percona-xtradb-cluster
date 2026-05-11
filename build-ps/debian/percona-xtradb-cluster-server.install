@@ -148,3 +148,6 @@ usr/lib/mysql/private/libabsl_time_zone.so
 # private data files
 usr/lib/mysql/private/icudt77l/*.icu
 usr/lib/mysql/private/icudt77l/brkitr/*
+usr/lib/mysql/private/libicui18n.so.*
+usr/lib/mysql/private/libicustubdata.so.*
+usr/lib/mysql/private/libicuuc.so.*

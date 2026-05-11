@@ -17,7 +17,7 @@ mysqld-bin.000001	#	Query	#	#	use `test`; CREATE TABLE t1 (f1 INTEGER PRIMARY KE
 mysqld-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000001	#	Query	#	#	BEGIN
 mysqld-bin.000001	#	Table_map	#	#	table_id: # (test.t1)
-mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F
+mysqld-bin.000001	#	Write_rows	#	#	table_id: # flags: STMT_END_F USE_SQL_FOREIGN_KEY_F
 mysqld-bin.000001	#	Xid	#	#	COMMIT /* XID */
 gtid_executed_equal
 1
@@ -29,7 +29,7 @@ mysqld-bin.000002	#	Query	#	#	use `test`; CREATE TABLE t1 (f1 INTEGER PRIMARY KE
 mysqld-bin.000002	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000002	#	Query	#	#	BEGIN
 mysqld-bin.000002	#	Table_map	#	#	table_id: # (test.t1)
-mysqld-bin.000002	#	Write_rows	#	#	table_id: # flags: STMT_END_F
+mysqld-bin.000002	#	Write_rows	#	#	table_id: # flags: STMT_END_F USE_SQL_FOREIGN_KEY_F
 mysqld-bin.000002	#	Xid	#	#	COMMIT /* XID */
 SELECT COUNT(*) = 1 FROM t1;
 COUNT(*) = 1
@@ -44,7 +44,7 @@ mysqld-bin.000004	#	Query	#	#	use `test`; CREATE TABLE t1 (f1 INTEGER PRIMARY KE
 mysqld-bin.000004	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= 'Gtid_set'
 mysqld-bin.000004	#	Query	#	#	BEGIN
 mysqld-bin.000004	#	Table_map	#	#	table_id: # (test.t1)
-mysqld-bin.000004	#	Write_rows	#	#	table_id: # flags: STMT_END_F
+mysqld-bin.000004	#	Write_rows	#	#	table_id: # flags: STMT_END_F USE_SQL_FOREIGN_KEY_F
 mysqld-bin.000004	#	Xid	#	#	COMMIT /* XID */
 DROP TABLE t1;
 STOP REPLICA;

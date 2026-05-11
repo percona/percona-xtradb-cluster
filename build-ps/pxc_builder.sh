@@ -318,8 +318,8 @@ install_deps() {
         yum update -y
         yum install -y perl
         yum install -y https://repo.percona.com/yum/percona-release-latest.noarch.rpm
-        percona-release enable pxb-80 testing
 	percona-release enable pxb-84-lts release
+	percona-release enable pxb-9x-innovation testing
         if [ "x$RHEL" = "x8" -o "x$RHEL" = "x9" ]; then
             yum -y install dnf-plugins-core epel-release
             yum config-manager --set-enabled powertools
@@ -457,7 +457,11 @@ install_deps() {
         yum -y install cyrus-sasl-devel cyrus-sasl-scram krb5-devel
     else
         apt-get -y update
-        DEBIAN_FRONTEND=noninteractive apt-get -y install curl lsb-release gnupg2 wget apt-transport-https software-properties-common
+        export DEBIAN_FRONTEND="noninteractive"
+        apt-get -y install curl lsb-release gnupg2 wget apt-transport-https
+        if [ x"${DIST}" != xtrixie ]; then
+            apt-get -y install software-properties-common
+        fi
         apt-get -y install dirmngr || true
         apt-get update
         apt-get -y install dirmngr || true
@@ -467,15 +471,11 @@ install_deps() {
         percona-release enable tools release
         
         # (1) PXB compatible with previous PXC LTS version
-        percona-release enable pxb-80 release
-        if [ x"${DIST}" = xnoble ]; then
-            percona-release enable pxb-9x-innovation experimental
-        fi
         percona-release enable pxb-84-lts release
         # (2) PXB compatible with previous PXC version (note: it may be LTS as well)
-        # percona-release enable pxc-8x-innovation testing
+        percona-release enable pxb-9x-innovation testing
         # (3) PXB compatible with this PXC version (LTS or Innovative)
-        # percona-release enable pxc-84-lts testing
+        # percona-release enable pxb-9x-innovation testing
         
         until apt-get update; do
             sleep 1
@@ -494,33 +494,20 @@ install_deps() {
         apt-get -y install libsasl2-dev libsasl2-modules-gssapi-mit
         apt-get -y install stunnel libkrb5-dev
         apt-get -y install libudev-dev
-
-        if [ x"${DIST}" = xnoble ]; then
+/*
+        if [ x"${DIST}" = xnoble -o x"${DIST}" = xtrixie ]; then
             apt-get -y install gcc-13 g++-13
-            update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100 --slave /usr/bin/g++ g++ /usr/bin/g++-13
+            update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
+            update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
             update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-13 100
+            update-alternatives --config gcc
+            update-alternatives --config g++
         fi
-
-        if [ x"${DIST}" = xfocal -o x"${DIST}" = xbullseye -o x"${DIST}" = jammy -o x"${DIST}" = bookworm -o x"${DIST}" = xnoble ]; then
+*/
+        if [ x"${DIST}" = xfocal -o x"${DIST}" = xbullseye -o x"${DIST}" = jammy -o x"${DIST}" = bookworm -o x"${DIST}" = xnoble -o x"${DIST}" = xtrixie ]; then
             apt-get -y install python3-mysqldb
         else
             apt-get -y install python-mysqldb
-        fi
-        if [ x"${DIST}" = xbionic ]; then
-            apt-get -y install gcc-8 g++-8
-            wget https://downloads.percona.com/downloads/packaging/libfido2-1/libcbor0.6_0.6.0-0ubuntu1_amd64.deb
-            wget https://downloads.percona.com/downloads/packaging/libfido2-1/libfido2-1_1.3.1-1ubuntu2_amd64.deb
-            dpkg -i libcbor0.6_0.6.0-0ubuntu1_amd64.deb
-            dpkg -i libfido2-1_1.3.1-1ubuntu2_amd64.deb
-        fi
-        if [ x"${DIST}" = xbuster ]; then
-            wget https://downloads.percona.com/downloads/packaging/libfido2-1/libfido2-1_1.5.0-2~bpo10+1_amd64.deb
-            wget https://downloads.percona.com/downloads/packaging/libfido2-1/libcbor0_0.5.0+dfsg-2_amd64.deb
-            dpkg -i libcbor0_0.5.0+dfsg-2_amd64.deb
-            dpkg -i libfido2-1_1.5.0-2~bpo10+1_amd64.deb
-            echo "deb http://deb.debian.org/debian buster-backports main" >> /etc/apt/sources.list
-            apt update
-            apt -y install cmake/buster-backports
         fi
         if [ x"${DIST}" = xfocal ]; then
             apt-get -y install gcc-10 g++-10
@@ -536,10 +523,17 @@ install_deps() {
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
         #apt-get -y install --download-only percona-xtrabackup-80=8.0.35-33-1.${DIST}
-        if [ x"${DIST}" = xnoble ]; then
-            apt-get -y install --download-only percona-xtrabackup-91=9.1.0-1-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-96=9.6.0-1-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-91=9.1.0-1-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-84=8.4.0-5-1.${DIST}
+        if [ x"${DIST}" = xnoble -o x"${DIST}" = xtrixie ]; then
+            apt-get -y install gcc-13 g++-13
+            update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
+            update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
+            update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-13 100
+            update-alternatives --config gcc
+            update-alternatives --config g++
         fi
-        apt-get -y install --download-only percona-xtrabackup-84=8.4.0-4-1.${DIST}
     fi
     return;
 }
@@ -932,22 +926,15 @@ build_deb(){
     cd ${DIRNAME} || exit
 
     # (1) PXB compatible with previous PXC LTS version
-    #mkdir -p pxb-8.0
-    # (2) PXB compatible with this PXC version (LTS or Innovative)
-    if [ x"${DEBIAN_VERSION}" = xnoble ]; then
-        mkdir -p pxb-9.3
-        mkdir -p pxb-9.4
-    fi
     mkdir -p pxb-8.4
+    # (2) PXB compatible with this PXC version (LTS or Innovative)
+    mkdir -p pxb-9.5
+    mkdir -p pxb-9.6
 
-
-    #dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-80* pxb-8.0
-    if [ x"${DEBIAN_VERSION}" = xnoble ]; then
-        dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-91* pxb-9.3
-        dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-91* pxb-9.4
-    fi
 
     dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-84* pxb-8.4
+    dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-91* pxb-9.5
+    dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-96* pxb-9.6
 
     #  (1)
     cd pxb-8.4 || exit
@@ -956,20 +943,18 @@ build_deb(){
         rm -rf usr *.deb DEBIAN
 
     # (2)
-    if [ x"${DEBIAN_VERSION}" = xnoble ]; then
-        cd ../pxb-9.3 || exit
+    cd ../pxb-9.5 || exit
+        mv usr/bin ./
+        mv usr/lib* ./
+        rm -rf usr *.deb DEBIAN
+    cd ../pxb-9.6 || exit
         mv usr/bin ./
         mv usr/lib* ./
         rm -rf usr *.deb DEBIAN
 
-        cd ../pxb-9.4 || exit
-        mv usr/bin ./
-        mv usr/lib* ./
-        rm -rf usr *.deb DEBIAN
-    fi
     cd ../ || exit
 
-    if [[ "x$DEBIAN_VERSION" == "xbionic" || "x$DEBIAN_VERSION" == "xstretch" || "x$DEBIAN_VERSION" == "xfocal" || "x$DEBIAN_VERSION" == "xbullseye" || "x$DEBIAN_VERSION" == "xjammy" || "x$DEBIAN_VERSION" == "xbookworm" || "x$DEBIAN_VERSION" == "xnoble" ]]; then
+    if [[ "x$DEBIAN_VERSION" == "xfocal" || "x$DEBIAN_VERSION" == "xjammy" || "x$DEBIAN_VERSION" == "xbookworm" || "x$DEBIAN_VERSION" == "xnoble" || "x$DEBIAN_VERSION" == "xtrixie" ]]; then
         sed -i 's/fabi-version=2/fabi-version=2 -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -Wno-error=literal-suffix -Wno-misleading-indentation/' cmake/build_configurations/compiler_options.cmake
         sed -i 's/gnu++11/gnu++11 -Wno-virtual-move-assign/' cmake/build_configurations/compiler_options.cmake
     fi
@@ -979,7 +964,7 @@ build_deb(){
     export MYSQL_BUILD_CFLAGS="$CFLAGS"
     export MYSQL_BUILD_CXXFLAGS="$CXXFLAGS"
 
-    if [[ "x$DEBIAN_VERSION" == "xfocal" || "x${DEBIAN_VERSION}" == "xbionic" || "x${DEBIAN_VERSION}" == "xbuster" || "x$DEBIAN_VERSION" == "xbullseye" || "x$DEBIAN_VERSION" == "xjammy" || "x$DEBIAN_VERSION" == "xbookworm" || "x$DEBIAN_VERSION" == "xnoble" ]]; then
+    if [[ "x$DEBIAN_VERSION" == "xfocal" || "x${DEBIAN_VERSION}" == "xbionic" || "x${DEBIAN_VERSION}" == "xbuster" || "x$DEBIAN_VERSION" == "xbullseye" || "x$DEBIAN_VERSION" == "xjammy" || "x$DEBIAN_VERSION" == "xbookworm" || "x$DEBIAN_VERSION" == "xnoble" || "x$DEBIAN_VERSION" == "xtrixie" ]]; then
         sed -i "s:iproute:iproute2:g" debian/control
     fi
     sed -i "s:libcurl4-gnutls-dev:libcurl4-openssl-dev:g" debian/control
@@ -1084,23 +1069,7 @@ build_tarball(){
     cd ${BUILD_ROOT} || exit
     if [ -f /etc/redhat-release ]; then
         # (1)
-        mkdir pxb-8.0
-        pushd pxb-8.0
-        yumdownloader percona-xtrabackup-80-8.0.35
-        rpm2cpio *.rpm | cpio --extract --make-directories --verbose
-        mv usr/bin ./
-        mv usr/lib64 ./
-        mv lib64 lib
-        mv usr/lib/private lib/
-        mv lib/xtrabackup/* lib/
-        rm -rf lib/xtrabackup
-        rm -rf usr
-        rm -f *.rpm
-        popd
-
-        # (2)
         mkdir pxb-8.4
-%{_libdir}/mysqlrouter/private/libprotobuf-lite.so.*
         pushd pxb-8.4
         yumdownloader percona-xtrabackup-84-8.4.0
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
@@ -1113,22 +1082,46 @@ build_tarball(){
         rm -f *.rpm
         popd
 
-        tar -zcvf  percona-xtrabackup-8.0.tar.gz pxb-8.0
+        # (2)
+        mkdir pxb-9.5
+        pushd pxb-9.5
+        yumdownloader percona-xtrabackup-91-9.1.0
+        rpm2cpio *.rpm | cpio --extract --make-directories --verbose
+        mv usr/bin ./
+        mv usr/lib* ./
+        mv lib64 lib
+        mv lib/xtrabackup/* lib/ || true
+        rm -rf lib/xtrabackup
+        rm -rf usr
+        rm -f *.rpm
+        popd
+
+        # (3)
+        mkdir pxb-9.6
+        pushd pxb-9.6
+        yumdownloader percona-xtrabackup-96-9.6.0
+        rpm2cpio *.rpm | cpio --extract --make-directories --verbose
+        mv usr/bin ./
+        mv usr/lib* ./
+        mv lib64 lib
+        mv lib/xtrabackup/* lib/ || true
+        rm -rf lib/xtrabackup
+        rm -rf usr
+        rm -f *.rpm
+        popd
+
         tar -zcvf  percona-xtrabackup-8.4.tar.gz pxb-8.4
+        tar -zcvf  percona-xtrabackup-9.1.tar.gz pxb-9.5
+        tar -zcvf  percona-xtrabackup-9.6.tar.gz pxb-9.6
+
     else
         DEBIAN_VERSION="$(lsb_release -sc)"
-        mkdir pxb-8.0
         mkdir pxb-8.4
-        if [ x"${DEBIAN_VERSION}" = xnoble ]; then
-            mkdir pxb-9.3
-            mkdir pxb-9.4
-        fi
-        #dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-80* pxb-8.0
-        if [ x"${DEBIAN_VERSION}" = xjammy ]; then
-            dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-91* pxb-9.3
-            dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-91* pxb-9.4
-        fi
+        mkdir pxb-9.5
+        mkdir pxb-9.6
         dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-84* pxb-8.4
+        dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-91* pxb-9.5
+        dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-96* pxb-9.6
         
         # (1)
         pushd pxb-8.4
@@ -1138,31 +1131,25 @@ build_tarball(){
         popd
 
         # (2)
-        if [ x"${DEBIAN_VERSION}" = xnoble ]; then
-            pushd pxb-9.3
-                mv usr/bin ./
-                mv usr/lib* ./
-                rm -rf usr *.deb DEBIAN
-            popd
-            pushd pxb-9.4
-                mv usr/bin ./
-                mv usr/lib* ./
-                rm -rf usr *.deb DEBIAN
-            popd
-        fi
+        pushd pxb-9.5
+            mv usr/bin ./
+            mv usr/lib* ./
+            rm -rf usr *.deb DEBIAN
+        popd
+        pushd pxb-9.6
+            mv usr/bin ./
+            mv usr/lib* ./
+            rm -rf usr *.deb DEBIAN
+        popd
         
-        #tar -zcvf  percona-xtrabackup-8.0.tar.gz pxb-8.0
-        if [ x"${DEBIAN_VERSION}" = xnoble ]; then
-            tar -zcvf percona-xtrabackup-9.1.tar.gz pxb-9.3
-            tar -zcvf percona-xtrabackup-9.1.tar.gz pxb-9.4
-        fi
-
-        tar -zcvf  percona-xtrabackup-8.4.tar.gz pxb-8.4
+        tar -zcvf percona-xtrabackup-8.4.tar.gz pxb-8.4
+        tar -zcvf percona-xtrabackup-9.1.tar.gz pxb-9.5
+        tar -zcvf percona-xtrabackup-9.6.tar.gz pxb-9.6
     fi
     mkdir -p ${BUILD_ROOT}/target/pxc_extra/
     cp *.tar.gz ${BUILD_ROOT}/target/pxc_extra/
     cp *.tar.gz ${BUILD_ROOT}/target
-    rm -rf pxb-8.0 pxb-8.4 pxb-9.3 pxb-9.4 || true
+    rm -rf pxb-8.4 pxb-9.5 pxb-9.6 || true
     cd ${CURDIR} || exit
     rm -rf jemalloc
     wget https://github.com/jemalloc/jemalloc/releases/download/$JVERSION/jemalloc-$JVERSION.tar.bz2

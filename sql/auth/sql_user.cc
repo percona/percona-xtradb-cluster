@@ -127,8 +127,10 @@
   @param str     A String to store the user list.
   @param user    A LEX_USER which will be appended into user list.
   @param comma   If true, append a ',' before the the user.
+  @param reason for the failure
  */
-void log_user(THD *thd, String *str, LEX_USER *user, bool comma = true) {
+void log_user(THD *thd, String *str, LEX_USER *user, bool comma,
+              const char *reason) {
 #ifdef WITH_WSREP
   /*
     PXC doesn't allow user functions viz. USER/CURRENT_USER
@@ -153,6 +155,11 @@ void log_user(THD *thd, String *str, LEX_USER *user, bool comma = true) {
   append_query_string(thd, system_charset_info, &from_user, str);
   str->append(STRING_WITH_LEN("@"));
   append_query_string(thd, system_charset_info, &from_host, str);
+  if (reason) {
+    str->append(STRING_WITH_LEN(" ("));
+    str->append(reason);
+    str->append(STRING_WITH_LEN(")"));
+  }
 }
 
 extern bool initialized;
@@ -334,7 +341,8 @@ bool mysql_show_create_user(THD *thd, LEX_USER *user_name,
   if (!(acl_user =
             find_acl_user(user_name->host.str, user_name->user.str, true))) {
     String wrong_users;
-    log_user(thd, &wrong_users, user_name, wrong_users.length() > 0);
+    log_user(thd, &wrong_users, user_name, wrong_users.length() > 0,
+             "User account does not exist");
     my_error(ER_CANNOT_USER, MYF(0), "SHOW CREATE USER",
              wrong_users.c_ptr_safe());
     close_thread_tables(thd);
@@ -1486,7 +1494,10 @@ bool set_and_validate_user_attributes(
         */
         if (!thd->is_error()) {
           String error_user;
-          log_user(thd, &error_user, Str, false);
+          log_user(thd, &error_user, Str, false,
+                   "The authentication plugin failed to generate an "
+                   "authentication string, but "
+                   "returned no specific error");
           my_error(ER_CANNOT_USER, MYF(0), cmd, error_user.c_ptr_safe());
         }
         return true;
@@ -1698,8 +1709,12 @@ bool set_and_validate_user_attributes(
     and error if it is.
   */
   if (Str->alter_status.update_password_expired_fields &&
-      !Str->alter_status.use_default_password_lifetime &&
-      Str->alter_status.expire_after_days != 0 &&
+      (
+          // CREATE USER .. PASSWORD EXPIRE
+          Str->alter_status.update_password_expired_column ||
+          // CREATE USER PASSWORD EXPIRE INTERVAL
+          (!Str->alter_status.use_default_password_lifetime &&
+           Str->alter_status.expire_after_days != 0)) &&
       !auth_plugin_supports_expiration(
           Str->first_factor_auth_info.plugin.str)) {
     my_error(ER_PASSWORD_EXPIRATION_NOT_SUPPORTED_BY_AUTH_METHOD, MYF(0),
@@ -1857,7 +1872,7 @@ bool set_and_validate_user_attributes(
       */
       if (!thd->is_error()) {
         String error_user;
-        log_user(thd, &error_user, Str, false);
+        log_user(thd, &error_user, Str, false, nullptr);
         my_error(ER_CANNOT_USER, MYF(0), cmd, error_user.c_ptr_safe());
       }
       return (true);
@@ -2178,13 +2193,13 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
   */
   const Save_and_Restore_binlog_format_state binlog_format_state(thd);
 #ifdef WITH_WSREP
-  /*
-    Rewrite query to ensure it is safe to replay on slave thread with proper
-    user context established (this is important if original query fails to
-    explictly specify the user context and if such query is replicated
-    w/o re-writting then applier will not be able to establish user context).
-  */
   if (WSREP(thd) && !thd->wsrep_applier) {
+    /*
+      Rewrite query to ensure it is safe to replay on slave thread with proper
+      user context established (this is important if original query fails to
+      explictly specify the user context and if such query is replicated
+      w/o re-writting then applier will not be able to establish user context).
+    */
     { /* Critical section */
       Acl_cache_lock_guard acl_cache_rlock(thd, Acl_cache_lock_mode::READ_MODE);
 
@@ -2207,22 +2222,9 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
       }
     }
 
-
-
-    size_t query_length_max = strlen("SET PASSWORD FOR ''@''=''") + 3 * 120 + 1;
-    char *buff = (char *)thd->alloc(query_length_max);
-    if (!buff) {
-      my_error(ER_OUTOFMEMORY, MYF(ME_FATALERROR), 0);
+    if (wsrep_rewrite_set_password_query(thd, lex_user, new_password)) {
       return true;
     }
-
-    ulong query_length =
-        snprintf(buff, query_length_max,
-                 "SET PASSWORD FOR '%-.120s'@'%-.120s'='%-.120s'",
-                 lex_user->user.str ? lex_user->user.str : "",
-                 lex_user->host.str ? lex_user->host.str : "", new_password);
-    buff[query_length_max - 1] = 0;
-    thd->set_query(buff, query_length);
 
     if ((ret = open_grant_tables(thd, tables, &transactional_tables, false,
                                  WSREP_MYSQL_DB, "user"))) {
@@ -2859,7 +2861,8 @@ end:
 static bool stop_if_orphaned_definer(THD *thd, const LEX_USER *user_name,
                                      const std::string &object_type) {
   String wrong_user;
-  log_user(thd, &wrong_user, const_cast<LEX_USER *>(user_name), false);
+  log_user(thd, &wrong_user, const_cast<LEX_USER *>(user_name), false,
+           nullptr);  // a specific error is used
   if (!thd->security_context()
            ->has_global_grant(STRING_WITH_LEN("ALLOW_NONEXISTENT_DEFINER"))
            .first) {
@@ -3146,7 +3149,8 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
     while ((tmp_user_name = user_list++)) {
       if (acl_is_utility_user(tmp_user_name->user.str, tmp_user_name->host.str,
                               nullptr)) {
-        log_user(thd, &wrong_users, tmp_user_name, wrong_users.length() > 0);
+        log_user(thd, &wrong_users, tmp_user_name, wrong_users.length() > 0,
+                 "Cannot create utility user");
         result = true;
         continue;
       }
@@ -3157,7 +3161,8 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
       */
       if (!(user_name = get_current_user(thd, tmp_user_name))) {
         result = 1;
-        log_user(thd, &wrong_users, user_name, wrong_users.length() > 0);
+        log_user(thd, &wrong_users, user_name, wrong_users.length() > 0,
+                 "User account already exists");
         continue;
       }
       if (set_and_validate_user_attributes(
@@ -3165,7 +3170,8 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
               &tables[ACL_TABLES::TABLE_PASSWORD_HISTORY], &history_check_done,
               "CREATE USER", generated_passwords, &mfa, if_not_exists)) {
         result = 1;
-        log_user(thd, &wrong_users, user_name, wrong_users.length() > 0);
+        log_user(thd, &wrong_users, user_name, wrong_users.length() > 0,
+                 nullptr);  // no specific error data at this point
         continue;
       }
       if (!strcmp(user_name->user.str, "") &&
@@ -3197,7 +3203,8 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
         }
         if (if_not_exists) {
           String warn_user;
-          log_user(thd, &warn_user, user_name, false);
+          log_user(thd, &warn_user, user_name, false,
+                   nullptr);  // a specific warning issued
           push_warning_printf(
               thd, Sql_condition::SL_NOTE, ER_USER_ALREADY_EXISTS,
               ER_THD(thd, ER_USER_ALREADY_EXISTS), warn_user.c_ptr_safe());
@@ -3210,7 +3217,8 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
           }
           continue;
         } else {
-          log_user(thd, &wrong_users, user_name, wrong_users.length() > 0);
+          log_user(thd, &wrong_users, user_name, wrong_users.length() > 0,
+                   "User account already exists");
           result = 1;
         }
         continue;
@@ -3224,7 +3232,8 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
         result = 1;
         if (ret < 0) break;
 
-        log_user(thd, &wrong_users, user_name, wrong_users.length() > 0);
+        log_user(thd, &wrong_users, user_name, wrong_users.length() > 0,
+                 "Failed to update the user table");
 
         continue;
       }
@@ -3479,7 +3488,8 @@ bool mysql_drop_user(THD *thd, List<LEX_USER> &list, bool if_exists,
     get_mandatory_roles(&mandatory_roles);
     while ((user = user_list++) != nullptr) {
       if (acl_is_utility_user(user->user.str, user->host.str, nullptr)) {
-        log_user(thd, &wrong_users, user, wrong_users.length() > 0);
+        log_user(thd, &wrong_users, user, wrong_users.length() > 0,
+                 "Cannot drop utility user");
         result = true;
         continue;
       }
@@ -3521,12 +3531,14 @@ bool mysql_drop_user(THD *thd, List<LEX_USER> &list, bool if_exists,
         }
         if (if_exists) {
           String warn_user;
-          log_user(thd, &warn_user, user_name, false);
+          log_user(thd, &warn_user, user_name, false,
+                   nullptr);  // a specific error message
           push_warning_printf(
               thd, Sql_condition::SL_NOTE, ER_USER_DOES_NOT_EXIST,
               ER_THD(thd, ER_USER_DOES_NOT_EXIST), warn_user.c_ptr_safe());
         } else {
-          log_user(thd, &wrong_users, user_name, wrong_users.length() > 0);
+          log_user(thd, &wrong_users, user_name, wrong_users.length() > 0,
+                   "User account does not exist");
           result = 1;
         }
         continue;
@@ -3690,7 +3702,9 @@ bool mysql_rename_user(THD *thd, List<LEX_USER> &list) {
         List_of_granted_roles granted_roles;
         get_granted_roles(user_from, &granted_roles);
         if (!granted_roles.empty()) {
-          log_user(thd, &wrong_users, user_from, wrong_users.length() > 0);
+          log_user(thd, &wrong_users, user_from, wrong_users.length() > 0,
+                   "User account is renamed to anonymous user, but roles are "
+                   "granted to it");
           result = 1;
           continue;
         }
@@ -3708,7 +3722,9 @@ bool mysql_rename_user(THD *thd, List<LEX_USER> &list) {
           break;
         }
 
-        log_user(thd, &wrong_users, user_from, wrong_users.length() > 0);
+        log_user(
+            thd, &wrong_users, user_from, wrong_users.length() > 0,
+            nullptr);  // at this point we don't have a more concrete reason
         result = 1;
         continue;
       }
@@ -3721,7 +3737,9 @@ bool mysql_rename_user(THD *thd, List<LEX_USER> &list) {
           break;
         }
 
-        log_user(thd, &wrong_users, user_from, wrong_users.length() > 0);
+        log_user(
+            thd, &wrong_users, user_from, wrong_users.length() > 0,
+            nullptr);  // the concrete reason is hidden by handle_grant_data
         result = 1;
         continue;
       }
@@ -3889,14 +3907,16 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
 
       if (acl_is_utility_user(tmp_user_from->user.str, tmp_user_from->host.str,
                               nullptr)) {
-        log_user(thd, &wrong_users, tmp_user_from, wrong_users.length() > 0);
+        log_user(thd, &wrong_users, tmp_user_from, wrong_users.length() > 0,
+                 "Cannot alter utility user");
         result = 1;
         continue;
       }
 
       /* add the defaults where needed */
       if (!(user_from = get_current_user(thd, tmp_user_from))) {
-        log_user(thd, &wrong_users, tmp_user_from, wrong_users.length() > 0);
+        log_user(thd, &wrong_users, tmp_user_from, wrong_users.length() > 0,
+                 nullptr);  // should not happen
         result = 1;
         continue;
       }
@@ -3913,17 +3933,6 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
               &tables[ACL_TABLES::TABLE_PASSWORD_HISTORY], &history_check_done,
               "ALTER USER", generated_passwords, &mfa)) {
         result = 1;
-        continue;
-      }
-      /*
-        Check if the user's authentication method supports expiration only
-        if PASSWORD EXPIRE attribute is specified
-      */
-      if (user_from->alter_status.update_password_expired_column &&
-          !auth_plugin_supports_expiration(
-              user_from->first_factor_auth_info.plugin.str)) {
-        result = 1;
-        log_user(thd, &wrong_users, user_from, wrong_users.length() > 0);
         continue;
       }
 
@@ -3966,7 +3975,8 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
 
         if (if_exists) {
           String warn_user;
-          log_user(thd, &warn_user, user_from, false);
+          log_user(thd, &warn_user, user_from, false,
+                   nullptr);  // a specific error
           push_warning_printf(
               thd, Sql_condition::SL_NOTE, ER_USER_DOES_NOT_EXIST,
               ER_THD(thd, ER_USER_DOES_NOT_EXIST), warn_user.c_ptr_safe());
@@ -3978,7 +3988,8 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
                    warn_user.c_ptr_safe());
           }
         } else {
-          log_user(thd, &wrong_users, user_from, wrong_users.length() > 0);
+          log_user(thd, &wrong_users, user_from, wrong_users.length() > 0,
+                   "User account does not exist");
           result = 1;
         }
         continue;
@@ -3995,7 +4006,8 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
         }
         if (if_exists) {
           String warn_user;
-          log_user(thd, &warn_user, user_from, false);
+          log_user(thd, &warn_user, user_from, false,
+                   nullptr);  // a specific error
           push_warning_printf(
               thd, Sql_condition::SL_NOTE, ER_USER_DOES_NOT_EXIST,
               ER_THD(thd, ER_USER_DOES_NOT_EXIST), warn_user.c_ptr_safe());
@@ -4007,7 +4019,8 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
                    warn_user.c_ptr_safe());
           }
         } else {
-          log_user(thd, &wrong_users, user_from, wrong_users.length() > 0);
+          log_user(thd, &wrong_users, user_from, wrong_users.length() > 0,
+                   "User account does not exist");
           result = 1;
         }
         continue;

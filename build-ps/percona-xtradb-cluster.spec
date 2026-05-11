@@ -399,13 +399,13 @@ Requires:             percona-xtradb-cluster-icu-data-files = %{version}-%{relea
 Requires:             selinux-policy
 Requires:             policycoreutils
 Requires:             curl, nmap, nc
-%if 0%{?rhel} >= 8
+%if 0%{?rhel} >= 8 || 0%{?amzn} == 2023
 Requires:	      percona-telemetry-agent
 %endif
 Requires(pre):        policycoreutils
 Requires(post):       policycoreutils
 Requires(postun):     policycoreutils
-%if 0%{?rhel} == 8 || 0%{?rhel} == 9
+%if 0%{?rhel} == 8 || 0%{?rhel} == 9 || 0%{?amzn} == 2023 || 0%{?rhel} == 10
 Requires:             policycoreutils-python-utils
 Requires(pre):        policycoreutils-python-utils
 Requires(post):       policycoreutils-python-utils
@@ -437,10 +437,18 @@ Requires(post):   /sbin/chkconfig
 Requires(preun):  /sbin/chkconfig
 Requires(preun):  /sbin/service
 %endif
-Provides:       mysql-server MySQL-server
-%if 0%{?rhel} == 8 || 0%{?rhel} == 9
+Obsoletes:      community-mysql-bench
+Obsoletes:      mysql-bench
 Obsoletes:      mariadb-connector-c-config
-%endif
+Obsoletes:      mariadb-backup
+Obsoletes:      mariadb-bench
+Obsoletes:      mariadb-server
+Obsoletes:      mariadb-server-galera
+Obsoletes:      mariadb-server-utils
+Obsoletes:      mariadb-galera-server
+Obsoletes:      mariadb-gssapi-server
+Obsoletes:      mariadb-oqgraph-engine
+Provides:       mysql-server MySQL-server
 Conflicts:      Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56 Percona-Server-server-57
 
 %description -n percona-xtradb-cluster-server
@@ -492,6 +500,8 @@ Group:          Applications/Databases
 Provides:       mysql-test
 Requires:       perl(Socket), perl(Time::HiRes), perl(Data::Dumper), perl(Test::More), perl(Env)
 Conflicts:      Percona-SQL-test-50 Percona-Server-test-51 Percona-Server-test-55 Percona-XtraDB-Cluster-test-55
+Obsoletes:      mysql-test < %{version}-%{release}
+Obsoletes:      mariadb-test
 AutoReqProv:    no
 
 %description -n percona-xtradb-cluster-test
@@ -520,6 +530,9 @@ Conflicts:      Percona-SQL-devel-50 Percona-Server-devel-51 Percona-Server-deve
 %else
 Conflicts:      Percona-SQL-devel-50 Percona-Server-devel-51 Percona-Server-devel-55 Percona-XtraDB-Cluster-devel-55
 %endif
+Obsoletes:      mariadb-devel
+Obsoletes:      mariadb-connector-c-devel
+Obsoletes:      mysql-connector-c-devel < 6.2
 
 %description -n percona-xtradb-cluster-devel
 Percona XtraDB Cluster is based on the Percona Server database server and
@@ -670,7 +683,7 @@ export CFLAGS=${MYSQL_BUILD_CFLAGS:-${CFLAGS:-$RPM_OPT_FLAGS -Wno-implicit-funct
 export CXXFLAGS=${MYSQL_BUILD_CXXFLAGS:-${CXXFLAGS:-$RPM_OPT_FLAGS -felide-constructors -Wno-error=stringop-overflow -Wno-error=free-nonheap-object}}
 export LDFLAGS=${MYSQL_BUILD_LDFLAGS:-${LDFLAGS:-}}
 
-%if 0%{?rhel} == 8 || 0%{?rhel} == 9 || 0%{?rhel} == 10
+%if 0%{?rhel} == 8 || 0%{?rhel} == 9 || 0%{?amzn} >= 2023 || 0%{?rhel} == 10
 export CMAKE=${MYSQL_BUILD_CMAKE:-${CMAKE:-/usr/bin/cmake}}
 %else
 export CMAKE=${MYSQL_BUILD_CMAKE:-${CMAKE:-/usr/bin/cmake3}}
@@ -714,9 +727,9 @@ rm -rf usr
 rm -f *.rpm
 popd
 
-mkdir pxb-8.0
-pushd pxb-8.0
-yumdownloader percona-xtrabackup-80-8.0.35
+mkdir pxb-9.5
+pushd pxb-9.5
+yumdownloader percona-xtrabackup-91-9.1.0
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib64 ./
@@ -726,8 +739,22 @@ mv lib/xtrabackup/* lib/
 rm -rf lib/xtrabackup
 rm -rf usr
 rm -f *.rpm
-
 popd
+
+mkdir pxb-9.6
+pushd pxb-9.6
+yumdownloader percona-xtrabackup-96-9.6.0
+rpm2cpio *.rpm | cpio --extract --make-directories --verbose
+mv usr/bin ./
+mv usr/lib64 ./
+mv lib64 lib
+mv usr/lib/private lib/
+mv lib/xtrabackup/* lib/
+rm -rf lib/xtrabackup
+rm -rf usr
+rm -f *.rpm
+popd
+
 popd
 
 # Build debug mysqld and libmysqld.a
@@ -904,7 +931,7 @@ mv $RBR%{_libdir} $RPM_BUILD_DIR/%{_libdir}
 ##############################################################################
 %install
 
-%if 0%{?rhel} == 9
+%if 0%{?rhel} == 9 || 0%{?amzn} == 2023 || 0%{?rhel} == 10
     sed -i 's/python2$/python3/' scripts/pyclustercheck.py.in
 %endif
 
@@ -1721,6 +1748,9 @@ fi
 %attr(755, root, root) %{_libdir}/mysql/private/libabsl_throw_delegate.so
 %attr(755, root, root) %{_libdir}/mysql/private/libabsl_time.so
 %attr(755, root, root) %{_libdir}/mysql/private/libabsl_time_zone.so
+%attr(755, root, root) %{_libdir}/mysql/private/libicui18n.so.*
+%attr(755, root, root) %{_libdir}/mysql/private/libicustubdata.so.*
+%attr(755, root, root) %{_libdir}/mysql/private/libicuuc.so.*
 
 %if 0%{?systemd} == 0
 %attr(755, root, root) %{_sbindir}/rcmysql
@@ -2031,6 +2061,9 @@ rm -rf %{pxc_telemetry}
 %{_libdir}/mysqlrouter/private/libmysqlrouter_mysqlxclient.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_utils.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_routing_guidelines.*
+%{_libdir}/mysqlrouter/private/libicui18n.so.*
+%{_libdir}/mysqlrouter/private/libicustubdata.so.*
+%{_libdir}/mysqlrouter/private/libicuuc.so.*
 %{_libdir}/mysqlrouter/private/libprotobuf.so.*
 %dir %{_libdir}/mysqlrouter
 %dir %{_libdir}/mysqlrouter/private

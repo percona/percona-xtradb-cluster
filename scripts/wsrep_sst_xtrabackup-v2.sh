@@ -173,22 +173,19 @@ DATA="${WSREP_SST_OPT_DATA}"
 XTRABACKUP_PATH_PREFIX="$(dirname $0)/pxc_extra/pxb-"
 
 # XB path compatible with the current version of PXC
-XTRABACKUP_THIS_VER_PATH="$(dirname $0)/pxc_extra/pxb-9.4"
+XTRABACKUP_THIS_VER_PATH="$(dirname $0)/pxc_extra/pxb-9.6"
 
 # XB path compatible with prev PXC version. It may be prev Innovative release or LTS
 # if current PXC version is 1st Innovative.
 # Note that this can be the same as XTRABACKUP_PREV_LTS_VER_PATH
-XTRABACKUP_PREV_VER_PATH="$(dirname $0)/pxc_extra/pxb-9.3"
+XTRABACKUP_PREV_VER_PATH="$(dirname $0)/pxc_extra/pxb-9.5"
 
 # XB path compatible previous PXC LTS version
 XTRABACKUP_PREV_LTS_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.4"
 
 # Minimum PXB required versions for this node to work
 # To be able to service this version
-# Note: lock_ddl=REDUCED will be available in 9.1.0-2
-# For now, use 9.1.0-1. Once 9.1.0-2 is out, use it and revert this commit
-#XB_THIS_REQUIRED_VERSION="9.1.0-2"
-XB_THIS_REQUIRED_VERSION="9.1.0-1"
+XB_THIS_REQUIRED_VERSION="9.6.0-1"
 # To be able to service previous version
 XB_PREV_REQUIRED_VERSION="9.1.0"
 # To be able to service previous LTS version
@@ -198,7 +195,7 @@ XB_PREV_LTS_REQUIRED_VERSION="8.4.0"
 REQUIRED_DONOR_MYSQL_LTS_VERSION="8.4"
 # ...or to be this previous version (note that it may be LTS as well if this is
 # 1st innovative)
-REQUIRED_DONOR_MYSQL_PREV_VERSION="9.3"
+REQUIRED_DONOR_MYSQL_PREV_VERSION="9.5"
 
 # These files carry some important information in form of GTID of the data
 # that is being backed up.
@@ -1630,11 +1627,10 @@ function initialize_pxb_commands()
     # --lock-ddl option
     #
     # Use user-provided option if set, if not, use REDUCED by default.
-    # Starting from PXB 9.1.0-2, --lock-ddl=REDUCED is available in
-    # the community version. 9.1.0-2 is the minimum required version for this
+    # Starting from PXB 9.6.0-1, --lock-ddl=REDUCED is available in
+    # the community version. 9.6.0-1 is the minimum required version for this
     # script to work (see XB_THIS_REQUIRED_VERSION))
-    # lock_ddl="--lock-ddl=REDUCED"
-    lock_ddl=
+    lock_ddl="--lock-ddl=REDUCED"
     [[ -n "$lock_ddl_opt" ]] && lock_ddl="--lock-ddl=$lock_ddl_opt"
     wsrep_log_info "Using PXB option ${lock_ddl} for SST"
 

@@ -43,13 +43,13 @@ Standards-Version: 7.0.0
 Homepage: https://www.percona.com/mysql/software/percona-xtradb-cluster/
 Vcs-Git: https://github.com/percona/percona-xtradb-cluster
 
-Package: libperconaserverclient22
+Package: libperconaserverclient24
 Architecture: any
 Section: libs
 Pre-Depends: ${misc:Pre-Depends}
 Multi-Arch: same
 Depends: percona-xtradb-cluster-common (= ${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
-Replaces: libpercona-server-client16, libperconaserverclient18, libperconaserverclient18.1, libperconaserverclient20, libperconaserverclient21
+Replaces: libpercona-server-client16, libperconaserverclient18, libperconaserverclient18.1, libperconaserverclient20, libperconaserverclient21, libperconaserverclient22
 Description: Percona XtraDB Cluster database client library
  Percona XtraDB Cluster is based on the Percona Server database
  server and provides a High Availability solution.
@@ -59,12 +59,13 @@ Description: Percona XtraDB Cluster database client library
  .
  This package includes the client library.
 
-Package: libperconaserverclient22-dev
+Package: libperconaserverclient24-dev
 Architecture: any
 Section: libdevel
-Depends: libperconaserverclient22 (= ${binary:Version}),
+Depends: libperconaserverclient24 (= ${binary:Version}),
          zlib1g-dev, ${misc:Depends}
-Breaks: libperconaserverclient21-dev,
+Breaks: libperconaserverclient22-dev,
+	libperconaserverclient21-dev,
 	libperconaserverclient20-dev,
         libperconaserverclient18.1-dev,
         libperconaserverclient18-dev,
@@ -77,8 +78,10 @@ Breaks: libperconaserverclient21-dev,
         libmysqlclient18-dev,
         libmysqlclient20-dev,
         libmysqlclient21-dev,
+        libmysqlclient22-dev,
         libmariadbclient-dev
-Replaces: libperconaserverclient21-dev,
+Replaces: libperconaserverclient22-dev,
+	  libperconaserverclient21-dev,
 	  libperconaserverclient20-dev,
           libperconaserverclient18.1-dev,
           libperconaserverclient18-dev,
