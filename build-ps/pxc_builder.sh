@@ -646,10 +646,14 @@ build_srpm(){
         '*/build-ps/rpm/percona-telemetry-cleanup.sh' || true
     tar -xzf ${TARFILE}
     rm -rf ${TARFILE}
-    PXCDIR=$(ls | grep 'Percona-XtraDB-Cluster*' | sort | tail -n1)
-    mv ${PXCDIR} Percona-XtraDB-Cluster-${MYSQL_VERSION}
-    tar -zcf Percona-XtraDB-Cluster-${MYSQL_VERSION}.tar.gz Percona-XtraDB-Cluster-${MYSQL_VERSION}
-    rm -rf ${PXCDIR}
+    PXCDIR=$(ls | grep -i 'Percona-XtraDB-Cluster' | sort | tail -n1)
+    # Repack tarball to match %{src_dir} = percona-xtradb-cluster-${mysql_version}
+    # in build-ps/percona-xtradb-cluster.spec.in (lowercase, aligned with PS
+    # convention). The original upstream tarball ships a CamelCase top-level
+    # dir; %setup -n %{src_dir} requires the internal dir name to match.
+    mv ${PXCDIR} percona-xtradb-cluster-${MYSQL_VERSION}
+    tar -zcf percona-xtradb-cluster-${MYSQL_VERSION}.tar.gz percona-xtradb-cluster-${MYSQL_VERSION}
+    rm -rf percona-xtradb-cluster-${MYSQL_VERSION}
     cd ${WORKDIR} || exit
     #
     # Substitute @VAR@ markers in spec template (mirrors PS @VAR@ pattern,

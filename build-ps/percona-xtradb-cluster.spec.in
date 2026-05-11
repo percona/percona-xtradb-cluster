@@ -188,9 +188,10 @@ Prefix: %{_sysconfdir}
 # ----------------------------------------------------------------------------
 # Source name
 # ----------------------------------------------------------------------------
-%if %{undefined src_base}
-  %define src_base Percona-XtraDB-Cluster
-%endif
+# src_base is defined above (lowercase, aligned with Percona Server
+# convention). The legacy CamelCase default has been removed because it
+# was dead code: %{!?src_base:...} above always wins, so this %if block
+# never executed and only created confusion about which casing was used.
 %define src_dir %{src_base}-%{mysql_version}
 
 %if %{undefined feature_set}
