@@ -53,3 +53,35 @@ usr/lib/mysql/plugin/debug/component_test_event_tracking_producer_b.so
 # Router plugins not in PXC distribution
 usr/lib/mysqlrouter/plugin/mysql_rest_service.so
 usr/lib/mysqlrouter/private/libprotobuf.so.*
+
+# MySQL Router is not currently packaged for PXC deb.
+# percona-xtradb-cluster-mysql-router.install and
+# percona-xtradb-cluster-mysql-router-dev.install exist in the source
+# tree but no matching Package: percona-xtradb-cluster-mysql-router
+# stanza was added to debian/control, so dh_install never reads those
+# install files and every file they would have shipped becomes orphaned.
+# Until router packages are added to control, exclude the router private
+# libs and sample configs from the build to keep dh_missing quiet.
+usr/lib/mysqlrouter/private/libabsl_*.so
+usr/lib/mysqlrouter/private/libicu*.so.*
+usr/lib/mysqlrouter/private/libmysqlharness*.so.*
+usr/lib/mysqlrouter/private/libmysqlrouter*.so.*
+usr/share/mysqlrouter/docs/sample_mysqlrouter.conf
+
+# garbd installs duplicate copies of these helpers under usr/share/ on
+# deb in addition to the canonical lib/systemd/system/ and usr/bin/
+# locations already claimed by percona-xtradb-cluster-garbd.install.
+# The usr/share/ copies are leftovers from the upstream galera SCons
+# build; drop them rather than shipping two copies in the same package.
+usr/share/garb-systemd
+usr/share/garb.cnf
+usr/share/garb.service
+
+# garbd man page lands under usr/man/ (legacy path) instead of
+# usr/share/man/. Excluding it is safer than path-rewriting until the
+# galera build is fixed upstream.
+usr/man/man8/garbd.8
+
+# Stale debug symbol stub referencing the old 5.7 doc dir. Not
+# meaningful on the 9.x line; drop until upstream cleans this up.
+usr/share/doc/percona-xtradb-cluster-5.7/mysqld.sym.gz

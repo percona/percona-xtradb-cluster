@@ -28,9 +28,14 @@ usr/share/mysql
 # Defaults file
 etc/default/mysql
 
-# Telemetry helper scripts (called from postinst/postrm)
-debian/extra/percona-telemetry-setup.sh usr/libexec/percona-xtradb-cluster/
-debian/extra/percona-telemetry-cleanup.sh usr/libexec/percona-xtradb-cluster/
+# Telemetry helper scripts (called from postinst/postrm). cmake's
+# `make install` places these under usr/libexec/percona-xtradb-cluster/
+# via spec.in Source11/Source12 + the equivalent CMake install rules,
+# so pick them up from debian/tmp directly. Using `debian/extra/...`
+# source paths would orphan the cmake-installed copies under
+# debian/tmp/ and trigger dh_missing.
+usr/libexec/percona-xtradb-cluster/percona-telemetry-setup.sh
+usr/libexec/percona-xtradb-cluster/percona-telemetry-cleanup.sh
 
 # systemd unit files
 lib/systemd/system/mysql.service
