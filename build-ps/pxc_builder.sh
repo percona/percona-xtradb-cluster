@@ -640,10 +640,12 @@ build_srpm(){
     mv -fv ${TARFILE} ${WORKDIR}/rpmbuild/SOURCES
     cd ${WORKDIR}/rpmbuild/SOURCES || exit
     # Extract telemetry helper scripts from the source tarball into SOURCES
-    # so the spec's Source11 / Source12 declarations resolve.
-    tar xzf ${TARFILE} --wildcards --strip-components=2 \
-        '*/build-ps/rpm/percona-telemetry-setup.sh' \
-        '*/build-ps/rpm/percona-telemetry-cleanup.sh' || true
+    # so the spec's Source11 / Source12 declarations resolve. Strip 3 path
+    # components (<topdir>/build-ps/rpm/) so the helpers land flat in SOURCES;
+    # rpmbuild looks for them by filename. Matches the pattern used in
+    # percona-server/build-ps/percona-server-9.0_builder.sh.
+    tar vxzf ${TARFILE} --wildcards '*/build-ps/rpm/percona-telemetry-setup.sh' --strip=3
+    tar vxzf ${TARFILE} --wildcards '*/build-ps/rpm/percona-telemetry-cleanup.sh' --strip=3
     tar -xzf ${TARFILE}
     rm -rf ${TARFILE}
     PXCDIR=$(ls | grep -i 'Percona-XtraDB-Cluster' | sort | tail -n1)
