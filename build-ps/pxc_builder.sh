@@ -499,8 +499,14 @@ install_deps() {
         apt-get -y install psmisc
         apt-get -y install libsasl2-modules:amd64 || apt-get -y install libsasl2-modules
         apt-get -y install dh-systemd || true
-        # Required by debhelper-compat (= 13) + new Build-Depends in debian/control
+        # Required by debhelper-compat (= 13) + new Build-Depends in debian/control.
+        # `debhelper-compat` is a virtual package provided by recent debhelper
+        # releases; install it explicitly so older host debhelper packages that
+        # don't provide the (= 13) virtual still get pulled forward. `|| true`
+        # tolerates ancient distros where the package literally does not exist
+        # (e.g. bionic) — those distros need backports configured separately.
         apt-get -y install dh-apparmor libsystemd-dev pkg-config
+        apt-get -y install debhelper-compat || true
         apt-get -y install curl bison cmake perl libssl-dev libaio-dev libldap2-dev libwrap0-dev gdb unzip gawk
         apt-get -y install lsb-release libmecab-dev libncurses5-dev libreadline-dev libpam-dev zlib1g-dev libcurl4-gnutls-dev
         apt-get -y install libldap2-dev libnuma-dev libjemalloc-dev libeatmydata libc6-dbg valgrind libjson-perl libsasl2-dev
@@ -899,7 +905,12 @@ build_source_deb(){
     sed -i "s:libcurl4-gnutls-dev:libcurl4-openssl-dev:g" debian/control
 
     dch -D UNRELEASED --force-distribution -v "$MYSQL_VERSION-$MYSQL_RELEASE-$DEB_RELEASE" "Update to new upstream release Percona XtraDB Cluster ${VERSION}-rel${RELEASE}"
-    dpkg-buildpackage -S
+    # -d skips dpkg-checkbuilddeps. The source-only package (.dsc + .orig.tar +
+    # .debian.tar) does not require build-deps to be installed on this host
+    # because nothing is being compiled. The binary build runs build-deps
+    # checks separately when build_deb invokes dpkg-buildpackage -b on a
+    # properly-prepared host.
+    dpkg-buildpackage -S -d
     #
     rm -fr ${HNAME}-${VERSION}-${RELEASE}
 
