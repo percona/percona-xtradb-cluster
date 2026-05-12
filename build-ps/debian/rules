@@ -82,6 +82,7 @@ CMAKE_COMMON_FLAGS = \
 	-DMYSQL_UNIX_ADDR=/var/run/mysqld/mysqld.sock \
 	-DSYSTEM_TYPE="debian-linux-gnu" \
 	-DWITHOUT_TOKUDB=ON \
+	-DWITH_ROUTER=OFF \
 	-DMYSQL_SERVER_SUFFIX=".$(rel)" \
 	-DWITH_WSREP=ON \
 	-DWITH_LDAP=system \
