@@ -1157,6 +1157,15 @@ install -d $RBR%{_libdir}/mysql
 #    mv $RBR%{_libdir}/mecab $RBR%{_libdir}/mysql
 #%endif
 
+# Remove any core dumps left behind by MTR run-profile-suite crashes.
+# A core file outside mysql-test/var/ (e.g. directly under mysql-test/)
+# escapes the `rm -r $(readlink mysql-test/var)` cleanup in the PGO
+# %%build pass and ends up shipped via `make install`, where it trips
+# /usr/lib/rpm/check-buildroot because the binary core contains the
+# absolute BUILDROOT path of the crashed mysqld.
+find $RBR -name 'core' -type f -delete 2>/dev/null || :
+find $RBR -name 'core.[0-9]*' -type f -delete 2>/dev/null || :
+
 ##############################################################################
 #  Post processing actions, i.e. when installed
 ##############################################################################
