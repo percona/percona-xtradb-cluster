@@ -100,7 +100,7 @@ Prefix: %{_sysconfdir}
 
 # dwz on EL8 (dwz-0.13) crashes with assertion failure when compressing
 # DWARF emitted by GCC with PGO+LTO. The crash leaves a core file in
-# BUILDROOT which then trips %check-buildroot. Skip dwz on EL8 — debuginfo
+# BUILDROOT which then trips %%check-buildroot. Skip dwz on EL8 — debuginfo
 # packages will be slightly larger but won't fail to build.
 %if 0%{?rhel} == 8
 %global _find_debuginfo_dwz_opts %{nil}
@@ -998,7 +998,7 @@ mv $RBR%{_libdir} $RPM_BUILD_DIR/%{_libdir}
 mkdir -p %{buildroot}%{_bindir}/
 cp -r pxc_extra %{buildroot}%{_bindir}/
 
-# Install Percona telemetry helper scripts (called from %post / %postun)
+# Install Percona telemetry helper scripts (called from %%post / %%postun)
 install -D -m 0755 %{SOURCE11} %{buildroot}%{_libexecdir}/percona-xtradb-cluster/percona-telemetry-setup.sh
 install -D -m 0755 %{SOURCE12} %{buildroot}%{_libexecdir}/percona-xtradb-cluster/percona-telemetry-cleanup.sh
 
@@ -1476,7 +1476,7 @@ fi
 if [ "$SERVER_TO_START" = "true" ] ; then
 %if 0%{?systemd}
 
-# Check %postun
+# Check %%postun
 
 %else
 # Restart in the same way that mysqld will be started normally.
@@ -1649,7 +1649,7 @@ fi
 %files -n percona-xtradb-cluster-server
 %defattr(-,root,root,0755)
 
-# Telemetry helper scripts (called from %post / %postun)
+# Telemetry helper scripts (called from %%post / %%postun)
 %attr(0755, root, root) %{_libexecdir}/percona-xtradb-cluster/percona-telemetry-setup.sh
 %attr(0755, root, root) %{_libexecdir}/percona-xtradb-cluster/percona-telemetry-cleanup.sh
 
@@ -1974,7 +1974,7 @@ fi
 # No dot before the `*` so this matches both the bare soname symlink
 # `libmysqlclient.so.${compatlib}` and the fully-versioned file
 # `libmysqlclient.so.${compatlib}.<minor>.<patch>`. The compat install
-# loop in %install already extracts both forms from the upstream shared
+# loop in %%install already extracts both forms from the upstream shared
 # rpm; the previous `${compatlib}.*` glob only claimed the versioned
 # file and orphaned the soname symlink.
 %{_libdir}/mysql/libmysqlclient.so.%{compatlib}*
