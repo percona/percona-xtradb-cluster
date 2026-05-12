@@ -31,15 +31,15 @@
 #                     and /usr/lib/debug/.../mysqlrouter/private/libabsl_*.so.debug
 #
 # The previous attempt to fix this here with
-#     %global _build_id_links alldebug
+#     %%global _build_id_links alldebug
 # caused `rpmbuild -bs` to fail with:
-#     error: Package already exists: %package debuginfo
+#     error: Package already exists: %%package debuginfo
 # on the Jenkins build hosts (rpm 4.16+), so the spec-level workaround is
 # off. Percona Server handles the same problem from the builder side by
 # patching /usr/lib/rpm/find-debuginfo.sh (see PS
 # build-ps/percona-server-9.0_builder.sh apply_workaround_bug_304121); the
 # equivalent patch needs to be ported into pxc_builder.sh before the next
-# release if duplicate-build-id complaints resurface at %install time.
+# release if duplicate-build-id complaints resurface at %%install time.
 
 %define galera_src_dir percona-xtradb-cluster-galera
 %define galera_docs /usr/share/doc/%{galera_src_dir}
