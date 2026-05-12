@@ -441,7 +441,6 @@ fi
         -DCMAKE_C_FLAGS="${TARBALL_WARN_SUPPRESS}"
         -DCMAKE_CXX_FLAGS="${TARBALL_WARN_SUPPRESS}"
         -DWITH_PAM=ON
-        -DWITH_ROUTER=OFF
         -DWITHOUT_ROCKSDB=ON
         -DWITHOUT_TOKUDB=ON
         -DWITH_INNODB_MEMCACHED=ON
@@ -489,6 +488,8 @@ fi
             -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
             -DMINIMAL_RELWITHDEBINFO=OFF \
             $PGO_FIRST_FLAG \
+            -DROUTER_INSTALL_LIBDIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib/mysqlrouter/private" \
+            -DROUTER_INSTALL_PLUGINDIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib/mysqlrouter/plugin" \
             -DCOMPILATION_COMMENT="$COMMENT" \
             $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
@@ -508,6 +509,8 @@ fi
                 -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
                 -DMINIMAL_RELWITHDEBINFO=OFF \
                 -DFPROFILE_USE=1 \
+                -DROUTER_INSTALL_LIBDIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib/mysqlrouter/private" \
+                -DROUTER_INSTALL_PLUGINDIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib/mysqlrouter/plugin" \
                 -DCOMPILATION_COMMENT="$COMMENT" \
                 $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
@@ -618,7 +621,7 @@ fi
 # Patch needed libraries
 (
     LIBLIST="libnuma.so libgssapi.so libldap_r-2.4.so.2 liblber-2.4.so.2 libaio.so libprocps.so libgcrypt.so libtinfo.so libsasl2.so libbrotlidec.so libbrotlicommon.so librtmp.so libfreebl3.so libssl3.so libsmime3.so libnss3.so libnssutil3.so libplds4.so libplc4.so libnspr4.so libtirpc.so libncurses.so.5 libboost_program_options"
-    DIRLIST="bin bin/pxc_extra/pxb-8.4/bin bin/pxc_extra/pxb-9.1/bin lib bin/pxc_extra/pxb-8.4/lib/plugin bin/pxc_extra/pxb-9.1/lib/plugin lib/private lib/plugin"
+    DIRLIST="bin bin/pxc_extra/pxb-8.4/bin bin/pxc_extra/pxb-9.1/bin lib bin/pxc_extra/pxb-8.4/lib/plugin bin/pxc_extra/pxb-9.1/lib/plugin lib/private lib/plugin lib/mysqlrouter/plugin lib/mysqlrouter/private"
 
     LIBPATH=""
     OVERRIDE=false
@@ -718,6 +721,14 @@ fi
         set_runpath bin/pxc_extra/pxb-9.1/lib/plugin '$ORIGIN/../../../../../lib/private/'
         set_runpath lib/plugin '$ORIGIN/../private/'
         set_runpath lib/private '$ORIGIN'
+        #  LIBS MYSQLROUTER
+        unset override && export override=true && set_runpath lib/mysqlrouter/plugin '$ORIGIN/:$ORIGIN/../private/:$ORIGIN/../../private/'
+        unset override && export override=true && set_runpath lib/mysqlrouter/private '$ORIGIN/:$ORIGIN/../plugin/:$ORIGIN/../../private/'
+        #  BINS MYSQLROUTER
+        unset override && export override=true && set_runpath bin/mysqlrouter_passwd '$ORIGIN/../lib/mysqlrouter/private/:$ORIGIN/../lib/mysqlrouter/plugin/:$ORIGIN/../lib/private/'
+        unset override && export override=true && set_runpath bin/mysqlrouter_plugin_info '$ORIGIN/../lib/mysqlrouter/private/:$ORIGIN/../lib/mysqlrouter/plugin/:$ORIGIN/../lib/private/'
+        unset override && export override=true && set_runpath bin/mysqlrouter '$ORIGIN/../lib/mysqlrouter/private/:$ORIGIN/../lib/mysqlrouter/plugin/:$ORIGIN/../lib/private/'
+        unset override && export override=true && set_runpath bin/mysqlrouter_keyring '$ORIGIN/../lib/mysqlrouter/private/:$ORIGIN/../lib/mysqlrouter/plugin/:$ORIGIN/../lib/private/'
         #  BINS XTRABACKUP
         unset override && export override=true && set_runpath bin/pxc_extra/pxb-8.4/bin/xtrabackup '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'
         unset override && export override=true && set_runpath bin/pxc_extra/pxb-8.4/bin/xtrabackup-debug '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'

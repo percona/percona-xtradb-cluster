@@ -236,7 +236,27 @@ get_sources(){
     rsync -av ${WORKDIR}/percona-xtradb-cluster/extra/coredumper/ ${PXCDIR}/extra/coredumper --exclude .git
     rsync -av ${WORKDIR}/percona-xtradb-cluster/extra/libkmip/ ${PXCDIR}/extra/libkmip --exclude .git
 
+    sed -i 's:ROUTER_RUNTIMEDIR:/var/run/mysqlrouter/:g' ${PXCDIR}/packaging/rpm-common/*
     cd ${PXCDIR}/packaging/rpm-common || exit
+        # systemd unit + tmpfiles templates live under scripts/systemd/ in the
+        # source tree; copy them in if they're not already in rpm-common.
+        if [ ! -f mysqlrouter.service ]; then
+            if [ -f mysqlrouter.service.in ]; then
+                cp -p mysqlrouter.service.in mysqlrouter.service
+            elif [ -f ../../scripts/systemd/mysqlrouter.service.in ]; then
+                cp -p ../../scripts/systemd/mysqlrouter.service.in mysqlrouter.service
+            fi
+        fi
+        if [ ! -f mysqlrouter.tmpfiles.d ]; then
+            if [ -f mysqlrouter.tmpfiles.d.in ]; then
+                cp -p mysqlrouter.tmpfiles.d.in mysqlrouter.tmpfiles.d
+            elif [ -f ../../scripts/systemd/mysqlrouter.tmpfiles.d.in ]; then
+                cp -p ../../scripts/systemd/mysqlrouter.tmpfiles.d.in mysqlrouter.tmpfiles.d
+            fi
+        fi
+        if [ ! -f mysqlrouter.conf ]; then
+            cp -p mysqlrouter.conf.in mysqlrouter.conf
+        fi
         if [ ! -f mysql.logrotate ]; then
             cp -p mysql.logrotate.in mysql.logrotate
         fi
@@ -1122,6 +1142,7 @@ build_tarball(){
 
         # (2)
         mkdir pxb-8.4
+%{_libdir}/mysqlrouter/private/libprotobuf-lite.so.*
         pushd pxb-8.4
         yumdownloader percona-xtrabackup-84-8.4.0
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose

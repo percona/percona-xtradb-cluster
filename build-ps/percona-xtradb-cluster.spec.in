@@ -20,11 +20,18 @@
 
 %undefine _missing_build_ids_terminate_build
 
-# Defensive: with -DWITH_ROUTER=OFF the duplicate
-# %{_libdir}/mysql/private vs %{_libdir}/mysqlrouter/private build-id
-# collision goes away, but keep `alldebug` mode active so any future
-# private-lib duplication (e.g. plugin-debug copies) doesn't fail the
-# debuginfo extraction.
+# The upstream MySQL build installs identical absl / protobuf / icu private
+# libraries under both %{_libdir}/mysql/private/ and
+# %{_libdir}/mysqlrouter/private/. The two copies share the same build-id,
+# which rpm's default `compat` build-id link mode rejects when generating
+# debuginfo packages:
+#     Duplicate build-ids /usr/lib/debug/.../mysql/private/libabsl_*.so.debug
+#                     and /usr/lib/debug/.../mysqlrouter/private/libabsl_*.so.debug
+# Switch to `alldebug` mode, which appends a unique .debug suffix to the
+# build-id symlinks so duplicates can coexist without collision. This is the
+# rpm-native equivalent of the find-debuginfo.sh patch PS applies in its
+# builder (apply_workaround_bug_304121); doing it here keeps the workaround
+# in the spec instead of requiring container-level surgery.
 %global _build_id_links alldebug
 
 %define galera_src_dir percona-xtradb-cluster-galera
@@ -655,11 +662,27 @@ Obsoletes:      galera-57-debuginfo galera-garbd-57
 %description -n percona-xtradb-cluster-garbd
 This package contains the garb binary and init scripts.
 
-# MySQL Router is intentionally excluded from PXC distribution. The build
-# disables it via -DWITH_ROUTER=OFF in %{cmake_common_flags}; the
-# %package / %files / %scriptlet stanzas have been removed accordingly.
-# Users who need MySQL Router should install it from the standalone
-# percona-mysql-router product.
+%package  -n   percona-xtradb-cluster-mysql-router
+Summary:       Percona MySQL Router
+Group:         Applications/Databases
+Provides:      percona-xtradb-cluster-mysql-router = %{version}-%{release}
+Obsoletes:     percona-xtradb-cluster-mysql-router < %{version}-%{release}
+Obsoletes:     percona-mysql-router
+Provides:      mysql-router
+
+%description -n percona-xtradb-cluster-mysql-router
+The Percona MySQL Router software delivers a fast, multi-threaded way of
+routing connections from MySQL Clients to MySQL Servers.
+
+%package   -n   percona-xtradb-cluster-mysql-router-devel
+Summary:        Development header files and libraries for Percona MySQL Router
+Group:          Applications/Databases
+Provides:       percona-xtradb-cluster-mysql-router-devel = %{version}-%{release}
+Obsoletes:      mysql-router-devel percona-mysql-router-devel
+
+%description -n percona-xtradb-cluster-mysql-router-devel
+This package contains the development header files and libraries
+necessary to develop Percona MySQL Router applications.
 
 %package   -n   percona-xtradb-cluster-icu-data-files
 Summary:        MySQL packaging of ICU data files
@@ -795,7 +818,6 @@ popd
            -DWITH_INNODB_MEMCACHED=ON \\\
            -DUSE_LD_LLD=0 \\\
            -DWITH_AUTHENTICATION_CLIENT_PLUGINS=1 \\\
-           -DWITH_ROUTER=OFF \\\
            -DWITH_CURL=system \\\
            %{cmake_systemd_flags} \\\
            -DENABLE_DTRACE=OFF \\\
@@ -993,6 +1015,8 @@ install -d $RBR%{_mandir}
 install -d $RBR%{_sbindir}
 install -d $RBR%{_libdir}/mysql/plugin
 install -d -m 0755 %{buildroot}/var/run/mysqld
+install -d -m 0755 %{buildroot}/var/run/mysqlrouter
+install -d -m 0755 %{buildroot}/var/log/mysqlrouter
 
 # SElinux
 pushd $MBD/build-ps/rpm/selinux
@@ -1025,6 +1049,12 @@ install -d %{buildroot}%{_sysconfdir}/my.cnf.d
 %else
   install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d/mysql
 %endif
+
+%if 0%{?systemd}
+%else
+install -D -p -m 0755 packaging/rpm-common/mysqlrouter.init %{buildroot}%{_sysconfdir}/init.d/mysqlrouter
+%endif
+install -D -p -m 0644 packaging/rpm-common/mysqlrouter.conf.in %{buildroot}%{_sysconfdir}/mysqlrouter/mysqlrouter.conf
 
 #
 %{__rm} -f $RBR/%{_prefix}/README
@@ -1560,6 +1590,38 @@ if [ "$1" = 0 ]; then
   fi
 fi
 
+%pre -n percona-xtradb-cluster-mysql-router
+/usr/sbin/groupadd -r mysqlrouter >/dev/null 2>&1 || :
+/usr/sbin/useradd -M -N -g mysqlrouter -r -d /var/lib/mysqlrouter -s /bin/false \
+    -c "Percona MySQL Router" mysqlrouter >/dev/null 2>&1 || :
+
+%post -n percona-xtradb-cluster-mysql-router
+/sbin/ldconfig
+%if 0%{?systemd}
+%systemd_post mysqlrouter.service
+%else
+/sbin/chkconfig --add mysqlrouter
+%endif # systemd
+
+%preun -n percona-xtradb-cluster-mysql-router
+%if 0%{?systemd}
+%systemd_preun mysqlrouter.service
+%else
+if [ "$1" = 0 ]; then
+    /sbin/service mysqlrouter stop >/dev/null 2>&1 || :
+    /sbin/chkconfig --del mysqlrouter
+fi
+%endif # systemd
+
+%postun -n percona-xtradb-cluster-mysql-router
+/sbin/ldconfig
+%if 0%{?systemd}
+%systemd_postun_with_restart mysqlrouter.service
+%else
+if [ $1 -ge 1 ]; then
+    /sbin/service mysqlrouter condrestart >/dev/null 2>&1 || :
+fi
+%endif # systemd
 # ----------------------------------------------------------------------
 # Clean up the BuildRoot after build is done
 # ----------------------------------------------------------------------
@@ -2013,6 +2075,59 @@ fi
 %attr(755, root, root) %{_bindir}/mysql_client_test
 %attr(755, root, root) %{_bindir}/mysqlxtest
 %attr(755, root, root) %{_bindir}/mysqltest_safe_process
+
+
+%files -n percona-xtradb-cluster-mysql-router
+%defattr(-, root, root, -)
+%doc router/README.router router/LICENSE.router
+%dir %{_sysconfdir}/mysqlrouter
+%config(noreplace) %{_sysconfdir}/mysqlrouter/mysqlrouter.conf
+%attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/logrotate.d/mysqlrouter
+%{_bindir}/mysqlrouter
+%{_bindir}/mysqlrouter_keyring
+%{_bindir}/mysqlrouter_plugin_info
+%{_bindir}/mysqlrouter_passwd
+%{_bindir}/mysqlrouter_bootstrap
+%{_bindir}/mysqlrouter_mrs_client
+%doc %attr(644, root, man) %{_mandir}/man1/mysqlrouter.1*
+%doc %attr(644, root, man) %{_mandir}/man1/mysqlrouter_passwd.1*
+%doc %attr(644, root, man) %{_mandir}/man1/mysqlrouter_plugin_info.1*
+%if 0%{?systemd}
+%else
+%{_sysconfdir}/init.d/mysqlrouter
+%endif
+%{_libdir}/mysqlrouter/private/libmysqlharness.so.*
+%{_libdir}/mysqlrouter/private/libmysqlharness_stdx.so.*
+%{_libdir}/mysqlrouter/private/libmysqlharness_tls.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_connection_pool.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_http.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_http_auth_backend.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_http_auth_realm.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_http_client.so.*
+%{_libdir}/mysqlrouter/private/libabsl_*.so
+%{_libdir}/mysqlrouter/private/libmysqlrouter_io_component.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_metadata_cache.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_mysqlxmessages.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_routing.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_destination_status.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_routing_connections.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_cluster.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_http_server.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_mysql.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_mysqlclient.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_mysqlxclient.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_utils.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_routing_guidelines.*
+%{_libdir}/mysqlrouter/private/libprotobuf.so.*
+%{_libdir}/mysqlrouter/private/libicui18n.so.*
+%{_libdir}/mysqlrouter/private/libicustubdata.so.*
+%{_libdir}/mysqlrouter/private/libicuuc.so.*
+%dir %{_libdir}/mysqlrouter
+%dir %{_libdir}/mysqlrouter/private
+%{_libdir}/mysqlrouter/*.so*
+%dir %attr(755, mysqlrouter, mysqlrouter) /var/log/mysqlrouter
+%dir %attr(755, mysqlrouter, mysqlrouter) /var/run/mysqlrouter
 
 
 %files -n percona-xtradb-cluster-icu-data-files
