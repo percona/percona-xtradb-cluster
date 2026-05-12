@@ -37,6 +37,9 @@ libgalera_smm.so usr/lib/galera4
 usr/lib/mysql/private/libprotobuf-lite.so.*
 usr/lib/mysql/private/libprotobuf.so.*
 usr/lib/mysql/private/libabsl_*.so
+usr/lib/mysql/private/libicui18n.so.*
+usr/lib/mysql/private/libicustubdata.so.*
+usr/lib/mysql/private/libicuuc.so.*
 
 # ICU data files
 usr/lib/mysql/private/icudt77l/*.icu

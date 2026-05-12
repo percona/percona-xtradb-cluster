@@ -23,6 +23,20 @@ usr/share/mysql/mysql.server
 # Source tarball — only shipped in -source package
 usr/src/percona-xtradb-cluster/percona-xtradb-cluster-source.tar.gz
 
+# MySQL test suite — cmake installs the full mtr framework, test
+# files, helper scripts, and sanitizer suppressions under
+# usr/lib/mysql-test/. PXC ships only mysqlxtest from the test
+# package (see percona-xtradb-cluster-test.install); the rest of the
+# tree (~5000 .test/.result/.inc files plus mtr.pl, suite/, include/,
+# std_data/, lib/, plus tsan.supp / valgrind.supp) is not packaged.
+# release-9.6.0 silently dropped these at compat 9; at compat 13
+# dh_missing requires the explicit exclude.
+usr/lib/mysql-test/*
+
+# daemon_example.ini — sample config for the daemon_example plugin
+# (which is itself a build-only example, not shipped).
+usr/lib/mysql/plugin/daemon_example.ini
+
 # Test plugins — not for production binaries
 usr/lib/mysql/plugin/ha_mock.so
 usr/lib/mysql/plugin/debug/ha_mock.so
