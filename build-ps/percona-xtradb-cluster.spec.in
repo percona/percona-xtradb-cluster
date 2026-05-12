@@ -21,6 +21,27 @@
 %define _build_id_links none
 %undefine _missing_build_ids_terminate_build
 
+# Disable auto-debuginfo subpackage generation.
+#
+# WORKAROUND: the Jenkins build agents' rpm (4.18+ on EL9) fails the
+# spec parse with
+#     error: Package already exists: %%package debuginfo
+# whenever the PXC spec contains the standard PXC subpackage layout
+# plus the mysql-router subpackages. The exact same spec content
+# passed `rpmbuild -bs` at commit 9072f82eab5 and failed at
+# 004854a1af9, so the trigger appears to be an rpm version bump on
+# the agent rather than anything in the spec itself. release-9.6.0
+# is unaffected because it shipped before the agent upgrade.
+#
+# Setting `debug_package %%{nil}` tells rpm not to auto-generate a
+# debuginfo subpackage at all, which sidesteps the collision. The
+# trade-off is that this release will not ship the
+# `*-debuginfo.rpm` packages that release-9.6.0 produced. The proper
+# fix is to port PS's apply_workaround_bug_304121 (patches
+# /usr/lib/rpm/find-debuginfo.sh) into pxc_builder.sh:install_deps,
+# at which point this %%define can be removed.
+%define debug_package %{nil}
+
 %define galera_src_dir percona-xtradb-cluster-galera
 %define galera_docs /usr/share/doc/%{galera_src_dir}
 
