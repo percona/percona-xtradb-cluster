@@ -20,6 +20,20 @@
 
 %undefine _missing_build_ids_terminate_build
 
+# The upstream MySQL build installs identical absl / protobuf / icu private
+# libraries under both %{_libdir}/mysql/private/ and
+# %{_libdir}/mysqlrouter/private/. The two copies share the same build-id,
+# which rpm's default `compat` build-id link mode rejects when generating
+# debuginfo packages:
+#     Duplicate build-ids /usr/lib/debug/.../mysql/private/libabsl_*.so.debug
+#                     and /usr/lib/debug/.../mysqlrouter/private/libabsl_*.so.debug
+# Switch to `alldebug` mode, which appends a unique .debug suffix to the
+# build-id symlinks so duplicates can coexist without collision. This is the
+# rpm-native equivalent of the find-debuginfo.sh patch PS applies in its
+# builder (apply_workaround_bug_304121); doing it here keeps the workaround
+# in the spec instead of requiring container-level surgery.
+%global _build_id_links alldebug
+
 %define galera_src_dir percona-xtradb-cluster-galera
 %define galera_docs /usr/share/doc/%{galera_src_dir}
 
@@ -1694,6 +1708,9 @@ fi
 %attr(755, root, root) %{_libdir}/mysql/private/libprotobuf-lite.so.*
 %attr(755, root, root) %{_libdir}/mysql/private/libprotobuf.so.*
 %attr(755, root, root) %{_libdir}/mysql/private/libfido2.so.*
+%attr(755, root, root) %{_libdir}/mysql/private/libicui18n.so.*
+%attr(755, root, root) %{_libdir}/mysql/private/libicustubdata.so.*
+%attr(755, root, root) %{_libdir}/mysql/private/libicuuc.so.*
 %attr(755, root, root) %{_libdir}/mysql/private/libabsl_bad_any_cast_impl.so
 %attr(755, root, root) %{_libdir}/mysql/private/libabsl_bad_optional_access.so
 %attr(755, root, root) %{_libdir}/mysql/private/libabsl_bad_variant_access.so
@@ -1946,7 +1963,13 @@ fi
 %doc %{?license_files_server}
 %dir %attr(755, root, root) %{_libdir}/mysql
 %attr(644, root, root) %{_sysconfdir}/ld.so.conf.d/*
-%{_libdir}/mysql/libmysqlclient.so.%{compatlib}.*
+# No dot before the `*` so this matches both the bare soname symlink
+# `libmysqlclient.so.${compatlib}` and the fully-versioned file
+# `libmysqlclient.so.${compatlib}.<minor>.<patch>`. The compat install
+# loop in %install already extracts both forms from the upstream shared
+# rpm; the previous `${compatlib}.*` glob only claimed the versioned
+# file and orphaned the soname symlink.
+%{_libdir}/mysql/libmysqlclient.so.%{compatlib}*
 # libmysqlclient_r (the threadsafe variant) only existed up to MySQL 5.6.
 # MySQL 5.7 merged thread-safety into the main libmysqlclient and dropped
 # the _r shim, so EL7 (compatlib=18 from PXC-5.6) is the only distro that
@@ -2097,6 +2120,9 @@ fi
 %{_libdir}/mysqlrouter/private/libmysqlrouter_utils.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_routing_guidelines.*
 %{_libdir}/mysqlrouter/private/libprotobuf.so.*
+%{_libdir}/mysqlrouter/private/libicui18n.so.*
+%{_libdir}/mysqlrouter/private/libicustubdata.so.*
+%{_libdir}/mysqlrouter/private/libicuuc.so.*
 %dir %{_libdir}/mysqlrouter
 %dir %{_libdir}/mysqlrouter/private
 %{_libdir}/mysqlrouter/*.so*
