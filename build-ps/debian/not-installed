@@ -50,23 +50,57 @@ usr/lib/mysql/plugin/debug/component_test_event_tracking_producer_a.so
 usr/lib/mysql/plugin/component_test_event_tracking_producer_b.so
 usr/lib/mysql/plugin/debug/component_test_event_tracking_producer_b.so
 
-# Router plugins not in PXC distribution
-usr/lib/mysqlrouter/plugin/mysql_rest_service.so
-usr/lib/mysqlrouter/private/libprotobuf.so.*
+# MySQL Router is built (cmake WITH_ROUTER=ON by default) but NOT shipped
+# in any PXC deb package: debian/control has no
+#   Package: percona-xtradb-cluster-mysql-router
+# stanza, so dh_install never reads the router .install files and every
+# file cmake produces under mysqlrouter paths becomes orphaned at
+# dh_missing time. release-9.6.0 silently dropped these orphans because
+# it was at debhelper compat 9 where dh_missing is opt-in; at compat 13
+# the orphans are fatal, so we must explicitly exclude every router file
+# cmake installs to debian/tmp/.
+#
+# This matches the *effective* release-9.6.0 deb behavior (no router deb
+# shipped). RPM packaging is unaffected; the RPM build continues to ship
+# percona-xtradb-cluster-mysql-router rpms as in release-9.6.0.
 
-# MySQL Router is not currently packaged for PXC deb.
-# percona-xtradb-cluster-mysql-router.install and
-# percona-xtradb-cluster-mysql-router-dev.install exist in the source
-# tree but no matching Package: percona-xtradb-cluster-mysql-router
-# stanza was added to debian/control, so dh_install never reads those
-# install files and every file they would have shipped becomes orphaned.
-# Until router packages are added to control, exclude the router private
-# libs and sample configs from the build to keep dh_missing quiet.
+# Router binaries
+usr/bin/mysqlrouter*
+
+# Router plugins (covers all of connection_pool, http_*, routing,
+# rest_*, mysql_rest_service, metadata_cache, mysql_protocol,
+# keepalive, io, router_openssl, router_protobuf, etc.)
+usr/lib/mysqlrouter/plugin/*.so
+
+# Router private shared libraries
 usr/lib/mysqlrouter/private/libabsl_*.so
 usr/lib/mysqlrouter/private/libicu*.so.*
 usr/lib/mysqlrouter/private/libmysqlharness*.so.*
 usr/lib/mysqlrouter/private/libmysqlrouter*.so.*
-usr/share/mysqlrouter/docs/sample_mysqlrouter.conf
+usr/lib/mysqlrouter/private/libprotobuf.so.*
+
+# Router-dev static libs + .so symlinks (claimed by the dead
+# percona-xtradb-cluster-mysql-router-dev.install)
+usr/lib/*/libmysqlharness.a
+usr/lib/*/libmysqlharness.so
+usr/lib/*/libmysqlrouter.so
+usr/lib/*/libmysqlrouter_http.so
+
+# Router man pages
+usr/share/man/man1/mysqlrouter*
+
+# Router docs, sample configs, and systemd-start helper
+usr/share/mysqlrouter/*
+
+# Router etc/ files (config, logrotate, apparmor)
+etc/mysqlrouter/*
+etc/logrotate.d/mysqlrouter
+etc/apparmor.d/usr.bin.mysqlrouter
+
+# LICENSE.router / README.router source-tree copies that the router
+# .install files would have rehomed under /usr/share/doc/.
+usr/LICENSE.router
+usr/README.router
 
 # garbd installs duplicate copies of these helpers under usr/share/ on
 # deb in addition to the canonical lib/systemd/system/ and usr/bin/
