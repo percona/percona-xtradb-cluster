@@ -20,19 +20,26 @@
 
 %undefine _missing_build_ids_terminate_build
 
+# Note on the duplicate-build-id problem
+# ---------------------------------------
 # The upstream MySQL build installs identical absl / protobuf / icu private
 # libraries under both %{_libdir}/mysql/private/ and
 # %{_libdir}/mysqlrouter/private/. The two copies share the same build-id,
-# which rpm's default `compat` build-id link mode rejects when generating
-# debuginfo packages:
+# which rpm's default build-id link mode rejects when generating debuginfo
+# packages:
 #     Duplicate build-ids /usr/lib/debug/.../mysql/private/libabsl_*.so.debug
 #                     and /usr/lib/debug/.../mysqlrouter/private/libabsl_*.so.debug
-# Switch to `alldebug` mode, which appends a unique .debug suffix to the
-# build-id symlinks so duplicates can coexist without collision. This is the
-# rpm-native equivalent of the find-debuginfo.sh patch PS applies in its
-# builder (apply_workaround_bug_304121); doing it here keeps the workaround
-# in the spec instead of requiring container-level surgery.
-%global _build_id_links alldebug
+#
+# The previous attempt to fix this here with
+#     %global _build_id_links alldebug
+# caused `rpmbuild -bs` to fail with:
+#     error: Package already exists: %package debuginfo
+# on the Jenkins build hosts (rpm 4.16+), so the spec-level workaround is
+# off. Percona Server handles the same problem from the builder side by
+# patching /usr/lib/rpm/find-debuginfo.sh (see PS
+# build-ps/percona-server-9.0_builder.sh apply_workaround_bug_304121); the
+# equivalent patch needs to be ported into pxc_builder.sh before the next
+# release if duplicate-build-id complaints resurface at %install time.
 
 %define galera_src_dir percona-xtradb-cluster-galera
 %define galera_docs /usr/share/doc/%{galera_src_dir}
