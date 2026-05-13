@@ -37,6 +37,35 @@ usr/lib/mysql-test/*
 # (which is itself a build-only example, not shipped).
 usr/lib/mysql/plugin/daemon_example.ini
 
+# Galera/garb source artifacts. The galera scons build leaks its
+# source/build directory into make-install output (CMakeFiles/,
+# garb_*.cpp, garb_*.hpp, files/garb.{cnf,service,sh,systemd},
+# Makefile, SConscript, CTestTestfile.cmake, etc.). None of this
+# should ship in a deb. release-9.6.0 silently dropped all of it
+# at compat 9.
+garb/*
+
+# Root-level docs that the galera build leaves at debian/tmp
+# top-level (AUTHORS, COPYING, LICENSE.asio, README) plus a stray
+# copy of usr/share/mysql/README. The canonical docs ship via
+# debian/copyright + dh_installdocs.
+README
+usr/doc/*
+
+# Duplicate libgalera_smm.so at the root usr/lib path. The
+# canonical location used by mysqld is usr/lib/galera4/ (shipped
+# via the `libgalera_smm.so usr/lib/galera4` rule in
+# percona-xtradb-cluster-server-core.install), so this top-level
+# copy is redundant.
+usr/lib/libgalera_smm.so
+
+# Test/helper binaries not shipped in PXC deb (release-9.6.0
+# parity — these were silently dropped at compat 9).
+usr/bin/mysql_test_event_tracking
+usr/bin/mysqltest_safe_process
+usr/bin/ps-admin
+usr/bin/wsrep_sst_clone
+
 # Test plugins — not for production binaries
 usr/lib/mysql/plugin/ha_mock.so
 usr/lib/mysql/plugin/debug/ha_mock.so
