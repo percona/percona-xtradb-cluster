@@ -1,4 +1,4 @@
-/* Copyright (c) 2016, 2025, Oracle and/or its affiliates. */
+/* Copyright (c) 2016, 2026, Oracle and/or its affiliates. */
 
 #ifndef UTIL_H
 #define UTIL_H
@@ -34,7 +34,7 @@ MEMCACHED_PUBLIC_API extern uint64_t htonll(uint64_t);
 MEMCACHED_PUBLIC_API extern uint64_t ntohll(uint64_t);
 #endif
 
-#ifdef __GCC
+#if defined(__GNUC__) || defined(__clang__)
 # define __gcc_attribute__ __attribute__
 #else
 # define __gcc_attribute__(x)

@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2025, Oracle and/or its affiliates.
+Copyright (c) 1996, 2026, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -1229,6 +1229,7 @@ int dd_upgrade_tablespace(THD *thd) {
           Datafile df;
           df.set_filepath(orig_name.c_str());
           if (df.open_read_only(false) != DB_SUCCESS) {
+            ib::error(ER_IB_MISSING_TABLESPACE_FILE, orig_name.c_str());
             mem_heap_free(heap);
             pcur.close();
             return HA_ERR_TABLESPACE_MISSING;

@@ -214,6 +214,11 @@ IF(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   ADD_CXX_COMPILE_FLAGS_TO_FILES(-Wno-conditional-uninitialized FILES ha_rocksdb.cc rdb_datadic.cc rocksdb/db/db_impl/db_impl.cc rocksdb/db/write_thread.cc rocksdb/env/env_posix.cc rocksdb/env/fs_posix.cc)
 ENDIF()
 
+# Suppress warnings for clang-21 or newer
+IF(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 21)
+  ADD_CXX_COMPILE_FLAGS_TO_FILES(-Wno-missing-format-attribute FILES rocksdb/env/file_system.cc rocksdb/env/env.cc rocksdb/env/mock_env.cc rocksdb/logging/auto_roll_logger.cc rocksdb/util/stderr_logger.cc rocksdb/logging/log_buffer.cc)
+ENDIF()
+
 # Suppress warnings for clang-15 or newer
 IF(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 15)
   ADD_CXX_COMPILE_FLAGS_TO_FILES(-Wno-unused-but-set-variable FILES rocksdb/db/version_set.cc rocksdb/db/version_edit_handler.cc rocksdb/cache/lru_cache.cc)
@@ -260,6 +265,18 @@ ENDIF()
 # Suppress warnings for gcc ASan build
 IF(CMAKE_COMPILER_IS_GNUCXX AND WITH_ASAN)
   ADD_CXX_COMPILE_FLAGS_TO_FILES(-Wno-error=maybe-uninitialized FILES rocksdb/util/bloom.cc)
+ENDIF()
+
+# GCC 16 -O2 emits false-positive -Wmaybe-uninitialized warnings on:
+#  - autovector::front() inlined into LevelCompactionBuilder::SetupInitialFiles()
+#    (the optimizer cannot see that !expired_files.empty() implies buf_[0]
+#    was written),
+#  - PSI inlining inside myrocks::Rdb_cond_var / Rdb_mutex constructors in
+#    rdb_mutex_wrapper.cc (same pattern as the plugin/x suppression).
+IF(CMAKE_COMPILER_IS_GNUCXX AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 16)
+  ADD_CXX_COMPILE_FLAGS_TO_FILES(-Wno-maybe-uninitialized
+    FILES rocksdb/db/compaction/compaction_picker_level.cc
+          rdb_mutex_wrapper.cc)
 ENDIF()
 
 

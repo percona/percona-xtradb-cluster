@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2025, Oracle and/or its affiliates.
+/* Copyright (c) 2000, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -4010,6 +4010,7 @@ class THD : public MDL_context_owner,
 
   /**
     Restore locations set by calls to nocheck_register_item_tree_change().
+    Note that this needs to happen before Item::cleanup is called.
   */
   void rollback_item_tree_changes();
 

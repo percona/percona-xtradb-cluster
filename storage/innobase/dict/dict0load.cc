@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2025, Oracle and/or its affiliates.
+Copyright (c) 1996, 2026, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -1565,7 +1565,7 @@ static inline space_id_t dict_check_sys_tables(bool validate) {
     }
 
     if (flags2 & DICT_TF2_DISCARDED) {
-      ib::info(ER_IB_MSG_193)
+      ib::error(ER_IB_MSG_193)
           << "Tablespace " << table_name
           << " is set as DISCARDED. Upgrade will stop, please make sure "
              "there are no discarded Tables/Partitions before upgrading.";

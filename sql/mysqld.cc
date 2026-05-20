@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2025, Oracle and/or its affiliates.
+/* Copyright (c) 2000, 2026, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -2913,6 +2913,21 @@ static void mysqld_exit(int exit_code) {
 #endif  // _WIN32
 
   exit(exit_code); /* purecov: inspected */
+}
+
+static const char *get_exit_code_str(int exit_code) {
+  switch (exit_code) {
+    case MYSQLD_SUCCESS_EXIT:
+      return "MYSQLD_SUCCESS_EXIT";
+    case MYSQLD_ABORT_EXIT:
+      return "MYSQLD_ABORT_EXIT";
+    case MYSQLD_FAILURE_EXIT:
+      return "MYSQLD_FAILURE_EXIT";
+    case MYSQLD_RESTART_EXIT:
+      return "MYSQLD_RESTART_EXIT";
+    default:
+      return "UNKNOWN";
+  }
 }
 
 /**
@@ -7536,6 +7551,8 @@ static int init_server_components() {
   if (opt_initialize) {
     if (!is_help_or_validate_option()) {
       if (dd::init(dd::enum_dd_init_type::DD_INITIALIZE)) {
+        LogErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG,
+               "DD init failed: mode=DD_INITIALIZE");
         LogErr(ERROR_LEVEL, ER_DD_INIT_FAILED);
         unireg_abort(1);
       }
@@ -7554,16 +7571,31 @@ static int init_server_components() {
     */
     if (!is_help_or_validate_option() &&
         dd::init(dd::enum_dd_init_type::DD_RESTART_OR_UPGRADE)) {
-      LogErr(ERROR_LEVEL, ER_DD_INIT_FAILED);
-
-      if (!dd::upgrade::no_server_upgrade_required()) {
+      const bool upgrade_required = !dd::upgrade::no_server_upgrade_required();
+      if (upgrade_required) {
         dd_init_failed_during_upgrade = true;
       }
 
       /* If clone recovery fails, we rollback the files to previous
       dataset and attempt to restart server. */
-      int exit_code =
+      const int exit_code =
           clone_recovery_error ? MYSQLD_RESTART_EXIT : MYSQLD_ABORT_EXIT;
+
+      const char *upgrade_mode_str =
+          get_type(&upgrade_mode_typelib, static_cast<uint>(opt_upgrade_mode));
+
+      std::ostringstream err_msg;
+      err_msg << "DD init failed: mode=DD_RESTART_OR_UPGRADE"
+              << ", upgrade_required=" << (upgrade_required ? "yes" : "no")
+              << ", upgrade_mode=" << upgrade_mode_str
+              << ", clone_recovery_error="
+              << (clone_recovery_error ? "yes" : "no")
+              << ", exit_code=" << get_exit_code_str(exit_code) << " ("
+              << exit_code << ")";
+
+      LogErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG, err_msg.str().c_str());
+
+      LogErr(ERROR_LEVEL, ER_DD_INIT_FAILED);
       unireg_abort(exit_code);
     }
   }

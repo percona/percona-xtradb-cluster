@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2003, 2025, Oracle and/or its affiliates.
+   Copyright (c) 2003, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -4287,7 +4287,7 @@ int MgmtSrvr::setDbParameter(int node, int param, const char *value,
   int p_type;
   unsigned val_32;
   Uint64 val_64 = 0;
-  const char *val_char;
+  const char *val_char = nullptr;
   do {
     p_type = 0;
     if (iter.get(param, &val_32) == 0) {
