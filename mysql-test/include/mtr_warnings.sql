@@ -432,6 +432,19 @@ INSERT INTO global_suppressions VALUES
  ("InnoDB High Priority being used"),
  ("Query apply failed"),
 
+ /*
+   Donor's IST AsyncSender notices that the IST receiver is gone before the
+   send loop has finished waiting for the connection to close (joiner shut
+   down / killed / dropped out of the primary view). The actual cleanup runs
+   unconditionally; pre Galera 26.4.25 this was silent, after the refresh it
+   logs a [Warning]. The warning is harmless and entirely timing-driven, so
+   any galera test that tears down a joiner around an active IST or runs a
+   multi-node topology under load can hit it. Suppress globally; tests that
+   legitimately exercise this still keep their explicit suppressions as
+   documentation of the intended teardown.
+ */
+ ("Peer \\(IST receiver\\).*for IST AsyncSender seems to be disconnected\\. Terminating IST AsyncSender\\."),
+
  /* MySQL supression needed by Galera */
  ("Replica I/O.*: Get master clock failed with error:.*"),
  ("Trying to access missing tablespace.*"),
