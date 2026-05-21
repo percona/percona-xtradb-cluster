@@ -94,11 +94,11 @@ INSERT INTO t1 VALUES (0);
 # While case 1 handled by SocketWatchdog introduced in commit fb7fe369,
 # case 2 was hit during 8.0.43 merge. Let's force it here by waiting.
 #
-# 'Terminating SST process.' is the last log. wait_proc_to_finish.inc doesn't work, because
+# 'Terminated.' is the last log. wait_proc_to_finish.inc doesn't work, because
 # node_2 is starting and is expecting to terminate immediately, so there are low chances we
 # will be able to access pid file from wait_for_pattern_in_file.inc to get pid of the process.
 
---let $grep_pattern = .*Terminating SST process.*
+--let $grep_pattern = .*Terminated.
 --let $grep_file = $ofile
 --let $wait_timeout = 20
 --source include/wait_for_pattern_in_file.inc
