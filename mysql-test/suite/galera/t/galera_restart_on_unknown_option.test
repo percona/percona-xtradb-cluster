@@ -9,6 +9,12 @@ call mtr.add_suppression("SST failed/interrupted");
 call mtr.add_suppression("IST was interrupted");
 call mtr.add_suppression("IST didn't contain all write sets");
 call mtr.add_suppression("Failure while signalling the completion of SST");
+# The joiner aborts via graceful-shutdown path after SST is
+# cancelled (here: mysqld detects --galera-unknown-option after SST and
+# triggers wsrep_sst_cancel -> -ECANCELED in Galera): it logs the
+# graceful-shutdown banner before exiting. The matching donor-side warning
+# (Terminating IST AsyncSender) is suppressed globally in mtr_warnings.sql.
+call mtr.add_suppression("\\[Warning\\].*State transfer interrupted, shutting down gracefully");
 
 #
 # We should count the number of "Assertion failed" warnings
