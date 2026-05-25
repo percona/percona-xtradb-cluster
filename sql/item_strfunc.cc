@@ -5749,7 +5749,6 @@ String *Item_func_internal_get_dd_column_extra::val_str(String *str) {
 
   return str;
 }
-<<<<<<< HEAD
 
 #ifdef WITH_WSREP
 
@@ -5861,8 +5860,6 @@ bool Item_func_wsrep_sync_wait_upto_gtid::itemize(Parse_context *pc,
 }
 
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-=======
 
 bool Item_func_current_auth_id_type_in::do_itemize(Parse_context *pc,
                                                    Item **res) {
@@ -5913,4 +5910,3 @@ bool Item_func_current_role_in::auth_id_in(
     std::string_view comma_separated_auth_id_list) const {
   return sctx.is_current_role_part_of(comma_separated_auth_id_list);
 }
->>>>>>> ps/release-9.7.0-1

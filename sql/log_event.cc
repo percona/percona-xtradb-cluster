@@ -3427,7 +3427,19 @@ bool Query_log_event::write(Basic_ostream *ostream) {
     *start++ = thd->variables.default_table_encryption;
   }
 
-<<<<<<< HEAD
+  if (thd && need_enable_cascade_triggers) {
+    *start++ = Q_ENABLE_CASCADE_TRIGGERS;
+    if (is_sql_fk_checks_enabled(thd)) {
+      *start++ = thd->variables.enable_cascade_triggers;
+    } else {
+      // Execution of triggers on FK cascade operations is supported by only SQL
+      // FK. Force log status of this variable as OFF if SQL FK is not in use.
+      if (thd->variables.enable_cascade_triggers)
+        LogErr(WARNING_LEVEL, ER_RPL_STMT_FORCE_DISABLE_CASCADE_TRIGGERS);
+      *start++ = false;
+    }
+  }
+
 #ifdef WITH_WSREP
   /*
     Replicate Q_DDL_SKIP_REWRITE only if the session has
@@ -3449,21 +3461,6 @@ bool Query_log_event::write(Basic_ostream *ostream) {
   }
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-=======
-  if (thd && need_enable_cascade_triggers) {
-    *start++ = Q_ENABLE_CASCADE_TRIGGERS;
-    if (is_sql_fk_checks_enabled(thd)) {
-      *start++ = thd->variables.enable_cascade_triggers;
-    } else {
-      // Execution of triggers on FK cascade operations is supported by only SQL
-      // FK. Force log status of this variable as OFF if SQL FK is not in use.
-      if (thd->variables.enable_cascade_triggers)
-        LogErr(WARNING_LEVEL, ER_RPL_STMT_FORCE_DISABLE_CASCADE_TRIGGERS);
-      *start++ = false;
-    }
-  }
->>>>>>> ps/release-9.7.0-1
   /*
     NOTE: When adding new status vars, please don't forget to update
     the MAX_SIZE_LOG_EVENT_STATUS in log_event.h
@@ -4301,21 +4298,19 @@ void Query_log_event::print_query_header(
                 "/*!80016 SET @@session.default_table_encryption=%d*/%s\n",
                 default_table_encryption, print_event_info->delimiter);
   }
-<<<<<<< HEAD
+#ifdef WITH_WSREP
   if (ddl_skip_rewrite != print_event_info->ddl_skip_rewrite) {
     my_b_printf(file, "/*!80026 SET @@session.binlog_ddl_skip_rewrite=%d*/%s\n",
                 ddl_skip_rewrite, print_event_info->delimiter);
     print_event_info->ddl_skip_rewrite = ddl_skip_rewrite;
   }
-||||||| merged common ancestors
-=======
+#endif /* WITH_WSREP */
   if (enable_cascade_triggers != print_event_info->enable_cascade_triggers) {
     my_b_printf(file, "/*!90700 SET @@session.enable_cascade_triggers=%d*/%s\n",
                 static_cast<int>(enable_cascade_triggers),
                 print_event_info->delimiter);
     print_event_info->enable_cascade_triggers = enable_cascade_triggers;
   }
->>>>>>> ps/release-9.7.0-1
 }
 
 void Query_log_event::print(FILE *, PRINT_EVENT_INFO *print_event_info) const {
@@ -4739,7 +4734,6 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
         }
       }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
       thd->variables.binlog_ddl_skip_rewrite =
           (ddl_skip_rewrite != 0) ? true : false;
@@ -4747,15 +4741,12 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
           (wsrep_applier_skip_readonly_checks != 0) ? true : false;
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-=======
       assert(enable_cascade_triggers == 0 || enable_cascade_triggers == 1);
       const bool new_val = static_cast<bool>(enable_cascade_triggers);
       if (thd->variables.enable_cascade_triggers != new_val) {
         thd->variables.enable_cascade_triggers = new_val;
       }
 
->>>>>>> ps/release-9.7.0-1
       thd->table_map_for_update = (table_map)table_map_for_update;
 
       LEX_STRING user_lex = LEX_STRING();

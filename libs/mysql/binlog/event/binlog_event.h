@@ -142,9 +142,10 @@
    1U + 8 /* type, xid of DDL */ + 1U +                                       \
    2 /* type, default_collation_for_utf8mb4_number */ + 1U +                  \
    1 /* sql_require_primary_key */ + 1U +                                     \
-   1 /* type, default_table_encryption */+ 1U +                               \
+   1 /* type, default_table_encryption */ + 1U +                              \
    1 /* type, binlog_ddl_skip_rewrite*/ + 1U +                                \
-   1 /* type, wsrep_applier_skip_readonly_checks */)
+   1 /* type, wsrep_applier_skip_readonly_checks */ + 1U +                    \
+   1 /* type, enable_cascade_triggers */)
 #else
 #define MAX_SIZE_LOG_EVENT_STATUS                                             \
   (1U + 4 /* type, flags2 */ + 1U + 8 /* type, sql_mode */ + 1U + 1 +         \
@@ -161,15 +162,9 @@
    1U + 8 /* type, xid of DDL */ + 1U +                                       \
    2 /* type, default_collation_for_utf8mb4_number */ + 1U +                  \
    1 /* sql_require_primary_key */ + 1U +                                     \
-<<<<<<< HEAD
-   1 /* type, default_table_encryption */)
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-   1 /* type, default_table_encryption */)
-=======
    1 /* type, default_table_encryption */ + 1U +                              \
    1 /* type, enable_cascade_triggers */)
->>>>>>> ps/release-9.7.0-1
+#endif /* WITH_WSREP */
 
 /**
    Uninitialized timestamp value (for either last committed or sequence number).

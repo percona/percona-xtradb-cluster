@@ -85,21 +85,16 @@ Query_event::Query_event(
       ddl_xid(INVALID_XID),
       default_collation_for_utf8mb4_number(0),
       sql_require_primary_key(0xff),
-<<<<<<< HEAD
       default_table_encryption(0xff)
 #ifdef WITH_WSREP
       ,
       ddl_skip_rewrite(0),
       wsrep_applier_skip_readonly_checks(0)
 #endif /* WITH_WSREP */
+      ,
+      enable_cascade_triggers(0)
 {
 }
-||||||| merged common ancestors
-      default_table_encryption(0xff) {}
-=======
-      default_table_encryption(0xff),
-      enable_cascade_triggers(0) {}
->>>>>>> ps/release-9.7.0-1
 
 /**
   Utility function for the Query_event constructor.
@@ -150,20 +145,15 @@ Query_event::Query_event(const char *buf, const Format_description_event *fde,
       ddl_xid(INVALID_XID),
       default_collation_for_utf8mb4_number(0),
       sql_require_primary_key(0xff),
-<<<<<<< HEAD
       default_table_encryption(0xff)
 #ifdef WITH_WSREP
       ,
       ddl_skip_rewrite(0),
       wsrep_applier_skip_readonly_checks(0)
 #endif /* WITH_WSREP */
+      ,
+      enable_cascade_triggers(0)
 {
-||||||| merged common ancestors
-      default_table_encryption(0xff) {
-=======
-      default_table_encryption(0xff),
-      enable_cascade_triggers(0) {
->>>>>>> ps/release-9.7.0-1
   BAPI_ENTER("Query_event::Query_event(const char*, ...)");
   READER_TRY_INITIALIZATION;
   READER_ASSERT_POSITION(fde->common_header_len);
@@ -357,7 +347,6 @@ Query_event::Query_event(const char *buf, const Format_description_event *fde,
       case Q_DEFAULT_TABLE_ENCRYPTION:
         READER_TRY_SET(default_table_encryption, read<uint8_t>);
         break;
-<<<<<<< HEAD
 #ifdef WITH_WSREP
       case Q_DDL_SKIP_REWRITE:
         READER_TRY_SET(ddl_skip_rewrite, read<uint8_t>);
@@ -366,12 +355,9 @@ Query_event::Query_event(const char *buf, const Format_description_event *fde,
         READER_TRY_SET(wsrep_applier_skip_readonly_checks, read<uint8_t>);
         break;
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-=======
       case Q_ENABLE_CASCADE_TRIGGERS:
         READER_TRY_SET(enable_cascade_triggers, read<uint8_t>);
         break;
->>>>>>> ps/release-9.7.0-1
       default:
         /* That's why you must write status vars in growing order of code */
         READER_CALL(go_to, end_variable_part);  // Break loop

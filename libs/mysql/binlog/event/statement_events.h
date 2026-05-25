@@ -428,7 +428,6 @@ const uint64_t INVALID_XID = 0xffffffffffffffffULL;
     <td>2 byte integer</td>
     <td>Value of the config variable default_table_encryption</td>
   </tr>
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   <tr>
     <td>ddl_skip_rewrite</td>
@@ -443,15 +442,12 @@ const uint64_t INVALID_XID = 0xffffffffffffffffULL;
     <td> This will be set only for replication applier threads </td>
   </tr>
 #endif
-||||||| merged common ancestors
-=======
   <tr>
     <td>enable_cascade_triggers</td>
     <td>Q_ENABLE_CASCADE_TRIGGERS</td>
     <td>1 byte boolean</td>
     <td>Value of the config variable enable_cascade_triggers</td>
   </tr>
->>>>>>> ps/release-9.7.0-1
   </table>
 
   @subsection Query_event_notes_on_previous_versions Notes on Previous Versions
@@ -554,8 +550,12 @@ class Query_event : public Binary_log_event {
     /*
       Replicate default_table_encryption.
     */
-<<<<<<< HEAD
-    Q_DEFAULT_TABLE_ENCRYPTION
+    Q_DEFAULT_TABLE_ENCRYPTION,
+
+    /*
+      Replicate enable_cascade_triggers.
+    */
+    Q_ENABLE_CASCADE_TRIGGERS
 #ifdef WITH_WSREP
     ,
     /*
@@ -567,16 +567,6 @@ class Query_event : public Binary_log_event {
     */
     Q_WSREP_SKIP_READONLY_CHECKS = 128
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-    Q_DEFAULT_TABLE_ENCRYPTION
-=======
-    Q_DEFAULT_TABLE_ENCRYPTION,
-
-    /*
-      Replicate enable_cascade_triggers.
-    */
-    Q_ENABLE_CASCADE_TRIGGERS
->>>>>>> ps/release-9.7.0-1
   };
   const char *query;
   const char *db;
@@ -694,7 +684,6 @@ class Query_event : public Binary_log_event {
 
   uint8_t default_table_encryption;
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   /**
     This class is used by server and mysqldump.
@@ -707,11 +696,8 @@ class Query_event : public Binary_log_event {
   uint8_t wsrep_applier_skip_readonly_checks;
 
 
-||||||| merged common ancestors
-=======
   uint8_t enable_cascade_triggers;
 
->>>>>>> ps/release-9.7.0-1
   /**
     The constructor will be used while creating a Query_event, to be
     written to the binary log.
