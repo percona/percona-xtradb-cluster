@@ -14,8 +14,8 @@ include/assert.inc [sql_require_primary_key global is ON.]
 START REPLICA USER = 'root';
 Warnings:
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
-include/wait_for_slave_io_to_start.inc
-include/wait_for_slave_sql_to_start.inc
+include/rpl/wait_for_receiver_to_start.inc
+include/rpl/wait_for_applier_to_start.inc
 # Source runs DDL without PK; replica applier uses replicated session metadata
 CREATE TABLE t_rpl_nopk (c1 INT) ENGINE = InnoDB;
 INSERT INTO t_rpl_nopk VALUES (1);
