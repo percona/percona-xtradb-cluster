@@ -219,30 +219,16 @@ let FILE_SIZE_23 = `SELECT FILE_SIZE FROM INFORMATION_SCHEMA.INNODB_TABLESPACES 
 if ($CRASH_ON_SHUTDOWN == 0)
 {
   --echo # Compare the undo tablespace sizes before and after truncation.
-<<<<<<< HEAD
-  # Check Undo Tablespace 1, consider SET GLOBAL innodb_max_undo_log_size=20000000
-  if ($FILE_SIZE_12 > 20000000)
-||||||| merged common ancestors
-  if ($FILE_SIZE_12 <= $FILE_SIZE_13)
-=======
   # Only assert shrinkage for files that actually grew during DML; a file
   # that never reached the truncation threshold cannot be shrunk by shutdown.
   if ($GREW_1 == 1)
->>>>>>> ps/release-9.7.0-1
   {
     if ($FILE_SIZE_12 <= $FILE_SIZE_13)
     {
       --echo ERROR: Truncated size is wrong for $UNDO_NAME_1: Size before truncation is $FILE_SIZE_12, Size after truncation  is $FILE_SIZE_13;
     }
   }
-<<<<<<< HEAD
-  # Check Undo Tablespace 2, consider SET GLOBAL innodb_max_undo_log_size=20000000
-  if ($FILE_SIZE_22 > 20000000)
-||||||| merged common ancestors
-  if ($FILE_SIZE_22 <= $FILE_SIZE_23)
-=======
   if ($GREW_2 == 1)
->>>>>>> ps/release-9.7.0-1
   {
     if ($FILE_SIZE_22 <= $FILE_SIZE_23)
     {
