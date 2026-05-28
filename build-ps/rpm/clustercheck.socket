@@ -1,0 +1,43 @@
+# Copyright (C) 2026 Percona Inc
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; version 2 of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; see the file COPYING. If not, write to the
+# Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston
+# MA  02110-1301  USA.
+#
+# PXC packaging override -- mirrors how build-ps/rpm/mysql.service overrides
+# upstream's CMake-installed unit. Keep behaviorally in sync with
+# scripts/systemd/clustercheck.socket.in (the @bindir@-templated source used
+# by tarball / dev builds with -DWITH_SYSTEMD=ON) and with
+# build-ps/debian/extra/clustercheck.socket. The .in template has no
+# @-substitutions in the .socket unit, so this file is byte-equal to its
+# deb counterpart except for this header comment.
+#
+# Validate after install: systemd-analyze verify clustercheck.socket clustercheck@.service
+# No Service=: Accept=yes relies on implicit mapping
+# clustercheck.socket -> clustercheck@.service (systemd.socket(5))
+
+[Unit]
+Description=Percona XtraDB Cluster clustercheck (HAProxy HTTP check)
+Documentation=https://docs.percona.com/percona-xtradb-cluster/
+Documentation=man:systemd.socket(5)
+After=network.target
+Wants=network.target
+
+[Socket]
+ListenStream=9200
+Accept=yes
+NoDelay=yes
+KeepAlive=yes
+
+[Install]
+WantedBy=sockets.target
