@@ -1,0 +1,8 @@
+# Example client defaults for clustercheck (systemd socket / HAProxy health check).
+# Copy to /etc/mysql/clustercheck.cnf and tighten permissions, e.g.:
+#   install -m 0640 -o root -g mysql clustercheck.cnf.example /etc/mysql/clustercheck.cnf
+# Replace user/password and remove this comment block after editing.
+
+[client]
+user=clustercheck
+password=REPLACE_WITH_A_STRONG_SECRET
