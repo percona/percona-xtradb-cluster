@@ -251,6 +251,22 @@ get_sources(){
             cp -p mysql.logrotate.in mysql.logrotate
         fi
 
+    # Ensure clustercheck units exist for RPM/DEB packaging paths.
+    mkdir -p ${PXCDIR}/build-ps/rpm ${PXCDIR}/build-ps/debian/extra
+    if [ ! -f ${PXCDIR}/build-ps/rpm/clustercheck.socket ]; then
+        cp -p ${PXCDIR}/scripts/systemd/clustercheck.socket.in ${PXCDIR}/build-ps/rpm/clustercheck.socket
+    fi
+    if [ ! -f ${PXCDIR}/build-ps/rpm/clustercheck@.service ]; then
+        cp -p ${PXCDIR}/scripts/systemd/clustercheck@.service.in ${PXCDIR}/build-ps/rpm/clustercheck@.service
+        sed -i 's:@bindir@:/usr/bin:g' ${PXCDIR}/build-ps/rpm/clustercheck@.service
+    fi
+    if [ ! -f ${PXCDIR}/build-ps/debian/extra/clustercheck.socket ]; then
+        cp -p ${PXCDIR}/build-ps/rpm/clustercheck.socket ${PXCDIR}/build-ps/debian/extra/clustercheck.socket
+    fi
+    if [ ! -f ${PXCDIR}/build-ps/debian/extra/clustercheck@.service ]; then
+        cp -p ${PXCDIR}/build-ps/rpm/clustercheck@.service ${PXCDIR}/build-ps/debian/extra/clustercheck@.service
+    fi
+
     cd ${WORKDIR} || exit
     #
     pushd ${PXCDIR}
