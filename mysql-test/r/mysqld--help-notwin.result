@@ -2168,14 +2168,8 @@ performance-schema-events-waits-history-long-size -1
 performance-schema-events-waits-history-size -1
 performance-schema-hosts-size -1
 performance-schema-instrument 
-<<<<<<< HEAD
-performance-schema-max-cond-classes 177
-||||||| 42cc0cf2bd6
-performance-schema-max-cond-classes 150
-=======
 performance-schema-logger 
-performance-schema-max-cond-classes 150
->>>>>>> ps/release-8.4.9-9
+performance-schema-max-cond-classes 177
 performance-schema-max-cond-instances -1
 performance-schema-max-digest-length 1024
 performance-schema-max-digest-sample-age 60
