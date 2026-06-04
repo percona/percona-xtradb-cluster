@@ -223,6 +223,11 @@ override_dh_auto_install:
 	install -m 0644 debian/extra/mysql.service $(TMP)/lib/systemd/system/
 	install -m 0644 debian/extra/mysql@.service $(TMP)/lib/systemd/system/
 
+	# install clustercheck service and related files.
+	install -m 0644 debian/extra/clustercheck.socket $(TMP)/lib/systemd/system/
+	install -m 0644 debian/extra/clustercheck@.service $(TMP)/lib/systemd/system/
+	install -D -m 0644 scripts/clustercheck.cnf.example $(TMP)/usr/share/mysql/clustercheck.cnf.example
+
 	install -m 0755 $(TMP)/garb/files/garb-systemd $(TMP)/usr/bin/
 	install -m 0644 $(TMP)/garb/files/garb.service $(TMP)/lib/systemd/system/garb.service
 	sed -i 's/sysconfig\/garb/default\/garb/' $(TMP)/lib/systemd/system/garb.service
