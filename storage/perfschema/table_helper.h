@@ -1150,17 +1150,9 @@ struct PFS_variable_value_row {
   char m_str[WSREP_PS_VAR_VALUE_BUFF_SIZE];
 #else
   char m_str[1024];
-<<<<<<< HEAD
 #endif /* WITH_WSREP */
-  uint m_length;
-  const CHARSET_INFO *m_charset;
-||||||| 42cc0cf2bd6
-  uint m_length;
-  const CHARSET_INFO *m_charset;
-=======
   uint m_length{0};
   const CHARSET_INFO *m_charset{nullptr};
->>>>>>> ps/release-8.4.9-9
 };
 
 struct PFS_user_variable_value_row {
