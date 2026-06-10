@@ -1,4 +1,4 @@
-/* Copyright (c) 2023, 2025, Oracle and/or its affiliates.
+/* Copyright (c) 2023, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -387,7 +387,7 @@ static net_async_status native_password_auth_client_nonblocking(
       if (mysql->passwd[0]) {
         char scrambled[SCRAMBLE_LENGTH + 1];
         DBUG_PRINT("info", ("sending scramble"));
-        scramble(scrambled, (char *)pkt, mysql->passwd);
+        scramble(scrambled, mysql->scramble, mysql->passwd);
         const net_async_status status = vio->write_packet_nonblocking(
             vio, (uchar *)scrambled, SCRAMBLE_LENGTH, &io_result);
         if (status == NET_ASYNC_NOT_READY) {

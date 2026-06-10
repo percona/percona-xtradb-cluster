@@ -23,6 +23,7 @@
 
 #include <include/scope_guard.h>
 #include <cstring>
+#include <stdexcept>
 #include <string>
 
 namespace audit_log_filter::log_writer {
@@ -32,16 +33,25 @@ const size_t kEvpKeyLength = 32;
 const size_t kEncryptChunkSize = 1024 * 1024;
 const char magic[] = "Salted__";
 
+const EVP_CIPHER *make_EVP_aes_256_cbc() {
+  auto cipher = EVP_aes_256_cbc();
+  if (!cipher) {
+    throw std::runtime_error("EVP_aes_256_cbc init failed");
+  }
+  return cipher;
+}
+
 }  // namespace
 
 FileWriterEncrypting::FileWriterEncrypting(
     std::unique_ptr<FileWriterBase> file_writer)
     : FileWriterDecoratorBase(std::move(file_writer)),
-      m_cipher{EVP_aes_256_cbc()},
+      m_cipher{make_EVP_aes_256_cbc()},
       m_ctx{nullptr},
-      m_key{nullptr},
-      m_iv{nullptr},
-      m_out_buff{nullptr} {}
+      m_key{std::make_unique<unsigned char[]>(kEvpKeyLength)},
+      m_iv{std::make_unique<unsigned char[]>(EVP_MAX_IV_LENGTH)},
+      m_out_buff{std::make_unique<unsigned char[]>(
+          kEncryptChunkSize + EVP_CIPHER_block_size(m_cipher))} {}
 
 FileWriterEncrypting::~FileWriterEncrypting() {
   if (m_ctx != nullptr) {
@@ -51,34 +61,6 @@ FileWriterEncrypting::~FileWriterEncrypting() {
   }
 }
 
-bool FileWriterEncrypting::init() noexcept {
-  if (m_cipher == nullptr) {
-    LogComponentErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG,
-                    "EVP_aes_256_cbc init failed");
-    return false;
-  }
-
-  m_key = std::make_unique<unsigned char[]>(kEvpKeyLength);
-  m_iv = std::make_unique<unsigned char[]>(EVP_MAX_IV_LENGTH);
-
-  if (m_key == nullptr || m_iv == nullptr) {
-    LogComponentErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG,
-                    "Failed to init key buffer");
-    return false;
-  }
-
-  m_out_buff = std::make_unique<unsigned char[]>(
-      kEncryptChunkSize + EVP_CIPHER_block_size(m_cipher));
-
-  if (m_out_buff == nullptr) {
-    LogComponentErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG,
-                    "Failed to init out buffer");
-    return false;
-  }
-
-  return FileWriterDecoratorBase::init();
-}
-
 bool FileWriterEncrypting::open() noexcept {
   assert(m_key != nullptr && m_iv != nullptr && m_out_buff != nullptr);
 
@@ -86,8 +68,7 @@ bool FileWriterEncrypting::open() noexcept {
   const auto options = audit_keyring::get_encryption_options(keyring_key_id);
 
   if (options == nullptr || !options->check_valid()) {
-    LogComponentErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG,
-                    "Failed to fetch options for id %s",
+    LogComponentErr(ERROR_LEVEL, ER_AUDIT_ENCRYPTION_OPTIONS_FETCH_FAILURE,
                     keyring_key_id.c_str());
     return false;
   }
@@ -97,19 +78,19 @@ bool FileWriterEncrypting::open() noexcept {
   const auto &keyring_salt = options->get_salt();
 
   if (keyring_password.empty()) {
-    LogComponentErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG, "Empty password for id %s",
+    LogComponentErr(ERROR_LEVEL, ER_AUDIT_ENCRYPTION_EMPTY_PASSWORD,
                     keyring_key_id.c_str());
     return false;
   }
 
   if (keyring_iterations < 1) {
-    LogComponentErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG,
-                    "Bad iterations count for id %s", keyring_key_id.c_str());
+    LogComponentErr(ERROR_LEVEL, ER_AUDIT_ENCRYPTION_BAD_ITERATIONS,
+                    keyring_key_id.c_str());
     return false;
   }
 
   if (keyring_salt.empty()) {
-    LogComponentErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG, "Empty salt for id %s",
+    LogComponentErr(ERROR_LEVEL, ER_AUDIT_ENCRYPTION_EMPTY_SALT,
                     keyring_key_id.c_str());
     return false;
   }
@@ -125,8 +106,7 @@ bool FileWriterEncrypting::open() noexcept {
           keyring_salt.data(), static_cast<int>(keyring_salt.size()),
           static_cast<int>(keyring_iterations), EVP_sha256(), ik_len + iv_len,
           tmp_key_iv)) {
-    LogComponentErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG,
-                    "PKCS5_PBKDF2_HMAC error: %s",
+    LogComponentErr(ERROR_LEVEL, ER_AUDIT_ENCRYPTION_PBKDF2_ERROR,
                     ERR_error_string(ERR_peek_error(), nullptr));
     return false;
   }
@@ -143,8 +123,7 @@ bool FileWriterEncrypting::open() noexcept {
 
   if (EVP_CipherInit_ex(m_ctx, m_cipher, nullptr, m_key.get(), m_iv.get(), 1) !=
       1) {
-    LogComponentErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG,
-                    "EVP_CipherInit_ex error: %s",
+    LogComponentErr(ERROR_LEVEL, ER_AUDIT_ENCRYPTION_CIPHER_INIT_ERROR,
                     ERR_error_string(ERR_peek_error(), nullptr));
     ERR_clear_error();
     EVP_CIPHER_CTX_free(m_ctx);
@@ -167,8 +146,7 @@ void FileWriterEncrypting::close() noexcept {
   int out_size = 0;
 
   if (EVP_EncryptFinal_ex(m_ctx, m_out_buff.get(), &out_size) != 1) {
-    LogComponentErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG,
-                    "EVP_EncryptFinal error: %s",
+    LogComponentErr(ERROR_LEVEL, ER_AUDIT_ENCRYPTION_ENCRYPT_FINAL_ERROR,
                     ERR_error_string(ERR_peek_error(), nullptr));
   }
 
@@ -199,8 +177,7 @@ void FileWriterEncrypting::write(const char *record, size_t size) noexcept {
             m_ctx, m_out_buff.get(), &out_size,
             reinterpret_cast<const unsigned char *>(record + encrypted_size),
             chunk_size) != 1) {
-      LogComponentErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG,
-                      "EVP_EncryptUpdate error: %s",
+      LogComponentErr(ERROR_LEVEL, ER_AUDIT_ENCRYPTION_ENCRYPT_UPDATE_ERROR,
                       ERR_error_string(ERR_peek_error(), nullptr));
       return;
     }

@@ -79,7 +79,16 @@ ERROR HY000: Table storage engine for 'setup_metrics' doesn't have this option
 SELECT TABLE_NAME INTO @table_name FROM table_list WHERE id=95;
 HANDLER performance_schema.setup_meters OPEN;
 ERROR HY000: Table storage engine for 'setup_meters' doesn't have this option
+<<<<<<< HEAD
 SELECT TABLE_NAME INTO @table_name FROM table_list WHERE id=94;
+||||||| 42cc0cf2bd6
+SELECT TABLE_NAME INTO @table_name FROM table_list WHERE id=93;
+=======
+SELECT TABLE_NAME INTO @table_name FROM table_list WHERE id=94;
+HANDLER performance_schema.setup_loggers OPEN;
+ERROR HY000: Table storage engine for 'setup_loggers' doesn't have this option
+SELECT TABLE_NAME INTO @table_name FROM table_list WHERE id=93;
+>>>>>>> ps/release-8.4.9-9
 HANDLER performance_schema.setup_instruments OPEN;
 ERROR HY000: Table storage engine for 'setup_instruments' doesn't have this option
 SELECT TABLE_NAME INTO @table_name FROM table_list WHERE id=93;

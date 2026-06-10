@@ -1,4 +1,4 @@
-/* Copyright (c) 2015, 2025, Oracle and/or its affiliates.
+/* Copyright (c) 2015, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -112,6 +112,7 @@ enum options_mysqld {
   OPT_REPLICA_PARALLEL_TYPE,
   OPT_REPLICA_PARALLEL_WORKERS,
   OPT_SYNC_RELAY_LOG_INFO,
+<<<<<<< HEAD
   OPT_CHARACTER_SET_CLIENT_HANDSHAKE
 #ifdef WITH_WSREP
   ,
@@ -121,6 +122,13 @@ enum options_mysqld {
   OPT_WSREP_START_POSITION,
   OPT_WSREP_RECOVER
 #endif /* WITH_WSREP */
+||||||| 42cc0cf2bd6
+  OPT_CHARACTER_SET_CLIENT_HANDSHAKE
+=======
+  OPT_CHARACTER_SET_CLIENT_HANDSHAKE,
+  OPT_PFS_METER,
+  OPT_PFS_LOGGER
+>>>>>>> ps/release-8.4.9-9
 };
 
 #endif  // OPTIONS_MYSQLD_INCLUDED

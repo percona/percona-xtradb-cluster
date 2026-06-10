@@ -19,7 +19,10 @@
 #include "components/audit_log_filter/audit_event_class_internal.h"
 #include "my_sqlcommand.h"  // enum_sql_command
 
+#include <cstdint>
 #include <map>
+#include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -29,8 +32,6 @@ struct mysql_event_tracking_general_data;
 struct mysql_event_tracking_connection_data;
 struct mysql_event_tracking_table_access_data;
 struct mysql_event_tracking_global_variable_data;
-struct mysql_event_tracking_startup_data;
-struct mysql_event_tracking_shutdown_data;
 struct mysql_event_tracking_command_data;
 struct mysql_event_tracking_query_data;
 struct mysql_event_tracking_stored_program_data;
@@ -40,7 +41,10 @@ struct mysql_event_tracking_parse_data;
 
 namespace audit_log_filter {
 
-using AuditRecordFieldsList = std::map<std::string, std::string>;
+using AuditRecordFieldValue = std::variant<std::string, int64_t, uint64_t>;
+using AuditRecordFieldsList = std::map<std::string, AuditRecordFieldValue>;
+
+enum class EventFieldValueType { String, SignedInteger, UnsignedInteger };
 
 constexpr std::string_view CONNECTION_TYPE_FIELD_NAME = "connection_type";
 
@@ -87,22 +91,6 @@ struct AuditRecordGlobalVariable {
   std::string_view event_subclass_name;
   audit_event_class_t event_class;
   const mysql_event_tracking_global_variable_data *event;
-  ExtendedInfo extended_info;
-};
-
-struct AuditRecordServerStartup {
-  std::string_view event_class_name;
-  std::string_view event_subclass_name;
-  audit_event_class_t event_class;
-  const mysql_event_tracking_startup_data *event;
-  ExtendedInfo extended_info;
-};
-
-struct AuditRecordServerShutdown {
-  std::string_view event_class_name;
-  std::string_view event_subclass_name;
-  audit_event_class_t event_class;
-  const mysql_event_tracking_shutdown_data *event;
   ExtendedInfo extended_info;
 };
 
@@ -173,7 +161,6 @@ struct AuditRecordUnknown {
 using AuditRecordVariant =
     std::variant<AuditRecordGeneral, AuditRecordConnection,
                  AuditRecordTableAccess, AuditRecordGlobalVariable,
-                 AuditRecordServerStartup, AuditRecordServerShutdown,
                  AuditRecordCommand, AuditRecordQuery, AuditRecordStoredProgram,
                  AuditRecordAuthentication, AuditRecordMessage,
                  AuditRecordParse, AuditRecordAudit, AuditRecordUnknown>;
@@ -183,10 +170,11 @@ using AuditRecordVariant =
  *
  * @param event_class Received audit event class
  * @param event Received audit event
- * @return An instance of AuditRecordVariant representing audit event
+ * @return An instance of AuditRecordVariant representing audit event,
+ *         or std::nullopt when the event should be ignored
  */
-AuditRecordVariant get_audit_record(audit_event_class_t event_class,
-                                    const void *event);
+std::optional<AuditRecordVariant> get_audit_record(
+    audit_event_class_t event_class, const void *event);
 
 /**
  * @brief Convert connection_type pseudo-constant to numeric value.
@@ -194,6 +182,16 @@ AuditRecordVariant get_audit_record(audit_event_class_t event_class,
  * @param type Connection type
  */
 void update_connection_type_pseudo_to_numeric(std::string &type);
+
+/**
+ * @brief Check if connection_type value is valid.
+ *
+ * Valid values are "0" through "5" (after pseudo-to-numeric conversion).
+ *
+ * @param value Connection type value to validate
+ * @return true if the value is a valid connection type, false otherwise
+ */
+bool is_valid_connection_type_value(std::string_view value);
 
 /**
  * @brief Get fields list from AuditRecordGeneral event record.
@@ -229,24 +227,6 @@ AuditRecordFieldsList get_audit_record_fields(
  */
 AuditRecordFieldsList get_audit_record_fields(
     const AuditRecordGlobalVariable &record);
-
-/**
- * @brief Get fields list from AuditRecordServerStartup event record.
- *
- * @param record Audit event record
- * @return Fields list, @ref AuditRecordFieldsList
- */
-AuditRecordFieldsList get_audit_record_fields(
-    const AuditRecordServerStartup &record);
-
-/**
- * @brief Get fields list from AuditRecordServerShutdown event record.
- *
- * @param record Audit event record
- * @return Fields list, @ref AuditRecordFieldsList
- */
-AuditRecordFieldsList get_audit_record_fields(
-    const AuditRecordServerShutdown &record);
 
 /**
  * @brief Get fields list from AuditRecordCommand event record.
@@ -313,6 +293,85 @@ AuditRecordFieldsList get_audit_record_fields(const AuditRecordAudit &record);
  * @return Fields list, @ref AuditRecordFieldsList
  */
 AuditRecordFieldsList get_audit_record_fields(const AuditRecordUnknown &record);
+
+/**
+ * @brief Convert an AuditRecordFieldValue to its string representation.
+ */
+std::string field_value_to_string(const AuditRecordFieldValue &value);
+
+/**
+ * @brief Compare an AuditRecordFieldValue against a string expected value.
+ *
+ * For string alternatives the comparison is direct. For integer alternatives
+ * the expected string is parsed to the matching integer type first; returns
+ * false on parse failure.
+ */
+bool field_value_matches(const AuditRecordFieldValue &value,
+                         const std::string &expected);
+
+/**
+ * @brief Check if an event class has at least one subclass allowed in
+ *        REDUCED event mode.
+ *
+ * @param class_name Event class name to validate (e.g. "connection")
+ * @return true if the class has any allowed subclass in REDUCED mode,
+ *         false otherwise
+ */
+bool is_event_class_allowed_in_reduced_mode(std::string_view class_name);
+
+/**
+ * @brief Check if a specific event subclass is allowed in REDUCED event mode.
+ *
+ * @param class_name Event class name (e.g. "connection")
+ * @param subclass_name Event subclass name (e.g. "connect")
+ * @return true if the event is allowed in REDUCED mode, false otherwise
+ */
+bool is_event_subclass_allowed_in_reduced_mode(std::string_view class_name,
+                                               std::string_view subclass_name);
+
+/**
+ * @brief Check if an event class name is supported by filter definitions.
+ *
+ * @param class_name Event class name to validate (e.g. "connection")
+ * @return true if the class name is accepted by filter-rule validation,
+ *         false otherwise
+ */
+bool is_valid_event_class_name(std::string_view class_name);
+
+/**
+ * @brief Check if an event subclass name is valid for a filterable class.
+ *
+ * @param class_name Event class name (e.g. "connection")
+ * @param subclass_name Event subclass name to validate (e.g. "connect")
+ * @return true if the subclass name is recognized for the class by
+ *         filter-rule validation,
+ *         false otherwise
+ */
+bool is_valid_event_subclass_name(std::string_view class_name,
+                                  std::string_view subclass_name);
+
+/**
+ * @brief Check if a field name is valid for a filterable event class.
+ *
+ * @param event_class_name Audit event class name (e.g. "table_access")
+ * @param field_name Field name to validate (e.g. "table_name.str")
+ * @return true if the field name is recognized for the event class by
+ *         filter-rule validation,
+ *         false otherwise
+ */
+bool is_valid_event_field_name(std::string_view event_class_name,
+                               std::string_view field_name);
+
+/**
+ * @brief Get the expected value type for a field in a filterable event class.
+ *
+ * @param event_class_name Audit event class name (e.g. "table_access")
+ * @param field_name Field name to check (e.g. "connection_id")
+ * @return EventFieldValueType indicating String, SignedInteger, or
+ *         UnsignedInteger
+ */
+EventFieldValueType get_event_field_value_type(
+    std::string_view event_class_name, std::string_view field_name);
 
 }  // namespace audit_log_filter
 

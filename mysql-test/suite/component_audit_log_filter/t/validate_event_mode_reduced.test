@@ -1,0 +1,259 @@
+--source include/have_component_audit_log.inc
+--source ../inc/audit_tables_init.inc
+--source ../inc/audit_comp_install.inc
+
+--disable_query_log
+call mtr.add_suppression("Component audit_log_filter reported: 'Wrong argument: incorrect rule definition");
+call mtr.add_suppression("Component audit_log_filter reported: 'Wrong JSON filter '.*' format");
+call mtr.add_suppression("Component audit_log_filter reported: 'Skipping disabled event .*' in filter");
+--enable_query_log
+
+SET GLOBAL audit_log_filter.event_mode=REDUCED;
+SELECT @@global.audit_log_filter.event_mode;
+
+--let $audit_filter_log_path = `SELECT @@global.datadir`
+--let audit_filter_log_path = $audit_filter_log_path
+--let $audit_filter_log_name = `SELECT @@global.audit_log_filter.file`
+--let audit_filter_log_name = $audit_filter_log_name
+--let $audit_filter_log_format = json
+--let audit_filter_log_format = $audit_filter_log_format
+
+--echo #
+--echo # Reduced mode rejects disabled event classes during validation
+SELECT audit_log_filter_set_filter('disabled_query', '{"filter":{"class":{"name":"query"}}}');
+SELECT audit_log_filter_set_filter('disabled_global_variable', '{"filter":{"class":{"name":"global_variable"}}}');
+SELECT audit_log_filter_set_filter('disabled_command', '{"filter":{"class":{"name":"command"}}}');
+SELECT audit_log_filter_set_filter('disabled_stored_program', '{"filter":{"class":{"name":"stored_program"}}}');
+SELECT audit_log_filter_set_filter('disabled_authentication', '{"filter":{"class":{"name":"authentication"}}}');
+SELECT audit_log_filter_set_filter('disabled_parse', '{"filter":{"class":{"name":"parse"}}}');
+
+--echo #
+--echo # Reduced mode rejects disabled event subclasses during validation
+SELECT audit_log_filter_set_filter('disabled_general_log', '{"filter":{"class":{"name":"general","event":{"name":"log"}}}}');
+SELECT audit_log_filter_set_filter('disabled_general_error', '{"filter":{"class":{"name":"general","event":{"name":"error"}}}}');
+SELECT audit_log_filter_set_filter('disabled_general_result', '{"filter":{"class":{"name":"general","event":{"name":"result"}}}}');
+SELECT audit_log_filter_set_filter('disabled_conn_preauth', '{"filter":{"class":{"name":"connection","event":{"name":"pre_authenticate"}}}}');
+
+--echo #
+--echo # Reduced mode rejects mixed valid + invalid class names in arrays
+SELECT audit_log_filter_set_filter('mixed_general_query', '{"filter":{"class":{"name":["general","query"]}}}');
+SELECT audit_log_filter_set_filter('mixed_connection_parse', '{"filter":{"class":{"name":["connection","parse"]}}}');
+SELECT audit_log_filter_set_filter('mixed_table_access_command', '{"filter":{"class":{"name":["table_access","command"]}}}');
+SELECT audit_log_filter_set_filter('mixed_message_auth', '{"filter":{"class":{"name":["message","authentication"]}}}');
+
+--echo #
+--echo # Persisted filters keep the enabled subset after reload
+SELECT audit_log_filter_set_filter('mixed_rule', '{"filter":{"class":{"name":["general","query"]}}}');
+SET GLOBAL audit_log_filter.event_mode=FULL;
+SELECT audit_log_filter_set_filter('mixed_rule', '{"filter":{"class":{"name":["general","query"]}}}');
+SELECT audit_log_filter_set_filter('mixed_subclass_rule', '{"filter":{"class":{"name":"general","event":{"name":["status","log"]}}}}');
+SELECT audit_log_filter_set_filter('mixed_conn_command_rule', '{"filter":{"class":{"name":["connection","command"]}}}');
+SELECT audit_log_filter_set_filter('mixed_ta_sp_rule', '{"filter":{"class":{"name":["table_access","stored_program"]}}}');
+SELECT audit_log_filter_set_filter('mixed_conn_subclass_rule', '{"filter":{"class":{"name":"connection","event":{"name":["connect","pre_authenticate"]}}}}');
+SELECT * FROM mysql.audit_log_filter;
+SET GLOBAL audit_log_filter.event_mode=REDUCED;
+SELECT audit_log_filter_flush();
+SELECT audit_log_filter_set_user('%', 'mixed_rule');
+--source include/count_sessions.inc
+disconnect default;
+connect(default, localhost, root, , test);
+--source include/wait_until_count_sessions.inc
+--source clean_current_audit_log.inc
+--source generate_audit_events.inc
+--let $search_tag="class": "general"
+--source check_all_events_with_tag.inc
+SELECT audit_log_filter_set_user('%', 'mixed_subclass_rule');
+--source include/count_sessions.inc
+disconnect default;
+connect(default, localhost, root, , test);
+--source include/wait_until_count_sessions.inc
+--source clean_current_audit_log.inc
+--source generate_audit_events.inc
+--let $search_tag="event": "status"
+--source check_all_events_with_tag.inc
+SELECT audit_log_filter_set_user('%', 'mixed_conn_command_rule');
+--source include/count_sessions.inc
+disconnect default;
+connect(default, localhost, root, , test);
+--source include/wait_until_count_sessions.inc
+--source clean_current_audit_log.inc
+--source generate_audit_events.inc
+--let $search_tag="class": "connection"
+--source check_all_events_with_tag.inc
+SELECT audit_log_filter_set_user('%', 'mixed_ta_sp_rule');
+--source include/count_sessions.inc
+disconnect default;
+connect(default, localhost, root, , test);
+--source include/wait_until_count_sessions.inc
+--source clean_current_audit_log.inc
+--source generate_audit_events.inc
+--let $search_tag="class": "table_access"
+--source check_all_events_with_tag.inc
+SELECT audit_log_filter_set_user('%', 'mixed_conn_subclass_rule');
+--source include/count_sessions.inc
+disconnect default;
+connect(default, localhost, root, , test);
+--source include/wait_until_count_sessions.inc
+--source clean_current_audit_log.inc
+--source generate_audit_events.inc
+--let $search_tag="event": "connect"
+--source check_all_events_with_tag.inc
+SELECT audit_log_filter_remove_filter('mixed_conn_subclass_rule');
+SELECT audit_log_filter_remove_filter('mixed_ta_sp_rule');
+SELECT audit_log_filter_remove_filter('mixed_conn_command_rule');
+SELECT audit_log_filter_remove_filter('mixed_subclass_rule');
+SELECT audit_log_filter_remove_filter('mixed_rule');
+SELECT * FROM mysql.audit_log_filter;
+SELECT audit_log_filter_flush();
+
+--echo #
+--echo # Changing to FULL reloads already-loaded rules without explicit flush
+SET GLOBAL audit_log_filter.event_mode=FULL;
+SELECT audit_log_filter_set_filter('query_only_rule', '{"filter":{"class":{"name":"query"}}}');
+SET GLOBAL audit_log_filter.event_mode=REDUCED;
+SELECT audit_log_filter_set_user('%', 'query_only_rule');
+SET GLOBAL audit_log_filter.event_mode=FULL;
+--source include/count_sessions.inc
+disconnect default;
+connect(default, localhost, root, , test);
+--source include/wait_until_count_sessions.inc
+--source clean_current_audit_log.inc
+--source generate_audit_events.inc
+--let $search_tag="class": "query"
+--source check_all_events_with_tag.inc
+SELECT audit_log_filter_remove_filter('query_only_rule');
+SET GLOBAL audit_log_filter.event_mode=REDUCED;
+
+--echo #
+--echo # Reduced mode logs only the reduced event-class subset
+SELECT audit_log_filter_set_filter('log_all', '{"filter":{"log": true}}');
+SELECT audit_log_filter_set_user('%', 'log_all');
+--source include/count_sessions.inc
+disconnect default;
+connect(default, localhost, root, , test);
+--source include/wait_until_count_sessions.inc
+--source clean_current_audit_log.inc
+--source generate_audit_events.inc
+SELECT audit_log_filter_flush();
+
+perl;
+  use strict;
+  use warnings;
+  use JSON::PP ();
+
+  my $log_dir = $ENV{audit_filter_log_path};
+  my $log_name = $ENV{audit_filter_log_name};
+  my $full_log_name = "$log_dir/$log_name";
+
+  open(my $fh, '<:encoding(UTF-8)', $full_log_name)
+    or die "Could not open '$full_log_name': $!";
+
+  local $/;
+  my $json_text = <$fh>;
+  close($fh);
+
+  $json_text =~ s/\s+$//;
+  unless ($json_text =~ /\]\s*$/) {
+    $json_text =~ s/,\s*$//;
+    $json_text .= "\n]\n";
+  }
+
+  my $events = JSON::PP::decode_json($json_text);
+  my %allowed = map { $_ => 1 } qw(audit general connection table_access message);
+  my %required = map { $_ => 1 } qw(general connection table_access message);
+  my %seen;
+
+  for my $event (@{$events}) {
+    next if ref($event) ne 'HASH' || !exists $event->{class};
+    my $class = $event->{class};
+    die "Unexpected class '$class' observed in REDUCED mode\n"
+      if !$allowed{$class};
+    $seen{$class} = 1;
+  }
+
+  for my $class (sort keys %required) {
+    die "Expected class '$class' was not observed in REDUCED mode\n"
+      if !$seen{$class};
+  }
+
+  print "OK\n";
+EOF
+
+--echo #
+--echo # Reduced mode skips nested stored-program general/status events
+--disable_query_log
+--disable_result_log
+DELIMITER //;
+CREATE PROCEDURE trigger_nested_query()
+BEGIN
+  DO (SELECT 'nested query from stored procedure');
+END//
+DELIMITER ;//
+--enable_result_log
+--enable_query_log
+
+disconnect default;
+connect(default, localhost, root, , test);
+
+--disable_query_log
+--disable_result_log
+CALL trigger_nested_query();
+SELECT audit_log_filter_flush();
+--enable_result_log
+--enable_query_log
+
+perl;
+  use strict;
+  use warnings;
+  use JSON::PP ();
+
+  my $log_dir = $ENV{audit_filter_log_path};
+  my $log_name = $ENV{audit_filter_log_name};
+  my $full_log_name = "$log_dir/$log_name";
+
+  open(my $fh, '<:encoding(UTF-8)', $full_log_name)
+    or die "Could not open '$full_log_name': $!";
+
+  local $/;
+  my $json_text = <$fh>;
+  close($fh);
+
+  $json_text =~ s/\s+$//;
+  unless ($json_text =~ /\]\s*$/) {
+    $json_text =~ s/,\s*$//;
+    $json_text .= "\n]\n";
+  }
+
+  my $events = JSON::PP::decode_json($json_text);
+  my $outer = 0;
+  my $nested = 0;
+
+  for my $event (@{$events}) {
+    next if ref($event) ne 'HASH';
+    next if ($event->{class} // '') ne 'general';
+    next if ($event->{event} // '') ne 'status';
+
+    my $sql_command = $event->{general_data}->{sql_command} // '';
+    my $query = $event->{general_data}->{query} // '';
+    ++$outer if $sql_command eq 'call_procedure' &&
+                $query eq 'CALL trigger_nested_query()';
+    ++$nested if $query eq q{DO (SELECT 'nested query from stored procedure')};
+  }
+
+  die "Expected exactly one outer CALL event, found $outer\n" if $outer != 1;
+  die "Expected nested statement to be skipped, found $nested events\n"
+    if $nested != 0;
+
+  print "OK\n";
+EOF
+
+--disable_query_log
+--disable_result_log
+DROP PROCEDURE trigger_nested_query;
+--enable_result_log
+--enable_query_log
+
+--echo #
+--echo # Cleanup
+--source ../inc/audit_comp_uninstall.inc
+--source ../inc/audit_tables_cleanup.inc

@@ -1,4 +1,4 @@
-/* Copyright (c) 2006, 2025, Oracle and/or its affiliates.
+/* Copyright (c) 2006, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -525,8 +525,26 @@ bool partition_info::set_used_partition(
     TODO: avoid setting non partitioning fields default value, to avoid
     overhead. Not yet done, since mostly only one DEFAULT function per
     table, or at least very few such columns.
+
+    In case of prepared statements and stored routines we can't do pruning
+    for partition expression dependent on DEFAULT CURRENT_TIMESTAMP values
+    before tables are locked.
+
+    Doing so would result in partition_info::lock_partitions bitmap being
+    set at prepare/first-execution-of-procedure time based on current
+    timestamp value at this point. This bitmap would be also applied in
+    case of statement (re-)execution which might happen under different
+    current timestamp, resulting in correct target partition for insert
+    being erroneously pruned away.
+
+    So, instead, in such a case, we simply rely on pruning which is done
+    after tables are locked. It is re-done for each statement (re-)execution
+    and only affects partition_info::read_partitions, which is recalculated
+    for further re-executions.
   */
   if (info.function_defaults_apply_on_columns(&full_part_field_set)) {
+    if (!thd->stmt_arena->is_regular() && !tables_locked) return true;
+
     if (info.set_function_defaults(table)) return true;
   }
   {
