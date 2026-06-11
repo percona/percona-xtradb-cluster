@@ -91,8 +91,8 @@ ha_rows table_variables_info::get_row_count() {
 #ifndef NDEBUG
 #ifdef WITH_WSREP
   [[maybe_unused]]
-#endif /* WITH_WSREP */
   extern mysql_mutex_t LOCK_plugin;
+#endif /* WITH_WSREP */
   mysql_mutex_assert_not_owner(&LOCK_plugin);
 #endif
   mysql_rwlock_rdlock(&LOCK_system_variables_hash);

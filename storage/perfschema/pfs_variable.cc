@@ -93,8 +93,8 @@ bool PFS_system_variable_cache::init_show_var_array(enum_var_type scope,
 #ifndef NDEBUG
 #ifdef WITH_WSREP
   [[maybe_unused]]
-#endif /* WITH_WSREP */
   extern mysql_mutex_t LOCK_plugin;
+#endif /* WITH_WSREP */
   mysql_mutex_assert_not_owner(&LOCK_plugin);
 #endif
   mysql_rwlock_rdlock(&LOCK_system_variables_hash);
