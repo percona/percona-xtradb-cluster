@@ -1,0 +1,37 @@
+
+# 1. Create table and populate 10 rows on node_1; confirm node_2 received them.
+
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 VARCHAR(64)) ENGINE=InnoDB;
+
+# 2. Cleanly shut node_2 down so close_preamble() writes a synced preamble.
+
+
+# 3. Corrupt one on-disk BufferHeader::size to a value larger than the cache.
+
+
+# 4. Restart node_2 with gcache.recover=yes; scan() rejects the header.
+
+# restart
+
+# 5. GCache recovery is aborted and a full reset is forced.
+
+
+# 6. node_2 rejoins (cluster size 2) without crashing or "Memory corruption".
+
+
+# 7. Data is intact and both servers are consistent (diff_servers).
+
+SELECT COUNT(*) AS rows_post_recovery FROM t1;
+rows_post_recovery
+10
+include/diff_servers.inc [servers=1 2]
+
+# 8. Cleanup.
+
+CALL mtr.add_suppression("Exception while mapping writeset");
+CALL mtr.add_suppression("Aborting GCache recovery");
+CALL mtr.add_suppression("Recovery failed, need to do full reset");
+CALL mtr.add_suppression("implausible bh->size");
+CALL mtr.add_suppression("Failed to scan the last segment to the end");
+CALL mtr.add_suppression("Skipped GCache ring buffer recovery");
+DROP TABLE t1;

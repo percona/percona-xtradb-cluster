@@ -1,0 +1,14 @@
+!include ../galera_2nodes.cnf
+
+#
+# PXC-5209 size-corruption regression.
+#
+# Use gcache.recover=yes so a stopped node reads the on-disk galera.cache on
+# restart. Keep gcache small so the helper can use a deterministic cache-size
+# bound when corrupting BufferHeader::size.
+#
+[mysqld.1]
+wsrep_provider_options='base_port=@mysqld.1.#galera_port;gcache.recover=yes;gcache.size=1M;@ENV.WSREP_PROVIDER_TIMEOUTS'
+
+[mysqld.2]
+wsrep_provider_options='base_port=@mysqld.2.#galera_port;gcache.recover=yes;gcache.size=1M;@ENV.WSREP_PROVIDER_TIMEOUTS'
