@@ -1,0 +1,75 @@
+# Copyright (C) 2024, 2026 Percona Inc
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; version 2 of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; see the file COPYING. If not, write to the
+# Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston
+# MA  02110-1301  USA.
+#
+# PXC packaging override -- mirrors how build-ps/debian/extra/mysql.service
+# overrides upstream's CMake-installed unit. Keep behaviorally in sync with
+# scripts/systemd/clustercheck@.service.in (the @bindir@-templated source
+# used by tarball / dev builds with -DWITH_SYSTEMD=ON). The only difference
+# from the .in template is @bindir@ resolved to /usr/bin for PXC packages.
+#
+# Validate after install: systemd-analyze verify clustercheck.socket clustercheck@.service
+
+[Unit]
+Description=Percona XtraDB Cluster clustercheck connection %i
+Documentation=https://docs.percona.com/percona-xtradb-cluster/
+Documentation=man:systemd.service(5)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=mysql
+Group=mysql
+
+StandardInput=socket
+StandardOutput=socket
+StandardError=journal
+
+SuccessExitStatus=0 1
+
+# Requires /etc/mysql/clustercheck.cnf with proper credentials before enabling the socket.
+#
+# 4th positional arg is the mysql client error file (ERR_FILE) used by
+# clustercheck.sh as `mysql ... 2>${ERR_FILE}`. We pass /dev/null on purpose:
+#
+#   * Under socket activation StandardError=journal, so fd 2 is a journal
+#     stream socket. open("/proc/self/fd/2", O_WRONLY|O_CREAT|O_TRUNC) on
+#     such a socket fails with ENXIO ("No such device or address"), the
+#     redirect '2>/proc/self/fd/2' aborts the line BEFORE mysql runs,
+#     PXC_NODE_STATUS stays empty and the script always replies HTTP 503
+#     even on a healthy synced node (HAProxy then marks every PXC node DOWN).
+#   * /dev/stderr resolves to the same /proc/self/fd/2 path and fails the
+#     same way, so it is NOT a substitute.
+#   * /dev/null is always openable, never causes an unrelated open(2) to fail
+#     the check, and mysql connection errors are still observable via the
+#     server's own error log (and via systemctl edit override below).
+#
+# Operators who want to capture mysql client stderr can override with a
+# drop-in, e.g.:
+#   sudo systemctl edit clustercheck@.service
+#   [Service]
+#   ExecStart=
+#   ExecStart=/usr/bin/clustercheck - 1 /var/log/mysql/clustercheck.err 1 /etc/mysql/clustercheck.cnf
+ExecStart=/usr/bin/clustercheck - 1 /dev/null 1 /etc/mysql/clustercheck.cnf
+
+# Hardening kept compatible with systemd 219; stronger options can be added via drop-in on newer systems.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=yes
+ProtectHome=yes
+PrivateDevices=yes
+
+TimeoutStopSec=30
+RuntimeMaxSec=30

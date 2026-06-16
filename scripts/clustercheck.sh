@@ -12,16 +12,51 @@
 # GRANT PROCESS ON *.* TO 'clustercheckuser'@'localhost' IDENTIFIED BY 'clustercheckpassword!';
 
 if [[ $1 == '-h' || $1 == '--help' ]];then
-    echo "Usage: $0 <user> <pass> <available_when_donor=0|1> <log_file> <available_when_readonly=0|1> <defaults_extra_file>"
+    echo "Usage:"
+    echo "  $0 <user> <pass> <available_when_donor=0|1> <log_file> <available_when_readonly=0|1> <defaults_extra_file>"
+    echo "      Pass credentials directly on the command line. Default form, compatible"
+    echo "      with existing operator scripts."
+    echo ""
+    echo "  $0 - <available_when_donor=0|1> <log_file> <available_when_readonly=0|1> <defaults_extra_file>"
+    echo "      Use '-' in place of <user> <pass> to keep credentials off the command"
+    echo "      line. The mysql client reads [client] user= and password= from"
+    echo "      <defaults_extra_file> (typically /etc/mysql/clustercheck.cnf, 0640"
+    echo "      root:mysql). Used by the systemd socket-activated clustercheck@.service"
+    echo "      shipped with PXC; see /usr/share/mysql/clustercheck.cnf.example."
     exit
 fi
 
-MYSQL_USERNAME="${1-clustercheckuser}" 
-MYSQL_PASSWORD="${2-clustercheckpassword!}" 
-AVAILABLE_WHEN_DONOR=${3:-0}
-ERR_FILE="${4:-/dev/null}" 
-AVAILABLE_WHEN_READONLY=${5:-1}
-DEFAULTS_EXTRA_FILE=${6:-/etc/my.cnf}
+# Leading "-" omits --user/--password so mysql reads credentials only from defaults_extra_file.
+if [[ "$1" == "-" ]]; then
+  shift
+  MYSQL_USERNAME=""
+  MYSQL_PASSWORD=""
+  AVAILABLE_WHEN_DONOR=${1:-0}
+  ERR_FILE="${2:-/dev/null}"
+  AVAILABLE_WHEN_READONLY=${3:-1}
+  DEFAULTS_EXTRA_FILE=${4:-/etc/my.cnf}
+else
+  MYSQL_USERNAME="${1-clustercheckuser}"
+  MYSQL_PASSWORD="${2-clustercheckpassword!}"
+  AVAILABLE_WHEN_DONOR=${3:-0}
+  ERR_FILE="${4:-/dev/null}"
+  AVAILABLE_WHEN_READONLY=${5:-1}
+  DEFAULTS_EXTRA_FILE=${6:-/etc/my.cnf}
+fi
+
+# if ERR_FILE cannot actually be opened for append, fall back to
+# /dev/null. Otherwise the very first 'mysql ... 2>${ERR_FILE}' below would
+# fail on the redirect (e.g. ENXIO) before mysql even runs, leaving the
+# status array empty and the node falsely reported as down.
+#
+# The case is /proc/self/fd/2 when stderr is a systemd journal
+# stream socket: opening that path returns ENXIO and the redirect aborts the
+# command. Any unwritable path (read-only fs, missing parent dir, denied perm)
+# would do the same, so we test once here and substitute /dev/null.
+if ! ( : >> "$ERR_FILE" ) 2>/dev/null; then
+    ERR_FILE=/dev/null
+fi
+
 #Timeout exists for instances where mysqld may be hung
 TIMEOUT=10
 

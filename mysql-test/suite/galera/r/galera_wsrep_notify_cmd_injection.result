@@ -1,0 +1,5 @@
+SELECT 1;
+1
+1
+call mtr.add_suppression('Unsafe characters in cluster member');
+include/wait_for_pattern_in_file.inc [Unsafe characters in cluster member]
