@@ -1636,7 +1636,10 @@ function initialize_pxb_commands()
     # Starting from PXB 8.4.0-5, --lock-ddl=REDUCED is available in
     # the community version. 8.4.0-5 is the minimum required version for this
     # script to work (see XB_THIS_REQUIRED_VERSION))
-    lock_ddl="--lock-ddl=REDUCED"
+    #
+    # Due to https://perconadev.atlassian.net/browse/PXB-3818 make ON the defaut
+    # Once PXB-3818 is fixed, we can revert to REDUCED by default.
+    lock_ddl="--lock-ddl=ON"
     [[ -n "$lock_ddl_opt" ]] && lock_ddl="--lock-ddl=$lock_ddl_opt"
     wsrep_log_info "Using PXB option ${lock_ddl} for SST"
 
