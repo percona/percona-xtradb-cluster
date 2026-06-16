@@ -13,12 +13,35 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA */
 
+#include <cctype>
 #include "mysql/components/services/log_builtins.h"
 #include "mysqld.h"
 #include "wsrep_priv.h"
 #include "wsrep_utils.h"
 
 const char *wsrep_notify_cmd = "";
+
+/* Allow only alnum and -_. */
+static bool is_valid_node_name(const char *s) {
+  if (!s) return true;
+  for (; *s; ++s) {
+    unsigned char c = (unsigned char)*s;
+    if (!std::isalnum(c) && c != '-' && c != '_' && c != '.') return false;
+  }
+  return true;
+}
+
+/* Allow alnum and -_.:[]/ (host:port and [ipv6] forms). */
+static bool is_valid_node_addr(const char *s) {
+  if (!s) return true;
+  for (; *s; ++s) {
+    unsigned char c = (unsigned char)*s;
+    if (!std::isalnum(c) && c != '-' && c != '_' && c != '.' && c != ':' &&
+        c != '[' && c != ']' && c != '/')
+      return false;
+  }
+  return true;
+}
 
 void wsrep_notify_status(enum wsrep::server_state::state status,
                          const wsrep::view *view) {
@@ -55,12 +78,21 @@ void wsrep_notify_status(enum wsrep::server_state::state status,
       cmd_off += snprintf(cmd_ptr + cmd_off, cmd_len - cmd_off, " --members");
 
       for (unsigned int i = 0; i < members.size(); i++) {
+        const char *name = members[i].name().c_str();
+        const char *incoming = members[i].incoming().c_str();
+        if (!is_valid_node_name(name) || !is_valid_node_addr(incoming)) {
+          WSREP_ERROR(
+              "Unsafe characters in cluster member %u "
+              "wsrep_node_name or wsrep_node_incoming_address, "
+              "aborting notification.",
+              i);
+          return;
+        }
         std::ostringstream id;
         id << members[i].id();
         cmd_off +=
             snprintf(cmd_ptr + cmd_off, cmd_len - cmd_off, "%c%s/%s/%s",
-                     i > 0 ? ',' : ' ', id.str().c_str(),
-                     members[i].name().c_str(), members[i].incoming().c_str());
+                     i > 0 ? ',' : ' ', id.str().c_str(), name, incoming);
       }
     }
   }
