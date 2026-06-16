@@ -502,7 +502,9 @@ struct PRINT_EVENT_INFO {
     The version of the last server that sent the transaction
   */
   uint32_t immediate_server_version;
-  bool ddl_skip_rewrite;
+#ifdef WITH_WSREP
+  bool ddl_skip_rewrite {false};
+#endif
 };
 #endif
 

@@ -7261,7 +7261,7 @@ int Append_block_log_event::do_apply_event(Relay_log_info const *rli) {
   if (get_create_or_append()) {
     /*
       Usually lex_start() is called by dispatch_sql_command(), but we need it
-      here as the present method does not call dispatch_sql_command().
+      here as the present method does not call mysql_parse().
     */
     lex_start(thd);
     mysql_reset_thd_for_next_command(thd);
@@ -14861,8 +14861,7 @@ PRINT_EVENT_INFO::PRINT_EVENT_INFO()
       base64_output_mode(BASE64_OUTPUT_UNSPEC),
       printed_fd_event(false),
       have_unflushed_events(false),
-      skipped_event_in_transaction(false),
-      ddl_skip_rewrite(false) {
+      skipped_event_in_transaction(false) {
   /*
     Currently we only use static PRINT_EVENT_INFO objects, so zeroed at
     program's startup, but these explicit memset() is for the day someone
