@@ -103,3 +103,11 @@ leak:Source*buildSource
 # The following line is needed to suppress memory leaks coming from standard /usr/bin/grep
 # utility on Ubuntu 22.04 Jammy
 leak:re_compile_internal
+
+# OpenSSL libcrypto holds global/lazy-init allocations for the process lifetime
+# (released via atexit handlers on clean shutdown). When mysqld is killed by
+# safe_process during PXC cluster teardown, those handlers never run and LSan
+# reports them as leaks. The reported stack ends at CRYPTO_malloc because
+# libcrypto.so is shipped without debug symbols, so suppress by that frame.
+leak:CRYPTO_malloc
+leak:CRYPTO_zalloc
