@@ -1,0 +1,118 @@
+#
+# This test case first corrupts the buffer header's seqno_g on disk to
+# an implausible value (10^12) and verifies recovery rejects it instead of
+# inserting it into seqno2ptr_ (which on a memory-constrained host OOM-kills the
+# node, and elsewhere throws std::bad_alloc).
+#
+# 1. Create table and populate 10 rows on the single node.
+# 2. Cleanly shut the node down so the synced preamble is written to galera.cache.
+# 3. Corrupt the first buffer header's seqno_g on disk to an implausible value.
+# 4. Restart with gcache.recover=yes; scan() flags the implausible seqno.
+# 5. GCache recovery is aborted and a full reset is forced.
+# 6. The node does not crash (no fatal signal) or OOM (no std::bad_alloc).
+# 7. Data is intact after recovery.
+# 8. Cleanup.
+#
+
+--let $galera_cluster_size = 1
+--source include/galera_cluster.inc
+
+--echo
+--echo # 1. Create table and populate 10 rows on the single node.
+--echo
+--connection node_1
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 VARCHAR(64)) ENGINE=InnoDB;
+
+--disable_query_log
+--let $i = 1
+while ($i <= 10)
+{
+  --eval INSERT INTO t1 VALUES ($i, REPEAT('a', 64))
+  --inc $i
+}
+--enable_query_log
+
+--let $NODE1_DATA_DIR = `SELECT @@datadir`
+
+--echo
+--echo # 2. Cleanly shut the node down so the synced preamble is written to galera.cache.
+--echo
+# Clean shutdown so preamble is synced before we patch on-disk cache.
+--source include/shutdown_mysqld.inc
+
+--echo
+--echo # 3. Corrupt the first buffer header's seqno_g on disk to an implausible value.
+--echo
+# opens an existing cache file ($cache_file) in read/write mode
+# seeks to offset 1024 + 32*8 (1280)
+# corrupted seqno_g at offset 1280 (set to 1000000000000)
+# overwrites 8 bytes (seqno_g) with 1000000000000
+# Original cache file size remains same
+# Or take copy of galera.cache file and place it in std_data and copy it to
+# $NODE1_DATA_DIR/`SELECT @@datadir` using --copy_file
+# But this increases the commit and repo size.
+--write_file $MYSQLTEST_VARDIR/tmp/pxc_5209_corrupt_gcache_customerlike.pl
+use strict;
+use warnings;
+
+my $cache_file  = $ARGV[0] or die "usage: $0 <galera.cache>\n";
+my $bogus_seqno = 1_000_000_000_000; # huge, implausible for any realistic cache
+my $first_bh_seqno_offset = 1024 + 32 * 8;
+
+open(my $fh, '+<:raw', $cache_file) or die "open $cache_file: $!";
+seek($fh, $first_bh_seqno_offset, 0) or die "seek $cache_file: $!";
+print $fh pack('q<', $bogus_seqno) or die "write $cache_file: $!";
+close($fh) or die "close $cache_file: $!";
+
+EOF
+
+--exec perl $MYSQLTEST_VARDIR/tmp/pxc_5209_corrupt_gcache_customerlike.pl $NODE1_DATA_DIR/galera.cache
+--remove_file $MYSQLTEST_VARDIR/tmp/pxc_5209_corrupt_gcache_customerlike.pl
+
+--echo
+--echo # 4. Restart with gcache.recover=yes; scan() flags the implausible seqno.
+--echo
+# restart
+--let $_expect_file_name = $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
+--source include/start_mysqld.inc
+
+--connection node_1
+--source include/wait_until_connected_again.inc
+--source include/galera_wait_ready.inc
+
+--let $wait_condition = SELECT COUNT(*) >= 1 FROM performance_schema.error_log WHERE data LIKE "%implausible seqno%" AND data LIKE "%cache appears to be corrupt%"
+--source include/wait_condition.inc
+
+--echo
+--echo # 5. GCache recovery is aborted and a full reset is forced.
+--echo
+--let $wait_condition = SELECT COUNT(*) >= 1 FROM performance_schema.error_log WHERE data LIKE "%Aborting GCache recovery%"
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT COUNT(*) >= 1 FROM performance_schema.error_log WHERE data LIKE "%Recovery failed, need to do full reset%"
+--source include/wait_condition.inc
+
+--echo
+--echo # 6. The node does not crash (no fatal signal) or OOM (no std::bad_alloc).
+--echo
+--let $wait_condition = SELECT COUNT(*) = 0 FROM performance_schema.error_log WHERE data LIKE "%handle_fatal_signal%"
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT COUNT(*) = 0 FROM performance_schema.error_log WHERE data LIKE "%std::bad_alloc%"
+--source include/wait_condition.inc
+
+--echo
+--echo # 7. Data is intact after recovery.
+--echo
+SELECT COUNT(*) AS rows_post_recovery FROM t1;
+
+--echo
+--echo # 8. Cleanup.
+--echo
+CALL mtr.add_suppression("Skipped GCache ring buffer recovery");
+CALL mtr.add_suppression("Exception while mapping writeset");
+CALL mtr.add_suppression("Aborting GCache recovery");
+CALL mtr.add_suppression("Recovery failed, need to do full reset");
+CALL mtr.add_suppression("implausible seqno");
+
+DROP TABLE t1;
