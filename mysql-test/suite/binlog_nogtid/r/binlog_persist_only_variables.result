@@ -47,7 +47,13 @@ INSERT INTO aliases(name) VALUES
 ('slave_parallel_workers'), ('slave_pending_jobs_size_max'),
 ('pseudo_slave_mode'), ('skip_slave_start');
 
+<<<<<<< HEAD
 include/assert.inc [Expect 116 variables in the table.]
+||||||| merged common ancestors
+include/assert.inc [Expect 111 variables in the table.]
+=======
+include/assert.inc [Expect 112 variables in the table.]
+>>>>>>> ps/release-9.7.0-1
 
 # Test SET PERSIST_ONLY
 SET PERSIST_ONLY binlog_cache_size = @@GLOBAL.binlog_cache_size;
@@ -145,6 +151,7 @@ SET PERSIST_ONLY relay_log_purge = @@GLOBAL.relay_log_purge;
 SET PERSIST_ONLY relay_log_recovery = @@GLOBAL.relay_log_recovery;
 SET PERSIST_ONLY relay_log_space_limit = @@GLOBAL.relay_log_space_limit;
 SET PERSIST_ONLY replica_allow_batching = @@GLOBAL.replica_allow_batching;
+SET PERSIST_ONLY replica_allow_higher_version_source = @@GLOBAL.replica_allow_higher_version_source;
 SET PERSIST_ONLY replica_checkpoint_group = @@GLOBAL.replica_checkpoint_group;
 SET PERSIST_ONLY replica_checkpoint_period = @@GLOBAL.replica_checkpoint_period;
 SET PERSIST_ONLY replica_compressed_protocol = @@GLOBAL.replica_compressed_protocol;
@@ -265,16 +272,32 @@ SET PERSIST_ONLY wsrep_applier_UK_checks = @@GLOBAL.wsrep_applier_UK_checks;
 SET PERSIST_ONLY wsrep_replicate_myisam = @@GLOBAL.wsrep_replicate_myisam;
 SET PERSIST_ONLY wsrep_restart_replica = @@GLOBAL.wsrep_restart_replica;
 
+<<<<<<< HEAD
 include/assert.inc [Expect 103 persisted variables in persisted_variables table.]
+||||||| merged common ancestors
+include/assert.inc [Expect 98 persisted variables in persisted_variables table.]
+=======
+include/assert.inc [Expect 99 persisted variables in persisted_variables table.]
+>>>>>>> ps/release-9.7.0-1
 
 ############################################################
 # 2. Restart server, it must preserve the persisted variable
 #    settings. Verify persisted configuration.
 # restart
 
+<<<<<<< HEAD
 include/assert.inc [Expect 103 persisted variables in persisted_variables table.]
 include/assert.inc [Expect 103 persisted variables shown as PERSISTED in variables_info table.]
 include/assert.inc [Expect 103 persisted variables with matching persisted and global values.]
+||||||| merged common ancestors
+include/assert.inc [Expect 98 persisted variables in persisted_variables table.]
+include/assert.inc [Expect 98 persisted variables shown as PERSISTED in variables_info table.]
+include/assert.inc [Expect 98 persisted variables with matching persisted and global values.]
+=======
+include/assert.inc [Expect 99 persisted variables in persisted_variables table.]
+include/assert.inc [Expect 99 persisted variables shown as PERSISTED in variables_info table.]
+include/assert.inc [Expect 99 persisted variables with matching persisted and global values.]
+>>>>>>> ps/release-9.7.0-1
 
 ############################################################
 # 3. Test RESET PERSIST. Verify persisted variable settings
@@ -342,6 +365,7 @@ RESET PERSIST relay_log_purge;
 RESET PERSIST relay_log_recovery;
 RESET PERSIST relay_log_space_limit;
 RESET PERSIST replica_allow_batching;
+RESET PERSIST replica_allow_higher_version_source;
 RESET PERSIST replica_checkpoint_group;
 RESET PERSIST replica_checkpoint_period;
 RESET PERSIST replica_compressed_protocol;

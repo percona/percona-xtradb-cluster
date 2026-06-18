@@ -26,7 +26,13 @@ VARIABLE_NAME LIKE '%applier%') AND
 (VARIABLE_NAME NOT LIKE 'innodb%')
 ORDER BY VARIABLE_NAME;
 
+<<<<<<< HEAD
 include/assert.inc [Expect 116 variables in the table.]
+||||||| merged common ancestors
+include/assert.inc [Expect 111 variables in the table.]
+=======
+include/assert.inc [Expect 112 variables in the table.]
+>>>>>>> ps/release-9.7.0-1
 
 # Test SET PERSIST
 SET PERSIST binlog_cache_size = @@GLOBAL.binlog_cache_size;
@@ -125,6 +131,7 @@ ERROR HY000: Variable 'relay_log_recovery' is a read only variable
 SET PERSIST relay_log_space_limit = @@GLOBAL.relay_log_space_limit;
 ERROR HY000: Variable 'relay_log_space_limit' is a read only variable
 SET PERSIST replica_allow_batching = @@GLOBAL.replica_allow_batching;
+SET PERSIST replica_allow_higher_version_source = @@GLOBAL.replica_allow_higher_version_source;
 SET PERSIST replica_checkpoint_group = @@GLOBAL.replica_checkpoint_group;
 SET PERSIST replica_checkpoint_period = @@GLOBAL.replica_checkpoint_period;
 SET PERSIST replica_compressed_protocol = @@GLOBAL.replica_compressed_protocol;
@@ -243,16 +250,32 @@ SET PERSIST wsrep_applier_UK_checks = @@GLOBAL.wsrep_applier_UK_checks;
 SET PERSIST wsrep_replicate_myisam = @@GLOBAL.wsrep_replicate_myisam;
 SET PERSIST wsrep_restart_replica = @@GLOBAL.wsrep_restart_replica;
 
+<<<<<<< HEAD
 include/assert.inc [Expect 91 persisted variables in persisted_variables table.]
+||||||| merged common ancestors
+include/assert.inc [Expect 86 persisted variables in persisted_variables table.]
+=======
+include/assert.inc [Expect 87 persisted variables in persisted_variables table.]
+>>>>>>> ps/release-9.7.0-1
 
 ############################################################
 # 2. Restart server, it must preserve the persisted variable
 #    settings. Verify persisted configuration.
 # restart
 
+<<<<<<< HEAD
 include/assert.inc [Expect 91 persisted variables in persisted_variables table.']
 include/assert.inc [Expect 91 persisted variables shown as PERSISTED in variables_info table.']
 include/assert.inc [Expect 91 persisted variables with matching persisted and global values.]
+||||||| merged common ancestors
+include/assert.inc [Expect 86 persisted variables in persisted_variables table.']
+include/assert.inc [Expect 86 persisted variables shown as PERSISTED in variables_info table.']
+include/assert.inc [Expect 86 persisted variables with matching persisted and global values.]
+=======
+include/assert.inc [Expect 87 persisted variables in persisted_variables table.']
+include/assert.inc [Expect 87 persisted variables shown as PERSISTED in variables_info table.']
+include/assert.inc [Expect 87 persisted variables with matching persisted and global values.]
+>>>>>>> ps/release-9.7.0-1
 
 ############################################################
 # 3. Test RESET PERSIST IF EXISTS. Verify persisted variable
@@ -354,6 +377,7 @@ RESET PERSIST IF EXISTS relay_log_space_limit;
 Warnings:
 Warning	3615	Variable relay_log_space_limit does not exist in persisted config file
 RESET PERSIST IF EXISTS replica_allow_batching;
+RESET PERSIST IF EXISTS replica_allow_higher_version_source;
 RESET PERSIST IF EXISTS replica_checkpoint_group;
 RESET PERSIST IF EXISTS replica_checkpoint_period;
 RESET PERSIST IF EXISTS replica_compressed_protocol;

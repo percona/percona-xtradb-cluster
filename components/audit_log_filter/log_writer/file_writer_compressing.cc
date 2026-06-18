@@ -25,10 +25,6 @@ FileWriterCompressing::FileWriterCompressing(
 
 FileWriterCompressing::~FileWriterCompressing() { deflateEnd(&m_strm); }
 
-bool FileWriterCompressing::init() noexcept {
-  return FileWriterDecoratorBase::init();
-}
-
 bool FileWriterCompressing::open() noexcept {
   m_strm.zalloc = Z_NULL;
   m_strm.zfree = Z_NULL;
@@ -38,8 +34,7 @@ bool FileWriterCompressing::open() noexcept {
                           MAX_WBITS + 16, MAX_MEM_LEVEL, Z_DEFAULT_STRATEGY);
 
   if (ret != Z_OK) {
-    LogComponentErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG,
-                    "Failed to init compressing: %i", ret);
+    LogComponentErr(ERROR_LEVEL, ER_AUDIT_COMPRESSION_INIT_FAILURE, ret);
     return false;
   }
 
@@ -58,9 +53,17 @@ void FileWriterCompressing::write(const char *record, size_t size) noexcept {
   m_strm.avail_in = size;
   m_strm.next_in =
       reinterpret_cast<unsigned char *>(const_cast<char *>(record));
-  m_flush = Z_NO_FLUSH;
+  m_flush = Z_SYNC_FLUSH;
 
   do_deflate();
+}
+
+void FileWriterCompressing::sync() noexcept {
+  m_strm.avail_in = 0;
+  m_strm.next_in = nullptr;
+  m_flush = Z_SYNC_FLUSH;
+  do_deflate();
+  FileWriterDecoratorBase::sync();
 }
 
 void FileWriterCompressing::do_deflate() noexcept {

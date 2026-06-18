@@ -1,4 +1,4 @@
-/* Copyright (c) 2015, 2025, Oracle and/or its affiliates.
+/* Copyright (c) 2015, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -115,6 +115,7 @@ enum options_mysqld {
   OPT_CHARACTER_SET_CLIENT_HANDSHAKE,
   OPT_PFS_METER,
   OPT_PFS_LOGGER,
+<<<<<<< HEAD
   OPT_INNODB_FOREIGN_KEYS
 #ifdef WITH_WSREP
   ,
@@ -124,6 +125,12 @@ enum options_mysqld {
   OPT_WSREP_START_POSITION,
   OPT_WSREP_RECOVER
 #endif /* WITH_WSREP */
+||||||| merged common ancestors
+  OPT_INNODB_FOREIGN_KEYS
+=======
+  OPT_INNODB_FOREIGN_KEYS,
+  OPT_CASCADE_TRIGGERS,
+>>>>>>> ps/release-9.7.0-1
 };
 
 #endif  // OPTIONS_MYSQLD_INCLUDED

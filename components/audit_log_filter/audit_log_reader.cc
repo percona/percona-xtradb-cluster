@@ -15,6 +15,7 @@
 
 #include "components/audit_log_filter/audit_log_reader.h"
 
+#include "components/audit_log_filter/audit_error_log.h"
 #include "components/audit_log_filter/audit_keyring.h"
 #include "components/audit_log_filter/audit_psi_info.h"
 
@@ -27,10 +28,77 @@
 #include "mysql/components/library_mysys/my_memory.h"
 
 #include <scope_guard.h>
+#include <algorithm>
 #include <filesystem>
 #include <functional>
 #include <string>
 #include <vector>
+
+namespace {
+
+/**
+  SAX parser handler for audit JSON logs.
+  Saves "timestamp" field from the first encountered event, and stops parsing.
+*/
+class AuditJsonFirstTimestampHandler
+    : public rapidjson::BaseReaderHandler<rapidjson::UTF8<>,
+                                          AuditJsonFirstTimestampHandler> {
+ public:
+  bool Default() {
+    m_expect_timestamp = false;
+
+    // We want to make sure the first parsed token is "open-array".
+    // If we encounter something else first, we stop parsing.
+    return m_array_open;
+  }
+
+  bool String(const char *str, rapidjson::SizeType length,
+              [[maybe_unused]] bool copy) {
+    if (m_expect_timestamp) {
+      timestamp.assign(str, length);
+      return false;
+    }
+    return Default();
+  }
+
+  bool StartObject() {
+    ++m_depth;
+    return Default();
+  }
+
+  bool Key(const char *str, rapidjson::SizeType length,
+           [[maybe_unused]] bool copy) {
+    // Depth 2 means we're in "[ { ...".
+    m_expect_timestamp =
+        m_depth == 2 && std::string_view(str, length) == "timestamp";
+    return true;
+  }
+
+  bool EndObject([[maybe_unused]] rapidjson::SizeType memberCount) {
+    --m_depth;
+    return Default();
+  }
+
+  bool StartArray() {
+    m_array_open = true;
+    ++m_depth;
+    return Default();
+  }
+
+  bool EndArray([[maybe_unused]] rapidjson::SizeType elementCount) {
+    --m_depth;
+    return Default();
+  }
+
+  std::string timestamp;
+
+ private:
+  int m_depth = 0;
+  bool m_expect_timestamp = false;
+  bool m_array_open = false;
+};
+
+}  // namespace
 
 namespace audit_log_filter {
 
@@ -40,12 +108,14 @@ void AuditLogReader::set_files_to_read_list(
     return;
   }
 
-  std::vector<std::string> tp_list;
+  for (auto item = m_timestamp_to_file_map.cbegin();
+       item != m_timestamp_to_file_map.cend(); ++item) {
+    auto next_item = std::next(item);
+    bool is_last_item = next_item == m_timestamp_to_file_map.cend();
 
-  for (const auto &item : m_timestamp_to_file_map) {
-    if (item.second->first_timestamp >=
-        reader_context->next_event_bookmark.timestamp) {
-      auto *file_info = item.second.get();
+    if (is_last_item || reader_context->next_event_bookmark.timestamp <=
+                            next_item->second->first_timestamp) {
+      auto *file_info = item->second.get();
 
       if (file_info->is_encrypted && file_info->encryption_options == nullptr) {
         continue;
@@ -59,7 +129,8 @@ void AuditLogReader::set_files_to_read_list(
 void AuditLogReader::reset() noexcept { m_reload_requested = true; }
 
 bool AuditLogReader::init() noexcept {
-  if (SysVars::get_format_type() != AuditLogFormatType::Json) {
+  if (SysVars::get_format_type() != AuditLogFormatType::Json &&
+      SysVars::get_format_type() != AuditLogFormatType::Jsonl) {
     // Not supported for other log formats
     return true;
   }
@@ -69,8 +140,6 @@ bool AuditLogReader::init() noexcept {
   if (!m_reload_requested) {
     return true;
   }
-
-  m_reload_requested = false;
 
   my_service<SERVICE_TYPE(mysql_current_thread_reader)> thd_reader_srv(
       "mysql_current_thread_reader", SysVars::get_comp_registry_srv());
@@ -96,18 +165,34 @@ bool AuditLogReader::init() noexcept {
   }
 
   std::vector<std::string> all_files;
-  std::vector<std::string> new_files;
-  std::vector<std::string> removed_files;
+  bool have_complete_file_snapshot = true;
 
-  for (const auto &entry :
-       std::filesystem::directory_iterator{SysVars::get_file_dir()}) {
+  std::error_code ec;
+  auto it = std::filesystem::directory_iterator{SysVars::get_file_dir(), ec};
+
+  if (ec) {
+    return false;
+  }
+
+  for (; it != std::filesystem::directory_iterator{}; it.increment(ec)) {
+    const auto &entry = *it;
     auto log_name = entry.path().filename().string();
 
-    if (entry.is_regular_file() &&
+    std::error_code entry_ec;
+    if (entry.is_regular_file(entry_ec) && !entry_ec &&
         log_name.find(log_base_file_name) != std::string::npos) {
       all_files.push_back(std::move(log_name));
+    } else if (entry_ec) {
+      have_complete_file_snapshot = false;
     }
   }
+
+  if (ec) {
+    have_complete_file_snapshot = false;
+  }
+
+  std::vector<std::string> new_files;
+  std::vector<std::string> removed_files;
 
   std::copy_if(std::cbegin(all_files), std::cend(all_files),
                std::back_inserter(new_files), [this](const auto &name) {
@@ -118,27 +203,23 @@ bool AuditLogReader::init() noexcept {
                                      });
                });
 
-  std::for_each(std::cbegin(m_timestamp_to_file_map),
-                std::cend(m_timestamp_to_file_map),
-                [&all_files, &removed_files](const auto &pair) {
-                  if (!std::any_of(std::cbegin(all_files), std::cend(all_files),
-                                   [&pair](const auto &name) {
-                                     return name == pair.second->name;
-                                   })) {
-                    removed_files.push_back(pair.second->name);
-                  }
-                });
+  if (have_complete_file_snapshot) {
+    std::for_each(
+        std::cbegin(m_timestamp_to_file_map),
+        std::cend(m_timestamp_to_file_map),
+        [&all_files, &removed_files](const auto &pair) {
+          if (!std::any_of(std::cbegin(all_files), std::cend(all_files),
+                           [&pair](const auto &name) {
+                             return name == pair.second->name;
+                           })) {
+            removed_files.push_back(pair.second->name);
+          }
+        });
+  }
 
   for (const auto &log_name : new_files) {
-    bool is_current_log =
-        log_name.find(log_current_file_name) != std::string::npos;
     bool is_compressed = log_name.find(".gz") != std::string::npos;
     bool is_encrypted = log_name.find(".enc") != std::string::npos;
-
-    if (is_current_log && is_encrypted) {
-      // TODO: Improve handling of currently opened encrypted log
-      continue;
-    }
 
     auto encryption_options_id =
         audit_keyring::get_options_id_for_file_name(log_name);
@@ -164,26 +245,27 @@ bool AuditLogReader::init() noexcept {
     auto json_reader_guard =
         create_scope_guard([&] { json_reader_stream->close(); });
 
-    rapidjson::Document json_doc;
-    json_doc.ParseStream(*json_reader_stream);
+    rapidjson::Reader json_reader;
+    AuditJsonFirstTimestampHandler first_timestamp_handler;
+    json_reader.Parse(*json_reader_stream, first_timestamp_handler);
 
-    if (json_doc.HasParseError() || json_doc.Empty() || !json_doc.IsArray() ||
-        json_doc.GetArray().Empty()) {
+    if (first_timestamp_handler.timestamp.empty()) {
       continue;
     }
 
-    auto *first_event = json_doc.GetArray().Begin();
+    file_info->first_timestamp = first_timestamp_handler.timestamp;
 
-    if (!first_event->IsObject() || !first_event->HasMember("timestamp") ||
-        !first_event->GetObject()["timestamp"].IsString()) {
-      continue;
+    try {
+      auto ts = LogFileTimestamp(log_name);
+      m_timestamp_to_file_map.emplace(std::move(ts), std::move(file_info));
+    } catch (const std::exception &e) {
+      LogComponentErr(WARNING_LEVEL, ER_AUDIT_LOG_FILE_NAME_PARSE_FAILURE,
+                      log_name.c_str(), e.what());
+    } catch (...) {
+      LogComponentErr(WARNING_LEVEL,
+                      ER_AUDIT_LOG_FILE_NAME_UNKNOWN_PARSE_FAILURE,
+                      log_name.c_str());
     }
-
-    file_info->first_timestamp =
-        first_event->GetObject()["timestamp"].GetString();
-
-    m_timestamp_to_file_map.emplace(LogFileTimestamp(log_name),
-                                    std::move(file_info));
   }
 
   for (const auto &log_name : removed_files) {
@@ -197,6 +279,11 @@ bool AuditLogReader::init() noexcept {
     }
   }
 
+  if (!have_complete_file_snapshot) {
+    return false;
+  }
+
+  m_reload_requested = false;
   return true;
 }
 
@@ -244,6 +331,13 @@ bool AuditLogReader::read(AuditLogReaderContext *reader_context) noexcept {
       reader_context->reader->IterativeParseNext<rapidjson::kParseDefaultFlags>(
           *reader_context->audit_json_read_stream,
           *reader_context->audit_json_handler);
+
+      // We don't want reading to fail because of EOF during parsing.
+      // This would break reading of currently open log file, as its
+      // top-level array isn't closed yet.
+      if (reader_context->audit_json_read_stream->check_eof_reached()) {
+        break;
+      }
 
       if (reader_context->reader->HasParseError()) {
         return false;

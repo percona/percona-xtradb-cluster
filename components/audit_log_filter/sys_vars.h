@@ -27,6 +27,15 @@
 
 namespace audit_log_filter {
 
+class AuditRule;
+
+struct SessionFilterRuleCache {
+  uint64_t generation;
+  uint64_t detach_generation;
+  uint64_t removed_filter_generation;
+  std::shared_ptr<AuditRule> rule;
+};
+
 struct AuditLogReaderContext;
 class SysVars;
 
@@ -36,9 +45,15 @@ using log_writer::AuditLogEncryptionType;
 using log_writer::AuditLogHandlerType;
 using log_writer::AuditLogStrategyType;
 
+enum class AuditLogEventModeType { Reduced = 0, Full = 1 };
+
 struct LogBookmark {
   uint64_t id;
   std::string timestamp;
+
+  friend bool operator==(const LogBookmark &lhs, const LogBookmark &rhs) {
+    return lhs.id == rhs.id && lhs.timestamp == rhs.timestamp;
+  }
 };
 
 class SysVars {
@@ -90,6 +105,14 @@ class SysVars {
    *         of AuditLogHandlerType
    */
   [[nodiscard]] static AuditLogHandlerType get_handler_type() noexcept;
+
+  /**
+   * @brief Get audit log filter event mode.
+   *
+   * @return Audit log filter event mode, may be one of possible values
+   *         of AuditLogEventModeType
+   */
+  [[nodiscard]] static AuditLogEventModeType get_event_mode_type() noexcept;
 
   /**
    * @brief Get audit log filter format type.
@@ -215,13 +238,20 @@ class SysVars {
   [[nodiscard]] static int get_key_derivation_iter_count_mean() noexcept;
 
   /**
-   * @brief Check if a 'time' field is enabled for JSON formatted logs.
+   * @brief Check if a 'time' field is enabled for JSON or JSONL logs.
    *
    * @return true in case 'time' field containing UNIX timestamp should be
    *             added to log record,
    *         false otherwise
    */
   [[nodiscard]] static bool get_format_unix_timestamp() noexcept;
+
+  /**
+   * @brief Check if O_DIRECT is enabled for audit log file writes.
+   *
+   * @return true if O_DIRECT should be used, false otherwise
+   */
+  [[nodiscard]] static bool get_direct_io() noexcept;
 
   /**
    * @brief Set filter_id for a session.
@@ -348,6 +378,86 @@ class SysVars {
    */
   static void set_log_reader_context(MYSQL_THD thd,
                                      AuditLogReaderContext *context) noexcept;
+
+  /**
+   * @brief Get the cached filter rule for a session.
+   *
+   * @param thd Connection specific THD instance
+   * @return Pointer to session filter rule cache, or nullptr if not yet cached
+   */
+  static SessionFilterRuleCache *get_session_filter_rule(
+      MYSQL_THD thd) noexcept;
+
+  /**
+   * @brief Cache a filter rule for a session.
+   *
+   * @param thd Connection specific THD instance
+   * @param generation Current filter rule generation at time of resolution
+   * @param detach_generation Current detach generation at time of resolution
+   * @param removed_filter_generation Current removed-filter generation at time
+   *                                  of resolution
+   * @param rule The resolved filter rule (nullptr if no rule applies)
+   */
+  static void set_session_filter_rule(MYSQL_THD thd, uint64_t generation,
+                                      uint64_t detach_generation,
+                                      uint64_t removed_filter_generation,
+                                      std::shared_ptr<AuditRule> rule) noexcept;
+
+  /**
+   * @brief Get the current global filter rule generation counter.
+   *
+   * @return Current generation value
+   */
+  static uint64_t get_filter_rule_generation() noexcept;
+
+  /**
+   * @brief Increment the global filter rule generation counter.
+   *
+   * Forces all sessions to re-resolve their filter rule on the next event.
+   * Used by flush and remove_filter operations.
+   */
+  static void bump_filter_rule_generation() noexcept;
+
+  /**
+   * @brief Get the current global detach generation counter.
+   *
+   * @return Current generation value
+   */
+  static uint64_t get_filter_rule_detach_generation() noexcept;
+
+  /**
+   * @brief Increment the global detach generation counter.
+   *
+   * Forces current sessions to detach from their cached filter until the next
+   * connect or change-user operation.
+   */
+  static void bump_filter_rule_detach_generation() noexcept;
+
+  /**
+   * @brief Get the current removed-filter generation counter.
+   *
+   * @return Current generation value
+   */
+  static uint64_t get_removed_filter_generation() noexcept;
+
+  /**
+   * @brief Mark a filter ID as removed for existing sessions.
+   *
+   * Sessions still using this cached filter ID will detach on their next
+   * non-connection event.
+   */
+  static void mark_removed_filter_id(uint64_t filter_id) noexcept;
+
+  /**
+   * @brief Check whether a filter ID has been removed.
+   *
+   * @param filter_id Filtering rule ID
+   * @param since_generation The session cache's removed-filter generation
+   * @return true if the filter was removed after since_generation,
+   *         false otherwise
+   */
+  static bool is_removed_filter_id(uint64_t filter_id,
+                                   uint64_t since_generation) noexcept;
 
 #ifndef NDEBUG
   /**

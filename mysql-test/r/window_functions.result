@@ -7405,7 +7405,7 @@ Warning	1681	Integer display width is deprecated and will be removed in a future
 Warning	1287	'utf8mb3' is deprecated and will be removed in a future release. Please use utf8mb4 instead
 SET tmp_table_size= 16384;
 Warnings:
-Warning	48038	Tmp_table_size is set below 1MiB. The TEMPTABLE engine requires at least 1MiB table size, and will use that value instead. Please increase the limit to silence this warning.
+Warning	48040	Tmp_table_size is set below 1MiB. The TEMPTABLE engine requires at least 1MiB table size, and will use that value instead. Please increase the limit to silence this warning.
 SELECT DISTINCT MAX( table2.`col_varchar_255_utf8` ) AS max1 ,
 MIN( table1.`col_date` ) AS min1 ,
 AVG( table2.`col_int` ) AS avg1 ,
@@ -9149,8 +9149,8 @@ SELECT ((MAKETIME(((QUARTER('| !*c>*{/'))<=>
 )OVER())),'9236-05-27',0xe2a7d4))^(0x1109))
 NULL
 Warnings:
-Warning	1292	Incorrect datetime value: '| !*c>*{/'
-Warning	1292	Incorrect datetime value: '| !*c>*{/'
+Warning	1292	Truncated incorrect date value: '| !*c>*{/'
+Warning	1292	Truncated incorrect date value: '| !*c>*{/'
 Warning	1292	Truncated incorrect INTEGER value: '9236-05-27'
 SELECT ((FIRST_VALUE(JSON_MERGE_PATCH(1.755913e+308,'{ }'))OVER())<=(1));
 ERROR 22032: Invalid data type for JSON data in argument 1 to function json_merge_patch; a JSON string or JSON type is required.
@@ -9556,7 +9556,7 @@ INSERT INTO t1 VALUES
 SET @@session.max_heap_table_size=16*1024;
 SET @@session.tmp_table_size=1024;
 Warnings:
-Warning	48038	Tmp_table_size is set below 1MiB. The TEMPTABLE engine requires at least 1MiB table size, and will use that value instead. Please increase the limit to silence this warning.
+Warning	48040	Tmp_table_size is set below 1MiB. The TEMPTABLE engine requires at least 1MiB table size, and will use that value instead. Please increase the limit to silence this warning.
 SET optimizer_switch="derived_condition_pushdown=off";
 SET SESSION internal_tmp_mem_storage_engine=MEMORY;
 SELECT * FROM (SELECT c2, c3, c4, SUM(c1) OVER (PARTITION BY c2) AS wcol FROM t1)o WHERE c2=10;
@@ -9590,7 +9590,7 @@ OVER()
 )
 NULL
 Warnings:
-Warning	1292	Incorrect datetime value: '0000-00-00'
+Warning	6527	DATE value is out of range in 'from_days(2486378174430980553)'
 SELECT (3.14 DIV (
 NTH_VALUE(
 FROM_DAYS(2486378174430980553), 1
@@ -9607,4 +9607,4 @@ OVER()
 )
 NULL
 Warnings:
-Warning	1292	Incorrect datetime value: '0000-00-00'
+Warning	6527	DATE value is out of range in 'from_days(2486378174430980553)'
