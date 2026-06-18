@@ -14,6 +14,7 @@
    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA */
 
 #include "wsrep_sst.h"
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <regex>
@@ -90,6 +91,36 @@ static std::vector<std::string> allowed_sst_methods;
 
 bool wsrep_sst_donor_rejects_queries = false;
 
+/* alphanumerics plus -_. (POSIX portable filename character set) */
+static bool filename_char(int const c) {
+  return std::isalnum(c) || (c == '-') || (c == '_') || (c == '.');
+}
+
+/* comma, used as separator in donor lists */
+static bool comma_char(int const c) { return (c == ','); }
+
+/* characters valid in a single address (host:port or [ipv6]/...) */
+static bool address_char(int const c) {
+  return filename_char(c) || (c == ':') || (c == '[') || (c == ']') ||
+         (c == '/');
+}
+
+/* characters valid in a comma-separated list of node addresses */
+static bool names_list(int const c) { return address_char(c) || comma_char(c); }
+
+static bool check_request_str(const char *const str, bool (*check)(int c),
+                              bool log_warn = true) {
+  for (size_t i(0); str[i] != '\0'; ++i) {
+    if (!check(str[i])) {
+      if (log_warn)
+        WSREP_WARN("Illegal character in state transfer request: %i (%c).",
+                   str[i], str[i]);
+      return true;
+    }
+  }
+  return false;
+}
+
 /* Function checks if the new value for sst_method is valid.
 @return false if no error encountered with check else return true. */
 bool wsrep_sst_method_check(sys_var *self, THD *, set_var *var) {
@@ -118,17 +149,22 @@ bool wsrep_sst_method_update(sys_var *, THD *, enum_var_type) { return 0; }
 /* Function checks if the new value for sst_recieve_address is valid.
 @return false if no error encountered with check else return true. */
 bool wsrep_sst_receive_address_check(sys_var *self, THD *, set_var *var) {
-  char addr_buf[FN_REFLEN];
+  if (!var->save_result.string_value.str) goto err;
 
-  if ((!var->save_result.string_value.str) ||
-      (var->save_result.string_value.length > (FN_REFLEN - 1)))  // safety
+  /* Allow empty value. */
+  if (var->save_result.string_value.length == 0) return false;
+
+  /* Check length. */
+  if (var->save_result.string_value.length > (FN_REFLEN - 1))  // safety
   {
     goto err;
   }
 
-  memcpy(addr_buf, var->save_result.string_value.str,
-         var->save_result.string_value.length);
-  addr_buf[var->save_result.string_value.length] = 0;
+  /* Reject shell-unsafe characters (MDEV-39676 / PXC-5241). */
+  if (check_request_str(var->save_result.string_value.str, address_char,
+                        false)) {
+    goto err;
+  }
 
   return false;
 
@@ -143,7 +179,30 @@ bool wsrep_sst_receive_address_update(sys_var *, THD *, enum_var_type) {
   return 0;
 }
 
-bool wsrep_sst_donor_check(sys_var *, THD *, set_var *) { return 0; }
+bool wsrep_sst_donor_check(sys_var *self, THD *, set_var *var) {
+  if (!var->save_result.string_value.str ||
+      var->save_result.string_value.length == 0)
+    return false;
+
+  /* Check length. */
+  if (var->save_result.string_value.length > (FN_REFLEN - 1))  // safety
+  {
+    goto err;
+  }
+
+  /* Reject shell-unsafe characters (MDEV-39676 / PXC-5241). */
+  if (check_request_str(var->save_result.string_value.str, names_list, false)) {
+    goto err;
+  }
+
+  return false;
+
+err:
+  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), self->name.str,
+           var->save_result.string_value.str ? var->save_result.string_value.str
+                                             : "NULL");
+  return true;
+}
 
 bool wsrep_sst_donor_update(sys_var *, THD *, enum_var_type) { return 0; }
 
