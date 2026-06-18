@@ -24,7 +24,7 @@ event-scheduler=1
 
 wsrep_provider=@ENV.WSREP_PROVIDER
 wsrep_cluster_address='gcomm://'
-wsrep_provider_options='base_port=@mysqld.1.#galera_port'
+wsrep_provider_options='base_port=@mysqld.1.#galera_port;@ENV.WSREP_PROVIDER_TIMEOUTS'
 
 # enforce read-committed characteristics across the cluster
 wsrep_sync_wait = 15
@@ -49,7 +49,7 @@ event-scheduler=1
 
 wsrep_provider=@ENV.WSREP_PROVIDER
 wsrep_cluster_address='gcomm://127.0.0.1:@mysqld.1.#galera_port'
-wsrep_provider_options='base_port=@mysqld.2.#galera_port'
+wsrep_provider_options='base_port=@mysqld.2.#galera_port;@ENV.WSREP_PROVIDER_TIMEOUTS'
 
 # enforce read-committed characteristics across the cluster
 wsrep_sync_wait = 15
