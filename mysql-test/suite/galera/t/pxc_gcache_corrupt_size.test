@@ -1,0 +1,166 @@
+#
+# This test corrupts galera.cache and verifies recovery rejects the bad
+# BufferHeader::size before post-recovery path can run.
+# This test case only extends the code coverage and does not reproduce
+# any customer issue or any code issue.
+#
+# 1. Create table and populate 10 rows on node_1; confirm node_2 received them.
+# 2. Cleanly shut node_2 down so close_preamble() writes a synced preamble.
+# 3. Corrupt one on-disk BufferHeader::size to a value larger than the cache.
+# 4. Restart node_2 with gcache.recover=yes; scan() rejects the header.
+# 5. GCache recovery is aborted and a full reset is forced.
+# 6. node_2 rejoins (cluster size 2) without crashing or "Memory corruption".
+# 7. Data is intact and both servers are consistent (diff_servers).
+# 8. Cleanup.
+#
+
+--source include/galera_cluster.inc
+
+--echo
+--echo # 1. Create table and populate 10 rows on node_1; confirm node_2 received them.
+--echo
+--connection node_1
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 VARCHAR(64)) ENGINE=InnoDB;
+
+--disable_query_log
+--let $i = 1
+while ($i <= 10)
+{
+  --eval INSERT INTO t1 VALUES ($i, REPEAT('a', 64))
+  --inc $i
+}
+--enable_query_log
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 10 FROM t1
+--source include/wait_condition.inc
+--let $NODE2_DATA_DIR = `SELECT @@datadir`
+
+--echo
+--echo # 2. Cleanly shut node_2 down so close_preamble() writes a synced preamble.
+--echo
+# Shut node_2 down cleanly so close_preamble() writes a synced preamble and the
+# next start takes the gcache.recover=yes path over the cache we corrupt below.
+--source include/shutdown_mysqld.inc
+
+--echo
+--echo # 3. Corrupt one on-disk BufferHeader::size to a value larger than the cache.
+--echo
+# Corrupt one on-disk BufferHeader::size to a value larger than the whole cache.
+# BH_test() only verifies size >= sizeof(BufferHeader). The scan code must reject
+# this explicitly and abort gcache recovery before inserting bh+1 into seqno2ptr_.
+--disable_query_log
+--disable_result_log
+--write_file $MYSQLTEST_VARDIR/tmp/pxc_5209_corrupt_size.pl
+use strict;
+use warnings;
+
+my $cache_file = $ARGV[0] or die "usage: $0 <galera.cache>\n";
+
+my $PREAMBLE_LEN = 1024;
+my $HEADER_LEN   = 32 * 8;
+my $BH_LEN       = 24;
+my $SIZE_OFF     = 8 + 8;
+
+# Must match the .cnf's gcache.size=1M.
+my $GCACHE_SIZE = 1024 * 1024;
+my $BOGUS_SIZE  = $GCACHE_SIZE + 1;
+
+open(my $fh, '+<:raw', $cache_file)
+    or die "open $cache_file: $!";
+binmode($fh);
+
+my $file_size = -s $cache_file;
+my $start = $PREAMBLE_LEN + $HEADER_LEN;
+my $end = $file_size - $BH_LEN;
+
+my $target;
+for (my $pos = $start; $pos <= $end; $pos += 8) {
+    seek($fh, $pos, 0) or die "seek $cache_file: $!";
+    read($fh, my $buf, $BH_LEN) == $BH_LEN or next;
+    my ($seqno, $ctx, $size, $flags, $store, $type) =
+        unpack('q<Q<L<S<cc', $buf);
+
+    next unless $seqno > 0;
+    next unless $size >= $BH_LEN;
+    next unless $size <= ($file_size - $start);
+    next unless $flags <= 3;
+    next unless $store == 1; # BUFFER_IN_RB
+
+    $target = [$pos, $seqno, $size, $flags, $store, $type];
+    last;
+}
+
+$target or die "no plausible BufferHeader found in $cache_file\n";
+my ($pos, $seqno, $old_size) = @$target;
+my $size_pos = $pos + $SIZE_OFF;
+
+seek($fh, $size_pos, 0) or die "seek size field $size_pos: $!";
+print $fh pack('L<', $BOGUS_SIZE) or die "write bogus size: $!";
+close($fh) or die "close $cache_file: $!";
+
+print "corrupted BufferHeader::size at offset $size_pos ",
+      "(bh=$pos seqno=$seqno old_size=$old_size new_size=$BOGUS_SIZE)\n";
+EOF
+--exec perl $MYSQLTEST_VARDIR/tmp/pxc_5209_corrupt_size.pl $NODE2_DATA_DIR/galera.cache > $MYSQLTEST_VARDIR/log/pxc_5209_corrupt_size_helper.log 2>&1
+--remove_file $MYSQLTEST_VARDIR/tmp/pxc_5209_corrupt_size.pl
+--enable_result_log
+--enable_query_log
+
+--echo
+--echo # 4. Restart node_2 with gcache.recover=yes; scan() rejects the header.
+--echo
+# Restart node_2. With the fix, RingBuffer::scan() rejects the header, aborts
+# recovery, resets the cache, and the node rejoins instead of carrying a corrupt
+# pointer into GCache::free_common().
+--let $_expect_file_name = $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
+--source include/start_mysqld.inc
+
+--connection node_2
+--source include/wait_until_connected_again.inc
+--source include/galera_wait_ready.inc
+
+--echo
+--echo # 5. GCache recovery is aborted and a full reset is forced.
+--echo
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) >= 1 FROM performance_schema.error_log WHERE data LIKE "%Recovery failed, need to do full reset%"
+--source include/wait_condition.inc
+
+--echo
+--echo # 6. node_2 rejoins (cluster size 2) without crashing or "Memory corruption".
+--echo
+--connection node_1
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 0 FROM performance_schema.error_log WHERE data LIKE "%handle_fatal_signal%"
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT COUNT(*) = 0 FROM performance_schema.error_log WHERE data LIKE "%Memory corruption: unrecognized store%"
+--source include/wait_condition.inc
+
+--echo
+--echo # 7. Data is intact and both servers are consistent (diff_servers).
+--echo
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 10 FROM t1
+--source include/wait_condition.inc
+SELECT COUNT(*) AS rows_post_recovery FROM t1;
+
+--let $diff_servers = 1 2
+--source include/diff_servers.inc
+
+--echo
+--echo # 8. Cleanup.
+--echo
+CALL mtr.add_suppression("Exception while mapping writeset");
+CALL mtr.add_suppression("Aborting GCache recovery");
+CALL mtr.add_suppression("Recovery failed, need to do full reset");
+CALL mtr.add_suppression("implausible bh->size");
+CALL mtr.add_suppression("Failed to scan the last segment to the end");
+
+--connection node_1
+CALL mtr.add_suppression("Skipped GCache ring buffer recovery");
+DROP TABLE t1;
