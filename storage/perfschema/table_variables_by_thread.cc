@@ -103,10 +103,6 @@ PFS_engine_table *table_variables_by_thread::create(PFS_engine_table_share *) {
 ha_rows table_variables_by_thread::get_row_count() {
   mysql_mutex_lock(&LOCK_plugin_delete);
 #ifndef NDEBUG
-#ifdef WITH_WSREP
-  [[maybe_unused]]
-  extern mysql_mutex_t LOCK_plugin;
-#endif /* WITH_WSREP */
   mysql_mutex_assert_not_owner(&LOCK_plugin);
 #endif
   mysql_rwlock_rdlock(&LOCK_system_variables_hash);
