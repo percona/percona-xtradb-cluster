@@ -29,8 +29,8 @@ function set_suites() {
     WORKER_3_MTR_SUITES="engines/funcs,innodb,galera_sr"
     WORKER_4_MTR_SUITES="main,rpl,percona_rpl"
     WORKER_5_MTR_SUITES="rpl_nogtid,rpl_gtid,percona_rpl_gtid,galera|big"
-    WORKER_6_MTR_SUITES="parts,group_replication,clone,innodb_gis"
-    WORKER_7_MTR_SUITES="stress,perfschema,component_keyring_file,binlog,percona_binlog,innodb_fts,sys_vars,innodb_zip,x,gcol,engines/iuds,encryption,federated,funcs_1,auth_sec,binlog_nogtid,binlog_gtid,funcs_2,jp,information_schema,rpl_encryption,sysschema,json,opt_trace,collations,gis,query_rewrite_plugins,test_service_sql_api,secondary_engine,component_audit_log_filter,component_encryption_udf,percona,percona_innodb,component_masking_functions"
+    WORKER_6_MTR_SUITES="parts,group_replication,clone,innodb_gis,component_percona_telemetry"
+    WORKER_7_MTR_SUITES="stress,perfschema,component_keyring_file,binlog,percona_binlog,innodb_fts,sys_vars,innodb_zip,x,gcol,engines/iuds,encryption,federated,funcs_1,auth_sec,binlog_nogtid,binlog_gtid,funcs_2,jp,information_schema,rpl_encryption,sysschema,json,opt_trace,collations,gis,query_rewrite_plugins,test_service_sql_api,secondary_engine,component_audit_log_filter,component_encryption_udf,percona,percona_innodb,component_masking_functions,component_percona_telemetry"
     WORKER_8_MTR_SUITES="galera|nobig,audit_log,component_js_lang"
   else # Debug (and everything different from "RelWithDebInfo")
     echo "Setting WORKER_x_MTR_SUITES for BUILD_TYPE=Debug"
