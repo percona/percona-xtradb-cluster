@@ -110,6 +110,7 @@ Wsrep_applier_service *wsrep_create_streaming_applier(THD *orig_thd,
         ctx, thd->thread_id());
     if (!(ret = new (std::nothrow) Wsrep_applier_service(thd))) {
       delete thd;
+      wsrep_delete_threadvars();
     }
   }
   /* Restore original thread local storage state before returning. */
