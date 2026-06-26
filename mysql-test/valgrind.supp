@@ -3131,3 +3131,53 @@ g   codership/mysql-wsrep/issues#176
    fun:_ZL18do_shutdown_serverP10st_command
    fun:main
 }
+
+#   (a) mysqltest client SSL handshake: EVP_DecryptUpdate in
+#       ssl_handshake_loop (viossl.cc:442) and BIO_write (viossl.cc:322)
+#   (b) GR XCom server TLS: EVP_DecryptUpdate in xcom_tcp_server_startup
+#       (xcom_network_provider.cc:112)
+#
+
+{
+   OpenSSL3_EVP_DecryptUpdate_uninit_mysqltest_ssl_handshake_Cond
+   Memcheck:Cond
+   obj:*/libcrypto.so.3*
+   obj:*/libcrypto.so.3*
+   fun:EVP_DecryptUpdate
+   obj:*/libssl.so.3*
+   ...
+   fun:ssl_handshake_loop
+}
+
+{
+   OpenSSL3_EVP_DecryptUpdate_uninit_mysqltest_ssl_handshake_Value8
+   Memcheck:Value8
+   obj:*/libcrypto.so.3*
+   obj:*/libcrypto.so.3*
+   fun:EVP_DecryptUpdate
+   obj:*/libssl.so.3*
+   ...
+   fun:ssl_handshake_loop
+}
+
+{
+   OpenSSL3_BIO_write_uninit_mysqltest_ssl_send
+   Memcheck:Param
+   write(buf)
+   ...
+   fun:BIO_write
+   obj:*/libssl.so.3*
+   ...
+   fun:vio_ssl_write
+}
+
+{
+   OpenSSL3_EVP_DecryptUpdate_uninit_xcom_tcp_server_Cond
+   Memcheck:Cond
+   obj:*/libcrypto.so.3*
+   obj:*/libcrypto.so.3*
+   fun:EVP_DecryptUpdate
+   obj:*/libssl.so.3*
+   ...
+   fun:_ZN23Xcom_network_provider22xcom_tcp_server_startupEPS_
+}
