@@ -452,9 +452,6 @@ void wsrep_delete_threadvars() {
   Copy session context fields from src to dst.
 */
 void wsrep_copy_session_from_thd(THD *dst, const THD *src) {
-  /*
-    Ref: set_slave_thread_default_charset
-  */
   dst->variables.character_set_client = src->variables.character_set_client;
   dst->variables.collation_connection = src->variables.collation_connection;
   dst->variables.collation_server = src->variables.collation_server;
