@@ -49,6 +49,8 @@ static void init_service_thd(THD *thd, const char *thread_stack) {
   thd->set_time();
   thd->set_command(COM_SLEEP);
   thd->reset_for_next_command();
+  thd->variables.transaction_read_only = false;
+  thd->tx_read_only = false;
 }
 
 wsrep::storage_service *Wsrep_server_service::storage_service(
