@@ -1,0 +1,80 @@
+# === Purpose ===
+# Verify wsrep applier threads never run with transaction_read_only=1.
+#
+# === Reference ===
+# PXC-5229: WSREP applier threads should never have tx_read_only=true
+
+--source include/galera_cluster.inc
+
+--connection node_2
+SET @transaction_read_only_save = @@GLOBAL.transaction_read_only;
+SET @wsrep_applier_threads_save = @@GLOBAL.wsrep_applier_threads;
+
+SET GLOBAL transaction_read_only = 1;
+SET GLOBAL wsrep_applier_threads = 10;
+# Confirm 10 applier threads
+--let $wait_condition = SELECT COUNT(*) = @@wsrep_applier_threads + 1 FROM performance_schema.processlist WHERE USER = 'system user' AND COMMAND != 'Daemon'
+--source include/wait_condition.inc
+
+# Have 2 tables a lock one of the table
+--connection node_1
+CREATE TABLE test.pxc_5229_t1(id INT PRIMARY KEY, v INT);
+CREATE TABLE test.pxc_5229_t2(id INT PRIMARY KEY, v INT);
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM information_schema.tables WHERE table_schema = 'test' AND table_name = 'pxc_5229_t1'
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT COUNT(*) = 1 FROM information_schema.tables WHERE table_schema = 'test' AND table_name = 'pxc_5229_t2'
+--source include/wait_condition.inc
+
+LOCK TABLE test.pxc_5229_t1 READ;
+
+--connection node_1
+# Generate workload to distribute among applier threads
+--disable_query_log
+--let $i = 1
+while ($i <= 50)
+{
+  --eval INSERT INTO test.pxc_5229_t1 VALUES ($i, $i)
+  --eval INSERT INTO test.pxc_5229_t2 VALUES ($i, $i)
+  --inc $i
+}
+UPDATE test.pxc_5229_t1 SET v = v + 5;
+UPDATE test.pxc_5229_t2 SET v = v + 5;
+--enable_query_log
+
+# Sleep to let workload distribute and UNLOCK tables
+--connection node_2
+
+--sleep 2
+UNLOCK TABLES;
+
+--let $wait_condition = SELECT COUNT(*) = 50 FROM test.pxc_5229_t2
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT COUNT(*) = 50 FROM test.pxc_5229_t1
+--source include/wait_condition.inc
+
+--let $assert_text = node_2 wsrep_cluster_status must stay Primary
+--let $assert_cond = "[SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = \'wsrep_cluster_status\', VARIABLE_VALUE, 1]" = "Primary"
+--source include/assert.inc
+
+--let $assert_text = node_2 wsrep_connected must stay ON
+--let $assert_cond = "[SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = \'wsrep_connected\', VARIABLE_VALUE, 1]" = "ON"
+--source include/assert.inc
+
+--let $assert_text = node_2 wsrep_ready must stay ON
+--let $assert_cond = "[SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = \'wsrep_ready\', VARIABLE_VALUE, 1]" = "ON"
+--source include/assert.inc
+
+--let $assert_text = node_2 wsrep_local_state_comment must stay Synced
+--let $assert_cond = "[SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = \'wsrep_local_state_comment\', VARIABLE_VALUE, 1]" = "Synced"
+--source include/assert.inc
+
+SET @@GLOBAL.transaction_read_only = @transaction_read_only_save;
+SET @@GLOBAL.wsrep_applier_threads = @wsrep_applier_threads_save;
+
+--connection node_1
+DROP TABLE test.pxc_5229_t1;
+DROP TABLE test.pxc_5229_t2;

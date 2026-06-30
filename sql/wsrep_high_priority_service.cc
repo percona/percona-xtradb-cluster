@@ -1013,6 +1013,7 @@ Wsrep_replayer_service::Wsrep_replayer_service(THD *replayer_thd, THD *orig_thd)
   /* Copy thd vars from orig_thd before reset, otherwise reset
      for orig thd clears thread local storage before copy. */
   wsrep_assign_from_threadvars(replayer_thd);
+  wsrep_copy_session_from_thd(replayer_thd, orig_thd);
   wsrep_reset_threadvars(orig_thd);
   wsrep_store_threadvars(replayer_thd);
   replayer_thd->wsrep_replayer = true;

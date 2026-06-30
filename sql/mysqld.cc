@@ -12683,6 +12683,14 @@ static int init_wsrep_thread(THD *thd) {
 #endif /* GALERA */
   thd->enable_slow_log = opt_log_slow_replica_statements;
   set_slave_thread_options(thd);
+  /*
+    Wsrep applier threads must always be able to apply writesets.
+    A freshly created applier THD would inherit a global
+    transaction_read_only. The flag is not just a SQL-layer gate: it also
+    propagates into InnoDB.
+  */
+  thd->variables.transaction_read_only = false;
+  thd->tx_read_only = false;
   thd->get_protocol_classic()->set_client_capabilities(CLIENT_LOCAL_FILES);
 
   /*
