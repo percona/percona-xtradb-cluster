@@ -1,6 +1,7 @@
 --source include/have_component_audit_log.inc
 --source ../inc/audit_tables_init.inc
 --source ../inc/audit_comp_install.inc
+SET GLOBAL audit_log_filter.event_mode=FULL;
 
 SELECT audit_log_filter_set_filter('log_query', '{"filter": {"class": {"name": "query"}}}');
 SELECT audit_log_filter_set_user('%', 'log_query');
@@ -14,6 +15,12 @@ SELECT "4IHYyOZMEAUJcURiOO9nLoceKvbRi3HSZZObmonjTjv4IHYyOZMEAUJcURiOO9nLoceKvbRi
 --enable_query_log
 
 SHOW GLOBAL STATUS LIKE 'Audit_log_filter_direct_writes';
+
+--let $audit_filter_log_check_one = `SELECT audit_log_rotate()`
+--let $audit_filter_log_path = `SELECT @@global.datadir`
+--let $audit_filter_log_name = `SELECT @@global.audit_log_filter.file`
+--let $audit_filter_log_format = xml
+--source validate_logs_format.inc
 
 --echo #
 --echo # Cleanup

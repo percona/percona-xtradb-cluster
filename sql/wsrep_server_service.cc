@@ -49,6 +49,8 @@ static void init_service_thd(THD *thd, const char *thread_stack) {
   thd->set_time();
   thd->set_command(COM_SLEEP);
   thd->reset_for_next_command();
+  thd->variables.transaction_read_only = false;
+  thd->tx_read_only = false;
 }
 
 wsrep::storage_service *Wsrep_server_service::storage_service(
@@ -110,6 +112,7 @@ Wsrep_applier_service *wsrep_create_streaming_applier(THD *orig_thd,
         ctx, thd->thread_id());
     if (!(ret = new (std::nothrow) Wsrep_applier_service(thd))) {
       delete thd;
+      wsrep_delete_threadvars();
     }
   }
   /* Restore original thread local storage state before returning. */

@@ -1,3 +1,4 @@
+SET GLOBAL audit_log_filter.event_mode=FULL;
 SET GLOBAL DEBUG='+d,audit_log_filter_add_record_debug_info';
 SET GLOBAL DEBUG='+d,audit_log_filter_rotate_after_audit_rules_flush';
 #
@@ -81,7 +82,7 @@ audit_log_filter_set_filter('log_by_digest_no_args', '{
 }
 }
 }')
-ERROR: Incorrect rule definition
+ERROR: Incorrect rule definition: invalid arguments for 'query_digest' function
 #
 # Wrong arguments for query_digest()
 SELECT audit_log_filter_set_filter('wrong_digest_type', '{
@@ -120,7 +121,7 @@ audit_log_filter_set_filter('wrong_digest_type', '{
 }
 }
 }')
-ERROR: Incorrect rule definition
+ERROR: Incorrect rule definition: wrong function args format provided
 SELECT audit_log_filter_set_filter('too_many_args', '{
 "filter": {
 "class": {
@@ -152,7 +153,7 @@ audit_log_filter_set_filter('too_many_args', '{
 "args": [
 {"string": {"string": "INSERT INTO `t` VALUES (?)"}},
 {"string": {"string": "unexp
-ERROR: Incorrect rule definition
+ERROR: Incorrect rule definition: invalid arguments for 'query_digest' function
 SELECT * FROM mysql.audit_log_filter;
 filter_id	name	filter
 1	log_by_digest	{"filter": {"class": {"name": "query", "event": {"log": {"function": {"args": [{"string": {"string": "INSERT INTO `t` VALUES (?)"}}], "name": "query_digest"}}, "name": "start"}}}}

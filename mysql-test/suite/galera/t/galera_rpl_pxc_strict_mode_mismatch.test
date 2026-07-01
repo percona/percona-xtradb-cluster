@@ -91,8 +91,8 @@ SET GLOBAL pxc_strict_mode = 'ENFORCING';
 --enable_query_log
 START REPLICA USER = 'root';
 
---source include/wait_for_slave_io_to_start.inc
---source include/wait_for_slave_sql_to_start.inc
+--source include/rpl/wait_for_receiver_to_start.inc
+--source include/rpl/wait_for_applier_to_start.inc
 
 --echo # Source runs DDL without PK; replica applier uses replicated session metadata
 --connection node_1

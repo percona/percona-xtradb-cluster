@@ -50,6 +50,7 @@
 
 #include <scope_guard.h>
 #include <array>
+#include <exception>
 #include <memory>
 #include <variant>
 
@@ -74,7 +75,7 @@ SERVICE_TYPE(log_builtins_string) *log_bs = nullptr;
 namespace audit_log_filter {
 namespace {
 
-AuditLogFilter *audit_log_filter = nullptr;
+std::unique_ptr<AuditLogFilter> audit_log_filter;
 
 class EventsConsumer {
  public:
@@ -174,10 +175,23 @@ void deinit_abort_exempt_privilege() {
   }
 }
 
+mysql_service_status_t get_sql_command(MYSQL_THD thd,
+                                       mysql_cstring_with_length &sql_command) {
+  return !mysql_service_mysql_thd_attributes->get(
+             thd, "percona_sql_command_9.6", &sql_command) ||
+         !mysql_service_mysql_thd_attributes->get(thd, "sql_command",
+                                                  &sql_command);
+}
+
+bool is_stored_program_statement(MYSQL_THD thd) {
+  auto *server_thd = static_cast<THD *>(thd);
+  return server_thd != nullptr && server_thd->sp_runtime_ctx != nullptr;
+}
+
 }  // namespace
 
 AuditLogFilter *get_audit_log_filter_instance() noexcept {
-  return audit_log_filter;
+  return audit_log_filter.get();
 }
 
 /*
@@ -267,7 +281,7 @@ static std::array udfs_list{
  * @return Initialization status, 0 in case of success or non zero
  *         code otherwise
  */
-mysql_service_status_t audit_log_filter_init() {
+mysql_service_status_t audit_log_filter_init() try {
   auto *all_mem_info = get_all_memory_info();
   mysql_memory_register(AUDIT_LOG_FILTER_PSI_CATEGORY, all_mem_info,
                         sizeof(*all_mem_info) / sizeof(PSI_memory_info));
@@ -356,26 +370,33 @@ mysql_service_status_t audit_log_filter_init() {
 
   log_reader->reset();
 
-  audit_log_filter =
-      new AuditLogFilter(std::move(audit_rule_registry), std::move(audit_udf),
-                         std::move(log_writer), std::move(log_reader));
+  auto local_audit_log_filter = std::make_unique<AuditLogFilter>(
+      std::move(audit_rule_registry), std::move(audit_udf),
+      std::move(log_writer), std::move(log_reader));
 
-  if (audit_log_filter == nullptr || !audit_log_filter->init()) {
+  if (!local_audit_log_filter->init()) {
     LogComponentErr(ERROR_LEVEL, ER_AUDIT_INIT_FAILURE);
     return 1;
   }
 
-  // In case of successful initialization,
-  // prevent comp_registry_srv from being released by the comp_scope_guard.
-  comp_registry_srv = nullptr;
-
   if (SysVars::get_log_disabled()) {
     LogComponentErr(WARNING_LEVEL, ER_AUDIT_INIT_DISABLED_WARN);
   } else {
-    audit_log_filter->send_audit_start_event();
+    local_audit_log_filter->send_audit_start_event();
   }
 
+  // Disarm the scope guard only after all potentially-throwing operations
+  // succeeded, so that SysVars cleanup still runs on exception.
+  comp_registry_srv = nullptr;
+  audit_log_filter = std::move(local_audit_log_filter);
   return 0;
+} catch (const std::exception &e) {
+  LogComponentErr(ERROR_LEVEL, ER_AUDIT_INIT_EXCEPTION, e.what());
+  return 1;
+} catch (...) {
+  LogComponentErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG,
+                  "Unknown exception in audit_log_filter_init");
+  return 1;
 }
 
 /**
@@ -385,7 +406,7 @@ mysql_service_status_t audit_log_filter_init() {
  * @return Plugin deinit status, 0 in case of success or non zero
  *         code otherwise
  */
-mysql_service_status_t audit_log_filter_deinit() {
+mysql_service_status_t audit_log_filter_deinit() try {
   if (audit_log_filter == nullptr) {
     return 0;
   }
@@ -400,10 +421,16 @@ mysql_service_status_t audit_log_filter_deinit() {
   SysVars::deinit();
   SysVars::release_comp_registry_srv();
 
-  delete audit_log_filter;
-  audit_log_filter = nullptr;
+  audit_log_filter.reset();
 
   return 0;
+} catch (const std::exception &e) {
+  LogComponentErr(ERROR_LEVEL, ER_AUDIT_DEINIT_EXCEPTION, e.what());
+  return 1;
+} catch (...) {
+  LogComponentErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG,
+                  "Unknown exception in audit_log_filter_deinit");
+  return 1;
 }
 
 AuditLogFilter::AuditLogFilter(
@@ -461,8 +488,13 @@ void AuditLogFilter::deinit() noexcept {
 }
 
 int AuditLogFilter::notify_event(audit_event_class_t event_class,
-                                 const void *event_data) {
+                                 const void *event_data) try {
   if (SysVars::get_log_disabled() || !m_is_active) {
+    return 0;
+  }
+
+  if (event_class == audit_event_class_t::AUDIT_SERVER_STARTUP_CLASS ||
+      event_class == audit_event_class_t::AUDIT_SERVER_SHUTDOWN_CLASS) {
     return 0;
   }
 
@@ -483,46 +515,197 @@ int AuditLogFilter::notify_event(audit_event_class_t event_class,
     return 0;
   }
 
-  // Get connection specific filtering rule
-  std::string rule_name;
+  bool must_resolve_rule = false;
+  if (event_class == audit_event_class_t::AUDIT_CONNECTION_CLASS) {
+    auto sc =
+        static_cast<const mysql_event_tracking_connection_data *>(event_data)
+            ->event_subclass;
+    if (sc == EVENT_TRACKING_CONNECTION_CONNECT ||
+        sc == EVENT_TRACKING_CONNECTION_CHANGE_USER) {
+      must_resolve_rule = true;
+    }
+  }
 
-  if (!m_audit_rules_registry->lookup_rule_name(user_name, user_host,
-                                                rule_name)) {
+  auto current_gen = SysVars::get_filter_rule_generation();
+  auto current_detach_gen = SysVars::get_filter_rule_detach_generation();
+  auto current_removed_gen = SysVars::get_removed_filter_generation();
+  auto *rule_cache = SysVars::get_session_filter_rule(thd);
+  const bool can_cache_miss = must_resolve_rule || rule_cache != nullptr;
+
+  std::shared_ptr<AuditRule> filter_rule;
+  bool detach_session = rule_cache != nullptr &&
+                        rule_cache->detach_generation != current_detach_gen;
+
+  if (!detach_session && rule_cache != nullptr &&
+      rule_cache->removed_filter_generation != current_removed_gen) {
+    if (rule_cache->rule != nullptr &&
+        SysVars::is_removed_filter_id(rule_cache->rule->get_filter_id(),
+                                      rule_cache->removed_filter_generation)) {
+      detach_session = true;
+    } else {
+      rule_cache->removed_filter_generation = current_removed_gen;
+    }
+  }
+
+  if (detach_session && !must_resolve_rule) {
     SysVars::set_session_filter_id(thd, 0);
+    SysVars::set_session_filter_rule(thd, current_gen, current_detach_gen,
+                                     current_removed_gen, nullptr);
     return 0;
   }
 
-  auto filter_rule = m_audit_rules_registry->get_rule(rule_name);
+  if (!detach_session && !must_resolve_rule && rule_cache != nullptr &&
+      rule_cache->generation == current_gen &&
+      rule_cache->detach_generation == current_detach_gen &&
+      rule_cache->removed_filter_generation == current_removed_gen) {
+    filter_rule = rule_cache->rule;
+    if (filter_rule == nullptr) {
+      return 0;
+    }
+  } else {
+    auto resolve = [&]() -> bool {
+      std::string rule_name;
+      filter_rule = m_audit_rules_registry->resolve_rule_for_user(
+          user_name, user_host, &rule_name);
 
-  if (filter_rule == nullptr) {
-    LogComponentErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG,
-                    "Failed to find '%s' filtering rule", rule_name.c_str());
-    return 0;
+      if (filter_rule == nullptr) {
+        if (rule_name.empty()) {
+          return false;
+        }
+        LogComponentErr(ERROR_LEVEL, ER_AUDIT_FILTER_RULE_NOT_FOUND,
+                        rule_name.c_str());
+        return false;
+      }
+
+      return true;
+    };
+
+    auto before_load_ver = must_resolve_rule
+                               ? m_audit_rules_registry->load_version()
+                               : uint64_t{0};
+
+    bool resolved = resolve();
+
+    bool may_cache = true;
+    if (must_resolve_rule) {
+      // Read is_reload_in_progress BEFORE load_version so that the
+      // acquire on the loads_in_progress counter establishes a
+      // happens-before with the UDF thread's release-store of
+      // load_version.  If we observe "not in progress", the subsequent
+      // version read is guaranteed to reflect any completed reload.
+      bool reload_pending = m_audit_rules_registry->is_reload_in_progress();
+      auto after_load_ver = m_audit_rules_registry->load_version();
+
+      if (after_load_ver != before_load_ver) {
+        current_gen = SysVars::get_filter_rule_generation();
+        resolved = resolve();
+        reload_pending = m_audit_rules_registry->is_reload_in_progress();
+      }
+
+      if (reload_pending) may_cache = false;
+    }
+
+    if (!resolved) {
+      SysVars::set_session_filter_id(thd, 0);
+      if (!may_cache) {
+        // Invalidate any prior cache (relevant for CHANGE_USER on an
+        // existing session).  Store ~current_gen as a deliberate
+        // generation mismatch: the cache fast path only hits when the
+        // cached generation equals current_gen, so using the bitwise
+        // complement forces the next event to resolve again instead of
+        // reusing a stale rule or transient miss while reload is still
+        // in progress.
+        SysVars::set_session_filter_rule(thd, ~current_gen, current_detach_gen,
+                                         current_removed_gen, nullptr);
+      } else if (can_cache_miss) {
+        SysVars::set_session_filter_rule(thd, current_gen, current_detach_gen,
+                                         current_removed_gen, nullptr);
+      }
+      return 0;
+    }
+
+    if (may_cache) {
+      SysVars::set_session_filter_rule(thd, current_gen, current_detach_gen,
+                                       current_removed_gen, filter_rule);
+    } else {
+      SysVars::set_session_filter_rule(thd, ~current_gen, current_detach_gen,
+                                       current_removed_gen, nullptr);
+    }
   }
 
   SysVars::set_session_filter_id(thd, filter_rule->get_filter_id());
 
-  // Get actual event info based on event class
-  AuditRecordVariant audit_record = get_audit_record(event_class, event_data);
+  if (SysVars::get_event_mode_type() == AuditLogEventModeType::Reduced) {
+    switch (event_class) {
+      case audit_event_class_t::AUDIT_GLOBAL_VARIABLE_CLASS:
+      case audit_event_class_t::AUDIT_COMMAND_CLASS:
+      case audit_event_class_t::AUDIT_QUERY_CLASS:
+      case audit_event_class_t::AUDIT_STORED_PROGRAM_CLASS:
+      case audit_event_class_t::AUDIT_AUTHENTICATION_CLASS:
+      case audit_event_class_t::AUDIT_PARSE_CLASS:
+        return 0;
+      case audit_event_class_t::AUDIT_GENERAL_CLASS: {
+        auto sc =
+            static_cast<const mysql_event_tracking_general_data *>(event_data)
+                ->event_subclass;
+        if (sc == EVENT_TRACKING_GENERAL_LOG ||
+            sc == EVENT_TRACKING_GENERAL_ERROR ||
+            sc == EVENT_TRACKING_GENERAL_RESULT)
+          return 0;
+        if (sc == EVENT_TRACKING_GENERAL_STATUS &&
+            is_stored_program_statement(thd))
+          return 0;
+        break;
+      }
+      case audit_event_class_t::AUDIT_CONNECTION_CLASS: {
+        auto sc = static_cast<const mysql_event_tracking_connection_data *>(
+                      event_data)
+                      ->event_subclass;
+        if (sc == EVENT_TRACKING_CONNECTION_PRE_AUTHENTICATE) return 0;
+        break;
+      }
+      default:
+        break;
+    }
+  }
 
-  if (std::holds_alternative<AuditRecordUnknown>(audit_record)) {
-    LogComponentErr(WARNING_LEVEL, ER_LOG_PRINTF_MSG,
-                    "Unsupported audit event class with ID %i received",
+  // Get actual event info based on event class
+  auto audit_record = get_audit_record(event_class, event_data);
+  if (!audit_record.has_value()) {
+    return 0;
+  }
+  auto &record = *audit_record;
+
+  if (std::holds_alternative<AuditRecordUnknown>(record)) {
+    LogComponentErr(WARNING_LEVEL, ER_AUDIT_UNSUPPORTED_EVENT_CLASS,
                     event_class);
     return 0;
   }
 
-  if (auto rec = std::get_if<AuditRecordGeneral>(&audit_record)) {
+  if (auto rec = std::get_if<AuditRecordGeneral>(&record)) {
+    set_extended_info(thd, sctx, *rec);
+
+    if (SysVars::get_event_mode_type() == AuditLogEventModeType::Reduced &&
+        rec->extended_info.command == "Quit") {
+      return 0;
+    }
+  }
+
+  if (auto rec = std::get_if<AuditRecordQuery>(&record)) {
     set_extended_info(thd, sctx, *rec);
   }
 
-  if (auto rec = std::get_if<AuditRecordTableAccess>(&audit_record)) {
+  if (auto rec = std::get_if<AuditRecordMessage>(&record)) {
+    set_extended_info(thd, sctx, *rec);
+  }
+
+  if (auto rec = std::get_if<AuditRecordTableAccess>(&record)) {
     set_extended_info(thd, sctx, *rec);
   }
 
   // Apply filtering rule
   AuditAction filter_result =
-      AuditEventFilter::apply(filter_rule.get(), audit_record);
+      AuditEventFilter::apply(filter_rule.get(), record);
 
   if (filter_result == AuditAction::Skip) {
     SysVars::inc_events_filtered();
@@ -535,48 +718,127 @@ int AuditLogFilter::notify_event(audit_event_class_t event_class,
         [](const auto &rec) -> std::string_view {
           return rec.event_class_name;
         },
-        audit_record);
-    LogComponentErr(INFORMATION_LEVEL, ER_LOG_PRINTF_MSG,
-                    "Blocked audit event '%s' with class %i", ev_name.data(),
+        record);
+    LogComponentErr(INFORMATION_LEVEL, ER_AUDIT_BLOCKED_EVENT, ev_name.data(),
                     event_class);
     return 1;
   }
 
   if (event_class == audit_event_class_t::AUDIT_CONNECTION_CLASS) {
-    get_connection_attrs(thd, audit_record);
+    get_connection_attrs(thd, record);
   }
 
-  m_log_writer->write(audit_record);
+  try {
+    m_log_writer->write(record);
+  } catch (...) {
+    SysVars::inc_events_lost();
+    throw;
+  }
   SysVars::inc_events_written();
 
   return 0;
+} catch (const std::exception &e) {
+  LogComponentErr(ERROR_LEVEL, ER_AUDIT_NOTIFY_EVENT_EXCEPTION, e.what());
+  return 0;
+} catch (...) {
+  LogComponentErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG,
+                  "Caught unknown exception in notify_event");
+  return 0;
 }
 
-void AuditLogFilter::send_audit_start_event() noexcept {
+void AuditLogFilter::send_audit_start_event() noexcept try {
   auto event = internal_event_tracking_audit_data{
-      INTERNAL_EVENT_TRACKING_AUDIT_AUDIT, static_cast<uint32>(::server_id)};
-  m_log_writer->write(get_audit_record(
-      audit_event_class_t::AUDIT_INTERNAL_AUDIT_CLASS, &event));
+      INTERNAL_EVENT_TRACKING_AUDIT_AUDIT, static_cast<uint32>(::server_id), 0};
+
+  MYSQL_THD thd = nullptr;
+  if (mysql_service_mysql_current_thread_reader->get(&thd) == 0 &&
+      thd != nullptr) {
+    event.connection_id = static_cast<unsigned long>(thd->thread_id());
+  }
+
+  auto audit_record =
+      get_audit_record(audit_event_class_t::AUDIT_INTERNAL_AUDIT_CLASS, &event);
+  if (!audit_record.has_value()) {
+    return;
+  }
+
+  Security_context_handle sctx{};
+  if (thd != nullptr && m_security_context_srv != nullptr &&
+      m_security_context_opts_srv != nullptr &&
+      m_security_context_srv->get(thd, &sctx) == 0 && sctx != nullptr) {
+    auto load_security_context_option = [this, &sctx](const char *name,
+                                                      std::string &value) {
+      MYSQL_LEX_CSTRING raw_value{"", 0};
+      if (m_security_context_opts_srv->get(sctx, name, &raw_value) == 0 &&
+          raw_value.str != nullptr && raw_value.length > 0) {
+        value.assign(raw_value.str, raw_value.length);
+      } else {
+        value.clear();
+      }
+    };
+
+    if (auto *record = std::get_if<AuditRecordAudit>(&*audit_record)) {
+      load_security_context_option("user", record->extended_info.user);
+      load_security_context_option("host", record->extended_info.host);
+      load_security_context_option("ip", record->extended_info.ip);
+      load_security_context_option("external_user",
+                                   record->extended_info.external_user);
+      load_security_context_option("proxy_user",
+                                   record->extended_info.proxy_user);
+    }
+  }
+
+  m_log_writer->write(*audit_record);
+} catch (...) {
+  LogComponentErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG,
+                  "Caught exception in send_audit_start_event");
 }
 
-void AuditLogFilter::send_audit_stop_event() noexcept {
-  auto event = internal_event_tracking_audit_data{
-      INTERNAL_EVENT_TRACKING_AUDIT_NOAUDIT, static_cast<uint32>(::server_id)};
-  m_log_writer->write(get_audit_record(
-      audit_event_class_t::AUDIT_INTERNAL_AUDIT_CLASS, &event));
+void AuditLogFilter::send_audit_stop_event() noexcept try {
+  auto event =
+      internal_event_tracking_audit_data{INTERNAL_EVENT_TRACKING_AUDIT_NOAUDIT,
+                                         static_cast<uint32>(::server_id), 0};
+
+  MYSQL_THD thd = nullptr;
+  if (mysql_service_mysql_current_thread_reader->get(&thd) == 0 &&
+      thd != nullptr) {
+    event.connection_id = static_cast<unsigned long>(thd->thread_id());
+  }
+
+  auto audit_record =
+      get_audit_record(audit_event_class_t::AUDIT_INTERNAL_AUDIT_CLASS, &event);
+  if (!audit_record.has_value()) {
+    return;
+  }
+
+  m_log_writer->write(*audit_record);
+} catch (...) {
+  LogComponentErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG,
+                  "Caught exception in send_audit_stop_event");
 }
 
-bool AuditLogFilter::on_audit_rule_flush_requested() noexcept {
+bool AuditLogFilter::on_audit_rule_flush_requested(
+    std::string &error_message) noexcept try {
   if (!m_is_active) {
     return false;
   }
 
-  const bool is_flushed = m_audit_rules_registry->load();
+  const bool is_flushed = m_audit_rules_registry->load(error_message);
 
   DBUG_EXECUTE_IF("audit_log_filter_rotate_after_audit_rules_flush",
                   { m_log_writer->rotate(nullptr); });
 
   return is_flushed;
+} catch (...) {
+  LogComponentErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG,
+                  "Caught exception in on_audit_rule_flush_requested");
+  return false;
+}
+
+void AuditLogFilter::invalidate_audit_rules() noexcept {
+  if (m_is_active) {
+    m_audit_rules_registry->invalidate();
+  }
 }
 
 void AuditLogFilter::on_audit_log_prune_requested() noexcept {
@@ -593,14 +855,19 @@ void AuditLogFilter::on_audit_log_rotate_requested(
   }
 }
 
-void AuditLogFilter::on_encryption_password_prune_requested() noexcept {
+void AuditLogFilter::on_encryption_password_prune_requested() noexcept try {
   if (m_is_active && SysVars::get_password_history_keep_days() > 0 &&
       audit_keyring::check_keyring_initialized()) {
-    audit_keyring::prune_encryption_options(
-        SysVars::get_password_history_keep_days(),
-        log_writer::FileHandle::get_log_names_list(SysVars::get_file_dir(),
-                                                   SysVars::get_file_name()));
+    std::vector<std::string> log_names;
+    if (log_writer::FileHandle::get_log_names_list(
+            SysVars::get_file_dir(), SysVars::get_file_name(), log_names)) {
+      audit_keyring::prune_encryption_options(
+          SysVars::get_password_history_keep_days(), log_names);
+    }
   }
+} catch (...) {
+  LogComponentErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG,
+                  "Caught exception in on_encryption_password_prune_requested");
 }
 
 void AuditLogFilter::on_audit_log_rotated() noexcept {
@@ -646,7 +913,7 @@ void AuditLogFilter::get_connection_attrs(MYSQL_THD thd,
 
 bool AuditLogFilter::get_connection_user(Security_context_handle &ctx,
                                          std::string &user_name,
-                                         std::string &user_host) noexcept {
+                                         std::string &user_host) noexcept try {
   MYSQL_LEX_CSTRING user{"", 0};
   MYSQL_LEX_CSTRING host{"", 0};
 
@@ -674,6 +941,8 @@ bool AuditLogFilter::get_connection_user(Security_context_handle &ctx,
   }
 
   return true;
+} catch (...) {
+  return false;
 }
 
 bool AuditLogFilter::check_abort_exempt_privilege(
@@ -699,12 +968,13 @@ bool AuditLogFilter::get_security_context(
 
 bool AuditLogFilter::get_security_context_option(Security_context_handle &ctx,
                                                  const std::string &name,
-                                                 std::string &value) noexcept {
+                                                 std::string &value) noexcept
+    try {
   MYSQL_LEX_CSTRING val{"", 0};
   // calls mysql_security_context_imp::get
   if (m_security_context_opts_srv->get(ctx, name.c_str(), &val) != 0) {
-    LogComponentErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG,
-                    "Can not get %s from security context", name.c_str());
+    LogComponentErr(ERROR_LEVEL, ER_AUDIT_SECURITY_CONTEXT_FIELD_FAILURE,
+                    name.c_str());
     return false;
   }
 
@@ -715,6 +985,8 @@ bool AuditLogFilter::get_security_context_option(Security_context_handle &ctx,
   }
 
   return true;
+} catch (...) {
+  return false;
 }
 
 std::string AuditLogFilter::get_sql_text(MYSQL_THD thd) {
@@ -757,8 +1029,7 @@ bool AuditLogFilter::set_extended_info(MYSQL_THD thd,
   extra.query = get_sql_text(thd);
 
   mysql_cstring_with_length sql_command;
-  if (!mysql_service_mysql_thd_attributes->get(thd, "sql_command",
-                                               &sql_command)) {
+  if (get_sql_command(thd, sql_command)) {
     extra.sql_command = {sql_command.str, sql_command.length};
   }
 
@@ -766,6 +1037,44 @@ bool AuditLogFilter::set_extended_info(MYSQL_THD thd,
   mysql_cstring_with_length command;
   if (!mysql_service_mysql_thd_attributes->get(thd, "command", &command)) {
     extra.command = {command.str, command.length};
+  }
+
+  if (!sctx) return false;
+
+  get_security_context_option(sctx, "user", extra.user);
+  get_security_context_option(sctx, "host", extra.host);
+  get_security_context_option(sctx, "ip", extra.ip);
+  get_security_context_option(sctx, "external_user", extra.external_user);
+  get_security_context_option(sctx, "proxy_user", extra.proxy_user);
+
+  return true;
+}
+
+bool AuditLogFilter::set_extended_info(MYSQL_THD, Security_context_handle sctx,
+                                       AuditRecordQuery &record) {
+  if (!sctx) return false;
+
+  auto &extra = record.extended_info;
+
+  get_security_context_option(sctx, "user", extra.user);
+  get_security_context_option(sctx, "host", extra.host);
+  get_security_context_option(sctx, "ip", extra.ip);
+  get_security_context_option(sctx, "external_user", extra.external_user);
+  get_security_context_option(sctx, "proxy_user", extra.proxy_user);
+
+  return true;
+}
+
+bool AuditLogFilter::set_extended_info(MYSQL_THD thd,
+                                       Security_context_handle sctx,
+                                       AuditRecordMessage &record) {
+  if (!thd) return false;
+
+  auto &extra = record.extended_info;
+
+  mysql_cstring_with_length sql_command;
+  if (get_sql_command(thd, sql_command)) {
+    extra.sql_command = {sql_command.str, sql_command.length};
   }
 
   if (!sctx) return false;
@@ -794,8 +1103,7 @@ bool AuditLogFilter::set_extended_info(MYSQL_THD thd,
   extra.query = get_sql_text(thd);
 
   mysql_cstring_with_length sql_command;
-  if (!mysql_service_mysql_thd_attributes->get(thd, "sql_command",
-                                               &sql_command)) {
+  if (get_sql_command(thd, sql_command)) {
     extra.sql_command = {sql_command.str, sql_command.length};
   }
 

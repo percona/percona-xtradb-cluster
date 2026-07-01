@@ -17,6 +17,7 @@
 #include "components/audit_log_filter/sys_vars.h"
 
 #include "my_dbug.h"
+#include "sql/mysqld.h"
 
 #include <mysql/components/services/defs/event_tracking_authentication_defs.h>
 #include <mysql/components/services/defs/event_tracking_command_defs.h>
@@ -75,23 +76,13 @@ const std::string_view kAuditEventNameAuthCredentialChange{
 const std::string_view kAuditEventNameAuthAuthidRename{"auth_authid_rename"};
 const std::string_view kAuditEventNameAuthAuthidDrop{"auth_authid_drop"};
 
-const std::string_view kAuditEventNameServerStartupStartup{"startup"};
-
-const std::string_view kAuditEventNameServerShutdownShutdown{"shutdown"};
-
 const std::string_view kAuditEventNameStoredProgramExecute{"execute"};
 
 const std::string_view kAuditEventNameMessageInternal{"internal"};
 const std::string_view kAuditEventNameMessageUser{"user"};
 
-const std::string_view kAuditEventNameParseRewriteNone{"no_rewrite"};
-const std::string_view kAuditEventNameParseRewriteQueryRewritten{
-    "query_rewritten"};
-const std::string_view kAuditEventNameParseRewritePreparedStatement{
-    "prepared_statement"};
-
-const std::string_view kAuditNameShutdownReasonShutdown{"shutdown"};
-const std::string_view kAuditNameShutdownReasonAbort{"abort"};
+const std::string_view kAuditEventNameParsePreparse{"preparse"};
+const std::string_view kAuditEventNameParsePostparse{"postparse"};
 
 const std::string_view kAuditConnectionTypeNameUndef{"undefined"};
 const std::string_view kAuditConnectionTypeNameTcpip{"tcp/ip"};
@@ -100,14 +91,31 @@ const std::string_view kAuditConnectionTypeNamePipe{"named_pipe"};
 const std::string_view kAuditConnectionTypeNameSsl{"ssl"};
 const std::string_view kAuditConnectionTypeNameShared{"shared_memory"};
 
-const std::string_view kAuditEventNameAuditStart{"audit"};
-const std::string_view kAuditEventNameAuditStop{"noaudit"};
+const std::string_view kAuditEventNameAuditStart{"startup"};
+const std::string_view kAuditEventNameAuditStop{"shutdown"};
 
 auto make_unix_timestamp(
     const std::chrono::system_clock::time_point time_point) noexcept {
   return std::chrono::duration_cast<std::chrono::microseconds>(
              time_point.time_since_epoch())
       .count();
+}
+void format_json_header(std::ostream &out, std::string_view timestamp,
+                        const std::chrono::system_clock::time_point &time_now) {
+  out << "  {\n"
+      << R"(    "timestamp": ")" << timestamp << "\",\n";
+  if (SysVars::get_format_unix_timestamp()) {
+    out << R"(    "time": )" << make_unix_timestamp(time_now) << ",\n";
+  }
+}
+
+void format_jsonl_header(
+    std::ostream &out, std::string_view timestamp,
+    const std::chrono::system_clock::time_point &time_now) {
+  out << R"({ "timestamp": ")" << timestamp << R"(", )";
+  if (SysVars::get_format_unix_timestamp()) {
+    out << R"("time": )" << make_unix_timestamp(time_now) << ", ";
+  }
 }
 
 }  // namespace
@@ -233,30 +241,6 @@ std::string_view LogRecordFormatterJson::event_subclass_to_string(
 }
 
 std::string_view LogRecordFormatterJson::event_subclass_to_string(
-    const mysql_event_tracking_startup_data *event) const noexcept {
-  switch (event->event_subclass) {
-    case EVENT_TRACKING_STARTUP_STARTUP:
-      return kAuditEventNameServerStartupStartup;
-    default:
-      assert(false);
-  }
-
-  return kAuditNameUnknown;
-}
-
-std::string_view LogRecordFormatterJson::event_subclass_to_string(
-    const mysql_event_tracking_shutdown_data *event) const noexcept {
-  switch (event->event_subclass) {
-    case EVENT_TRACKING_SHUTDOWN_SHUTDOWN:
-      return kAuditEventNameServerShutdownShutdown;
-    default:
-      assert(false);
-  }
-
-  return kAuditNameUnknown;
-}
-
-std::string_view LogRecordFormatterJson::event_subclass_to_string(
     const mysql_event_tracking_stored_program_data *event) const noexcept {
   switch (event->event_subclass) {
     case EVENT_TRACKING_STORED_PROGRAM_EXECUTE:
@@ -285,12 +269,10 @@ std::string_view LogRecordFormatterJson::event_subclass_to_string(
 std::string_view LogRecordFormatterJson::event_subclass_to_string(
     const mysql_event_tracking_parse_data *event) const noexcept {
   switch (event->event_subclass) {
-    case EVENT_TRACKING_PARSE_REWRITE_NONE:
-      return kAuditEventNameParseRewriteNone;
-    case EVENT_TRACKING_PARSE_REWRITE_QUERY_REWRITTEN:
-      return kAuditEventNameParseRewriteQueryRewritten;
-    case EVENT_TRACKING_PARSE_REWRITE_IS_PREPARED_STATEMENT:
-      return kAuditEventNameParseRewritePreparedStatement;
+    case EVENT_TRACKING_PARSE_PREPARSE:
+      return kAuditEventNameParsePreparse;
+    case EVENT_TRACKING_PARSE_POSTPARSE:
+      return kAuditEventNameParsePostparse;
     default:
       assert(false);
   }
@@ -334,20 +316,6 @@ std::string_view LogRecordFormatterJson::connection_type_name_to_string(
   return kAuditNameUnknown;
 }
 
-std::string_view LogRecordFormatterJson::shutdown_reason_to_string(
-    mysql_event_tracking_shutdown_reason_t reason) const noexcept {
-  switch (reason) {
-    case EVENT_TRACKING_SHUTDOWN_REASON_SHUTDOWN:
-      return kAuditNameShutdownReasonShutdown;
-    case EVENT_TRACKING_SHUTDOWN_REASON_ABORT:
-      return kAuditNameShutdownReasonAbort;
-    default:
-      assert(false);
-  }
-
-  return kAuditNameUnknown;
-}
-
 AuditRecordString LogRecordFormatterJson::apply(
     const AuditRecordGeneral &audit_record) const noexcept {
   std::stringstream result;
@@ -355,14 +323,7 @@ AuditRecordString LogRecordFormatterJson::apply(
   const auto timestamp = make_timestamp(time_now);
   const auto rec_id = make_record_id();
   const auto &extra = audit_record.extended_info;
-
-  /* clang-format off */
-  result << "  {\n"
-         << R"(    "timestamp": ")" << timestamp << "\",\n";
-
-  if (SysVars::get_format_unix_timestamp()) {
-    result << R"(    "time": )" << make_unix_timestamp(time_now) << ",\n";
-  }
+  const auto event_name = event_subclass_to_string(audit_record.event);
 
   const auto escaped_user = make_escaped_string(extra.user);
   const auto escaped_host = make_escaped_string(extra.host);
@@ -375,21 +336,41 @@ AuditRecordString LogRecordFormatterJson::apply(
                  ? make_escaped_string(extra.query)
                  : make_escaped_string(audit_record.extended_info.digest);
 
-  result << R"(    "id": )" << rec_id << ",\n"
-         << R"(    "class": "general",)" << "\n"
-         << R"(    "event": ")" << event_subclass_to_string(audit_record.event) << "\",\n"
-         << R"(    "connection_id": )" << audit_record.event->connection_id << ",\n"
-         << R"(    "account": { "user": ")" << escaped_user << R"(", "host": ")" << escaped_host << R"(" },)" << "\n"
-         << R"(    "login": { "user": ")" << escaped_user << R"(", "os": ")" << esc_external_user << R"(", "ip": ")" << escaped_ip << R"(", "proxy": ")" << esc_proxy_user << R"(" },)" << "\n"
-         << R"(    "general_data": {)" << "\n"
-         << R"(      "command": ")" << esc_command << "\",\n";
-  if (!esc_query.empty()) {
-    result << R"(      "sql_command": ")" << esc_sql_command << "\",\n"
-           << R"(      "query": ")" << esc_query << "\",\n";
+  /* clang-format off */
+  if (SysVars::get_format_type() == AuditLogFormatType::Json) {
+    format_json_header(result, timestamp, time_now);
+
+    result << R"(    "id": )" << rec_id << ",\n"
+           << R"(    "class": "general",)" << "\n"
+           << R"(    "event": ")" <<  event_name << "\",\n"
+           << R"(    "connection_id": )" << audit_record.event->connection_id << ",\n"
+           << R"(    "account": { "user": ")" << escaped_user << R"(", "host": ")" << escaped_host << R"(" },)" << "\n"
+           << R"(    "login": { "user": ")" << escaped_user << R"(", "os": ")" << esc_external_user << R"(", "ip": ")" << escaped_ip << R"(", "proxy": ")" << esc_proxy_user << R"(" },)" << "\n"
+           << R"(    "general_data": {)" << "\n"
+           << R"(      "command": ")" << esc_command << "\",\n";
+    if (!esc_query.empty()) {
+      result << R"(      "sql_command": ")" << esc_sql_command << "\",\n"
+             << R"(      "query": ")" << esc_query << "\",\n";
+    }
+    result << R"(      "status": )" << audit_record.event->error_code << "\n    }"
+           << extra_attrs_to_string(audit_record.extended_info) << "\n  }";
+  } else {
+    format_jsonl_header(result, timestamp, time_now);
+
+    result << R"("id": )" << rec_id << ", "
+           << R"("class": "general", )"
+           << R"("event": ")" << event_name << R"(", )"
+           << R"("connection_id": )" << audit_record.event->connection_id << ", "
+           << R"("account": { "user": ")" << escaped_user << R"(", "host": ")" << escaped_host << R"(" }, )"
+           << R"("login": { "user": ")" << escaped_user << R"(", "os": ")" << esc_external_user << R"(", "ip": ")" << escaped_ip << R"(", "proxy": ")" << esc_proxy_user << R"(" }, )"
+           << R"("general_data": { "command": ")" << esc_command << R"(", )";
+    if (!esc_query.empty()) {
+      result << R"("sql_command": ")" << esc_sql_command << R"(", )"
+             << R"("query": ")" << esc_query << R"(", )";
+    }
+    result << R"("status": )" << audit_record.event->error_code << " }"
+           << extra_attrs_to_string_jsonl(audit_record.extended_info) << " }";
   }
-  result << R"(      "status": )" << audit_record.event->error_code
-         << "\n    }"
-         << extra_attrs_to_string(audit_record.extended_info) << "\n  }";
   /* clang-format on */
 
   SysVars::update_log_bookmark(rec_id, timestamp);
@@ -403,14 +384,9 @@ AuditRecordString LogRecordFormatterJson::apply(
   const auto time_now = std::chrono::system_clock::now();
   const auto timestamp = make_timestamp(time_now);
   const auto rec_id = make_record_id();
-
-  /* clang-format off */
-  result << "  {\n"
-         << R"(    "timestamp": ")" << timestamp << "\",\n";
-
-  if (SysVars::get_format_unix_timestamp()) {
-    result << R"(    "time": )" << make_unix_timestamp(time_now) << ",\n";
-  }
+  const auto event_name = event_subclass_to_string(audit_record.event);
+  const auto conn_type_name =
+      connection_type_name_to_string(audit_record.event->connection_type);
 
   const auto escaped_user = make_escaped_string(&audit_record.event->user);
   const auto escaped_host = make_escaped_string(&audit_record.event->host);
@@ -418,17 +394,46 @@ AuditRecordString LogRecordFormatterJson::apply(
   const auto escaped_external_user = make_escaped_string(&audit_record.event->external_user);
   const auto escaped_proxy_user = make_escaped_string(&audit_record.event->proxy_user);
 
-  result << R"(    "id": )" << rec_id << ",\n"
-         << R"(    "class": "connection",)" << "\n"
-         << R"(    "event": ")" << event_subclass_to_string(audit_record.event) << "\",\n"
-         << R"(    "connection_id": )" << audit_record.event->connection_id << ",\n"
-         << R"(    "account": { "user": ")" << escaped_user << R"(", "host": ")" << escaped_host << R"(" },)" << "\n"
-         << R"(    "login": { "user": ")" << escaped_user << R"(", "os": ")" << escaped_external_user << R"(", "ip": ")" << escaped_ip << R"(", "proxy": ")" << escaped_proxy_user << R"(" },)" << "\n"
-         << R"(    "connection_data": {)" << "\n"
-         << R"(      "connection_type": ")" << connection_type_name_to_string(audit_record.event->connection_type) << "\",\n"
-         << R"(      "status": )" << audit_record.event->status << ",\n"
-         << R"(      "db": ")" << make_escaped_string(&audit_record.event->database) << "\"\n    }"
-         << extra_attrs_to_string(audit_record.extended_info) << "\n  }";
+  /* clang-format off */
+  if (SysVars::get_format_type() == AuditLogFormatType::Json) {
+    format_json_header(result, timestamp, time_now);
+
+    result << R"(    "id": )" << rec_id << ",\n"
+           << R"(    "class": "connection",)" << "\n"
+           << R"(    "event": ")" << event_name << "\",\n"
+           << R"(    "connection_id": )" << audit_record.event->connection_id << ",\n"
+           << R"(    "account": { "user": ")" << escaped_user << R"(", "host": ")" << escaped_host << R"(" },)" << "\n"
+           << R"(    "login": { "user": ")" << escaped_user << R"(", "os": ")" << escaped_external_user << R"(", "ip": ")" << escaped_ip << R"(", "proxy": ")" << escaped_proxy_user << R"(" },)" << "\n"
+           << R"(    "connection_data": {)" << "\n"
+           << R"(      "connection_type": ")" << conn_type_name << "\"";
+
+    if (audit_record.event->event_subclass != EVENT_TRACKING_CONNECTION_DISCONNECT) {
+      result << ",\n"
+            << R"(      "status": )" << audit_record.event->status << ",\n"
+            << R"(      "db": ")" << make_escaped_string(&audit_record.event->database) << "\""
+            << extra_attrs_to_string(audit_record.extended_info, 6, 8);
+    }
+
+    result << "\n    }\n  }";
+  } else {
+    format_jsonl_header(result, timestamp, time_now);
+
+    result << R"("id": )" << rec_id << ", "
+           << R"("class": "connection", )"
+           << R"("event": ")" << event_name << R"(", )"
+           << R"("connection_id": )" << audit_record.event->connection_id << ", "
+           << R"("account": { "user": ")" << escaped_user << R"(", "host": ")" << escaped_host << R"(" }, )"
+           << R"("login": { "user": ")" << escaped_user << R"(", "os": ")" << escaped_external_user << R"(", "ip": ")" << escaped_ip << R"(", "proxy": ")" << escaped_proxy_user << R"(" }, )"
+           << R"("connection_data": { "connection_type": ")" << conn_type_name << R"(")";
+
+    if (audit_record.event->event_subclass != EVENT_TRACKING_CONNECTION_DISCONNECT) {
+      result << R"(, "status": )" << audit_record.event->status
+             << R"(, "db": ")" << make_escaped_string(&audit_record.event->database) << R"(")"
+             << extra_attrs_to_string_jsonl(audit_record.extended_info);
+    }
+
+    result << " } }";
+  }
   /* clang-format on */
 
   SysVars::update_log_bookmark(rec_id, timestamp);
@@ -456,25 +461,36 @@ AuditRecordString LogRecordFormatterJson::apply(
           : make_escaped_string(audit_record.extended_info.digest);
 
   /* clang-format off */
-  result << "  {\n"
-         << R"(    "timestamp": ")" << timestamp << "\",\n";
+  if (SysVars::get_format_type() == AuditLogFormatType::Json) {
+    format_json_header(result, timestamp, time_now);
 
-  if (SysVars::get_format_unix_timestamp()) {
-    result << R"(    "time": )" << make_unix_timestamp(time_now) << ",\n";
+    result << R"(    "id": )" << rec_id << ",\n"
+          << R"(    "class": "table_access",)" << "\n"
+          << R"(    "event": ")" << event_subclass_to_string(audit_record.event) << "\",\n"
+          << R"(    "connection_id": )" << audit_record.event->connection_id << ",\n"
+          << R"(    "account": { "user": ")" << escaped_user << R"(", "host": ")" << escaped_host << R"(" },)" << "\n"
+          << R"(    "login": { "user": ")" << escaped_user << R"(", "os": ")" << esc_external_user << R"(", "ip": ")" << escaped_ip << R"(", "proxy": ")" << esc_proxy_user << R"(" },)" << "\n"
+          << R"(    "table_access_data": {)" << "\n"
+          << R"(      "db": ")" << make_escaped_string(&audit_record.event->table_database) << "\",\n"
+          << R"(      "table": ")" << make_escaped_string(&audit_record.event->table_name) << "\",\n"
+          << R"(      "query": ")" << esc_query << "\",\n"
+          << R"(      "sql_command": ")" << escaped_sql_command << "\"\n    }"
+          << extra_attrs_to_string(audit_record.extended_info) << "\n  }";
+  } else {
+    format_jsonl_header(result, timestamp, time_now);
+
+    result << R"("id": )" << rec_id << ", "
+           << R"("class": "table_access", )"
+           << R"("event": ")" << event_subclass_to_string(audit_record.event) << R"(", )"
+           << R"("connection_id": )" << audit_record.event->connection_id << ", "
+           << R"("account": { "user": ")" << escaped_user << R"(", "host": ")" << escaped_host << R"(" }, )"
+           << R"("login": { "user": ")" << escaped_user << R"(", "os": ")" << esc_external_user << R"(", "ip": ")" << escaped_ip << R"(", "proxy": ")" << esc_proxy_user << R"(" }, )"
+           << R"("table_access_data": { "db": ")" << make_escaped_string(&audit_record.event->table_database)
+           << R"(", "table": ")" << make_escaped_string(&audit_record.event->table_name)
+           << R"(", "query": ")" << esc_query
+           << R"(", "sql_command": ")" << escaped_sql_command << R"(" })"
+           << extra_attrs_to_string_jsonl(audit_record.extended_info) << " }";
   }
-
-  result << R"(    "id": )" << rec_id << ",\n"
-         << R"(    "class": "table_access",)" << "\n"
-         << R"(    "event": ")" << event_subclass_to_string(audit_record.event) << "\",\n"
-         << R"(    "connection_id": )" << audit_record.event->connection_id << ",\n"
-         << R"(    "account": { "user": ")" << escaped_user << R"(", "host": ")" << escaped_host << R"(" },)" << "\n"
-         << R"(    "login": { "user": ")" << escaped_user << R"(", "os": ")" << esc_external_user << R"(", "ip": ")" << escaped_ip << R"(", "proxy": ")" << esc_proxy_user << R"(" },)" << "\n"
-         << R"(    "table_access_data": {)" << "\n"
-         << R"(      "db": ")" << make_escaped_string(&audit_record.event->table_database) << "\",\n"
-         << R"(      "table": ")" << make_escaped_string(&audit_record.event->table_name) << "\",\n"
-         << R"(      "query": ")" << esc_query << "\",\n"
-         << R"(      "sql_command": ")" << escaped_sql_command << "\"\n    }"
-         << extra_attrs_to_string(audit_record.extended_info) << "\n  }";
   /* clang-format on */
 
   SysVars::update_log_bookmark(rec_id, timestamp);
@@ -490,87 +506,30 @@ AuditRecordString LogRecordFormatterJson::apply(
   const auto rec_id = make_record_id();
 
   /* clang-format off */
-  result << "  {\n"
-         << R"(    "timestamp": ")" << timestamp << "\",\n";
+  if (SysVars::get_format_type() == AuditLogFormatType::Json) {
+    format_json_header(result, timestamp, time_now);
 
-  if (SysVars::get_format_unix_timestamp()) {
-    result << R"(    "time": )" << make_unix_timestamp(time_now) << ",\n";
+    result << R"(    "id": )" << rec_id << ",\n"
+           << R"(    "class": "global_variable",)" << "\n"
+           << R"(    "event": ")" << event_subclass_to_string(audit_record.event) << "\",\n"
+           << R"(    "connection_id": )" << audit_record.event->connection_id << ",\n"
+           << R"(    "global_variable_data": {)" << "\n"
+           << R"(      "name": ")" << make_escaped_string(&audit_record.event->variable_name) << "\",\n"
+           << R"(      "value": ")" << make_escaped_string(&audit_record.event->variable_value) << "\",\n"
+           << R"(      "sql_command": ")" << make_escaped_string(audit_record.event->sql_command) << "\"}"
+           << extra_attrs_to_string(audit_record.extended_info) << "\n  }";
+  } else {
+    format_jsonl_header(result, timestamp, time_now);
+
+    result << R"("id": )" << rec_id << ", "
+           << R"("class": "global_variable", )"
+           << R"("event": ")" << event_subclass_to_string(audit_record.event) << R"(", )"
+           << R"("connection_id": )" << audit_record.event->connection_id << ", "
+           << R"("global_variable_data": { "name": ")" << make_escaped_string(&audit_record.event->variable_name)
+           << R"(", "value": ")" << make_escaped_string(&audit_record.event->variable_value)
+           << R"(", "sql_command": ")" << make_escaped_string(audit_record.event->sql_command) << R"(" })"
+           << extra_attrs_to_string_jsonl(audit_record.extended_info) << " }";
   }
-
-  result << R"(    "id": )" << rec_id << ",\n"
-         << R"(    "class": "global_variable",)" << "\n"
-         << R"(    "event": ")" << event_subclass_to_string(audit_record.event) << "\",\n"
-         << R"(    "connection_id": )" << audit_record.event->connection_id << ",\n"
-         << R"(    "global_variable_data": {)" << "\n"
-         << R"(      "name": ")" << make_escaped_string(&audit_record.event->variable_name) << "\",\n"
-         << R"(      "value": ")" << make_escaped_string(&audit_record.event->variable_value) << "\",\n"
-         << R"(      "sql_command": ")" << make_escaped_string(audit_record.event->sql_command) << "\"}"
-         << extra_attrs_to_string(audit_record.extended_info) << "\n  }";
-  /* clang-format on */
-
-  SysVars::update_log_bookmark(rec_id, timestamp);
-
-  return result.str();
-}
-
-AuditRecordString LogRecordFormatterJson::apply(
-    const AuditRecordServerStartup &audit_record) const noexcept {
-  std::stringstream result;
-  const auto time_now = std::chrono::system_clock::now();
-  const auto timestamp = make_timestamp(time_now);
-  const auto rec_id = make_record_id();
-
-  /* clang-format off */
-  result << "  {\n"
-         << R"(    "timestamp": ")" << timestamp << "\",\n";
-
-  if (SysVars::get_format_unix_timestamp()) {
-    result << R"(    "time": )" << make_unix_timestamp(time_now) << ",\n";
-  }
-
-  result << R"(    "id": )" << rec_id << ",\n"
-         << R"(    "class": "server_startup",)" << "\n"
-         << R"(    "event": ")" << event_subclass_to_string(audit_record.event) << "\",\n"
-         << R"(    "args": [)"
-         << "\n";
-  for (unsigned int i = 0; i < audit_record.event->argc; ++i) {
-    if (audit_record.event->argv[i] != nullptr) {
-      result << ((i == 0) ? "" : ",\n") << R"(      ")"
-             << make_escaped_string(audit_record.event->argv[i]) << "\"";
-    }
-  }
-
-  result << "\n     ]" << extra_attrs_to_string(audit_record.extended_info)
-         << "\n  }";
-  /* clang-format on */
-
-  SysVars::update_log_bookmark(rec_id, timestamp);
-
-  return result.str();
-}
-
-AuditRecordString LogRecordFormatterJson::apply(
-    const AuditRecordServerShutdown &audit_record) const noexcept {
-  std::stringstream result;
-  const auto time_now = std::chrono::system_clock::now();
-  const auto timestamp = make_timestamp(time_now);
-  const auto rec_id = make_record_id();
-
-  /* clang-format off */
-  result << "  {\n"
-         << R"(    "timestamp": ")" << timestamp << "\",\n";
-
-  if (SysVars::get_format_unix_timestamp()) {
-    result << R"(    "time": )" << make_unix_timestamp(time_now) << ",\n";
-  }
-
-  result << R"(    "id": )" << rec_id << ",\n"
-         << R"(    "class": "server_shutdown",)" << "\n"
-         << R"(    "event": ")" << event_subclass_to_string(audit_record.event) << "\",\n"
-         << R"(    "server_shutdown_data": {)" << "\n"
-         << R"(      "status": )" << audit_record.event->exit_code << ",\n"
-         << R"(      "reason": ")" << shutdown_reason_to_string(audit_record.event->reason) << "\"}"
-         << extra_attrs_to_string(audit_record.extended_info) << "\n  }";
   /* clang-format on */
 
   SysVars::update_log_bookmark(rec_id, timestamp);
@@ -586,22 +545,30 @@ AuditRecordString LogRecordFormatterJson::apply(
   const auto rec_id = make_record_id();
 
   /* clang-format off */
-  result << "  {\n"
-         << R"(    "timestamp": ")" << timestamp << "\",\n";
+  if (SysVars::get_format_type() == AuditLogFormatType::Json) {
+    format_json_header(result, timestamp, time_now);
 
-  if (SysVars::get_format_unix_timestamp()) {
-    result << R"(    "time": )" << make_unix_timestamp(time_now) << ",\n";
+    result << R"(    "id": )" << rec_id << ",\n"
+           << R"(    "class": "command",)" << "\n"
+           << R"(    "event": ")" << event_subclass_to_string(audit_record.event) << "\",\n"
+           << R"(    "connection_id": )" << audit_record.event->connection_id << ",\n"
+           << R"(    "command_data": {)" << "\n"
+           << R"(      "name": ")" << event_subclass_to_string(audit_record.event) << "\",\n"
+           << R"(      "status": )" << audit_record.event->status << ",\n"
+           << R"(      "command": ")" << make_escaped_string(&audit_record.event->command) << "\"}"
+           << extra_attrs_to_string(audit_record.extended_info) << "\n  }";
+  } else {
+    format_jsonl_header(result, timestamp, time_now);
+
+    result << R"("id": )" << rec_id << ", "
+           << R"("class": "command", )"
+           << R"("event": ")" << event_subclass_to_string(audit_record.event) << R"(", )"
+           << R"("connection_id": )" << audit_record.event->connection_id << ", "
+           << R"("command_data": { "name": ")" << event_subclass_to_string(audit_record.event)
+           << R"(", "status": )" << audit_record.event->status
+           << R"(, "command": ")" << make_escaped_string(&audit_record.event->command) << R"(" })"
+           << extra_attrs_to_string_jsonl(audit_record.extended_info) << " }";
   }
-
-  result << R"(    "id": )" << rec_id << ",\n"
-         << R"(    "class": "command",)" << "\n"
-         << R"(    "event": ")" << event_subclass_to_string(audit_record.event) << "\",\n"
-         << R"(    "connection_id": )" << audit_record.event->connection_id << ",\n"
-         << R"(    "command_data": {)" << "\n"
-         << R"(      "name": ")" << event_subclass_to_string(audit_record.event) << "\",\n"
-         << R"(      "status": )" << audit_record.event->status << ",\n"
-         << R"(      "command": ")" << make_escaped_string(&audit_record.event->command) << "\"}"
-         << extra_attrs_to_string(audit_record.extended_info) << "\n  }";
   /* clang-format on */
 
   SysVars::update_log_bookmark(rec_id, timestamp);
@@ -616,26 +583,36 @@ AuditRecordString LogRecordFormatterJson::apply(
   const auto timestamp = make_timestamp(time_now);
   const auto rec_id = make_record_id();
 
+  const auto esc_query =
+      audit_record.extended_info.digest.empty()
+          ? make_escaped_string(&audit_record.event->query)
+          : make_escaped_string(audit_record.extended_info.digest);
+
   /* clang-format off */
-  result << "  {\n"
-         << R"(    "timestamp": ")" << timestamp << "\",\n";
+  if (SysVars::get_format_type() == AuditLogFormatType::Json) {
+    format_json_header(result, timestamp, time_now);
 
-  if (SysVars::get_format_unix_timestamp()) {
-    result << R"(    "time": )" << make_unix_timestamp(time_now) << ",\n";
+    result << R"(    "id": )" << rec_id << ",\n"
+           << R"(    "class": "query",)" << "\n"
+           << R"(    "event": ")" << event_subclass_to_string(audit_record.event) << "\",\n"
+           << R"(    "connection_id": )" << audit_record.event->connection_id << ",\n"
+           << R"(    "query_data": {)" << "\n"
+           << R"(      "query": ")" << esc_query << "\",\n"
+           << R"(      "status": )" << audit_record.event->status << ",\n"
+           << R"(      "sql_command": ")" << make_escaped_string(audit_record.event->sql_command) << "\"}"
+           << extra_attrs_to_string(audit_record.extended_info) << "\n  }";
+  } else {
+    format_jsonl_header(result, timestamp, time_now);
+
+    result << R"("id": )" << rec_id << ", "
+           << R"("class": "query", )"
+           << R"("event": ")" << event_subclass_to_string(audit_record.event) << R"(", )"
+           << R"("connection_id": )" << audit_record.event->connection_id << ", "
+           << R"("query_data": { "query": ")" << esc_query
+           << R"(", "status": )" << audit_record.event->status
+           << R"(, "sql_command": ")" << make_escaped_string(audit_record.event->sql_command) << R"(" })"
+           << extra_attrs_to_string_jsonl(audit_record.extended_info) << " }";
   }
-
-  result << R"(    "id": )" << rec_id << ",\n"
-         << R"(    "class": "query",)" << "\n"
-         << R"(    "event": ")" << event_subclass_to_string(audit_record.event) << "\",\n"
-         << R"(    "connection_id": )" << audit_record.event->connection_id << ",\n"
-         << R"(    "query_data": {)" << "\n"
-         << R"(      "query": ")" << (audit_record.extended_info.digest.empty()
-                                        ? make_escaped_string(&audit_record.event->query)
-                                        : make_escaped_string(audit_record.extended_info.digest)) << "\",\n"
-         << R"(      "status": )" << audit_record.event->status << ",\n"
-         << R"(      "sql_command": ")" << make_escaped_string(audit_record.event->sql_command) << "\"}"
-         << extra_attrs_to_string(audit_record.extended_info)
-         << "\n  }";
   /* clang-format on */
 
   SysVars::update_log_bookmark(rec_id, timestamp);
@@ -651,22 +628,28 @@ AuditRecordString LogRecordFormatterJson::apply(
   const auto rec_id = make_record_id();
 
   /* clang-format off */
-  result << "  {\n"
-         << R"(    "timestamp": ")" << timestamp << "\",\n";
+  if (SysVars::get_format_type() == AuditLogFormatType::Json) {
+    format_json_header(result, timestamp, time_now);
 
-  if (SysVars::get_format_unix_timestamp()) {
-    result << R"(    "time": )" << make_unix_timestamp(time_now) << ",\n";
+    result << R"(    "id": )" << rec_id << ",\n"
+           << R"(    "class": "stored_program",)" << "\n"
+           << R"(    "event": ")" << event_subclass_to_string(audit_record.event) << "\",\n"
+           << R"(    "connection_id": )" << audit_record.event->connection_id << ",\n"
+           << R"(    "stored_program_data": {)" << "\n"
+           << R"(      "name": ")" << make_escaped_string(&audit_record.event->name) << "\",\n"
+           << R"(      "db": ")" << make_escaped_string(&audit_record.event->database) << "\"}"
+           << extra_attrs_to_string(audit_record.extended_info) << "\n  }";
+  } else {
+    format_jsonl_header(result, timestamp, time_now);
+
+    result << R"("id": )" << rec_id << ", "
+           << R"("class": "stored_program", )"
+           << R"("event": ")" << event_subclass_to_string(audit_record.event) << R"(", )"
+           << R"("connection_id": )" << audit_record.event->connection_id << ", "
+           << R"("stored_program_data": { "name": ")" << make_escaped_string(&audit_record.event->name)
+           << R"(", "db": ")" << make_escaped_string(&audit_record.event->database) << R"(" })"
+           << extra_attrs_to_string_jsonl(audit_record.extended_info) << " }";
   }
-
-  result << R"(    "id": )" << rec_id << ",\n"
-         << R"(    "class": "stored_program",)" << "\n"
-         << R"(    "event": ")" << event_subclass_to_string(audit_record.event) << "\",\n"
-         << R"(    "connection_id": )" << audit_record.event->connection_id << ",\n"
-         << R"(    "stored_program_data": {)" << "\n"
-         << R"(      "name": ")" << make_escaped_string(&audit_record.event->name) << "\",\n"
-         << R"(      "db": ")" << make_escaped_string(&audit_record.event->database) << "\"}"
-         << extra_attrs_to_string(audit_record.extended_info)
-         << "\n  }";
   /* clang-format on */
 
   SysVars::update_log_bookmark(rec_id, timestamp);
@@ -681,25 +664,31 @@ AuditRecordString LogRecordFormatterJson::apply(
   const auto timestamp = make_timestamp(time_now);
   const auto rec_id = make_record_id();
 
-  /* clang-format off */
-  result << "  {\n"
-         << R"(    "timestamp": ")" << timestamp << "\",\n";
-
-  if (SysVars::get_format_unix_timestamp()) {
-    result << R"(    "time": )" << make_unix_timestamp(time_now) << ",\n";
-  }
-
   const auto escaped_user = make_escaped_string(&audit_record.event->user);
   const auto escaped_host = make_escaped_string(&audit_record.event->host);
 
-  result << R"(    "id": )" << rec_id << ",\n"
-         << R"(    "class": "authentication",)" << "\n"
-         << R"(    "event": ")" << event_subclass_to_string(audit_record.event) << "\",\n"
-         << R"(    "connection_id": )" << audit_record.event->connection_id << ",\n"
-         << R"(    "account": { "user": ")" << escaped_user << R"(", "host": ")" << escaped_host << R"(" },)" << "\n"
-         << R"(    "authentication_data": { "status": )" << audit_record.event->status << " }"
-         << extra_attrs_to_string(audit_record.extended_info)
-         << "\n  }";
+  /* clang-format off */
+  if (SysVars::get_format_type() == AuditLogFormatType::Json) {
+    format_json_header(result, timestamp, time_now);
+
+    result << R"(    "id": )" << rec_id << ",\n"
+           << R"(    "class": "authentication",)" << "\n"
+           << R"(    "event": ")" << event_subclass_to_string(audit_record.event) << "\",\n"
+           << R"(    "connection_id": )" << audit_record.event->connection_id << ",\n"
+           << R"(    "account": { "user": ")" << escaped_user << R"(", "host": ")" << escaped_host << R"(" },)" << "\n"
+           << R"(    "authentication_data": { "status": )" << audit_record.event->status << " }"
+           << extra_attrs_to_string(audit_record.extended_info) << "\n  }";
+  } else {
+    format_jsonl_header(result, timestamp, time_now);
+
+    result << R"("id": )" << rec_id << ", "
+           << R"("class": "authentication", )"
+           << R"("event": ")" << event_subclass_to_string(audit_record.event) << R"(", )"
+           << R"("connection_id": )" << audit_record.event->connection_id << ", "
+           << R"("account": { "user": ")" << escaped_user << R"(", "host": ")" << escaped_host << R"(" }, )"
+           << R"("authentication_data": { "status": )" << audit_record.event->status << " }"
+           << extra_attrs_to_string_jsonl(audit_record.extended_info) << " }";
+  }
   /* clang-format on */
 
   SysVars::update_log_bookmark(rec_id, timestamp);
@@ -713,46 +702,79 @@ AuditRecordString LogRecordFormatterJson::apply(
   const auto time_now = std::chrono::system_clock::now();
   const auto timestamp = make_timestamp(time_now);
   const auto rec_id = make_record_id();
+  const auto &extra = audit_record.extended_info;
+
+  const auto escaped_user = make_escaped_string(extra.user);
+  const auto escaped_host = make_escaped_string(extra.host);
+  const auto escaped_ip = make_escaped_string(extra.ip);
+  const auto escaped_external_user = make_escaped_string(extra.external_user);
+  const auto escaped_proxy_user = make_escaped_string(extra.proxy_user);
 
   /* clang-format off */
-  result << "  {\n"
-         << R"(    "timestamp": ")" << timestamp << "\",\n";
+  if (SysVars::get_format_type() == AuditLogFormatType::Json) {
+    format_json_header(result, timestamp, time_now);
 
-  if (SysVars::get_format_unix_timestamp()) {
-    result << R"(    "time": )" << make_unix_timestamp(time_now) << ",\n";
-  }
+    result << R"(    "id": )" << rec_id << ",\n"
+           << R"(    "class": "message",)" << "\n"
+           << R"(    "event": ")" << event_subclass_to_string(audit_record.event) << "\",\n"
+           << R"(    "connection_id": )" << audit_record.event->connection_id << ",\n"
+           << R"(    "account": { "user": ")" << escaped_user << R"(", "host": ")" << escaped_host << R"(" },)" << "\n"
+           << R"(    "login": { "user": ")" << escaped_user << R"(", "os": ")" << escaped_external_user << R"(", "ip": ")" << escaped_ip << R"(", "proxy": ")" << escaped_proxy_user << R"(" },)" << "\n"
+           << R"(    "message_data": {)" << "\n"
+           << R"(      "component": ")" << make_escaped_string(&audit_record.event->component) << "\",\n"
+           << R"(      "producer": ")" << make_escaped_string(&audit_record.event->producer) << "\",\n"
+           << R"(      "message": ")" << make_escaped_string(&audit_record.event->message) << "\",\n"
+           << R"(      "map": {)" << "\n";
 
-  result << R"(    "id": )" << rec_id << ",\n"
-         << R"(    "class": "message",)" << "\n"
-         << R"(    "event": ")" << event_subclass_to_string(audit_record.event) << "\",\n"
-         << R"(    "connection_id": )" << audit_record.event->connection_id << ",\n"
-         << R"(    "message_data": {)" << "\n"
-         << R"(      "component": ")" << make_escaped_string(&audit_record.event->component) << "\",\n"
-         << R"(      "producer": ")" << make_escaped_string(&audit_record.event->producer) << "\",\n"
-         << R"(      "message": ")" << make_escaped_string(&audit_record.event->message) << "\",\n"
-         << R"(      "message_attributes": {)" << "\n";
-
-  for (size_t i = 0; i < audit_record.event->key_value_map_length; ++i) {
-    result << ((i == 0) ? "" : ",\n") << "        \""
-           << make_escaped_string(&audit_record.event->key_value_map[i].key)
-           << "\": ";
-    if (audit_record.event->key_value_map[i].value_type ==
-        EVENT_TRACKING_MESSAGE_VALUE_TYPE_STR) {
-      result << "\""
-             << make_escaped_string(
-                    &audit_record.event->key_value_map[i].value.str)
-             << "\"";
-    } else if (audit_record.event->key_value_map[i].value_type ==
-               EVENT_TRACKING_MESSAGE_VALUE_TYPE_NUM) {
-      result << audit_record.event->key_value_map[i].value.num;
-    } else {
-      result << "\"\"";
+    for (size_t i = 0; i < audit_record.event->key_value_map_length; ++i) {
+      result << ((i == 0) ? "" : ",\n") << "        \""
+            << make_escaped_string(&audit_record.event->key_value_map[i].key)
+            << "\": ";
+      if (audit_record.event->key_value_map[i].value_type == EVENT_TRACKING_MESSAGE_VALUE_TYPE_STR) {
+        result << "\""
+              << make_escaped_string(
+                      &audit_record.event->key_value_map[i].value.str)
+              << "\"";
+      } else if (audit_record.event->key_value_map[i].value_type ==
+                EVENT_TRACKING_MESSAGE_VALUE_TYPE_NUM) {
+        result << audit_record.event->key_value_map[i].value.num;
+      } else {
+        result << "\"\"";
+      }
     }
-  }
 
-  result << "\n      }\n"
-         << "    }" << extra_attrs_to_string(audit_record.extended_info)
-         << "\n  }";
+    result << "\n      }\n"
+           << "    }" << extra_attrs_to_string(audit_record.extended_info)
+           << "\n  }";
+  } else {
+    format_jsonl_header(result, timestamp, time_now);
+
+    result << R"("id": )" << rec_id << ", "
+           << R"("class": "message", )"
+           << R"("event": ")" << event_subclass_to_string(audit_record.event) << R"(", )"
+           << R"("connection_id": )" << audit_record.event->connection_id << ", "
+           << R"("account": { "user": ")" << escaped_user << R"(", "host": ")" << escaped_host << R"(" }, )"
+           << R"("login": { "user": ")" << escaped_user << R"(", "os": ")" << escaped_external_user << R"(", "ip": ")" << escaped_ip << R"(", "proxy": ")" << escaped_proxy_user << R"(" }, )"
+           << R"("message_data": { "component": ")" << make_escaped_string(&audit_record.event->component)
+           << R"(", "producer": ")" << make_escaped_string(&audit_record.event->producer)
+           << R"(", "message": ")" << make_escaped_string(&audit_record.event->message)
+           << R"(", "map": { )";
+
+    for (size_t i = 0; i < audit_record.event->key_value_map_length; ++i) {
+      if (i != 0) result << ", ";
+      result << '"' << make_escaped_string(&audit_record.event->key_value_map[i].key) << R"(": )";
+      if (audit_record.event->key_value_map[i].value_type == EVENT_TRACKING_MESSAGE_VALUE_TYPE_STR) {
+        result << '"' << make_escaped_string(&audit_record.event->key_value_map[i].value.str) << '"';
+      } else if (audit_record.event->key_value_map[i].value_type == EVENT_TRACKING_MESSAGE_VALUE_TYPE_NUM) {
+        result << audit_record.event->key_value_map[i].value.num;
+      } else {
+        result << R"("")";
+      }
+    }
+
+    result << " } }"
+           << extra_attrs_to_string_jsonl(audit_record.extended_info) << " }";
+  }
   /* clang-format on */
 
   SysVars::update_log_bookmark(rec_id, timestamp);
@@ -767,25 +789,38 @@ AuditRecordString LogRecordFormatterJson::apply(
   const auto timestamp = make_timestamp(time_now);
   const auto rec_id = make_record_id();
 
+  const auto esc_query =
+      audit_record.extended_info.digest.empty()
+          ? make_escaped_string(&audit_record.event->query)
+          : make_escaped_string(audit_record.extended_info.digest);
+  const auto flags =
+      audit_record.event->flags != nullptr ? *audit_record.event->flags : 0;
+
   /* clang-format off */
-  result << "  {\n"
-         << R"(    "timestamp": ")" << timestamp << "\",\n";
+  if (SysVars::get_format_type() == AuditLogFormatType::Json) {
+    format_json_header(result, timestamp, time_now);
 
-  if (SysVars::get_format_unix_timestamp()) {
-    result << R"(    "time": )" << make_unix_timestamp(time_now) << ",\n";
+    result << R"(    "id": )" << rec_id << ",\n"
+           << R"(    "class": "parse",)" << "\n"
+           << R"(    "event": ")" << event_subclass_to_string(audit_record.event) << "\",\n"
+           << R"(    "connection_id": )" << audit_record.event->connection_id << ",\n"
+           << R"(    "parse_data": {)" << "\n"
+           << R"(      "flags": )" << flags << ",\n"
+           << R"(      "query": ")" << esc_query << "\",\n"
+           << R"(      "rewritten_query": ")" << make_escaped_string(audit_record.event->rewritten_query) << "\"}"
+           << extra_attrs_to_string(audit_record.extended_info) << "\n  }";
+  } else {
+    format_jsonl_header(result, timestamp, time_now);
+
+    result << R"("id": )" << rec_id << ", "
+           << R"("class": "parse", )"
+           << R"("event": ")" << event_subclass_to_string(audit_record.event) << R"(", )"
+           << R"("connection_id": )" << audit_record.event->connection_id << ", "
+           << R"("parse_data": { "flags": )" << flags
+           << R"(, "query": ")" << esc_query
+           << R"(", "rewritten_query": ")" << make_escaped_string(audit_record.event->rewritten_query) << R"(" })"
+           << extra_attrs_to_string_jsonl(audit_record.extended_info) << " }";
   }
-
-  result << R"(    "id": )" << rec_id << ",\n"
-         << R"(    "class": "parse",)" << "\n"
-         << R"(    "event": ")" << event_subclass_to_string(audit_record.event) << "\",\n"
-         << R"(    "connection_id": )" << audit_record.event->connection_id << ",\n"
-         << R"(    "parse_data": {)" << "\n"
-         << R"(      "flags": )" << (audit_record.event->flags != nullptr ? *audit_record.event->flags : 0) << ",\n"
-         << R"(      "query": ")" << (audit_record.extended_info.digest.empty()
-                                          ? make_escaped_string(&audit_record.event->query)
-                                          : make_escaped_string(audit_record.extended_info.digest)) << "\",\n"
-         << R"(      "rewritten_query": ")" << make_escaped_string(audit_record.event->rewritten_query) << "\"}"
-         << extra_attrs_to_string(audit_record.extended_info) << "\n  }";
   /* clang-format on */
 
   SysVars::update_log_bookmark(rec_id, timestamp);
@@ -799,20 +834,92 @@ AuditRecordString LogRecordFormatterJson::apply(
   const auto time_now = std::chrono::system_clock::now();
   const auto timestamp = make_timestamp(time_now);
   const auto rec_id = make_record_id();
+  const auto escaped_user =
+      make_escaped_string(audit_record.extended_info.user);
+  const auto escaped_host =
+      make_escaped_string(audit_record.extended_info.host);
+  const auto escaped_ip = make_escaped_string(audit_record.extended_info.ip);
+  const auto escaped_external_user =
+      make_escaped_string(audit_record.extended_info.external_user);
+  const auto escaped_proxy_user =
+      make_escaped_string(audit_record.extended_info.proxy_user);
+  const auto escaped_server_version = make_escaped_string(server_version);
+  const auto event_name = event_subclass_to_string(audit_record.event);
 
   /* clang-format off */
-  result << "  {\n"
-         << R"(    "timestamp": ")" << timestamp << "\",\n";
+  if (SysVars::get_format_type() == AuditLogFormatType::Json) {
+    format_json_header(result, timestamp, time_now);
 
-  if (SysVars::get_format_unix_timestamp()) {
-    result << R"(    "time": )" << make_unix_timestamp(time_now) << ",\n";
+    result << R"(    "id": )" << rec_id << ",\n"
+           << R"(    "class": "audit",)" << "\n"
+           << R"(    "event": ")" << event_name << "\"";
+
+    if (audit_record.event->event_subclass == INTERNAL_EVENT_TRACKING_AUDIT_AUDIT) {
+      result << ",\n"
+             << R"(    "connection_id": )" << audit_record.event->connection_id << ",\n"
+             << R"(    "account": { "user": ")" << escaped_user
+             << R"(", "host": ")" << escaped_host << R"(" },)" << "\n"
+             << R"(    "login": { "user": ")" << escaped_user
+             << R"(", "os": ")" << escaped_external_user
+             << R"(", "ip": ")" << escaped_ip
+             << R"(", "proxy": ")" << escaped_proxy_user << R"(" },)" << "\n"
+             << R"(    "startup_data": {)" << "\n"
+             << R"(      "server_id": )" << audit_record.event->server_id << ",\n"
+             << R"(      "os_version": ")" << MACHINE_TYPE "-" SYSTEM_TYPE << "\",\n"
+             << R"(      "mysql_version": ")" << escaped_server_version << "\",\n"
+             << R"(      "args": [)" << "\n";
+
+      for (int i = 0; i < orig_argc; ++i) {
+        if (orig_argv[i] != nullptr) {
+          result << ((i == 0) ? "" : ",\n") << R"(        ")"
+                << make_escaped_string(orig_argv[i]) << "\"";
+        }
+      }
+
+      result << "\n"
+            << R"(      ])" << "\n"
+            << R"(    })";
+    } else {
+      result << ",\n"
+            << R"(    "connection_id": )" << audit_record.event->connection_id
+            << ",\n"
+            << R"(    "shutdown_data": { "server_id": )"
+            << audit_record.event->server_id << " }";
+    }
+
+    result << extra_attrs_to_string(audit_record.extended_info) << "\n  }";
+  } else {
+    format_jsonl_header(result, timestamp, time_now);
+
+    result << R"("id": )" << rec_id << ", "
+           << R"("class": "audit", )"
+           << R"("event": ")" << event_name << R"(")";
+
+    if (audit_record.event->event_subclass == INTERNAL_EVENT_TRACKING_AUDIT_AUDIT) {
+      result << R"(, "connection_id": )" << audit_record.event->connection_id << ", "
+             << R"("account": { "user": ")" << escaped_user << R"(", "host": ")" << escaped_host << R"(" }, )"
+             << R"("login": { "user": ")" << escaped_user << R"(", "os": ")" << escaped_external_user
+             << R"(", "ip": ")" << escaped_ip << R"(", "proxy": ")" << escaped_proxy_user << R"(" }, )"
+             << R"("startup_data": { "server_id": )" << audit_record.event->server_id
+             << R"(, "os_version": ")" << MACHINE_TYPE "-" SYSTEM_TYPE
+             << R"(", "mysql_version": ")" << escaped_server_version
+             << R"(", "args": [)";
+
+      for (int i = 0; i < orig_argc; ++i) {
+        if (orig_argv[i] != nullptr) {
+          if (i != 0) result << ", ";
+          result << '"' << make_escaped_string(orig_argv[i]) << '"';
+        }
+      }
+
+      result << "] }";
+    } else {
+      result << R"(, "connection_id": )" << audit_record.event->connection_id
+             << R"(, "shutdown_data": { "server_id": )" << audit_record.event->server_id << " }";
+    }
+
+    result << extra_attrs_to_string_jsonl(audit_record.extended_info) << " }";
   }
-
-  result << R"(    "id": )" << rec_id << ",\n"
-         << R"(    "class": "audit",)" << "\n"
-         << R"(    "event": ")" << event_subclass_to_string(audit_record.event) << "\",\n"
-         << R"(    "server_id": )" << audit_record.event->server_id
-         << extra_attrs_to_string(audit_record.extended_info) << "\n  }";
   /* clang-format on */
 
   SysVars::update_log_bookmark(rec_id, timestamp);
@@ -843,7 +950,7 @@ const EscapeRulesContainer &LogRecordFormatterJson::get_escape_rules()
       {20, "\\u0014"}, {21, "\\u0015"}, {22, "\\u0016"}, {23, "\\u0017"},
       {24, "\\u0018"}, {25, "\\u0019"}, {26, "\\u001A"}, {27, "\\u001B"},
       {28, "\\u001C"}, {29, "\\u001D"}, {30, "\\u001E"}, {31, "\\u001F"},
-      {'\\', "\\\\"},  {'"', "\\\""},   {'/', "\\/"}};
+      {'\\', "\\\\"},  {'"', "\\\""}};
 
   return escape_rules;
 }
@@ -886,21 +993,49 @@ void LogRecordFormatterJson::apply_debug_info(
 
 std::string LogRecordFormatterJson::extra_attrs_to_string(
     const ExtendedInfo &info) const noexcept {
+  return extra_attrs_to_string(info, 4, 6);
+}
+
+std::string LogRecordFormatterJson::extra_attrs_to_string(
+    const ExtendedInfo &info, std::size_t tag_indent,
+    std::size_t value_indent) const noexcept {
   std::stringstream result;
+  const auto tag_padding = std::string(tag_indent, ' ');
+  const auto value_padding = std::string(value_indent, ' ');
 
   for (const auto &pair : info.attrs) {
-    result << ",\n"
-           << "    \"" << pair.first << "\": {\n";
+    result << ",\n" << tag_padding << "\"" << pair.first << "\": {\n";
 
     bool is_first_attr = true;
     for (const auto &name_value : pair.second) {
-      result << (is_first_attr ? "" : ",\n") << "      \""
+      result << (is_first_attr ? "" : ",\n") << value_padding << "\""
              << make_escaped_string(name_value.first) << "\": \""
              << make_escaped_string(name_value.second) << "\"";
       is_first_attr = false;
     }
 
-    result << "\n    }";
+    result << "\n" << tag_padding << "}";
+  }
+
+  return result.str();
+}
+
+std::string LogRecordFormatterJson::extra_attrs_to_string_jsonl(
+    const ExtendedInfo &info) const noexcept {
+  std::stringstream result;
+
+  for (const auto &pair : info.attrs) {
+    result << R"(, ")" << pair.first << R"(": { )";
+
+    bool is_first_attr = true;
+    for (const auto &name_value : pair.second) {
+      if (!is_first_attr) result << ", ";
+      result << '"' << make_escaped_string(name_value.first) << R"(": ")"
+             << make_escaped_string(name_value.second) << '"';
+      is_first_attr = false;
+    }
+
+    result << " }";
   }
 
   return result.str();

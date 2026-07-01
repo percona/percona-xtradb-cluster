@@ -1,4 +1,4 @@
-# Copyright (c) 2017, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2017, 2026, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -3693,7 +3693,7 @@ ER_AUDIT_LOG_EC_WRITER_FAILED_TO_CREATE_FILE
 ER_AUDIT_LOG_RENAME_LOG_FILE_BEFORE_FLUSH
   eng "Audit log file (%s) must be manually renamed before audit_log_flush is set to true."
 
-ER_AUDIT_LOG_FILTER_RESULT_MSG
+OBSOLETE_ER_AUDIT_LOG_FILTER_RESULT_MSG
   eng "%s"
 
 ER_AUDIT_LOG_JSON_READER_FAILED_TO_PARSE
@@ -12360,6 +12360,21 @@ ER_IB_WRN_REDO_DISABLED_INFO
 ER_IB_MSG_LOG_WRITER_WAIT_ON_NEW_LOG_FILE_INFO
   eng "Redo log writer is waiting for a new redo log file. Consider increasing innodb_redo_log_capacity. The current log capacity is %llu bytes. The log capacity used is %llu bytes."
 
+ER_AUDIT_LOG_INVALID_FILTER_LOG_ALL
+  eng "The '%s' filter is invalid: %s The operation will continue, and all activities will be logged for this filter. Please fix the filter using the '%s' UDF."
+
+ER_AUDIT_LOG_INVALID_FILTER_LOG_NOTHING
+  eng "The '%s' filter is invalid: %s The operation will continue, but logging for this filter has been disabled. Please fix the filter using the '%s' UDF, or change the '%s' variable to LOG_ALL_IF_INVALID_FILTER_DETECTED."
+
+ER_AUDIT_LOG_INVALID_FILTER_ABORT
+  eng "The '%s' filter is invalid: %s The operation has been aborted. Please fix the filter using the '%s' UDF, or change the '%s' variable as required."
+
+ER_AUDIT_LOG_JSON_INVALID_FILTER_CANNOT_BE_USED
+  eng "The '%s' filter is invalid and cannot be used until corrected. Please apply the '%s' UDF to resolve the issue."
+
+ER_WARN_AUDIT_LOG_FILTER_RECOVERY_LOGGING_DISABLED_LOG
+  eng "The '%s' variable is set to LOG_NOTHING_IF_INVALID_FILTER_DETECTED, meaning audit events will not be logged if the filter is invalid. Consider changing this variable to LOG_ALL_IF_INVALID_FILTER_DETECTED to ensure that all events are logged, even when the filter is invalid."
+
 #
 # End of 8.0 error messages intended to be written to the server error log.
 #
@@ -12835,6 +12850,7 @@ ER_AUTH_INITIAL_PLUGIN_OVERRIDE
 # End of 8.1, 8.2, 8.3, 8.4 error messages intended to be written to the server error log.
 #
 
+
 #
 # Start of Percona Server 8.0 server error log messages
 #
@@ -12852,10 +12868,10 @@ ER_XB_MSG_1
 ER_COMPRESSION_DICTIONARY_NO_CREATE
   eng "Cannot create compression dictionary tables in %s%sread-only mode."
 
-ER_XB_UNUSED_1
+ER_UNUSED_48004
   eng "%s"
 
-ER_XB_UNUSED_2
+ER_UNUSED_48005
   eng "%s"
 
 ER_XB_MSG_4
@@ -12867,13 +12883,14 @@ ER_XB_MSG_5
 ER_XB_MSG_WAIT_FOR_KEYRING_ENCRYPT_THREAD
   eng "Waiting for keyring encryption threads to exit"
 
-ER_XB_UNUSED_3
+ER_UNUSED_48009
   eng "%s"
 
+# 48010
 ER_XB_MSG_6
   eng "Key rotation of encrypted session temporary tablespace %s failed"
 
-ER_XB_UNUSED_4
+ER_UNUSED_48011
   eng "%s"
 
 ER_UPGRADE_KEYRING_UNSUPPORTED_VERSION_ENCRYPTION
@@ -12900,6 +12917,7 @@ ER_REDO_ENCRYPTION_CANT_PARSE_KEY
 ER_REDO_ENCRYPTION_KEYRING
   eng "Redo log cannot be encrypted if the keyring is not loaded."
 
+# 48020
 ER_UNDO_NO_KEYRING
   eng "Undo log can't be encrypted if the keyring is not loaded."
 
@@ -12930,6 +12948,13 @@ ER_IB_MSG_UNDO_TRUNCATE_DELAY_BY_LTFB
 ER_XPLUGIN_SSL_RELOAD_REGISTER_FAILED
   eng "X plugin failed to register SSL reload callback. ALTER INSTANCE RELOAD TLS will have no effect on the plugin."
 
+# 48030
+ER_UNUSED_48030
+  eng "deprecated ER_IB_MSG_INNODB_PARALLEL_DOUBLEWRITE_PATH"
+
+ER_UNUSED_48031
+  eng "deprecated ER_IB_MSG_INNODB_PARALLEL_DBLWR_ENCRYPT"
+
 ER_KEYRING_COMPONENT_NO_CONFIG
   eng "Keyring configuration doesn't exists: %s"
 
@@ -12954,6 +12979,7 @@ ER_RPL_ENABLE_EVENT_ADD_WILD_PATTERN_FAILED
 ER_GRP_RPL_FLOW_CONTROL_TIMEOUT
   eng "Flow control auto evict timeout reached. The server will now leave the group."
 
+# 48040
 ER_PERCONA_IGNORE_TMP_TABLE_SIZE
   eng "Tmp_table_size is set below 1MiB. The TEMPTABLE engine requires at least 1MiB table size, and will use that value instead. Please increase the limit to silence this warning."
 
@@ -12968,6 +12994,19 @@ ER_CONN_CONTROL_DELAYED_CONN_STATS
 
 ER_LOG_NAME_NOT_MATCHING_SEC_LOG_PATH
   eng "The --secure-file-path is configured, %s must be set accordingly."
+
+ER_SSL_FIPS_MODE_ENABLED
+  eng "A FIPS-approved version of the OpenSSL cryptographic library has been detected in the operating system with a properly configured FIPS module available for loading. Percona Server for MySQL will load this module and run in FIPS mode."
+
+#
+# End of Percona Server 8.0 server error log messages
+#
+
+
+#
+# Start of Audit Log Filter error log messages
+#
+start-error-number 48100
 
 ER_AUDIT_INIT_STARTED
   eng "Initializing Audit Event Filter..."
@@ -12999,6 +13038,7 @@ ER_AUDIT_INIT_WRITER_INIT_FAILURE
 ER_AUDIT_INIT_WRITER_OPEN_FAILURE
   eng "Cannot open log writer, error: %s"
 
+# 48110
 ER_AUDIT_INIT_READER_INIT_FAILURE
   eng "Failed to create log reader instance"
 
@@ -13029,6 +13069,7 @@ ER_AUDIT_SET_USER_UDF_FAIL
 ER_AUDIT_REMOVE_USER_UDF_FAIL
   eng "Failed to remove filter for user '%s@%s' from users table"
 
+# 48120
 ER_AUDIT_LOG_ROTATE_UDF_FAIL
   eng "Log rotation failed: '%s'"
 
@@ -13059,6 +13100,7 @@ ER_AUDIT_PARSE_EVENT_CLASS_BAD_CLASS_TYPE
 ER_AUDIT_PARSE_EVENT_CLASS_NO_CLASS_NAME
   eng "Wrong JSON filter '%s' format, no name provided for event class"
 
+# 48130
 ER_AUDIT_PARSE_EVENT_CLASS_BAD_ABORT_DEF
   eng "Wrong JSON filter '%s' format, 'abort' condition should be set for subclass only"
 
@@ -13089,6 +13131,7 @@ ER_AUDIT_PARSE_EVENT_SUBCLASS_BAD_SUBCLASS_TYPE
 ER_AUDIT_PARSE_ACTION_BAD_ABORT_TYPE
   eng "Wrong JSON filter '%s' format, 'abort' must be of bool or object type"
 
+# 48140
 ER_AUDIT_PARSE_ACTION_BAD_REPLACE
   eng "Event field '%s' cannot be replaced"
 
@@ -13105,7 +13148,7 @@ ER_AUDIT_PARSE_CONDITION_BAD_FIELD_TYPE
   eng "Wrong JSON filter '%s' format, condition definition 'field' must be of object type"
 
 ER_AUDIT_PARSE_CONDITION_BAD_FIELD_NAME_AND_VALUE
-  eng "Wrong JSON filter '%s' format, event field definition 'field' must have field 'name' and 'value' provided as strings"
+  eng "Wrong JSON filter '%s' format, event field definition 'field' must have field 'name' provided as a string and 'value' as a string or integer"
 
 ER_AUDIT_PARSE_CONDITION_BAD_AND_COND_TYPE
   eng "Wrong JSON filter '%s' format, condition definition 'and' must be of array type"
@@ -13119,6 +13162,7 @@ ER_AUDIT_PARSE_CONDITION_BAD_AND_COND_OPERANDS
 ER_AUDIT_PARSE_CONDITION_BAD_OR_COND_TYPE
   eng "Wrong JSON filter '%s' format, condition definition 'or' must be of array type"
 
+# 48150
 ER_AUDIT_PARSE_CONDITION_BAD_OR_COND_FORMAT
   eng "Wrong JSON filter '%s' format, a member of 'or' condition must be of object type"
 
@@ -13149,6 +13193,7 @@ ER_AUDIT_PARSE_FUNCTION_BAD_ARGS_FORMAT
 ER_AUDIT_PARSE_FUNCTION_BAD_ARGS
   eng "Wrong JSON filter '%s' format, invalid arguments for '%s' function"
 
+# 48160
 ER_AUDIT_PARSE_NO_SUBCLASS_NAME
   eng "Wrong JSON filter '%s' format, no name provided for event subclass"
 
@@ -13179,6 +13224,7 @@ ER_AUDIT_UDF_SET_FILTER_BAD_DEFINITION
 ER_AUDIT_UDF_SET_FILTER_UNIQUE_CHECK_FAIL
   eng "Failed to check filtering rule name existence"
 
+# 48170
 ER_AUDIT_UDF_SET_FILTER_NAME_EXISTS
   eng "Filtering rule with the name '%s' already exists"
 
@@ -13188,18 +13234,219 @@ ER_AUDIT_UDF_SET_FILTER_FAILURE
 ER_AUDIT_REPLACE_FIELD_UNEXPECTED_EVENT_TYPE
   eng "Unexpected event type for replace_field action"
 
-ER_SSL_FIPS_MODE_ENABLED
-  eng "A FIPS-approved version of the OpenSSL cryptographic library has been detected in the operating system with a properly configured FIPS module available for loading. Percona Server for MySQL will load this module and run in FIPS mode."
-
 ER_AUDIT_PARSE_CONDITION_TYPE_UNEXPECTED_COND_TYPE
   eng "Wrong JSON filter '%s' format, the 'log' field must be of bool or object type"
 
 ER_AUDIT_SYS_VAR_INVALID_FILE_DIRECTORY
   eng "Invalid audit log filter file directory: %s"
 
+ER_AUDIT_PARSE_CONDITION_FIELD_NAME_NOT_FOUND
+  eng "Wrong JSON filter '%s' format, field name '%s' is not valid for event class '%s'"
+
+ER_AUDIT_PARSE_INVALID_EVENT_CLASS_NAME
+  eng "Wrong JSON filter '%s' format, unknown event class name '%s'"
+
+ER_AUDIT_PARSE_INVALID_EVENT_SUBCLASS_NAME
+  eng "Wrong JSON filter '%s' format, unknown event subclass name '%s' for class '%s'"
+
+ER_AUDIT_PARSE_EMPTY_ARRAY
+  eng "Wrong JSON filter '%s' format, empty array is not allowed"
+
+ER_AUDIT_PARSE_UNEXPECTED_KEY
+  eng "Wrong JSON filter '%s' format, unexpected key '%s'"
+
+# 48180
+ER_AUDIT_INIT_EXCEPTION
+  eng "Exception in audit_log_filter_init: %s"
+
+ER_AUDIT_DEINIT_EXCEPTION
+  eng "Exception in audit_log_filter_deinit: %s"
+
+ER_AUDIT_FILTER_RULE_NOT_FOUND
+  eng "Failed to find '%s' filtering rule"
+
+ER_AUDIT_UNSUPPORTED_EVENT_CLASS
+  eng "Unsupported audit event class with ID %i received"
+
+ER_AUDIT_BLOCKED_EVENT
+  eng "Blocked audit event '%s' with class %i"
+
+ER_AUDIT_NOTIFY_EVENT_EXCEPTION
+  eng "Caught exception in notify_event: %s"
+
+ER_AUDIT_SECURITY_CONTEXT_FIELD_FAILURE
+  eng "Can not get %s from security context"
+
+ER_AUDIT_TABLE_OPEN_FAILURE
+  eng "Failed to get an opened %s table"
+
+ER_AUDIT_TABLE_CHECK_FIELDS_FAILURE
+  eng "Failed to check %s table fields"
+
+ER_AUDIT_TABLE_INDEX_SCAN_INIT_FAILURE
+  eng "Failed to init index scan of %s table"
+
+# 48190
+ER_AUDIT_TABLE_INDEX_ACCESS_INIT_FAILURE
+  eng "Failed to init index access of %s table"
+
+ER_AUDIT_TABLE_FULL_SCAN_INIT_FAILURE
+  eng "Failed to init full scan of %s table"
+
+ER_AUDIT_TABLE_FULL_SCAN_END_FAILURE
+  eng "Failed to end full scan of %s table"
+
+ER_AUDIT_TABLE_READ_FIELD_FAILURE
+  eng "Failed to read %s.%s"
+
+ER_AUDIT_TABLE_FILTER_WRONG_FORMAT
+  eng "audit_log_filter name: %s, filter: %s has wrong format, consider using audit_log_filter.event_mode=FULL"
+
+ER_AUDIT_TABLE_FILTER_INSERT_COMMIT_FAILURE
+  eng "Failed to insert filtering rule '%s', '%s', commit failed"
+
+ER_AUDIT_TABLE_FILTER_DELETE_FAILURE
+  eng "Failed to delete filter with the name '%s'"
+
+ER_AUDIT_TABLE_FILTER_DELETE_COMMIT_FAILURE
+  eng "Failed to delete filter with the name '%s', commit failed"
+
+ER_AUDIT_TABLE_USER_DELETE_FILTER_FAILURE
+  eng "Failed to delete record for filter '%s'"
+
+ER_AUDIT_TABLE_USER_DELETE_FILTER_COMMIT_FAILURE
+  eng "Failed to delete record for filter '%s', commit failed"
+
+# 48200
+ER_AUDIT_TABLE_USER_DELETE_USER_FAILURE
+  eng "Failed to delete record for user '%s@%s'"
+
+ER_AUDIT_TABLE_USER_DELETE_USER_COMMIT_FAILURE
+  eng "Failed to delete record for user '%s@%s', commit failed"
+
+ER_AUDIT_TABLE_USER_ASSIGN_FILTER_FAILURE
+  eng "Failed to assign '%s' filtering rule for user '%s@%s'"
+
+ER_AUDIT_TABLE_USER_ASSIGN_FILTER_COMMIT_FAILURE
+  eng "Failed to assign '%s' filtering rule for user '%s@%s', commit failed"
+
+ER_AUDIT_ENCRYPTION_OPTIONS_FETCH_FAILURE
+  eng "Failed to fetch options for id %s"
+
+ER_AUDIT_ENCRYPTION_EMPTY_PASSWORD
+  eng "Empty password for id %s"
+
+ER_AUDIT_ENCRYPTION_BAD_ITERATIONS
+  eng "Bad iterations count for id %s"
+
+ER_AUDIT_ENCRYPTION_EMPTY_SALT
+  eng "Empty salt for id %s"
+
+ER_AUDIT_ENCRYPTION_PBKDF2_ERROR
+  eng "PKCS5_PBKDF2_HMAC error: %s"
+
+ER_AUDIT_ENCRYPTION_CIPHER_INIT_ERROR
+  eng "EVP_CipherInit_ex error: %s"
+
+# 48210
+ER_AUDIT_ENCRYPTION_ENCRYPT_FINAL_ERROR
+  eng "EVP_EncryptFinal error: %s"
+
+ER_AUDIT_ENCRYPTION_ENCRYPT_UPDATE_ERROR
+  eng "EVP_EncryptUpdate error: %s"
+
+ER_AUDIT_ENCRYPTION_INVALID_OPTIONS
+  eng "Invalid options provided for id %s"
+
+ER_AUDIT_ENCRYPTION_DECRYPT_UPDATE_ERROR
+  eng "EVP_DecryptUpdate error: %s"
+
+ER_AUDIT_ENCRYPTION_DECRYPT_FINAL_ERROR
+  eng "EVP_DecryptFinal error: %s"
+
+ER_AUDIT_LOG_FILE_WRITER_CREATE_FAILURE
+  eng "Failed to create Audit Log Filter file writer (%s)"
+
+ER_AUDIT_LOG_DIR_LIST_FAILURE
+  eng "Failed to list audit filter log directory '%s'"
+
+ER_AUDIT_LOG_ROTATE_INTERNAL_FAILURE
+  eng "Failed to rotate audit filter log: %i, %s"
+
+ER_AUDIT_LOG_FILE_INSPECT_FAILURE
+  eng "Failed to inspect audit filter log path '%s': %s"
+
+ER_AUDIT_LOG_FILE_PREPARE_FAILURE
+  eng "Failed to prepare audit filter log '%s' for appending"
+
+# 48220
+ER_AUDIT_LOG_DIR_LISTING_FAILURE
+  eng "Failed to list audit log directory '%s': %s"
+
+ER_AUDIT_LOG_DIR_ITERATE_FAILURE
+  eng "Failed to iterate audit log directory '%s': %s"
+
+ER_AUDIT_LOG_FOOTER_REMOVE_FAILURE
+  eng "Failed to remove footer from audit log '%s': %s"
+
+ER_AUDIT_LOG_FILE_NAME_PARSE_FAILURE
+  eng "Skipping audit log file with unparseable name '%s': %s"
+
+ER_AUDIT_LOG_FILE_NAME_UNKNOWN_PARSE_FAILURE
+  eng "Skipping audit log file with unparseable name '%s'"
+
+ER_AUDIT_LOG_FILE_OPEN_READ_FAILURE
+  eng "Failed to open file for reading: %s"
+
+ER_AUDIT_LOG_FILE_READ_FAILURE
+  eng "Failed to read: %s"
+
+ER_AUDIT_COMPRESSION_INIT_FAILURE
+  eng "Failed to init compressing: %i"
+
+ER_AUDIT_DECOMPRESSION_INIT_FAILURE
+  eng "Failed to init decompressing: %i"
+
+ER_AUDIT_UDF_REGISTER_FAILURE
+  eng "Failed to register %s UDF"
+
+# 48230
+ER_AUDIT_KEYRING_KEY_NOT_FOUND
+  eng "No data found for key '%s'"
+
+ER_AUDIT_KEYRING_OPTIONS_REMOVE_FAILURE
+  eng "Failed to remove options with ID: %s"
+
+ER_AUDIT_PARSE_SKIP_DISABLED_EVENT_CLASS
+  eng "Skipping disabled event class '%s' in filter '%s'"
+
+ER_AUDIT_PARSE_SKIP_DISABLED_EVENT_SUBCLASS
+  eng "Skipping disabled event '%s/%s' in filter '%s'"
+
 #
-# End of Percona Server 8.0 server error log messages
+# End of Audit Log Filter error log messages
 #
+
+
+#
+# Start of Percona Server 8.4 error log messages
+#
+start-error-number 48300
+
+#
+# End of Percona Server 8.4 error log messages
+#
+
+
+#
+# Start of Percona Server 9.7 error log messages
+#
+start-error-number 48400
+
+#
+# End of Percona Server 9.7 error log messages
+#
+
 
 ################################################################################
 # Error numbers 50000 to 51999 are reserved. Please do not use them for

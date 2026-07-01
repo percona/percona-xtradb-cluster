@@ -1,0 +1,16 @@
+SET @transaction_read_only_save = @@GLOBAL.transaction_read_only;
+SET @wsrep_applier_threads_save = @@GLOBAL.wsrep_applier_threads;
+SET GLOBAL transaction_read_only = 1;
+SET GLOBAL wsrep_applier_threads = 10;
+CREATE TABLE test.pxc_5229_t1(id INT PRIMARY KEY, v INT);
+CREATE TABLE test.pxc_5229_t2(id INT PRIMARY KEY, v INT);
+LOCK TABLE test.pxc_5229_t1 READ;
+UNLOCK TABLES;
+include/assert.inc [node_2 wsrep_cluster_status must stay Primary]
+include/assert.inc [node_2 wsrep_connected must stay ON]
+include/assert.inc [node_2 wsrep_ready must stay ON]
+include/assert.inc [node_2 wsrep_local_state_comment must stay Synced]
+SET @@GLOBAL.transaction_read_only = @transaction_read_only_save;
+SET @@GLOBAL.wsrep_applier_threads = @wsrep_applier_threads_save;
+DROP TABLE test.pxc_5229_t1;
+DROP TABLE test.pxc_5229_t2;

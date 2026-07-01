@@ -35,8 +35,10 @@
 #include <atomic>
 #include <filesystem>
 #include <iomanip>
+#include <mutex>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 
 namespace audit_log_filter {
 namespace {
@@ -49,8 +51,17 @@ constexpr std::string_view kReaderContextSlotName{
     "component_audit_reader_context"};
 constexpr std::string_view kSessionFilterIdSlotName{
     "component_audit_reader_session_filter_id"};
+constexpr std::string_view kSessionFilterRuleSlotName{
+    "component_audit_session_filter_rule"};
 mysql_thd_store_slot reader_context_thread_slot{nullptr};
 mysql_thd_store_slot session_filter_id_slot{nullptr};
+mysql_thd_store_slot session_filter_rule_slot{nullptr};
+
+std::atomic<uint64_t> filter_rule_generation{0};
+std::atomic<uint64_t> filter_rule_detach_generation{0};
+std::atomic<uint64_t> removed_filter_generation{0};
+std::mutex removed_filter_ids_mutex;
+std::unordered_map<uint64_t, uint64_t> removed_filter_ids;
 
 bool has_system_variables_privilege(MYSQL_THD thd) {
   my_service<SERVICE_TYPE(mysql_thd_security_context)> security_context_service(
@@ -204,6 +215,7 @@ std::string default_log_file_name{"audit_filter.log"};
 char *config_database_name;
 std::string default_config_database_name{"mysql"};
 ulong log_handler_type = static_cast<ulong>(AuditLogHandlerType::File);
+ulong log_event_mode_type = static_cast<ulong>(AuditLogEventModeType::Reduced);
 ulong log_format_type = static_cast<ulong>(AuditLogFormatType::New);
 ulong log_strategy_type =
     static_cast<ulong>(AuditLogStrategyType::Asynchronous);
@@ -224,6 +236,7 @@ ulonglong log_password_history_keep_days = 0;
 int key_derivation_iter_count_mean = 0;
 const int default_key_derivation_iter_count_mean = 600000;
 bool json_with_unix_timestamp = false;
+bool log_direct_io = false;
 ulong read_buffer_size = 0;
 
 const char *audit_log_filter_handler_names[] = {"FILE", "SYSLOG", nullptr};
@@ -232,7 +245,14 @@ TYPE_LIB audit_log_filter_handler_typelib = {
     "audit_log_filter_handler_typelib", audit_log_filter_handler_names,
     nullptr};
 
-const char *audit_log_filter_format_names[] = {"NEW", "OLD", "JSON", nullptr};
+const char *audit_log_filter_event_mode_names[] = {"REDUCED", "FULL", nullptr};
+TYPE_LIB audit_log_filter_event_mode_typelib = {
+    array_elements(audit_log_filter_event_mode_names) - 1,
+    "audit_log_filter_event_mode_typelib", audit_log_filter_event_mode_names,
+    nullptr};
+
+const char *audit_log_filter_format_names[] = {"NEW", "OLD", "JSON", "JSONL",
+                                               nullptr};
 TYPE_LIB audit_log_filter_format_typelib = {
     array_elements(audit_log_filter_format_names) - 1,
     "audit_log_filter_format_typelib", audit_log_filter_format_names, nullptr};
@@ -263,6 +283,18 @@ void prune_seconds_update_func(MYSQL_THD, SYS_VAR *, void *val_ptr,
   if (*val > 0) {
     log_max_size = 0;
     get_audit_log_filter_instance()->on_audit_log_prune_requested();
+  }
+}
+
+void event_mode_update_func(MYSQL_THD, SYS_VAR *, void *val_ptr,
+                            const void *save) {
+  const auto new_val = *static_cast<const ulong *>(save);
+  const auto old_val = *static_cast<ulong *>(val_ptr);
+  *static_cast<ulong *>(val_ptr) = new_val;
+
+  if (old_val != new_val) {
+    get_audit_log_filter_instance()->invalidate_audit_rules();
+    SysVars::bump_filter_rule_generation();
   }
 }
 
@@ -377,7 +409,8 @@ void format_unix_timestamp_update_func(MYSQL_THD, SYS_VAR *, void *val_ptr,
   if (json_with_unix_timestamp != new_val) {
     *static_cast<bool *>(val_ptr) = new_val;
 
-    if (SysVars::get_format_type() == AuditLogFormatType::Json) {
+    if (SysVars::get_format_type() == AuditLogFormatType::Json ||
+        SysVars::get_format_type() == AuditLogFormatType::Jsonl) {
       get_audit_log_filter_instance()->on_audit_log_rotate_requested();
     }
   }
@@ -393,6 +426,9 @@ using int_arg_check_type = INTEGRAL_CHECK_ARG(int);
 str_arg_check_type check_file{default_log_file_name.data()};
 enum_arg_check_type check_handler{static_cast<ulong>(AuditLogHandlerType::File),
                                   &audit_log_filter_handler_typelib};
+enum_arg_check_type check_event_mode{
+    static_cast<ulong>(AuditLogEventModeType::Reduced),
+    &audit_log_filter_event_mode_typelib};
 enum_arg_check_type check_format{static_cast<ulong>(AuditLogFormatType::New),
                                  &audit_log_filter_format_typelib};
 enum_arg_check_type check_strategy{
@@ -422,6 +458,7 @@ ulonglong_arg_check_type check_password_history_keep_days{0UL, 0UL, ULLONG_MAX,
 int_arg_check_type check_key_derivation_iterations_count_mean{
     default_key_derivation_iter_count_mean, 1000, 1000000, 0};
 bool_arg_check_type check_format_unix_timestamp{false};
+bool_arg_check_type check_direct_io{false};
 str_arg_check_type check_database{default_config_database_name.data()};
 ulong_arg_check_type check_read_buffer_size{32768UL, 32768UL, ULONG_MAX, 0UL};
 
@@ -459,6 +496,17 @@ SysVarListType sys_vars = {
       "The audit log handler.", nullptr, nullptr,
       static_cast<void *>(&check_handler),
       static_cast<void *>(&log_handler_type)},
+     false},
+    /*
+     * The audit_log_filter.event_mode variable controls which event types are
+     * tracked. REDUCED mode limits events to a predefined subset, FULL mode
+     * tracks all events. Defaults to REDUCED.
+     */
+    {{"event_mode", PLUGIN_VAR_ENUM | PLUGIN_VAR_RQCMDARG,
+      "Event mode controlling which event types are tracked. REDUCED limits "
+      "events to a predefined subset, FULL tracks all events.",
+      nullptr, event_mode_update_func, static_cast<void *>(&check_event_mode),
+      static_cast<void *>(&log_event_mode_type)},
      false},
     /*
      * The audit_log_filter.format variable is used to specify the audit filter
@@ -662,6 +710,20 @@ SysVarListType sys_vars = {
       static_cast<void *>(&config_database_name)},
      false},
     /*
+     * The audit_log_filter.direct_io variable enables O_DIRECT for audit log
+     * file writes when set to ON. This bypasses the OS page cache, preventing
+     * audit log data from consuming kernel buffer memory. Requires filesystem
+     * support for O_DIRECT. Falls back to buffered I/O if unsupported.
+     * This variable has effect only when audit_log_filter.handler is set to
+     * FILE.
+     */
+    {{"direct_io", PLUGIN_VAR_BOOL | PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
+      "Use O_DIRECT for audit log file writes to bypass OS page cache, if FILE "
+      "handler is used.",
+      nullptr, nullptr, static_cast<void *>(&check_direct_io),
+      static_cast<void *>(&log_direct_io)},
+     false},
+    /*
      * The audit_log_filter.read_buffer_size variable defines buffer size for
      * reading from the audit log file, in bytes. The audit_log_read() function
      * reads no more than this many bytes. Log file reading is supported only
@@ -740,6 +802,16 @@ bool SysVars::init() noexcept {
     return false;
   }
 
+  if (thd_store_service->register_slot(
+          kSessionFilterRuleSlotName.data(),
+          [](void *cache) -> int {
+            delete reinterpret_cast<SessionFilterRuleCache *>(cache);
+            return 0;
+          },
+          &session_filter_rule_slot) == 1) {
+    return false;
+  }
+
   if (status_var_registration_srv->register_variable(status_vars) == 1) {
     LogComponentErr(ERROR_LEVEL, ER_AUDIT_STATUS_VAR_REGISTER_FAILURE);
     return false;
@@ -778,11 +850,20 @@ void SysVars::deinit() noexcept {
       thd_store_service->get(nullptr, reader_context_thread_slot));
   delete reinterpret_cast<ulong *>(
       thd_store_service->get(nullptr, session_filter_id_slot));
+  delete reinterpret_cast<SessionFilterRuleCache *>(
+      thd_store_service->get(nullptr, session_filter_rule_slot));
   thd_store_service->set(nullptr, reader_context_thread_slot, nullptr);
   thd_store_service->set(nullptr, session_filter_id_slot, nullptr);
+  thd_store_service->set(nullptr, session_filter_rule_slot, nullptr);
+
+  {
+    std::lock_guard<std::mutex> lock(removed_filter_ids_mutex);
+    removed_filter_ids.clear();
+  }
 
   thd_store_service->unregister_slot(reader_context_thread_slot);
   thd_store_service->unregister_slot(session_filter_id_slot);
+  thd_store_service->unregister_slot(session_filter_rule_slot);
 
   if (status_var_registration_srv->unregister_variable(status_vars) == 1) {
     LogComponentErr(ERROR_LEVEL, ER_AUDIT_STATUS_VAR_UNREGISTER_FAILURE);
@@ -823,8 +904,9 @@ bool SysVars::validate() noexcept {
 
   // Check if log file directory points to a valid file system directory or if
   // it is left at the default setting (empty).
+  std::error_code ec;
   if (!SysVars::get_file_dir().empty() &&
-      !std::filesystem::is_directory(SysVars::get_file_dir())) {
+      !std::filesystem::is_directory(SysVars::get_file_dir(), ec)) {
     LogComponentErr(ERROR_LEVEL, ER_AUDIT_SYS_VAR_INVALID_FILE_DIRECTORY,
                     SysVars::get_file_dir().c_str());
     return false;
@@ -863,6 +945,10 @@ const char *SysVars::get_config_database_name() noexcept {
 
 AuditLogHandlerType SysVars::get_handler_type() noexcept {
   return static_cast<AuditLogHandlerType>(log_handler_type);
+}
+
+AuditLogEventModeType SysVars::get_event_mode_type() noexcept {
+  return static_cast<AuditLogEventModeType>(log_event_mode_type);
 }
 
 AuditLogFormatType SysVars::get_format_type() noexcept {
@@ -920,6 +1006,8 @@ int SysVars::get_key_derivation_iter_count_mean() noexcept {
 bool SysVars::get_format_unix_timestamp() noexcept {
   return json_with_unix_timestamp;
 }
+
+bool SysVars::get_direct_io() noexcept { return log_direct_io; }
 
 void SysVars::set_session_filter_id(MYSQL_THD thd, ulong id) noexcept {
   my_service<SERVICE_TYPE(mysql_thd_store)> thd_store_service(
@@ -985,6 +1073,83 @@ void SysVars::set_log_reader_context(MYSQL_THD thd,
 
   thd_store_service->set(thd, reader_context_thread_slot,
                          reinterpret_cast<void *>(context));
+}
+
+SessionFilterRuleCache *SysVars::get_session_filter_rule(
+    MYSQL_THD thd) noexcept {
+  my_service<SERVICE_TYPE(mysql_thd_store)> thd_store_service(
+      "mysql_thd_store", SysVars::get_comp_registry_srv());
+
+  return reinterpret_cast<SessionFilterRuleCache *>(
+      thd_store_service->get(thd, session_filter_rule_slot));
+}
+
+void SysVars::set_session_filter_rule(
+    MYSQL_THD thd, uint64_t generation, uint64_t detach_generation,
+    uint64_t current_removed_filter_generation,
+    std::shared_ptr<AuditRule> rule) noexcept {
+  my_service<SERVICE_TYPE(mysql_thd_store)> thd_store_service(
+      "mysql_thd_store", SysVars::get_comp_registry_srv());
+
+  auto *cache = reinterpret_cast<SessionFilterRuleCache *>(
+      thd_store_service->get(thd, session_filter_rule_slot));
+
+  if (cache == nullptr) {
+    auto *new_cache = new (std::nothrow) SessionFilterRuleCache{
+        generation, detach_generation, current_removed_filter_generation,
+        std::move(rule)};
+
+    if (new_cache != nullptr) {
+      if (thd_store_service->set(thd, session_filter_rule_slot,
+                                 reinterpret_cast<void *>(new_cache)) == 1) {
+        LogComponentErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG,
+                        "Failed to set session_filter_rule");
+        delete new_cache;
+      }
+    } else {
+      LogComponentErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG,
+                      "Failed to allocate session_filter_rule");
+    }
+  } else {
+    *cache = SessionFilterRuleCache{generation, detach_generation,
+                                    current_removed_filter_generation,
+                                    std::move(rule)};
+  }
+}
+
+uint64_t SysVars::get_filter_rule_generation() noexcept {
+  return filter_rule_generation.load(std::memory_order_acquire);
+}
+
+void SysVars::bump_filter_rule_generation() noexcept {
+  filter_rule_generation.fetch_add(1, std::memory_order_release);
+}
+
+uint64_t SysVars::get_filter_rule_detach_generation() noexcept {
+  return filter_rule_detach_generation.load(std::memory_order_acquire);
+}
+
+void SysVars::bump_filter_rule_detach_generation() noexcept {
+  filter_rule_detach_generation.fetch_add(1, std::memory_order_release);
+}
+
+uint64_t SysVars::get_removed_filter_generation() noexcept {
+  return removed_filter_generation.load(std::memory_order_acquire);
+}
+
+void SysVars::mark_removed_filter_id(uint64_t filter_id) noexcept {
+  std::lock_guard<std::mutex> lock(removed_filter_ids_mutex);
+  const auto next_generation =
+      removed_filter_generation.load(std::memory_order_relaxed) + 1;
+  removed_filter_ids[filter_id] = next_generation;
+  removed_filter_generation.store(next_generation, std::memory_order_release);
+}
+
+bool SysVars::is_removed_filter_id(uint64_t filter_id,
+                                   uint64_t since_generation) noexcept {
+  std::lock_guard<std::mutex> lock(removed_filter_ids_mutex);
+  const auto it = removed_filter_ids.find(filter_id);
+  return it != removed_filter_ids.end() && it->second > since_generation;
 }
 
 void SysVars::inc_events_total() noexcept {

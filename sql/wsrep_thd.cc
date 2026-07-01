@@ -448,6 +448,21 @@ void wsrep_delete_threadvars() {
 #endif
 }
 
+/*
+  Copy session context fields from src to dst.
+*/
+void wsrep_copy_session_from_thd(THD *dst, const THD *src) {
+  dst->variables.character_set_client = src->variables.character_set_client;
+  dst->variables.collation_connection = src->variables.collation_connection;
+  dst->variables.collation_server = src->variables.collation_server;
+  dst->variables.sql_mode = src->variables.sql_mode;
+  dst->variables.time_zone = src->variables.time_zone;
+  dst->update_charset();
+
+  dst->variables.transaction_read_only = false;
+  dst->tx_read_only = false;
+}
+
 void wsrep_assign_from_threadvars(THD *) {
 #if 0
   if (thread_handling == SCHEDULER_TYPES_COUNT) {
