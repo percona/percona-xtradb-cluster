@@ -24,25 +24,33 @@ function set_suites() {
   if [[ "$1" == "RelWithDebInfo" ]]; then
     echo "Setting WORKER_x_MTR_SUITES for BUILD_TYPE=RelWithDebInfo"
     # Unit tests will be executed by worker 1
-    WORKER_1_MTR_SUITES="innodb_undo,test_services,audit_null,service_sys_var_registration,connection_control,data_masking,binlog_57_decryption,service_udf_registration,service_status_var_registration,procfs,interactive_utilities,percona-pam-for-mysql,component_encryption_udf,percona"
-    WORKER_2_MTR_SUITES="galera_nbo,galera_3nodes,galera_sr,galera_3nodes_nbo,galera_3nodes_sr,galera_encryption,galera-x,wsrep"
-    WORKER_3_MTR_SUITES="engines/funcs,innodb"
-    WORKER_4_MTR_SUITES="main,rpl"
-    WORKER_5_MTR_SUITES="rpl_nogtid,rpl_gtid"
-    WORKER_6_MTR_SUITES="parts,group_replication,clone,innodb_gis"
-    WORKER_7_MTR_SUITES="stress,perfschema,component_keyring_file,binlog,innodb_fts,sys_vars,innodb_zip,x,gcol,engines/iuds,encryption,federated,funcs_1,auth_sec,binlog_nogtid,binlog_gtid,funcs_2,jp,information_schema,rpl_encryption,sysschema,json,opt_trace,audit_log,audit_log_filter,collations,gis,query_rewrite_plugins,test_service_sql_api,secondary_engine,component_masking_functions"
-    WORKER_8_MTR_SUITES="galera"
+    # Split derived from measured KH timings (whole-suite and |big/|nobig runs).
+    # Only group_replication and galera are split: their whole-suite times exceed
+    # what a single worker can absorb. Everything else runs as a whole suite per
+    # rule 4 (prefer non-split). Makespan ~4241s (bound by group_replication|big).
+    WORKER_1_MTR_SUITES="main,component_encryption_udf,innodb,sysschema,galera_nbo,galera_encryption,engines/funcs,audit_log,rpl_encryption,test_services,service_sys_var_registration,json,percona,interactive_utilities"
+    WORKER_2_MTR_SUITES="group_replication|big"
+    WORKER_3_MTR_SUITES="galera|nobig"
+    WORKER_4_MTR_SUITES="rpl"
+    WORKER_5_MTR_SUITES="galera|big,galera_3nodes_nbo,x,binlog,clone,test_service_sql_api,binlog_gtid,information_schema,federated,secondary_engine,data_masking,procfs"
+    WORKER_6_MTR_SUITES="group_replication|nobig,galera_sr,perfschema,component_percona_telemetry,parts,innodb_fts,innodb_undo,innodb_gis,jp,collations,service_status_var_registration,service_udf_registration"
+    WORKER_7_MTR_SUITES="rpl_nogtid,galera-x,galera_3nodes_sr,sys_vars,binlog_nogtid,wsrep,component_masking_functions,query_rewrite_plugins,gcol,engines/iuds,audit_null,funcs_2,encryption"
+    WORKER_8_MTR_SUITES="galera_3nodes,rpl_gtid,component_keyring_file,auth_sec,stress,audit_log_filter,funcs_1,innodb_zip,connection_control,opt_trace,gis,binlog_57_decryption,percona-pam-for-mysql"
   else # Debug (and everything different from "RelWithDebInfo")
     echo "Setting WORKER_x_MTR_SUITES for BUILD_TYPE=Debug"
     # Unit tests will be executed by worker 1
-    WORKER_1_MTR_SUITES="innodb_undo,test_services,audit_null,service_sys_var_registration,connection_control,data_masking,binlog_57_decryption,service_udf_registration,service_status_var_registration,procfs,interactive_utilities,percona-pam-for-mysql,rpl|big,component_encryption_udf,percona"
-    WORKER_2_MTR_SUITES="galera_nbo,galera_3nodes,galera_sr,galera_3nodes_nbo,galera_3nodes_sr,galera_encryption,galera-x,wsrep"
-    WORKER_3_MTR_SUITES="engines/funcs,innodb,clone"
-    WORKER_4_MTR_SUITES="main,rpl|nobig"
-    WORKER_5_MTR_SUITES="rpl_nogtid,rpl_gtid,component_keyring_file,perfschema,binlog"
-    WORKER_6_MTR_SUITES="parts,group_replication,innodb_gis"
-    WORKER_7_MTR_SUITES="galera|big,stress,innodb_fts,sys_vars,innodb_zip,x,gcol,engines/iuds,encryption,federated,funcs_1,auth_sec,binlog_nogtid,binlog_gtid,funcs_2,jp,information_schema,rpl_encryption,sysschema,json,opt_trace,audit_log,audit_log_filter,collations,gis,query_rewrite_plugins,test_service_sql_api,secondary_engine,component_masking_functions"
-    WORKER_8_MTR_SUITES="galera|nobig"
+    # Split derived from measured KH timings (whole-suite and |big/|nobig runs).
+    # group_replication, galera and rpl are split because their whole-suite times
+    # would otherwise dominate the makespan. Everything else runs as a whole suite
+    # per rule 4 (prefer non-split). Makespan ~6623s, workers balanced within 20s.
+    WORKER_1_MTR_SUITES="rpl_gtid,rpl|big,galera_3nodes_nbo,innodb_undo,encryption,binlog_nogtid,innodb_zip,json,jp,secondary_engine"
+    WORKER_2_MTR_SUITES="group_replication|big,percona-pam-for-mysql"
+    WORKER_3_MTR_SUITES="galera|nobig,innodb_fts,galera_3nodes_sr,galera_nbo,information_schema,component_masking_functions,test_services,audit_null,interactive_utilities"
+    WORKER_4_MTR_SUITES="main,innodb_gis,engines/funcs,binlog,gcol,funcs_1,engines/iuds,opt_trace,service_status_var_registration,procfs"
+    WORKER_5_MTR_SUITES="galera|big,galera_3nodes,stress,sys_vars,audit_log_filter,federated,rpl_encryption,gis,service_udf_registration"
+    WORKER_6_MTR_SUITES="rpl|nobig,component_encryption_udf,perfschema,x,wsrep,binlog_gtid,funcs_2,service_sys_var_registration,percona"
+    WORKER_7_MTR_SUITES="group_replication|nobig,component_keyring_file,galera_sr,parts,auth_sec,component_percona_telemetry,audit_log,collations,connection_control,binlog_57_decryption"
+    WORKER_8_MTR_SUITES="innodb,rpl_nogtid,galera-x,clone,sysschema,galera_encryption,test_service_sql_api,query_rewrite_plugins,data_masking"
   fi
 }
 

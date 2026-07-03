@@ -1,6 +1,6 @@
 #ifndef SQL_PREPARE_H
 #define SQL_PREPARE_H
-/* Copyright (c) 2009, 2025, Oracle and/or its affiliates.
+/* Copyright (c) 2009, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -426,7 +426,7 @@ class Prepared_statement final {
 
  public:
   Prepared_statement(THD *thd_arg);
-  virtual ~Prepared_statement();
+  ~Prepared_statement();
 
   bool set_name(const LEX_CSTRING &name);
   const LEX_CSTRING &name() const { return m_name; }

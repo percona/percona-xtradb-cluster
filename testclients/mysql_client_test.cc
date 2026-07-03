@@ -1,4 +1,4 @@
-/* Copyright (c) 2002, 2025, Oracle and/or its affiliates.
+/* Copyright (c) 2002, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -19134,7 +19134,7 @@ static void test_wl6791() {
   }
 
   for (idx = 0; idx < sizeof(err_opts) / sizeof(enum mysql_option); idx++) {
-    void *dummy_arg;
+    void *dummy_arg = nullptr;
     if (!opt_silent)
       fprintf(stdout, "testing invalid option #%d (%d)\n", idx,
               (int)err_opts[idx]);

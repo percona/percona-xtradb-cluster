@@ -1,4 +1,4 @@
-# Copyright (c) 2006, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2006, 2026, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -574,6 +574,25 @@ ELSE()
         PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
       )
     ENDIF()
+
+    # clustercheck
+    CONFIGURE_FILE(systemd/clustercheck.socket.in
+      ${CMAKE_CURRENT_BINARY_DIR}/clustercheck.socket ESCAPE_QUOTES @ONLY)
+    CONFIGURE_FILE(systemd/clustercheck@.service.in
+      ${CMAKE_CURRENT_BINARY_DIR}/clustercheck@.service ESCAPE_QUOTES @ONLY)
+
+    INSTALL(FILES
+      ${CMAKE_CURRENT_BINARY_DIR}/clustercheck.socket
+      ${CMAKE_CURRENT_BINARY_DIR}/clustercheck@.service
+      DESTINATION ${SYSTEMD_INSTALL_PREFIX}${SYSTEMD_SERVICES_DIR}
+      COMPONENT Server
+      PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+    )
+    INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/clustercheck.cnf.example
+      DESTINATION ${INSTALL_MYSQLSHAREDIR}
+      COMPONENT Server
+      PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+    )
   ENDIF()
 ENDIF()
 

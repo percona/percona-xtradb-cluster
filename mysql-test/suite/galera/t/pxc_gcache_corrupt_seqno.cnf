@@ -1,0 +1,9 @@
+!include ../galera_1node.cnf
+
+#
+# Customer-like synthetic regression for PXC-5209:
+# keep the same key knobs as customer repro.
+#   wsrep_provider_options='gcache.size=1g;gcache.recover=yes'
+#
+[mysqld.1]
+wsrep_provider_options='base_port=@mysqld.1.#galera_port;gcache.recover=yes;gcache.size=1m;@ENV.WSREP_PROVIDER_TIMEOUTS'

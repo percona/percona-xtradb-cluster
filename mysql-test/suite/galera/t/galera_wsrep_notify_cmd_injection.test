@@ -1,0 +1,29 @@
+#
+# Joiner-supplied wsrep_node_name must not inject shell commands into
+# the donor's wsrep_notify_cmd. Fails if "Notification command failed"
+# co-occurs with ";touch" in node_1's error log.
+#
+
+--source include/galera_cluster.inc
+
+SELECT 1;
+
+--connection node_1
+call mtr.add_suppression('Unsafe characters in cluster member');
+--let $datadir=`select @@datadir`
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 'Synced' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment'
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+# Wait for node_1 to attempt the notify and reject the unsafe member name.
+# The notify is invoked from a background thread after the view change, so
+# polling the error log is more robust than a fixed sleep.
+--let $grep_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
+--let $grep_pattern = Unsafe characters in cluster member
+--let $wait_timeout = 60
+--source include/wait_for_pattern_in_file.inc
+
+--list_files $datadir PWN

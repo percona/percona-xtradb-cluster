@@ -40,47 +40,47 @@ SHOW STATUS LIKE 'wsrep_flow_control_interval';
 # --address and --group can't be omitted
 
 --let $option_name = name
---let $command_opt_value = --name "\$(echo -ne '\x0dtest')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
+--let $command_opt_value = --name "\$(printf '\015test')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
 --source ../include/galera_garbd_invalid_param_value.inc
 
 --let $option_name = address
---let $command_opt_value = --address "\$(echo -ne 'gcomm://\x0d127.0.0.1:$NODE_GALERAPORT_1')" --group my_wsrep_cluster
+--let $command_opt_value = --address "\$(printf 'gcomm://\015127.0.0.1:$NODE_GALERAPORT_1')" --group my_wsrep_cluster
 --source ../include/galera_garbd_invalid_param_value.inc
 
 --let $option_name = group
---let $command_opt_value = --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group "\$(echo -ne 'my_wsrep_cluster\x0d')"
+--let $command_opt_value = --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group "\$(printf 'my_wsrep_cluster\015')"
 --source ../include/galera_garbd_invalid_param_value.inc
 
 --let $option_name = sst
---let $command_opt_value = --sst "\$(echo -ne '\x0dxtrabackup-v2:127.0.0.1:9999/xtrabackup_sst//1')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
+--let $command_opt_value = --sst "\$(printf '\015xtrabackup-v2:127.0.0.1:9999/xtrabackup_sst//1')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
 --source ../include/galera_garbd_invalid_param_value.inc
 
 --let $option_name = donor
---let $command_opt_value = --donor "\$(echo -ne '\x0ddonor_name')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
+--let $command_opt_value = --donor "\$(printf '\015donor_name')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
 --source ../include/galera_garbd_invalid_param_value.inc
 
 --let $option_name = options
---let $command_opt_value = --options "\$(echo -ne 'evs.inactive_timeout=PT\x0d6S')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
+--let $command_opt_value = --options "\$(printf 'evs.inactive_timeout=PT\0156S')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
 --source ../include/galera_garbd_invalid_param_value.inc
 
 --let $option_name = log
---let $command_opt_value = --log "\$(echo -ne '/log/\x0file/path')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
+--let $command_opt_value = --log "\$(printf '/log/\015file/path')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
 --source ../include/galera_garbd_invalid_param_value.inc
 
 --let $option_name = recv-script
---let $command_opt_value = --recv-script "\$(echo -ne '\x0d/script/path')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
+--let $command_opt_value = --recv-script "\$(printf '\015/script/path')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
 --source ../include/galera_garbd_invalid_param_value.inc
 
 --let $option_name = post-recv-script
---let $command_opt_value = --post-recv-script "\$(echo -ne '\x0d/script/path')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
+--let $command_opt_value = --post-recv-script "\$(printf '\015/script/path')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
 --source ../include/galera_garbd_invalid_param_value.inc
 
 --let $option_name = workdir
---let $command_opt_value = --workdir "\$(echo -ne '\x0d/workdir/path')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
+--let $command_opt_value = --workdir "\$(printf '\015/workdir/path')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
 --source ../include/galera_garbd_invalid_param_value.inc
 
 --let $option_name = cfg
---let $command_opt_value = --cfg "\$(echo -ne '/cfg/\x0d//path')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
+--let $command_opt_value = --cfg "\$(printf '/cfg/\015//path')" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster
 --source ../include/galera_garbd_invalid_param_value.inc
 
 --echo #
@@ -99,5 +99,3 @@ SHOW STATUS LIKE 'wsrep_flow_control_interval';
 --connection node_2
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
-
-

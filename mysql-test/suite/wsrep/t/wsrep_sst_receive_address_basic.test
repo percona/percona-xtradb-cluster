@@ -27,16 +27,13 @@ SELECT @@global.wsrep_sst_receive_address;
 
 --echo
 --echo # invalid values
-#--error ER_WRONG_VALUE_FOR_VAR
-#SET @@global.wsrep_sst_receive_address='127.0.0.1:4444';
-#--error ER_WRONG_VALUE_FOR_VAR
-#SET @@global.wsrep_sst_receive_address='127.0.0.1';
 SELECT @@global.wsrep_sst_receive_address;
 --error ER_WRONG_VALUE_FOR_VAR
 SET @@global.wsrep_sst_receive_address=NULL;
 SELECT @@global.wsrep_sst_receive_address;
-# Currently there is no strict checking performed for wsrep_sst_receive_address
-# so following values jusr pass through.
+# Address values are restricted to a conservative whitelist (alnum, -_.:[]/);
+# shell metacharacters are rejected to prevent SST command injection
+# (MDEV-39676 / PXC-5241). Values below contain no metacharacters and pass.
 SET @@global.wsrep_sst_receive_address='OFF';
 SELECT @@global.wsrep_sst_receive_address;
 SET @@global.wsrep_sst_receive_address=ON;

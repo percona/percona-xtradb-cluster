@@ -14,6 +14,7 @@
    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA */
 
 #include "wsrep_sst.h"
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <regex>
@@ -90,6 +91,36 @@ static std::vector<std::string> allowed_sst_methods;
 
 bool wsrep_sst_donor_rejects_queries = false;
 
+/* alphanumerics plus -_. (POSIX portable filename character set) */
+static bool filename_char(int const c) {
+  return std::isalnum(c) || (c == '-') || (c == '_') || (c == '.');
+}
+
+/* comma, used as separator in donor lists */
+static bool comma_char(int const c) { return (c == ','); }
+
+/* characters valid in a single address (host:port or [ipv6]/...) */
+static bool address_char(int const c) {
+  return filename_char(c) || (c == ':') || (c == '[') || (c == ']') ||
+         (c == '/');
+}
+
+/* characters valid in a comma-separated list of node addresses */
+static bool names_list(int const c) { return address_char(c) || comma_char(c); }
+
+static bool check_request_str(const char *const str, bool (*check)(int c),
+                              bool log_warn = true) {
+  for (size_t i(0); str[i] != '\0'; ++i) {
+    if (!check(str[i])) {
+      if (log_warn)
+        WSREP_WARN("Illegal character in state transfer request: %i (%c).",
+                   str[i], str[i]);
+      return true;
+    }
+  }
+  return false;
+}
+
 /* Function checks if the new value for sst_method is valid.
 @return false if no error encountered with check else return true. */
 bool wsrep_sst_method_check(sys_var *self, THD *, set_var *var) {
@@ -118,17 +149,22 @@ bool wsrep_sst_method_update(sys_var *, THD *, enum_var_type) { return 0; }
 /* Function checks if the new value for sst_recieve_address is valid.
 @return false if no error encountered with check else return true. */
 bool wsrep_sst_receive_address_check(sys_var *self, THD *, set_var *var) {
-  char addr_buf[FN_REFLEN];
+  if (!var->save_result.string_value.str) goto err;
 
-  if ((!var->save_result.string_value.str) ||
-      (var->save_result.string_value.length > (FN_REFLEN - 1)))  // safety
+  /* Allow empty value. */
+  if (var->save_result.string_value.length == 0) return false;
+
+  /* Check length. */
+  if (var->save_result.string_value.length > (FN_REFLEN - 1))  // safety
   {
     goto err;
   }
 
-  memcpy(addr_buf, var->save_result.string_value.str,
-         var->save_result.string_value.length);
-  addr_buf[var->save_result.string_value.length] = 0;
+  /* Reject shell-unsafe characters (MDEV-39676 / PXC-5241). */
+  if (check_request_str(var->save_result.string_value.str, address_char,
+                        false)) {
+    goto err;
+  }
 
   return false;
 
@@ -143,7 +179,30 @@ bool wsrep_sst_receive_address_update(sys_var *, THD *, enum_var_type) {
   return 0;
 }
 
-bool wsrep_sst_donor_check(sys_var *, THD *, set_var *) { return 0; }
+bool wsrep_sst_donor_check(sys_var *self, THD *, set_var *var) {
+  if (!var->save_result.string_value.str ||
+      var->save_result.string_value.length == 0)
+    return false;
+
+  /* Check length. */
+  if (var->save_result.string_value.length > (FN_REFLEN - 1))  // safety
+  {
+    goto err;
+  }
+
+  /* Reject shell-unsafe characters (MDEV-39676 / PXC-5241). */
+  if (check_request_str(var->save_result.string_value.str, names_list, false)) {
+    goto err;
+  }
+
+  return false;
+
+err:
+  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), self->name.str,
+           var->save_result.string_value.str ? var->save_result.string_value.str
+                                             : "NULL");
+  return true;
+}
 
 bool wsrep_sst_donor_update(sys_var *, THD *, enum_var_type) { return 0; }
 
@@ -526,179 +585,182 @@ static void *sst_joiner_thread(void *a) {
   wsrep_pfs_register_thread(key_THREAD_wsrep_sst_joiner);
 #endif /* HAVE_PSI_INTERFACE */
 
-  {
-    THD *thd;
-    const char magic[] = "ready";
-    const size_t magic_len = sizeof(magic) - 1;
-    const int out_len = 512;
-    char out[out_len];
+  THD *thd;
+  const char magic[] = "ready";
+  const size_t magic_len = sizeof(magic) - 1;
+  const int out_len = 512;
+  char out[out_len];
 
-    WSREP_INFO("Initiating SST/IST transfer on JOINER side (%s)", arg->cmd);
+  WSREP_INFO("Initiating SST/IST transfer on JOINER side (%s)", arg->cmd);
 
-    // Launch the SST script and save pointer to its process:
+  // Launch the SST script and save pointer to its process:
 
-    if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
-    wsp::process proc(arg->cmd, "rw", arg->env);
-    sst_process = &proc;
-    mysql_mutex_unlock(&LOCK_wsrep_sst);
+  if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
+  wsp::process proc(arg->cmd, "rw", arg->env);
+  sst_process = &proc;
+  mysql_mutex_unlock(&LOCK_wsrep_sst);
 
-    pthread_t logger_thd = 0;
-    sst_logger_thread_arg logger_arg(proc.err_pipe());
-    proc.clear_err_pipe();
+  pthread_t logger_thd = 0;
+  sst_logger_thread_arg logger_arg(proc.err_pipe());
+  proc.clear_err_pipe();
 
-    err = start_sst_logger_thread(&logger_arg, &logger_thd);
+  err = start_sst_logger_thread(&logger_arg, &logger_thd);
 
-    if (!err && !proc.error()) {
-      // Write out to the stdin pipe any parameters (if needed)
+  if (!err && !proc.error()) {
+    // Write out to the stdin pipe any parameters (if needed)
 
-      // Close the pipe, so that the other side gets an EOF
-      proc.close_write_pipe();
-    }
-    if (!err && proc.pipe() && !proc.error()) {
-      const char *tmp = my_fgets(out, out_len, proc.pipe());
-      if (!tmp || strlen(tmp) < (magic_len + 2) ||
-          strncasecmp(tmp, magic, magic_len)) {
-        if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
-        // Print error message if SST is not cancelled:
-        if (!sst_cancelled) {
-          // The process has exited, so the logger thread should
-          // also have exited
-          if (logger_thd) {
-            pthread_join(logger_thd, NULL);
-            logger_thd = 0;
-          }
-          // Null-pointer is not valid argument for %s formatting (even
-          // though it is supported by many compilers):
-          WSREP_ERROR("Failed to read '%s <addr>' from: %s\n\tRead: '%s'",
-                      magic, arg->cmd, tmp ? tmp : "(null)");
-        }
-        // Clear the pointer to SST process:
-        sst_process = NULL;
-        mysql_mutex_unlock(&LOCK_wsrep_sst);
-        proc.wait();
-        if (proc.error()) err = proc.error();
-      } else {
-        // Do not clear the pointer to SST process. It will be useful if
-        // we decide to interrupt it.
-        err = 0;
-      }
-    } else {
-      // Clear the pointer to SST process:
+    // Close the pipe, so that the other side gets an EOF
+    proc.close_write_pipe();
+  }
+  if (!err && proc.pipe() && !proc.error()) {
+    const char *tmp = my_fgets(out, out_len, proc.pipe());
+    if (!tmp || strlen(tmp) < (magic_len + 2) ||
+        strncasecmp(tmp, magic, magic_len)) {
       if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
+      // Print error message if SST is not cancelled:
+      if (!sst_cancelled) {
+        // The process has exited, so the logger thread should
+        // also have exited
+        if (logger_thd) {
+          pthread_join(logger_thd, NULL);
+          logger_thd = 0;
+        }
+        // Null-pointer is not valid argument for %s formatting (even
+        // though it is supported by many compilers):
+        WSREP_ERROR("Failed to read '%s <addr>' from: %s\n\tRead: '%s'",
+                    magic, arg->cmd, tmp ? tmp : "(null)");
+      }
+      // Clear the pointer to SST process:
       sst_process = NULL;
       mysql_mutex_unlock(&LOCK_wsrep_sst);
-      err = proc.error();
-      WSREP_ERROR("Failed to execute: %s : %d (%s)", arg->cmd, err,
-                  strerror(err));
+      proc.wait();
+      if (proc.error()) err = proc.error();
+    } else {
+      // Do not clear the pointer to SST process. It will be useful if
+      // we decide to interrupt it.
+      err = 0;
     }
+  } else {
+    // Clear the pointer to SST process:
+    if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
+    sst_process = NULL;
+    mysql_mutex_unlock(&LOCK_wsrep_sst);
+    err = proc.error();
+    WSREP_ERROR("Failed to execute: %s : %d (%s)", arg->cmd, err,
+                strerror(err));
+  }
 
-    // signal sst_prepare thread with ret code,
-    // it will go on sending SST request
-    mysql_mutex_lock(&arg->LOCK_wsrep_sst_thread);
-    if (!err) {
-      arg->ret_str = strdup(out + magic_len + 1);
-      if (!arg->ret_str) err = ENOMEM;
-    }
-    arg->err = -err;
-    mysql_cond_signal(&arg->COND_wsrep_sst_thread);
-    mysql_mutex_unlock(&arg->LOCK_wsrep_sst_thread);
+  // signal sst_prepare thread with ret code,
+  // it will go on sending SST request
+  mysql_mutex_lock(&arg->LOCK_wsrep_sst_thread);
+  if (!err) {
+    arg->ret_str = strdup(out + magic_len + 1);
+    if (!arg->ret_str) err = ENOMEM;
+  }
+  arg->err = -err;
+  mysql_cond_signal(&arg->COND_wsrep_sst_thread);
+  mysql_mutex_unlock(&arg->LOCK_wsrep_sst_thread);
 
-    if (err) {
-      // The process has exited, so the logger thread should
-      // also have exited
-      if (logger_thd) pthread_join(logger_thd, NULL);
-
-      return NULL; /* lp:808417 - return immediately, don't signal
-                    * initializer thread to ensure single thread of
-                    * shutdown. */
-    }
-
-    wsrep_uuid_t ret_uuid = WSREP_UUID_UNDEFINED;
-    wsrep_seqno_t ret_seqno = WSREP_SEQNO_UNDEFINED;
-
-    // in case of successfull receiver start, wait for SST completion/end
-    char *tmp = my_fgets(out, out_len, proc.pipe());
-
-    proc.wait();
-    err = EINVAL;
-
+  if (err) {
     // The process has exited, so the logger thread should
     // also have exited
     if (logger_thd) pthread_join(logger_thd, NULL);
 
-    if (!tmp || proc.error()) {
-      WSREP_ERROR("Failed to read uuid:seqno from joiner script.");
-      if (proc.error()) {
-        err = proc.error();
-        char errbuf[MYSYS_STRERROR_SIZE];
-        WSREP_ERROR("SST script aborted with error %d (%s)", err,
-                    my_strerror(errbuf, sizeof(errbuf), err));
-      }
-    } else {
-      err = sst_scan_uuid_seqno(out, &ret_uuid, &ret_seqno);
-    }
-
-    wsrep::gtid ret_gtid;
-
-    if (err) {
-      ret_gtid = wsrep::gtid::undefined();
-    } else {
-      ret_gtid = wsrep::gtid(wsrep::id(ret_uuid.data, sizeof(ret_uuid.data)),
-                             wsrep::seqno(ret_seqno));
-    }
-
-    // Tell initializer thread that SST is complete
-    if (my_thread_init()) {
-      WSREP_ERROR(
-          "my_thread_init() failed, can't signal end of SST. "
-          "Aborting.");
-      unireg_abort(1);
-    }
-
-    thd = new THD;
-    thd->set_new_thread_id();
-
-    if (!thd) {
-      WSREP_ERROR(
-          "Failed to allocate THD to restore view from local state, "
-          "can't signal end of SST. Aborting.");
-      unireg_abort(1);
-    }
-
-    thd->thread_stack = (char *)&thd;
-    thd->security_context()->skip_grants();
-    thd->system_thread = SYSTEM_THREAD_BACKGROUND;
-    thd->real_id = pthread_self();
-    wsrep_assign_from_threadvars(thd);
-    wsrep_store_threadvars(thd);
-
-    /* */
-    thd->variables.wsrep_on = 0;
-    /* No binlogging */
-    thd->variables.sql_log_bin = 0;
-    thd->variables.option_bits &= ~OPTION_BIN_LOG;
-    thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
-    /* No general log */
-    thd->variables.option_bits |= OPTION_LOG_OFF;
-    /* Read committed isolation to avoid gap locking */
-    thd->variables.transaction_isolation = ISO_READ_COMMITTED;
-
-    if (wsrep_sst_complete(thd, -err)) {
-      WSREP_WARN("Failure while signalling the completion of SST.");
-    }
-
-    WSREP_SYSTEM("SST completed");
-    delete thd;
-    my_thread_end();
+    return NULL; /* lp:808417 - return immediately, don't signal
+                  * initializer thread to ensure single thread of
+                  * shutdown. */
   }
+
+  wsrep_uuid_t ret_uuid = WSREP_UUID_UNDEFINED;
+  wsrep_seqno_t ret_seqno = WSREP_SEQNO_UNDEFINED;
+
+  // in case of successfull receiver start, wait for SST completion/end
+  char *tmp = my_fgets(out, out_len, proc.pipe());
+
+  proc.wait();
+  // proc.wait() has reaped the SST process, so the global pointer is no
+  // longer needed. Clear it now (under LOCK_wsrep_sst) so a concurrent
+  // wsrep_sst_cancel() - in particular the one invoked from the SIGABRT
+  // handler that Galera triggers after a graceful shutdown (MDEV-31517) -
+  // does not log "Terminating SST process" and call terminate() on a
+  // process that has already exited.
+  if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
+  sst_process = NULL;
+  mysql_mutex_unlock(&LOCK_wsrep_sst);
+  err = EINVAL;
+
+  // The process has exited, so the logger thread should
+  // also have exited
+  if (logger_thd) pthread_join(logger_thd, NULL);
+
+  if (!tmp || proc.error()) {
+    WSREP_ERROR("Failed to read uuid:seqno from joiner script.");
+    if (proc.error()) {
+      err = proc.error();
+      char errbuf[MYSYS_STRERROR_SIZE];
+      WSREP_ERROR("SST script aborted with error %d (%s)", err,
+                  my_strerror(errbuf, sizeof(errbuf), err));
+    }
+  } else {
+    err = sst_scan_uuid_seqno(out, &ret_uuid, &ret_seqno);
+  }
+
+  wsrep::gtid ret_gtid;
+
+  if (err) {
+    ret_gtid = wsrep::gtid::undefined();
+  } else {
+    ret_gtid = wsrep::gtid(wsrep::id(ret_uuid.data, sizeof(ret_uuid.data)),
+                            wsrep::seqno(ret_seqno));
+  }
+
+  // Tell initializer thread that SST is complete
+  if (my_thread_init()) {
+    WSREP_ERROR(
+        "my_thread_init() failed, can't signal end of SST. "
+        "Aborting.");
+    unireg_abort(1);
+  }
+
+  thd = new THD;
+  thd->set_new_thread_id();
+
+  if (!thd) {
+    WSREP_ERROR(
+        "Failed to allocate THD to restore view from local state, "
+        "can't signal end of SST. Aborting.");
+    unireg_abort(1);
+  }
+
+  thd->thread_stack = (char *)&thd;
+  thd->security_context()->skip_grants();
+  thd->system_thread = SYSTEM_THREAD_BACKGROUND;
+  thd->real_id = pthread_self();
+  wsrep_assign_from_threadvars(thd);
+  wsrep_store_threadvars(thd);
+
+  /* */
+  thd->variables.wsrep_on = 0;
+  /* No binlogging */
+  thd->variables.sql_log_bin = 0;
+  thd->variables.option_bits &= ~OPTION_BIN_LOG;
+  thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+  /* No general log */
+  thd->variables.option_bits |= OPTION_LOG_OFF;
+  /* Read committed isolation to avoid gap locking */
+  thd->variables.transaction_isolation = ISO_READ_COMMITTED;
+
+  if (wsrep_sst_complete(thd, -err)) {
+    WSREP_WARN("Failure while signalling the completion of SST.");
+  }
+
+  WSREP_SYSTEM("SST completed");
+  delete thd;
+  my_thread_end();
 
 #ifdef HAVE_PSI_INTERFACE
   wsrep_pfs_delete_thread();
 #endif /* HAVE_PSI_INTERFACE */
-
-  if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
-  sst_process = NULL;
-  mysql_mutex_unlock(&LOCK_wsrep_sst);
 
   return NULL;
 }

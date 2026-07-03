@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+/* Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -205,6 +205,9 @@ static int mecab_parse(MeCab::Lattice *mecab_lattice,
   if (param->mode == MYSQL_FTPARSER_FULL_BOOLEAN_INFO) {
     for (const MeCab::Node *node = mecab_lattice->bos_node(); node != NULL;
          node = node->next) {
+      if (node->stat == MECAB_BOS_NODE || node->stat == MECAB_EOS_NODE) {
+        continue;
+      }
       token_num += 1;
     }
 

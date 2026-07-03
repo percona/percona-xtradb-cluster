@@ -1,0 +1,3 @@
+[enc_off]
+wsrep-gcache-encrypt=OFF
+wsrep-disk-pages-encrypt=OFF
