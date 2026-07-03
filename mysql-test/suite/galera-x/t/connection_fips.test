@@ -15,15 +15,15 @@ SHOW STATUS LIKE 'ssl_cipher';
 EOF
 
 --echo ##Test: Restart server and provide weak ssl-cipher at server startup
-let $restart_parameters=restart:--ssl-cipher=CAMELLIA256-SHA;
+let $restart_parameters=restart:--ssl-cipher=DHE-RSA-CHACHA20-POLY1305;
 --source ../include/restart_mysqld.inc
 
 let $wait_condition=SELECT 1 FROM performance_schema.global_status WHERE variable_name='mysqlx_port' AND variable_value!='';
 --source include/wait_condition_or_abort.inc
 
 --error 1
---exec $MYSQLXTEST -u root --file=$MYSQL_TMP_DIR/mysqlx_fips_test.tmp --ssl-mode=required --ssl-fips-mode=on --ssl-cipher=CAMELLIA256-SHA 2>&1
---exec $MYSQLXTEST -u root --file=$MYSQL_TMP_DIR/mysqlx_fips_test.tmp --ssl-mode=required --ssl-fips-mode=off --ssl-cipher=CAMELLIA256-SHA 2>&1
+--exec $MYSQLXTEST -u root --file=$MYSQL_TMP_DIR/mysqlx_fips_test.tmp --ssl-mode=required --ssl-fips-mode=on --ssl-cipher=DHE-RSA-CHACHA20-POLY1305 2>&1
+--exec $MYSQLXTEST -u root --file=$MYSQL_TMP_DIR/mysqlx_fips_test.tmp --ssl-mode=required --ssl-fips-mode=off --ssl-cipher=DHE-RSA-CHACHA20-POLY1305 2>&1
 
 --echo ##Cleanup: Restore ssl-cipher to default
 
