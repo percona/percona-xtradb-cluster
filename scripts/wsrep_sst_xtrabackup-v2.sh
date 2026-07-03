@@ -127,8 +127,8 @@ declare -a RC
 # major - mandatory, multiple digits
 # minor - mandatory, multiple digits
 # patch - optional, multiple digits
-# build - optional, multiple digits
-xb_version_regex=' [0-9]\+\(\.[0-9]\+\)\{1,2\}\(-[0-9]\+\)\?'
+# build - optional, multiple digits or rc<number>
+xb_version_regex=' [0-9]\+\(\.[0-9]\+\)\{1,2\}\(-\(rc[0-9]\+\|[0-9]\+\)\)\?'
 # default XB (xtrabackup-binary) to use.
 XTRABACKUP_BIN=xtrabackup
 DATA="${WSREP_SST_OPT_DATA}"
@@ -185,7 +185,7 @@ XTRABACKUP_PREV_LTS_VER_PATH="$(dirname $0)/pxc_extra/pxb-8.4"
 
 # Minimum PXB required versions for this node to work
 # To be able to service this version
-XB_THIS_REQUIRED_VERSION="9.7.0-1"
+XB_THIS_REQUIRED_VERSION="9.7.1-rc1"
 # To be able to service previous version
 XB_PREV_REQUIRED_VERSION="9.6.0-1"
 # To be able to service previous LTS version

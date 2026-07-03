@@ -443,9 +443,14 @@ function get_length_in_bytes()
 #   Parameter 1: a version string
 #                like "8.4.0-5"
 #                anything after the major.minor.revision-build is ignored
+#  or
+#  Parameter 1: a version string
+#                like "9.7.1-rc2"
+#                anything after the major.minor.revision-rc<number> is ignored
 # Outputs:
 #   A string that can be used directly with string comparisons.
 #   So, the string "8.4.0-5" is transformed into "08040005"
+#   or "9.7.1-rc2" is transformed into "09070102"
 #   Note that individual version numbers can only go up to 99.
 #
 function normalize_version()
@@ -454,13 +459,15 @@ function normalize_version()
     local minor=0
     local patch=0
     local build=0
-    # Only parses purely numeric version numbers, 1.2.3-4
-    # Everything after the first four values is ignored
-    if [[ $1 =~ ^([0-9]+)\.([0-9]+)\.?([0-9]*)\-?([0-9]*)([^ ])* ]]; then
+    # Parses numeric versions, 1.2.3-4, and rc versions, 1.2.3-rc4.
+    # RC builds are expected to use lower numeric suffixes than the final build
+    # (for example, -rc1, -rc2, then -3), so numeric comparison preserves order.
+    # Everything after the first four values is ignored.
+    if [[ $1 =~ ^([0-9]+)\.([0-9]+)\.?([0-9]*)-?(rc)?([0-9]*)([^[:space:]]*) ]]; then
         major=${BASH_REMATCH[1]}
         minor=${BASH_REMATCH[2]}
         patch=${BASH_REMATCH[3]}
-        build=${BASH_REMATCH[4]}
+        build=${BASH_REMATCH[5]}
     fi
 
     printf %02d%02d%02d%02d $major $minor $patch $build
