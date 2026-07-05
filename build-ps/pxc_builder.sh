@@ -23,6 +23,7 @@ Usage: $0 [OPTIONS]
         --bin_release       BIN version( default = 1)
         --enable_fipsmode   Build gated PXC
         --debug             Build debug tarball
+        --enable_pgo        PGO (Profile-Guided Optimization) build (default = 1, set to 0 to disable)
         --help) usage ;;
 Example $0 --builddir=/tmp/PXC80 --get_sources=1 --build_src_rpm=1 --build_rpm=1
 EOF
@@ -61,7 +62,8 @@ parse_arguments() {
             --no_clone=*) NO_CLONE="$val" ;;
             --debug=*) DEBUG="$val" ;;
             --enable_fipsmode=*) FIPSMODE="$val" ;;
-            --help) usage ;;      
+            --enable_pgo=*) ENABLE_PGO="$val" ;;
+            --help) usage ;;
             *)
               if test -n "$pick_args"
               then
@@ -849,17 +851,22 @@ build_rpm(){
     source ${WORKDIR}/pxc-80.properties
     source ${CURDIR}/srpm/pxc-80.properties
     #
+    # PGO: default is on; propagate --enable_pgo=0 as --define 'without_pgo 1'
+    PGO_DEFINE=""
+    if [ "${ENABLE_PGO}" = "0" ]; then
+        PGO_DEFINE="--define \"without_pgo 1\""
+    fi
     if [ ${ARCH} = x86_64 ]; then
         if [[ "x${FIPSMODE}" == "x1" ]]; then
-            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "enable_fipsmode 1" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+            eval rpmbuild --define '"_topdir ${WORKDIR}/rpmbuild"' --define '"dist ${OS_NAME}"' --define '"rpm_version $MYSQL_RELEASE.$RPM_RELEASE"' --define '"enable_fipsmode 1"' --define '"rel $RPM_RELEASE"' --define '"galera_revision ${GALERA_REVNO}"' --define '"with_mecab ${MECAB_INSTALL_DIR}/usr"' ${PGO_DEFINE} --rebuild rpmbuild/SRPMS/${SRCRPM}
         else
-            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+            eval rpmbuild --define '"_topdir ${WORKDIR}/rpmbuild"' --define '"dist ${OS_NAME}"' --define '"rpm_version $MYSQL_RELEASE.$RPM_RELEASE"' --define '"rel $RPM_RELEASE"' --define '"galera_revision ${GALERA_REVNO}"' --define '"with_mecab ${MECAB_INSTALL_DIR}/usr"' ${PGO_DEFINE} --rebuild rpmbuild/SRPMS/${SRCRPM}
         fi
     else
         if [[ "x${FIPSMODE}" == "x1" ]]; then
-            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "enable_fipsmode 1" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+            eval rpmbuild --define '"_topdir ${WORKDIR}/rpmbuild"' --define '"dist ${OS_NAME}"' --define '"rpm_version $MYSQL_RELEASE.$RPM_RELEASE"' --define '"enable_fipsmode 1"' --define '"rel $RPM_RELEASE"' --define '"galera_revision ${GALERA_REVNO}"' --define '"with_tokudb 0"' --define '"with_rocksdb 0"' --define '"with_mecab ${MECAB_INSTALL_DIR}/usr"' ${PGO_DEFINE} --rebuild rpmbuild/SRPMS/${SRCRPM}
         else
-            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+            eval rpmbuild --define '"_topdir ${WORKDIR}/rpmbuild"' --define '"dist ${OS_NAME}"' --define '"rpm_version $MYSQL_RELEASE.$RPM_RELEASE"' --define '"rel $RPM_RELEASE"' --define '"galera_revision ${GALERA_REVNO}"' --define '"with_tokudb 0"' --define '"with_rocksdb 0"' --define '"with_mecab ${MECAB_INSTALL_DIR}/usr"' ${PGO_DEFINE} --rebuild rpmbuild/SRPMS/${SRCRPM}
         fi
     fi
     return_code=$?
@@ -1159,6 +1166,10 @@ build_deb(){
         sed -i 's/export CXXFLAGS=/export CXXFLAGS=-Wno-error=nonnull-compare -Wno-error=deprecated-declarations -Wno-error=unused-function -Wno-error=unused-variable -Wno-error=unused-parameter -Wno-error=date-time /' debian/rules
     fi
 
+    # PGO: default is on; propagate --enable_pgo=0 as DEB_NO_PGO=1
+    if [ "${ENABLE_PGO}" = "0" ]; then
+        export DEB_NO_PGO=1
+    fi
     GALERA_REVNO="${GALERA_REVNO}" SCONS_ARGS=' strict_build_flags=0'  MAKE_JFLAG=-j4  dpkg-buildpackage -rfakeroot -uc -us -b
     #
     cd ${WORKSPACE} || exit
@@ -1310,6 +1321,9 @@ build_tarball(){
     if [ -n "${REVISION}" ]; then
         sed -i "s:REVISION=\"\":REVISION=\"$REVISION\":g" ./build-ps/build-binary.sh
     fi
+    # Pass ENABLE_PGO through to build-binary.sh as WITH_PGO so tarball builds
+    # honour --enable_pgo=0 the same way RPM/DEB builds do.
+    export WITH_PGO="${ENABLE_PGO}"
     if [[ ${DEBUG} == 1 ]]; then
         bash -x ./build-ps/build-binary.sh --debug --with-jemalloc=jemalloc/ -t $BIN_RELEASE $BUILD_ROOT
     else
@@ -1351,6 +1365,7 @@ RPM_RELEASE=1
 DEB_RELEASE=1
 BIN_RELEASE=1
 DEBUG=0
+ENABLE_PGO=1
 REVISION=0
 BRANCH="8.0"
 MECAB_INSTALL_DIR="${WORKDIR}/mecab-install"
