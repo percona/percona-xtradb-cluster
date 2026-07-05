@@ -333,8 +333,61 @@ if [[ $ENABLE_ASAN -eq 1 ]]; then
     fi
 fi
 COMMON_FLAGS="-DPERCONA_INNODB_VERSION=$PERCONA_SERVER_EXTENSION"
-export CFLAGS=" $COMMON_FLAGS -static-libgcc $MACHINE_SPECS_CFLAGS ${CFLAGS:-}"
-export CXXFLAGS=" $COMMON_FLAGS $MACHINE_SPECS_CFLAGS ${CXXFLAGS:-}"
+
+# PGO + LTO settings
+#   WITH_PGO=1  (default)  - enable Profile-Guided Optimization (3-pass build)
+#   WITH_PGO=0             - skip PGO (single cmake pass)
+# Debug builds always skip PGO (no value profiling an unoptimized binary).
+WITH_PGO="${WITH_PGO:-1}"
+if [ "${CMAKE_BUILD_TYPE:-}" = "Debug" ]; then
+    WITH_PGO=0
+fi
+
+# LTO toolchain blocklist. We must pass -DWITH_LTO=OFF *explicitly* on
+# affected hosts, because cmake/fprofile.cmake auto-promotes
+# WITH_LTO_DEFAULT=ON whenever FPROFILE_USE is set; an omitted flag
+# would let LTO fire during the PGO rebuild pass on a broken toolchain.
+#
+# Disabled on:
+#   - RHEL/OL/AlmaLinux/Rocky 8 and older   (toolchain known LTO bugs)
+#   - Amazon Linux < 2023                   (GCC too old)
+#   - Debian bullseye / Ubuntu focal        (per build-ps/debian/rules)
+# Enabled everywhere else.
+WITH_LTO_FLAG="-DWITH_LTO=ON"
+HOST_RHEL=0
+HOST_AMZN=0
+HOST_DIST="unknown"
+if [ -f /etc/redhat-release ]; then
+    HOST_RHEL=$(rpm --eval %rhel 2>/dev/null || echo 0)
+    HOST_AMZN=$(rpm --eval %amzn 2>/dev/null || echo 0)
+    case "${HOST_AMZN}" in ''|*[!0-9]*) HOST_AMZN=0 ;; esac
+    case "${HOST_RHEL}" in ''|*[!0-9]*) HOST_RHEL=0 ;; esac
+    if [ "${HOST_AMZN}" -ge 2023 ] 2>/dev/null; then
+        :  # Amazon Linux 2023+ is fine, leave LTO=ON
+    elif [ "${HOST_AMZN}" -gt 0 ] 2>/dev/null; then
+        WITH_LTO_FLAG="-DWITH_LTO=OFF"   # Amazon Linux < 2023
+    elif [ "${HOST_RHEL}" -gt 0 ] 2>/dev/null && [ "${HOST_RHEL}" -le 8 ] 2>/dev/null; then
+        WITH_LTO_FLAG="-DWITH_LTO=OFF"   # RHEL/OL/Alma 8 and older
+    fi
+elif [ -f /etc/debian_version ]; then
+    HOST_DIST=$(lsb_release -sc 2>/dev/null || echo unknown)
+    case "${HOST_DIST}" in
+        focal|bullseye) WITH_LTO_FLAG="-DWITH_LTO=OFF" ;;
+    esac
+fi
+echo "build-binary.sh: ${WITH_LTO_FLAG} (HOST_RHEL=${HOST_RHEL} HOST_AMZN=${HOST_AMZN} HOST_DIST=${HOST_DIST})"
+
+# Suppress GCC false positives that fire during LTO link on Bison-generated
+# parsers (sql_hints.yy.cc, pars0grm.cc, etc.) and on bundled libs.
+# Distro-built RPMs/DEBs get these via redhat-hardened-cc1 / dpkg-buildflags;
+# the standalone tarball build doesn't, so add them explicitly. Matches the
+# suppressions Oracle uses in their official MySQL RPM/DEB INFO_BIN.
+# Parameterized warnings (-Walloc-size-larger-than=N etc.) require -Wno- form,
+# not -Wno-error= form, in GCC 14+.
+TARBALL_WARN_SUPPRESS="-Wno-free-nonheap-object -Wno-stringop-overflow -Wno-stringop-overread -Wno-alloc-size-larger-than -Wno-array-bounds"
+
+export CFLAGS=" $COMMON_FLAGS -static-libgcc $MACHINE_SPECS_CFLAGS $TARBALL_WARN_SUPPRESS ${CFLAGS:-}"
+export CXXFLAGS=" $COMMON_FLAGS $MACHINE_SPECS_CFLAGS $TARBALL_WARN_SUPPRESS ${CXXFLAGS:-}"
 export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
 
 #
@@ -482,9 +535,14 @@ fi
             cp -R $SOURCEDIR/percona-xtradb-cluster-tests $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/
         ) || exit 1
     else
+        PGO_FIRST_FLAG=""
+        [ "${WITH_PGO}" = "1" ] && PGO_FIRST_FLAG="-DFPROFILE_GENERATE=1"
+
         cmake $SOURCEDIR/ ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
             -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
             -DMINIMAL_RELWITHDEBINFO=OFF \
+            $PGO_FIRST_FLAG \
+            "${WITH_LTO_FLAG}" \
             -DCMAKE_INSTALL_PREFIX="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" \
             -DMYSQL_DATADIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/data" \
             -DROUTER_INSTALL_LIBDIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib/mysqlrouter/private" \
@@ -517,6 +575,54 @@ fi
             ${BUILD_PARAMETER} $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
         (make $MAKE_JFLAG $QUIET) || exit 1
+
+        if [ "${WITH_PGO}" = "1" ]; then
+            echo "PGO: running MTR profile suite to generate .gcda profile data"
+            (make run-profile-suite) || exit 1
+
+            echo "PGO: rebuilding with profile data (-DFPROFILE_USE=1)"
+            cd "$TARGETDIR"
+            rm -rf bld
+            mkdir bld
+            cd bld
+            cmake $SOURCEDIR/ ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
+                -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
+                -DMINIMAL_RELWITHDEBINFO=OFF \
+                -DFPROFILE_USE=1 \
+                "${WITH_LTO_FLAG}" \
+                -DCMAKE_INSTALL_PREFIX="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" \
+                -DMYSQL_DATADIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/data" \
+                -DROUTER_INSTALL_LIBDIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib/mysqlrouter/private" \
+                -DROUTER_INSTALL_PLUGINDIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib/mysqlrouter/plugin" \
+                -DCOMPILATION_COMMENT="$COMMENT" \
+                -DWITH_PAM=ON \
+                -DWITHOUT_ROCKSDB=ON \
+                -DWITHOUT_TOKUDB=ON \
+                -DWITH_INNODB_MEMCACHED=ON \
+                -DDOWNLOAD_BOOST=1 \
+                -DFORCE_INSOURCE_BUILD=1 \
+                -DWITH_SYSTEM_LIBS=ON \
+                -DWITH_PROTOBUF=bundled \
+                -DWITH_RAPIDJSON=bundled \
+                -DWITH_ICU=bundled \
+                -DWITH_LZ4=bundled \
+                -DWITH_EDITLINE=bundled \
+                -DWITH_LIBEVENT=bundled \
+                -DWITH_ZLIB=bundled \
+                -DWITH_ZSTD=bundled \
+                -DWITH_FIDO="$add_fido_plugin" \
+                -DWITH_NUMA=ON \
+                -DWITH_LDAP=system \
+                -DWITH_BOOST="$TARGETDIR/libboost" \
+                -DWITH_PACKAGE_FLAGS=OFF \
+                -DMYSQL_SERVER_SUFFIX=".$TAG" \
+                -DWITH_WSREP=ON \
+                -DWITH_PERCONA_TELEMETRY=ON \
+                -DWITH_UNIT_TESTS=0 \
+                ${BUILD_PARAMETER} $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
+            (make $MAKE_JFLAG $QUIET) || exit 1
+        fi
+
         (make install) || exit 1
         echo "mysqld in build in release mode"
     fi
