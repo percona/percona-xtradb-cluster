@@ -78,6 +78,10 @@ Prefix: %{_sysconfdir}
 %{?with_mecab: %global mecab_option -DWITH_MECAB=%{with_mecab}}
 %{?with_mecab: %global mecab 1}
 
+# Profile-Guided Optimization: enabled by default
+# To disable: pass --define 'without_pgo 1' to rpmbuild
+%{!?without_pgo: %global pgo 1}
+
  %define boost_req boost-devel
  %define gcc_req gcc-c++
 
@@ -854,6 +858,7 @@ mkdir release
   # XXX: MYSQL_UNIX_ADDR should be in cmake/* but mysql_version is included before
   # XXX: install_layout so we can't just set it based on INSTALL_LAYOUT=RPM
   ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
+           %{?pgo:-DFPROFILE_GENERATE=1} \
            -DDOWNLOAD_BOOST=1 -DWITH_BOOST=build-ps/boost \
            -DWITH_PACKAGE_FLAGS=OFF \
            -DCMAKE_BUILD_TYPE=RelWithDebInfo  -DCMAKE_INSTALL_PREFIX=%{_prefix} \
@@ -901,6 +906,71 @@ mkdir release
            -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_OFF} %{ROCKSDB_FLAGS}
   make %{?_smp_mflags}
 )
+
+# PGO second pass: rebuild the release tree with profile data.
+# Enabled by default. Disable with: rpmbuild --define 'without_pgo 1'
+%if 0%{?pgo}
+(
+  # Run MTR load to generate .gcda profile data
+  pushd release
+  make run-profile-suite
+  rm -r $(readlink mysql-test/var)
+  popd
+
+  # Rebuild release with -DFPROFILE_USE=1
+  rm -rf release
+  mkdir release && pushd release
+  ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
+           -DFPROFILE_USE=1 \
+           -DDOWNLOAD_BOOST=1 -DWITH_BOOST=build-ps/boost \
+           -DWITH_PACKAGE_FLAGS=OFF \
+           -DCMAKE_BUILD_TYPE=RelWithDebInfo  -DCMAKE_INSTALL_PREFIX=%{_prefix} \
+           -DMINIMAL_RELWITHDEBINFO=OFF \
+           -DCMAKE_C_FLAGS="$CFLAGS" \
+           -DCMAKE_CXX_FLAGS="$CXXFLAGS" \
+           -DWITH_EMBEDDED_SERVER=OFF \
+           -DWITH_INNODB_MEMCACHED=ON \
+           -DUSE_LD_LLD=0 \
+           -DWITH_AUTHENTICATION_CLIENT_PLUGINS=1 \
+           -DWITH_CURL=system \
+%if 0%{?systemd}
+           -DWITH_SYSTEMD=OFF \
+%endif
+           -DENABLE_DTRACE=OFF \
+           -DWITH_SSL=system \
+           -DWITH_ZLIB=bundled \
+           -DWITH_READLINE=system \
+           -DWITHOUT_TOKUDB=ON \
+           -DINSTALL_MYSQLSHAREDIR=share/percona-xtradb-cluster \
+           -DINSTALL_SUPPORTFILESDIR=share/percona-xtradb-cluster \
+           -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
+           -DFEATURE_SET="%{feature_set}" \
+           -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
+           -DWITH_WSREP=ON \
+           -DWITH_PERCONA_TELEMETRY=ON \
+           -DWITH_LDAP=system \
+           -DWITH_INNODB_DISALLOW_WRITES=ON \
+           -DWITH_EMBEDDED_SERVER=0 \
+           -DWITH_EMBEDDED_SHARED_LIBRARY=0 \
+           -DWITH_INNODB_MEMCACHED=1 \
+           -DWITH_ZSTD=bundled \
+%if 0%{?add_fido_plugins}
+           -DWITH_FIDO=bundled \
+%else
+           -DWITH_FIDO=none \
+%endif
+           -DWITH_UNIT_TESTS=0 \
+           -DWITH_SCALABILITY_METRICS=ON \
+%if 0%{?rhel} > 8
+           -DWITH_LTO=ON \
+%endif
+           %{?mecab_option} \
+           -DMYSQL_SERVER_SUFFIX=".%{rel}" \
+           -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_OFF} %{ROCKSDB_FLAGS}
+  make %{?_smp_mflags}
+  popd
+)
+%endif # pgo
 
 # For the debuginfo extraction stage, some source files are not located in the release
 # and debug dirs, but in the source dir. Make a link there to avoid errors in the
