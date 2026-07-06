@@ -554,8 +554,8 @@ install_deps() {
             update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-10 100
         fi
 
-        apt-get -y install --download-only percona-xtrabackup-80=8.0.35-34-1.${DIST}
-        apt-get -y install --download-only percona-xtrabackup-84=8.4.0-5-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-80=8.0.35-36-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-84=8.4.0-6-1.${DIST}
     fi
     return;
 }
