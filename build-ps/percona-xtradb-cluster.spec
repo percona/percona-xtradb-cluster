@@ -1160,17 +1160,15 @@ ln -s "galera4/libgalera_smm.so" "$RBR/%{_libdir}/"
 install -d $RBR%{galera_docs}
 install -m 644 $MBD/%{galera_src_dir}/COPYING                     \
     $RBR%{galera_docs}/COPYING
-install -m 644 $MBD/%{galera_src_dir}/packages/rpm/README     \
+install -m 644 $MBD/%{galera_src_dir}/README                      \
     $RBR%{galera_docs}/README
-install -m 644 $MBD/%{galera_src_dir}/packages/rpm/README-MySQL \
-    $RBR%{galera_docs}/README-MySQL
 install -m 644 $MBD/%{galera_src_dir}/asio/LICENSE_1_0.txt    \
     $RBR%{galera_docs}/LICENSE.asio
 
 install -d $RBR%{galera_docs2}
 install -m 644 $MBD/%{galera_src_dir}/COPYING                     \
     $RBR%{galera_docs2}/COPYING
-install -m 644 $MBD/%{galera_src_dir}/packages/rpm/README     \
+install -m 644 $MBD/%{galera_src_dir}/README                      \
     $RBR%{galera_docs2}/README
 
 install -d $RBR%{_mandir}/man8
@@ -1742,7 +1740,9 @@ fi
 %dir %{_libdir}/mysql/private
 %attr(755, root, root) %{_libdir}/mysql/private/libprotobuf-lite.so.*
 %attr(755, root, root) %{_libdir}/mysql/private/libprotobuf.so.*
-%attr(755, root, root) %{_libdir}/mysql/private/libfido2.so.*
+%attr(755, root, root) %{_libdir}/mysql/private/libfido2.so.1.*
+# This is a symlink
+%{_libdir}/mysql/private/libfido2.so.1
 %attr(755, root, root) %{_libdir}/mysql/private/libabsl_bad_any_cast_impl.so
 %attr(755, root, root) %{_libdir}/mysql/private/libabsl_bad_optional_access.so
 %attr(755, root, root) %{_libdir}/mysql/private/libabsl_bad_variant_access.so
@@ -1874,10 +1874,10 @@ fi
 # This is a symlink
 %{_libdir}/libgalera_smm.so
 %{_libdir}/galera4/libgalera_smm.so
+%attr(755, root, root) %{_libdir}/mysql/libgalera_smm.so
 %attr(0755,root,root) %dir %{galera_docs}
 %doc %attr(0644,root,root) %{galera_docs}/COPYING
 %doc %attr(0644,root,root) %{galera_docs}/README
-%doc %attr(0644,root,root) %{galera_docs}/README-MySQL
 %doc %attr(0644,root,root) %{galera_docs}/LICENSE.asio
 %config(noreplace) %{_sysconfdir}/my.cnf
 %dir %{_sysconfdir}/my.cnf.d
@@ -1967,6 +1967,9 @@ fi
 #coredumper
 %attr(755, root, root) %{_includedir}/coredumper/coredumper.h
 %attr(755, root, root) /usr/lib/libcoredumper.a
+#kmip
+%attr(755, root, root) /usr/lib/libkmipclient.a
+%attr(755, root, root) /usr/lib/libkmipcore.a
 
 # ----------------------------------------------------------------------------
 %files -n percona-xtradb-cluster-garbd

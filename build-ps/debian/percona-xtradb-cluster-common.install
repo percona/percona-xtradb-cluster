@@ -4,3 +4,6 @@ debian/extra/my.cnf.fallback etc/mysql/
 #coredumper
 usr/include/coredumper/coredumper.h
 usr/lib/libcoredumper.a
+#kmip
+usr/lib/libkmipclient.a
+usr/lib/libkmipcore.a
