@@ -346,6 +346,12 @@ override_dh_auto_install:
 	install -d $(TMP)/etc/apparmor.d
 	install -d $(TMP)/etc/apparmor.d/local
 
+	# Clean up MTR core dumps that may have landed under mysql-test/
+	# during the PGO run-profile-suite pass. These embed the build
+	# path (from crashed mysqld's environment) and trip downstream
+	# lintian / dh_shlibdeps / policy checks.
+	find $(TMP) -name 'core.[0-9]*' -type f -delete || true
+
 override_dh_install:
 	dh_install
 	mkdir -p debian/percona-xtradb-cluster-server-debug/usr/lib/mysql/private/debug

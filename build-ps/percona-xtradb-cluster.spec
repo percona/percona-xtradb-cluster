@@ -1185,6 +1185,15 @@ install -d $RBR%{_libdir}/mysql
 #    mv $RBR%{_libdir}/mecab $RBR%{_libdir}/mysql
 #%endif
 
+# Clean up MTR core dumps that may have landed under mysql-test/ during
+# the PGO run-profile-suite pass. Core files embed the buildroot path
+# (from crashed mysqld's environment), which trips check-buildroot on
+# EL10 with:
+#     Found '/.../BUILDROOT/...' in installed files; aborting
+# Use core.[0-9]* pattern so we only match PID-suffixed dumps and never
+# a legitimately-named "core*" file.
+find $RBR -name 'core.[0-9]*' -type f -delete || true
+
 ##############################################################################
 #  Post processing actions, i.e. when installed
 ##############################################################################
