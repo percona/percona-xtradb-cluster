@@ -195,7 +195,6 @@ override_dh_auto_install:
 	(cd $(builddir) && $(MAKE) install DESTDIR=$(TMP)/)
 	(cd $(galeradir) && cp -r garb $(TMP)/)
 	(cd $(builddir)/$(galeradir) && cp libgalera_smm.so $(TMP)/)
-	(cd $(galeradir) && cp packages/rpm/README $(TMP)/)
 	mkdir -p $(TMP)/usr/bin/pxc_extra/
 	(cp -r pxb-2.4 $(TMP)/usr/bin/pxc_extra/)
 	(mv $(TMP)/usr/bin/pxc_extra/pxb-2.4/lib/xtrabackup/* $(TMP)/usr/bin/pxc_extra/pxb-2.4/lib/)
@@ -234,12 +233,10 @@ override_dh_auto_install:
 	cp -rp $(TMP)/usr/lib/mysql-test/* $(TMP)/usr/lib/percona-xtradb-cluster-testsuite
 
 	# mysql-server
-	mkdir -p $(TMP)/usr/share/doc/percona-xtradb-cluster-5.7/examples
 	rm -vf $(TMP)/usr/share/percona-xtradb-cluster/mi_test_all* \
 		$(TMP)/usr/share/percona-xtradb-cluster/mysql-log-rotate \
 		$(TMP)/usr/share/percona-xtradb-cluster/mysql.server \
 		$(TMP)/usr/share/percona-xtradb-cluster/binary-configure
-	nm -n $(builddir)/sql/mysqld |gzip -9 > $(TMP)/usr/share/doc/percona-xtradb-cluster-5.7/mysqld.sym.gz
 	# FIXME install -m 0755 debian/additions/echo_stderr $(TMP)/usr/share/mysql/
 	# install -d $(TMP)/etc/mysql
 	# install -m 0755 debian/additions/debian-start $(TMP)/etc/mysql/
