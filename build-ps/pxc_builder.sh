@@ -146,6 +146,8 @@ get_sources(){
             git submodule update
             cd ../ || exit
         done
+
+        sed -i "/^env = conf.Finish()/i conf.env.Append(CPPFLAGS = ' -DGALERA_LOG_H_ENABLE_CXX')" percona-xtradb-cluster-galera/SConstruct
     else
         cd percona-xtradb-cluster || exit
     fi
@@ -612,7 +614,10 @@ build_srpm(){
     #
     mv -fv ${TARFILE} ${WORKDIR}/rpmbuild/SOURCES
     cd ${WORKDIR}/rpmbuild/SOURCES || exit
-    wget https://raw.githubusercontent.com/Percona-Lab/telemetry-agent/phase-0/call-home.sh
+    CALLHOME_SHA="0e3a2ed40336c70727f9aad8402a8a820ebc8db0"
+    CALLHOME_SHA256="3497f6631e71799bed9dedb1d72350bf1f0565d93578955234ac30cf2fb6eba4"
+    wget -q "https://raw.githubusercontent.com/percona/telemetry-agent/${CALLHOME_SHA}/call-home.sh"
+    echo "${CALLHOME_SHA256} call-home.sh" | sha256sum -c - || { echo "ERROR: call-home.sh checksum mismatch"; exit 1; }
     tar -xzf ${TARFILE}
     rm -rf ${TARFILE}
     PXCDIR=$(ls | grep 'Percona-XtraDB-Cluster*' | sort | tail -n1)
@@ -646,7 +651,7 @@ build_srpm(){
     cp ../SOURCES/call-home.sh ./
     awk -v n=$line_number 'NR <= n {print > "part1.txt"} NR > n {print > "part2.txt"}' percona-xtradb-cluster.spec
     head -n -1 part1.txt > temp && mv temp part1.txt
-    echo "cat <<'CALLHOME' > /tmp/call-home.sh" >> part1.txt
+    echo "cat <<'CALLHOME' > \$tfn" >> part1.txt
     cat call-home.sh >> part1.txt 
     echo "CALLHOME" >> part1.txt
     cat part2.txt >> part1.txt
@@ -952,15 +957,19 @@ build_deb(){
 
     postfix=""
     cd debian/
-        wget https://raw.githubusercontent.com/Percona-Lab/telemetry-agent/phase-0/call-home.sh
+        CALLHOME_SHA="0e3a2ed40336c70727f9aad8402a8a820ebc8db0"
+        CALLHOME_SHA256="3497f6631e71799bed9dedb1d72350bf1f0565d93578955234ac30cf2fb6eba4"
+        wget -q "https://raw.githubusercontent.com/percona/telemetry-agent/${CALLHOME_SHA}/call-home.sh"
+        echo "${CALLHOME_SHA256}  call-home.sh" | sha256sum -c - || { echo "ERROR: call-home.sh checksum mismatch"; exit 1; }
         sed -i 's:exit 0::' percona-xtradb-cluster-server"${postfix}".postinst
-        echo "cat <<'CALLHOME' > /tmp/call-home.sh" >> percona-xtradb-cluster-server"${postfix}".postinst
+        echo "tfn=\$(/usr/bin/mktemp -p \$(/usr/bin/mktemp -d /tmp/XXXXXXXX) call-home.XXXXXX.sh)" >> percona-xtradb-cluster-server"${postfix}".postinst
+        echo "cat <<'CALLHOME' > \$tfn" >> percona-xtradb-cluster-server"${postfix}".postinst
         cat call-home.sh >> percona-xtradb-cluster-server"${postfix}".postinst
         echo "CALLHOME" >> percona-xtradb-cluster-server"${postfix}".postinst
-        echo "bash +x /tmp/call-home.sh -f \"PRODUCT_FAMILY_PXC\" -v \"${MYSQL_VERSION}-${MYSQL_RELEASE}-${DEB_RELEASE}\" -d \"PACKAGE\" &>/dev/null || :" >> percona-xtradb-cluster-server"${postfix}".postinst
+        echo "bash +x \$tfn -f \"PRODUCT_FAMILY_PXC\" -v \"${MYSQL_VERSION}-${MYSQL_RELEASE}-${DEB_RELEASE}\" -d \"PACKAGE\" &>/dev/null || :" >> percona-xtradb-cluster-server"${postfix}".postinst
         echo "chgrp percona-telemetry /usr/local/percona/telemetry_uuid &>/dev/null || :" >> percona-xtradb-cluster-server"${postfix}".postinst
         echo "chmod 664 /usr/local/percona/telemetry_uuid &>/dev/null || :" >> percona-xtradb-cluster-server"${postfix}".postinst
-        echo "rm -rf /tmp/call-home.sh" >> percona-xtradb-cluster-server"${postfix}".postinst
+        echo "rm -rf \$tfn" >> percona-xtradb-cluster-server"${postfix}".postinst
         echo "exit 0" >> percona-xtradb-cluster-server"${postfix}".postinst
         rm -f call-home.sh
     cd ../
