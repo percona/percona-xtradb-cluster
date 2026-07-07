@@ -82,6 +82,21 @@ Prefix: %{_sysconfdir}
 # To disable: pass --define 'without_pgo 1' to rpmbuild
 %{!?without_pgo: %global pgo 1}
 
+# EL8's dwz (rpm-build debug-info compressor) crashes on the debug info
+# produced by PGO+LTO builds:
+#     dwz: dwz.c:8584: adjust_exprloc: Assertion `refd != NULL &&
+#          !refd->die_remove' failed.
+#     Aborted (core dumped)
+# Two side effects: (a) find-debuginfo fails, (b) the aborted dwz process
+# writes /usr/lib/debug/core.NNN into the buildroot, which then trips
+# check-buildroot when it discovers the buildroot path embedded in the
+# core file. Newer distros (EL9+) have a fixed dwz, so gate this narrowly.
+# Turning off dwz_opts skips the compression pass entirely - debuginfo
+# packages are slightly larger but functionally identical.
+%if 0%{?rhel} == 8
+%global _find_debuginfo_dwz_opts %{nil}
+%endif
+
  %define boost_req boost-devel
  %define gcc_req gcc-c++
 
