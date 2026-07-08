@@ -437,7 +437,7 @@ Requires(preun):  /sbin/service
 %endif
 Provides:       mysql-server MySQL-server
 %if 0%{?rhel} == 8 || 0%{?rhel} == 9 || 0%{?amzn} == 2023
-Obsoletes:      mariadb-connector-c-config
+Obsoletes:      mariadb-connector-c-config mariadb11.8-connector-c-config
 %endif
 Conflicts:      Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56 Percona-Server-server-57
 Conflicts:      percona-xtradb-cluster-server-pro
