@@ -204,10 +204,10 @@ Depends: percona-xtradb-cluster-client (>= ${binary:Version}),
          lsb-base (>= 3.0-10),
          socat,
          procps,
-         qpress,
          iproute,
          netcat-openbsd,
          curl,
+         qpress,
          stunnel
 Provides: mysql-server,
           virtual-mysql-server, virtual-mysql-server-core,
@@ -299,8 +299,8 @@ Depends: percona-xtradb-cluster-client (>= ${binary:Version}),
          passwd,
          lsb-base (>= 3.0-10),
          socat,
-         qpress,
          netcat-openbsd,
+         qpress,
          iproute
 Provides: mysql-server-debug
 Replaces: percona-xtradb-cluster-server-pro-debug

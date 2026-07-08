@@ -438,7 +438,7 @@ Requires:             percona-xtradb-cluster-shared-compat = %{version}-%{releas
 %endif
 %endif
 Requires:             socat iproute perl-DBI perl-DBD-MySQL
-Requires:       perl(Data::Dumper) which qpress
+Requires:             perl(Data::Dumper) which qpress
 %if 0%{?systemd}
 Requires(post):   systemd
 Requires(preun):  systemd
@@ -450,15 +450,19 @@ Requires(preun):  /sbin/service
 %endif
 Obsoletes:      community-mysql-bench
 Obsoletes:      mysql-bench
-Obsoletes:      mariadb-connector-c-config
-Obsoletes:      mariadb-backup
-Obsoletes:      mariadb-bench
-Obsoletes:      mariadb-server
-Obsoletes:      mariadb-server-galera
-Obsoletes:      mariadb-server-utils
-Obsoletes:      mariadb-galera-server
-Obsoletes:      mariadb-gssapi-server
-Obsoletes:      mariadb-oqgraph-engine
+Obsoletes:      mariadb-connector-c-config mariadb11.8-connector-c-config
+Obsoletes:      mariadb-backup mariadb11.8-backup
+Obsoletes:      mariadb-bench mariadb11.8-bench
+Obsoletes:      mariadb-server mariadb11.8-server
+Obsoletes:      mariadb-server-galera mariadb11.8-server-galera
+Obsoletes:      mariadb-server-utils mariadb11.8-server-utils
+Obsoletes:      mariadb-galera-server mariadb11.8-galera-server
+Obsoletes:      mariadb-gssapi-server mariadb11.8-gssapi-server
+Obsoletes:      mariadb-oqgraph-engine mariadb11.8-oqgraph-engine
+Obsoletes:      mysql8.4-server < 99
+Obsoletes:      mysql8.4 < 99
+Obsoletes:      mysql8.4-common < 99
+Obsoletes:      mysql8.4-errmsg < 99
 Provides:       mysql-server MySQL-server
 Conflicts:      Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56 Percona-Server-server-57
 Conflicts:      percona-xtradb-cluster-server-pro
@@ -1031,6 +1035,8 @@ install -D -p -m 0644 packaging/rpm-common/mysqlrouter.conf.in %{buildroot}%{_sy
 %{__rm} -f $RBR/usr/include/kmippp.h
 %{__rm} -f $RBR/usr/lib/libkmip.a
 %{__rm} -f $RBR/usr/lib/libkmippp.a
+%{__rm} -f $RBR/usr/lib/libkmipclient.a
+%{__rm} -f $RBR/usr/lib/libkmipcore.a
 %{__rm} -f $RBR/usr/lib/libgalera_smm.so
 %{__rm} -f $RBR/usr/share/garb-systemd
 %{__rm} -f $RBR/usr/share/garb.cnf
@@ -1038,7 +1044,6 @@ install -D -p -m 0644 packaging/rpm-common/mysqlrouter.conf.in %{buildroot}%{_sy
 %{__rm} -rf $RBR/usr/man
 %{__rm} -rf $RBR/usr/doc
 #
-
 install -d $RBR%{_sysconfdir}/ld.so.conf.d
 echo %{_libdir}/mysql > $RBR%{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
 %if 0%{?systemd} == 0
@@ -1898,9 +1903,6 @@ fi
 #coredumper
 %attr(755, root, root) %{_includedir}/coredumper/coredumper.h
 %attr(755, root, root) /usr/lib/libcoredumper.a
-#kmip
-%attr(755, root, root) /usr/lib/libkmipclient.a
-%attr(755, root, root) /usr/lib/libkmipcore.a
 
 # ----------------------------------------------------------------------------
 %files -n percona-xtradb-cluster-garbd
