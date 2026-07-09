@@ -39,6 +39,7 @@ mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	MANAGE_DATA_MASKING_POLICY	Y
 mysql.pxc.internal.session	localhost	OPTIMIZE_LOCAL_TABLE	Y
 mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
@@ -99,6 +100,7 @@ root	localhost	GROUP_REPLICATION_ADMIN	Y
 root	localhost	GROUP_REPLICATION_STREAM	Y
 root	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 root	localhost	INNODB_REDO_LOG_ENABLE	Y
+root	localhost	MANAGE_DATA_MASKING_POLICY	Y
 root	localhost	OPTIMIZE_LOCAL_TABLE	Y
 root	localhost	PASSWORDLESS_USER_ADMIN	Y
 root	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
@@ -153,6 +155,7 @@ mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	MANAGE_DATA_MASKING_POLICY	Y
 mysql.pxc.internal.session	localhost	OPTIMIZE_LOCAL_TABLE	Y
 mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
@@ -213,6 +216,7 @@ root	localhost	GROUP_REPLICATION_ADMIN	Y
 root	localhost	GROUP_REPLICATION_STREAM	Y
 root	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 root	localhost	INNODB_REDO_LOG_ENABLE	Y
+root	localhost	MANAGE_DATA_MASKING_POLICY	Y
 root	localhost	OPTIMIZE_LOCAL_TABLE	Y
 root	localhost	PASSWORDLESS_USER_ADMIN	Y
 root	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
@@ -268,6 +272,7 @@ mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	MANAGE_DATA_MASKING_POLICY	Y
 mysql.pxc.internal.session	localhost	OPTIMIZE_LOCAL_TABLE	Y
 mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
@@ -328,6 +333,7 @@ root	localhost	GROUP_REPLICATION_ADMIN	Y
 root	localhost	GROUP_REPLICATION_STREAM	Y
 root	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 root	localhost	INNODB_REDO_LOG_ENABLE	Y
+root	localhost	MANAGE_DATA_MASKING_POLICY	Y
 root	localhost	OPTIMIZE_LOCAL_TABLE	Y
 root	localhost	PASSWORDLESS_USER_ADMIN	Y
 root	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
@@ -394,6 +400,7 @@ mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	MANAGE_DATA_MASKING_POLICY	Y
 mysql.pxc.internal.session	localhost	OPTIMIZE_LOCAL_TABLE	Y
 mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
@@ -454,6 +461,7 @@ root	localhost	GROUP_REPLICATION_ADMIN	Y
 root	localhost	GROUP_REPLICATION_STREAM	Y
 root	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 root	localhost	INNODB_REDO_LOG_ENABLE	Y
+root	localhost	MANAGE_DATA_MASKING_POLICY	Y
 root	localhost	OPTIMIZE_LOCAL_TABLE	Y
 root	localhost	PASSWORDLESS_USER_ADMIN	Y
 root	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
@@ -514,6 +522,7 @@ mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	MANAGE_DATA_MASKING_POLICY	Y
 mysql.pxc.internal.session	localhost	OPTIMIZE_LOCAL_TABLE	Y
 mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
@@ -574,6 +583,7 @@ root	localhost	GROUP_REPLICATION_ADMIN	Y
 root	localhost	GROUP_REPLICATION_STREAM	Y
 root	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 root	localhost	INNODB_REDO_LOG_ENABLE	Y
+root	localhost	MANAGE_DATA_MASKING_POLICY	Y
 root	localhost	OPTIMIZE_LOCAL_TABLE	Y
 root	localhost	PASSWORDLESS_USER_ADMIN	Y
 root	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
@@ -627,6 +637,7 @@ mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	MANAGE_DATA_MASKING_POLICY	Y
 mysql.pxc.internal.session	localhost	OPTIMIZE_LOCAL_TABLE	Y
 mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
@@ -687,6 +698,7 @@ root	localhost	GROUP_REPLICATION_ADMIN	Y
 root	localhost	GROUP_REPLICATION_STREAM	Y
 root	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 root	localhost	INNODB_REDO_LOG_ENABLE	Y
+root	localhost	MANAGE_DATA_MASKING_POLICY	Y
 root	localhost	OPTIMIZE_LOCAL_TABLE	Y
 root	localhost	PASSWORDLESS_USER_ADMIN	Y
 root	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
@@ -767,6 +779,7 @@ mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	MANAGE_DATA_MASKING_POLICY	Y
 mysql.pxc.internal.session	localhost	OPTIMIZE_LOCAL_TABLE	Y
 mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
@@ -827,6 +840,7 @@ root	localhost	GROUP_REPLICATION_ADMIN	Y
 root	localhost	GROUP_REPLICATION_STREAM	Y
 root	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 root	localhost	INNODB_REDO_LOG_ENABLE	Y
+root	localhost	MANAGE_DATA_MASKING_POLICY	Y
 root	localhost	OPTIMIZE_LOCAL_TABLE	Y
 root	localhost	PASSWORDLESS_USER_ADMIN	Y
 root	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
@@ -894,6 +908,7 @@ mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	MANAGE_DATA_MASKING_POLICY	Y
 mysql.pxc.internal.session	localhost	OPTIMIZE_LOCAL_TABLE	Y
 mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
@@ -954,6 +969,7 @@ root	localhost	GROUP_REPLICATION_ADMIN	Y
 root	localhost	GROUP_REPLICATION_STREAM	Y
 root	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 root	localhost	INNODB_REDO_LOG_ENABLE	Y
+root	localhost	MANAGE_DATA_MASKING_POLICY	Y
 root	localhost	OPTIMIZE_LOCAL_TABLE	Y
 root	localhost	PASSWORDLESS_USER_ADMIN	Y
 root	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
@@ -1029,6 +1045,7 @@ mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	MANAGE_DATA_MASKING_POLICY	Y
 mysql.pxc.internal.session	localhost	OPTIMIZE_LOCAL_TABLE	Y
 mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
@@ -1089,6 +1106,7 @@ root	localhost	GROUP_REPLICATION_ADMIN	Y
 root	localhost	GROUP_REPLICATION_STREAM	Y
 root	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 root	localhost	INNODB_REDO_LOG_ENABLE	Y
+root	localhost	MANAGE_DATA_MASKING_POLICY	Y
 root	localhost	OPTIMIZE_LOCAL_TABLE	Y
 root	localhost	PASSWORDLESS_USER_ADMIN	Y
 root	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
@@ -1399,7 +1417,7 @@ GRANT ALL ON *.* to u1;
 SHOW GRANTS FOR u1;
 Grants for u1@%
 GRANT <ALL_STATIC_PRIVILEGES> ON *.* TO `u1`@`%`
-GRANT ALLOW_NONEXISTENT_DEFINER,APPLICATION_PASSWORD_ADMIN,AUDIT_ABORT_EXEMPT,AUDIT_ADMIN,AUTHENTICATION_POLICY_ADMIN,BACKUP_ADMIN,BINLOG_ADMIN,BINLOG_ENCRYPTION_ADMIN,CLONE_ADMIN,CONNECTION_ADMIN,CREATE_SPATIAL_REFERENCE_SYSTEM,ENCRYPTION_KEY_ADMIN,FIREWALL_EXEMPT,FLUSH_OPTIMIZER_COSTS,FLUSH_PRIVILEGES,FLUSH_STATUS,FLUSH_TABLES,FLUSH_USER_RESOURCES,GROUP_REPLICATION_ADMIN,GROUP_REPLICATION_STREAM,HELLOWORLD,INNODB_REDO_LOG_ARCHIVE,INNODB_REDO_LOG_ENABLE,NON_DOCUMENTED_PRIVILEGE,OPTIMIZE_LOCAL_TABLE,PASSWORDLESS_USER_ADMIN,PERSIST_RO_VARIABLES_ADMIN,REPLICATION_APPLIER,REPLICATION_SLAVE_ADMIN,RESOURCE_GROUP_ADMIN,RESOURCE_GROUP_USER,ROLE_ADMIN,ROUTINE_GRANT,RUBBISH,SENSITIVE_VARIABLES_OBSERVER,SERVICE_CONNECTION_ADMIN,SESSION_VARIABLES_ADMIN,SET_ANY_DEFINER,SHOW_ROUTINE,SYSTEM_USER,SYSTEM_VARIABLES_ADMIN,TABLE_ENCRYPTION_ADMIN,TELEMETRY_LOG_ADMIN,TRANSACTION_GTID_TAG,XA_RECOVER_ADMIN ON *.* TO `u1`@`%`
+GRANT ALLOW_NONEXISTENT_DEFINER,APPLICATION_PASSWORD_ADMIN,AUDIT_ABORT_EXEMPT,AUDIT_ADMIN,AUTHENTICATION_POLICY_ADMIN,BACKUP_ADMIN,BINLOG_ADMIN,BINLOG_ENCRYPTION_ADMIN,CLONE_ADMIN,CONNECTION_ADMIN,CREATE_SPATIAL_REFERENCE_SYSTEM,ENCRYPTION_KEY_ADMIN,FIREWALL_EXEMPT,FLUSH_OPTIMIZER_COSTS,FLUSH_PRIVILEGES,FLUSH_STATUS,FLUSH_TABLES,FLUSH_USER_RESOURCES,GROUP_REPLICATION_ADMIN,GROUP_REPLICATION_STREAM,HELLOWORLD,INNODB_REDO_LOG_ARCHIVE,INNODB_REDO_LOG_ENABLE,MANAGE_DATA_MASKING_POLICY,NON_DOCUMENTED_PRIVILEGE,OPTIMIZE_LOCAL_TABLE,PASSWORDLESS_USER_ADMIN,PERSIST_RO_VARIABLES_ADMIN,REPLICATION_APPLIER,REPLICATION_SLAVE_ADMIN,RESOURCE_GROUP_ADMIN,RESOURCE_GROUP_USER,ROLE_ADMIN,ROUTINE_GRANT,RUBBISH,SENSITIVE_VARIABLES_OBSERVER,SERVICE_CONNECTION_ADMIN,SESSION_VARIABLES_ADMIN,SET_ANY_DEFINER,SHOW_ROUTINE,SYSTEM_USER,SYSTEM_VARIABLES_ADMIN,TABLE_ENCRYPTION_ADMIN,TELEMETRY_LOG_ADMIN,TRANSACTION_GTID_TAG,XA_RECOVER_ADMIN ON *.* TO `u1`@`%`
 GRANT `r2`@`%` TO `u1`@`%`
 # Boundary value test for privilege_id
 INSERT INTO mysql.global_grants VALUES('u1', '%',
@@ -1455,6 +1473,7 @@ Index	Tables	To create or drop indexes
 Insert	Tables	To insert data into tables
 LENGTH_32_ABCDEFGHIJKLMNOPQRSTUX	Server Admin	
 Lock tables	Databases	To use LOCK TABLES (together with SELECT privilege)
+MANAGE_DATA_MASKING_POLICY	Server Admin	
 NON_DOCUMENTED_PRIVILEGE	Server Admin	
 OPTIMIZE_LOCAL_TABLE	Server Admin	
 PASSWORDLESS_USER_ADMIN	Server Admin	

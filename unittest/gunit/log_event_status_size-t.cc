@@ -1,4 +1,4 @@
-/* Copyright (c) 2022, 2025, Oracle and/or its affiliates.
+/* Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -118,6 +118,7 @@ class LogEventStatusSizeTest : public ::testing::Test {
     qe.thd->system_thread = SYSTEM_THREAD_SLAVE_SQL;
     wsrep_provider_set = 1;
 #endif /* WITH_WSREP */
+    qe.need_enable_cascade_triggers = true;
 
     for (size_t did = 0; did < MAX_DBS_IN_EVENT_MTS; ++did) {
       std::string db = fill_str(NAME_LEN, 'a' + did);

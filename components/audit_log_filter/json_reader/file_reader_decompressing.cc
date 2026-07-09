@@ -25,11 +25,7 @@ FileReaderDecompressing::FileReaderDecompressing(
     std::unique_ptr<FileReaderBase> file_reader)
     : FileReaderDecoratorBase(std::move(file_reader)) {}
 
-FileReaderDecompressing::~FileReaderDecompressing() {
-  if (is_opened) {
-    close();
-  }
-}
+FileReaderDecompressing::~FileReaderDecompressing() { close(); }
 
 bool FileReaderDecompressing::init() noexcept {
   return FileReaderDecoratorBase::init();
@@ -55,8 +51,7 @@ bool FileReaderDecompressing::open(FileInfo *file_info) noexcept {
   auto ret = inflateInit2(&m_strm, MAX_WBITS + 16);
 
   if (ret != Z_OK) {
-    LogComponentErr(ERROR_LEVEL, ER_LOG_PRINTF_MSG,
-                    "Failed to init decompressing: %i", ret);
+    LogComponentErr(ERROR_LEVEL, ER_AUDIT_DECOMPRESSION_INIT_FAILURE, ret);
     FileReaderDecoratorBase::close();
     return false;
   }
@@ -67,9 +62,11 @@ bool FileReaderDecompressing::open(FileInfo *file_info) noexcept {
 }
 
 void FileReaderDecompressing::close() noexcept {
-  is_opened = false;
-  inflateEnd(&m_strm);
-  FileReaderDecoratorBase::close();
+  if (is_opened) {
+    is_opened = false;
+    inflateEnd(&m_strm);
+    FileReaderDecoratorBase::close();
+  }
 }
 
 ReadStatus FileReaderDecompressing::read(unsigned char *out_buffer,
@@ -96,7 +93,7 @@ ReadStatus FileReaderDecompressing::read(unsigned char *out_buffer,
 
   *read_size = out_buffer_size - m_strm.avail_out;
 
-  if (ret == Z_STREAM_END) {
+  if (ret == Z_STREAM_END || status == ReadStatus::Eof) {
     status = ReadStatus::Eof;
   } else if (ret != Z_OK) {
     status = ReadStatus::Error;

@@ -1,4 +1,4 @@
-/* Copyright (c) 2024, 2025, Oracle and/or its affiliates.
+/* Copyright (c) 2024, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -48,8 +48,8 @@ constexpr char default_catalog[] = "def";
   to be repeatable as long as the view does not change. The tree nodes cannot
   be const since we assign tmp ids.
 
-  @param root
-  @param visit_single_node
+  @param root Root node of the content tree to traverse.
+  @param visit_single_node Callback invoked for each node; return true to stop.
 */
 void visit_tree(jdv::Content_tree_node *root, auto &&visit_single_node) {
   std::stack<jdv::Content_tree_node *> nodes_left;

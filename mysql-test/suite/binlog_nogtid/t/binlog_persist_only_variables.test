@@ -84,7 +84,7 @@ INSERT INTO aliases(name) VALUES
 # If this count differs, it means a variable has been added or removed.
 # In that case, this testcase needs to be updated accordingly.
 
-# While Percona Server has 111 persisted variables, PXC has 116 persisted
+# While Percona Server has 112 persisted variables, PXC has 117 persisted
 # variables.
 #
 # This is beacause of the following variables.
@@ -94,7 +94,7 @@ INSERT INTO aliases(name) VALUES
 # 4. wsrep_replicate_myisam
 # 5. wsrep_restart_replica
 --echo
---let $expected = 116
+--let $expected = 117
 --let $assert_text = Expect $expected variables in the table.
 --let $assert_cond = [SELECT COUNT(*) as count FROM rplvars, count, 1] = $expected
 --source include/assert.inc
@@ -125,7 +125,7 @@ while ( $varid <= $countvars )
   --inc $varid
 }
 
-# While Percona Server has 98 persisted variables, PXC has 103 persisted
+# While Percona Server has 87 persisted variables, PXC has 104 persisted
 # variables.
 #
 # This is beacause of the following variables.
@@ -135,7 +135,7 @@ while ( $varid <= $countvars )
 # 4. wsrep_replicate_myisam
 # 5. wsrep_applier_FK_checks
 --echo
---let $expected = 103
+--let $expected = 104
 --let $assert_text = Expect $expected persisted variables in persisted_variables table.
 --let $assert_cond = [SELECT COUNT(*) as count FROM performance_schema.persisted_variables, count, 1] = $expected
 --source include/assert.inc

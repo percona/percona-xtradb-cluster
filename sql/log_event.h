@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2025, Oracle and/or its affiliates.
+/* Copyright (c) 2000, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -428,6 +428,7 @@ struct PRINT_EVENT_INFO {
   my_thread_id thread_id;
   bool thread_id_printed;
   uint8_t default_table_encryption;
+  uint8_t enable_cascade_triggers;
 
   PRINT_EVENT_INFO();
 
@@ -501,7 +502,9 @@ struct PRINT_EVENT_INFO {
     The version of the last server that sent the transaction
   */
   uint32_t immediate_server_version;
-  bool ddl_skip_rewrite;
+#ifdef WITH_WSREP
+  bool ddl_skip_rewrite {false};
+#endif
 };
 #endif
 
@@ -1507,6 +1510,10 @@ class Query_log_event : public virtual mysql::binlog::event::Query_event,
   /** Whether or not the statement represented by this event requires
       `Q_DEFAULT_TABLE_ENCRYPTION` to be logged along aside. */
   bool needs_default_table_encryption{false};
+
+  /** Whether or not the statement represented by this event requires
+      `Q_ENABLE_CASCADE_TRIGGERS` to be logged along aside. */
+  bool need_enable_cascade_triggers{false};
 };
 
 /**

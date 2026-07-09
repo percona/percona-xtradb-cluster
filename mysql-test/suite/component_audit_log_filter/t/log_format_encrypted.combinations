@@ -3,11 +3,6 @@ loose-audit_log_filter.format=NEW
 loose-audit_log_filter.file=audit_filter.xml.log
 loose-audit_log_filter.encryption=AES
 
-[old_aes]
-loose-audit_log_filter.format=OLD
-loose-audit_log_filter.file=audit_filter.xml.log
-loose-audit_log_filter.encryption=AES
-
 [json_aes]
 loose-audit_log_filter.format=JSON
 loose-audit_log_filter.file=audit_filter.json.log
@@ -16,5 +11,16 @@ loose-audit_log_filter.encryption=AES
 [json_gzip_aes]
 loose-audit_log_filter.format=JSON
 loose-audit_log_filter.file=audit_filter.json.log
+loose-audit_log_filter.compression=GZIP
+loose-audit_log_filter.encryption=AES
+
+[jsonl_aes]
+loose-audit_log_filter.format=JSONL
+loose-audit_log_filter.file=audit_filter.jsonl.log
+loose-audit_log_filter.encryption=AES
+
+[jsonl_gzip_aes]
+loose-audit_log_filter.format=JSONL
+loose-audit_log_filter.file=audit_filter.jsonl.log
 loose-audit_log_filter.compression=GZIP
 loose-audit_log_filter.encryption=AES

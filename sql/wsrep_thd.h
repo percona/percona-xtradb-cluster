@@ -148,6 +148,11 @@ int wsrep_show_bf_aborts(THD *thd, SHOW_VAR *var, char *buff);
 void wsrep_create_appliers(long threads);
 void wsrep_create_rollbacker();
 
+/**
+  Copy session-level and related variables.
+*/
+void wsrep_copy_session_from_thd(THD *dst, const THD *src);
+
 bool wsrep_bf_abort(const THD *, THD *);
 int wsrep_abort_thd(const THD *bf_thd_ptr, THD *victim_thd_ptr, bool signal);
 

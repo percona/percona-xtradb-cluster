@@ -29,9 +29,13 @@ LogWriterBase::LogWriterBase(
     std::unique_ptr<log_record_formatter::LogRecordFormatterBase> formatter)
     : m_formatter{std::move(formatter)} {}
 
+LogWriterBase::~LogWriterBase() = default;
+
 void LogWriterBase::init_formatter() noexcept { SysVars::init_record_id(0); }
 
 void LogWriterBase::write(const AuditRecordVariant &record) noexcept {
+  std::lock_guard<std::mutex> write_guard{m_write_mutex};
+
   // Format event data according to audit_log_filter_format settings
   std::string record_str = std::visit(
       [this](const auto &rec) -> std::string {
@@ -45,14 +49,13 @@ void LogWriterBase::write(const AuditRecordVariant &record) noexcept {
     const std::string_view event_subclass_name = std::visit(
         [](const auto &rec) { return rec.event_subclass_name; }, record);
 
-    m_formatter->apply_debug_info(event_class_name, event_subclass_name,
-                                  record_str);
+    if (!record_str.empty()) {
+      m_formatter->apply_debug_info(event_class_name, event_subclass_name,
+                                    record_str);
+    }
   });
 
-  {
-    std::lock_guard<std::mutex> write_guaard{m_write_mutex};
-    write(record_str, true);
-  }
+  write(record_str, true);
 }
 
 }  // namespace audit_log_filter::log_writer
