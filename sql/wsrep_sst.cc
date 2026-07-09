@@ -1282,6 +1282,12 @@ static int wsrep_create_sst_user(bool initialize_thread, const char *password) {
     return ECANCELED;
   }
 
+  THD *thd = session->get_thd();
+  const bool saved_disable_password_validation =
+      thd->m_disable_password_validation;
+  // Ephemeral internal account; password is server-generated for SST only.
+  thd->m_disable_password_validation = true;
+
   for (int index = 0; !err && cmds[index]; index += 2) {
     int ret;
     ret = snprintf(auth_buf, auth_len, cmds[index], password);
@@ -1296,6 +1302,8 @@ static int wsrep_create_sst_user(bool initialize_thread, const char *password) {
 
   // Overwrite query (clear out any sensitive data)
   ::memset(auth_buf, 0, auth_len);
+
+  thd->m_disable_password_validation = saved_disable_password_validation;
 
   cleanup_server_session(session, initialize_thread);
   wsrep_allow_server_session = false;
