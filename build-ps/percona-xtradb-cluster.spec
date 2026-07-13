@@ -78,6 +78,12 @@ Prefix: %{_sysconfdir}
 %{?with_mecab: %global mecab_option -DWITH_MECAB=%{with_mecab}}
 %{?with_mecab: %global mecab 1}
 
+%{!?without_pgo: %global pgo 1}
+
+%if 0%{?rhel} == 8
+%global _find_debuginfo_dwz_opts %{nil}
+%endif
+
  %define boost_req boost-devel
  %define gcc_req gcc-c++
 
@@ -757,6 +763,60 @@ popd
 
 popd
 
+%if 0%{?add_fido_plugins}
+%global cmake_fido_flags -DWITH_FIDO=bundled
+%else
+%global cmake_fido_flags -DWITH_FIDO=none
+%endif
+
+%if 0%{?systemd}
+%global cmake_systemd_flags -DWITH_SYSTEMD=OFF
+%else
+%global cmake_systemd_flags %{nil}
+%endif
+
+%if 0%{?rhel} > 8
+%global cmake_lto_flags -DWITH_LTO=ON
+%else
+%global cmake_lto_flags %{nil}
+%endif
+
+%global cmake_common_flags \\\
+           -DBUILD_CONFIG=mysql_release \\\
+           -DINSTALL_LAYOUT=RPM \\\
+           -DDOWNLOAD_BOOST=1 -DWITH_BOOST=build-ps/boost \\\
+           -DWITH_PACKAGE_FLAGS=OFF \\\
+           -DCMAKE_C_FLAGS="$CFLAGS" \\\
+           -DCMAKE_CXX_FLAGS="$CXXFLAGS" \\\
+           -DCMAKE_INSTALL_PREFIX=%{_prefix} \\\
+           -DWITH_EMBEDDED_SERVER=OFF \\\
+           -DWITH_EMBEDDED_SHARED_LIBRARY=0 \\\
+           -DWITH_INNODB_MEMCACHED=ON \\\
+           -DUSE_LD_LLD=0 \\\
+           -DWITH_AUTHENTICATION_CLIENT_PLUGINS=1 \\\
+           -DWITH_CURL=system \\\
+           %{cmake_systemd_flags} \\\
+           -DENABLE_DTRACE=OFF \\\
+           -DWITH_SSL=system \\\
+           -DWITH_ZLIB=bundled \\\
+           -DWITH_READLINE=system \\\
+           -DWITHOUT_TOKUDB=ON \\\
+           -DINSTALL_MYSQLSHAREDIR=share/percona-xtradb-cluster \\\
+           -DINSTALL_SUPPORTFILESDIR=share/percona-xtradb-cluster \\\
+           -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \\\
+           -DFEATURE_SET="%{feature_set}" \\\
+           -DWITH_WSREP=ON \\\
+           -DWITH_PERCONA_TELEMETRY=ON \\\
+           -DWITH_LDAP=system \\\
+           -DWITH_INNODB_DISALLOW_WRITES=ON \\\
+           -DWITH_ZSTD=bundled \\\
+           %{cmake_fido_flags} \\\
+           -DWITH_UNIT_TESTS=0 \\\
+           -DWITH_SCALABILITY_METRICS=ON \\\
+           -DMYSQL_SERVER_SUFFIX=".%{rel}" \\\
+           %{cmake_lto_flags} \\\
+           %{?mecab_option}
+
 # Build debug mysqld and libmysqld.a
 mkdir debug
 (
@@ -787,50 +847,10 @@ mkdir debug
                 -e 's/ $//'`
   # XXX: MYSQL_UNIX_ADDR should be in cmake/* but mysql_version is included before
   # XXX: install_layout so we can't just set it based on INSTALL_LAYOUT=RPM
-  ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
-           -DDOWNLOAD_BOOST=1 -DWITH_BOOST=build-ps/boost \
-           -DWITH_PACKAGE_FLAGS=OFF \
-           -DCMAKE_C_FLAGS="$CFLAGS" \
-           -DCMAKE_CXX_FLAGS="$CXXFLAGS" \
-           -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=%{_prefix} \
-           -DWITH_EMBEDDED_SERVER=OFF \
-           -DWITH_INNODB_MEMCACHED=ON \
-           -DUSE_LD_LLD=0 \
-           -DWITH_AUTHENTICATION_CLIENT_PLUGINS=1 \
-           -DWITH_CURL=system \
-%if 0%{?systemd}
-           -DWITH_SYSTEMD=OFF \
-%endif
-           -DENABLE_DTRACE=OFF \
-           -DWITH_SSL=system \
-           -DWITH_ZLIB=bundled \
-           -DWITH_READLINE=system \
-           -DWITHOUT_TOKUDB=ON \
-           -DINSTALL_MYSQLSHAREDIR=share/percona-xtradb-cluster \
-           -DINSTALL_SUPPORTFILESDIR=share/percona-xtradb-cluster \
-           -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
-           -DFEATURE_SET="%{feature_set}" \
+  ${CMAKE} ../ \
+           -DCMAKE_BUILD_TYPE=Debug \
+           %{cmake_common_flags} \
            -DCOMPILATION_COMMENT="%{compilation_comment_debug}" \
-           -DWITH_WSREP=ON \
-           -DWITH_PERCONA_TELEMETRY=ON \
-           -DWITH_LDAP=system \
-           -DWITH_INNODB_DISALLOW_WRITES=ON \
-           -DWITH_EMBEDDED_SERVER=0 \
-           -DWITH_EMBEDDED_SHARED_LIBRARY=0 \
-           -DWITH_INNODB_MEMCACHED=1 \
-           -DWITH_ZSTD=bundled \
-%if 0%{?add_fido_plugins}
-           -DWITH_FIDO=bundled \
-%else
-           -DWITH_FIDO=none \
-%endif
-           -DWITH_UNIT_TESTS=0 \
-           -DWITH_SCALABILITY_METRICS=ON \
-           -DMYSQL_SERVER_SUFFIX=".%{rel}" \
-%if 0%{?rhel} > 8
-           -DWITH_LTO=ON \
-%endif
-           %{?mecab_option} \
            -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_ON} %{ROCKSDB_FLAGS}
   # echo BEGIN_DEBUG_CONFIG ; egrep '^#define' include/config.h ; echo END_DEBUG_CONFIG
   make %{?_smp_mflags}
@@ -841,55 +861,37 @@ mkdir release
   cd release
   # XXX: MYSQL_UNIX_ADDR should be in cmake/* but mysql_version is included before
   # XXX: install_layout so we can't just set it based on INSTALL_LAYOUT=RPM
-  ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
-           -DDOWNLOAD_BOOST=1 -DWITH_BOOST=build-ps/boost \
-           -DWITH_PACKAGE_FLAGS=OFF \
-           -DCMAKE_C_FLAGS="$CFLAGS" \
-           -DCMAKE_CXX_FLAGS="$CXXFLAGS" \
-           -DCMAKE_BUILD_TYPE=RelWithDebInfo  -DCMAKE_INSTALL_PREFIX=%{_prefix} \
+  ${CMAKE} ../ \
+           %{?pgo:-DFPROFILE_GENERATE=1} \
+           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
            -DMINIMAL_RELWITHDEBINFO=OFF \
-           -DWITH_EMBEDDED_SERVER=OFF \
-           -DWITH_INNODB_MEMCACHED=ON \
-           -DUSE_LD_LLD=0 \
-           -DWITH_AUTHENTICATION_CLIENT_PLUGINS=1 \
-           -DWITH_CURL=system \
-%if 0%{?systemd}
-           -DWITH_SYSTEMD=OFF \
-%endif
-           -DENABLE_DTRACE=OFF \
-           -DWITH_SSL=system \
-           -DWITH_ZLIB=bundled \
-           -DWITH_READLINE=system \
-           -DWITHOUT_TOKUDB=ON \
-           -DINSTALL_MYSQLSHAREDIR=share/percona-xtradb-cluster \
-           -DINSTALL_SUPPORTFILESDIR=share/percona-xtradb-cluster \
-           -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
-           -DFEATURE_SET="%{feature_set}" \
+           %{cmake_common_flags} \
            -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
-           -DWITH_WSREP=ON \
-           -DWITH_PERCONA_TELEMETRY=ON \
-           -DWITH_LDAP=system \
-           -DWITH_INNODB_DISALLOW_WRITES=ON \
-           -DWITH_EMBEDDED_SERVER=0 \
-           -DWITH_EMBEDDED_SHARED_LIBRARY=0 \
-           -DWITH_INNODB_MEMCACHED=1 \
-           -DWITH_ZSTD=bundled \
-%if 0%{?add_fido_plugins}
-           -DWITH_FIDO=bundled \
-%else
-           -DWITH_FIDO=none \
-%endif
-           -DWITH_UNIT_TESTS=0 \
-           -DWITH_SCALABILITY_METRICS=ON \
-%if 0%{?rhel} > 8
-           -DWITH_LTO=ON \
-%endif
-           %{?mecab_option} \
-           -DMYSQL_SERVER_SUFFIX=".%{rel}" \
            -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_OFF} %{ROCKSDB_FLAGS}
   # echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
   make %{?_smp_mflags}
 )
+
+%if 0%{?pgo}
+(
+  pushd release
+  make run-profile-suite
+  rm -r $(readlink mysql-test/var)
+  popd
+
+  rm -rf release
+  mkdir release && pushd release
+  ${CMAKE} ../ \
+           -DFPROFILE_USE=1 \
+           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+           -DMINIMAL_RELWITHDEBINFO=OFF \
+           %{cmake_common_flags} \
+           -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
+           -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_OFF} %{ROCKSDB_FLAGS}
+  make %{?_smp_mflags}
+  popd
+)
+%endif # pgo
 
 # For the debuginfo extraction stage, some source files are not located in the release
 # and debug dirs, but in the source dir. Make a link there to avoid errors in the
@@ -1104,6 +1106,8 @@ install -d $RBR%{_libdir}/mysql
 #%if 0%{?mecab}
 #    mv $RBR%{_libdir}/mecab $RBR%{_libdir}/mysql
 #%endif
+
+find $RBR -name 'core.[0-9]*' -type f -delete || true
 
 ##############################################################################
 #  Post processing actions, i.e. when installed
