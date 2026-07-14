@@ -1085,17 +1085,15 @@ ln -s "galera4/libgalera_smm.so" "$RBR/%{_libdir}/"
 install -d $RBR%{galera_docs}
 install -m 644 $MBD/%{galera_src_dir}/COPYING                     \
     $RBR%{galera_docs}/COPYING
-install -m 644 $MBD/%{galera_src_dir}/packages/rpm/README     \
+install -m 644 $MBD/%{galera_src_dir}/README                  \
     $RBR%{galera_docs}/README
-install -m 644 $MBD/%{galera_src_dir}/packages/rpm/README-MySQL \
-    $RBR%{galera_docs}/README-MySQL
 install -m 644 $MBD/%{galera_src_dir}/asio/LICENSE_1_0.txt    \
     $RBR%{galera_docs}/LICENSE.asio
 
 install -d $RBR%{galera_docs2}
 install -m 644 $MBD/%{galera_src_dir}/COPYING                     \
     $RBR%{galera_docs2}/COPYING
-install -m 644 $MBD/%{galera_src_dir}/packages/rpm/README     \
+install -m 644 $MBD/%{galera_src_dir}/README                  \
     $RBR%{galera_docs2}/README
 
 install -d $RBR%{_mandir}/man8
@@ -1807,7 +1805,6 @@ fi
 %attr(0755,root,root) %dir %{galera_docs}
 %doc %attr(0644,root,root) %{galera_docs}/COPYING
 %doc %attr(0644,root,root) %{galera_docs}/README
-%doc %attr(0644,root,root) %{galera_docs}/README-MySQL
 %doc %attr(0644,root,root) %{galera_docs}/LICENSE.asio
 %config(noreplace) %{_sysconfdir}/my.cnf
 %dir %{_sysconfdir}/my.cnf.d
