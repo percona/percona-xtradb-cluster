@@ -408,7 +408,16 @@ Requires:       percona-xtradb-cluster-server = %{version}-%{release}
 Requires:       percona-xtradb-cluster-client = %{version}-%{release}
 Requires:       percona-xtradb-cluster-devel = %{version}-%{release}
 Requires:       percona-xtradb-cluster-test = %{version}-%{release}
+%if 0%{?rhel} == 8
+Requires:       percona-xtradb-cluster-server-debuginfo = %{version}-%{release}
+Requires:       percona-xtradb-cluster-client-debuginfo = %{version}-%{release}
+Requires:       percona-xtradb-cluster-test-debuginfo = %{version}-%{release}
+Requires:       percona-xtradb-cluster-shared-debuginfo = %{version}-%{release}
+Requires:       percona-xtradb-cluster-garbd-debuginfo = %{version}-%{release}
+Requires:       percona-xtradb-cluster-mysql-router-debuginfo = %{version}-%{release}
+%else
 Requires:       percona-xtradb-cluster-debuginfo = %{version}-%{release}
+%endif
 Requires:       percona-xtradb-cluster-garbd = %{version}-%{release}
 Conflicts:      percona-xtradb-cluster-pro-full
 
