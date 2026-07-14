@@ -1686,14 +1686,6 @@ fi
 %{_libdir}/mysql/mecab
 %endif
 
-%if "%rhel" == "5"
-    %attr(755, root, root) %{_datadir}/percona-xtradb-cluster/
-%endif
-
-%if "%rhel" >= "6"
-    %attr(755, root, root) %{_datarootdir}/percona-xtradb-cluster/
-%endif
-
 %if %{WITH_TCMALLOC}
 %attr(755, root, root) %{_libdir}/mysql/%{malloc_lib_target}
 %endif
