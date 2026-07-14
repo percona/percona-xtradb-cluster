@@ -130,7 +130,6 @@ SET(MTR_TESTS_FOR_PROFILING
   json
   main
   sysschema
-  thread_pool
   x
   component_connection_control
   )
