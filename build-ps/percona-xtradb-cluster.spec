@@ -1719,6 +1719,7 @@ fi
 # This is a symlink
 %{_libdir}/libgalera_smm.so
 %{_libdir}/galera4/libgalera_smm.so
+%attr(755, root, root) %{_libdir}/mysql/libgalera_smm.so
 %attr(0755,root,root) %dir %{galera_docs}
 %doc %attr(0644,root,root) %{galera_docs}/COPYING
 %doc %attr(0644,root,root) %{galera_docs}/README
@@ -1811,6 +1812,9 @@ fi
 #coredumper
 %attr(755, root, root) %{_includedir}/coredumper/coredumper.h
 %attr(755, root, root) /usr/lib/libcoredumper.a
+#kmip
+%attr(755, root, root) /usr/lib/libkmipclient.a
+%attr(755, root, root) /usr/lib/libkmipcore.a
 
 # ----------------------------------------------------------------------------
 %files -n percona-xtradb-cluster-garbd
