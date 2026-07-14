@@ -148,6 +148,7 @@ get_sources(){
             git submodule update
             cd ../ || exit
         done
+        sed -i "/^env = conf.Finish()/i conf.env.Append(CPPFLAGS = ' -DGALERA_LOG_H_ENABLE_CXX')" percona-xtradb-cluster-galera/SConstruct
     else
         cd percona-xtradb-cluster || exit
     fi
