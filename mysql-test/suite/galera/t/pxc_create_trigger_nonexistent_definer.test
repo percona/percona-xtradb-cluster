@@ -1,0 +1,234 @@
+################################################################################
+# PXC-5292: CREATE TRIGGER with a nonexistent DEFINER by a user without
+#           SUPER / ALLOW_NONEXISTENT_DEFINER must be rejected on the origin
+#           node BEFORE the statement is replicated (before TOI), so the node
+#           is NOT evicted from the cluster.
+#
+# This guards against the inconsistency via the orphan-definer path
+# (WL#15874 stage 2). Without the fix, the origin accepts the statement and
+# replicates it. Statement is later rejected in check_valid_definer()
+# during creation (post-TOI) while the appliers create it successfully -> the
+# origin is declared inconsistent by consensus and leaves the cluster.
+#
+# Test:
+# 1. Setup users.
+# 2. SET_ANY_DEFINER user, nonexistent DEFINER -> rejected pre-TOI, no eviction.
+# 2b. SET_ANY_DEFINER , EXISTING different DEFINER -> allowed, replicates.
+# 3. ALLOW_NONEXISTENT_DEFINER user, nonexistent DEFINER -> allowed, replicates.
+# 4. SUPER user, nonexistent DEFINER -> allowed, replicates.
+# 4b. trust = 0, nonexistent DEFINER: which gate reports, and both enforced.
+#     - SET_ANY_DEFINER only -> rejected by the DEFINER check (it runs first).
+#     - SUPER -> satisfies both gates, allowed, replicates.
+#     - ALLOW_NONEXISTENT_DEFINER without SUPER -> clears the DEFINER check,
+#       then rejected by the binlog gate.
+# 5. Cleanup.
+################################################################################
+
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+--echo
+--echo # 1. Setup users.
+--echo
+
+--connection node_1
+SET @old_trust = @@GLOBAL.log_bin_trust_function_creators;
+--disable_warnings
+SET GLOBAL log_bin_trust_function_creators = 1;
+--enable_warnings
+
+CREATE DATABASE probe;
+
+# SET_ANY_DEFINER, but NOT SUPER and NOT ALLOW_NONEXISTENT_DEFINER.
+CREATE USER 'any_def'@'%' IDENTIFIED BY '';
+GRANT ALL PRIVILEGES ON probe.* TO 'any_def'@'%';
+GRANT SET_ANY_DEFINER ON *.* TO 'any_def'@'%';
+
+# SET_ANY_DEFINER + ALLOW_NONEXISTENT_DEFINER (allowed to create orphan definer).
+CREATE USER 'nonexist_ok'@'%' IDENTIFIED BY '';
+GRANT ALL PRIVILEGES ON probe.* TO 'nonexist_ok'@'%';
+GRANT SET_ANY_DEFINER, ALLOW_NONEXISTENT_DEFINER ON *.* TO 'nonexist_ok'@'%';
+
+# SUPER.
+CREATE USER 'sup'@'%' IDENTIFIED BY '';
+GRANT ALL PRIVILEGES ON probe.* TO 'sup'@'%';
+GRANT SUPER ON *.* TO 'sup'@'%';
+
+--connect (any_def_con,localhost,any_def,,probe,$NODE_MYPORT_1)
+CREATE TABLE t (id INT PRIMARY KEY);
+
+--echo
+--echo # 2. SET_ANY_DEFINER user, nonexistent DEFINER -> rejected pre-TOI, no eviction.
+--echo
+
+# The 'ghost1' definer does not exist, logged in as 'user with SET_ANY_DEFINER'
+--connection any_def_con
+--error ER_SPECIFIC_ACCESS_DENIED_ERROR
+CREATE DEFINER='ghost1'@'localhost' TRIGGER tg_ghost1 AFTER INSERT ON t FOR EACH ROW SET @n = NEW.id;
+
+# --- Eviction guard: node_1 must still be a healthy member of the 2-node cluster ---
+--connection node_1
+--let $assert_text= 'node_1 still in a 2-node cluster after the rejected orphan-definer CREATE TRIGGER (no eviction)'
+--let $assert_cond= [SELECT VARIABLE_VALUE = 2 AS c FROM performance_schema.global_status WHERE VARIABLE_NAME = "wsrep_cluster_size", c, 1] = 1
+--source include/assert.inc
+
+--let $assert_text= 'node_1 is still Synced (not Inconsistent)'
+--let $assert_cond= [SELECT VARIABLE_VALUE = "Synced" AS c FROM performance_schema.global_status WHERE VARIABLE_NAME = "wsrep_local_state_comment", c, 1] = 1
+--source include/assert.inc
+
+--let $assert_text= 'No inconsistency seen in node_1'
+--let $assert_cond = [SELECT COUNT(*) FROM performance_schema.error_log WHERE DATA LIKE "%Inconsistency detected%"] = 0
+--source include/assert.inc
+
+# Rejected before replication: trigger exists on no node.
+--let $assert_text= 'Trigger tg_ghost1 not created on node_1'
+--let $assert_cond= [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "tg_ghost1", c, 1] = 0
+--source include/assert.inc
+
+--connection node_2
+--let $assert_text= 'node_2 still in a 2-node cluster (no eviction)'
+--let $assert_cond= [SELECT VARIABLE_VALUE = 2 AS c FROM performance_schema.global_status WHERE VARIABLE_NAME = "wsrep_cluster_size", c, 1] = 1
+--source include/assert.inc
+
+--let $assert_text= 'No inconsistency seen in node_2'
+--let $assert_cond = [SELECT COUNT(*) FROM performance_schema.error_log WHERE DATA LIKE "%Inconsistency detected%"] = 0
+--source include/assert.inc
+
+--let $assert_text= 'Trigger tg_ghost1 not created on node_2'
+--let $assert_cond= [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "tg_ghost1", c, 1] = 0
+--source include/assert.inc
+
+--echo
+--echo # 2b. SET_ANY_DEFINER , EXISTING different DEFINER -> allowed, replicates.
+--echo
+
+# The 'sup' DEFINER is existing, logged in as 'user with SET_ANY_DEFINER'
+--connection any_def_con
+CREATE DEFINER='sup'@'%' TRIGGER tg_existing AFTER UPDATE ON t FOR EACH ROW SET @u = NEW.id;
+
+--connection node_1
+--let $assert_text= 'Trigger tg_existing (existing DEFINER) created on node_1 by SET_ANY_DEFINER user'
+--let $assert_cond= [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "tg_existing", c, 1] = 1
+--source include/assert.inc
+
+--connection node_2
+--echo 'Trigger tg_existing replicated to node_2'
+--let $wait_condition= SELECT COUNT(*) = 1 FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "tg_existing"
+--source include/wait_condition.inc
+
+--echo
+--echo # 3. ALLOW_NONEXISTENT_DEFINER user, nonexistent DEFINER -> allowed, replicates.
+--echo
+
+# The 'ghost2' DEFINER is not existing, logged in as 'user with ALLOW_NONEXISTENT_DEFINER'
+--connect (nonexist_ok_con,localhost,nonexist_ok,,probe,$NODE_MYPORT_1)
+CREATE DEFINER='ghost2'@'localhost' TRIGGER tg_ghost2 AFTER INSERT ON t FOR EACH ROW SET @n = NEW.id;
+
+--connection node_1
+--let $assert_text= 'Trigger tg_ghost2 created on node_1 (ALLOW_NONEXISTENT_DEFINER)'
+--let $assert_cond= [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "tg_ghost2", c, 1] = 1
+--source include/assert.inc
+
+--connection node_2
+--echo 'Trigger tg_ghost2 replicated to node_2'
+--let $wait_condition= SELECT COUNT(*) = 1 FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "tg_ghost2"
+--source include/wait_condition.inc
+
+--echo
+--echo # 4. SUPER user, nonexistent DEFINER -> allowed, replicates.
+--echo
+
+# The 'ghost3' DEFINER is not existing, logged in as 'super user'
+--connect (sup_con,localhost,sup,,probe,$NODE_MYPORT_1)
+CREATE DEFINER='ghost3'@'localhost' TRIGGER tg_ghost3 AFTER INSERT ON t FOR EACH ROW SET @n = NEW.id;
+
+--connection node_1
+--let $assert_text= 'Trigger tg_ghost3 created on node_1 (SUPER)'
+--let $assert_cond= [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "tg_ghost3", c, 1] = 1
+--source include/assert.inc
+
+--connection node_2
+--echo 'Trigger tg_ghost3 replicated to node_2'
+--let $wait_condition= SELECT COUNT(*) = 1 FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "tg_ghost3"
+--source include/wait_condition.inc
+
+--echo
+--echo # 4b. trust = 0, nonexistent DEFINER: which gate reports, and both enforced.
+--echo
+
+# Cases above runs with log_bin_trust_function_creators = 1.
+--connection node_1
+--disable_warnings
+SET GLOBAL log_bin_trust_function_creators = 0;
+--enable_warnings
+
+# The 'ghost4' definer does not exist, logged in as 'user with SET_ANY_DEFINER'
+--connection any_def_con
+--error ER_SPECIFIC_ACCESS_DENIED_ERROR
+CREATE DEFINER='ghost4'@'localhost' TRIGGER tg_ghost4 AFTER INSERT ON t FOR EACH ROW SET @n = NEW.id;
+
+# Rejected before replication: trigger exists on no node.
+--connection node_1
+--let $assert_text= 'Trigger tg_ghost4 not created on node_1 (trust = 0)'
+--let $assert_cond= [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "tg_ghost4", c, 1] = 0
+--source include/assert.inc
+
+--let $assert_text= 'node_1 still in a 2-node cluster after the rejected trust = 0 CREATE TRIGGER (no eviction)'
+--let $assert_cond= [SELECT VARIABLE_VALUE = 2 AS c FROM performance_schema.global_status WHERE VARIABLE_NAME = "wsrep_cluster_size", c, 1] = 1
+--source include/assert.inc
+
+--connection node_2
+--let $assert_text= 'Trigger tg_ghost4 not created on node_2 (trust = 0)'
+--let $assert_cond= [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "tg_ghost4", c, 1] = 0
+--source include/assert.inc
+
+# --- SUPER: satisfies the DEFINER check
+--connection sup_con
+CREATE DEFINER='ghost5'@'localhost' TRIGGER tg_ghost5 AFTER INSERT ON t FOR EACH ROW SET @n = NEW.id;
+
+--connection node_1
+--let $assert_text= 'Trigger tg_ghost5 created on node_1 (SUPER, trust = 0)'
+--let $assert_cond= [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "tg_ghost5", c, 1] = 1
+--source include/assert.inc
+
+--connection node_2
+--echo 'Trigger tg_ghost5 replicated to node_2 (SUPER, trust = 0)'
+--let $wait_condition= SELECT COUNT(*) = 1 FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "tg_ghost5"
+--source include/wait_condition.inc
+
+# --- ALLOW_NONEXISTENT_DEFINER without SUPER: clears the DEFINER check, ---
+# then the binlog gate rejects, because only SUPER (or trust = 1) satisfies it.
+# This pins that the binlog gate is still reached and enforced AFTER the
+# DEFINER check passes -- the complement of the SET_ANY_DEFINER case above.
+--connection nonexist_ok_con
+--error ER_BINLOG_CREATE_ROUTINE_NEED_SUPER
+CREATE DEFINER='ghost6'@'localhost' TRIGGER tg_ghost6 AFTER INSERT ON t FOR EACH ROW SET @n = NEW.id;
+
+--connection node_1
+--let $assert_text= 'Trigger tg_ghost6 not created on node_1 (ALLOW_NONEXISTENT_DEFINER, no SUPER, trust = 0)'
+--let $assert_cond= [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "tg_ghost6", c, 1] = 0
+--source include/assert.inc
+
+--connection node_2
+--let $assert_text= 'Trigger tg_ghost6 not created on node_2 (ALLOW_NONEXISTENT_DEFINER, no SUPER, trust = 0)'
+--let $assert_cond= [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "tg_ghost6", c, 1] = 0
+--source include/assert.inc
+
+--echo
+--echo # 5. Cleanup.
+--echo
+
+--disconnect sup_con
+--disconnect nonexist_ok_con
+--disconnect any_def_con
+
+--connection node_1
+DROP DATABASE probe;
+DROP USER 'any_def'@'%';
+DROP USER 'nonexist_ok'@'%';
+DROP USER 'sup'@'%';
+--disable_warnings
+SET GLOBAL log_bin_trust_function_creators = @old_trust;
+--enable_warnings
+
+--source include/wait_until_count_sessions.inc
