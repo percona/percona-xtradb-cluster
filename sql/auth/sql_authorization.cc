@@ -7803,7 +7803,12 @@ bool check_system_user_privilege(THD *thd, List<LEX_USER> list) {
   return (false);
 }
 
+#ifdef WITH_WSREP
+bool check_valid_definer(THD *thd, LEX_USER *definer,
+                         bool report_no_such_user_warning) {
+#else
 bool check_valid_definer(THD *thd, LEX_USER *definer) {
+#endif
   DBUG_TRACE;
   Security_context *sctx = thd->security_context();
   if ((strcmp(definer->user.str, sctx->priv_user().str) ||
@@ -7829,6 +7834,9 @@ bool check_valid_definer(THD *thd, LEX_USER *definer) {
                "SUPER or ALLOW_NONEXISTENT_DEFINER");
       return true;
     } else
+#ifdef WITH_WSREP
+        if (report_no_such_user_warning)
+#endif
       push_warning_printf(thd, Sql_condition::SL_NOTE, ER_NO_SUCH_USER,
                           ER_THD(thd, ER_NO_SUCH_USER), definer->user.str,
                           definer->host.str);
