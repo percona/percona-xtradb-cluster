@@ -22,6 +22,7 @@ Usage: $0 [OPTIONS]
         --deb_release       DEB version( default = 1)
         --bin_release       BIN version( default = 1)
         --debug             Build debug tarball
+        --enable_pgo        PGO (Profile-Guided Optimization) build (default = 1, set to 0 to disable)
         --help) usage ;;
 Example $0 --builddir=/tmp/PXC9x --get_sources=1 --build_src_rpm=1 --build_rpm=1
 EOF
@@ -59,6 +60,7 @@ parse_arguments() {
             --bin_release=*) BIN_RELEASE="$val" ;;
             --no_clone=*) NO_CLONE="$val" ;;
             --debug=*) DEBUG="$val" ;;
+            --enable_pgo=*) ENABLE_PGO="$val" ;;
             --help) usage ;;      
             *)
               if test -n "$pick_args"
@@ -146,6 +148,7 @@ get_sources(){
             git submodule update
             cd ../ || exit
         done
+        sed -i "/^env = conf.Finish()/i conf.env.Append(CPPFLAGS = ' -DGALERA_LOG_H_ENABLE_CXX')" percona-xtradb-cluster-galera/SConstruct
     else
         cd percona-xtradb-cluster || exit
     fi
@@ -549,6 +552,14 @@ install_deps() {
             update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-13 100
             update-alternatives --config gcc
             update-alternatives --config g++
+        elif [ x"${DIST}" = xresolute ]; then
+            apt-get -y install gcc-15 g++-15
+            update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 100
+            update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15 100
+            update-alternatives --install /usr/bin/cc  cc  /usr/bin/gcc-15 100
+            update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++-15 100
+            update-alternatives --config gcc
+            update-alternatives --config g++
         fi
     fi
     return;
@@ -814,10 +825,14 @@ build_rpm(){
     source ${WORKDIR}/pxc-9x.properties
     source ${CURDIR}/srpm/pxc-9x.properties
     #
+    PGO_DEFINE=""
+    if [ "${ENABLE_PGO}" = "0" ]; then
+        PGO_DEFINE="--define \"without_pgo 1\""
+    fi
     if [ ${ARCH} = x86_64 ]; then
-        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+        rpmbuild --define '"_topdir ${WORKDIR}/rpmbuild"' --define '"dist ${OS_NAME}"' --define '"rpm_version $MYSQL_RELEASE.$RPM_RELEASE"' --define '"rel $RPM_RELEASE"' --define '"galera_revision ${GALERA_REVNO}"' --define '"with_mecab ${MECAB_INSTALL_DIR}/usr"' ${PGO_DEFINE} --rebuild rpmbuild/SRPMS/${SRCRPM}
     else
-        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+        rpmbuild --define '"_topdir ${WORKDIR}/rpmbuild"' --define '"dist ${OS_NAME}"' --define '"rpm_version $MYSQL_RELEASE.$RPM_RELEASE"' --define '"rel $RPM_RELEASE"' --define '"galera_revision ${GALERA_REVNO}"' --define '"with_tokudb 0"' --define '"with_rocksdb 0"' --define '"with_mecab ${MECAB_INSTALL_DIR}/usr"' ${PGO_DEFINE} --rebuild rpmbuild/SRPMS/${SRCRPM}
     fi
     return_code=$?
     if [ $return_code != 0 ]; then
@@ -1011,6 +1026,9 @@ build_deb(){
    #    sed -i '196,201d' debian/rules
    # fi
 
+    if [ "${ENABLE_PGO}" = "0" ]; then
+        export DEB_NO_PGO=1
+    fi
     GALERA_REVNO="${GALERA_REVNO}" SCONS_ARGS=' strict_build_flags=0'  MAKE_JFLAG=-j4  dpkg-buildpackage -rfakeroot -uc -us -b
     #
     cd ${WORKSPACE} || exit
@@ -1182,6 +1200,7 @@ build_tarball(){
     if [ -n "${REVISION}" ]; then
         sed -i "s:REVISION=\"\":REVISION=\"$REVISION\":g" ./build-ps/build-binary.sh
     fi
+    export WITH_PGO="${ENABLE_PGO}"
     if [[ ${DEBUG} == 1 ]]; then
         bash -x ./build-ps/build-binary.sh --debug --with-jemalloc=jemalloc/ -t $BIN_RELEASE $BUILD_ROOT
     else
@@ -1223,6 +1242,7 @@ RPM_RELEASE=1
 DEB_RELEASE=1
 BIN_RELEASE=1
 DEBUG=0
+ENABLE_PGO=1
 REVISION=0
 BRANCH="trunk"
 MECAB_INSTALL_DIR="${WORKDIR}/mecab-install"

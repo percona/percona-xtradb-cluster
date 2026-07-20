@@ -78,6 +78,12 @@ Prefix: %{_sysconfdir}
 %{?with_mecab: %global mecab_option -DWITH_MECAB=%{with_mecab}}
 %{?with_mecab: %global mecab 1}
 
+%{!?without_pgo: %global pgo 1}
+
+%if 0%{?rhel} == 8
+%global _find_debuginfo_dwz_opts %{nil}
+%endif
+
  %define boost_req boost-devel
  %define gcc_req gcc-c++
 
@@ -757,6 +763,60 @@ popd
 
 popd
 
+%if 0%{?add_fido_plugins}
+%global cmake_fido_flags -DWITH_FIDO=bundled
+%else
+%global cmake_fido_flags -DWITH_FIDO=none
+%endif
+
+%if 0%{?systemd}
+%global cmake_systemd_flags -DWITH_SYSTEMD=OFF
+%else
+%global cmake_systemd_flags %{nil}
+%endif
+
+%if 0%{?rhel} > 8
+%global cmake_lto_flags -DWITH_LTO=ON
+%else
+%global cmake_lto_flags %{nil}
+%endif
+
+%global cmake_common_flags \\\
+           -DBUILD_CONFIG=mysql_release \\\
+           -DINSTALL_LAYOUT=RPM \\\
+           -DDOWNLOAD_BOOST=1 -DWITH_BOOST=build-ps/boost \\\
+           -DWITH_PACKAGE_FLAGS=OFF \\\
+           -DCMAKE_C_FLAGS="$CFLAGS" \\\
+           -DCMAKE_CXX_FLAGS="$CXXFLAGS" \\\
+           -DCMAKE_INSTALL_PREFIX=%{_prefix} \\\
+           -DWITH_EMBEDDED_SERVER=OFF \\\
+           -DWITH_EMBEDDED_SHARED_LIBRARY=0 \\\
+           -DWITH_INNODB_MEMCACHED=ON \\\
+           -DUSE_LD_LLD=0 \\\
+           -DWITH_AUTHENTICATION_CLIENT_PLUGINS=1 \\\
+           -DWITH_CURL=system \\\
+           %{cmake_systemd_flags} \\\
+           -DENABLE_DTRACE=OFF \\\
+           -DWITH_SSL=system \\\
+           -DWITH_ZLIB=bundled \\\
+           -DWITH_READLINE=system \\\
+           -DWITHOUT_TOKUDB=ON \\\
+           -DINSTALL_MYSQLSHAREDIR=share/percona-xtradb-cluster \\\
+           -DINSTALL_SUPPORTFILESDIR=share/percona-xtradb-cluster \\\
+           -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \\\
+           -DFEATURE_SET="%{feature_set}" \\\
+           -DWITH_WSREP=ON \\\
+           -DWITH_PERCONA_TELEMETRY=ON \\\
+           -DWITH_LDAP=system \\\
+           -DWITH_INNODB_DISALLOW_WRITES=ON \\\
+           -DWITH_ZSTD=bundled \\\
+           %{cmake_fido_flags} \\\
+           -DWITH_UNIT_TESTS=0 \\\
+           -DWITH_SCALABILITY_METRICS=ON \\\
+           -DMYSQL_SERVER_SUFFIX=".%{rel}" \\\
+           %{cmake_lto_flags} \\\
+           %{?mecab_option}
+
 # Build debug mysqld and libmysqld.a
 mkdir debug
 (
@@ -787,50 +847,10 @@ mkdir debug
                 -e 's/ $//'`
   # XXX: MYSQL_UNIX_ADDR should be in cmake/* but mysql_version is included before
   # XXX: install_layout so we can't just set it based on INSTALL_LAYOUT=RPM
-  ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
-           -DDOWNLOAD_BOOST=1 -DWITH_BOOST=build-ps/boost \
-           -DWITH_PACKAGE_FLAGS=OFF \
-           -DCMAKE_C_FLAGS="$CFLAGS" \
-           -DCMAKE_CXX_FLAGS="$CXXFLAGS" \
-           -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=%{_prefix} \
-           -DWITH_EMBEDDED_SERVER=OFF \
-           -DWITH_INNODB_MEMCACHED=ON \
-           -DUSE_LD_LLD=0 \
-           -DWITH_AUTHENTICATION_CLIENT_PLUGINS=1 \
-           -DWITH_CURL=system \
-%if 0%{?systemd}
-           -DWITH_SYSTEMD=OFF \
-%endif
-           -DENABLE_DTRACE=OFF \
-           -DWITH_SSL=system \
-           -DWITH_ZLIB=bundled \
-           -DWITH_READLINE=system \
-           -DWITHOUT_TOKUDB=ON \
-           -DINSTALL_MYSQLSHAREDIR=share/percona-xtradb-cluster \
-           -DINSTALL_SUPPORTFILESDIR=share/percona-xtradb-cluster \
-           -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
-           -DFEATURE_SET="%{feature_set}" \
+  ${CMAKE} ../ \
+           -DCMAKE_BUILD_TYPE=Debug \
+           %{cmake_common_flags} \
            -DCOMPILATION_COMMENT="%{compilation_comment_debug}" \
-           -DWITH_WSREP=ON \
-           -DWITH_PERCONA_TELEMETRY=ON \
-           -DWITH_LDAP=system \
-           -DWITH_INNODB_DISALLOW_WRITES=ON \
-           -DWITH_EMBEDDED_SERVER=0 \
-           -DWITH_EMBEDDED_SHARED_LIBRARY=0 \
-           -DWITH_INNODB_MEMCACHED=1 \
-           -DWITH_ZSTD=bundled \
-%if 0%{?add_fido_plugins}
-           -DWITH_FIDO=bundled \
-%else
-           -DWITH_FIDO=none \
-%endif
-           -DWITH_UNIT_TESTS=0 \
-           -DWITH_SCALABILITY_METRICS=ON \
-           -DMYSQL_SERVER_SUFFIX=".%{rel}" \
-%if 0%{?rhel} > 8
-           -DWITH_LTO=ON \
-%endif
-           %{?mecab_option} \
            -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_ON} %{ROCKSDB_FLAGS}
   # echo BEGIN_DEBUG_CONFIG ; egrep '^#define' include/config.h ; echo END_DEBUG_CONFIG
   make %{?_smp_mflags}
@@ -841,55 +861,37 @@ mkdir release
   cd release
   # XXX: MYSQL_UNIX_ADDR should be in cmake/* but mysql_version is included before
   # XXX: install_layout so we can't just set it based on INSTALL_LAYOUT=RPM
-  ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
-           -DDOWNLOAD_BOOST=1 -DWITH_BOOST=build-ps/boost \
-           -DWITH_PACKAGE_FLAGS=OFF \
-           -DCMAKE_C_FLAGS="$CFLAGS" \
-           -DCMAKE_CXX_FLAGS="$CXXFLAGS" \
-           -DCMAKE_BUILD_TYPE=RelWithDebInfo  -DCMAKE_INSTALL_PREFIX=%{_prefix} \
+  ${CMAKE} ../ \
+           %{?pgo:-DFPROFILE_GENERATE=1} \
+           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
            -DMINIMAL_RELWITHDEBINFO=OFF \
-           -DWITH_EMBEDDED_SERVER=OFF \
-           -DWITH_INNODB_MEMCACHED=ON \
-           -DUSE_LD_LLD=0 \
-           -DWITH_AUTHENTICATION_CLIENT_PLUGINS=1 \
-           -DWITH_CURL=system \
-%if 0%{?systemd}
-           -DWITH_SYSTEMD=OFF \
-%endif
-           -DENABLE_DTRACE=OFF \
-           -DWITH_SSL=system \
-           -DWITH_ZLIB=bundled \
-           -DWITH_READLINE=system \
-           -DWITHOUT_TOKUDB=ON \
-           -DINSTALL_MYSQLSHAREDIR=share/percona-xtradb-cluster \
-           -DINSTALL_SUPPORTFILESDIR=share/percona-xtradb-cluster \
-           -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
-           -DFEATURE_SET="%{feature_set}" \
+           %{cmake_common_flags} \
            -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
-           -DWITH_WSREP=ON \
-           -DWITH_PERCONA_TELEMETRY=ON \
-           -DWITH_LDAP=system \
-           -DWITH_INNODB_DISALLOW_WRITES=ON \
-           -DWITH_EMBEDDED_SERVER=0 \
-           -DWITH_EMBEDDED_SHARED_LIBRARY=0 \
-           -DWITH_INNODB_MEMCACHED=1 \
-           -DWITH_ZSTD=bundled \
-%if 0%{?add_fido_plugins}
-           -DWITH_FIDO=bundled \
-%else
-           -DWITH_FIDO=none \
-%endif
-           -DWITH_UNIT_TESTS=0 \
-           -DWITH_SCALABILITY_METRICS=ON \
-%if 0%{?rhel} > 8
-           -DWITH_LTO=ON \
-%endif
-           %{?mecab_option} \
-           -DMYSQL_SERVER_SUFFIX=".%{rel}" \
            -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_OFF} %{ROCKSDB_FLAGS}
   # echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
   make %{?_smp_mflags}
 )
+
+%if 0%{?pgo}
+(
+  pushd release
+  make run-profile-suite
+  rm -r $(readlink mysql-test/var)
+  popd
+
+  rm -rf release
+  mkdir release && pushd release
+  ${CMAKE} ../ \
+           -DFPROFILE_USE=1 \
+           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+           -DMINIMAL_RELWITHDEBINFO=OFF \
+           %{cmake_common_flags} \
+           -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
+           -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_OFF} %{ROCKSDB_FLAGS}
+  make %{?_smp_mflags}
+  popd
+)
+%endif # pgo
 
 # For the debuginfo extraction stage, some source files are not located in the release
 # and debug dirs, but in the source dir. Make a link there to avoid errors in the
@@ -1024,6 +1026,8 @@ install -D -p -m 0644 packaging/rpm-common/mysqlrouter.conf.in %{buildroot}%{_sy
 %{__rm} -f $RBR/usr/include/kmippp.h
 %{__rm} -f $RBR/usr/lib/libkmip.a
 %{__rm} -f $RBR/usr/lib/libkmippp.a
+%{__rm} -f $RBR/usr/lib/libkmipclient.a
+%{__rm} -f $RBR/usr/lib/libkmipcore.a
 %{__rm} -f $RBR/usr/lib/libgalera_smm.so
 %{__rm} -f $RBR/usr/share/garb-systemd
 %{__rm} -f $RBR/usr/share/garb.cnf
@@ -1083,17 +1087,15 @@ ln -s "galera4/libgalera_smm.so" "$RBR/%{_libdir}/"
 install -d $RBR%{galera_docs}
 install -m 644 $MBD/%{galera_src_dir}/COPYING                     \
     $RBR%{galera_docs}/COPYING
-install -m 644 $MBD/%{galera_src_dir}/packages/rpm/README     \
+install -m 644 $MBD/%{galera_src_dir}/README                  \
     $RBR%{galera_docs}/README
-install -m 644 $MBD/%{galera_src_dir}/packages/rpm/README-MySQL \
-    $RBR%{galera_docs}/README-MySQL
 install -m 644 $MBD/%{galera_src_dir}/asio/LICENSE_1_0.txt    \
     $RBR%{galera_docs}/LICENSE.asio
 
 install -d $RBR%{galera_docs2}
 install -m 644 $MBD/%{galera_src_dir}/COPYING                     \
     $RBR%{galera_docs2}/COPYING
-install -m 644 $MBD/%{galera_src_dir}/packages/rpm/README     \
+install -m 644 $MBD/%{galera_src_dir}/README                  \
     $RBR%{galera_docs2}/README
 
 install -d $RBR%{_mandir}/man8
@@ -1104,6 +1106,8 @@ install -d $RBR%{_libdir}/mysql
 #%if 0%{?mecab}
 #    mv $RBR%{_libdir}/mecab $RBR%{_libdir}/mysql
 #%endif
+
+find $RBR -name 'core.[0-9]*' -type f -delete || true
 
 ##############################################################################
 #  Post processing actions, i.e. when installed
@@ -1665,92 +1669,9 @@ fi
 %dir %{_libdir}/mysql/private
 %attr(755, root, root) %{_libdir}/mysql/private/libprotobuf-lite.so.*
 %attr(755, root, root) %{_libdir}/mysql/private/libprotobuf.so.*
-%attr(755, root, root) %{_libdir}/mysql/private/libfido2.so.*
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_bad_any_cast_impl.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_bad_optional_access.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_bad_variant_access.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_base.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_city.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_civil_time.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_cord_internal.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_cord.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_cordz_functions.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_cordz_handle.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_cordz_info.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_cordz_sample_token.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_crc32c.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_crc_cord_state.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_crc_cpu_detect.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_crc_internal.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_debugging_internal.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_demangle_internal.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_die_if_null.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_examine_stack.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_exponential_biased.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_failure_signal_handler.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_flags_commandlineflag_internal.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_flags_commandlineflag.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_flags_config.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_flags_internal.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_flags_marshalling.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_flags_parse.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_flags_private_handle_accessor.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_flags_program_name.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_flags_reflection.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_flags.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_flags_usage_internal.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_flags_usage.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_graphcycles_internal.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_hash.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_hashtablez_sampler.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_int128.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_kernel_timeout_internal.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_leak_check.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_entry.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_flags.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_globals.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_initialize.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_internal_check_op.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_internal_conditions.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_internal_format.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_internal_globals.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_internal_log_sink_set.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_internal_message.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_internal_nullguard.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_internal_proto.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_severity.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_log_sink.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_low_level_hash.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_malloc_internal.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_periodic_sampler.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_random_distributions.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_random_internal_distribution_test_util.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_random_internal_platform.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_random_internal_pool_urbg.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_random_internal_randen_hwaes_impl.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_random_internal_randen_hwaes.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_random_internal_randen_slow.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_random_internal_randen.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_random_internal_seed_material.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_random_seed_gen_exception.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_random_seed_sequences.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_raw_hash_set.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_raw_logging_internal.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_scoped_set_env.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_spinlock_wait.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_stacktrace.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_statusor.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_status.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_strerror.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_str_format_internal.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_strings_internal.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_strings.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_string_view.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_symbolize.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_synchronization.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_throw_delegate.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_time.so
-%attr(755, root, root) %{_libdir}/mysql/private/libabsl_time_zone.so
+%attr(755, root, root) %{_libdir}/mysql/private/libfido2.so.1.*
+%{_libdir}/mysql/private/libfido2.so.1
+%attr(755, root, root) %{_libdir}/mysql/private/libabsl_*.so
 %attr(755, root, root) %{_libdir}/mysql/private/libicui18n.so.*
 %attr(755, root, root) %{_libdir}/mysql/private/libicustubdata.so.*
 %attr(755, root, root) %{_libdir}/mysql/private/libicuuc.so.*
@@ -1765,14 +1686,6 @@ fi
 
 %if 0%{?mecab}
 %{_libdir}/mysql/mecab
-%endif
-
-%if "%rhel" == "5"
-    %attr(755, root, root) %{_datadir}/percona-xtradb-cluster/
-%endif
-
-%if "%rhel" >= "6"
-    %attr(755, root, root) %{_datarootdir}/percona-xtradb-cluster/
 %endif
 
 %if %{WITH_TCMALLOC}
@@ -1800,10 +1713,10 @@ fi
 # This is a symlink
 %{_libdir}/libgalera_smm.so
 %{_libdir}/galera4/libgalera_smm.so
+%attr(755, root, root) %{_libdir}/mysql/libgalera_smm.so
 %attr(0755,root,root) %dir %{galera_docs}
 %doc %attr(0644,root,root) %{galera_docs}/COPYING
 %doc %attr(0644,root,root) %{galera_docs}/README
-%doc %attr(0644,root,root) %{galera_docs}/README-MySQL
 %doc %attr(0644,root,root) %{galera_docs}/LICENSE.asio
 %config(noreplace) %{_sysconfdir}/my.cnf
 %dir %{_sysconfdir}/my.cnf.d

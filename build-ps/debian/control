@@ -3,8 +3,8 @@ Section: database
 Priority: extra
 Maintainer: Percona Server Development Team <mysql-dev@percona.com>
 Uploaders: George Lorch <george.lorch@percona.com>,
-           Tomislav Plavcic <tomislav.plavcic@percona.com>
-           Raghavendra Prabhu <raghavendra.prabhu@percona.com>
+           Tomislav Plavcic <tomislav.plavcic@percona.com>,
+           Raghavendra Prabhu <raghavendra.prabhu@percona.com>,
            Krunal Bauskar <krunal.bauskar@percona.com>
 Build-Depends: libtool (>= 1.4.2-7),
                procps,
