@@ -1026,6 +1026,8 @@ install -D -p -m 0644 packaging/rpm-common/mysqlrouter.conf.in %{buildroot}%{_sy
 %{__rm} -f $RBR/usr/include/kmippp.h
 %{__rm} -f $RBR/usr/lib/libkmip.a
 %{__rm} -f $RBR/usr/lib/libkmippp.a
+%{__rm} -f $RBR/usr/lib/libkmipclient.a
+%{__rm} -f $RBR/usr/lib/libkmipcore.a
 %{__rm} -f $RBR/usr/lib/libgalera_smm.so
 %{__rm} -f $RBR/usr/share/garb-systemd
 %{__rm} -f $RBR/usr/share/garb.cnf
@@ -1804,9 +1806,6 @@ fi
 #coredumper
 %attr(755, root, root) %{_includedir}/coredumper/coredumper.h
 %attr(755, root, root) /usr/lib/libcoredumper.a
-#kmip
-%attr(755, root, root) /usr/lib/libkmipclient.a
-%attr(755, root, root) /usr/lib/libkmipcore.a
 
 # ----------------------------------------------------------------------------
 %files -n percona-xtradb-cluster-garbd
