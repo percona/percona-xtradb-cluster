@@ -45,6 +45,7 @@ DEB_UPSTREAM_VERSION_MAJOR_MINOR := $(shell echo $(DEB_UPSTREAM_VERSION) | sed -
 DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 
 EXPORTED_SOURCE_TARBALL = debian/percona-xtradb-cluster-source-8.0.tar.gz
+SBOM_UTILS = build-ps/sbom
 
 DISTRIBUTION = $(shell lsb_release -i -s)
 DISTRELEASE = $(shell lsb_release -c -s)
@@ -285,6 +286,21 @@ override_dh_install:
 	mkdir -p debian/percona-xtradb-cluster-server-debug/usr/lib/mysql/private/debug
 	cp ./builddir/library_output_directory/libprotobuf-lite.so* debian/percona-xtradb-cluster-server-debug/usr/lib/mysql/private/debug
 	patchelf --debug --set-rpath $(rpathdebug) debian/percona-xtradb-cluster-server-debug/usr/lib/mysql/plugin/debug/group_replication.so
+ifneq (,$(filter pkg.pxc.sbom,$(DEB_BUILD_PROFILES)))
+	@test -n "$(DEB_VERSION)" || \
+		{ echo "SBOM: dpkg-parsechangelog produced no Version" >&2; exit 1; }
+	@test -d debian/percona-xtradb-cluster-server || \
+		{ echo "SBOM: debian/percona-xtradb-cluster-server is not a staging dir" >&2; exit 1; }
+	sh $(SBOM_UTILS)/check-components.sh --root .
+	install -d -m 0755 debian/percona-xtradb-cluster-server/usr/share/percona-xtradb-cluster/sbom
+	sh $(SBOM_UTILS)/gen-sbom.sh \
+		--pkg percona-xtradb-cluster \
+		--version $(DEB_VERSION) \
+		--root . \
+		--pins $(SBOM_UTILS)/submodule-pins.txt \
+		--artifact package \
+		--dest debian/percona-xtradb-cluster-server/usr/share/percona-xtradb-cluster/sbom
+endif
 	@echo "RULES.$@"
 
 ifeq ($(OS_VERSION), 18.04)

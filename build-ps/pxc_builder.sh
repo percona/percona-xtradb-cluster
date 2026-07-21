@@ -23,6 +23,7 @@ Usage: $0 [OPTIONS]
         --bin_release       BIN version( default = 1)
         --enable_fipsmode   Build gated PXC
         --debug             Build debug tarball
+        --sbom              If it is 1 SBOMs are generated and shipped (default = 0)
         --help) usage ;;
 Example $0 --builddir=/tmp/PXC80 --get_sources=1 --build_src_rpm=1 --build_rpm=1
 EOF
@@ -61,6 +62,7 @@ parse_arguments() {
             --no_clone=*) NO_CLONE="$val" ;;
             --debug=*) DEBUG="$val" ;;
             --enable_fipsmode=*) FIPSMODE="$val" ;;
+            --sbom=*) SBOM="$val" ;;
             --help) usage ;;      
             *)
               if test -n "$pick_args"
@@ -236,6 +238,19 @@ get_sources(){
     rsync -av ${WORKDIR}/percona-xtradb-cluster/extra/coredumper/ ${PXCDIR}/extra/coredumper --exclude .git
     rsync -av ${WORKDIR}/percona-xtradb-cluster/extra/libkmip/ ${PXCDIR}/extra/libkmip --exclude .git
 
+    # the rsync above drops .git, so record the submodule pins while they are
+    # still resolvable; the SBOM tooling reads this file instead of git
+    if [ ${SBOM} = 1 ]; then
+        mkdir -p ${PXCDIR}/build-ps/sbom
+        git -C ${WORKDIR}/percona-xtradb-cluster submodule status --recursive \
+            | awk '{ sub(/^[-+U]/, "", $1); print $2 "|" $1 }' \
+            > ${PXCDIR}/build-ps/sbom/submodule-pins.txt
+        if [ ! -s ${PXCDIR}/build-ps/sbom/submodule-pins.txt ]; then
+            echo "ERROR: --sbom=1 but no submodule pins could be recorded"
+            exit 1
+        fi
+    fi
+
     sed -i 's:ROUTER_RUNTIMEDIR:/var/run/mysqlrouter/:g' ${PXCDIR}/packaging/rpm-common/*
     cd ${PXCDIR}/packaging/rpm-common || exit
         if [ ! -f mysqlrouter.service ]; then
@@ -272,6 +287,27 @@ get_sources(){
     pushd ${PXCDIR}
         sed -i 's:boostorg\.jfrog\.io/artifactory/main/release/.*/source:downloads.percona.com/downloads/packaging/boost:g' cmake/boost.cmake
     popd
+    #
+    if [ ${SBOM} = 1 ]; then
+        if ! sh ${PXCDIR}/build-ps/sbom/check-components.sh --root ${PXCDIR}; then
+            echo "ERROR: --sbom=1 but the component registry does not match the tree"
+            exit 1
+        fi
+        if ! sh ${PXCDIR}/build-ps/sbom/gen-sbom.sh \
+            --pkg percona-xtradb-cluster \
+            --version ${MYSQL_VERSION}-${MYSQL_RELEASE} \
+            --root ${PXCDIR} \
+            --pins ${PXCDIR}/build-ps/sbom/submodule-pins.txt \
+            --artifact source \
+            --dest ${PXCDIR}/sbom; then
+            echo "ERROR: --sbom=1 but SBOM generation failed"
+            exit 1
+        fi
+        if [ -z "$(ls -A ${PXCDIR}/sbom 2>/dev/null)" ]; then
+            echo "ERROR: --sbom=1 but no SBOM was produced for the source tarball"
+            exit 1
+        fi
+    fi
     #
     tar --owner=0 --group=0 --exclude=.bzr --exclude=.git -czf ${PXCDIR}.tar.gz ${PXCDIR}
     rm -fr ${PXCDIR}
@@ -849,17 +885,22 @@ build_rpm(){
     source ${WORKDIR}/pxc-80.properties
     source ${CURDIR}/srpm/pxc-80.properties
     #
+    SBOM_DEFINE=()
+    if [ "${SBOM}" = "1" ]; then
+        SBOM_DEFINE=(--define "with_sbom 1")
+    fi
+    #
     if [ ${ARCH} = x86_64 ]; then
         if [[ "x${FIPSMODE}" == "x1" ]]; then
-            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "enable_fipsmode 1" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "enable_fipsmode 1" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" "${SBOM_DEFINE[@]}" --rebuild rpmbuild/SRPMS/${SRCRPM}
         else
-            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" "${SBOM_DEFINE[@]}" --rebuild rpmbuild/SRPMS/${SRCRPM}
         fi
     else
         if [[ "x${FIPSMODE}" == "x1" ]]; then
-            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "enable_fipsmode 1" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "enable_fipsmode 1" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" "${SBOM_DEFINE[@]}" --rebuild rpmbuild/SRPMS/${SRCRPM}
         else
-            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" "${SBOM_DEFINE[@]}" --rebuild rpmbuild/SRPMS/${SRCRPM}
         fi
     fi
     return_code=$?
@@ -1159,7 +1200,16 @@ build_deb(){
         sed -i 's/export CXXFLAGS=/export CXXFLAGS=-Wno-error=nonnull-compare -Wno-error=deprecated-declarations -Wno-error=unused-function -Wno-error=unused-variable -Wno-error=unused-parameter -Wno-error=date-time /' debian/rules
     fi
 
-    GALERA_REVNO="${GALERA_REVNO}" SCONS_ARGS=' strict_build_flags=0'  MAKE_JFLAG=-j4  dpkg-buildpackage -rfakeroot -uc -us -b
+    if [ "${SBOM}" = "1" ]; then
+        DEB_BUILD_PROFILES="${DEB_BUILD_PROFILES:+${DEB_BUILD_PROFILES} }pkg.pxc.sbom" \
+            GALERA_REVNO="${GALERA_REVNO}" SCONS_ARGS=' strict_build_flags=0'  MAKE_JFLAG=-j4  dpkg-buildpackage -rfakeroot -uc -us -b
+    else
+        GALERA_REVNO="${GALERA_REVNO}" SCONS_ARGS=' strict_build_flags=0'  MAKE_JFLAG=-j4  dpkg-buildpackage -rfakeroot -uc -us -b
+    fi
+    if [ $? != 0 ]; then
+        echo "ERROR: dpkg-buildpackage failed"
+        exit 1
+    fi
     #
     cd ${WORKSPACE} || exit
     rm -fv *.dsc *.orig.tar.gz *.debian.tar.gz *.changes
@@ -1324,9 +1374,25 @@ build_tarball(){
     mkdir -p ${WORKDIR}/${DIRNAME}
     mkdir -p ${CURDIR}/${DIRNAME}
     rm -f $BUILD_NUMBER/percona-xtrabackup* || true
+    if [ -z "$(ls -A $BUILD_NUMBER/*.tar.gz 2>/dev/null)" ]; then
+        echo "ERROR: build-binary.sh produced no tarballs"
+        exit 1
+    fi
     cp  $BUILD_NUMBER/*.tar.gz ${WORKDIR}/../${DIRNAME}
     cp  $BUILD_NUMBER/*.tar.gz ${WORKDIR}/${DIRNAME}
     cp  $BUILD_NUMBER/*.tar.gz ${CURDIR}/${DIRNAME}
+
+    if [ ${SBOM} = 1 ]; then
+        mkdir -p ${WORKDIR}/sbom
+        mkdir -p ${CURDIR}/sbom
+        if [ -n "$(ls -A $BUILD_NUMBER/sbom 2>/dev/null)" ]; then
+            cp $BUILD_NUMBER/sbom/* ${WORKDIR}/sbom/
+            cp $BUILD_NUMBER/sbom/* ${CURDIR}/sbom/
+        else
+            echo "ERROR: --sbom=1 but build-binary.sh produced no SBOMs"
+            exit 1
+        fi
+    fi
 
 }
 
@@ -1351,6 +1417,7 @@ RPM_RELEASE=1
 DEB_RELEASE=1
 BIN_RELEASE=1
 DEBUG=0
+SBOM=0
 REVISION=0
 BRANCH="8.0"
 MECAB_INSTALL_DIR="${WORKDIR}/mecab-install"
@@ -1362,6 +1429,7 @@ WSREP_VERSION=31.33
 PRODUCT_FULL=Percona-XtraDB-Cluster-8.0.13-31.33
 BOOST_PACKAGE_NAME=boost_1_59_0
 parse_arguments PICK-ARGS-FROM-ARGV "$@"
+export SBOM
 
 check_workdir
 get_system

@@ -1112,6 +1112,18 @@ install -d $RBR%{_libdir}/mysql
 #    mv $RBR%{_libdir}/mecab $RBR%{_libdir}/mysql
 #%endif
 
+%if 0%{?with_sbom}
+sh $MBD/build-ps/sbom/check-components.sh --root $MBD
+install -d -m 0755 $RBR%{_datadir}/percona-xtradb-cluster/sbom
+sh $MBD/build-ps/sbom/gen-sbom.sh \
+  --pkg percona-xtradb-cluster \
+  --version %{mysql_version}-%{percona_server_version} \
+  --root $MBD \
+  --pins $MBD/build-ps/sbom/submodule-pins.txt \
+  --artifact package \
+  --dest $RBR%{_datadir}/percona-xtradb-cluster/sbom
+%endif
+
 ##############################################################################
 #  Post processing actions, i.e. when installed
 ##############################################################################
@@ -1609,6 +1621,10 @@ fi
 
 %files -n percona-xtradb-cluster-server
 %defattr(-,root,root,0755)
+
+%if 0%{?with_sbom}
+%{_datadir}/percona-xtradb-cluster/sbom
+%endif
 
 %if %{defined license_files_server}
 %doc %{license_files_server}
