@@ -6361,19 +6361,6 @@ finish:
 #endif /* WITH_WSREP */
   }
 
-#ifdef WITH_WSREP
-  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-  if (thd->wsrep_conflict_state != REPLAYED)
-  {
-    /* Hold this lock only for duration of wsrep_conflict_state state check.
-    Release it before entering unit-cleanup. Unit-cleanup will cause
-    external_unlock at InnoDB level that will need transaction lock.
-    This could conflict if this thread has conflicting lock with
-    other high-priority thread that needs transaction lock and
-    LOCK_wsrep_thd too. */
-    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-#endif /* WITH_WSREP */
-
 #ifndef EMBEDDED_LIBRARY
   if (thd->get_command() == COM_STMT_EXECUTE)
   {
@@ -6389,6 +6376,18 @@ finish:
   }
 #endif /* !EMBEDDED_LIBRARY */
 
+#ifdef WITH_WSREP
+  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+  if (thd->wsrep_conflict_state != REPLAYED)
+  {
+    /* Hold this lock only for duration of wsrep_conflict_state state check.
+    Release it before entering unit-cleanup. Unit-cleanup will cause
+    external_unlock at InnoDB level that will need transaction lock.
+    This could conflict if this thread has conflicting lock with
+    other high-priority thread that needs transaction lock and
+    LOCK_wsrep_thd too. */
+    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+#endif /* WITH_WSREP */
   lex->unit->cleanup(true);
 #ifdef WITH_WSREP
   }
