@@ -78,6 +78,7 @@ override_dh_auto_install:
 	rm debian/tmp/usr/lib/mysql-test/CTestTestfile.cmake
 	rm debian/tmp/usr/lib/mysql-test/Makefile
 	# add missing man pages
+<<<<<<< HEAD
 	# install -g root -o root -m 0644 debian/extra/mysql_embedded.1 debian/tmp/usr/share/man/man1
 	# add MySQL Server debug binary and library to package
 	# install -g root -o root -m 0755 debian/extra/server-binary debian/tmp/usr/sbin/mysqld-debug
@@ -100,6 +101,11 @@ endif
 	install -g root -o root -m 0755 -d debian/tmp/usr/lib/mysql/plugin/debug
 	#install -g root -o root -m 0755 debian/extra/*.so debian/tmp/usr/lib/mysql/plugin/debug
 	#install -g root -o root -m 0755 debian/extra/daemon_example.ini debian/tmp/usr/lib/mysql/plugin/debug
+||||||| d7ee10ef14c
+	install -g root -o root -m 0644 debian/extra/mysql_embedded.1 debian/tmp/usr/share/man/man1
+=======
+	install -m 0644 debian/extra/mysql_embedded.1 debian/tmp/usr/share/man/man1
+>>>>>>> Percona-Server-5.7.44-57
 	# Add helper functions for maintainer scripts
 	install -m 0644 debian/extra/mysql-helpers debian/tmp/usr/share/mysql/
 	# add apparmor profile

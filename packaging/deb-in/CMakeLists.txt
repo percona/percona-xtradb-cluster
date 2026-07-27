@@ -292,7 +292,7 @@ ELSEIF(DEB_CODENAME STREQUAL "trusty")
   SET (DEB_INSTALL_SOURCE_XZ "")
   SET (DEB_RULES_INSTALL_SYSTEMD "")
   SET (DEB_RULES_INSTALL_APPARMOR
-    "install -g root -o root -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld")
+    "install -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld")
   SET (DEB_RULES_APPARMOR_LOAD
     "dh_apparmor -pmysql-${DEB_PRODUCTNAME}-server --profile-name=usr.sbin.mysqld")
   SET (DEB_RULES_SYSTEMD_ENABLE "")
@@ -313,7 +313,7 @@ ELSEIF(DEB_CODENAME STREQUAL "xenial")
   SET (DEB_RULES_INSTALL_SYSTEMD
     "install -m 0755 debian/extra/mysql-systemd-start debian/tmp/usr/share/mysql/")
   SET (DEB_RULES_INSTALL_APPARMOR
-    "install -g root -o root -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld")
+    "install -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld")
   SET (DEB_RULES_APPARMOR_LOAD
     "dh_apparmor -pmysql-${DEB_PRODUCTNAME}-server --profile-name=usr.sbin.mysqld")
   SET (DEB_SYSTEMD_SERVICE_NAME "mysql")
@@ -337,7 +337,7 @@ ELSEIF(DEB_CODENAME STREQUAL "zesty")
   SET (DEB_RULES_INSTALL_SYSTEMD
     "install -m 0755 debian/extra/mysql-systemd-start debian/tmp/usr/share/mysql/")
   SET (DEB_RULES_INSTALL_APPARMOR
-    "install -g root -o root -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld")
+    "install -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld")
   SET (DEB_RULES_APPARMOR_LOAD
     "dh_apparmor -pmysql-${DEB_PRODUCTNAME}-server --profile-name=usr.sbin.mysqld")
   SET (DEB_SYSTEMD_SERVICE_NAME "mysql")
@@ -359,7 +359,7 @@ ELSEIF(DEB_CODENAME STREQUAL "artful")
   SET (DEB_RULES_INSTALL_SYSTEMD
     "install -m 0755 debian/extra/mysql-systemd-start debian/tmp/usr/share/mysql/")
   SET (DEB_RULES_INSTALL_APPARMOR
-    "install -g root -o root -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld")
+    "install -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld")
   SET (DEB_RULES_APPARMOR_LOAD
     "dh_apparmor -pmysql-${DEB_PRODUCTNAME}-server --profile-name=usr.sbin.mysqld")
   SET (DEB_RULES_SYSTEMD_ENABLE "dh_systemd_enable --name=mysql")
@@ -378,7 +378,7 @@ ELSEIF(DEB_CODENAME STREQUAL "bionic")
   SET (DEB_RULES_INSTALL_SYSTEMD
     "install -m 0755 debian/extra/mysql-systemd-start debian/tmp/usr/share/mysql/")
   SET (DEB_RULES_INSTALL_APPARMOR
-    "install -g root -o root -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld")
+    "install -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld")
   SET (DEB_RULES_APPARMOR_LOAD
     "dh_apparmor -pmysql-${DEB_PRODUCTNAME}-server${DEB_PRODUCTSERIES} --profile-name=usr.sbin.mysqld")
   SET (DEB_SYSTEMD_SERVICE_NAME "mysql")
@@ -402,7 +402,7 @@ ELSEIF(DEB_CODENAME STREQUAL "cosmic")
   SET (DEB_RULES_INSTALL_SYSTEMD
     "install -m 0755 debian/extra/mysql-systemd-start debian/tmp/usr/share/mysql/")
   SET (DEB_RULES_INSTALL_APPARMOR
-    "install -g root -o root -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld")
+    "install -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld")
   SET (DEB_RULES_APPARMOR_LOAD
     "dh_apparmor -pmysql-${DEB_PRODUCTNAME}-server --profile-name=usr.sbin.mysqld")
   SET (DEB_RULES_SYSTEMD_ENABLE "dh_systemd_enable --name=mysql")
@@ -414,6 +414,64 @@ ELSEIF(DEB_CODENAME STREQUAL "cosmic")
   SET (DEB_INIT_APPARMOR "/lib/apparmor/profile-load usr.sbin.mysqld")
   SET (DEB_CONTROL_DBGSYM "")
   SET (DEB_RULES_STRIP "")
+<<<<<<< HEAD
+||||||| d7ee10ef14c
+ELSEIF(DEB_CODENAME STREQUAL "disco")
+  SET (DEB_PLATFORMRELEASE "ubuntu19.04")
+  SET (DEB_CONTROL_BDEPS ", dh-apparmor, dh-systemd (>=1.5)")
+  SET (DEB_INSTALL_SOURCE_XZ "../*.tar.xz usr/src/mysql/")
+  SET (DEB_RULES_INSTALL_SYSTEMD
+    "install -m 0755 debian/extra/mysql-systemd-start debian/tmp/usr/share/mysql/")
+  SET (DEB_RULES_INSTALL_APPARMOR
+  "
+	install -g root -o root -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld
+  ")
+  SET (DEB_RULES_APPARMOR_LOAD
+  "
+	dh_apparmor -pmysql-${DEB_PRODUCTNAME}-server --profile-name=usr.sbin.mysqld
+  ")
+  SET (DEB_RULES_SYSTEMD_ENABLE "dh_systemd_enable --name=mysql")
+  SET (DEB_RULES_SYSTEMD_START "dh_systemd_start --restart-after-upgrade")
+  SET (DEB_INSTALL_SERVER_SYSTEMD "usr/share/mysql/mysql-systemd-start")
+  SET (DEB_INSTALL_SERVER_APPARMOR "etc/apparmor.d/usr.sbin.mysqld")
+  SET (DEB_SERVICE_SERVER_EXECPRE
+    "ExecStartPre=/usr/share/mysql/mysql-systemd-start pre")
+  SET (DEB_INIT_APPARMOR "/lib/apparmor/profile-load usr.sbin.mysqld")
+  SET (DEB_CONTROL_DBGSYM "")
+  SET (DEB_RULES_STRIP "")
+  IF (DEFINED WITH_NDBCLUSTER_STORAGE_ENGINE)
+    # Cluster code triggers a lot of new warnings with GCC 7.2
+    SET (DEB_DEBUG_MAINTAINER "-DMYSQL_MAINTAINER_MODE=0")
+  ENDIF()
+=======
+ELSEIF(DEB_CODENAME STREQUAL "disco")
+  SET (DEB_PLATFORMRELEASE "ubuntu19.04")
+  SET (DEB_CONTROL_BDEPS ", dh-apparmor, dh-systemd (>=1.5)")
+  SET (DEB_INSTALL_SOURCE_XZ "../*.tar.xz usr/src/mysql/")
+  SET (DEB_RULES_INSTALL_SYSTEMD
+    "install -m 0755 debian/extra/mysql-systemd-start debian/tmp/usr/share/mysql/")
+  SET (DEB_RULES_INSTALL_APPARMOR
+  "
+	install -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld
+  ")
+  SET (DEB_RULES_APPARMOR_LOAD
+  "
+	dh_apparmor -pmysql-${DEB_PRODUCTNAME}-server --profile-name=usr.sbin.mysqld
+  ")
+  SET (DEB_RULES_SYSTEMD_ENABLE "dh_systemd_enable --name=mysql")
+  SET (DEB_RULES_SYSTEMD_START "dh_systemd_start --restart-after-upgrade")
+  SET (DEB_INSTALL_SERVER_SYSTEMD "usr/share/mysql/mysql-systemd-start")
+  SET (DEB_INSTALL_SERVER_APPARMOR "etc/apparmor.d/usr.sbin.mysqld")
+  SET (DEB_SERVICE_SERVER_EXECPRE
+    "ExecStartPre=/usr/share/mysql/mysql-systemd-start pre")
+  SET (DEB_INIT_APPARMOR "/lib/apparmor/profile-load usr.sbin.mysqld")
+  SET (DEB_CONTROL_DBGSYM "")
+  SET (DEB_RULES_STRIP "")
+  IF (DEFINED WITH_NDBCLUSTER_STORAGE_ENGINE)
+    # Cluster code triggers a lot of new warnings with GCC 7.2
+    SET (DEB_DEBUG_MAINTAINER "-DMYSQL_MAINTAINER_MODE=0")
+  ENDIF()
+>>>>>>> Percona-Server-5.7.44-57
 ELSE()
   MESSAGE(STATUS
     "Skipping deb packaging on unsupported platform ${DEB_CODENAME}.")
