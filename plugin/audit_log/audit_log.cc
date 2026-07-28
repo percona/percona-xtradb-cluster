@@ -540,7 +540,8 @@ static char *audit_log_general_record(char *buf, size_t buflen,
                      strlen(name) + event.general_sql_command.length +
                      20 + /* general_thread_id */
                      20 + /* status */
-                     MAX_RECORD_ID_SIZE + MAX_TIMESTAMP_SIZE;
+                     MAX_RECORD_ID_SIZE + MAX_TIMESTAMP_SIZE +
+                     static_cast<size_t>(endptr - buf);
   if (buflen_estimated > buflen) {
     *outlen = buflen_estimated;
     return NULL;
@@ -1123,15 +1124,17 @@ static int audit_log_notify(MYSQL_THD thd, mysql_event_class_t event_class,
             log_rec, buflen, event_general->general_command.str,
             event_general->general_time, event_general->general_error_code,
             *event_general, local->db, &len);
-        if (len > buflen) {
-          buflen = len + 1024;
+        while (log_rec == nullptr && len > buflen) {
+          const size_t next_buflen = len + 1024;
+          if (next_buflen <= buflen) break;
+          buflen = next_buflen;
           log_rec = audit_log_general_record(
               get_record_buffer(thd, buflen), buflen,
               event_general->general_command.str, event_general->general_time,
               event_general->general_error_code, *event_general, local->db,
               &len);
-          assert(log_rec);
         }
+        assert(log_rec);
         if (log_rec) audit_log_write(log_rec, len);
         break;
       }

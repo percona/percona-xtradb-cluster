@@ -1,4 +1,4 @@
-/* Copyright (c) 2015, 2025, Oracle and/or its affiliates.
+/* Copyright (c) 2015, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -67,6 +67,10 @@ static void WRITE_STR(const char *format) {
   my_write(outfile, (uchar *)buffer, strlen(buffer), MYF(0));
 }
 
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-format-attribute"
+#endif
 template <typename T>
 void WRITE_VAL(const char *format, T value) {
   char buffer[STRING_BUFFER_SIZE];
@@ -80,6 +84,9 @@ void WRITE_VAL(const char *format, T1 value1, T2 value2) {
   snprintf(buffer, sizeof(buffer), format, value1, value2);
   my_write(outfile, (uchar *)buffer, strlen(buffer), MYF(0));
 }
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
 
 static const char *user_localhost = "localhost";
 static const char *user_local = "127.0.0.1";

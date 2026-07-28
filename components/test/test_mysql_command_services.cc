@@ -1,4 +1,4 @@
-/* Copyright (c) 2022, 2025, Oracle and/or its affiliates.
+/* Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License, version 2.0,
@@ -229,6 +229,7 @@ static char *test_mysql_command_services_apis_udf(UDF_INIT *, UDF_ARGS *args,
   uint64_t row_count = 0;
   unsigned int num_column = 0;
   std::string result_set;
+  void *option_val = nullptr;
 
   //  Execute the SQL specified in the argument.
   if (cmd_factory_srv->init(&mysql_h)) {
@@ -261,7 +262,6 @@ static char *test_mysql_command_services_apis_udf(UDF_INIT *, UDF_ARGS *args,
   }
 
   /* To get the mysql option value */
-  void *option_val;
   cmd_options_srv->get(mysql_h, MYSQL_OPT_MAX_ALLOWED_PACKET, &option_val);
 
   {
