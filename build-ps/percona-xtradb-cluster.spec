@@ -445,15 +445,20 @@ Requires(preun):  /sbin/service
 %endif
 Obsoletes:      community-mysql-bench
 Obsoletes:      mysql-bench
-Obsoletes:      mariadb-connector-c-config
-Obsoletes:      mariadb-backup
-Obsoletes:      mariadb-bench
-Obsoletes:      mariadb-server
-Obsoletes:      mariadb-server-galera
-Obsoletes:      mariadb-server-utils
-Obsoletes:      mariadb-galera-server
-Obsoletes:      mariadb-gssapi-server
-Obsoletes:      mariadb-oqgraph-engine
+Obsoletes:      mariadb-connector-c-config mariadb11.8-connector-c-config
+Obsoletes:      mariadb-backup mariadb11.8-backup
+Obsoletes:      mariadb-bench mariadb11.8-bench
+Obsoletes:      mariadb-server mariadb11.8-server
+Obsoletes:      mariadb-server-galera mariadb11.8-server-galera
+Obsoletes:      mariadb-server-utils mariadb11.8-server-utils
+Obsoletes:      mariadb-galera-server mariadb11.8-galera-server
+Obsoletes:      mariadb-gssapi-server mariadb11.8-gssapi-server
+Obsoletes:      mariadb-oqgraph-engine mariadb11.8-oqgraph-engine
+Obsoletes:      mariadb-client-utils mariadb11.8-client-utils
+Obsoletes:      mysql8.4-server < 99
+Obsoletes:      mysql8.4 < 99
+Obsoletes:      mysql8.4-common < 99
+Obsoletes:      mysql8.4-errmsg < 99
 Provides:       mysql-server MySQL-server
 Conflicts:      Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56 Percona-Server-server-57
 
