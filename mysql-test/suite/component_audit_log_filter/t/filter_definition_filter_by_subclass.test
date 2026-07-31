@@ -2,6 +2,7 @@
 --source include/have_debug.inc
 --source ../inc/audit_tables_init.inc
 --source ../inc/audit_comp_install.inc
+SET GLOBAL audit_log_filter.event_mode=FULL;
 
 --let $audit_filter_log_path = `SELECT @@global.datadir`
 --let $audit_filter_log_name = `SELECT @@global.audit_log_filter.file`
@@ -24,6 +25,11 @@ let $filter = {
 
 eval SELECT audit_log_filter_set_filter('log_general_log', '$filter');
 SELECT audit_log_filter_set_user('%', 'log_general_log');
+--source include/count_sessions.inc
+disconnect default;
+connect(default, localhost, root, , test);
+--source include/wait_until_count_sessions.inc
+--source clean_current_audit_log.inc
 --source generate_audit_events.inc
 --let $search_tag=<EVENT_SUBCLASS_NAME>log</EVENT_SUBCLASS_NAME>
 --source check_all_events_with_tag.inc
@@ -41,6 +47,11 @@ let $filter = {
 
 eval SELECT audit_log_filter_set_filter('log_general_result', '$filter');
 SELECT audit_log_filter_set_user('%', 'log_general_result');
+--source include/count_sessions.inc
+disconnect default;
+connect(default, localhost, root, , test);
+--source include/wait_until_count_sessions.inc
+--source clean_current_audit_log.inc
 --source generate_audit_events.inc
 --let $search_tag=<EVENT_SUBCLASS_NAME>result</EVENT_SUBCLASS_NAME>
 --source check_all_events_with_tag.inc
@@ -58,6 +69,11 @@ let $filter = {
 
 eval SELECT audit_log_filter_set_filter('log_general_status', '$filter');
 SELECT audit_log_filter_set_user('%', 'log_general_status');
+--source include/count_sessions.inc
+disconnect default;
+connect(default, localhost, root, , test);
+--source include/wait_until_count_sessions.inc
+--source clean_current_audit_log.inc
 --source generate_audit_events.inc
 --let $search_tag=<EVENT_SUBCLASS_NAME>status</EVENT_SUBCLASS_NAME>
 --source check_all_events_with_tag.inc
@@ -78,6 +94,11 @@ let $filter = {
 
 eval SELECT audit_log_filter_set_filter('log_general_log_result_1', '$filter');
 SELECT audit_log_filter_set_user('%', 'log_general_log_result_1');
+--source include/count_sessions.inc
+disconnect default;
+connect(default, localhost, root, , test);
+--source include/wait_until_count_sessions.inc
+--source clean_current_audit_log.inc
 --source generate_audit_events.inc
 --let $search_tag=<EVENT_SUBCLASS_NAME>(?:log|result)</EVENT_SUBCLASS_NAME>
 --source check_all_events_with_tag.inc
@@ -97,6 +118,11 @@ let $filter = {
 
 eval SELECT audit_log_filter_set_filter('log_general_log_result_2', '$filter');
 SELECT audit_log_filter_set_user('%', 'log_general_log_result_2');
+--source include/count_sessions.inc
+disconnect default;
+connect(default, localhost, root, , test);
+--source include/wait_until_count_sessions.inc
+--source clean_current_audit_log.inc
 --source generate_audit_events.inc
 --let $search_tag=<EVENT_SUBCLASS_NAME>(?:log|result)</EVENT_SUBCLASS_NAME>
 --source check_all_events_with_tag.inc
@@ -114,6 +140,11 @@ let $filter = {
 
 eval SELECT audit_log_filter_set_filter('log_connect_insert', '$filter');
 SELECT audit_log_filter_set_user('%', 'log_connect_insert');
+--source include/count_sessions.inc
+disconnect default;
+connect(default, localhost, root, , test);
+--source include/wait_until_count_sessions.inc
+--source clean_current_audit_log.inc
 --source generate_audit_events.inc
 --let $search_tag=<EVENT_SUBCLASS_NAME>(?:connect|insert)</EVENT_SUBCLASS_NAME>
 --source check_all_events_with_tag.inc
@@ -136,6 +167,11 @@ let $filter = {
 
 eval SELECT audit_log_filter_set_filter('log_table_access_explicit_action', '$filter');
 SELECT audit_log_filter_set_user('%', 'log_table_access_explicit_action');
+--source include/count_sessions.inc
+disconnect default;
+connect(default, localhost, root, , test);
+--source include/wait_until_count_sessions.inc
+--source clean_current_audit_log.inc
 --source generate_audit_events.inc
 --let $search_tag=<EVENT_SUBCLASS_NAME>(?:read|insert)</EVENT_SUBCLASS_NAME>
 --source check_all_events_with_tag.inc

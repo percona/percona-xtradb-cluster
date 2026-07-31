@@ -23,6 +23,7 @@ Usage: $0 [OPTIONS]
         --bin_release       BIN version( default = 1)
         --enable_fipsmode   Build gated PXC
         --debug             Build debug tarball
+        --enable_pgo        PGO (Profile-Guided Optimization) build (default = 1, set to 0 to disable)
         --help) usage ;;
 Example $0 --builddir=/tmp/PXC80 --get_sources=1 --build_src_rpm=1 --build_rpm=1
 EOF
@@ -61,7 +62,8 @@ parse_arguments() {
             --no_clone=*) NO_CLONE="$val" ;;
             --debug=*) DEBUG="$val" ;;
             --enable_fipsmode=*) FIPSMODE="$val" ;;
-            --help) usage ;;      
+            --enable_pgo=*) ENABLE_PGO="$val" ;;
+            --help) usage ;;
             *)
               if test -n "$pick_args"
               then
@@ -148,6 +150,7 @@ get_sources(){
             git submodule update
             cd ../ || exit
         done
+        sed -i "/^env = conf.Finish()/i conf.env.Append(CPPFLAGS = ' -DGALERA_LOG_H_ENABLE_CXX')" percona-xtradb-cluster-galera/SConstruct
     else
         cd percona-xtradb-cluster || exit
     fi
@@ -517,12 +520,7 @@ install_deps() {
         apt-get -y install libsasl2-dev libsasl2-modules-gssapi-mit
         apt-get -y install stunnel libkrb5-dev
         apt-get -y install libudev-dev
-
-        if [ x"${DIST}" = xfocal -o x"${DIST}" = xbullseye -o x"${DIST}" = jammy -o x"${DIST}" = bookworm -o x"${DIST}" = xnoble -o x"${DIST}" = xtrixie ]; then
-            apt-get -y install python3-mysqldb
-        else
-            apt-get -y install python-mysqldb
-        fi
+        apt-get -y install python3-mysqldb
         if [ x"${DIST}" = xbuster ]; then
             wget https://downloads.percona.com/downloads/packaging/libfido2-1/libfido2-1_1.5.0-2~bpo10+1_amd64.deb
             wget https://downloads.percona.com/downloads/packaging/libfido2-1/libcbor0_0.5.0+dfsg-2_amd64.deb
@@ -552,8 +550,8 @@ install_deps() {
             update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-10 100
         fi
 
-        apt-get -y install --download-only percona-xtrabackup-80=8.0.35-34-1.${DIST}
-        apt-get -y install --download-only percona-xtrabackup-84=8.4.0-5-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-80=8.0.35-36-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-84=8.4.0-6-1.${DIST}
     fi
     return;
 }
@@ -633,7 +631,10 @@ build_srpm(){
     #
     mv -fv ${TARFILE} ${WORKDIR}/rpmbuild/SOURCES
     cd ${WORKDIR}/rpmbuild/SOURCES || exit
-    wget https://raw.githubusercontent.com/Percona-Lab/telemetry-agent/phase-0/call-home.sh
+    CALLHOME_SHA="0e3a2ed40336c70727f9aad8402a8a820ebc8db0"
+    CALLHOME_SHA256="3497f6631e71799bed9dedb1d72350bf1f0565d93578955234ac30cf2fb6eba4"
+    wget -q "https://raw.githubusercontent.com/percona/telemetry-agent/${CALLHOME_SHA}/call-home.sh"
+    echo "${CALLHOME_SHA256} call-home.sh" | sha256sum -c - || { echo "ERROR: call-home.sh checksum mismatch"; exit 1; }
     tar -xzf ${TARFILE}
     rm -rf ${TARFILE}
     PXCDIR=$(ls | grep 'Percona-XtraDB-Cluster*' | sort | tail -n1)
@@ -704,7 +705,7 @@ build_srpm(){
     cp ../SOURCES/call-home.sh ./
     awk -v n=$line_number 'NR <= n {print > "part1.txt"} NR > n {print > "part2.txt"}' percona-xtradb-cluster.spec
     head -n -1 part1.txt > temp && mv temp part1.txt
-    echo "cat <<'CALLHOME' > /tmp/call-home.sh" >> part1.txt
+    echo "cat <<'CALLHOME' > \$tfn" >> part1.txt
     cat call-home.sh >> part1.txt 
     echo "CALLHOME" >> part1.txt
     cat part2.txt >> part1.txt
@@ -849,17 +850,22 @@ build_rpm(){
     source ${WORKDIR}/pxc-80.properties
     source ${CURDIR}/srpm/pxc-80.properties
     #
+    # PGO: default is on; propagate --enable_pgo=0 as --define 'without_pgo 1'
+    PGO_DEFINE=""
+    if [ "${ENABLE_PGO}" = "0" ]; then
+        PGO_DEFINE="--define \"without_pgo 1\""
+    fi
     if [ ${ARCH} = x86_64 ]; then
         if [[ "x${FIPSMODE}" == "x1" ]]; then
-            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "enable_fipsmode 1" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+            eval rpmbuild --define '"_topdir ${WORKDIR}/rpmbuild"' --define '"dist ${OS_NAME}"' --define '"rpm_version $MYSQL_RELEASE.$RPM_RELEASE"' --define '"enable_fipsmode 1"' --define '"rel $RPM_RELEASE"' --define '"galera_revision ${GALERA_REVNO}"' --define '"with_mecab ${MECAB_INSTALL_DIR}/usr"' ${PGO_DEFINE} --rebuild rpmbuild/SRPMS/${SRCRPM}
         else
-            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+            eval rpmbuild --define '"_topdir ${WORKDIR}/rpmbuild"' --define '"dist ${OS_NAME}"' --define '"rpm_version $MYSQL_RELEASE.$RPM_RELEASE"' --define '"rel $RPM_RELEASE"' --define '"galera_revision ${GALERA_REVNO}"' --define '"with_mecab ${MECAB_INSTALL_DIR}/usr"' ${PGO_DEFINE} --rebuild rpmbuild/SRPMS/${SRCRPM}
         fi
     else
         if [[ "x${FIPSMODE}" == "x1" ]]; then
-            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "enable_fipsmode 1" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+            eval rpmbuild --define '"_topdir ${WORKDIR}/rpmbuild"' --define '"dist ${OS_NAME}"' --define '"rpm_version $MYSQL_RELEASE.$RPM_RELEASE"' --define '"enable_fipsmode 1"' --define '"rel $RPM_RELEASE"' --define '"galera_revision ${GALERA_REVNO}"' --define '"with_tokudb 0"' --define '"with_rocksdb 0"' --define '"with_mecab ${MECAB_INSTALL_DIR}/usr"' ${PGO_DEFINE} --rebuild rpmbuild/SRPMS/${SRCRPM}
         else
-            rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+            eval rpmbuild --define '"_topdir ${WORKDIR}/rpmbuild"' --define '"dist ${OS_NAME}"' --define '"rpm_version $MYSQL_RELEASE.$RPM_RELEASE"' --define '"rel $RPM_RELEASE"' --define '"galera_revision ${GALERA_REVNO}"' --define '"with_tokudb 0"' --define '"with_rocksdb 0"' --define '"with_mecab ${MECAB_INSTALL_DIR}/usr"' ${PGO_DEFINE} --rebuild rpmbuild/SRPMS/${SRCRPM}
         fi
     fi
     return_code=$?
@@ -1117,19 +1123,15 @@ build_deb(){
 
     cd ../ || exit
 
-    if [[ "x$DEBIAN_VERSION" == "xbionic" || "x$DEBIAN_VERSION" == "xstretch" || "x$DEBIAN_VERSION" == "xfocal" || "x$DEBIAN_VERSION" == "xbullseye" || "x$DEBIAN_VERSION" == "xjammy" || "x$DEBIAN_VERSION" == "xbookworm" || "x$DEBIAN_VERSION" == "xnoble" || "x$DEBIAN_VERSION" == "xtrixie" ]]; then
-        sed -i 's/fabi-version=2/fabi-version=2 -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -Wno-error=literal-suffix -Wno-misleading-indentation/' cmake/build_configurations/compiler_options.cmake
-        sed -i 's/gnu++11/gnu++11 -Wno-virtual-move-assign/' cmake/build_configurations/compiler_options.cmake
-    fi
+    sed -i 's/fabi-version=2/fabi-version=2 -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -Wno-error=literal-suffix -Wno-misleading-indentation/' cmake/build_configurations/compiler_options.cmake
+    sed -i 's/gnu++11/gnu++11 -Wno-virtual-move-assign/' cmake/build_configurations/compiler_options.cmake
 
     #==========
     export DEB_CFLAGS_APPEND="$CFLAGS" DEB_CXXFLAGS_APPEND="$CXXFLAGS"
     export MYSQL_BUILD_CFLAGS="$CFLAGS"
     export MYSQL_BUILD_CXXFLAGS="$CXXFLAGS"
 
-    if [[ "x$DEBIAN_VERSION" == "xfocal" || "x${DEBIAN_VERSION}" == "xbionic" || "x${DEBIAN_VERSION}" == "xbuster" || "x$DEBIAN_VERSION" == "xbullseye" || "x$DEBIAN_VERSION" == "xjammy" || "x$DEBIAN_VERSION" == "xbookworm" || "x$DEBIAN_VERSION" == "xnoble" || "x$DEBIAN_VERSION" == "xtrixie" ]]; then
-        sed -i "s:iproute:iproute2:g" debian/control
-    fi
+    sed -i "s:iproute:iproute2:g" debian/control
     sed -i "s:libcurl4-gnutls-dev:libcurl4-openssl-dev:g" debian/control
     chmod 777 debian/rules
     dch -b -m -D "$DEBIAN_VERSION" --force-distribution -v "1:$MYSQL_VERSION-$MYSQL_RELEASE-$DEB_RELEASE.${DEBIAN_VERSION}" 'Update distribution'
@@ -1141,15 +1143,19 @@ build_deb(){
     fi
 
     cd debian/
-        wget https://raw.githubusercontent.com/Percona-Lab/telemetry-agent/phase-0/call-home.sh
+        CALLHOME_SHA="0e3a2ed40336c70727f9aad8402a8a820ebc8db0"
+        CALLHOME_SHA256="3497f6631e71799bed9dedb1d72350bf1f0565d93578955234ac30cf2fb6eba4"
+        wget -q "https://raw.githubusercontent.com/percona/telemetry-agent/${CALLHOME_SHA}/call-home.sh"
+        echo "${CALLHOME_SHA256}  call-home.sh" | sha256sum -c - || { echo "ERROR: call-home.sh checksum mismatch"; exit 1; }
         sed -i 's:exit 0::' percona-xtradb-cluster-server"${postfix}".postinst
-        echo "cat <<'CALLHOME' > /tmp/call-home.sh" >> percona-xtradb-cluster-server"${postfix}".postinst
+        echo "tfn=\$(/usr/bin/mktemp -p \$(/usr/bin/mktemp -d /tmp/XXXXXXXX) call-home.XXXXXX.sh)" >> percona-xtradb-cluster-server"${postfix}".postinst
+        echo "cat <<'CALLHOME' > \$tfn" >> percona-xtradb-cluster-server"${postfix}".postinst
         cat call-home.sh >> percona-xtradb-cluster-server"${postfix}".postinst
         echo "CALLHOME" >> percona-xtradb-cluster-server"${postfix}".postinst
-        echo "bash +x /tmp/call-home.sh -f \"PRODUCT_FAMILY_PXC\" -v \"${MYSQL_VERSION}-${MYSQL_RELEASE}-${DEB_RELEASE}\" -d \"PACKAGE\" &>/dev/null || :" >> percona-xtradb-cluster-server"${postfix}".postinst
+        echo "bash +x \$tfn -f \"PRODUCT_FAMILY_PXC\" -v \"${MYSQL_VERSION}-${MYSQL_RELEASE}-${DEB_RELEASE}\" -d \"PACKAGE\" &>/dev/null || :" >> percona-xtradb-cluster-server"${postfix}".postinst
         echo "chgrp percona-telemetry /usr/local/percona/telemetry_uuid &>/dev/null || :" >> percona-xtradb-cluster-server"${postfix}".postinst
         echo "chmod 664 /usr/local/percona/telemetry_uuid &>/dev/null || :" >> percona-xtradb-cluster-server"${postfix}".postinst
-        echo "rm -rf /tmp/call-home.sh" >> percona-xtradb-cluster-server"${postfix}".postinst
+        echo "rm -rf \$tfn" >> percona-xtradb-cluster-server"${postfix}".postinst
         echo "exit 0" >> percona-xtradb-cluster-server"${postfix}".postinst
         rm -f call-home.sh
     cd ../
@@ -1159,6 +1165,10 @@ build_deb(){
         sed -i 's/export CXXFLAGS=/export CXXFLAGS=-Wno-error=nonnull-compare -Wno-error=deprecated-declarations -Wno-error=unused-function -Wno-error=unused-variable -Wno-error=unused-parameter -Wno-error=date-time /' debian/rules
     fi
 
+    # PGO: default is on; propagate --enable_pgo=0 as DEB_NO_PGO=1
+    if [ "${ENABLE_PGO}" = "0" ]; then
+        export DEB_NO_PGO=1
+    fi
     GALERA_REVNO="${GALERA_REVNO}" SCONS_ARGS=' strict_build_flags=0'  MAKE_JFLAG=-j4  dpkg-buildpackage -rfakeroot -uc -us -b
     #
     cd ${WORKSPACE} || exit
@@ -1310,6 +1320,9 @@ build_tarball(){
     if [ -n "${REVISION}" ]; then
         sed -i "s:REVISION=\"\":REVISION=\"$REVISION\":g" ./build-ps/build-binary.sh
     fi
+    # Pass ENABLE_PGO through to build-binary.sh as WITH_PGO so tarball builds
+    # honour --enable_pgo=0 the same way RPM/DEB builds do.
+    export WITH_PGO="${ENABLE_PGO}"
     if [[ ${DEBUG} == 1 ]]; then
         bash -x ./build-ps/build-binary.sh --debug --with-jemalloc=jemalloc/ -t $BIN_RELEASE $BUILD_ROOT
     else
@@ -1351,6 +1364,7 @@ RPM_RELEASE=1
 DEB_RELEASE=1
 BIN_RELEASE=1
 DEBUG=0
+ENABLE_PGO=1
 REVISION=0
 BRANCH="8.0"
 MECAB_INSTALL_DIR="${WORKDIR}/mecab-install"

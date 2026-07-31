@@ -30,10 +30,14 @@ class AuditRuleParser {
    *
    * @param rule_str String representation of audit filtering rule
    * @param audit_rule Audit filtering rule instance to be initialized
+   * @param skip_disabled_events When true, silently skip event
+   *        classes/subclasses disabled by the current event_mode
+   *        instead of treating them as parse errors
    * @return true in case rule is parsed successfully,
    *         false otherwise
    */
-  static bool parse(const char *rule_str, AuditRule *audit_rule) noexcept;
+  static bool parse(const char *rule_str, AuditRule *audit_rule,
+                    bool skip_disabled_events = false) noexcept;
 
  private:
   /**
@@ -41,11 +45,12 @@ class AuditRuleParser {
    *
    * @param json_doc JSON document representation of audit filtering rule
    * @param audit_rule Audit filtering rule instance to be initialized
+   * @param skip_disabled_events When true, silently skip disabled events
    * @return true in case rule is parsed successfully,
    *         false otherwise
    */
-  static bool parse(rapidjson::Document &json_doc,
-                    AuditRule *audit_rule) noexcept;
+  static bool parse(rapidjson::Document &json_doc, AuditRule *audit_rule,
+                    bool skip_disabled_events) noexcept;
 
   /**
    * @brief Determine the default logging action for unmatched audit events.
@@ -67,7 +72,8 @@ class AuditRuleParser {
    *         false otherwise
    */
   static bool parse_event_class_json(const rapidjson::Document &json_doc,
-                                     AuditRule *audit_rule) noexcept;
+                                     AuditRule *audit_rule,
+                                     bool skip_disabled_events) noexcept;
 
   /**
    * @brief Parse one JSON object related to audit event class definition.
@@ -79,7 +85,8 @@ class AuditRuleParser {
    *         false otherwise
    */
   static bool parse_event_class_obj_json(
-      const rapidjson::Value &event_class_json, AuditRule *audit_rule) noexcept;
+      const rapidjson::Value &event_class_json, AuditRule *audit_rule,
+      bool skip_disabled_events) noexcept;
 
   /**
    * @brief Parse audit event subclass related definitions in a filtering rule
@@ -93,8 +100,8 @@ class AuditRuleParser {
    */
   static bool parse_event_subclass_json(
       const std::string &class_name,
-      const rapidjson::Value &event_subclass_json,
-      AuditRule *audit_rule) noexcept;
+      const rapidjson::Value &event_subclass_json, AuditRule *audit_rule,
+      bool skip_disabled_events) noexcept;
 
   /**
    * @brief Parse JSON definition for one event subclass in a filtering rule.
@@ -107,19 +114,21 @@ class AuditRuleParser {
    */
   static bool parse_event_subclass_obj_json(
       const std::string &class_name,
-      const rapidjson::Value &event_subclass_json,
-      AuditRule *audit_rule) noexcept;
+      const rapidjson::Value &event_subclass_json, AuditRule *audit_rule,
+      bool skip_disabled_events) noexcept;
 
   /**
    * @brief Parse definition of a logical condition in audit event filter
    *        represented by a JSON string.
    *
    * @param condition_json JSON object representing condition definition
+   * @param class_name Audit event class name for field name validation
    * @param audit_rule Audit filtering rule instance to be initialized
    * @return Pointer to an instance representing parsed condition
    */
   static std::shared_ptr<EventFieldConditionBase> parse_condition(
-      const rapidjson::Value &condition_json, AuditRule *audit_rule) noexcept;
+      const rapidjson::Value &condition_json, const std::string &class_name,
+      AuditRule *audit_rule) noexcept;
 
   /**
    * @brief Get type of condition specified for an event field.
@@ -137,12 +146,13 @@ class AuditRuleParser {
    *
    * @param condition_json JSON object representing audit event filter condition
    * @param cond_type Condition type, one of @ref EventFieldConditionType
+   * @param class_name Audit event class name for field name validation
    * @param audit_rule Audit filtering rule instance to be initialized
    * @return Logical condition instance
    */
   static std::shared_ptr<EventFieldConditionBase> parse_condition_json(
       const rapidjson::Value &condition_json, EventFieldConditionType cond_type,
-      AuditRule *audit_rule) noexcept;
+      const std::string &class_name, AuditRule *audit_rule) noexcept;
 
   /**
    * @brief Parse function definition in a filtering rule represented by
@@ -150,12 +160,14 @@ class AuditRuleParser {
    *
    * @param function_json JSON object representing a function
    * @param expected_return_type Expected return type of the function
+   * @param class_name Audit event class name for field name validation
    * @param audit_rule Audit filtering rule instance to be initialized
    * @return Function instance
    */
   static std::unique_ptr<EventFilterFunctionBase> parse_function(
       const rapidjson::Value &function_json,
-      FunctionReturnType expected_return_type, AuditRule *audit_rule) noexcept;
+      FunctionReturnType expected_return_type, const std::string &class_name,
+      AuditRule *audit_rule) noexcept;
 
   /**
    * @brief Parse function arguments in a filtering rule represented
@@ -163,11 +175,13 @@ class AuditRuleParser {
    *
    * @param function_args_obj JSON object representing function arguments
    * @param args Container to store parsed arguments in
+   * @param class_name Audit event class name for field name validation
+   * @param audit_rule Audit filtering rule instance to be initialized
    * @return true in case of success, false otherwise
    */
   static bool parse_function_args_json(
-      const rapidjson::Value &function_args_obj,
-      FunctionArgsList &args) noexcept;
+      const rapidjson::Value &function_args_obj, FunctionArgsList &args,
+      const std::string &class_name, AuditRule *audit_rule) noexcept;
 
   /**
    * @brief Parse action definition in a filtering rule represented by
@@ -175,21 +189,23 @@ class AuditRuleParser {
    *
    * @param action_type Action type
    * @param action_json JSON object representing action
+   * @param class_name Audit event class name for field name validation
    * @param audit_rule Audit filtering rule instance to be initialized
    * @return Action instance
    */
   [[nodiscard]] static std::shared_ptr<EventFieldActionBase> parse_action_json(
       EventActionType action_type, const rapidjson::Value &action_json,
-      AuditRule *audit_rule) noexcept;
+      const std::string &class_name, AuditRule *audit_rule) noexcept;
 
   /**
    * @brief Build replacement filtering rule.
    *
    * @param rule_json JSON definition of replacement filtering rule
+   * @param audit_rule Parent filtering rule collecting parse errors
    * @return Replacement filtering rule instance
    */
   [[nodiscard]] static std::shared_ptr<AuditRule> make_replacement_rule(
-      const rapidjson::Value &rule_json) noexcept;
+      const rapidjson::Value &rule_json, AuditRule *audit_rule) noexcept;
 };
 
 }  // namespace audit_log_filter

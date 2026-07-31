@@ -85,12 +85,12 @@ class AuditLogFilter {
   AuditLogReader *get_log_reader() noexcept;
 
   /**
-   * @brief Send Audit event to log upon plugin initialization.
+   * @brief Send startup audit event to log upon component initialization.
    */
   void send_audit_start_event() noexcept;
 
   /**
-   * @brief Send NoAudit event to log upon plugin de-initialization.
+   * @brief Send shutdown audit event to log upon component de-initialization.
    */
   void send_audit_stop_event() noexcept;
 
@@ -98,9 +98,19 @@ class AuditLogFilter {
   /**
    * @brief Handle filters flush request.
    *
+   * @param error_message Out-parameter for a human-readable error
    * @return true in case filters reloaded successfully, false otherwise
    */
-  bool on_audit_rule_flush_requested() noexcept;
+  bool on_audit_rule_flush_requested(std::string &error_message) noexcept;
+
+  /**
+   * @brief Mark the rule registry for lazy reload on the next audit event.
+   *
+   * Unlike on_audit_rule_flush_requested(), this does not open tables and
+   * is safe to call from contexts that hold LOCK_plugin (e.g. sysvar update
+   * callbacks).
+   */
+  void invalidate_audit_rules() noexcept;
 
   /**
    * @brief Handle log files pruning request.
@@ -183,6 +193,10 @@ class AuditLogFilter {
    */
   bool set_extended_info(MYSQL_THD thd, Security_context_handle sctx,
                          AuditRecordTableAccess &record);
+  bool set_extended_info(MYSQL_THD thd, Security_context_handle sctx,
+                         AuditRecordQuery &record);
+  bool set_extended_info(MYSQL_THD thd, Security_context_handle sctx,
+                         AuditRecordMessage &record);
   bool set_extended_info(MYSQL_THD thd, Security_context_handle sctx,
                          AuditRecordGeneral &record);
 

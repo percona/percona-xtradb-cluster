@@ -78,6 +78,25 @@ Prefix: %{_sysconfdir}
 %{?with_mecab: %global mecab_option -DWITH_MECAB=%{with_mecab}}
 %{?with_mecab: %global mecab 1}
 
+# Profile-Guided Optimization: enabled by default
+# To disable: pass --define 'without_pgo 1' to rpmbuild
+%{!?without_pgo: %global pgo 1}
+
+# EL8's dwz (rpm-build debug-info compressor) crashes on the debug info
+# produced by PGO+LTO builds:
+#     dwz: dwz.c:8584: adjust_exprloc: Assertion `refd != NULL &&
+#          !refd->die_remove' failed.
+#     Aborted (core dumped)
+# Two side effects: (a) find-debuginfo fails, (b) the aborted dwz process
+# writes /usr/lib/debug/core.NNN into the buildroot, which then trips
+# check-buildroot when it discovers the buildroot path embedded in the
+# core file. Newer distros (EL9+) have a fixed dwz, so gate this narrowly.
+# Turning off dwz_opts skips the compression pass entirely - debuginfo
+# packages are slightly larger but functionally identical.
+%if 0%{?rhel} == 8
+%global _find_debuginfo_dwz_opts %{nil}
+%endif
+
  %define boost_req boost-devel
  %define gcc_req gcc-c++
 
@@ -389,7 +408,16 @@ Requires:       percona-xtradb-cluster-server = %{version}-%{release}
 Requires:       percona-xtradb-cluster-client = %{version}-%{release}
 Requires:       percona-xtradb-cluster-devel = %{version}-%{release}
 Requires:       percona-xtradb-cluster-test = %{version}-%{release}
+%if 0%{?rhel} == 8
+Requires:       percona-xtradb-cluster-server-debuginfo = %{version}-%{release}
+Requires:       percona-xtradb-cluster-client-debuginfo = %{version}-%{release}
+Requires:       percona-xtradb-cluster-test-debuginfo = %{version}-%{release}
+Requires:       percona-xtradb-cluster-shared-debuginfo = %{version}-%{release}
+Requires:       percona-xtradb-cluster-garbd-debuginfo = %{version}-%{release}
+Requires:       percona-xtradb-cluster-mysql-router-debuginfo = %{version}-%{release}
+%else
 Requires:       percona-xtradb-cluster-debuginfo = %{version}-%{release}
+%endif
 Requires:       percona-xtradb-cluster-garbd = %{version}-%{release}
 Conflicts:      percona-xtradb-cluster-pro-full
 
@@ -438,7 +466,7 @@ Requires:             percona-xtradb-cluster-shared-compat = %{version}-%{releas
 %endif
 %endif
 Requires:             socat iproute perl-DBI perl-DBD-MySQL
-Requires:       perl(Data::Dumper) which qpress
+Requires:             perl(Data::Dumper) which qpress
 %if 0%{?systemd}
 Requires(post):   systemd
 Requires(preun):  systemd
@@ -450,15 +478,19 @@ Requires(preun):  /sbin/service
 %endif
 Obsoletes:      community-mysql-bench
 Obsoletes:      mysql-bench
-Obsoletes:      mariadb-connector-c-config
-Obsoletes:      mariadb-backup
-Obsoletes:      mariadb-bench
-Obsoletes:      mariadb-server
-Obsoletes:      mariadb-server-galera
-Obsoletes:      mariadb-server-utils
-Obsoletes:      mariadb-galera-server
-Obsoletes:      mariadb-gssapi-server
-Obsoletes:      mariadb-oqgraph-engine
+Obsoletes:      mariadb-connector-c-config mariadb11.8-connector-c-config
+Obsoletes:      mariadb-backup mariadb11.8-backup
+Obsoletes:      mariadb-bench mariadb11.8-bench
+Obsoletes:      mariadb-server mariadb11.8-server
+Obsoletes:      mariadb-server-galera mariadb11.8-server-galera
+Obsoletes:      mariadb-server-utils mariadb11.8-server-utils
+Obsoletes:      mariadb-galera-server mariadb11.8-galera-server
+Obsoletes:      mariadb-gssapi-server mariadb11.8-gssapi-server
+Obsoletes:      mariadb-oqgraph-engine mariadb11.8-oqgraph-engine
+Obsoletes:      mysql8.4-server < 99
+Obsoletes:      mysql8.4 < 99
+Obsoletes:      mysql8.4-common < 99
+Obsoletes:      mysql8.4-errmsg < 99
 Provides:       mysql-server MySQL-server
 Conflicts:      Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56 Percona-Server-server-57
 Conflicts:      percona-xtradb-cluster-server-pro
@@ -850,6 +882,7 @@ mkdir release
   # XXX: MYSQL_UNIX_ADDR should be in cmake/* but mysql_version is included before
   # XXX: install_layout so we can't just set it based on INSTALL_LAYOUT=RPM
   ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
+           %{?pgo:-DFPROFILE_GENERATE=1} \
            -DDOWNLOAD_BOOST=1 -DWITH_BOOST=build-ps/boost \
            -DWITH_PACKAGE_FLAGS=OFF \
            -DCMAKE_BUILD_TYPE=RelWithDebInfo  -DCMAKE_INSTALL_PREFIX=%{_prefix} \
@@ -897,6 +930,71 @@ mkdir release
            -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_OFF} %{ROCKSDB_FLAGS}
   make %{?_smp_mflags}
 )
+
+# PGO second pass: rebuild the release tree with profile data.
+# Enabled by default. Disable with: rpmbuild --define 'without_pgo 1'
+%if 0%{?pgo}
+(
+  # Run MTR load to generate .gcda profile data
+  pushd release
+  make run-profile-suite
+  rm -r $(readlink mysql-test/var)
+  popd
+
+  # Rebuild release with -DFPROFILE_USE=1
+  rm -rf release
+  mkdir release && pushd release
+  ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
+           -DFPROFILE_USE=1 \
+           -DDOWNLOAD_BOOST=1 -DWITH_BOOST=build-ps/boost \
+           -DWITH_PACKAGE_FLAGS=OFF \
+           -DCMAKE_BUILD_TYPE=RelWithDebInfo  -DCMAKE_INSTALL_PREFIX=%{_prefix} \
+           -DMINIMAL_RELWITHDEBINFO=OFF \
+           -DCMAKE_C_FLAGS="$CFLAGS" \
+           -DCMAKE_CXX_FLAGS="$CXXFLAGS" \
+           -DWITH_EMBEDDED_SERVER=OFF \
+           -DWITH_INNODB_MEMCACHED=ON \
+           -DUSE_LD_LLD=0 \
+           -DWITH_AUTHENTICATION_CLIENT_PLUGINS=1 \
+           -DWITH_CURL=system \
+%if 0%{?systemd}
+           -DWITH_SYSTEMD=OFF \
+%endif
+           -DENABLE_DTRACE=OFF \
+           -DWITH_SSL=system \
+           -DWITH_ZLIB=bundled \
+           -DWITH_READLINE=system \
+           -DWITHOUT_TOKUDB=ON \
+           -DINSTALL_MYSQLSHAREDIR=share/percona-xtradb-cluster \
+           -DINSTALL_SUPPORTFILESDIR=share/percona-xtradb-cluster \
+           -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
+           -DFEATURE_SET="%{feature_set}" \
+           -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
+           -DWITH_WSREP=ON \
+           -DWITH_PERCONA_TELEMETRY=ON \
+           -DWITH_LDAP=system \
+           -DWITH_INNODB_DISALLOW_WRITES=ON \
+           -DWITH_EMBEDDED_SERVER=0 \
+           -DWITH_EMBEDDED_SHARED_LIBRARY=0 \
+           -DWITH_INNODB_MEMCACHED=1 \
+           -DWITH_ZSTD=bundled \
+%if 0%{?add_fido_plugins}
+           -DWITH_FIDO=bundled \
+%else
+           -DWITH_FIDO=none \
+%endif
+           -DWITH_UNIT_TESTS=0 \
+           -DWITH_SCALABILITY_METRICS=ON \
+%if 0%{?rhel} > 8
+           -DWITH_LTO=ON \
+%endif
+           %{?mecab_option} \
+           -DMYSQL_SERVER_SUFFIX=".%{rel}" \
+           -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_OFF} %{ROCKSDB_FLAGS}
+  make %{?_smp_mflags}
+  popd
+)
+%endif # pgo
 
 # For the debuginfo extraction stage, some source files are not located in the release
 # and debug dirs, but in the source dir. Make a link there to avoid errors in the
@@ -1031,6 +1129,8 @@ install -D -p -m 0644 packaging/rpm-common/mysqlrouter.conf.in %{buildroot}%{_sy
 %{__rm} -f $RBR/usr/include/kmippp.h
 %{__rm} -f $RBR/usr/lib/libkmip.a
 %{__rm} -f $RBR/usr/lib/libkmippp.a
+%{__rm} -f $RBR/usr/lib/libkmipclient.a
+%{__rm} -f $RBR/usr/lib/libkmipcore.a
 %{__rm} -f $RBR/usr/lib/libgalera_smm.so
 %{__rm} -f $RBR/usr/share/garb-systemd
 %{__rm} -f $RBR/usr/share/garb.cnf
@@ -1038,7 +1138,6 @@ install -D -p -m 0644 packaging/rpm-common/mysqlrouter.conf.in %{buildroot}%{_sy
 %{__rm} -rf $RBR/usr/man
 %{__rm} -rf $RBR/usr/doc
 #
-
 install -d $RBR%{_sysconfdir}/ld.so.conf.d
 echo %{_libdir}/mysql > $RBR%{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
 %if 0%{?systemd} == 0
@@ -1090,17 +1189,15 @@ ln -s "galera4/libgalera_smm.so" "$RBR/%{_libdir}/"
 install -d $RBR%{galera_docs}
 install -m 644 $MBD/%{galera_src_dir}/COPYING                     \
     $RBR%{galera_docs}/COPYING
-install -m 644 $MBD/%{galera_src_dir}/packages/rpm/README     \
+install -m 644 $MBD/%{galera_src_dir}/README                      \
     $RBR%{galera_docs}/README
-install -m 644 $MBD/%{galera_src_dir}/packages/rpm/README-MySQL \
-    $RBR%{galera_docs}/README-MySQL
 install -m 644 $MBD/%{galera_src_dir}/asio/LICENSE_1_0.txt    \
     $RBR%{galera_docs}/LICENSE.asio
 
 install -d $RBR%{galera_docs2}
 install -m 644 $MBD/%{galera_src_dir}/COPYING                     \
     $RBR%{galera_docs2}/COPYING
-install -m 644 $MBD/%{galera_src_dir}/packages/rpm/README     \
+install -m 644 $MBD/%{galera_src_dir}/README                      \
     $RBR%{galera_docs2}/README
 
 install -d $RBR%{_mandir}/man8
@@ -1111,6 +1208,16 @@ install -d $RBR%{_libdir}/mysql
 #%if 0%{?mecab}
 #    mv $RBR%{_libdir}/mecab $RBR%{_libdir}/mysql
 #%endif
+
+# Clean up MTR core dumps that may have landed under mysql-test/ during
+# the PGO run-profile-suite pass. Core files embed the buildroot path
+# (from crashed mysqld's environment), which trips check-buildroot on
+# EL8/EL10 with:
+#     Found '/.../BUILDROOT/...' in installed files; aborting
+# Match both PID-suffixed dumps (core.[0-9]*, when core_uses_pid is on)
+# and the bare "core" filename (the default kernel.core_pattern), since
+# neither is a legitimately-shipped mysql-test source file.
+find $RBR \( -name 'core.[0-9]*' -o -name 'core' \) -type f -delete || true
 
 ##############################################################################
 #  Post processing actions, i.e. when installed
@@ -1449,11 +1556,12 @@ chcon -t mysqld_db_t %{pxc_telemetry}
 chcon -u system_u %{pxc_telemetry}
 %endif
 
+tfn=$(/usr/bin/mktemp -p "$(/usr/bin/mktemp -d /tmp/XXXXXXXX)" call-home.XXXXXX.sh)
 cp %SOURCE999 /tmp/ 2>/dev/null || :
-bash /tmp/call-home.sh -f "PRODUCT_FAMILY_PXC" -v %{mysql_version}-%{percona_server_version}-%{rpm_release} -d "PACKAGE" &>/dev/null || :
+bash $tfn -f "PRODUCT_FAMILY_PXC" -v %{mysql_version}-%{percona_server_version}-%{rpm_release} -d "PACKAGE" &>/dev/null || :
 chgrp percona-telemetry /usr/local/percona/telemetry_uuid &>/dev/null || :
 chmod 664 /usr/local/percona/telemetry_uuid &>/dev/null || :
-rm -f /tmp/call-home.sh
+rm -f $tfn
 
 echo "Percona XtraDB Cluster is distributed with several useful UDFs from Percona Toolkit."
 echo "Run the following commands to create these functions:"
@@ -1672,7 +1780,9 @@ fi
 %dir %{_libdir}/mysql/private
 %attr(755, root, root) %{_libdir}/mysql/private/libprotobuf-lite.so.*
 %attr(755, root, root) %{_libdir}/mysql/private/libprotobuf.so.*
-%attr(755, root, root) %{_libdir}/mysql/private/libfido2.so.*
+%attr(755, root, root) %{_libdir}/mysql/private/libfido2.so.1.*
+# This is a symlink
+%{_libdir}/mysql/private/libfido2.so.1
 %attr(755, root, root) %{_libdir}/mysql/private/libabsl_bad_any_cast_impl.so
 %attr(755, root, root) %{_libdir}/mysql/private/libabsl_bad_optional_access.so
 %attr(755, root, root) %{_libdir}/mysql/private/libabsl_bad_variant_access.so
@@ -1804,10 +1914,10 @@ fi
 # This is a symlink
 %{_libdir}/libgalera_smm.so
 %{_libdir}/galera4/libgalera_smm.so
+%attr(755, root, root) %{_libdir}/mysql/libgalera_smm.so
 %attr(0755,root,root) %dir %{galera_docs}
 %doc %attr(0644,root,root) %{galera_docs}/COPYING
 %doc %attr(0644,root,root) %{galera_docs}/README
-%doc %attr(0644,root,root) %{galera_docs}/README-MySQL
 %doc %attr(0644,root,root) %{galera_docs}/LICENSE.asio
 %config(noreplace) %{_sysconfdir}/my.cnf
 %dir %{_sysconfdir}/my.cnf.d

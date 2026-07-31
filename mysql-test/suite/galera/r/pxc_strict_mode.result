@@ -41,12 +41,26 @@ set global pxc_strict_mode='ENFORCING';
 #node-2
 set global pxc_strict_mode='DISABLED';
 call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of MyISAM table replication as it is an experimental feature");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of MyISAM table replication feature");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of MyISAM table replication feature");
 call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of DML command");
 call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of TRUNCATE command");
 call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of ADMIN command");
 call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of ALTER command");
 call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend changing storage engine of a table ");
 call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of CREATE TABLE AS SELECT");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of INSERT");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of HANDLER");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of DML command");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of TRUNCATE command");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of ADMIN command");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of ALTER command");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits changing storage engine of a table");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of CREATE TABLE AS SELECT");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of INSERT");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of HANDLER");
+call mtr.add_suppression("WSREP doesn't support XA transaction");
+call mtr.add_suppression("Event 1 Query apply failed");
 set global pxc_strict_mode='ENFORCING';
 #node-1
 set global pxc_strict_mode = 'DISABLED';

@@ -96,9 +96,24 @@ COMMIT;
 --let $gtid_executed_node2 = `SELECT @@global.gtid_executed;`
 
 --let $binlog_file = mysqld-bin.000001
---let $binlog_start = 125
---let $keep_gtid_events = 1
---source include/rpl/deprecated/show_binlog_events.inc
+--let $binlog_position = 4
+--let $somewhere = 1
+--let $event_sequence = Query/CREATE SCHEMA test1
+--source include/rpl/assert_binlog_events.inc
+--let $event_sequence = Query/.*CREATE TABLE t1 .*ENGINE=InnoDB
+--source include/rpl/assert_binlog_events.inc
+--let $event_sequence = Table_map/.*test1\\.t1
+--source include/rpl/assert_binlog_events.inc
+--let $event_sequence = Write_rows
+--source include/rpl/assert_binlog_events.inc
+--let $event_sequence = Update_rows
+--source include/rpl/assert_binlog_events.inc
+--let $event_sequence = Delete_rows
+--source include/rpl/assert_binlog_events.inc
+--let $invert = 1
+--let $event_sequence = Table_map/.*test2\\.t1
+--source include/rpl/assert_binlog_events.inc
+--let $invert =
 
 --connection node_3
 
@@ -107,9 +122,24 @@ COMMIT;
 --enable_query_log
 
 --let $binlog_file = mysqld-bin.000001
---let $binlog_start = 125
---let $keep_gtid_events = 1
---source include/rpl/deprecated/show_binlog_events.inc
+--let $binlog_position = 4
+--let $somewhere = 1
+--let $event_sequence = Query/CREATE SCHEMA test1
+--source include/rpl/assert_binlog_events.inc
+--let $event_sequence = Query/.*CREATE TABLE t1 .*ENGINE=InnoDB
+--source include/rpl/assert_binlog_events.inc
+--let $event_sequence = Table_map/.*test1\\.t1
+--source include/rpl/assert_binlog_events.inc
+--let $event_sequence = Write_rows
+--source include/rpl/assert_binlog_events.inc
+--let $event_sequence = Update_rows
+--source include/rpl/assert_binlog_events.inc
+--let $event_sequence = Delete_rows
+--source include/rpl/assert_binlog_events.inc
+--let $invert = 1
+--let $event_sequence = Table_map/.*test2\\.t1
+--source include/rpl/assert_binlog_events.inc
+--let $invert =
 
 #
 # Final consistency checks

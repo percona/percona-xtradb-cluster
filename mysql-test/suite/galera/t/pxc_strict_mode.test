@@ -83,7 +83,16 @@ set global pxc_strict_mode='ENFORCING';
 # to allow insertion in add_suppression table.
 set global pxc_strict_mode='DISABLED';
 
+# Suppressions must be added explicitly on node_2 as well: mtr.test_suppressions
+# is a MyISAM table and wsrep_replicate_myisam is OFF, so suppressions added on
+# node_1 are not replicated. If we do a full SST in scenario-8, suppresions
+# from node_1 are replicated via SST to node_2 (so they apply there, but it
+# is a side-effect). For the test to be reliable, we can not assume SST
+# during restart, state transfer can be served via IST, so we need to add
+# suppresions on node_2 explicitly.
 call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of MyISAM table replication as it is an experimental feature");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of MyISAM table replication feature");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of MyISAM table replication feature");
 
 call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of DML command");
 call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of TRUNCATE command");
@@ -91,6 +100,20 @@ call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of ADMIN 
 call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of ALTER command");
 call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend changing storage engine of a table ");
 call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of CREATE TABLE AS SELECT");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of INSERT");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of HANDLER");
+
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of DML command");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of TRUNCATE command");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of ADMIN command");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of ALTER command");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits changing storage engine of a table");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of CREATE TABLE AS SELECT");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of INSERT");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of HANDLER");
+
+call mtr.add_suppression("WSREP doesn't support XA transaction");
+call mtr.add_suppression("Event 1 Query apply failed");
 
 set global pxc_strict_mode='ENFORCING';
 

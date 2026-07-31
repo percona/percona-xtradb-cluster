@@ -27,13 +27,6 @@ class FileWriterBase {
   virtual ~FileWriterBase() = default;
 
   /**
-   * @brief Init file writer.
-   *
-   * @return true in case of success, false otherwise
-   */
-  virtual bool init() noexcept = 0;
-
-  /**
    * @brief Prepare writer for work with newly opened log file.
    *
    * @return true in case of success, false otherwise
@@ -53,6 +46,11 @@ class FileWriterBase {
    * @param size Log record size
    */
   virtual void write(const char *record, size_t size) noexcept = 0;
+
+  /**
+   * @brief Flush any pending writer state and sync the active file.
+   */
+  virtual void sync() noexcept = 0;
 };
 
 }  // namespace audit_log_filter::log_writer

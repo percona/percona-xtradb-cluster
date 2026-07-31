@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, 2025, Oracle and/or its affiliates.
+/* Copyright (c) 2009, 2026, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -428,12 +428,6 @@ static bool check_session_admin_no_super(sys_var *self, THD *thd,
   @param thd the session context
   @param setv the SET operations metadata
  */
-#ifdef WITH_WSREP
-static bool check_session_admin_and_sql_require_primary_key_on_check(sys_var *,
-                                                                     THD *,
-                                                                     set_var *);
-#endif /* WITH_WSREP */
-
 static bool check_session_admin(sys_var *self, THD *thd, set_var *setv) {
   Security_context *sctx = thd->security_context();
 
@@ -552,6 +546,20 @@ static Sys_var_charptr Sys_pfs_instrument(
     "Default startup value for a performance schema instrument.",
     READ_ONLY NOT_VISIBLE GLOBAL_VAR(pfs_param.m_pfs_instrument),
     CMD_LINE(OPT_ARG, OPT_PFS_INSTRUMENT), IN_FS_CHARSET, DEFAULT(""),
+    PFS_TRAILING_PROPERTIES);
+
+static Sys_var_charptr Sys_pfs_meter(
+    "performance_schema_meter",
+    "Default startup value for a performance schema meter.",
+    READ_ONLY NOT_VISIBLE GLOBAL_VAR(pfs_param.m_pfs_meter),
+    CMD_LINE(OPT_ARG, OPT_PFS_METER), IN_FS_CHARSET, DEFAULT(""),
+    PFS_TRAILING_PROPERTIES);
+
+static Sys_var_charptr Sys_pfs_logger(
+    "performance_schema_logger",
+    "Default startup value for a performance schema logger.",
+    READ_ONLY NOT_VISIBLE GLOBAL_VAR(pfs_param.m_pfs_logger),
+    CMD_LINE(OPT_ARG, OPT_PFS_LOGGER), IN_FS_CHARSET, DEFAULT(""),
     PFS_TRAILING_PROPERTIES);
 
 /**
@@ -982,6 +990,13 @@ static Sys_var_ulong Sys_pfs_max_metric_classes(
     READ_ONLY GLOBAL_VAR(pfs_param.m_metric_class_sizing),
     CMD_LINE(REQUIRED_ARG), VALID_RANGE(0, 11000),
     DEFAULT(PFS_MAX_METRIC_CLASS), BLOCK_SIZE(1), PFS_TRAILING_PROPERTIES);
+
+static Sys_var_ulong Sys_pfs_max_logger_classes(
+    "performance_schema_max_logger_classes",
+    "Maximum number of logger source instruments.",
+    READ_ONLY GLOBAL_VAR(pfs_param.m_logger_class_sizing),
+    CMD_LINE(REQUIRED_ARG), VALID_RANGE(0, 200), DEFAULT(PFS_MAX_LOGGER_CLASS),
+    BLOCK_SIZE(1), PFS_TRAILING_PROPERTIES);
 
 static Sys_var_long Sys_pfs_digest_size(
     "performance_schema_digests_size",
@@ -4367,15 +4382,35 @@ static Sys_var_deprecated_alias Sys_slave_preserve_commit_order(
 bool Sys_var_charptr::global_update(THD *, set_var *var) {
   char *new_val, *ptr = var->save_result.string_value.str;
   const size_t len = var->save_result.string_value.length;
+  char *old_val = nullptr;
+
+  // Save old value before allocating new one to avoid leak on allocation failure
+  if ((flags & ALLOCATED) || option.var_type == GET_STR_ALLOC) {
+    old_val = global_var(char *);
+  }
+
   if (ptr) {
     new_val = (char *)my_memdup(key_memory_Sys_var_charptr_value, ptr, len + 1,
                                 MYF(MY_WME));
-    if (!new_val) return true;
+    if (!new_val) {
+      // Allocation failed, but old_val is still held by global_var
+      // which will be cleaned up at shutdown via cleanup()
+      return true;
+    }
     new_val[len] = 0;
-  } else
+  } else {
     new_val = nullptr;
-  if (flags & ALLOCATED) my_free(global_var(char *));
-  flags |= ALLOCATED;
+  }
+
+  // Free old value after new allocation succeeds
+  if (old_val) my_free(old_val);
+
+  // Only set ALLOCATED flag if new_val is not nullptr
+  if (new_val) {
+    flags |= ALLOCATED;
+  } else {
+    flags &= ~ALLOCATED;
+  }
   global_var(char *) = new_val;
   return false;
 }
@@ -6235,7 +6270,7 @@ static bool check_general_log_file(sys_var *self, THD *thd, set_var *var) {
   return false;
 }
 
-static bool fix_general_log_file(sys_var *, THD *, enum_var_type) {
+static bool fix_general_log_file(sys_var *self, THD *, enum_var_type) {
   bool res;
 
   if (!opt_general_logname)  // SET ... = DEFAULT
@@ -6245,6 +6280,8 @@ static bool fix_general_log_file(sys_var *, THD *, enum_var_type) {
         key_memory_LOG_name, make_query_log_name(buff, QUERY_LOG_GENERAL),
         MYF(MY_FAE + MY_WME));
     if (!opt_general_logname) return true;
+
+    static_cast<Sys_var_charptr *>(self)->mark_global_value_allocated();
   }
 
   res = query_logger.set_log_file(QUERY_LOG_GENERAL);
@@ -6284,7 +6321,7 @@ static bool check_slow_log_file(sys_var *self, THD *thd, set_var *var) {
   return false;
 }
 
-static bool fix_slow_log_file(sys_var *, THD *thd [[maybe_unused]],
+static bool fix_slow_log_file(sys_var *self, THD *thd [[maybe_unused]],
                               enum_var_type) {
   bool res;
 
@@ -6297,6 +6334,8 @@ static bool fix_slow_log_file(sys_var *, THD *thd [[maybe_unused]],
                                  make_query_log_name(buff, QUERY_LOG_SLOW),
                                  MYF(MY_FAE + MY_WME));
     if (!opt_slow_logname) return true;
+
+    static_cast<Sys_var_charptr *>(self)->mark_global_value_allocated();
   }
 
   res = query_logger.set_log_file(QUERY_LOG_SLOW);
@@ -7907,11 +7946,7 @@ static Sys_var_bool Sys_sql_require_primary_key{
     DEFAULT(false),
     NO_MUTEX_GUARD,
     IN_BINLOG,
-#ifdef WITH_WSREP
-    ON_CHECK(check_session_admin_and_sql_require_primary_key_on_check)};
-#else
     ON_CHECK(check_session_admin)};
-#endif
 
 static Sys_var_bool Sys_sql_generate_invisible_primary_key(
     "sql_generate_invisible_primary_key",
@@ -8168,22 +8203,6 @@ static Sys_var_charptr Sys_protocol_compression_algorithms(
 #include "wsrep_binlog.h"
 #include "wsrep_sst.h"
 #include "wsrep_var.h"
-
-static bool check_session_admin_and_sql_require_primary_key_on_check(
-    sys_var *self, THD *thd, set_var *var) {
-  if (check_session_admin(self, thd, var)) return true;
-  if (pxc_strict_mode < PXC_STRICT_MODE_ENFORCING) return false;
-  if (var->save_result.ulonglong_value == 0) {
-    const char *strict_name =
-        (pxc_strict_mode == PXC_STRICT_MODE_MASTER) ? "MASTER" : "ENFORCING";
-    WSREP_ERROR(
-        "Cannot set sql_require_primary_key=OFF while pxc_strict_mode is %s.",
-        strict_name);
-    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), self->name.str, "OFF");
-    return true;
-  }
-  return false;
-}
 
 static PolyLock_mutex PLock_wsrep_cluster_config(&LOCK_wsrep_cluster_config);
 static Sys_var_charptr Sys_wsrep_provider(
@@ -8573,7 +8592,7 @@ static Sys_var_enum Sys_pxc_strict_mode(
     "PXC strict mode help control behavior of experimental features",
     GLOBAL_VAR(pxc_strict_mode), CMD_LINE(OPT_ARG), pxc_strict_modes,
     DEFAULT(PXC_STRICT_MODE_ENFORCING), NO_MUTEX_GUARD, NOT_IN_BINLOG,
-    ON_CHECK(pxc_strict_mode_check), ON_UPDATE(pxc_strict_mode_update));
+    ON_CHECK(pxc_strict_mode_check), ON_UPDATE(0));
 
 static const char *pxc_maint_modes[] = {"DISABLED", "SHUTDOWN", "MAINTENANCE",
                                         NullS};
@@ -8957,3 +8976,4 @@ static Sys_var_enum_default_table_encryption Sys_default_table_encryption(
     HINT_UPDATEABLE SESSION_VAR(default_table_encryption), CMD_LINE(OPT_ARG),
     default_table_encryption_type_names, DEFAULT(DEFAULT_TABLE_ENC_OFF),
     NO_MUTEX_GUARD, IN_BINLOG, ON_CHECK(check_set_default_table_encryption));
+

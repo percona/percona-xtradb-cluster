@@ -21,6 +21,11 @@ while ($_ds_servers != '') {
   --connect _node_, 127.0.0.1, user1, 111, test, $port_for_connection
   --connection _node_
   SELECT audit_log_filter_flush();
+  # We need to reconnect, Reference: PS-10951 [8.4]: Detach current sessions after audit_log_filter_flush
+  --disconnect _node_
+
+  --connect _node_, 127.0.0.1, user1, 111, test, $port_for_connection
+  --connection _node_
   --echo
   --echo Executing statement on: node_$_ds_server_number
   if ($expected_error) {
