@@ -432,8 +432,9 @@ BuildRequires: 		selinux-policy-devel
 Requires:             percona-xtradb-cluster-shared-compat = %{version}-%{release}
 %endif
 %endif
-Requires:             socat iproute perl-DBI perl-DBD-MySQL
-Requires:       perl(Data::Dumper) which qpress
+Requires:             socat iproute perl-DBI
+Requires:             perl(Data::Dumper) which
+Recommends:           perl-DBD-MySQL
 %if 0%{?systemd}
 Requires(post):   systemd
 Requires(preun):  systemd
@@ -880,8 +881,10 @@ mkdir release
 %if 0%{?pgo}
 (
   pushd release
+  ulimit -c 0
   make run-profile-suite
   rm -r $(readlink mysql-test/var)
+  find . -maxdepth 2 -name 'core' -o -name 'core.*' | xargs -r rm -f
   popd
 
   rm -rf release
@@ -996,6 +999,11 @@ popd
   cd $MBD/release
   make DESTDIR=$RBR install
 )
+
+# Defensive cleanup: a crashed mysqld/mtr process during the PGO profiling
+# run (or any other test run) can leave a core dump behind in the mysql-test
+# tree; such a binary embeds the buildroot path and trips check-buildroot.
+find $RBR%{_datadir}/mysql-test -maxdepth 1 \( -name 'core' -o -name 'core.*' \) -exec rm -f {} +
 
 # Install logrotate and autostart
 install -m 644 $MBD/release/support-files/mysql-log-rotate $RBR%{_sysconfdir}/logrotate.d/mysql

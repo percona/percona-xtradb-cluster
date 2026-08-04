@@ -698,6 +698,8 @@ build_srpm(){
     mkdir -p ${CURDIR}/srpm
     cp rpmbuild/SRPMS/*.src.rpm ${CURDIR}/srpm
     cp rpmbuild/SRPMS/*.src.rpm ${WORKDIR}/srpm
+    cp pxc-9x.properties ${CURDIR}/srpm
+    cp pxc-9x.properties ${WORKDIR}/srpm
     return
 }
 
@@ -825,14 +827,14 @@ build_rpm(){
     source ${WORKDIR}/pxc-9x.properties
     source ${CURDIR}/srpm/pxc-9x.properties
     #
-    PGO_DEFINE=""
+    PGO_DEFINE=()
     if [ "${ENABLE_PGO}" = "0" ]; then
-        PGO_DEFINE="--define \"without_pgo 1\""
+        PGO_DEFINE=(--define "without_pgo 1")
     fi
     if [ ${ARCH} = x86_64 ]; then
-        rpmbuild --define '"_topdir ${WORKDIR}/rpmbuild"' --define '"dist ${OS_NAME}"' --define '"rpm_version $MYSQL_RELEASE.$RPM_RELEASE"' --define '"rel $RPM_RELEASE"' --define '"galera_revision ${GALERA_REVNO}"' --define '"with_mecab ${MECAB_INSTALL_DIR}/usr"' ${PGO_DEFINE} --rebuild rpmbuild/SRPMS/${SRCRPM}
+        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" "${PGO_DEFINE[@]}" --rebuild rpmbuild/SRPMS/${SRCRPM}
     else
-        rpmbuild --define '"_topdir ${WORKDIR}/rpmbuild"' --define '"dist ${OS_NAME}"' --define '"rpm_version $MYSQL_RELEASE.$RPM_RELEASE"' --define '"rel $RPM_RELEASE"' --define '"galera_revision ${GALERA_REVNO}"' --define '"with_tokudb 0"' --define '"with_rocksdb 0"' --define '"with_mecab ${MECAB_INSTALL_DIR}/usr"' ${PGO_DEFINE} --rebuild rpmbuild/SRPMS/${SRCRPM}
+        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist ${OS_NAME}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "rel $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" "${PGO_DEFINE[@]}" --rebuild rpmbuild/SRPMS/${SRCRPM}
     fi
     return_code=$?
     if [ $return_code != 0 ]; then
