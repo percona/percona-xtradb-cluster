@@ -107,7 +107,7 @@ int wsrep_to_isolation = 0;                  // # of active TO isolation threads
 bool wsrep_certify_nonPK = 1;  // certify, even when no primary key
 ulong wsrep_certification_rules = WSREP_CERTIFICATION_RULES_STRICT;
 static constexpr WsrepVersion wsrep_max_protocol_version =
-    WsrepVersion::V4;  // maximum protocol version to use
+    WsrepVersion::V5;  // maximum protocol version to use
 WsrepVersion wsrep_protocol_version = wsrep_max_protocol_version;
 ulong wsrep_trx_fragment_unit = WSREP_FRAG_BYTES;
 // unit for fragment size
@@ -1570,7 +1570,8 @@ static bool wsrep_prepare_key_for_isolation(const char *db, const char *table,
     case WsrepVersion::V1:
     case WsrepVersion::V2:
     case WsrepVersion::V3:
-    case WsrepVersion::V4: {
+    case WsrepVersion::V4:
+    case WsrepVersion::V5: {
       *key_len = 0;
       if (db) {
         key[*key_len].ptr = db;
@@ -1710,7 +1711,8 @@ bool wsrep_prepare_key_for_innodb(const uchar *cache_key, size_t cache_key_len,
     case WsrepVersion::V1:
     case WsrepVersion::V2:
     case WsrepVersion::V3:
-    case WsrepVersion::V4: {
+    case WsrepVersion::V4:
+    case WsrepVersion::V5: {
       key[0].ptr = cache_key;
       key[0].len =
           strlen(reinterpret_cast<char *>(const_cast<uchar *>(cache_key)));
