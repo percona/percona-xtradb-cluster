@@ -188,7 +188,7 @@ Description: Percona XtraDB Cluster database client binaries
 
 Package: percona-xtradb-cluster-server
 Architecture: any
-Suggests: tinyca, pv
+Suggests: tinyca, pv, libdbd-mysql-perl
 Pre-Depends: percona-xtradb-cluster-common (= ${binary:Version}),
              adduser,
              debconf (>= 0.2.17)
@@ -281,7 +281,7 @@ Description: Percona XtraDB Cluster database server binaries
 
 Package: percona-xtradb-cluster-server-debug
 Architecture: any
-Suggests: tinyca, pv
+Suggests: tinyca, pv, libdbd-mysql-perl
 Pre-Depends: percona-xtradb-cluster-common (>= ${binary:Version}),
              adduser (>= 3.4.0),
              debconf
