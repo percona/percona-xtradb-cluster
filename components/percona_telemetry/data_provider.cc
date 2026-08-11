@@ -944,14 +944,10 @@ bool DataProvider::collect_metrics(rapidjson::Document *document) {
   res |= collect_group_replication_info(document);
   res |= collect_async_replication_info(document);
   res |= collect_server_config(document);
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   res |= collect_galera_replication_info(document);
 #endif
-||||||| d76e81f492e
-=======
   res |= collect_server_status(document);
->>>>>>> ps/release-8.4.11-11
 
   /* The requirement is to have db_replication_id key at the top of JSON
   structure. But it may originate from the different places. The above

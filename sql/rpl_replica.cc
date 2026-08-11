@@ -7579,11 +7579,6 @@ wsrep_restart_point :
       if (ev != nullptr && rli->is_parallel_exec() &&
           rli->current_mts_submode != nullptr) {
         if (rli->current_mts_submode->set_multi_threaded_applier_context(*rli,
-<<<<<<< HEAD
-                                                                        *ev)) {
-||||||| d76e81f492e
-                                                                         *ev)) {
-=======
                                                                          *ev) ||
             DBUG_EVALUATE_IF("error_on_set_mta_context_main", true, false)) {
           rli->report(ERROR_LEVEL, ER_REPLICA_FATAL_ERROR,
@@ -7593,7 +7588,6 @@ wsrep_restart_point :
                       "Try stopping and starting replication.");
           delete ev;
           ev = nullptr;
->>>>>>> ps/release-8.4.11-11
           goto err;
         }
       }

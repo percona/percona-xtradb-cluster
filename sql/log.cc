@@ -2722,18 +2722,7 @@ int log_vmessage(int log_type [[maybe_unused]], va_list fili) {
 
   ll.count = 0;
   ll.seen = 0;
-<<<<<<< HEAD
-#ifdef WITH_WSREP
-  /*
-   Related to Bug#36808425 i_main.bug31674599 fails ob pb2 daily-trunk
-   This code to be removed/merged with PS once PS merges Bug#36808425
-  */
   ll.flags = 0;
-#endif
-||||||| d76e81f492e
-=======
-  ll.flags = 0;
->>>>>>> ps/release-8.4.11-11
 
   do {
     dedup = false;
