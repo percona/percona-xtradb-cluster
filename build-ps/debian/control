@@ -206,7 +206,6 @@ Depends: percona-xtradb-cluster-client (>= ${binary:Version}),
          netcat-openbsd,
          curl,
          stunnel
-Suggests: libdbd-mysql-perl
 Provides: mysql-server,
           virtual-mysql-server, virtual-mysql-server-core,
           mysql-server-8.0, mysql-server-core-8.0, mysql-community-server-core
@@ -296,7 +295,6 @@ Depends: percona-xtradb-cluster-client (>= ${binary:Version}),
          socat,
          netcat-openbsd,
          iproute
-Suggests: libdbd-mysql-perl
 Provides: mysql-server-debug
 Description: Percona XtraDB Cluster database server UNIV_DEBUG binaries
  Percona XtraDB Cluster is based on the Percona Server database
