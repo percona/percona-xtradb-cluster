@@ -26,13 +26,7 @@ VARIABLE_NAME LIKE '%applier%') AND
 (VARIABLE_NAME NOT LIKE 'innodb%')
 ORDER BY VARIABLE_NAME;
 
-<<<<<<< HEAD
-include/assert.inc [Expect 122 variables in the table.]
-||||||| d76e81f492e
-include/assert.inc [Expect 113 variables in the table.]
-=======
-include/assert.inc [Expect 114 variables in the table.]
->>>>>>> ps/release-8.4.11-11
+include/assert.inc [Expect 123 variables in the table.]
 
 # Test SET PERSIST
 SET PERSIST binlog_cache_size = @@GLOBAL.binlog_cache_size;
@@ -274,32 +268,16 @@ Warnings:
 Warning	1287	'@@wsrep_slave_UK_checks' is deprecated and will be removed in a future release. Please use wsrep_applier_UK_checks instead.
 Warning	1287	'@@wsrep_slave_UK_checks' is deprecated and will be removed in a future release. Please use wsrep_applier_UK_checks instead.
 
-<<<<<<< HEAD
-include/assert.inc [Expect 97 persisted variables in persisted_variables table.]
-||||||| d76e81f492e
-include/assert.inc [Expect 88 persisted variables in persisted_variables table.]
-=======
-include/assert.inc [Expect 89 persisted variables in persisted_variables table.]
->>>>>>> ps/release-8.4.11-11
+include/assert.inc [Expect 98 persisted variables in persisted_variables table.]
 
 ############################################################
 # 2. Restart server, it must preserve the persisted variable
 #    settings. Verify persisted configuration.
 # restart
 
-<<<<<<< HEAD
-include/assert.inc [Expect 97 persisted variables in persisted_variables table.']
-include/assert.inc [Expect 97 persisted variables shown as PERSISTED in variables_info table.']
-include/assert.inc [Expect 97 persisted variables with matching persisted and global values.]
-||||||| d76e81f492e
-include/assert.inc [Expect 88 persisted variables in persisted_variables table.']
-include/assert.inc [Expect 88 persisted variables shown as PERSISTED in variables_info table.']
-include/assert.inc [Expect 88 persisted variables with matching persisted and global values.]
-=======
-include/assert.inc [Expect 89 persisted variables in persisted_variables table.']
-include/assert.inc [Expect 89 persisted variables shown as PERSISTED in variables_info table.']
-include/assert.inc [Expect 89 persisted variables with matching persisted and global values.]
->>>>>>> ps/release-8.4.11-11
+include/assert.inc [Expect 98 persisted variables in persisted_variables table.']
+include/assert.inc [Expect 98 persisted variables shown as PERSISTED in variables_info table.']
+include/assert.inc [Expect 98 persisted variables with matching persisted and global values.]
 
 ############################################################
 # 3. Test RESET PERSIST IF EXISTS. Verify persisted variable

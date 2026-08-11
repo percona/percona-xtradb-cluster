@@ -12,14 +12,8 @@ select * from performance_schema.setup_threads;
 --enable_result_log
 
 select * from performance_schema.setup_threads
-<<<<<<< HEAD
   where name not like '%galera%'
-  order by name limit 13;
-||||||| d76e81f492e
-  order by name limit 13;
-=======
   order by name limit 14;
->>>>>>> ps/release-8.4.11-11
 
 # PXC specific threads
 select * from performance_schema.setup_threads

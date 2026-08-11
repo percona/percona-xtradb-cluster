@@ -73,13 +73,7 @@ INSERT INTO rplvars (varname, varvalue)
 # 9. wsrep_replicate_myisam
 
 --echo
-<<<<<<< HEAD
---let $expected = 122
-||||||| d76e81f492e
---let $expected = 113
-=======
---let $expected = 114
->>>>>>> ps/release-8.4.11-11
+--let $expected = 123
 --let $assert_text = Expect $expected variables in the table.
 --let $assert_cond = [SELECT COUNT(*) as count FROM rplvars, count, 1] = $expected
 --source include/assert.inc
@@ -102,13 +96,7 @@ while ( $varid <= $countvars )
 }
 
 --echo
-<<<<<<< HEAD
---let $expected = 97
-||||||| d76e81f492e
---let $expected = 88
-=======
---let $expected = 89
->>>>>>> ps/release-8.4.11-11
+--let $expected = 98
 --let $assert_text = Expect $expected persisted variables in persisted_variables table.
 --let $assert_cond = [SELECT COUNT(*) as count FROM performance_schema.persisted_variables, count, 1] = $expected
 --source include/assert.inc
