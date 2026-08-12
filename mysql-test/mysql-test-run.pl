@@ -218,6 +218,7 @@ our $exe_mysql_embedded;
 our $exe_mysql_ssl_rsa_setup;
 
 our $opt_big_test= 0;
+our $opt_only_big_test= 0;
 
 our @opt_combinations;
 
@@ -307,7 +308,7 @@ my $opt_build_thread= $ENV{'MTR_BUILD_THREAD'} || "auto";
 my $opt_port_base= $ENV{'MTR_PORT_BASE'} || "auto";
 my $build_thread= 0;
 
-my $ports_per_thread= 10;
+my $ports_per_thread= 70;
 our $group_replication= 0;
 our $xplugin= 0;
 
@@ -1362,6 +1363,7 @@ sub command_line_setup {
              'do-test=s'                => \&collect_option,
              'start-from=s'             => \&collect_option,
              'big-test'                 => \$opt_big_test,
+             'only-big-test'            => \$opt_only_big_test,
 	     'combination=s'            => \@opt_combinations,
              'skip-combinations'        => \&collect_option,
              'experimental=s'           => \@opt_experimentals,
@@ -1901,10 +1903,15 @@ sub command_line_setup {
   # --------------------------------------------------------------------------
   # Big test flags
   # --------------------------------------------------------------------------
-   if ( $opt_big_test )
-   {
-     $ENV{'BIG_TEST'}= 1;
-   }
+  if ($opt_only_big_test and $opt_big_test)
+  {
+    # Disabling only-big-test option if both big-test and
+    # only-big-test options are passed.
+    mtr_report("Turning off --only-big-test");
+    $opt_only_big_test= 0;
+  }
+
+  $ENV{'BIG_TEST'}= 1 if ($opt_big_test or $opt_only_big_test);
 
   # --------------------------------------------------------------------------
   # Gcov flag
@@ -2207,18 +2214,18 @@ sub set_build_thread_ports($) {
   # Calculate baseport
   $baseport= $build_thread * $opt_port_group_size + 10000;
 
+  my $baseport_offset = 10 * 6;
+
+  # Next set of 10 ports is reserver for Group Replication if used
+  if ($group_replication) {
+    $baseport_offset = $baseport_offset + 10;
+  }
+
   if (lc($opt_mysqlx_baseport) eq "auto")
   {
-    if ($ports_per_thread > 10)
-    {
-      # Reserving last 10 ports in the current port range for X plugin.
-      $mysqlx_baseport= $baseport + $ports_per_thread - 10;
-    }
-    else
-    {
-      # Reserving the last port in the range for X plugin
-      $mysqlx_baseport= $baseport + 9;
-    }
+    # Reserving last 10 ports in the current port range for X plugin.
+    $mysqlx_baseport = $baseport + $baseport_offset;
+    $baseport_offset = $baseport_offset + 10;
   }
   else
   {

@@ -26,3 +26,5 @@ explain_for_connection_rqg_json  : Bug#20697533 2015-03-20 erlend Fails several 
 explain_for_connection_rqg_trad : Bug#20697533 2015-03-20 erlend Fails several times each day on all platforms
 events_time_zone         : percona disabled because the test is fundamentally unstable https://bugs.launchpad.net/percona-server/+bug/1616320
 daemonize_opt : Bug#31335773 2020-05-12 Deepa Shutdown_report fails
+merge : Permanent failure since TOI tries to access the table name when the merge table is being attempted to be dropped during TOI.
+merge_mmap : Permanent failure since TOI tries to access the table name when the merge MyISAM table is being attempted to be dropped during TOI.

@@ -58,6 +58,8 @@ DROP TABLE t2;
 RESET MASTER;
 
 --connection node_1
+--let $wait_condition= SELECT COUNT(*)=0 FROM information_schema.tables WHERE TABLE_NAME="t2"
+--source include/wait_condition.inc
 RESET MASTER;
 
 --let $master_pos_before= query_get_value(SHOW MASTER STATUS,Position,1)
@@ -121,6 +123,9 @@ RESET MASTER;
 --let $master_pos_before= query_get_value(SHOW MASTER STATUS,Position,1)
 
 --connection node_1
+--let $wait_condition= SELECT COUNT(*)=0 FROM information_schema.tables WHERE TABLE_NAME="t2"
+--source include/wait_condition.inc
+
 RESET MASTER;
 
 SET SESSION sql_log_bin = OFF;
