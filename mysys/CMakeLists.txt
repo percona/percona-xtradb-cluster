@@ -32,6 +32,7 @@ INCLUDE_DIRECTORIES(SYSTEM ${BOOST_PATCHES_DIR} ${BOOST_INCLUDE_DIR})
 SET(MYSYS_SOURCES
   array.cc
   buffered_error_log.cc
+  base64_encode.cc
   charset.cc
   dbug.cc
   decimal.cc

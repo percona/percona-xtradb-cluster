@@ -92,28 +92,28 @@ OK
 
 Executing statement on: node_1
 INSERT INTO t1 VALUES (2);;
-ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_INSERT';1).
+ERROR HY000: Statement was aborted by an audit log filter.
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_2
 INSERT INTO t1 VALUES (2);;
-ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_INSERT';1).
+ERROR HY000: Statement was aborted by an audit log filter.
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_1
 INSERT INTO t2 VALUES (2);;
-ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_INSERT';1).
+ERROR HY000: Statement was aborted by an audit log filter.
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_2
 INSERT INTO t2 VALUES (2);;
-ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_INSERT';1).
+ERROR HY000: Statement was aborted by an audit log filter.
 # Verify that UPDATE statements are aborted on all nodes.
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
@@ -121,28 +121,28 @@ OK
 
 Executing statement on: node_1
 UPDATE t1 SET c1 = 3 WHERE c1 = 2;;
-ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_UPDATE';1).
+ERROR HY000: Statement was aborted by an audit log filter.
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_2
 UPDATE t1 SET c1 = 3 WHERE c1 = 2;;
-ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_UPDATE';1).
+ERROR HY000: Statement was aborted by an audit log filter.
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_1
 UPDATE t2 SET c2 = 3 WHERE c2 = 2;;
-ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_UPDATE';1).
+ERROR HY000: Statement was aborted by an audit log filter.
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_2
 UPDATE t2 SET c2 = 3 WHERE c2 = 2;;
-ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_UPDATE';1).
+ERROR HY000: Statement was aborted by an audit log filter.
 # Verify that DELETE statements are aborted on all nodes.
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
@@ -150,28 +150,28 @@ OK
 
 Executing statement on: node_1
 DELETE FROM t1 WHERE c1 = 1;;
-ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_DELETE';1).
+ERROR HY000: Statement was aborted by an audit log filter.
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_2
 DELETE FROM t1 WHERE c1 = 1;;
-ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_DELETE';1).
+ERROR HY000: Statement was aborted by an audit log filter.
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_1
 DELETE FROM t2 WHERE c2 = 1;;
-ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_DELETE';1).
+ERROR HY000: Statement was aborted by an audit log filter.
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_2
 DELETE FROM t2 WHERE c2 = 1;;
-ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_DELETE';1).
+ERROR HY000: Statement was aborted by an audit log filter.
 # Check table contents to ensure no changes were made.
 SELECT * FROM t1;
 c1
@@ -280,14 +280,14 @@ OK
 
 Executing statement on: node_1
 INSERT INTO t1 VALUES (2);;
-ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_INSERT';1).
+ERROR HY000: Statement was aborted by an audit log filter.
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_2
 INSERT INTO t1 VALUES (2);;
-ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_INSERT';1).
+ERROR HY000: Statement was aborted by an audit log filter.
 # Verify INSERT is allowed for t2.
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
@@ -308,14 +308,14 @@ OK
 
 Executing statement on: node_1
 UPDATE t1 SET c1 = 3 WHERE c1 = 2;;
-ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_UPDATE';1).
+ERROR HY000: Statement was aborted by an audit log filter.
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_2
 UPDATE t1 SET c1 = 3 WHERE c1 = 2;;
-ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_UPDATE';1).
+ERROR HY000: Statement was aborted by an audit log filter.
 # Verify UPDATE is allowed for t2.
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
@@ -336,14 +336,14 @@ OK
 
 Executing statement on: node_1
 DELETE FROM t1 WHERE c1 = 1;;
-ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_DELETE';1).
+ERROR HY000: Statement was aborted by an audit log filter.
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_2
 DELETE FROM t1 WHERE c1 = 1;;
-ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_DELETE';1).
+ERROR HY000: Statement was aborted by an audit log filter.
 # Verify DELETE is allowed for t2.
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
@@ -364,14 +364,14 @@ OK
 
 Executing statement on: node_1
 SELECT * FROM t1;;
-ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_READ';1).
+ERROR HY000: Statement was aborted by an audit log filter.
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()
 OK
 
 Executing statement on: node_2
 SELECT * FROM t1;;
-ERROR HY000: Aborted by Audit API ('EVENT_TRACKING_TABLE_ACCESS_READ';1).
+ERROR HY000: Statement was aborted by an audit log filter.
 # Verify SELECT is allowed for t2.
 SELECT audit_log_filter_flush();
 audit_log_filter_flush()

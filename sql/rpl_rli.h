@@ -301,8 +301,24 @@ class Relay_log_info : public Rpl_info {
     thread and nonzero for Relay_log_info objects that belong to
     clients.
   */
-  inline bool belongs_to_client() {
+  inline bool belongs_to_client() const {
     assert(info_thd);
+#ifdef WITH_WSREP
+    /*
+      A wsrep applier does not belong to a client. It applies events through
+      its own Relay_log_info (THD::wsrep_rli, set up by
+      Wsrep_high_priority_service), never through the THD::rli_fake that a
+      client executing a BINLOG statement uses.
+
+      It is not caught by the slave_thread test below because
+      init_wsrep_thread() (mysqld.cc) only sets THD::slave_thread under
+      #ifdef GALERA, and bare GALERA is never defined for sql/. Test the
+      applier's Relay_log_info directly so this predicate reports the truth
+      for every caller and in every build type.
+    */
+    if (info_thd->wsrep_rli != nullptr && info_thd->wsrep_rli == this)
+      return false;
+#endif /* WITH_WSREP */
     return !info_thd->slave_thread;
   }
 /* Instrumentation key for performance schema for mts_temp_table_LOCK */
