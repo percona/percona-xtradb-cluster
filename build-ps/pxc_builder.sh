@@ -339,6 +339,7 @@ install_deps() {
         yum install -y https://repo.percona.com/yum/percona-release-latest.noarch.rpm
 	percona-release enable pxb-84-lts release
 	percona-release enable pxb-9x-innovation testing
+	percona-release enable pxb-97-lts testing
         if [ "x$RHEL" = "x8" -o "x$RHEL" = "x9" ]; then
             yum -y install dnf-plugins-core epel-release
             yum config-manager --set-enabled powertools
@@ -494,7 +495,7 @@ install_deps() {
         # (2) PXB compatible with previous PXC version (note: it may be LTS as well)
         percona-release enable pxb-9x-innovation testing
         # (3) PXB compatible with this PXC version (LTS or Innovative)
-        # percona-release enable pxb-9x-innovation testing
+        percona-release enable pxb-97-lts testing
         
         until apt-get update; do
             sleep 1
@@ -542,9 +543,9 @@ install_deps() {
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
         #apt-get -y install --download-only percona-xtrabackup-80=8.0.35-33-1.${DIST}
-        apt-get -y install --download-only percona-xtrabackup-96=9.6.0-1-1.${DIST}
-        apt-get -y install --download-only percona-xtrabackup-91=9.1.0-1-1.${DIST}
         apt-get -y install --download-only percona-xtrabackup-84=8.4.0-5-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-96=9.6.0-1-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-97=9.7.1~rc1-1.${DIST}
         if [ x"${DIST}" = xnoble -o x"${DIST}" = xtrixie ]; then
             apt-get -y install gcc-13 g++-13
             update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
@@ -961,13 +962,13 @@ build_deb(){
     # (1) PXB compatible with previous PXC LTS version
     mkdir -p pxb-8.4
     # (2) PXB compatible with this PXC version (LTS or Innovative)
-    mkdir -p pxb-9.5
     mkdir -p pxb-9.6
+    mkdir -p pxb-9.7
 
 
     dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-84* pxb-8.4
-    dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-91* pxb-9.5
     dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-96* pxb-9.6
+    dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-97* pxb-9.7
 
     #  (1)
     cd pxb-8.4 || exit
@@ -976,11 +977,11 @@ build_deb(){
         rm -rf usr *.deb DEBIAN
 
     # (2)
-    cd ../pxb-9.5 || exit
+    cd ../pxb-9.6 || exit
         mv usr/bin ./
         mv usr/lib* ./
         rm -rf usr *.deb DEBIAN
-    cd ../pxb-9.6 || exit
+    cd ../pxb-9.7 || exit
         mv usr/bin ./
         mv usr/lib* ./
         rm -rf usr *.deb DEBIAN
@@ -1119,20 +1120,6 @@ build_tarball(){
         popd
 
         # (2)
-        mkdir pxb-9.5
-        pushd pxb-9.5
-        yumdownloader percona-xtrabackup-91-9.1.0
-        rpm2cpio *.rpm | cpio --extract --make-directories --verbose
-        mv usr/bin ./
-        mv usr/lib* ./
-        mv lib64 lib
-        mv lib/xtrabackup/* lib/ || true
-        rm -rf lib/xtrabackup
-        rm -rf usr
-        rm -f *.rpm
-        popd
-
-        # (3)
         mkdir pxb-9.6
         pushd pxb-9.6
         yumdownloader percona-xtrabackup-96-9.6.0
@@ -1146,18 +1133,32 @@ build_tarball(){
         rm -f *.rpm
         popd
 
+        # (3)
+        mkdir pxb-9.7
+        pushd pxb-9.7
+        yumdownloader percona-xtrabackup-97-9.7.1
+        rpm2cpio *.rpm | cpio --extract --make-directories --verbose
+        mv usr/bin ./
+        mv usr/lib* ./
+        mv lib64 lib
+        mv lib/xtrabackup/* lib/ || true
+        rm -rf lib/xtrabackup
+        rm -rf usr
+        rm -f *.rpm
+        popd
+
         tar -zcvf  percona-xtrabackup-8.4.tar.gz pxb-8.4
-        tar -zcvf  percona-xtrabackup-9.1.tar.gz pxb-9.5
         tar -zcvf  percona-xtrabackup-9.6.tar.gz pxb-9.6
+        tar -zcvf  percona-xtrabackup-9.7.tar.gz pxb-9.7
 
     else
         DEBIAN_VERSION="$(lsb_release -sc)"
         mkdir pxb-8.4
-        mkdir pxb-9.5
         mkdir pxb-9.6
+        mkdir pxb-9.7
         dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-84* pxb-8.4
-        dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-91* pxb-9.5
         dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-96* pxb-9.6
+        dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-97* pxb-9.7
         
         # (1)
         pushd pxb-8.4
@@ -1167,25 +1168,25 @@ build_tarball(){
         popd
 
         # (2)
-        pushd pxb-9.5
+        pushd pxb-9.6
             mv usr/bin ./
             mv usr/lib* ./
             rm -rf usr *.deb DEBIAN
         popd
-        pushd pxb-9.6
+        pushd pxb-9.7
             mv usr/bin ./
             mv usr/lib* ./
             rm -rf usr *.deb DEBIAN
         popd
         
         tar -zcvf percona-xtrabackup-8.4.tar.gz pxb-8.4
-        tar -zcvf percona-xtrabackup-9.1.tar.gz pxb-9.5
         tar -zcvf percona-xtrabackup-9.6.tar.gz pxb-9.6
+        tar -zcvf percona-xtrabackup-9.7.tar.gz pxb-9.7
     fi
     mkdir -p ${BUILD_ROOT}/target/pxc_extra/
     cp *.tar.gz ${BUILD_ROOT}/target/pxc_extra/
     cp *.tar.gz ${BUILD_ROOT}/target
-    rm -rf pxb-8.4 pxb-9.5 pxb-9.6 || true
+    rm -rf pxb-8.4 pxb-9.6 pxb-9.7 || true
     cd ${CURDIR} || exit
     rm -rf jemalloc
     wget https://github.com/jemalloc/jemalloc/releases/download/$JVERSION/jemalloc-$JVERSION.tar.bz2
