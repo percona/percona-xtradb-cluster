@@ -26,7 +26,7 @@ wsrep_cluster_address=gcomm://
 binlog_format=ROW
 
 # Slave thread to use
-wsrep_slave_threads=8
+wsrep_applier_threads=8
 
 wsrep_log_conflicts
 

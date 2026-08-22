@@ -571,12 +571,12 @@ fi
     ) || exit 1
     fi
 
-    # Look for the pxb 9.5 tarball
+    # Look for the pxb 9.7 tarball
     (
         cd "$TARGETDIR"
-        pxb_tar=$(ls -1td percona-xtrabackup-9.1.* | grep ".tar" | sort --version-sort | tail -n1)
+        pxb_tar=$(ls -1td percona-xtrabackup-9.7.* | grep ".tar" | sort --version-sort | tail -n1)
         if [[ -z $pxb_tar ]]; then
-            echo "Could not find percona-xtrabackup-9.1 tarball in $TARGETDIR.  Terminating."
+            echo "Could not find percona-xtrabackup-9.7 tarball in $TARGETDIR.  Terminating."
             exit 1
         fi
         # Remove the .tar.gz extension
@@ -585,22 +585,22 @@ fi
         if [[ $pxb_basename =~ x86_64 ]]; then
             pxb_basename="${pxb_basename%x86_64*}x86_64"
         fi
-        pxb_dir="pxb-9.5"
+        pxb_dir="pxb-9.7"
 
         mkdir -p pxc_extra
         cd pxc_extra
         if [[ -d ${pxb_basename} ]]; then
-            echo "Using existing pxb 9.5 directory : ${pxb_basename}"
+            echo "Using existing pxb 9.7 directory : ${pxb_basename}"
         else
-            echo "Removing existing percona-xtrabackup-9.5 basedir (if found)"
-            find . -maxdepth 1 -type d -name 'percona-xtrabackup-9.5' -exec rm -rf {} \+
+            echo "Removing existing percona-xtrabackup-9.7 basedir (if found)"
+            find . -maxdepth 1 -type d -name 'percona-xtrabackup-9.7' -exec rm -rf {} \+
 
-            echo "Extracting pxb 9.5 tarball"
+            echo "Extracting pxb 9.7 tarball"
             tar -xzf "../$pxb_tar"
         fi
         echo "Creating symlink $pxb_dir --> $pxb_basename"
-        rm -f pxb-9.5
-        ln -s ./${pxb_basename} pxb-9.5
+        rm -f pxb-9.7
+        ln -s ./${pxb_basename} pxb-9.7
     ) || exit 1
 
     # Look for the pxb 9.6 tarball
@@ -669,9 +669,9 @@ fi
 
     # Only copy over the bin and lib portions of the xtrabackup packages
     # Test cases and other files are not copied
-    mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-9.5"
-    (cp -v -r $TARGETDIR/pxc_extra/pxb-9.5/bin/  $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-9.5) || true
-    (cp -v -r $TARGETDIR/pxc_extra/pxb-9.5/lib/  $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-9.5) || true
+    mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-9.7"
+    (cp -v -r $TARGETDIR/pxc_extra/pxb-9.7/bin/  $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-9.7) || true
+    (cp -v -r $TARGETDIR/pxc_extra/pxb-9.7/lib/  $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-9.7) || true
 
     mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-9.6"
     (cp -v -r $TARGETDIR/pxc_extra/pxb-9.6/bin/  $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-9.6) || true
@@ -686,7 +686,7 @@ fi
 # Patch needed libraries
 (
     LIBLIST="libgpg-error.so libproc2.so libnuma.so libgssapi.so libldap_r-2.4.so.2 liblber-2.4.so.2 libaio.so libprocps.so libgcrypt.so libtinfo.so libsasl2.so libbrotlidec.so libbrotlicommon.so librtmp.so libfreebl3.so libssl3.so libsmime3.so libnss3.so libnssutil3.so libplds4.so libplc4.so libnspr4.so libtirpc.so libncurses.so.5 libboost_program_options"
-    DIRLIST="bin bin/pxc_extra/pxb-8.4/bin bin/pxc_extra/pxb-9.5/bin bin/pxc_extra/pxb-9.6/bin lib bin/pxc_extra/pxb-8.4/lib/plugin bin/pxc_extra/pxb-9.5/lib/plugin bin/pxc_extra/pxb-9.6/lib/plugin lib/private lib/plugin lib/mysqlrouter/plugin lib/mysqlrouter/private"
+    DIRLIST="bin bin/pxc_extra/pxb-8.4/bin bin/pxc_extra/pxb-9.7/bin bin/pxc_extra/pxb-9.6/bin lib bin/pxc_extra/pxb-8.4/lib/plugin bin/pxc_extra/pxb-9.7/lib/plugin bin/pxc_extra/pxb-9.6/lib/plugin lib/private lib/plugin lib/mysqlrouter/plugin lib/mysqlrouter/private"
 
     LIBPATH=""
     OVERRIDE=false
@@ -780,11 +780,11 @@ fi
         export override=false
         set_runpath bin '$ORIGIN/../lib/private/'
         set_runpath bin/pxc_extra/pxb-8.4/bin '$ORIGIN/../../../../lib/private/'
-        set_runpath bin/pxc_extra/pxb-9.5/bin '$ORIGIN/../../../../lib/private/'
+        set_runpath bin/pxc_extra/pxb-9.7/bin '$ORIGIN/../../../../lib/private/'
         set_runpath bin/pxc_extra/pxb-9.6/bin '$ORIGIN/../../../../lib/private/'
         set_runpath lib '$ORIGIN/private/'
         set_runpath bin/pxc_extra/pxb-8.4/lib/plugin '$ORIGIN/../../../../../lib/private/'
-        set_runpath bin/pxc_extra/pxb-9.5/lib/plugin '$ORIGIN/../../../../../lib/private/'
+        set_runpath bin/pxc_extra/pxb-9.7/lib/plugin '$ORIGIN/../../../../../lib/private/'
         set_runpath bin/pxc_extra/pxb-9.6/lib/plugin '$ORIGIN/../../../../../lib/private/'
         set_runpath lib/plugin '$ORIGIN/../private/'
         set_runpath lib/private '$ORIGIN'
@@ -799,8 +799,8 @@ fi
         #  BINS XTRABACKUP
         unset override && export override=true && set_runpath bin/pxc_extra/pxb-8.4/bin/xtrabackup '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'
         unset override && export override=true && set_runpath bin/pxc_extra/pxb-8.4/bin/xtrabackup-debug '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'
-        unset override && export override=true && set_runpath bin/pxc_extra/pxb-9.5/bin/xtrabackup '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'
-        unset override && export override=true && set_runpath bin/pxc_extra/pxb-9.5/bin/xtrabackup-debug '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'
+        unset override && export override=true && set_runpath bin/pxc_extra/pxb-9.7/bin/xtrabackup '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'
+        unset override && export override=true && set_runpath bin/pxc_extra/pxb-9.7/bin/xtrabackup-debug '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'
         unset override && export override=true && set_runpath bin/pxc_extra/pxb-9.6/bin/xtrabackup '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'
         unset override && export override=true && set_runpath bin/pxc_extra/pxb-9.6/bin/xtrabackup-debug '$ORIGIN/../../../../lib/private/:$ORIGIN/../lib/private/'
 
