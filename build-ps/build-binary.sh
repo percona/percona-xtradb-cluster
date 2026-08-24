@@ -736,7 +736,7 @@ fi
                 echo "* Changing RUNPATH for ${elf}"
                 patchelf --set-rpath ${r_path} ${elf}
             fi
-            if [[ ! -z $/{override} ]] && [[ ${override} == "true" ]]; then
+            if [[ ! -z ${override} ]] && [[ ${override} == "true" ]]; then
                 echo "Overriding RUNPATH for ${elf}"
                 patchelf --set-rpath ${r_path} ${elf}
             fi
