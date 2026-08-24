@@ -733,10 +733,10 @@ fi
         for elf in $(find ${elf_path} -maxdepth 1 -exec file {} \; | grep 'ELF ' | cut -d':' -f1); do
             echo "Checking LD_RUNPATH for ${elf}"
             if [[ -z $(patchelf --print-rpath ${elf}) ]]; then
-                echo "Changing RUNPATH for ${elf}"
+                echo "* Changing RUNPATH for ${elf}"
                 patchelf --set-rpath ${r_path} ${elf}
             fi
-            if [[ ! -z ${override} ]] && [[ ${override} == "true" ]]; then
+            if [[ ! -z $/{override} ]] && [[ ${override} == "true" ]]; then
                 echo "Overriding RUNPATH for ${elf}"
                 patchelf --set-rpath ${r_path} ${elf}
             fi
@@ -780,14 +780,15 @@ fi
         export override=false
         set_runpath bin '$ORIGIN/../lib/private/'
         set_runpath bin/pxc_extra/pxb-8.4/bin '$ORIGIN/../../../../lib/private/'
-        set_runpath bin/pxc_extra/pxb-9.7/bin '$ORIGIN/../../../../lib/private/'
-        set_runpath bin/pxc_extra/pxb-9.6/bin '$ORIGIN/../../../../lib/private/'
         set_runpath lib '$ORIGIN/private/'
         set_runpath bin/pxc_extra/pxb-8.4/lib/plugin '$ORIGIN/../../../../../lib/private/'
         set_runpath bin/pxc_extra/pxb-9.7/lib/plugin '$ORIGIN/../../../../../lib/private/'
         set_runpath bin/pxc_extra/pxb-9.6/lib/plugin '$ORIGIN/../../../../../lib/private/'
         set_runpath lib/plugin '$ORIGIN/../private/'
         set_runpath lib/private '$ORIGIN'
+        #  BINS PXB > 9.0
+        unset override && export override=true && set_runpath bin/pxc_extra/pxb-9.6/bin '$ORIGIN/../../../../lib/private/'
+        unset override && export override=true && set_runpath bin/pxc_extra/pxb-9.7/bin '$ORIGIN/../../../../lib/private/'
         #  LIBS MYSQLROUTER
         unset override && export override=true && set_runpath lib/mysqlrouter/plugin '$ORIGIN/:$ORIGIN/../private/:$ORIGIN/../../private/'
         unset override && export override=true && set_runpath lib/mysqlrouter/private '$ORIGIN/:$ORIGIN/../plugin/:$ORIGIN/../../private/'
