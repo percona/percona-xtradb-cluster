@@ -8277,6 +8277,13 @@ static bool check_session_admin_and_sql_require_primary_key_on_check(
     sys_var *self, THD *thd, set_var *var) {
   if (check_session_admin(self, thd, var)) return true;
   if (pxc_strict_mode < PXC_STRICT_MODE_ENFORCING) return false;
+  /*
+    Allow the server upgrade thread to bypass pxc_strict_mode when temporarily
+    disabling sql_require_primary_key for system tables without primary keys.
+    These are internal statements compiled into the server; rejecting them can
+    abort upgrades and prevent the node from starting (PXC-5296).
+  */
+  if (thd->is_server_upgrade_thread()) return false;
   if (var->save_result.ulonglong_value == 0) {
     const char *strict_name =
         (pxc_strict_mode == PXC_STRICT_MODE_MASTER) ? "MASTER" : "ENFORCING";
