@@ -387,12 +387,15 @@ Requires:             percona-xtradb-cluster-server = %{version}-%{release}
 Requires:             percona-xtradb-cluster-client = %{version}-%{release}
 Requires:             percona-xtradb-cluster-devel = %{version}-%{release}
 Requires:             percona-xtradb-cluster-test = %{version}-%{release}
+%if 0%{?rhel} != 8
 Requires:             percona-xtradb-cluster-debuginfo = %{version}-%{release}
+%endif
 Requires:             percona-xtradb-cluster-garbd = %{version}-%{release}
 
 %description -n percona-xtradb-cluster-full
 This is a meta-package which provides the full suite of Percona XtraDB
-Cluster 56 packages including the debuginfo. Recommended.
+Cluster 56 packages including the debuginfo (except on el8, where the
+debuginfo subpackage is not required). Recommended.
 # ----------------------------------------------------------------------------
 
 %package -n percona-xtradb-cluster-server
