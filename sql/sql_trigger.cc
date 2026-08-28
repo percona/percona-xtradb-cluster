@@ -449,6 +449,33 @@ bool Sql_cmd_create_trigger::execute(THD *thd) {
                                              true /* report_error */))
     return true;
 
+  /*
+    A DEFINER referring to a non-existent user (orphan object) requires SUPER or
+    ALLOW_NONEXISTENT_DEFINER. This mirrors stage 2 of check_valid_definer() in
+    sql/auth/sql_authorization.cc. Doing it here, before
+    wsrep_to_isolation_begin(), makes the origin reject the statement before it
+    is replicated; otherwise the origin would reject it only during creation
+    (after TOI) while the appliers create it successfully, leaving this node
+    inconsistent and evicting it from the cluster (PXC-5292, a PXC-4765-class
+    issue). The informational ER_NO_SUCH_USER warning is intentionally left to
+    the authoritative check_valid_definer() call during trigger creation.
+    is_acl_user() self-locks the ACL cache (READ, non-blocking) and returns true
+    when it cannot lock or ACL is not yet initialized; in that rare case this
+    gate is skipped and we simply fall back to the pre-existing post-TOI
+    check_valid_definer() behavior -- no worse than before this fix.
+  */
+  const bool has_super =
+      sctx->check_access(SUPER_ACL);  // This will come from PXC-5291
+  if (lex->definer &&
+      !is_acl_user(thd, lex->definer->host.str, lex->definer->user.str) &&
+      !has_super &&
+      !sctx->has_global_grant(STRING_WITH_LEN("ALLOW_NONEXISTENT_DEFINER"))
+           .first) {
+    my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0),
+             "SUPER or ALLOW_NONEXISTENT_DEFINER");
+    return true;
+  }
+
 #else
   if (!trust_function_creators && mysql_bin_log.is_open() &&
       !(sctx->check_access(SUPER_ACL))) {
