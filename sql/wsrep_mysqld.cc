@@ -3062,6 +3062,23 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
   }
 
   /*
+    Acquire Percona's LOCK TABLES FOR BACKUP lock.
+    LOCK TABLES FOR BACKUP (Percona's BACKUP_TABLES lock) forbids the holding
+    session from running its own DDL/DML (see the abort_if_acquired() guards
+    in sql_alter_instance.cc, sql_tablespace.cc, sql_base.cc). Unlike
+    LOCK INSTANCE FOR BACKUP below, this rejection must happen here, before
+    TOI replication, otherwise the statement would already be certified and
+    applied on peers by the time the local abort_if_acquired() check inside
+    the statement executor rejects it, causing the nodes to diverge and
+    Galera to raise an inconsistency vote.
+  */
+  if (thd->backup_tables_lock.abort_if_acquired() ||
+      thd->backup_tables_lock.acquire_protection(
+          thd, MDL_TRANSACTION, thd->variables.lock_wait_timeout)) {
+    return -1;
+  }
+
+  /*
     Acquire an intention exclusive lock to protect against others setting the
     global read_only and error out if the server is already read only.
 
