@@ -248,7 +248,7 @@ Depends: percona-xtradb-cluster-client (>= ${binary:Version}),
          passwd,
          lsb-base (>= 3.0-10),
          socat,
-         iproute,
+         iproute2,
          netcat-openbsd,
          curl,
          stunnel
@@ -340,7 +340,7 @@ Depends: percona-xtradb-cluster-client (>= ${binary:Version}),
          lsb-base (>= 3.0-10),
          socat,
          netcat-openbsd,
-         iproute
+         iproute2
 Provides: mysql-server-debug
 Description: Percona XtraDB Cluster database server UNIV_DEBUG binaries
  Percona XtraDB Cluster is based on the Percona Server database
@@ -408,10 +408,3 @@ Conflicts: percona-galera-arbitrator-3-dbg
 Replaces: percona-galera-arbitrator-3-dbg
 Depends: percona-xtradb-cluster-garbd (= ${binary:Version}), ${misc:Depends}
 Description: Debugging package for Percona XtraDB Cluster Garbd.
-
-Package: percona-xtradb-cluster-mysql-router
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: Percona MySQL Router
- MySQL Router is part of InnoDB Cluster, and provides transparent routing
- between an application and back-end MySQL servers.
