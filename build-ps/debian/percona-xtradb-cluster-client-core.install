@@ -1,0 +1,3 @@
+# Core client binaries
+usr/bin/mysql
+usr/bin/mysqldump

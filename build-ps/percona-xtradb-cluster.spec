@@ -463,7 +463,9 @@ Obsoletes:      mysql8.4-server < 99
 Obsoletes:      mysql8.4 < 99
 Obsoletes:      mysql8.4-common < 99
 Obsoletes:      mysql8.4-errmsg < 99
-Provides:       mysql-server MySQL-server
+Provides:       mysql-server = %{version}-%{release}
+Provides:       mysql-server%{?_isa} = %{version}-%{release}
+Provides:       MySQL-server%{?_isa} = %{version}-%{release}
 Conflicts:      Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56 Percona-Server-server-57
 
 %description -n percona-xtradb-cluster-server
@@ -490,6 +492,7 @@ Group:          Applications/Databases
 Provides:       mysql-client MySQL-client MySQL Percona-XtraDB-Cluster-client mysql
 Conflicts:      Percona-SQL-client-50 Percona-Server-client-51 Percona-Server-client-55 Percona-XtraDB-Cluster-client-55
 Requires:       perl-DBI
+Requires:       percona-xtradb-cluster-client-plugins = %{version}-%{release}
 
 %description -n percona-xtradb-cluster-client
 Percona XtraDB Cluster is based on the Percona Server database server and
@@ -512,7 +515,9 @@ https://www.percona.com/mysql/software/percona-xtradb-cluster/
 Requires:       percona-xtradb-cluster-client perl
 Summary:        Percona XtraDB Cluster - Test suite
 Group:          Applications/Databases
-Provides:       mysql-test
+Provides:       mysql-test = %{version}-%{release}
+Provides:       mysql-test%{?_isa} = %{version}-%{release}
+Provides:       MySQL-test%{?_isa} = %{version}-%{release}
 Requires:       perl(Socket), perl(Time::HiRes), perl(Data::Dumper), perl(Test::More), perl(Env)
 Conflicts:      Percona-SQL-test-50 Percona-Server-test-51 Percona-Server-test-55 Percona-XtraDB-Cluster-test-55
 Obsoletes:      mysql-test < %{version}-%{release}
@@ -539,7 +544,8 @@ https://www.percona.com/mysql/software/percona-xtradb-cluster/
 %package -n percona-xtradb-cluster-devel
 Summary:        Percona XtraDB Cluster - Development header files and libraries
 Group:          Applications/Databases
-Provides:       mysql-devel
+Provides:       mysql-devel = %{version}-%{release}
+Provides:       mysql-devel%{?_isa} = %{version}-%{release}
 %if "%rhel" == "6"
 Conflicts:      Percona-SQL-devel-50 Percona-Server-devel-51 Percona-Server-devel-55 Percona-XtraDB-Cluster-devel-55 /usr/bin/mysql_config
 %else
@@ -570,7 +576,9 @@ https://www.percona.com/mysql/software/percona-xtradb-cluster/
 %package -n percona-xtradb-cluster-shared
 Summary:        Percona XtraDB Cluster - Shared libraries
 Group:          Applications/Databases
-Provides:       mysql-shared >= %{mysql_version} mysql-libs >= %{mysql_version}
+Provides:       mysql-libs = %{version}-%{release}
+Provides:       mysql-libs%{?_isa} = %{version}-%{release}
+Provides:       mysql-shared
 Conflicts:      Percona-Server-shared-56
 Conflicts:      Percona-Server-shared-57
 %if "%rhel" > "6"
@@ -651,15 +659,16 @@ Provides:      mysql-router
 The Percona MySQL Router software delivers a fast, multi-threaded way of
 routing connections from MySQL Clients to MySQL Servers.
 
-%package   -n   percona-xtradb-cluster-mysql-router-devel
-Summary:        Development header files and libraries for Percona MySQL Router
+%package   -n   percona-xtradb-cluster-client-plugins
+Summary:        Percona XtraDB Cluster - Client Plugins
 Group:          Applications/Databases
-Provides:       percona-xtradb-cluster-mysql-router-devel = %{version}-%{release}
-Obsoletes:      mysql-router-devel percona-mysql-router-devel
+Provides:       mysql-client-plugins = %{version}-%{release}
+Provides:       mysql-client-plugins%{?_isa} = %{version}-%{release}
 
-%description -n percona-xtradb-cluster-mysql-router-devel
-This package contains the development header files and libraries
-necessary to develop Percona MySQL Router applications.
+%description -n percona-xtradb-cluster-client-plugins
+This package contains shared plugins for Percona XtraDB Cluster client
+applications, including authentication plugins for LDAP, Kerberos, WebAuthn,
+OpenID Connect, and OCI.
 
 %package   -n   percona-xtradb-cluster-icu-data-files
 Summary:        MySQL packaging of ICU data files
@@ -1607,10 +1616,6 @@ fi
 # ----------------------------------------------------------------------
 # Clean up the BuildRoot after build is done
 # ----------------------------------------------------------------------
-%clean
-[ "$RPM_BUILD_ROOT" != "/" ] && [ -d $RPM_BUILD_ROOT ] \
-  && rm -rf $RPM_BUILD_ROOT;
-
 ##############################################################################
 #  Files section
 ##############################################################################
@@ -1699,6 +1704,22 @@ fi
 
 %attr(755, root, root) %{_libdir}/mysql/plugin/*.so*
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/*.so*
+%exclude %{_libdir}/mysql/plugin/authentication_ldap_sasl_client.so
+%exclude %{_libdir}/mysql/plugin/authentication_kerberos_client.so
+%exclude %{_libdir}/mysql/plugin/authentication_openid_connect_client.so
+%exclude %{_libdir}/mysql/plugin/authentication_oci_client.so
+%exclude %{_libdir}/mysql/plugin/mysql_native_password.so
+%exclude %{_libdir}/mysql/plugin/dialog.so
+%exclude %{_libdir}/mysql/plugin/debug/authentication_ldap_sasl_client.so
+%exclude %{_libdir}/mysql/plugin/debug/authentication_kerberos_client.so
+%exclude %{_libdir}/mysql/plugin/debug/authentication_openid_connect_client.so
+%exclude %{_libdir}/mysql/plugin/debug/authentication_oci_client.so
+%exclude %{_libdir}/mysql/plugin/debug/mysql_native_password.so
+%exclude %{_libdir}/mysql/plugin/debug/dialog.so
+%if 0%{?add_fido_plugins}
+%exclude %{_libdir}/mysql/plugin/authentication_webauthn_client.so
+%exclude %{_libdir}/mysql/plugin/debug/authentication_webauthn_client.so
+%endif
 
 %if 0%{?mecab}
 %{_libdir}/mysql/mecab
@@ -2006,6 +2027,29 @@ rm -rf %{pxc_telemetry}
 %dir %attr(755, mysqlrouter, mysqlrouter) /var/log/mysqlrouter
 %dir %attr(755, mysqlrouter, mysqlrouter) /var/run/mysqlrouter
 
+
+%files -n percona-xtradb-cluster-client-plugins
+%defattr(-, root, root, -)
+%attr(755, root, root) %{_libdir}/mysql/plugin/authentication_ldap_sasl_client.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/authentication_kerberos_client.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/authentication_openid_connect_client.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/authentication_oci_client.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/mysql_native_password.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/dialog.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/authentication_ldap_sasl_client.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/authentication_kerberos_client.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/authentication_openid_connect_client.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/authentication_oci_client.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/mysql_native_password.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/dialog.so
+%if 0%{?add_fido_plugins}
+%attr(755, root, root) %{_libdir}/mysql/plugin/authentication_webauthn_client.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/authentication_webauthn_client.so
+%endif
+
+%post -n percona-xtradb-cluster-client-plugins -p /sbin/ldconfig
+
+%postun -n percona-xtradb-cluster-client-plugins -p /sbin/ldconfig
 
 %files -n percona-xtradb-cluster-icu-data-files
 %defattr(-, root, root, -)
