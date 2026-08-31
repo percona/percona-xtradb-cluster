@@ -54,7 +54,7 @@ class wsrep_apply_error {
   size_t len_;
 };
 
-void wsrep_store_error(const THD* thd, wsrep::mutable_buffer& buf,
+void wsrep_store_error(const THD *thd, wsrep::mutable_buffer &buf,
                        bool include_msg = true);
 class Format_description_log_event;
 void wsrep_set_apply_format(THD *, Format_description_log_event *);

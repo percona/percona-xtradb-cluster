@@ -417,8 +417,7 @@ int Wsrep_high_priority_service::rollback(const wsrep::ws_handle &ws_handle,
 
 static int apply_events(THD *thd, Relay_log_info *rli,
                         const wsrep::const_buffer &data,
-                        wsrep::mutable_buffer &err,
-                        bool include_msg = true) {
+                        wsrep::mutable_buffer &err, bool include_msg = true) {
   int const ret = wsrep_apply_events(thd, rli, data.data(), data.size());
   if (ret || wsrep_thd_has_ignored_error(thd)) {
     if (ret) {

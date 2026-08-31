@@ -2638,8 +2638,7 @@ static void wsrep_TOI_end(THD *thd) {
     wsrep_set_SE_checkpoint(client_state.toi_meta().gtid());
     wsrep::mutable_buffer err;
     if (thd->is_error() && !wsrep_must_ignore_error(thd)) {
-      wsrep_store_error(thd, err,
-                        wsrep_protocol_version < WsrepVersion::V7);
+      wsrep_store_error(thd, err, wsrep_protocol_version < WsrepVersion::V7);
     }
     int const ret = client_state.leave_toi_local(err);
 
@@ -2895,8 +2894,7 @@ static void wsrep_NBO_end_phase_two(THD *thd) {
 
     wsrep::mutable_buffer err;
     if (thd->is_error() && !wsrep_must_ignore_error(thd)) {
-      wsrep_store_error(thd, err,
-                        wsrep_protocol_version < WsrepVersion::V7);
+      wsrep_store_error(thd, err, wsrep_protocol_version < WsrepVersion::V7);
     }
     int ret = client_state.end_nbo_phase_two(err);
 
