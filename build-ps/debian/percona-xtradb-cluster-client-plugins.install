@@ -1,0 +1,7 @@
+usr/lib/mysql/plugin/authentication_*_client.so
+usr/lib/mysql/plugin/mysql_native_password.so
+usr/lib/mysql/plugin/dialog.so
+# debug variants
+usr/lib/mysql/plugin/debug/authentication_*_client.so
+usr/lib/mysql/plugin/debug/mysql_native_password.so
+usr/lib/mysql/plugin/debug/dialog.so
