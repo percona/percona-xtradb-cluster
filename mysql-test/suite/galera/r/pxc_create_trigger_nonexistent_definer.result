@@ -1,0 +1,80 @@
+
+# 1. Setup users.
+
+SET @old_trust = @@GLOBAL.log_bin_trust_function_creators;
+Warnings:
+Warning	1287	'@@log_bin_trust_function_creators' is deprecated and will be removed in a future release.
+SET GLOBAL log_bin_trust_function_creators = 1;
+CREATE DATABASE probe;
+CREATE USER 'any_def'@'%' IDENTIFIED BY '';
+GRANT ALL PRIVILEGES ON probe.* TO 'any_def'@'%';
+GRANT SET_ANY_DEFINER ON *.* TO 'any_def'@'%';
+CREATE USER 'nonexist_ok'@'%' IDENTIFIED BY '';
+GRANT ALL PRIVILEGES ON probe.* TO 'nonexist_ok'@'%';
+GRANT SET_ANY_DEFINER, ALLOW_NONEXISTENT_DEFINER ON *.* TO 'nonexist_ok'@'%';
+CREATE USER 'sup'@'%' IDENTIFIED BY '';
+GRANT ALL PRIVILEGES ON probe.* TO 'sup'@'%';
+GRANT SUPER ON *.* TO 'sup'@'%';
+Warnings:
+Warning	1287	The SUPER privilege identifier is deprecated
+CREATE TABLE t (id INT PRIMARY KEY);
+
+# 2. SET_ANY_DEFINER user, nonexistent DEFINER -> rejected pre-TOI, no eviction.
+
+CREATE DEFINER='ghost1'@'localhost' TRIGGER tg_ghost1 AFTER INSERT ON t FOR EACH ROW SET @n = NEW.id;
+ERROR 42000: Access denied; you need (at least one of) the SUPER or ALLOW_NONEXISTENT_DEFINER privilege(s) for this operation
+include/assert.inc ['node_1 still in a 2-node cluster after the rejected orphan-definer CREATE TRIGGER (no eviction)']
+include/assert.inc ['node_1 is still Synced (not Inconsistent)']
+include/assert.inc ['No inconsistency seen in node_1']
+include/assert.inc ['Trigger tg_ghost1 not created on node_1']
+include/assert.inc ['node_2 still in a 2-node cluster (no eviction)']
+include/assert.inc ['No inconsistency seen in node_2']
+include/assert.inc ['Trigger tg_ghost1 not created on node_2']
+
+# 2b. SET_ANY_DEFINER , EXISTING different DEFINER -> allowed, replicates.
+
+CREATE DEFINER='sup'@'%' TRIGGER tg_existing AFTER UPDATE ON t FOR EACH ROW SET @u = NEW.id;
+include/assert.inc ['Trigger tg_existing (existing DEFINER) created on node_1 by SET_ANY_DEFINER user']
+'Trigger tg_existing replicated to node_2'
+
+# 3. ALLOW_NONEXISTENT_DEFINER user, nonexistent DEFINER -> allowed, replicates.
+
+CREATE DEFINER='ghost2'@'localhost' TRIGGER tg_ghost2 AFTER INSERT ON t FOR EACH ROW SET @n = NEW.id;
+Warnings:
+Note	1449	The user specified as a definer ('ghost2'@'localhost') does not exist
+include/assert.inc ['Trigger tg_ghost2 created on node_1 (ALLOW_NONEXISTENT_DEFINER)']
+'Trigger tg_ghost2 replicated to node_2'
+
+# 4. SUPER user, nonexistent DEFINER -> allowed, replicates.
+
+CREATE DEFINER='ghost3'@'localhost' TRIGGER tg_ghost3 AFTER INSERT ON t FOR EACH ROW SET @n = NEW.id;
+Warnings:
+Note	1449	The user specified as a definer ('ghost3'@'localhost') does not exist
+include/assert.inc ['Trigger tg_ghost3 created on node_1 (SUPER)']
+'Trigger tg_ghost3 replicated to node_2'
+
+# 4b. trust = 0, nonexistent DEFINER: which gate reports, and both enforced.
+
+SET GLOBAL log_bin_trust_function_creators = 0;
+CREATE DEFINER='ghost4'@'localhost' TRIGGER tg_ghost4 AFTER INSERT ON t FOR EACH ROW SET @n = NEW.id;
+ERROR 42000: Access denied; you need (at least one of) the SUPER or ALLOW_NONEXISTENT_DEFINER privilege(s) for this operation
+include/assert.inc ['Trigger tg_ghost4 not created on node_1 (trust = 0)']
+include/assert.inc ['node_1 still in a 2-node cluster after the rejected trust = 0 CREATE TRIGGER (no eviction)']
+include/assert.inc ['Trigger tg_ghost4 not created on node_2 (trust = 0)']
+CREATE DEFINER='ghost5'@'localhost' TRIGGER tg_ghost5 AFTER INSERT ON t FOR EACH ROW SET @n = NEW.id;
+Warnings:
+Note	1449	The user specified as a definer ('ghost5'@'localhost') does not exist
+include/assert.inc ['Trigger tg_ghost5 created on node_1 (SUPER, trust = 0)']
+'Trigger tg_ghost5 replicated to node_2 (SUPER, trust = 0)'
+CREATE DEFINER='ghost6'@'localhost' TRIGGER tg_ghost6 AFTER INSERT ON t FOR EACH ROW SET @n = NEW.id;
+ERROR HY000: You do not have the SUPER privilege (you *might* want to use the less safe log_bin_trust_function_creators variable)
+include/assert.inc ['Trigger tg_ghost6 not created on node_1 (ALLOW_NONEXISTENT_DEFINER, no SUPER, trust = 0)']
+include/assert.inc ['Trigger tg_ghost6 not created on node_2 (ALLOW_NONEXISTENT_DEFINER, no SUPER, trust = 0)']
+
+# 5. Cleanup.
+
+DROP DATABASE probe;
+DROP USER 'any_def'@'%';
+DROP USER 'nonexist_ok'@'%';
+DROP USER 'sup'@'%';
+SET GLOBAL log_bin_trust_function_creators = @old_trust;

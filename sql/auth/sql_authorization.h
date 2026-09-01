@@ -71,9 +71,20 @@ extern mysql_mutex_t LOCK_mandatory_roles;
 
   @param thd the session
   @param definer the definer to check
+  @param report_no_such_user_warning whether the informational ER_NO_SUCH_USER
+         note is pushed when the definer does not exist and the caller is
+         allowed to create an orphan object. Pass false when the check is
+         repeated later on the same statement, so that the client is not given
+         a duplicate note.
   @retval false : success
   @retval true : failure
 */
+
+#ifdef WITH_WSREP
+extern bool check_valid_definer(THD *thd, LEX_USER *definer,
+                                bool report_no_such_user_warning = true);
+#else
 extern bool check_valid_definer(THD *thd, LEX_USER *definer);
+#endif
 
 #endif /* SQL_AUTHORIZATION_INCLUDED */
