@@ -179,8 +179,7 @@ Breaks: mysql-client-5.0,
         mariadb-client,
         mariadb-client-core-5.5,
         mariadb-client-5.5,
-        virtual-mysql-client,
-        virtual-mysql-client-core
+        virtual-mysql-client
 Replaces: mysql-client-5.0,
            mysql-client-core-5.1,
            mysql-client-core-5.5,
@@ -203,8 +202,7 @@ Replaces: mysql-client-5.0,
            mariadb-client,
            mariadb-client-core-5.5,
            mariadb-client-5.5,
-           virtual-mysql-client,
-           virtual-mysql-client-core
+           virtual-mysql-client
 Description: Percona XtraDB Cluster database client binaries
  Percona XtraDB Cluster is based on the Percona Server database
  server and provides a High Availability solution.
