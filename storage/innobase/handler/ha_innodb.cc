@@ -8730,7 +8730,7 @@ int wsrep_innobase_mysql_sort(int mysql_type, uint charset_number,
         if (wsrep_protocol_version >= WsrepVersion::V5 &&
             charset_number != charset_bin) {
           uchar const pad_char = charset->pad_char;
-          if (str[ret_length - 1] == pad_char) {
+          if (ret_length > 0 && str[ret_length - 1] == pad_char) {
             for (; ret_length > 0 && (str[ret_length - 1] == pad_char ||
                                       str[ret_length - 1] == 0x0);
                  ret_length--) {
