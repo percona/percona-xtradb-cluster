@@ -485,6 +485,25 @@ static int start_sst_logger_thread(sst_logger_thread_arg *arg, pthread_t *thd) {
   return 0;
 }
 
+/*
+  Parse "UUID:seqno" from the SST script output.
+
+  With protocol version >= 6 a Codership donor emits an enriched format:
+  "UUID:seqno/local_seqno/server_id/server_uuid" (/-delimited instead of
+  the old space-separated layout). The extra fields carry state for
+  Codership's local GTID manager (wsrep_local_gtid_manager) and
+  wsrep_sync_server_uuid feature, neither of which exists in PXC.
+
+  This parser tolerates the V6 format because strtoll() stops at the
+  first non-digit character ('/'), returning the correct wsrep seqno.
+  The trailing "/local_seqno/server_id/server_uuid" is silently ignored.
+
+  PXC donor side is unchanged and continues to emit plain "UUID:seqno".
+
+  TODO: if PXC ever needs to consume the extra V6 fields (e.g. to
+  implement wsrep_sync_server_uuid), this function and the donor-side
+  sst_donate_other() / wsrep_sst_xtrabackup-v2.sh must be extended.
+*/
 static int sst_scan_uuid_seqno(const char *str, wsrep_uuid_t *uuid,
                                wsrep_seqno_t *seqno) {
   int offt = wsrep_uuid_scan(str, strlen(str), uuid);

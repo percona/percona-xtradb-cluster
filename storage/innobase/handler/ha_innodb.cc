@@ -8668,6 +8668,7 @@ static inline uint get_field_offset(const TABLE *table, const Field *field) {
 int wsrep_innobase_mysql_sort(int mysql_type, uint charset_number,
                               unsigned char *str, unsigned int str_length,
                               unsigned int buf_length) {
+  static uint16 const charset_bin = my_charset_bin.number;
   CHARSET_INFO *charset;
   enum_field_types mysql_tp;
   int ret_length = str_length;
@@ -8725,6 +8726,17 @@ int wsrep_innobase_mysql_sort(int mysql_type, uint charset_number,
             charset, str, buf_length, str_length, tmp_str, str_length, 0);
         assert(tmp_length <= buf_length);
         ret_length = tmp_length;
+
+        if (wsrep_protocol_version >= WsrepVersion::V5 &&
+            charset_number != charset_bin) {
+          uchar const pad_char = charset->pad_char;
+          if (ret_length > 0 && str[ret_length - 1] == pad_char) {
+            for (; ret_length > 0 && (str[ret_length - 1] == pad_char ||
+                                      str[ret_length - 1] == 0x0);
+                 ret_length--) {
+            }
+          }
+        }
       }
       break;
     }
