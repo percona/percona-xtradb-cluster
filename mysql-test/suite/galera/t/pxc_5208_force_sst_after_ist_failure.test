@@ -1,0 +1,204 @@
+#
+# PXC-5208: the IST apply-failure path also drops grastate.dat.
+#
+# A writeset can also fail to apply while the node is catching up through IST.
+# That path reports "Inconsistency detected: Failed on preordered"
+# and closes replication on the spot: the node drops out of the cluster
+#
+# repl.force_sst_after_inconsistency=YES is set for node_2 in the .cnf rather
+# than with SET GLOBAL, because this test restarts node_2 and the provider
+# re-reads its options on initialisation.
+#
+# How the failure is provoked:
+#   1. node_2 leaves cleanly, so its recorded position stays valid and IST is
+#      possible when it comes back.
+#   2. node_1 deletes a row while node_2 is away -> that writeset is what
+#      node_2 will fetch through IST.
+#   3. node_2 is restarted standalone (wsrep-provider=none) and the same row is
+#      deleted locally. This diverges the dataset without touching grastate.dat.
+#   4. node_2 rejoins, IST replays the DELETE, the row is already gone and the
+#      apply fails. grastate.dat must be gone by then.
+#
+
+# Due to server restarts this test has been made big-test
+--source include/big_test.inc
+--source include/galera_cluster.inc
+
+--connection node_2
+--let $force_sst = `SELECT @@wsrep_provider_options LIKE '%repl.force_sst_after_inconsistency = yes%'`
+--echo repl.force_sst_after_inconsistency enabled on node_2: $force_sst
+
+if ($force_sst != 1) {
+    --die repl.force_sst_after_inconsistency must be enabled at startup for this test
+}
+
+--connection node_1
+--disable_query_log
+# pc.weight=2 lets node_1 hold quorum alone while node_2 is away.
+SET GLOBAL wsrep_provider_options = 'pc.weight=2';
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 INT);
+INSERT INTO t1 VALUES (1, 0),(2, 0),(3, 0),(4, 0),(5, 0),(6, 0),(7, 0),(8, 0);
+--enable_query_log
+
+--file_exists $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 8 FROM t1
+--source include/wait_condition.inc
+
+#
+# 1. node_2 leaves cleanly, keeping a valid position in grastate.dat.
+#
+--echo # Shutting node_2 down cleanly so that IST is possible on rejoin
+--source include/shutdown_mysqld.inc
+
+--connection node_1
+--let $wait_timeout = 60
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+#
+# 2. The writeset node_2 will replay through IST.
+#
+
+DELETE FROM t1 WHERE f1 = 5;
+
+#
+# 3. Diverge node_2 offline. wsrep-provider=none keeps Galera out of the
+#    picture entirely, so grastate.dat is left untouched and still holds a
+#    valid position.
+#
+--connection node_2
+--echo # Restarting node_2 standalone to diverge its dataset
+--let $start_mysqld_params = --wsrep-provider=none
+--let $do_not_echo_parameters = 1
+--source include/start_mysqld.inc
+
+DELETE FROM t1 WHERE f1 = 5;
+
+--source include/shutdown_mysqld.inc
+
+#
+# 4. Rejoin with Galera enabled again. IST replays the DELETE, cannot find the
+#    row, and the apply fails. Both $start_mysqld_params and
+#    $restart_parameters have to be cleared: start_mysqld.inc latches the
+#    latter and would otherwise reuse --wsrep-provider=none.
+#
+--let $start_mysqld_params =
+--let $restart_parameters =
+--let $do_not_echo_parameters = 0
+
+--echo # Rejoining node_2 - IST apply is expected to fail
+--exec echo "restart" > $_expect_file_name
+
+#
+# Synchronise on node_2 leaving the group, watched from node_1.
+#
+--connection node_1
+
+--let $grep_file = $MYSQLTEST_VARDIR/log/mysqld.2.err
+--let $grep_pattern = Removed state file .* because the node left the cluster due to an inconsistency
+--let $wait_timeout = 120
+--source include/wait_for_pattern_in_file.inc
+
+--echo # Verify grastate.dat was removed on the IST apply failure
+--error 1
+--file_exists $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
+
+#
+# Assert node 2 removed due to IST and removed state file logged.
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.2.err
+
+--let $assert_text = node_2 asked the donor for IST
+--let $assert_select = Receiving IST: .* writesets, seqnos
+--let $assert_count_condition = >= 1
+--source include/assert_grep.inc
+
+--let $assert_text = the IST writeset could not be applied
+--let $assert_select = Could not execute Delete_rows event on table test.t1
+--let $assert_count_condition = >= 1
+--source include/assert_grep.inc
+
+--let $assert_text = the failed IST apply was detected as an inconsistency
+--let $assert_select = Inconsistency detected: Failed on preordered
+--let $assert_count_condition = >= 1
+--source include/assert_grep.inc
+
+--let $assert_text = grastate.dat was removed because of the inconsistency
+--let $assert_select = Removed state file .* because the node left the cluster due to an inconsistency
+--let $assert_count_condition = >= 1
+--source include/assert_grep.inc
+
+--let $cluster_size = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'`
+--echo node_1 wsrep_cluster_size after node_2 was evicted: $cluster_size
+
+#
+# Here we cannot execute any client command since IST failed.
+# We can still execute shutdown but we are killing server instead.
+#
+--echo # Stopping node_2 if it is still alive
+--exec echo "wait" > $_expect_file_name
+--perl
+    my $log = "$ENV{'MYSQLTEST_VARDIR'}/log/mysqld.2.err";
+    open(my $fh, '<', $log) or die "cannot read $log: $!\n";
+    local $/; my $c = <$fh>; close($fh);
+    my @pids = ($c =~ /starting as process (\d+)/g);
+    die "could not determine node_2 pid from $log\n" unless @pids;
+    my $pid = $pids[-1];
+    # node_2 may already have gone, in which case its pid can have been reused
+    # by another process on the machine - an MTR worker, or node_1. Never rely
+    # on kill(0): confirm through /proc that the pid is still this node_2
+    # mysqld before sending anything to it.
+    my $is_node_2 = sub {
+        my $cf = "/proc/$pid/cmdline";
+        return 0 unless -r $cf;
+        open(my $h, '<', $cf) or return 0;
+        local $/; my $cl = <$h>; close($h);
+        return 0 unless defined $cl;
+        $cl =~ s/\0/ /g;
+        return ($cl =~ /mysqld/ && $cl =~ /defaults-group-suffix=\.2(?!\d)/) ? 1 : 0;
+    };
+    if ($is_node_2->()) {
+        kill('TERM', $pid);
+        for (my $i = 0; $i < 30 && $is_node_2->(); $i++) { sleep 1; }
+        kill('KILL', $pid) if $is_node_2->();
+        for (my $i = 0; $i < 30 && $is_node_2->(); $i++) { sleep 1; }
+        die "node_2 (pid $pid) would not stop\n" if $is_node_2->();
+    }
+EOF
+
+--connection node_2
+--echo # Restarting node_2 - with no state file it must take a full SST
+--source include/start_mysqld.inc
+--source include/galera_wait_ready.inc
+
+--connection node_1
+--let $node_1_data = `SELECT GROUP_CONCAT(f1, ':', f2 ORDER BY f1) FROM t1`
+--connection node_2
+--let $node_2_data = `SELECT GROUP_CONCAT(f1, ':', f2 ORDER BY f1) FROM t1`
+--echo node_2 t1 after SST: $node_2_data
+--echo node_1 t1 contents: $node_1_data
+
+if ($node_1_data != $node_2_data) {
+    --die node_2 dataset is not consistent with node_1 after SST
+}
+--echo datasets consistent: 1
+
+# Cleanup.
+--disable_query_log
+--connection node_1
+SET GLOBAL wsrep_provider_options = 'pc.weight=1';
+DROP TABLE t1;
+# node_1 was the IST donor and node_2 was killed while it was still attached.
+CALL mtr.add_suppression("Peer .* for IST AsyncSender seems to be disconnected");
+--connection node_2
+CALL mtr.add_suppression("Could not execute Delete_rows event on table test.t1.*Error_code: 1032");
+CALL mtr.add_suppression("Delete_rows apply failed:");
+CALL mtr.add_suppression("Failed to apply write set: ");
+CALL mtr.add_suppression("Failed to apply app buffer");
+CALL mtr.add_suppression("Inconsistency detected: Failed on preordered");
+CALL mtr.add_suppression("Aborting");
+# The evicted instance cannot rejoin - that is the point of the test. The
+# instance that comes back after the kill does sync with the group.
+CALL mtr.add_suppression("Failed to JOIN the cluster after SST");
+--enable_query_log
