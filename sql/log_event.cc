@@ -6107,6 +6107,9 @@ void Intvar_log_event::print(FILE *, PRINT_EVENT_INFO *print_event_info) const {
       msg = "BINLOG_CONTROL";
       assert(0);
       break;
+    case WSREP_SESSION_FLAGS_EVENT:
+      msg = "WSREP_SESSION_FLAGS";
+      break;
 #endif
     case INVALID_INT_EVENT:
     default:  // cannot happen
@@ -6145,6 +6148,10 @@ int Intvar_log_event::do_apply_event(Relay_log_info const *rli) {
       if (val == 0) {
         thd->variables.option_bits &= ~(OPTION_BIN_LOG);
       }
+      break;
+    case WSREP_SESSION_FLAGS_EVENT:
+      thd->variables.sql_generate_invisible_primary_key =
+          (val & WSREP_SESSION_FLAG_GENERATE_INVISIBLE_PK) != 0;
       break;
 #endif /* WITH_WSREP */
   }
