@@ -124,10 +124,10 @@ Package: percona-xtradb-cluster-client-plugins
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Provides: mysql-client-plugins
-Breaks: percona-xtradb-cluster-client (<< 9.7.1),
-        percona-xtradb-cluster-server (<< 9.7.1)
-Replaces: percona-xtradb-cluster-client (<< 9.7.1),
-          percona-xtradb-cluster-server (<< 9.7.1)
+Breaks: percona-xtradb-cluster-client (<< 1:9.7.1-1),
+        percona-xtradb-cluster-server (<< 1:9.7.1-1)
+Replaces: percona-xtradb-cluster-client (<< 1:9.7.1-1),
+          percona-xtradb-cluster-server (<< 1:9.7.1-1)
 Description: Percona XtraDB Cluster - Client Plugins
  This package contains shared plugins for Percona XtraDB Cluster client
  applications, including authentication plugins for LDAP, Kerberos, WebAuthn,
@@ -138,8 +138,8 @@ Architecture: any
 Depends: percona-xtradb-cluster-client-plugins,
          ${shlibs:Depends}, ${misc:Depends}
 Provides: virtual-mysql-client-core
-Breaks: percona-xtradb-cluster-client (<< 9.7.1)
-Replaces: percona-xtradb-cluster-client (<< 9.7.1)
+Breaks: percona-xtradb-cluster-client (<< 1:9.7.1-1)
+Replaces: percona-xtradb-cluster-client (<< 1:9.7.1-1)
 Description: Percona XtraDB Cluster database core client binaries
  Percona XtraDB Cluster is based on the Percona Server database
  server and provides a High Availability solution.
@@ -216,10 +216,10 @@ Package: percona-xtradb-cluster-server-core
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Provides: virtual-mysql-server-core
-Breaks: percona-xtradb-cluster-server (<< 9.7.1),
-        percona-xtradb-cluster-server-debug (<< 9.7.1)
-Replaces: percona-xtradb-cluster-server (<< 9.7.1),
-          percona-xtradb-cluster-server-debug (<< 9.7.1),
+Breaks: percona-xtradb-cluster-server (<< 1:9.7.1-1),
+        percona-xtradb-cluster-server-debug (<< 1:9.7.1-1)
+Replaces: percona-xtradb-cluster-server (<< 1:9.7.1-1),
+          percona-xtradb-cluster-server-debug (<< 1:9.7.1-1),
           mysql-server-core-8.0,
           mysql-community-server-core
 Description: Percona XtraDB Cluster database core server binaries
