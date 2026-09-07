@@ -71,6 +71,7 @@
 #include "debug_sync.h"
 
 #include "sql/sql_backup_lock.h"
+#include "sql/sql_gipk.h"
 #include "wsrep_master_key_manager.h"
 static bool wsrep_init_master_key();
 static void wsrep_deinit_master_key();
@@ -2013,6 +2014,43 @@ int wsrep_to_buf_helper(THD *thd, const char *query, uint query_len,
         thd, (uchar)mysql::binlog::event::Intvar_event::BINLOG_CONTROL_EVENT,
         0);
     if (ev.write(&tmp_io_cache)) ret = 1;
+  }
+
+  /*
+    Replicate the originating session's effective
+    @@session.sql_generate_invisible_primary_key for those statements whose
+    outcome depends on it, so that every node produces the same table
+    definition.
+
+    Impact on ALTER TABLE / CREATE INDEX / DROP INDEX, an applier with the
+    GIPK ON rejects dropping a primary key and fails to apply the write set.
+    @refer check_primary_key_alter_restrictions()
+
+    Emitted ahead of wsrep_TOI_pre_query so that a table definition shipped
+    through that channel (CREATE TABLE ... LIKE <temporary table>) is also
+    created under the originator's GIPK setting.
+  */
+  if (!ret) {
+    switch (thd->lex->sql_command) {
+      case SQLCOM_CREATE_TABLE:
+      case SQLCOM_ALTER_TABLE:
+      case SQLCOM_CREATE_INDEX:
+      case SQLCOM_DROP_INDEX: {
+        using Intvar_event = mysql::binlog::event::Intvar_event;
+
+        ulonglong session_flags = 0;
+        if (is_generate_invisible_primary_key_mode_active(thd))
+          session_flags |=
+              Intvar_event::WSREP_SESSION_FLAG_GENERATE_INVISIBLE_PK;
+
+        Intvar_log_event ev(thd, (uchar)Intvar_event::WSREP_SESSION_FLAGS_EVENT,
+                            session_flags);
+        if (ev.write(&tmp_io_cache)) ret = 1;
+        break;
+      }
+      default:
+        break;
+    }
   }
 
   /* if there is prepare query, add event for it */
