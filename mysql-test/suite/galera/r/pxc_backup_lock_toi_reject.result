@@ -1,0 +1,33 @@
+#
+# 1. Create table t1 on node_1, wait for it on node_2.
+#
+CREATE TABLE t1 (id INT PRIMARY KEY, a INT, KEY k_a (a)) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1, 10), (2, 20), (3, 30);
+#
+# 2. LOCK TABLES FOR BACKUP, ALTER TABLE will fail,
+#    Assert transaction is not replicated.
+#
+LOCK TABLES FOR BACKUP;
+ALTER TABLE t1 DROP KEY k_a;
+ERROR HY000: Can't execute the query because you have a conflicting backup lock
+include/assert.inc [k_a index must still exist on node_1 (statement rejected locally)]
+include/assert.inc [k_a index must still exist on node_2 -- nothing was replicated]
+include/assert.inc [Cluster must still have both nodes (no inconsistency vote / node eviction)]
+UNLOCK TABLES;
+#
+# 3. After UNLOCK, the same ALTER TABLE succeeds and replicates normally.
+#
+ALTER TABLE t1 DROP KEY k_a;
+include/assert.inc [k_a index must be dropped on node_2 after UNLOCK TABLES]
+#
+# 4. LOCK INSTANCE FOR BACKUP with same-session DDL is replicated.
+#
+ALTER TABLE t1 ADD KEY k_a (a);
+LOCK INSTANCE FOR BACKUP;
+ALTER TABLE t1 DROP KEY k_a;
+UNLOCK INSTANCE;
+include/assert.inc [k_a index must be dropped on node_1 -- LOCK INSTANCE FOR BACKUP allows same-session DDL]
+#
+# 5. Cleanup.
+#
+DROP TABLE t1;
