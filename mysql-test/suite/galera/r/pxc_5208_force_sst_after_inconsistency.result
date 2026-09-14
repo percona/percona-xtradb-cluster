@@ -1,0 +1,6 @@
+DELETE FROM t1 WHERE f1 = 2;
+# Verify grastate.dat was removed on inconsistency shutdown
+# restart
+node_2 t1 after SST: 1:0,3:0,4:0,5:0,6:0,7:0,8:0
+node_1 t1 contents: 1:0,3:0,4:0,5:0,6:0,7:0,8:0
+datasets consistent: 1
