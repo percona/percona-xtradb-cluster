@@ -73,8 +73,9 @@
 #include "thr_lock.h"
 
 #ifdef WITH_WSREP
-#include "sql_parse.h"  // create_default_definer
-#endif                  /* WITH_WSREP */
+#include "sql/auth/sql_authorization.h"  // check_valid_definer
+#include "sql_parse.h"                   // create_default_definer
+#endif                                   /* WITH_WSREP */
 
 namespace dd {
 class Schema;
@@ -409,26 +410,21 @@ bool Sql_cmd_create_trigger::execute(THD *thd) {
   Security_context *sctx = thd->security_context();
 #ifdef WITH_WSREP
   LEX *lex = thd->lex;
-  bool definer_is_current_user =
-      !lex->definer || /* If definer is not specified, consider current user */
-      (strcmp(lex->definer->user.str, sctx->priv_user().str) == 0 &&
-       my_strcasecmp(system_charset_info, lex->definer->host.str,
-                     sctx->priv_host().str) == 0);
-  bool binlog_requires_super =
+
+  /*
+    check_valid_definer() is the authorization check introduced in WL#15874.
+  */
+  if (WSREP(thd) && lex->definer &&
+      check_valid_definer(thd, lex->definer,
+                          false /* report_no_such_user_warning */)) {
+    return true;
+  }
+
+  const bool binlog_requires_super =
       !trust_function_creators &&
       (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open());
-  bool has_super_or_set_user_id =
-      sctx->check_access(SUPER_ACL) ||
-      sctx->has_global_grant(STRING_WITH_LEN("SET_ANY_DEFINER")).first;
-
-  // Definer check: If a definer is specified and is different from the current
-  // user, then we need to check for SUPER or SET_ANY_DEFINER privileges.
-  if ((!definer_is_current_user || binlog_requires_super) &&
-      !has_super_or_set_user_id) {
-    if (!definer_is_current_user) {
-      my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0),
-               "SUPER or SET_ANY_DEFINER");
-    } else if (WSREP(thd)) {
+  if (binlog_requires_super && !sctx->check_access(SUPER_ACL)) {
+    if (WSREP(thd)) {
       /*
         If WSREP is enabled, then we are ALWAYS doing binlog
         replication of some sort, and we always require the SUPER
@@ -444,10 +440,6 @@ bool Sql_cmd_create_trigger::execute(THD *thd) {
     }
     return true;
   }
-
-  if (lex->definer && sctx->can_operate_with(lex->definer, consts::system_user,
-                                             true /* report_error */))
-    return true;
 
 #else
   if (!trust_function_creators && mysql_bin_log.is_open() &&
