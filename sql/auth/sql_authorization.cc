@@ -3255,9 +3255,8 @@ bool mysql_revoke_role(THD *thd, const List<LEX_USER> *users,
         roles_it.rewind();
         while (LEX_USER *role = roles_it++) {
           for (const auto &r : p.second) {
-            const char *name = r.first.c_str();
             Role_id id(role->user.str, "");
-            Role_id id2(name, "");
+            Role_id id2(r.c_str(), "");
             if (id == id2) {
               my_error(ER_DYNAMIC_ROLE, MYF(0), role->user.str);
               commit_and_close_mysql_tables(thd);
@@ -5752,7 +5751,7 @@ bool acl_check_proxy_grant_access(THD *thd, const char *host, const char *user,
              ("user=%s host=%s with_grant=%d", user, host, (int)with_grant));
   assert(initialized);
   /* replication slave thread can do anything */
-#if WITH_WSREP
+#ifdef WITH_WSREP
   if (thd->slave_thread || thd->wsrep_applier) {
 #else
   if (thd->slave_thread) {
@@ -7803,7 +7802,12 @@ bool check_system_user_privilege(THD *thd, List<LEX_USER> list) {
   return (false);
 }
 
+#ifdef WITH_WSREP
+bool check_valid_definer(THD *thd, LEX_USER *definer,
+                         bool report_no_such_user_warning) {
+#else
 bool check_valid_definer(THD *thd, LEX_USER *definer) {
+#endif
   DBUG_TRACE;
   Security_context *sctx = thd->security_context();
   if ((strcmp(definer->user.str, sctx->priv_user().str) ||
@@ -7829,6 +7833,9 @@ bool check_valid_definer(THD *thd, LEX_USER *definer) {
                "SUPER or ALLOW_NONEXISTENT_DEFINER");
       return true;
     } else
+#ifdef WITH_WSREP
+        if (report_no_such_user_warning)
+#endif
       push_warning_printf(thd, Sql_condition::SL_NOTE, ER_NO_SUCH_USER,
                           ER_THD(thd, ER_NO_SUCH_USER), definer->user.str,
                           definer->host.str);

@@ -300,6 +300,7 @@ SET(SERVER_TESTS
   xid_extract
   log_event_status_size
   md5
+  wsrep_xid
 )
 # Hangs forever.
 IF(LINUX_ARM AND CMAKE_BUILD_TYPE_UPPER STREQUAL "RELWITHDEBINFO")

@@ -2,8 +2,9 @@ CREATE TABLE t1 (c1 INTEGER AUTO_INCREMENT PRIMARY KEY, c2 INTEGER);
 SET lc_messages = 'fr_FR';
 ALTER TABLE t1 MODIFY c2 BIGINT UNSIGNED NOT NULL AUTO_INCREMENT ;
 ERROR 42000: Un seul champ automatique est permis et il doit être indexé
-include/assert_grep.inc [Verify that node1 logs the message in the language set above]
-include/assert_grep.inc [Verify that node2 logs the message in the default language]
+include/assert_grep.inc [Verify that both nodes vote on the same error code]
+include/assert_grep.inc [Verify vote buffer carries no French message text]
+include/assert_grep.inc [Verify vote buffer carries no English message text]
 ALTER TABLE t1 MODIFY c2 BIGINT UNSIGNED NOT NULL;
 INSERT INTO t1 (c2) VALUES (123123), (234234);
 SELECT * FROM t1;

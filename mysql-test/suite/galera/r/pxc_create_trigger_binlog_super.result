@@ -1,0 +1,83 @@
+
+# 1. Setup users.
+
+SET @old_trust = @@GLOBAL.log_bin_trust_function_creators;
+Warnings:
+Warning	1287	'@@log_bin_trust_function_creators' is deprecated and will be removed in a future release.
+SET GLOBAL log_bin_trust_function_creators = 0;
+CREATE DATABASE probe;
+CREATE USER 'any_def'@'%' IDENTIFIED BY '';
+GRANT ALL PRIVILEGES ON probe.* TO 'any_def'@'%';
+GRANT SET_ANY_DEFINER ON *.* TO 'any_def'@'%';
+CREATE USER 'plain'@'%' IDENTIFIED BY '';
+GRANT ALL PRIVILEGES ON probe.* TO 'plain'@'%';
+CREATE USER 'sup'@'%' IDENTIFIED BY '';
+GRANT ALL PRIVILEGES ON probe.* TO 'sup'@'%';
+GRANT SUPER ON *.* TO 'sup'@'%';
+Warnings:
+Warning	1287	The SUPER privilege identifier is deprecated
+CREATE USER 'other'@'%' IDENTIFIED BY '';
+CREATE TABLE t (id BIGINT NOT NULL PRIMARY KEY);
+
+# 2. log_bin_trust_function_creators = 0
+
+# 2a. SET_ANY_DEFINER only
+CREATE TRIGGER t_any_definer_no_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
+ERROR HY000: You do not have the SUPER privilege (you *might* want to use the less safe log_bin_trust_function_creators variable)
+CREATE DEFINER = 'other'@'%' TRIGGER t_any_definer_definer_no_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
+ERROR HY000: You do not have the SUPER privilege (you *might* want to use the less safe log_bin_trust_function_creators variable)
+# 2b. Plain user (no SUPER, no SET_ANY_DEFINER)
+CREATE TRIGGER t_plain_no_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
+ERROR HY000: You do not have the SUPER privilege (you *might* want to use the less safe log_bin_trust_function_creators variable)
+CREATE DEFINER = 'other'@'%' TRIGGER t_plain_definer_no_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
+ERROR 42000: Access denied; you need (at least one of) the SUPER or SET_ANY_DEFINER privilege(s) for this operation
+# 2c. SUPER only
+CREATE TRIGGER t_super_no_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
+CREATE DEFINER = 'other'@'%' TRIGGER t_super_definer_no_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
+include/assert.inc ['Trigger t_any_definer_no_trust not created on node_1 (SET_ANY_DEFINER, trust = 0)']
+include/assert.inc ['Trigger t_any_definer_definer_no_trust not created on node_1 (SET_ANY_DEFINER, DEFINER, trust = 0)']
+include/assert.inc ['Trigger t_plain_no_trust not created on node_1 (PLAIN, trust = 0)']
+include/assert.inc ['Trigger t_plain_definer_no_trust not created on node_1 (PLAIN, DEFINER, trust = 0)']
+include/assert.inc ['Trigger t_super_no_trust created on node_1 (SUPER, trust = 0)']
+include/assert.inc ['Trigger t_super_definer_no_trust created on node_1 (SUPER, DEFINER, trust = 0)']
+'Trigger t_sup t_super_no_trust to node_2 (SUPER, trust = 0)'
+'Trigger t_super_definer_no_trust replicated to node_2 (SUPER, DEFINER, trust = 0)'
+include/assert.inc ['Trigger t_any_definer_no_trust not created on node_2 (SET_ANY_DEFINER, trust = 0)']
+include/assert.inc ['Trigger t_any_definer_definer_no_trust not created on node_2 (SET_ANY_DEFINER, DEFINER, trust = 0)']
+include/assert.inc ['Trigger t_plain_no_trust not created on node_2 (PLAIN, trust = 0)']
+include/assert.inc ['Trigger t_plain_definer_no_trust not created on node_2 (PLAIN, DEFINER, trust = 0)']
+
+# 3. log_bin_trust_function_creators = 1
+
+SET GLOBAL log_bin_trust_function_creators = 1;
+# 3a. SET_ANY_DEFINER only
+CREATE TRIGGER t_any_definer_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
+CREATE DEFINER = 'other'@'%' TRIGGER t_any_definer_definer_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
+# 3b. Plain user (no SUPER, no SET_ANY_DEFINER)
+CREATE TRIGGER t_plain_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
+CREATE DEFINER = 'other'@'%' TRIGGER t_plain_definer_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
+ERROR 42000: Access denied; you need (at least one of) the SUPER or SET_ANY_DEFINER privilege(s) for this operation
+# 3c. SUPER only
+CREATE TRIGGER t_super_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
+CREATE DEFINER = 'other'@'%' TRIGGER t_super_definer_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
+include/assert.inc ['Trigger t_any_definer_trust created on node_1 (SET_ANY_DEFINER, trust = 1)']
+include/assert.inc ['Trigger t_any_definer_definer_trust created on node_1 (SET_ANY_DEFINER, DEFINER, trust = 1)']
+include/assert.inc ['Trigger t_plain_trust created on node_1 (PLAIN, trust = 1)']
+include/assert.inc ['Trigger t_plain_definer_trust not created on node_1 (PLAIN, DEFINER, trust = 1)']
+include/assert.inc ['Trigger t_super_trust created on node_1 (SUPER, trust = 1)']
+include/assert.inc ['Trigger t_super_definer_trust created on node_1 (SUPER, DEFINER, trust = 1)']
+'Trigger t_any_definer_trust replicated to node_2 (SET_ANY_DEFINER, trust = 1)'
+'Trigger t_any_definer_definer_trust replicated to node_2 (SET_ANY_DEFINER, DEFINER, trust = 1)'
+'Trigger t_super_trust replicated to node_2 (SUPER, trust = 1)'
+'Trigger t_super_definer_trust replicated to node_2 (SUPER, DEFINER, trust = 1)'
+'Trigger t_plain_trust replicated to node_2 (PLAIN, trust = 1)'
+include/assert.inc ['Trigger t_plain_definer_trust not replicated on node_2 (PLAIN, DEFINER, trust = 1)']
+
+# 4. Cleanup.
+
+DROP DATABASE probe;
+DROP USER 'any_def'@'%';
+DROP USER 'plain'@'%';
+DROP USER 'sup'@'%';
+DROP USER 'other'@'%';
+SET GLOBAL log_bin_trust_function_creators = @old_trust;

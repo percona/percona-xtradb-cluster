@@ -106,8 +106,36 @@ ulong wsrep_max_ws_rows = 65536;             // max number of rows in ws
 int wsrep_to_isolation = 0;                  // # of active TO isolation threads
 bool wsrep_certify_nonPK = 1;  // certify, even when no primary key
 ulong wsrep_certification_rules = WSREP_CERTIFICATION_RULES_STRICT;
+/*
+  Protocol version history (Galera compatibility):
+  0 - Legacy certification key format. Table/key data is treated as a
+      single older-style key.
+  1 - Split key format: db/table/key parts are encoded separately.
+  2 - Improved certification key encoding for FK / variable-length / blob
+      related keys; current code uses "> 1" gates for this.
+  3 - String key normalization keeps the full transformed sort string
+      instead of truncating it.
+  4 - UPDATE rows use WSREP_SERVICE_KEY_UPDATE instead of exclusive keys;
+      group GTID is used directly (no Sid-map re-generation).
+  5 - Non-binary string certification keys trim trailing pad characters
+      and null bytes.
+  6 - SST/start-position metadata includes server_uuid. V6 donor
+      emits "UUID:seqno/local_seqno/server_id/server_uuid" instead of
+      the old space-separated format. PXC does not implement this on the
+      donor side and ignores the extra fields on the joiner side — see
+      the comment on sst_scan_uuid_seqno() in wsrep_sst.cc.
+  7 - TOI/NBO inconsistency voting uses error-code-only format
+      (" Error_code: NNNN;") instead of the full locale-dependent
+      message text, making votes deterministic across locales.
+      Non-TOI (DML applier, replay) error buffers keep the full
+      message text, following the same scope as Codership's V7.
+      PXC's Galera library additionally recomputes votes by extracting
+      and sorting error-code numbers (recompute_vote_based_on_error_code),
+      which keeps working because the code-only format still contains
+      the error numbers it parses.
+*/
 static constexpr WsrepVersion wsrep_max_protocol_version =
-    WsrepVersion::V4;  // maximum protocol version to use
+    WsrepVersion::V7;  // maximum protocol version to use
 WsrepVersion wsrep_protocol_version = wsrep_max_protocol_version;
 ulong wsrep_trx_fragment_unit = WSREP_FRAG_BYTES;
 // unit for fragment size
@@ -1570,7 +1598,10 @@ static bool wsrep_prepare_key_for_isolation(const char *db, const char *table,
     case WsrepVersion::V1:
     case WsrepVersion::V2:
     case WsrepVersion::V3:
-    case WsrepVersion::V4: {
+    case WsrepVersion::V4:
+    case WsrepVersion::V5:
+    case WsrepVersion::V6:
+    case WsrepVersion::V7: {
       *key_len = 0;
       if (db) {
         key[*key_len].ptr = db;
@@ -1710,7 +1741,10 @@ bool wsrep_prepare_key_for_innodb(const uchar *cache_key, size_t cache_key_len,
     case WsrepVersion::V1:
     case WsrepVersion::V2:
     case WsrepVersion::V3:
-    case WsrepVersion::V4: {
+    case WsrepVersion::V4:
+    case WsrepVersion::V5:
+    case WsrepVersion::V6:
+    case WsrepVersion::V7: {
       key[0].ptr = cache_key;
       key[0].len =
           strlen(reinterpret_cast<char *>(const_cast<uchar *>(cache_key)));
@@ -2604,7 +2638,7 @@ static void wsrep_TOI_end(THD *thd) {
     wsrep_set_SE_checkpoint(client_state.toi_meta().gtid());
     wsrep::mutable_buffer err;
     if (thd->is_error() && !wsrep_must_ignore_error(thd)) {
-      wsrep_store_error(thd, err);
+      wsrep_store_error(thd, err, wsrep_protocol_version < WsrepVersion::V7);
     }
     int const ret = client_state.leave_toi_local(err);
 
@@ -2860,7 +2894,7 @@ static void wsrep_NBO_end_phase_two(THD *thd) {
 
     wsrep::mutable_buffer err;
     if (thd->is_error() && !wsrep_must_ignore_error(thd)) {
-      wsrep_store_error(thd, err);
+      wsrep_store_error(thd, err, wsrep_protocol_version < WsrepVersion::V7);
     }
     int ret = client_state.end_nbo_phase_two(err);
 

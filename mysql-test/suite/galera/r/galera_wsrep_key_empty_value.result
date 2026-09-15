@@ -1,0 +1,74 @@
+#
+# Case 1: VARCHAR PK, empty value, multi-byte charset
+# (my_strnxfrm_unicode, nweights == 0 -> ret_length == 0)
+#
+CREATE TABLE t1 (a VARCHAR(10) PRIMARY KEY, b INT) CHARSET utf8mb4 ENGINE=InnoDB;
+INSERT INTO t1 VALUES ('', 1);
+UPDATE t1 SET b = 2 WHERE a = '';
+SELECT LENGTH(a) AS len_a, b FROM t1;
+len_a	b
+0	2
+DELETE FROM t1 WHERE a = '';
+SELECT COUNT(*) AS cnt FROM t1;
+cnt
+0
+DROP TABLE t1;
+#
+# Case 2: VARCHAR PK, empty value, single-byte charset
+# (my_strnxfrm_simple, a different code path to ret_length == 0)
+#
+CREATE TABLE t2 (a VARCHAR(10) PRIMARY KEY, b INT) CHARSET latin1 ENGINE=InnoDB;
+INSERT INTO t2 VALUES ('', 1);
+SELECT LENGTH(a) AS len_a, b FROM t2;
+len_a	b
+0	1
+DROP TABLE t2;
+#
+# Case 3: VARCHAR PK, all-pad value under a PAD SPACE collation
+# (the trim loop itself consumes every byte of the collated key)
+#
+CREATE TABLE t3 (a VARCHAR(10) PRIMARY KEY, b INT) CHARSET latin1 ENGINE=InnoDB;
+INSERT INTO t3 VALUES ('   ', 1);
+SELECT HEX(a) AS hex_a, b FROM t3;
+hex_a	b
+202020	1
+DROP TABLE t3;
+#
+# Case 4: CHAR PK, empty value
+# (MYSQL_TYPE_STRING branch; the record holds n pad characters)
+#
+CREATE TABLE t4 (a CHAR(4) PRIMARY KEY, b INT) CHARSET latin1 ENGINE=InnoDB;
+INSERT INTO t4 VALUES ('', 1);
+SELECT LENGTH(a) AS len_a, b FROM t4;
+len_a	b
+0	1
+DROP TABLE t4;
+#
+# Case 5: TEXT prefix PK, empty value
+# (BLOB branch of wsrep_store_key_val_for_row)
+#
+CREATE TABLE t5 (a TEXT NOT NULL, b INT, PRIMARY KEY (a(10))) CHARSET utf8mb4 ENGINE=InnoDB;
+INSERT INTO t5 VALUES ('', 1);
+SELECT LENGTH(a) AS len_a, b FROM t5;
+len_a	b
+0	1
+DROP TABLE t5;
+#
+# Case 6: multi-part PK with a zero-length part, written from both
+# nodes so key generation runs on each of them
+#
+CREATE TABLE t6 (a VARCHAR(10), b VARCHAR(10), c INT, PRIMARY KEY (a,b)) CHARSET latin1 ENGINE=InnoDB;
+INSERT INTO t6 VALUES ('', 'x', 1);
+INSERT INTO t6 VALUES ('x', '', 2);
+INSERT INTO t6 VALUES ('', '', 3);
+SELECT LENGTH(a) AS len_a, LENGTH(b) AS len_b, c FROM t6 ORDER BY c;
+len_a	len_b	c
+0	1	1
+1	0	2
+0	0	3
+SELECT LENGTH(a) AS len_a, LENGTH(b) AS len_b, c FROM t6 ORDER BY c;
+len_a	len_b	c
+0	1	1
+1	0	2
+0	0	3
+DROP TABLE t6;

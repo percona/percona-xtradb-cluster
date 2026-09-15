@@ -3,7 +3,7 @@ CREATE TABLE child (j INT PRIMARY KEY) ENGINE = InnoDB;
 INSERT INTO child VALUES (10);
 ALTER TABLE child ADD CONSTRAINT idx17 FOREIGN KEY (j) REFERENCES parent(i);
 ERROR 23000: Cannot add or update a child row: a foreign key constraint fails (`temp_table`, CONSTRAINT `idx17` FOREIGN KEY (`j`) REFERENCES `parent` (`i`))
-include/assert_grep.inc [Verify that the intermediate temporary table name has been replaced with temp_table]
+include/assert_grep.inc [Verify that both nodes vote on the same error code]
 SET SESSION wsrep_on=OFF;
 ALTER TABLE child ADD CONSTRAINT idx17 FOREIGN KEY (j) REFERENCES parent(i), ALGORITHM=COPY;
 ERROR 23000: Cannot add or update a child row: a foreign key constraint fails (`test`.`#sql-XXXXX

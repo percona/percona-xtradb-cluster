@@ -1,0 +1,94 @@
+#
+# PXC-5208: repl.force_sst_after_inconsistency defaults to NO.
+#
+# The default must preserve the historical behaviour: a node evicted for an
+# inconsistency keeps its grastate.dat so the state can be investigated, and
+# the operator decides whether to remove it.
+#
+# galera.pxc_5208_force_sst_after_inconsistency covers the opt-in behaviour.
+#
+
+--source include/galera_cluster.inc
+
+--connection node_2
+--let $force_sst_default = `SELECT @@wsrep_provider_options LIKE '%repl.force_sst_after_inconsistency = no%'`
+--echo repl.force_sst_after_inconsistency defaults to no: $force_sst_default
+
+if ($force_sst_default != 1) {
+    --die repl.force_sst_after_inconsistency must default to no
+}
+
+--connection node_1
+--disable_query_log
+# pc.weight=2 lets node_1 maintain quorum alone after node_2 leaves (2-node cluster).
+SET GLOBAL wsrep_provider_options = 'pc.weight=2';
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 INT);
+INSERT INTO t1 VALUES (1, 0),(2, 0),(3, 0),(4, 0),(5, 0),(6, 0),(7, 0),(8, 0);
+--enable_query_log
+
+--file_exists $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
+
+#
+# Same inconsistency as the opt-in test, but with the option left at its
+# default. Wait for the INSERT to reach node_2 before deleting locally.
+#
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 8 FROM t1
+--source include/wait_condition.inc
+
+--disable_query_log
+SET wsrep_on = OFF;
+DELETE FROM t1 WHERE f1 = 2;
+SET wsrep_on = ON;
+--enable_query_log
+
+--connection node_1
+DELETE FROM t1 WHERE f1 = 2;
+
+--let $wait_timeout = 60
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+--connection node_2
+--disable_query_log
+# node_2 is no longer in a primary component, so it refuses ordinary reads.
+SET SESSION wsrep_on = OFF;
+
+--let $wait_condition = SELECT COUNT(*) >= 1 FROM performance_schema.error_log WHERE data LIKE '%Inconsistency detected:%'
+--source include/wait_condition.inc
+--enable_query_log
+
+--source include/shutdown_mysqld.inc
+
+--echo # With the option at its default the state file is kept for investigation
+--file_exists $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
+
+#
+# Emulate the documented manual workaround so node_2 can rejoin through SST
+# and the cluster is healthy again for cleanup.
+#
+--remove_file $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
+--source include/start_mysqld.inc
+--source include/galera_wait_ready.inc
+
+--connection node_1
+--let $node_1_data = `SELECT GROUP_CONCAT(f1, ':', f2 ORDER BY f1) FROM t1`
+--connection node_2
+--let $node_2_data = `SELECT GROUP_CONCAT(f1, ':', f2 ORDER BY f1) FROM t1`
+
+if ($node_1_data != $node_2_data) {
+    --die node_2 dataset is not consistent with node_1 after SST
+}
+--echo datasets consistent: 1
+
+# Cleanup
+--disable_query_log
+--connection node_1
+SET GLOBAL wsrep_provider_options = 'pc.weight=1';
+DROP TABLE t1;
+--connection node_2
+CALL mtr.add_suppression("Could not execute Delete_rows event on table test.t1.*Error_code: 1032");
+CALL mtr.add_suppression("Delete_rows apply failed:");
+CALL mtr.add_suppression("Inconsistency detected: Inconsistent by consensus on");
+CALL mtr.add_suppression("Failed to apply write set: ");
+--enable_query_log
