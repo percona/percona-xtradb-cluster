@@ -1,0 +1,91 @@
+#
+# PXC-5140: an asynchronous replica attached to a cluster node must stay in
+#           sync, whichever node originated the DDL.
+#
+# node_1 and node_2 form the cluster (node_1 has
+# sql_generate_invisible_primary_key=ON, node_2 has it OFF); node_3 is a plain
+# asynchronous replica of node_2, i.e. of the *applier* node.
+#
+# This covers the replication-compatibility side of the fix:
+#  - a table created on node_1 with GIPK ON must reach node_3 with my_row_id;
+#  - the session variable the cluster injects into the node_2 applier must not
+#    leak into node_2's binary log, so a later PK-less table created directly on
+#    node_2 (GIPK OFF) must reach node_3 without my_row_id.
+#
+
+--source include/have_log_bin.inc
+--source include/galera_cluster.inc
+
+--connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
+--disable_query_log
+--eval CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1', SOURCE_PORT=$NODE_MYPORT_2;
+--enable_query_log
+START REPLICA USER='root';
+
+--echo #
+--echo # DDL originating on node_1 (GIPK ON)
+--echo #
+--connection node_1
+CREATE TABLE t1 (id INT NOT NULL, c VARCHAR(100)) ENGINE=InnoDB;
+SHOW CREATE TABLE t1;
+
+--echo # --- node_2 (cluster applier, GIPK OFF) ---
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'test' AND TABLE_NAME = 't1'
+--source include/wait_condition.inc
+SHOW CREATE TABLE t1;
+
+--echo # --- node_3 (async replica of node_2) ---
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'test' AND TABLE_NAME = 't1'
+--source include/wait_condition.inc
+SHOW CREATE TABLE t1;
+
+--echo #
+--echo # DDL originating on node_2 (GIPK OFF) - no leak into the async replica
+--echo #
+--connection node_2
+CREATE TABLE t2 (id INT NOT NULL, c VARCHAR(100)) ENGINE=InnoDB;
+SHOW CREATE TABLE t2;
+
+--echo # --- node_3 (async replica of node_2) ---
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'test' AND TABLE_NAME = 't2'
+--source include/wait_condition.inc
+SHOW CREATE TABLE t2;
+
+--echo #
+--echo # Direct evidence for the async-replication side: node_2's binary log must
+--echo # NOT contain the session-variable SET the cluster injects (a plain SET is
+--echo # not binlogged), and MUST contain the applied CREATE TABLE in expanded
+--echo # form, so any downstream replica is self-describing.
+--echo #
+--connection node_2
+# @@log_bin_basename rather than @@datadir + file name: log-bin may be an
+# absolute path outside the data directory.
+# NOTE for an 8.0 backport: SHOW BINARY LOG STATUS is 8.4+; 8.0 needs
+# SHOW MASTER STATUS.
+--let $node2_binlog_base = `SELECT @@log_bin_basename`
+--let $node2_binlog = query_get_value(SHOW BINARY LOG STATUS, File, 1)
+--let $node2_binlog_ext = `SELECT SUBSTRING_INDEX('$node2_binlog', '.', -1)`
+--exec $MYSQL_BINLOG --force-if-open $node2_binlog_base.$node2_binlog_ext > $MYSQLTEST_VARDIR/tmp/pxc5140_node2_binlog.sql
+
+--let SEARCH_FILE = $MYSQLTEST_VARDIR/tmp/pxc5140_node2_binlog.sql
+--let PRINT_SEARCH_RESULT = 1
+
+--let SEARCH_PATTERN = sql_generate_invisible_primary_key
+--source include/search_pattern_in_file.inc
+
+--let SEARCH_PATTERN = my_row_id
+--source include/search_pattern_in_file.inc
+
+--remove_file $MYSQLTEST_VARDIR/tmp/pxc5140_node2_binlog.sql
+
+--connection node_1
+DROP TABLE t1, t2;
+
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'test' AND TABLE_NAME IN ('t1','t2')
+--source include/wait_condition.inc
+STOP REPLICA;
+RESET REPLICA ALL;

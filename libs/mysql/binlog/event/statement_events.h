@@ -972,9 +972,24 @@ class Intvar_event : public Binary_log_event {
     INSERT_ID_EVENT
 #ifdef WITH_WSREP
     ,
-    BINLOG_CONTROL_EVENT
+    BINLOG_CONTROL_EVENT,
+    /**
+      We prefer Intvar to inform other nodes for GIPK value rather than a
+      "SET ..." statement because an applier must not execute an extra
+      statement, that would take part in GTID ownership and would trigger
+      the end-of-statement NBO phase-two hook.
+      @refer galera.galera_as_slave_gtid
+    */
+    WSREP_SESSION_FLAGS_EVENT
 #endif
   };
+
+#ifdef WITH_WSREP
+  enum Wsrep_session_flag {
+    /** @@session.sql_generate_invisible_primary_key was in effect. */
+    WSREP_SESSION_FLAG_GENERATE_INVISIBLE_PK = 1ULL << 0
+  };
+#endif
 
   /**
     moving from pre processor symbols from global scope in log_event.h
@@ -999,6 +1014,8 @@ class Intvar_event : public Binary_log_event {
 #ifdef WITH_WSREP
       case BINLOG_CONTROL_EVENT:
         return "BINLOG_CONTROL";
+      case WSREP_SESSION_FLAGS_EVENT:
+        return "WSREP_SESSION_FLAGS";
 #endif
       default: /* impossible */
         return "UNKNOWN";

@@ -15,6 +15,7 @@
 
 #include "wsrep_high_priority_service.h"
 #include "mysql/components/services/log_builtins.h"
+#include "sql/mysqld.h"              // global_system_variables
 #include "sql/mysqld_thd_manager.h"  // Global_THD_manager
 #include "sql/protocol_classic.h"
 #include "sql/rpl_info_factory.h"
@@ -85,6 +86,27 @@ static Relay_log_info *wsrep_relay_log_init(const char *) {
   rli->set_rli_description_event(ev);
 
   rli->current_mts_submode = new Mts_submode_wsrep();
+
+  /*
+    Initialise deferred-event collection in the common relay-log setup path.
+    1. Relay_log_info does not initialise deferred_events_collecting, but
+    2. the Intvar, Rand, and User_var event apply paths inspect it before
+    accessing deferred_events (Intvar_log_event::do_apply_even)
+    3. This cannot be left to Wsrep_high_priority_service because NBO workers
+    call wsrep_relay_log_init() directly.
+    An indeterminate true value would therefore make an NBO worker dereference
+    an uninitialised deferred_events pointer when applying an event such as
+    BINLOG_CONTROL.
+    Set the flag from the replication filter and allocate the corresponding
+    event container for every caller.
+
+    @refer handle_slave_worker and Wsrep_high_priority_service and
+    galera_nbo_binlog_control_intvar
+  */
+  if ((rli->deferred_events_collecting = rli->rpl_filter->is_on()) &&
+      rli->deferred_events == nullptr)
+    rli->deferred_events = new Deferred_log_events();
+
   return (rli);
 }
 
@@ -100,6 +122,11 @@ static void wsrep_setup_uk_and_fk_checks(THD *thd) {
     thd->variables.option_bits |= OPTION_NO_FOREIGN_KEY_CHECKS;
   else
     thd->variables.option_bits &= ~OPTION_NO_FOREIGN_KEY_CHECKS;
+}
+
+static void wsrep_setup_applier_session_vars(THD *thd) {
+  thd->variables.sql_generate_invisible_primary_key =
+      global_system_variables.sql_generate_invisible_primary_key;
 }
 
 /****************************************************************************
@@ -156,8 +183,10 @@ Wsrep_high_priority_service::Wsrep_high_priority_service(THD *thd)
 
     thd->init_query_mem_roots();
 
+    // Likely dead code, init moved to wsrep_relay_log_init
     if ((thd->wsrep_rli->deferred_events_collecting =
-             thd->wsrep_rli->rpl_filter->is_on()))
+             thd->wsrep_rli->rpl_filter->is_on()) &&
+        thd->wsrep_rli->deferred_events == nullptr)
       thd->wsrep_rli->deferred_events = new Deferred_log_events();
 
     assert(thd->rli_slave->info_thd == thd);
@@ -466,6 +495,8 @@ int Wsrep_high_priority_service::apply_toi(const wsrep::ws_meta &ws_meta,
   WSREP_DEBUG("Wsrep_high_priority_service::apply_toi: %lld",
               client_state.toi_meta().seqno().get());
 
+  wsrep_setup_applier_session_vars(thd);
+
   /* DDL are atomic so flow (in wsrep_apply_events) will assign XID.
   Avoid over-writting of this XID by MySQL XID */
   thd->get_transaction()->xid_state()->get_xid()->set_keep_wsrep_xid(true);
@@ -672,6 +703,8 @@ int Wsrep_applier_service::apply_write_set(const wsrep::ws_meta &ws_meta,
   };);
 
   wsrep_setup_uk_and_fk_checks(thd);
+  // A DML write set cannot create a table. But re-init GIPK anyway.
+  wsrep_setup_applier_session_vars(thd);
 
   int ret = apply_events(thd, m_rli, data, err);
 
@@ -762,6 +795,7 @@ int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
       replayer_thd->variables.option_bits &= ~(OPTION_BIN_LOG);
       replayer_thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
     }
+    wsrep_setup_applier_session_vars(replayer_thd);
 
     // Mark it as a system thread so it shows up in show processlist for wait
     // condition

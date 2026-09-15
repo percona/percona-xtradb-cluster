@@ -6107,6 +6107,9 @@ void Intvar_log_event::print(FILE *, PRINT_EVENT_INFO *print_event_info) const {
       msg = "BINLOG_CONTROL";
       assert(0);
       break;
+    case WSREP_SESSION_FLAGS_EVENT:
+      msg = "WSREP_SESSION_FLAGS";
+      break;
 #endif
     case INVALID_INT_EVENT:
     default:  // cannot happen
@@ -6130,6 +6133,14 @@ int Intvar_log_event::do_apply_event(Relay_log_info const *rli) {
     been processed.
    */
   const_cast<Relay_log_info *>(rli)->set_flag(Relay_log_info::IN_STMT);
+
+#ifdef WITH_WSREP
+  if (type == WSREP_SESSION_FLAGS_EVENT) {
+    thd->variables.sql_generate_invisible_primary_key =
+        (val & WSREP_SESSION_FLAG_GENERATE_INVISIBLE_PK) != 0;
+    return 0;
+  }
+#endif /* WITH_WSREP */
 
   if (rli->deferred_events_collecting) return rli->deferred_events->add(this);
 
