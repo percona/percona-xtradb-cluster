@@ -74,6 +74,19 @@ extern mysql_mutex_t LOCK_mandatory_roles;
   @retval false : success
   @retval true : failure
 */
+
+#ifdef WITH_WSREP
+/**
+  PXC-only overload.
+
+  @param report_no_such_user_warning if true, the informational
+         ER_NO_SUCH_USER note is raised for a non-existent definer; if false,
+         it is not.
+*/
+extern bool check_valid_definer(THD *thd, LEX_USER *definer,
+                                bool report_no_such_user_warning = true);
+#else
 extern bool check_valid_definer(THD *thd, LEX_USER *definer);
+#endif
 
 #endif /* SQL_AUTHORIZATION_INCLUDED */
