@@ -1,0 +1,116 @@
+#
+# Regression test for a stack-buffer-overflow (1-byte underflow READ)
+# in wsrep_innobase_mysql_sort() when a Galera-replicated write generates a
+# key value that collates to zero length.  The peek preceding the pad-trim
+# loop in the WsrepVersion::V5 branch used to read str[ret_length - 1]
+# without checking ret_length > 0; strnxfrm returns 0 for an empty non-binary
+# input, so the read was one byte before the caller's stack buffer and
+# tripped ASan.
+#
+# The fix guards the peek with `ret_length > 0`; the existing for-loop was
+# already bounded correctly.  This test exercises the six shapes that reach
+# the three wsrep_innobase_mysql_sort() call sites in
+# wsrep_store_key_val_for_row() with an empty key value.  Under a plain
+# build every case is a semantic round-trip; under an ASan build the pre-fix
+# tree crashes before the DROP.
+#
+
+--source include/galera_cluster.inc
+
+--echo #
+--echo # Case 1: VARCHAR PK, empty value, multi-byte charset
+--echo # (my_strnxfrm_unicode, nweights == 0 -> ret_length == 0)
+--echo #
+--connection node_1
+CREATE TABLE t1 (a VARCHAR(10) PRIMARY KEY, b INT) CHARSET utf8mb4 ENGINE=InnoDB;
+INSERT INTO t1 VALUES ('', 1);
+UPDATE t1 SET b = 2 WHERE a = '';
+
+--connection node_2
+SELECT LENGTH(a) AS len_a, b FROM t1;
+
+--connection node_1
+DELETE FROM t1 WHERE a = '';
+
+--connection node_2
+SELECT COUNT(*) AS cnt FROM t1;
+
+--connection node_1
+DROP TABLE t1;
+
+--echo #
+--echo # Case 2: VARCHAR PK, empty value, single-byte charset
+--echo # (my_strnxfrm_simple, a different code path to ret_length == 0)
+--echo #
+--connection node_1
+CREATE TABLE t2 (a VARCHAR(10) PRIMARY KEY, b INT) CHARSET latin1 ENGINE=InnoDB;
+INSERT INTO t2 VALUES ('', 1);
+
+--connection node_2
+SELECT LENGTH(a) AS len_a, b FROM t2;
+
+--connection node_1
+DROP TABLE t2;
+
+--echo #
+--echo # Case 3: VARCHAR PK, all-pad value under a PAD SPACE collation
+--echo # (the trim loop itself consumes every byte of the collated key)
+--echo #
+--connection node_1
+CREATE TABLE t3 (a VARCHAR(10) PRIMARY KEY, b INT) CHARSET latin1 ENGINE=InnoDB;
+INSERT INTO t3 VALUES ('   ', 1);
+
+--connection node_2
+SELECT HEX(a) AS hex_a, b FROM t3;
+
+--connection node_1
+DROP TABLE t3;
+
+--echo #
+--echo # Case 4: CHAR PK, empty value
+--echo # (MYSQL_TYPE_STRING branch; the record holds n pad characters)
+--echo #
+--connection node_1
+CREATE TABLE t4 (a CHAR(4) PRIMARY KEY, b INT) CHARSET latin1 ENGINE=InnoDB;
+INSERT INTO t4 VALUES ('', 1);
+
+--connection node_2
+SELECT LENGTH(a) AS len_a, b FROM t4;
+
+--connection node_1
+DROP TABLE t4;
+
+--echo #
+--echo # Case 5: TEXT prefix PK, empty value
+--echo # (BLOB branch of wsrep_store_key_val_for_row)
+--echo #
+--connection node_1
+CREATE TABLE t5 (a TEXT NOT NULL, b INT, PRIMARY KEY (a(10))) CHARSET utf8mb4 ENGINE=InnoDB;
+INSERT INTO t5 VALUES ('', 1);
+
+--connection node_2
+SELECT LENGTH(a) AS len_a, b FROM t5;
+
+--connection node_1
+DROP TABLE t5;
+
+--echo #
+--echo # Case 6: multi-part PK with a zero-length part, written from both
+--echo # nodes so key generation runs on each of them
+--echo #
+--connection node_1
+CREATE TABLE t6 (a VARCHAR(10), b VARCHAR(10), c INT, PRIMARY KEY (a,b)) CHARSET latin1 ENGINE=InnoDB;
+INSERT INTO t6 VALUES ('', 'x', 1);
+INSERT INTO t6 VALUES ('x', '', 2);
+
+--connection node_2
+INSERT INTO t6 VALUES ('', '', 3);
+
+--connection node_1
+SELECT LENGTH(a) AS len_a, LENGTH(b) AS len_b, c FROM t6 ORDER BY c;
+
+--connection node_2
+SELECT LENGTH(a) AS len_a, LENGTH(b) AS len_b, c FROM t6 ORDER BY c;
+
+--connection node_1
+DROP TABLE t6;
