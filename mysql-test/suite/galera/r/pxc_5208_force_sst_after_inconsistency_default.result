@@ -1,0 +1,5 @@
+repl.force_sst_after_inconsistency defaults to no: 1
+DELETE FROM t1 WHERE f1 = 2;
+# With the option at its default the state file is kept for investigation
+# restart
+datasets consistent: 1
