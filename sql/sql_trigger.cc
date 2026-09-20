@@ -409,17 +409,6 @@ bool Sql_cmd_create_trigger::execute(THD *thd) {
   */
   Security_context *sctx = thd->security_context();
 #ifdef WITH_WSREP
-  LEX *lex = thd->lex;
-
-  /*
-    check_valid_definer() is the authorization check introduced in WL#15874.
-  */
-  if (WSREP(thd) && lex->definer &&
-      check_valid_definer(thd, lex->definer,
-                          false /* report_no_such_user_warning */)) {
-    return true;
-  }
-
   const bool binlog_requires_super =
       !trust_function_creators &&
       (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open());
@@ -459,6 +448,16 @@ bool Sql_cmd_create_trigger::execute(THD *thd) {
 
 #ifdef WITH_WSREP
   if (WSREP(thd)) {
+    /*
+-    check_valid_definer() is the authorization check introduced in WL#15874.
+-  */
+    LEX *lex = thd->lex;
+    if (lex->definer &&
+        check_valid_definer(thd, lex->definer,
+                            false /* report_no_such_user_warning */)) {
+      return true;
+    }
+
     schema_mdl_locker.unlock();
     assert(!thd->mdl_context.has_locks());
     if (wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, m_trigger_table,
