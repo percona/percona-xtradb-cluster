@@ -435,6 +435,15 @@ bool run_bootstrap_thread(const char *file_name, MYSQL_FILE *file,
   */
   thd->variables.default_table_encryption = false;
 
+#ifdef WITH_WSREP
+  /*
+    Disable sql_require_primary_key for the server upgrade thread because its
+    internal upgrade script modifies system tables without primary keys.
+    Otherwise, PXC's default ENFORCING mode can abort the upgrade (PXC-5296).
+  */
+  if (thread_type == SYSTEM_THREAD_SERVER_UPGRADE)
+    thd->variables.sql_require_primary_key = false;
+#endif /* WITH_WSREP */
   my_thread_attr_t thr_attr;
   my_thread_attr_init(&thr_attr);
 #ifndef _WIN32
