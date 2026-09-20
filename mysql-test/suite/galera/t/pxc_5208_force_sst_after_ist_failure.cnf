@@ -1,0 +1,10 @@
+!include ../galera_2nodes.cnf
+
+[mysqld.2]
+#
+# repl.force_sst_after_inconsistency has to be set at startup here, not with
+# SET GLOBAL. This test restarts node_2, and the provider re-reads its options
+# from the configuration when it is initialised, so a runtime value would be
+# lost across exactly the restart whose behaviour we want to observe.
+#
+wsrep_provider_options='base_port=@mysqld.2.#galera_port;@ENV.WSREP_PROVIDER_TIMEOUTS;repl.force_sst_after_inconsistency=YES'
