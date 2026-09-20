@@ -7835,11 +7835,16 @@ bool check_valid_definer(THD *thd, LEX_USER *definer) {
       return true;
     } else
 #ifdef WITH_WSREP
-        if (report_no_such_user_warning)
-#endif
+        if (report_no_such_user_warning) {
       push_warning_printf(thd, Sql_condition::SL_NOTE, ER_NO_SUCH_USER,
                           ER_THD(thd, ER_NO_SUCH_USER), definer->user.str,
                           definer->host.str);
+    }
+#else
+      push_warning_printf(thd, Sql_condition::SL_NOTE, ER_NO_SUCH_USER,
+                          ER_THD(thd, ER_NO_SUCH_USER), definer->user.str,
+                          definer->host.str);
+#endif
   }
   return false;
 }
