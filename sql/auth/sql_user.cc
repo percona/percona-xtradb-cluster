@@ -3134,7 +3134,7 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
   /* check if CREATE user is allowed on this user list or not. */
   if (check_orphaned_definers(thd, list)) return true;
 
-#if WITH_WSREP
+#ifdef WITH_WSREP
   if (wsrep_check_system_user_privilege(thd, list)) {
     return true;
   }
@@ -3474,7 +3474,7 @@ bool mysql_drop_user(THD *thd, List<LEX_USER> &list, bool if_exists,
   /* check if DROP user is allowed on this user list or not. */
   if (check_orphaned_definers(thd, list)) return true;
 
-#if WITH_WSREP
+#ifdef WITH_WSREP
   if (wsrep_check_system_user_privilege(thd, list)) {
     return true;
   }
@@ -3878,7 +3878,7 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
   server_challenge_info_vector server_challenge;
   DBUG_TRACE;
 
-#if WITH_WSREP
+#ifdef WITH_WSREP
   if (wsrep_check_system_user_privilege(thd, list)) {
     return true;
   }
