@@ -6,6 +6,13 @@
 # status variables are provided. So we only check that simple replication works.
 #
 
+# Allocates 4 mysqld nodes plus an xtrabackup SST pipeline; running multiple
+# copies of this test concurrently with other galera tests over-subscribes the
+# host and causes EVS to declare peers inactive mid-SST (manifesting as
+# "SST preparation failed" / "State transfer ... failed: Operation canceled").
+# Serialise the test to keep it deterministic under high --parallel runs.
+--source include/not_parallel.inc
+
 --source include/galera_cluster.inc
 
 SELECT VARIABLE_VALUE = 4 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
