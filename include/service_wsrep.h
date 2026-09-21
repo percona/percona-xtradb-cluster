@@ -28,7 +28,16 @@ enum Wsrep_service_key_type {
 };
 
 namespace wsrep_version {
-enum wsrep_version : long { UNSPECIFIED = 0, V1 = 1, V2 = 2, V3 = 3, V4 = 4 };
+enum wsrep_version : long {
+  UNSPECIFIED = 0,
+  V1 = 1,
+  V2 = 2,
+  V3 = 3,
+  V4 = 4,
+  V5 = 5,
+  V6 = 6,
+  V7 = 7
+};
 }
 typedef wsrep_version::wsrep_version WsrepVersion;
 

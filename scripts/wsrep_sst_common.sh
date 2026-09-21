@@ -857,7 +857,10 @@ function run_post_processing_steps()
         mysqld_cmdline+=" --plugin-dir=${WSREP_SST_OPT_PLUGINDIR}"
     fi
 
-    # Generate a new random password to be used by the JOINER
+    # Generate a new random password to be used by the JOINER.
+    # The shape (aA!9 + 32 alnum) is enough. CREATE USER below runs from
+    # init-file before component validate_password (if installed) is active
+    # in this temporary mysqld.
     local sst_user="mysql.pxc.sst.user"
     local sst_password="aA!9$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)"
 

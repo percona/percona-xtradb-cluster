@@ -1,0 +1,239 @@
+################################################################################
+# PXC-5291: User without SUPER can create trigger even without
+#           log_bin_trust_function_creators enabled.
+#
+# Test:
+# 0. Two servers: node_1 and node_2.
+# 1. Setup users.
+# 2. log_bin_trust_function_creators = 0
+# 2a. SET_ANY_DEFINER only
+# 2b. Plain user (no SUPER, no SET_ANY_DEFINER)
+# 2c. SUPER only
+# 3. log_bin_trust_function_creators = 1
+# 3a. SET_ANY_DEFINER only
+# 3b. Plain user (no SUPER, no SET_ANY_DEFINER)
+# 3c. SUPER only
+# 4. Cleanup.
+################################################################################
+
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+--echo
+--echo # 1. Setup users.
+--echo
+
+--connection node_1
+SET @old_trust = @@GLOBAL.log_bin_trust_function_creators;
+--disable_warnings
+SET GLOBAL log_bin_trust_function_creators = 0;
+--enable_warnings
+
+CREATE DATABASE probe;
+
+# User with SET_ANY_DEFINER(YES), SUPER(NO)
+CREATE USER 'any_def'@'%' IDENTIFIED BY '';
+GRANT ALL PRIVILEGES ON probe.* TO 'any_def'@'%';
+GRANT SET_ANY_DEFINER ON *.* TO 'any_def'@'%';
+
+# User with SET_ANY_DEFINER(NO), SUPER(NO)
+CREATE USER 'plain'@'%' IDENTIFIED BY '';
+GRANT ALL PRIVILEGES ON probe.* TO 'plain'@'%';
+
+# User with SET_ANY_DEFINER(NO), SUPER(YES)
+CREATE USER 'sup'@'%' IDENTIFIED BY '';
+GRANT ALL PRIVILEGES ON probe.* TO 'sup'@'%';
+GRANT SUPER ON *.* TO 'sup'@'%';
+
+# Helper user used as a DEFINER.
+CREATE USER 'other'@'%' IDENTIFIED BY '';
+
+--connect (any_def_con,localhost,any_def,,probe,$NODE_MYPORT_1)
+CREATE TABLE t (id BIGINT NOT NULL PRIMARY KEY);
+
+################################################################################
+--echo
+--echo # 2. log_bin_trust_function_creators = 0
+--echo
+
+--echo # 2a. SET_ANY_DEFINER only
+--connection any_def_con
+
+--error ER_BINLOG_CREATE_ROUTINE_NEED_SUPER
+CREATE TRIGGER t_any_definer_no_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
+--error ER_BINLOG_CREATE_ROUTINE_NEED_SUPER
+CREATE DEFINER = 'other'@'%' TRIGGER t_any_definer_definer_no_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
+
+--echo # 2b. Plain user (no SUPER, no SET_ANY_DEFINER)
+--connect (plain_con,localhost,plain,,probe,$NODE_MYPORT_1)
+
+--error ER_BINLOG_CREATE_ROUTINE_NEED_SUPER
+CREATE TRIGGER t_plain_no_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
+--error ER_SPECIFIC_ACCESS_DENIED_ERROR
+CREATE DEFINER = 'other'@'%' TRIGGER t_plain_definer_no_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
+
+--echo # 2c. SUPER only
+--connect (sup_con,localhost,sup,,probe,$NODE_MYPORT_1)
+
+CREATE TRIGGER t_super_no_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
+CREATE DEFINER = 'other'@'%' TRIGGER t_super_definer_no_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
+
+################################################################################
+##### Asserts
+################################################################################
+
+# Rejected triggers exist on no node; the SUPER-created trigger replicates.
+--connection node_1
+--let $assert_text = 'Trigger t_any_definer_no_trust not created on node_1 (SET_ANY_DEFINER, trust = 0)'
+--let $assert_cond = [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "t_any_definer_no_trust", c, 1] = 0
+--source include/assert.inc
+
+--let $assert_text = 'Trigger t_any_definer_definer_no_trust not created on node_1 (SET_ANY_DEFINER, DEFINER, trust = 0)'
+--let $assert_cond = [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "t_any_definer_definer_no_trust", c, 1] = 0
+--source include/assert.inc
+
+--let $assert_text = 'Trigger t_plain_no_trust not created on node_1 (PLAIN, trust = 0)'
+--let $assert_cond = [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "t_plain_no_trust", c, 1] = 0
+--source include/assert.inc
+
+--let $assert_text = 'Trigger t_plain_definer_no_trust not created on node_1 (PLAIN, DEFINER, trust = 0)'
+--let $assert_cond = [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "t_plain_definer_no_trust", c, 1] = 0
+--source include/assert.inc
+
+--let $assert_text = 'Trigger t_super_no_trust created on node_1 (SUPER, trust = 0)'
+--let $assert_cond = [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "t_super_no_trust", c, 1] = 1
+--source include/assert.inc
+
+--let $assert_text = 'Trigger t_super_definer_no_trust created on node_1 (SUPER, DEFINER, trust = 0)'
+--let $assert_cond = [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "t_super_definer_no_trust", c, 1] = 1
+--source include/assert.inc
+
+--connection node_2
+--echo 'Trigger t_sup t_super_no_trust to node_2 (SUPER, trust = 0)'
+--let $wait_condition = SELECT COUNT(*) = 1 FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "t_super_no_trust"
+--source include/wait_condition.inc
+
+--echo 'Trigger t_super_definer_no_trust replicated to node_2 (SUPER, DEFINER, trust = 0)'
+--let $wait_condition = SELECT COUNT(*) = 1 FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "t_super_definer_no_trust"
+--source include/wait_condition.inc
+
+--let $assert_text = 'Trigger t_any_definer_no_trust not created on node_2 (SET_ANY_DEFINER, trust = 0)'
+--let $assert_cond = [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "t_any_definer_no_trust", c, 1] = 0
+--source include/assert.inc
+
+--let $assert_text = 'Trigger t_any_definer_definer_no_trust not created on node_2 (SET_ANY_DEFINER, DEFINER, trust = 0)'
+--let $assert_cond = [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "t_any_definer_definer_no_trust", c, 1] = 0
+--source include/assert.inc
+
+--let $assert_text = 'Trigger t_plain_no_trust not created on node_2 (PLAIN, trust = 0)'
+--let $assert_cond = [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "t_plain_no_trust", c, 1] = 0
+--source include/assert.inc
+
+--let $assert_text = 'Trigger t_plain_definer_no_trust not created on node_2 (PLAIN, DEFINER, trust = 0)'
+--let $assert_cond = [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "t_plain_definer_no_trust", c, 1] = 0
+--source include/assert.inc
+
+################################################################################
+--echo
+--echo # 3. log_bin_trust_function_creators = 1
+--echo
+
+--connection node_1
+--disable_warnings
+SET GLOBAL log_bin_trust_function_creators = 1;
+--enable_warnings
+
+--echo # 3a. SET_ANY_DEFINER only
+--connection any_def_con
+
+CREATE TRIGGER t_any_definer_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
+CREATE DEFINER = 'other'@'%' TRIGGER t_any_definer_definer_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
+
+--echo # 3b. Plain user (no SUPER, no SET_ANY_DEFINER)
+--connection plain_con
+
+# This passes(even in PS) since definer is not there and log_bin_trust_function_creators is set.
+CREATE TRIGGER t_plain_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
+--error ER_SPECIFIC_ACCESS_DENIED_ERROR
+CREATE DEFINER = 'other'@'%' TRIGGER t_plain_definer_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
+
+--echo # 3c. SUPER only
+--connection sup_con
+
+CREATE TRIGGER t_super_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
+CREATE DEFINER = 'other'@'%' TRIGGER t_super_definer_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
+
+################################################################################
+##### Asserts
+################################################################################
+# Rejected triggers exist on no node; the SUPER-created trigger replicates.
+--connection node_1
+--let $assert_text = 'Trigger t_any_definer_trust created on node_1 (SET_ANY_DEFINER, trust = 1)'
+--let $assert_cond = [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "t_any_definer_trust", c, 1] = 1
+--source include/assert.inc
+
+--let $assert_text = 'Trigger t_any_definer_definer_trust created on node_1 (SET_ANY_DEFINER, DEFINER, trust = 1)'
+--let $assert_cond = [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "t_any_definer_definer_trust", c, 1] = 1
+--source include/assert.inc
+
+--let $assert_text = 'Trigger t_plain_trust created on node_1 (PLAIN, trust = 1)'
+--let $assert_cond = [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "t_plain_trust", c, 1] = 1
+--source include/assert.inc
+
+--let $assert_text = 'Trigger t_plain_definer_trust not created on node_1 (PLAIN, DEFINER, trust = 1)'
+--let $assert_cond = [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "t_plain_definer_trust", c, 1] = 0
+--source include/assert.inc
+
+--let $assert_text = 'Trigger t_super_trust created on node_1 (SUPER, trust = 1)'
+--let $assert_cond = [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "t_super_trust", c, 1] = 1
+--source include/assert.inc
+
+--let $assert_text = 'Trigger t_super_definer_trust created on node_1 (SUPER, DEFINER, trust = 1)'
+--let $assert_cond = [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "t_super_definer_trust", c, 1] = 1
+--source include/assert.inc
+
+--connection node_2
+--echo 'Trigger t_any_definer_trust replicated to node_2 (SET_ANY_DEFINER, trust = 1)'
+--let $wait_condition = SELECT COUNT(*) = 1 FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "t_any_definer_trust"
+--source include/wait_condition.inc
+
+--echo 'Trigger t_any_definer_definer_trust replicated to node_2 (SET_ANY_DEFINER, DEFINER, trust = 1)'
+--let $wait_condition = SELECT COUNT(*) = 1 FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "t_any_definer_definer_trust"
+--source include/wait_condition.inc
+
+--echo 'Trigger t_super_trust replicated to node_2 (SUPER, trust = 1)'
+--let $wait_condition = SELECT COUNT(*) = 1 FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "t_super_trust"
+--source include/wait_condition.inc
+
+--echo 'Trigger t_super_definer_trust replicated to node_2 (SUPER, DEFINER, trust = 1)'
+--let $wait_condition = SELECT COUNT(*) = 1 FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "t_super_definer_trust"
+--source include/wait_condition.inc
+
+--echo 'Trigger t_plain_trust replicated to node_2 (PLAIN, trust = 1)'
+--let $wait_condition = SELECT COUNT(*) = 1 FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "t_plain_trust"
+--source include/wait_condition.inc
+
+--let $assert_text = 'Trigger t_plain_definer_trust not replicated on node_2 (PLAIN, DEFINER, trust = 1)'
+--let $assert_cond = [SELECT COUNT(*) AS c FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = "probe" AND TRIGGER_NAME = "t_plain_definer_trust", c, 1] = 0
+--source include/assert.inc
+
+################################################################################
+--echo
+--echo # 4. Cleanup.
+--echo
+
+--disconnect plain_con
+--disconnect sup_con
+--disconnect any_def_con
+
+--connection node_1
+DROP DATABASE probe;
+DROP USER 'any_def'@'%';
+DROP USER 'plain'@'%';
+DROP USER 'sup'@'%';
+DROP USER 'other'@'%';
+--disable_warnings
+SET GLOBAL log_bin_trust_function_creators = @old_trust;
+--enable_warnings
+
+--source include/wait_until_count_sessions.inc
