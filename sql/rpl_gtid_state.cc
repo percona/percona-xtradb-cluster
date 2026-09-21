@@ -890,23 +890,17 @@ void Gtid_state::update_gtids_impl_own_gtid(THD *thd, bool is_commit) {
     In Group Replication the GTID may additionally be owned by another
     thread, and we won't remove that ownership (it will be rolled back later)
   */
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   /* Check comment associated with wsrep_replayer for more details. */
   if (WSREP(thd)) {
-    assert(owned_gtids.is_owned_by(thd->owned_gtid, thd->thread_id()) ||
+    assert(owned_gtids.has_owner(thd->owned_gtid, thd->thread_id()) ||
            thd->wsrep_replayer);
   } else {
-    assert(owned_gtids.is_owned_by(thd->owned_gtid, thd->thread_id()));
+    assert(owned_gtids.has_owner(thd->owned_gtid, thd->thread_id()));
   }
 #else
-  assert(owned_gtids.is_owned_by(thd->owned_gtid, thd->thread_id()));
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-  assert(owned_gtids.is_owned_by(thd->owned_gtid, thd->thread_id()));
-=======
   assert(owned_gtids.has_owner(thd->owned_gtid, thd->thread_id()));
->>>>>>> ps/release-9.7.2-2
+#endif /* WITH_WSREP */
   owned_gtids.remove_gtid(thd->owned_gtid, thd->thread_id());
 
   if (is_commit) {

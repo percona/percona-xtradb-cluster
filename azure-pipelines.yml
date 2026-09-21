@@ -23,15 +23,8 @@ schedules:
   displayName: Daily 2:00 AM UTC build
   branches:
     include:
-<<<<<<< HEAD
     - 8.4
-||||||| merged common ancestors
-    - trunk
-=======
-    - 9.7
->>>>>>> ps/release-9.7.2-2
 
-<<<<<<< HEAD
 trigger:
   branches:
     include:
@@ -48,26 +41,6 @@ trigger:
     - policy
     - scripts
     - support-files
-||||||| merged common ancestors
-trigger:
-  branches:
-    include:
-    - '*'
-    exclude:
-    - trunk
-  paths:
-    exclude:
-    - doc
-    - build-ps
-    - man
-    - mysql-test
-    - packaging
-    - policy
-    - scripts
-    - support-files
-=======
-trigger: none
->>>>>>> ps/release-9.7.2-2
 
 pr:
   drafts: false
@@ -95,16 +68,8 @@ jobs:
     fetchDepth: 32
 
   - script: |
-<<<<<<< HEAD
       git fetch origin 8.4
       CHANGED_FILES=$(git diff --name-only --relative --diff-filter AMR origin/8.4 -- . | tr '\n' ' ')
-||||||| merged common ancestors
-      git fetch origin trunk
-      CHANGED_FILES=$(git diff --name-only --relative --diff-filter AMR origin/trunk -- . | tr '\n' ' ')
-=======
-      git fetch origin 9.7
-      CHANGED_FILES=$(git diff --name-only --relative --diff-filter AMR origin/9.7 -- . | tr '\n' ' ')
->>>>>>> ps/release-9.7.2-2
 
       if [ -z "${CHANGED_FILES}" ]; then
           echo --- No changed files
@@ -166,13 +131,7 @@ jobs:
     CCACHE_CPP2: 1
     CCACHE_MAXSIZE: 4G
     OS_NAME: $(Agent.OS)
-<<<<<<< HEAD
     PARENT_BRANCH: 8.4
-||||||| merged common ancestors
-    PARENT_BRANCH: trunk
-=======
-    PARENT_BRANCH: 9.7
->>>>>>> ps/release-9.7.2-2
     BUILD_PARAMS_TYPE: normal
 
   # Two tiers of coverage:

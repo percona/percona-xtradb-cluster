@@ -1866,9 +1866,10 @@ bool set_and_validate_user_attributes(
                              std::string(Str->host.str), gen_password, 1};
       generated_passwords.push_back(p);
     }
-<<<<<<< HEAD
+    Auth_plugin_operation_guard op_guard;
 #ifdef WITH_WSREP
-    if (auth->generate_authentication_string(outbuf, &buflen, inbuf,
+    if (!op_guard ||
+        auth->generate_authentication_string(outbuf, &buflen, inbuf,
                                              inbuflen) ||
         (verify_passwd_history &&
          auth_verify_password_history(thd, &Str->user, &Str->host,
@@ -1877,27 +1878,16 @@ bool set_and_validate_user_attributes(
                                       auth, inbuf, inbuflen, outbuf, buflen,
                                       history_table, what_to_set.m_what))) {
 #else
-    if (auth->generate_authentication_string(outbuf, &buflen, inbuf,
-||||||| merged common ancestors
-    if (auth->generate_authentication_string(outbuf, &buflen, inbuf,
-=======
-    Auth_plugin_operation_guard op_guard;
     if (!op_guard ||
         auth->generate_authentication_string(outbuf, &buflen, inbuf,
->>>>>>> ps/release-9.7.2-2
                                              inbuflen) ||
         auth_verify_password_history(thd, &Str->user, &Str->host,
                                      Str->alter_status.password_history_length,
                                      Str->alter_status.password_reuse_interval,
                                      auth, inbuf, inbuflen, outbuf, buflen,
                                      history_table, what_to_set.m_what)) {
-<<<<<<< HEAD
-
 #endif
-||||||| merged common ancestors
-=======
       if (!op_guard) my_error(ER_SERVER_SHUTDOWN, MYF(0));
->>>>>>> ps/release-9.7.2-2
       plugin_unlock(nullptr, plugin);
       what_to_set.m_what = NONE_ATTR;
       /*
