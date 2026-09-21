@@ -927,6 +927,7 @@ MySQL clients support the protocol:
 #include "thr_lock.h"
 #include "thr_mutex.h"
 #include "typelib.h"
+#include "vector-common/vector_distance.h"  // init_vector_distance_functions
 #include "violite.h"
 
 #ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
@@ -8975,6 +8976,7 @@ static int init_server_components() {
     We need to call each of these following functions to ensure that
     all things are initialized so that unireg_abort() doesn't fail
   */
+  init_vector_distance_functions();
   mdl_init();
   partitioning_init();
   if (table_def_init() || hostname_cache_init(host_cache_size))
@@ -9052,6 +9054,14 @@ static int init_server_components() {
     if no issues were encountered.
   */
   if (setup_error_log_components()) unireg_abort(MYSQLD_ABORT_EXIT);
+
+  if (!is_help_or_validate_option()) {
+    char vector_distance_msg[256];
+    vector_distance_dispatch_description(vector_distance_msg,
+                                         sizeof(vector_distance_msg));
+    LogErr(INFORMATION_LEVEL, ER_VECTOR_DISTANCE_SIMD_DISPATCH,
+           vector_distance_msg);
+  }
 
   if (MDL_context_backup_manager::init()) {
     LogErr(ERROR_LEVEL, ER_OOM);
@@ -10322,16 +10332,16 @@ Manifest_file_option_parser_helper::Manifest_file_option_parser_helper(
 
   /* Backup mysql_real_data_home */
   memcpy(save_datadir_, mysql_real_data_home, mysql_real_data_home_size);
+  memset(mysql_real_data_home, 0, mysql_real_data_home_size);
   /* Copy the string ensuring it is always 0 terminated */
-  strncpy(mysql_real_data_home, local_datadir_buffer,
+  strmake(mysql_real_data_home, local_datadir_buffer,
           mysql_real_data_home_size - 1);
-  mysql_real_data_home[mysql_real_data_home_size - 1] = 0;
 
   /* Backup opt_plugin_dir */
   memcpy(save_plugindir_, opt_plugin_dir, opt_plugin_dir_size);
+  memset(opt_plugin_dir, 0, opt_plugin_dir_size);
   /* Copy the string ensuring it is always 0 terminated */
-  strncpy(opt_plugin_dir, local_plugindir_buffer, opt_plugin_dir_size - 1);
-  opt_plugin_dir[opt_plugin_dir_size - 1] = 0;
+  strmake(opt_plugin_dir, local_plugindir_buffer, opt_plugin_dir_size - 1);
 
   valid_ = true;
 }
@@ -13419,6 +13429,19 @@ static int show_telemetry_traces_support(THD * /*unused*/, SHOW_VAR *var,
   return 0;
 }
 
+/** ON iff libcoredumper is linked in and --coredumper is in effect. */
+static int show_libcoredumper_enabled(THD * /*unused*/, SHOW_VAR *var,
+                                      char *buf) {
+  var->type = SHOW_BOOL;
+  var->value = buf;
+#if HAVE_LIBCOREDUMPER
+  *(pointer_cast<bool *>(buf)) = opt_libcoredumper;
+#else
+  *(pointer_cast<bool *>(buf)) = false;
+#endif
+  return 0;
+}
+
 static int show_deprecated_use_i_s_processlist_count(THD *, SHOW_VAR *var,
                                                      char *buf) {
   var->type = SHOW_LONG;
@@ -13616,6 +13639,8 @@ SHOW_VAR status_vars[] = {
     {"Last_query_partial_plans",
      (char *)offsetof(System_status_var, last_query_partial_plans),
      SHOW_LONGLONG_STATUS, SHOW_SCOPE_SESSION},
+    {"Libcoredumper_enabled", (char *)&show_libcoredumper_enabled, SHOW_FUNC,
+     SHOW_SCOPE_GLOBAL},
     {"Locked_connects", (char *)&locked_account_connection_count, SHOW_LONG,
      SHOW_SCOPE_GLOBAL},
     {"Max_execution_time_exceeded",
