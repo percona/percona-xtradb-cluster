@@ -111,7 +111,6 @@ class LogEventStatusSizeTest : public ::testing::Test {
     qe.need_sql_require_primary_key = 1;
     qe.needs_default_table_encryption = 1;
     qe.default_collation_for_utf8mb4_number = 1;
-<<<<<<< HEAD
 #ifdef WITH_WSREP
     qe.thd->variables.binlog_ddl_skip_rewrite = 1;
 
@@ -119,12 +118,7 @@ class LogEventStatusSizeTest : public ::testing::Test {
     qe.thd->system_thread = SYSTEM_THREAD_SLAVE_SQL;
     wsrep_provider_set = 1;
 #endif /* WITH_WSREP */
-    qe.need_enable_cascade_triggers = true;
-||||||| merged common ancestors
-    qe.need_enable_cascade_triggers = true;
-=======
     qe.need_enable_cascade_triggers = 1;
->>>>>>> ps/release-9.7.2-2
 
     for (size_t did = 0; did < MAX_DBS_IN_EVENT_MTS; ++did) {
       std::string db = fill_str(NAME_LEN, 'a' + did);
