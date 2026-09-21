@@ -17,10 +17,11 @@
 # 3. ALLOW_NONEXISTENT_DEFINER user, nonexistent DEFINER -> allowed, replicates.
 # 4. SUPER user, nonexistent DEFINER -> allowed, replicates.
 # 4b. trust = 0, nonexistent DEFINER: which gate reports, and both enforced.
-#     - SET_ANY_DEFINER only -> rejected by the DEFINER check (it runs first).
+#     The binlog gate runs first; the DEFINER pre-check runs just before TOI,
+#     matching the order PS uses.
+#     - SET_ANY_DEFINER only -> rejected by the binlog gate (no SUPER).
 #     - SUPER -> satisfies both gates, allowed, replicates.
-#     - ALLOW_NONEXISTENT_DEFINER without SUPER -> clears the DEFINER check,
-#       then rejected by the binlog gate.
+#     - ALLOW_NONEXISTENT_DEFINER without SUPER -> rejected by the binlog gate.
 # 5. Cleanup.
 ################################################################################
 
@@ -162,9 +163,12 @@ CREATE DEFINER='ghost3'@'localhost' TRIGGER tg_ghost3 AFTER INSERT ON t FOR EACH
 SET GLOBAL log_bin_trust_function_creators = 0;
 --enable_warnings
 
-# The 'ghost4' definer does not exist, logged in as 'user with SET_ANY_DEFINER'
+# The 'ghost4' definer does not exist, logged in as 'user with SET_ANY_DEFINER'.
+# Both gates would reject: the binlog gate (no SUPER, trust = 0) and the
+# orphan-DEFINER check. The binlog gate reports, because the DEFINER pre-check
+# runs later, just before TOI -- which is the order PS uses.
 --connection any_def_con
---error ER_SPECIFIC_ACCESS_DENIED_ERROR
+--error ER_BINLOG_CREATE_ROUTINE_NEED_SUPER
 CREATE DEFINER='ghost4'@'localhost' TRIGGER tg_ghost4 AFTER INSERT ON t FOR EACH ROW SET @n = NEW.id;
 
 # Rejected before replication: trigger exists on no node.

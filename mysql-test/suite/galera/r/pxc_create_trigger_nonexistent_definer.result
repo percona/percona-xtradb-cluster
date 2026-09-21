@@ -57,7 +57,7 @@ include/assert.inc ['Trigger tg_ghost3 created on node_1 (SUPER)']
 
 SET GLOBAL log_bin_trust_function_creators = 0;
 CREATE DEFINER='ghost4'@'localhost' TRIGGER tg_ghost4 AFTER INSERT ON t FOR EACH ROW SET @n = NEW.id;
-ERROR 42000: Access denied; you need (at least one of) the SUPER or ALLOW_NONEXISTENT_DEFINER privilege(s) for this operation
+ERROR HY000: You do not have the SUPER privilege (you *might* want to use the less safe log_bin_trust_function_creators variable)
 include/assert.inc ['Trigger tg_ghost4 not created on node_1 (trust = 0)']
 include/assert.inc ['node_1 still in a 2-node cluster after the rejected trust = 0 CREATE TRIGGER (no eviction)']
 include/assert.inc ['Trigger tg_ghost4 not created on node_2 (trust = 0)']
