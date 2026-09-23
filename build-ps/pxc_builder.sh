@@ -238,6 +238,7 @@ get_sources(){
     rsync -av ${WORKDIR}/percona-xtradb-cluster/wsrep-lib/ ${PXCDIR}/wsrep-lib --exclude .git
     rsync -av ${WORKDIR}/percona-xtradb-cluster/extra/coredumper/ ${PXCDIR}/extra/coredumper --exclude .git
     rsync -av ${WORKDIR}/percona-xtradb-cluster/extra/libkmip/ ${PXCDIR}/extra/libkmip --exclude .git
+    rsync -av ${WORKDIR}/percona-xtradb-cluster/extra/jwt-cpp/ ${PXCDIR}/extra/jwt-cpp --exclude .git
 
     sed -i 's:ROUTER_RUNTIMEDIR:/var/run/mysqlrouter/:g' ${PXCDIR}/packaging/rpm-common/*
     cd ${PXCDIR}/packaging/rpm-common || exit
@@ -485,6 +486,15 @@ install_deps() {
         yum -y install yum-utils patchelf
         yum -y install cyrus-sasl-devel cyrus-sasl-scram krb5-devel
     else
+        export OS_NAME="$(. /etc/os-release && echo "$VERSION_CODENAME")"
+        if [ "${OS_NAME}" == "bullseye" ]; then
+           sed -i -E '/bullseye(-security|-updates)?[[:space:]]/d' /etc/apt/sources.list
+cat <<'EOF' | tee -a /etc/apt/sources.list
+deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/20260830T000000Z/ bullseye main
+deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/20260830T000000Z/ bullseye-updates main
+deb [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/20260830T000000Z/ bullseye-security main
+EOF
+        fi
         apt-get -y update
         DEBIAN_FRONTEND=noninteractive apt-get -y install curl lsb-release gnupg2 wget apt-transport-https
         apt-get -y install dirmngr || true
@@ -551,7 +561,7 @@ install_deps() {
         fi
 
         apt-get -y install --download-only percona-xtrabackup-80=8.0.35-36-1.${DIST}
-        apt-get -y install --download-only percona-xtrabackup-84=8.4.0-6-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-84=8.4.0-7-1.${DIST}
     fi
     return;
 }
