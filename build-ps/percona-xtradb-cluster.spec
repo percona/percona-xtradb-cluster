@@ -207,7 +207,7 @@ Prefix: %{_sysconfdir}
 %endif
 %endif
 
-#%define server_suffix -80
+#%%define server_suffix -80
 
 %if 0%{?rhel} > 6 || 0%{?amzn} == 2023
     %define distro_req           chkconfig nmap nc
@@ -1742,8 +1742,8 @@ fi
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_tzinfo_to_sql.1*
 %doc %attr(644, root, man) %{_mandir}/man1/perror.1*
 %doc %attr(644, root, man) %{_mandir}/man1/comp_err.1*
-#%doc %attr(644, root, man) %{_mandir}/man1/resolve_stack_dump.1*
-#%doc %attr(644, root, man) %{_mandir}/man1/resolveip.1*
+#%%doc %%attr(644, root, man) %%{_mandir}/man1/resolve_stack_dump.1*
+#%%doc %%attr(644, root, man) %%{_mandir}/man1/resolveip.1*
 %doc %attr(644, root, man) %{_mandir}/man8/mysqld.8*
 
 %attr(755, root, root) %{_bindir}/pxc_extra/*
@@ -1766,8 +1766,9 @@ fi
 %attr(755, root, root) %{_bindir}/perror
 %attr(755, root, root) %{_bindir}/mysql_migrate_keyring
 %attr(755, root, root) %{_bindir}/mysql_keyring_encryption_test
-#%attr(755, root, root) %{_bindir}/resolve_stack_dump
-#%attr(755, root, root) %{_bindir}/resolveip
+%attr(755, root, root) %{_bindir}/create_id_token
+#%%attr(755, root, root) %%{_bindir}/resolve_stack_dump
+#%%attr(755, root, root) %%{_bindir}/resolveip
 %attr(755, root, root) %{_bindir}/wsrep_sst_common
 %attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup-v2
 %attr(755, root, root) %{_bindir}/wsrep_sst_clone
@@ -1881,13 +1882,7 @@ fi
 %{_libdir}/mysql/mecab
 %endif
 
-%if "%rhel" == "5"
-    %attr(755, root, root) %{_datadir}/percona-xtradb-cluster/
-%endif
-
-%if "%rhel" >= "6" || "%amzn" == "2023"
-    %attr(755, root, root) %{_datarootdir}/percona-xtradb-cluster/
-%endif
+%dir %attr(755, root, root) %{_datadir}/percona-xtradb-cluster
 
 %if %{WITH_TCMALLOC}
 %attr(755, root, root) %{_libdir}/mysql/%{malloc_lib_target}
