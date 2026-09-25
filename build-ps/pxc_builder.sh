@@ -753,8 +753,17 @@ build_mecab_lib(){
     wget ${MECAB_LINK}
     tar xf ${MECAB_TARBAL}
     if [ x"$ARCH" = "xaarch64" ]; then
-        git clone https://git.savannah.gnu.org/git/config.git
-        unalias cp
+        for i in 1 2 3 4 5; do
+            if git clone --depth 1 https://git.savannah.gnu.org/git/config.git; then
+                break
+            fi
+            rm -rf config
+            sleep 10
+        done
+        if [ ! -d config ]; then
+            echo "ERROR: failed to clone https://git.savannah.gnu.org/git/config.git after 5 attempts"
+            exit 1
+        fi
         cp config/config.guess ${MECAB_DIR}
         cp config/config.sub ${MECAB_DIR}
     fi
