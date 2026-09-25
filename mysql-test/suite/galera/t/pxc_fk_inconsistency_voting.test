@@ -11,10 +11,14 @@ INSERT INTO child VALUES (10);
 --error ER_NO_REFERENCED_ROW_2
 ALTER TABLE child ADD CONSTRAINT idx17 FOREIGN KEY (j) REFERENCES parent(i);
 
-# Assert that the message has 'temp_table'. Note that count is 2 because it
-# prints messages from both the nodes.
---let $assert_text= Verify that the intermediate temporary table name has been replaced with temp_table
---let $assert_select= a foreign key constraint fails \(`temp_table`, CONSTRAINT `idx17`
+# At wsrep application protocol >= 7 the TOI vote buffer contains only
+# " Error_code: NNNN;" (no locale-dependent message text), so voting is
+# deterministic across nodes regardless of the intermediate temp-table
+# name. Assert that both nodes' vote-initiation lines land on the same
+# error code (ER_NO_REFERENCED_ROW_2 = 1452). Count is 2 because
+# node_1 logs its own vote and node_2's vote.
+--let $assert_text= Verify that both nodes vote on the same error code
+--let $assert_select= initiates vote on .*:  Error_code: 1452;
 --let $assert_file= $MYSQLTEST_VARDIR/log/mysqld.1.err
 --let $assert_count=2
 --source include/assert_grep.inc

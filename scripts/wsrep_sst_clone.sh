@@ -67,6 +67,10 @@
 # joiner-timeout-wait-donor-message=60
 # joiner-timeout-clone-instance=90
 # donor-timeout-wait-joiner=200
+# sst-password-suffix=AAA..//2344
+#   Optional suffix appended to the generated clone SST password so it complies
+#   with validate_password. Allowed: A-Za-z0-9 and . _ / -
+#   (must also pass donor SST request validation in wsrep_sst.cc)
 #
 # NOTE for SSL usage
 # When using clone SSL certificates MUST be manually (or by automation) placed in a location on both servers DONOR/RECEIVER
@@ -113,8 +117,10 @@ CLONE_INSTANCE_PORT=4444
 
 # wsrep_gen_secret() generates enough randomness, yet some MySQL password
 # policy may insist on having upper and lower case letters, numbers and
-# special symbols. Make sure that whatever we generate, it has it.
-readonly PSWD_POLICY="Aa"
+# special symbols. Characters must also be accepted by donor SST request
+# validation (see allowed_chars_regex in sql/wsrep_sst.cc).
+readonly PSWD_POLICY="Aa1."
+readonly PSWD_SUFFIX_ALLOWED_SPECIALS="._/-"
 
 OS=$(uname)
 [ "$OS" = "Darwin" ] && export -n LD_LIBRARY_PATH
@@ -124,6 +130,12 @@ OS=$(uname)
 JOINER_TIMEOUT_WAIT_DONOR_MESSAGE=$(parse_cnf sst joiner-timeout-wait-donor-message "60")
 JOINER_TIMEOUT_WAIT_CLONE_INSTANCE=$(parse_cnf sst joiner-timeout-clone-instance "90")
 DONOR_TIMEOUT_WAIT_JOINER_CLONE_INSTANCE=$(parse_cnf sst donor-timeout-wait-joiner "200")
+SST_PASSWORD_SUFFIX=$(parse_cnf sst sst-password-suffix "")
+
+if [[ ! "$SST_PASSWORD_SUFFIX" =~ ^[A-Za-z0-9._/-]*$ ]]; then
+    wsrep_log_error "Invalid sst-password-suffix value. Allowed characters: letters, digits, and '$PSWD_SUFFIX_ALLOWED_SPECIALS'."
+    safe_exit $EINVAL
+fi
 
 
 wsrep_log_info "Running: $CMDLINE"
@@ -883,7 +895,7 @@ then
     "
 
     # Define USER and PW
-    CLONE_PSWD=`wsrep_gen_secret`"$PSWD_POLICY"
+    CLONE_PSWD=$(wsrep_gen_secret)"$PSWD_POLICY$SST_PASSWORD_SUFFIX"
     CLONE_USER="clone_sst"
 
     ##################################################################################################
