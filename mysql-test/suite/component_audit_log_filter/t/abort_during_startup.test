@@ -31,12 +31,13 @@
 --source ../inc/audit_comp_install.inc
 
 CALL mtr.add_suppression("Option --authentication-policy is set to an invalid value");
+CALL mtr.add_suppression("Aborting");
 
 --echo ### Shutdown
 --source include/shutdown_mysqld.inc
 
 --echo ### Start with invalid option
---let $restart_parameters=--authentication-policy=mysql_native_password --mysql_native_password=OFF
+--let $restart_parameters=--authentication-policy=mysql_native_password --loose-mysql_native_password=OFF
 --source include/start_mysqld_expecting_crash.inc
 
 --echo ### Waiting for the error message to occur
