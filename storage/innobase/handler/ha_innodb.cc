@@ -3080,6 +3080,7 @@ extensions.
 @return whether stats for slow query log InnoDB extensions should be logged
 */
 static bool innobase_slow_log_verbose(THD *thd) noexcept {
+#ifdef WITH_WSREP
   /* PXC: Cherrypicked commit from PS 26, to be removed once code is propagated
      to PS 9.7. */
   /* The background thread check has to come first: internal THDs created for
@@ -3088,6 +3089,11 @@ static bool innobase_slow_log_verbose(THD *thd) noexcept {
   trips AddressSanitizer. Such threads never log slow queries anyway. */
   return thd && thd_opt_slow_log() && !thd_is_background_thread(thd) &&
          unlikely(thd_log_slow_verbosity(thd) & (1ULL << SLOG_V_INNODB));
+#else
+  return thd && thd_opt_slow_log() &&
+         unlikely(thd_log_slow_verbosity(thd) & (1ULL << SLOG_V_INNODB)) &&
+         !thd_is_background_thread(thd);
+#endif /* WITH_WSREP */
 }
 
 /** Initializes some fields in an InnoDB transaction object. */

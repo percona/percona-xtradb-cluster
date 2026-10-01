@@ -317,10 +317,10 @@ class Relay_log_info : public Rpl_info {
       client executing a BINLOG statement uses.
 
       It is not caught by the slave_thread test below because
-      init_wsrep_thread() (mysqld.cc) only sets THD::slave_thread under
-      #ifdef GALERA, and bare GALERA is never defined for sql/. Test the
-      applier's Relay_log_info directly so this predicate reports the truth
-      for every caller and in every build type.
+      init_wsrep_thread() (mysqld.cc) only sets THD::slave_thread under a
+      bare GALERA guard, which is never defined for sql/. Test the applier's
+      Relay_log_info directly so this predicate reports the truth for every
+      caller and in every build type.
     */
     if (info_thd->wsrep_rli != nullptr && info_thd->wsrep_rli == this)
       return false;

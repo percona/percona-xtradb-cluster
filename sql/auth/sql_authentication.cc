@@ -4070,6 +4070,9 @@ static void check_and_update_password_lock_state(MPVIO_EXT &mpvio, THD *thd,
   }
 }
 
+#ifdef WITH_WSREP
+/* PXC: Cherrypicked PS-11593 fix from PS 9.7, to be removed once it is in a
+   PS 9.7 release. */
 /**
   Grant and revoke the external roles reported by the authentication plugin.
 
@@ -4194,6 +4197,81 @@ static bool apply_external_roles(THD *thd, const char *plugin_roles_list,
 
   return false;
 }
+#else
+static void apply_external_roles(THD *thd, const char *plugin_roles_list,
+                                 const ACL_USER *acl_user) {
+  // shall be always correct, we are passing a table
+  assert(plugin_roles_list != nullptr);
+  if (acl_user->user == nullptr) return;
+  std::vector<std::string> plugin_roles;
+  if (plugin_roles_list[0] != '\0')
+    boost::algorithm::split(plugin_roles, plugin_roles_list,
+                            boost::is_any_of(","));
+
+  // acl user is a copy, the below is safe
+  const name_and_host_t user(std::string(acl_user->user),
+                             std::string(acl_user->host.get_host()));
+
+  // Adding or removing external roles requires locking
+  Acl_cache_lock_guard acl_cache_lock_guard(thd,
+                                            Acl_cache_lock_mode::WRITE_MODE);
+  acl_cache_lock_guard.lock();
+  const auto user_roles_it = g_external_roles.find(user);
+  // we proceed only if some roles for the user either were added
+  // in the past or are being added
+  if (user_roles_it == g_external_roles.end() && plugin_roles.empty()) return;
+
+  // we need a pointer to the really cached user
+  ACL_USER *cached_acl_user =
+      find_acl_user(acl_user->host.get_host(), acl_user->user, true);
+  if (cached_acl_user == nullptr) return;
+
+  // if no roles added so far, add all roles returned by the plugin that exist
+  if (user_roles_it == g_external_roles.end()) {
+    std::vector<std::string> new_user_roles;
+    for (auto const &role : plugin_roles) {
+      ACL_USER *acl_role = find_acl_user("", role.c_str(), false);
+      if (acl_role != nullptr && acl_role->user != nullptr) {
+        grant_role(acl_role, cached_acl_user, false);
+        new_user_roles.push_back(role);
+      }
+    }
+    // set the new user roles to the external roles container
+    if (!new_user_roles.empty())
+      g_external_roles.emplace(user, std::move(new_user_roles));
+  } else {
+    std::vector<std::string> new_user_roles;
+    // added roles
+    for (auto const &role : plugin_roles)
+      if (std::ranges::find(user_roles_it->second, role) ==
+          user_roles_it->second.end()) {
+        // role not yet granted
+        ACL_USER *acl_role = find_acl_user("", role.c_str(), false);
+        if (acl_role != nullptr && acl_role->user != nullptr) {
+          grant_role(acl_role, cached_acl_user, false);
+          new_user_roles.push_back(role);
+        }
+      } else
+        // role already granted
+        new_user_roles.push_back(role);
+
+    // removed roles
+    for (auto const &role : user_roles_it->second)
+      if (std::ranges::find(plugin_roles, role) == plugin_roles.end()) {
+        // role to be revoken
+        ACL_USER *acl_role = find_acl_user("", role.c_str(), false);
+        if (acl_role != nullptr && acl_role->user != nullptr)
+          revoke_role(thd, acl_role, cached_acl_user);
+      }
+
+    // no external user roles from now
+    if (new_user_roles.empty())
+      g_external_roles.erase(user_roles_it);
+    else
+      std::swap(user_roles_it->second, new_user_roles);
+  }
+}
+#endif /* WITH_WSREP */
 
 /**
   Generate ER_SERVER_OFFLINE_MODE with several possible variants of the error
@@ -4507,10 +4585,14 @@ int acl_authenticate(THD *thd, enum_server_command command) {
       sctx->set_master_access(acl_user->access, *(mpvio.restrictions));
       assign_priv_user_host(sctx, const_cast<ACL_USER *>(acl_user));
 
+#ifdef WITH_WSREP
       // A failed ACL cache lock has already raised an error; the login must
       // fail here rather than reach my_ok() with an error in the DA.
       if (apply_external_roles(thd, mpvio.auth_info.external_roles, acl_user))
         goto end;
+#else
+      apply_external_roles(thd, mpvio.auth_info.external_roles, acl_user);
+#endif /* WITH_WSREP */
 
       /* Assign default role */
       {
