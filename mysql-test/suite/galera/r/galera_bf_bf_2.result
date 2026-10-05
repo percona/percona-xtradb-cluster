@@ -165,7 +165,6 @@ SET foreign_key_checks=0; UPDATE child SET data = 1 WHERE id = 0;
 SET SESSION wsrep_on = 0;
 SET SESSION wsrep_on = 1;
 SET SESSION wsrep_on = 0;
-Timeout in wait_condition.inc for SELECT 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_debug_sync_waiters' AND VARIABLE_VALUE = 'sync.apply_trx.start_of_apply_trx'
 SET SESSION wsrep_on = 1;
 SET GLOBAL wsrep_provider_options = 'dbug=';
 SET GLOBAL wsrep_provider_options = 'signal=sync.apply_trx.start_of_apply_trx';
