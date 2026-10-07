@@ -1,0 +1,113 @@
+#
+# PXC-5208: Force SST after a node is restarted following an inconsistency.
+#
+# When a node is voted out of the cluster because of a data inconsistency it
+# marks its state as corrupt.  That alone does not force a full SST on the next
+# start: mysqld_safe's --wsrep-recover recovers a usable position straight out
+# of InnoDB, the cluster then offers IST, and the inconsistent dataset survives.
+#
+# With repl.force_sst_after_inconsistency=YES the node also removes
+# grastate.dat, so the next start finds no usable position and can only rejoin
+# through a full SST, which is what repairs the dataset.
+#
+# The option is OFF by default; this test enables it explicitly on node_2.
+# galera.pxc_5208_force_sst_after_inconsistency_default covers the default.
+#
+
+--source include/galera_cluster.inc
+
+--connection node_1
+--disable_query_log
+# pc.weight=2 lets node_1 maintain quorum alone after node_2 leaves (2-node cluster).
+SET GLOBAL wsrep_provider_options = 'pc.weight=2';
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 INT);
+INSERT INTO t1 VALUES (1, 0),(2, 0),(3, 0),(4, 0),(5, 0),(6, 0),(7, 0),(8, 0);
+--enable_query_log
+
+--connection node_2
+--disable_query_log
+SET GLOBAL wsrep_provider_options = 'repl.force_sst_after_inconsistency=YES';
+--enable_query_log
+
+--file_exists $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
+
+#
+# Provoke inconsistency: delete row f1=2 locally on node_2 (not replicated),
+# then delete it on node_1 (replicated).  When the replicated DELETE arrives
+# at node_2 and can't find the row, the apply error triggers inconsistency
+# voting and node_2 is evicted.
+#
+# Wait for the INSERT to be applied on node_2 first, otherwise the local DELETE
+# below can race ahead of it and remove nothing.
+#
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 8 FROM t1
+--source include/wait_condition.inc
+
+--disable_query_log
+SET wsrep_on = OFF;
+DELETE FROM t1 WHERE f1 = 2;
+SET wsrep_on = ON;
+--enable_query_log
+
+--connection node_1
+DELETE FROM t1 WHERE f1 = 2;
+
+# node_2 detects the apply failure, gets voted inconsistent and aborts.
+# Wait on node_1 for cluster_size=1 (node_2 left).
+--let $wait_timeout = 60
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+#
+# Shut node_2 down.  It left due to an inconsistency with the option enabled,
+# so grastate.dat must already be gone.
+#
+--connection node_2
+--disable_query_log
+# node_2 is no longer in a primary component, so it refuses ordinary reads.
+# wsrep_on=OFF lets this session query performance_schema to confirm the
+# eviction actually happened before we shut the node down.
+SET SESSION wsrep_on = OFF;
+
+--let $wait_condition = SELECT COUNT(*) >= 1 FROM performance_schema.error_log WHERE data LIKE '%Inconsistency detected:%'
+--source include/wait_condition.inc
+--enable_query_log
+
+--source include/shutdown_mysqld.inc
+
+--echo # Verify grastate.dat was removed on inconsistency shutdown
+--error 1
+--file_exists $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
+
+#
+# Restart node_2.  With no grastate.dat it can only rejoin via SST, which
+# overwrites the inconsistent dataset and makes it consistent again.
+#
+--source include/start_mysqld.inc
+--source include/galera_wait_ready.inc
+
+# Verify the dataset is consistent with node_1 after SST.
+--connection node_1
+--let $node_1_data = `SELECT GROUP_CONCAT(f1, ':', f2 ORDER BY f1) FROM t1`
+--connection node_2
+--let $node_2_data = `SELECT GROUP_CONCAT(f1, ':', f2 ORDER BY f1) FROM t1`
+--echo node_2 t1 after SST: $node_2_data
+--echo node_1 t1 contents: $node_1_data
+
+if ($node_1_data != $node_2_data) {
+    --die node_2 dataset is not consistent with node_1 after SST
+}
+--echo datasets consistent: 1
+
+# Cleanup
+--disable_query_log
+--connection node_1
+SET GLOBAL wsrep_provider_options = 'pc.weight=1';
+DROP TABLE t1;
+--connection node_2
+CALL mtr.add_suppression("Could not execute Delete_rows event on table test.t1.*Error_code: 1032");
+CALL mtr.add_suppression("Delete_rows apply failed:");
+CALL mtr.add_suppression("Inconsistency detected: Inconsistent by consensus on");
+CALL mtr.add_suppression("Failed to apply write set: ");
+--enable_query_log

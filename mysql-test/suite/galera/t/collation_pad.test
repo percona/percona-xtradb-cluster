@@ -1,0 +1,105 @@
+#
+# This test checks the correct operation with respect to padding and non-padding
+# string key collations.
+#
+
+--source include/galera_cluster.inc
+--source include/have_debug_sync.inc
+--source suite/galera/include/galera_have_debug_sync.inc
+
+# We need two applier threads to avoid blocking on Galera internal
+# events
+--connection node_1
+SET GLOBAL wsrep_applier_threads = 2;
+
+# Session on node 1 for controlling sync points
+--connect node_1_ctrl, 127.0.0.1, root, , test, $NODE_MYPORT_1
+SET SESSION wsrep_sync_wait = 0;
+
+--echo #
+--echo # Case 1: Table with a binary collation that does not pad strings
+--echo #
+--connection node_1
+CREATE TABLE tcoll (string VARBINARY(16) PRIMARY KEY, node INTEGER) ENGINE=InnoDB;
+
+--let $certification_query_node_1 = INSERT INTO tcoll VALUES (0x61626300, 1)
+--let $certification_query_node_2 = INSERT INTO tcoll VALUES (0x616263, 2)
+--source suite/galera/include/certification_no_conflict.inc
+
+--connection node_1
+SELECT COUNT(*) AS expect_2 FROM tcoll;
+
+--connection node_2
+SELECT COUNT(*) AS expect_2 FROM tcoll;
+
+--connection node_1
+DROP TABLE tcoll;
+
+--echo #
+--echo # Case 2: Table with a binary collation that does pad strings
+--echo #
+
+--connection node_1
+CREATE TABLE tcoll (string BINARY(16) PRIMARY KEY, node INTEGER) ENGINE=InnoDB;
+
+--let $certification_query_node_1 = INSERT INTO tcoll VALUES (0x61626300, 1)
+--let $certification_query_node_2 = INSERT INTO tcoll VALUES (0x616263, 2)
+--source suite/galera/include/certification_conflict.inc
+
+--connection node_1
+SELECT COUNT(*) AS expect_1 FROM tcoll;
+
+--connection node_2
+SELECT COUNT(*) AS expect_1 FROM tcoll;
+
+--connection node_1
+DROP TABLE tcoll;
+
+--echo #
+--echo # Case 3: Create a table with a collation that pads strings
+--echo #
+
+--connection node_1
+CREATE TABLE tcoll (string VARCHAR(16) CHARSET utf8mb4 COLLATE utf8mb4_bin PRIMARY KEY, node INTEGER) ENGINE=InnoDB;
+
+--let $certification_query_node_1 = INSERT INTO tcoll VALUES ('abc', 1)
+--let $certification_query_node_2 = INSERT INTO tcoll VALUES ('abc ', 2)
+--source suite/galera/include/certification_conflict.inc
+
+--connection node_1
+SELECT COUNT(*) AS expect_1 FROM tcoll;
+
+--connection node_2
+SELECT COUNT(*) AS expect_1 FROM tcoll;
+
+--connection node_1
+DROP TABLE tcoll;
+
+--echo #
+--echo # Case 4: Create a table with a collation that pads strings
+--echo #
+
+--connection node_1
+CREATE TABLE tcoll (string VARCHAR(16) CHARSET latin1 PRIMARY KEY, node INTEGER) ENGINE=InnoDB;
+
+--let $certification_query_node_1 = INSERT INTO tcoll VALUES ('abc', 1)
+--let $certification_query_node_2 = INSERT INTO tcoll VALUES ('abc ', 2)
+--source suite/galera/include/certification_conflict.inc
+
+--connection node_1
+SELECT COUNT(*) AS expect_1 FROM tcoll;
+
+--connection node_2
+SELECT COUNT(*) AS expect_1 FROM tcoll;
+
+--connection node_1
+DROP TABLE tcoll;
+
+# Reset number of applier threads back to default and execute a
+# query to make the extra applier to exit before leaving the test.
+SET GLOBAL wsrep_applier_threads = DEFAULT;
+--connection node_2
+CREATE TABLE t1 (f1 INT PRIMARY KEY) ENGINE=InnoDB;
+--connection node_1
+SELECT * FROM t1;
+DROP TABLE t1;

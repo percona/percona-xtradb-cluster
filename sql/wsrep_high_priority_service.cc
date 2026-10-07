@@ -417,11 +417,11 @@ int Wsrep_high_priority_service::rollback(const wsrep::ws_handle &ws_handle,
 
 static int apply_events(THD *thd, Relay_log_info *rli,
                         const wsrep::const_buffer &data,
-                        wsrep::mutable_buffer &err) {
+                        wsrep::mutable_buffer &err, bool include_msg = true) {
   int const ret = wsrep_apply_events(thd, rli, data.data(), data.size());
   if (ret || wsrep_thd_has_ignored_error(thd)) {
     if (ret) {
-      wsrep_store_error(thd, err);
+      wsrep_store_error(thd, err, include_msg);
     }
     wsrep_dump_rbr_buf_with_header(thd, data.data(), data.size());
   }
@@ -470,7 +470,8 @@ int Wsrep_high_priority_service::apply_toi(const wsrep::ws_meta &ws_meta,
   Avoid over-writting of this XID by MySQL XID */
   thd->get_transaction()->xid_state()->get_xid()->set_keep_wsrep_xid(true);
 
-  int ret = apply_events(thd, m_rli, data, err);
+  int ret = apply_events(thd, m_rli, data, err,
+                         wsrep_protocol_version < WsrepVersion::V7);
   wsrep_thd_set_ignored_error(thd, false);
 
   snprintf(m_thd->wsrep_info, sizeof(m_thd->wsrep_info),
@@ -840,7 +841,8 @@ int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
     });
 
     wsrep::mutable_buffer err2;
-    ret = apply_events(thd, m_rli, our_buffer, err2);
+    ret = apply_events(thd, m_rli, our_buffer, err2,
+                       wsrep_protocol_version < WsrepVersion::V7);
     wsrep_thd_set_ignored_error(thd, false);
 
     snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),

@@ -980,6 +980,23 @@ bool pxc_strict_mode_check(sys_var *, THD *thd, set_var *var) {
   return (block);
 }
 
+bool pxc_strict_mode_update(sys_var *, THD *, enum_var_type) {
+  /*
+    When pxc_strict_mode=ENFORCING/MASTER, we set sql_require_primary_key=ON.
+    Only global is set; existing sessions keep their session value
+    (new sessions inherit the updated global default).
+  */
+  if (pxc_strict_mode >= PXC_STRICT_MODE_ENFORCING &&
+      global_system_variables.sql_require_primary_key == false) {
+    global_system_variables.sql_require_primary_key = true;
+    WSREP_INFO(
+        "Setting sql_require_primary_key=ON because pxc_strict_mode is "
+        "being changed to %s.",
+        pxc_strict_mode_to_string(pxc_strict_mode));
+  }
+  return false;
+}
+
 static const char *pxc_maint_mode_to_string(ulong value) {
   switch (value) {
     case PXC_MAINT_MODE_DISABLED:
