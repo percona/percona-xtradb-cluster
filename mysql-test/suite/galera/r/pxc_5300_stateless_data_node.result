@@ -1,0 +1,9 @@
+# gcs.stateless=yes without incoming address: startup must fail.
+include/assert_grep.inc [Startup refused for gcs.stateless=yes without incoming address]
+# gcs.stateless=yes with incoming address: node starts and joins.
+# restart: --wsrep_provider_options=base_port=<PORT>;gcs.stateless=yes
+SELECT @@wsrep_provider_options LIKE '%gcs.stateless = yes%' AS stateless_data_node;
+stateless_data_node
+1
+# Restore the default configuration.
+# restart
