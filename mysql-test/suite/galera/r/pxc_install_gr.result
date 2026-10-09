@@ -9,7 +9,5 @@ INSTALL PLUGIN group_replication SONAME 'group_replication.so';
 ERROR HY000: Group replication cannot be used with Percona XtraDB Cluster in strict mode.
 CREATE TABLE t1(id INT PRIMARY KEY AUTO_INCREMENT);
 SET GLOBAL pxc_strict_mode = 0;
-SET GLOBAL sql_require_primary_key = OFF;
 SET GLOBAL pxc_strict_mode = 0;
-SET GLOBAL sql_require_primary_key = OFF;
 DROP TABLE t1;

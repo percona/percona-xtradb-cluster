@@ -42,9 +42,7 @@ INSTALL PLUGIN group_replication SONAME 'group_replication.so';
 CREATE TABLE t1(id INT PRIMARY KEY AUTO_INCREMENT);
 
 SET GLOBAL pxc_strict_mode = 0;
-SET GLOBAL sql_require_primary_key = OFF;
 --connection node_2
 SET GLOBAL pxc_strict_mode = 0;
-SET GLOBAL sql_require_primary_key = OFF;
 --connection node_1
 DROP TABLE t1;
