@@ -11,7 +11,6 @@ CALL mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of multip
 CALL mtr.add_suppression("pxc_maint_mode cannot be changed while using of multiple major versions");
 CALL mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of multiple major versions while accepting write workload with pxc_strict_mode = ENFORCING");
 SET @global_saved_strict_tmp = @@global.pxc_strict_mode;
-# Below statement also sets @@global.sql_require_primary_key = ON;
 SET GLOBAL pxc_strict_mode = ENFORCING;
 CREATE TABLE tb1 (ID INT PRIMARY KEY);
 INSERT INTO tb1 VALUES (1),(2),(3);
@@ -77,6 +76,5 @@ SET SESSION wsrep_sync_wait = 0;
 --source include/wait_condition.inc
 SET SESSION wsrep_sync_wait = DEFAULT;
 DROP TABLE tb1;
-SET GLOBAL sql_require_primary_key = OFF;
 --enable_query_log
 
