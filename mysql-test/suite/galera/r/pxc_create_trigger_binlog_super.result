@@ -30,7 +30,7 @@ ERROR HY000: You do not have the SUPER privilege (you *might* want to use the le
 CREATE TRIGGER t_plain_no_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
 ERROR HY000: You do not have the SUPER privilege (you *might* want to use the less safe log_bin_trust_function_creators variable)
 CREATE DEFINER = 'other'@'%' TRIGGER t_plain_definer_no_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
-ERROR 42000: Access denied; you need (at least one of) the SUPER or SET_ANY_DEFINER privilege(s) for this operation
+ERROR HY000: You do not have the SUPER privilege (you *might* want to use the less safe log_bin_trust_function_creators variable)
 # 2c. SUPER only
 CREATE TRIGGER t_super_no_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
 CREATE DEFINER = 'other'@'%' TRIGGER t_super_definer_no_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
