@@ -1,0 +1,104 @@
+################################################################################
+#
+# PXC-5203: A session holding LOCK TABLES FOR BACKUP that then runs its own
+# DDL used to have the DDL replicated via Galera TOI *before* the local
+# backup-lock check rejected it. Peers applied the DDL successfully while the
+# originating node failed the statement locally -- a certification-vs-local
+# result divergence that made Galera raise an "Inconsistency detected" vote
+# and kick the node out of the cluster.
+#
+# This test proves the DDL is now rejected immediately, before it ever
+# reaches TOI/replication, so peers never see it and no divergence occurs.
+# It also proves LOCK INSTANCE FOR BACKUP (the ticket's "no problem" case)
+# keeps working exactly as before: same-session DDL still succeeds and
+# still replicates normally.
+#
+################################################################################
+# 1. Create table t1 on node_1, wait for it on node_2.
+# 2. LOCK TABLES FOR BACKUP + same-session ALTER TABLE fails immediately with
+#    ER_CANT_EXECUTE_WITH_BACKUP_LOCK; the index change never reaches node_2.
+# 3. After UNLOCK, the same ALTER TABLE succeeds and replicates normally.
+# 4. LOCK INSTANCE FOR BACKUP with same-session DDL is replicated.
+# 5. Cleanup.
+################################################################################
+--source include/galera_cluster.inc
+
+--echo #
+--echo # 1. Create table t1 on node_1, wait for it on node_2.
+--echo #
+
+--connection node_1
+CREATE TABLE t1 (id INT PRIMARY KEY, a INT, KEY k_a (a)) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1, 10), (2, 20), (3, 30);
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1'
+--source include/wait_condition.inc
+
+--echo #
+--echo # 2. LOCK TABLES FOR BACKUP, ALTER TABLE will fail,
+--echo #    Assert transaction is not replicated.
+--echo #
+
+--connection node_1
+LOCK TABLES FOR BACKUP;
+--error ER_CANT_EXECUTE_WITH_BACKUP_LOCK
+ALTER TABLE t1 DROP KEY k_a;
+
+--let $assert_text = k_a index must still exist on node_1 (statement rejected locally)
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.statistics WHERE TABLE_NAME="t1" AND INDEX_NAME="k_a" AND TABLE_SCHEMA=DATABASE()
+--source include/assert.inc
+
+--connection node_2
+--let $assert_text = k_a index must still exist on node_2 -- nothing was replicated
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.statistics WHERE TABLE_NAME="t1" AND INDEX_NAME="k_a" AND TABLE_SCHEMA=DATABASE()
+--source include/assert.inc
+
+--let $assert_text = Cluster must still have both nodes (no inconsistency vote / node eviction)
+--let $assert_cond = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME="wsrep_cluster_size") = 2
+--source include/assert.inc
+
+--connection node_1
+UNLOCK TABLES;
+
+--echo #
+--echo # 3. After UNLOCK, the same ALTER TABLE succeeds and replicates normally.
+--echo #
+
+ALTER TABLE t1 DROP KEY k_a;
+
+--connection node_2
+--let $assert_text = k_a index must be dropped on node_2 after UNLOCK TABLES
+--let $assert_cond = COUNT(*) = 0 FROM information_schema.statistics WHERE TABLE_NAME="t1" AND INDEX_NAME="k_a" AND TABLE_SCHEMA=DATABASE()
+--source include/assert.inc
+
+--echo #
+--echo # 4. LOCK INSTANCE FOR BACKUP with same-session DDL is replicated.
+--echo #
+
+--connection node_1
+ALTER TABLE t1 ADD KEY k_a (a);
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM information_schema.statistics WHERE TABLE_NAME="t1" AND INDEX_NAME="k_a" AND TABLE_SCHEMA=DATABASE()
+--source include/wait_condition.inc
+
+--connection node_1
+LOCK INSTANCE FOR BACKUP;
+ALTER TABLE t1 DROP KEY k_a;
+UNLOCK INSTANCE;
+
+--let $assert_text = k_a index must be dropped on node_1 -- LOCK INSTANCE FOR BACKUP allows same-session DDL
+--let $assert_cond = COUNT(*) = 0 FROM information_schema.statistics WHERE TABLE_NAME="t1" AND INDEX_NAME="k_a" AND TABLE_SCHEMA=DATABASE()
+--source include/assert.inc
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 0 FROM information_schema.statistics WHERE TABLE_NAME="t1" AND INDEX_NAME="k_a" AND TABLE_SCHEMA=DATABASE()
+--source include/wait_condition.inc
+
+--echo #
+--echo # 5. Cleanup.
+--echo #
+
+--connection node_1
+DROP TABLE t1;
