@@ -19,6 +19,7 @@ usr/bin/perror
 usr/bin/pxc_extra
 usr/bin/mysql_keyring_encryption_test
 usr/bin/mysql_migrate_keyring
+usr/bin/create_id_token
 usr/bin/mysql-systemd
 usr/sbin/mysqld
 

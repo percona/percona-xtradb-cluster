@@ -1674,6 +1674,7 @@ fi
 %attr(755, root, root) %{_bindir}/mysqldumpslow
 %attr(755, root, root) %{_bindir}/mysqltest
 %attr(755, root, root) %{_bindir}/perror
+%attr(755, root, root) %{_bindir}/create_id_token
 %attr(755, root, root) %{_bindir}/mysql_migrate_keyring
 %attr(755, root, root) %{_bindir}/mysql_keyring_encryption_test
 #%attr(755, root, root) %{_bindir}/resolve_stack_dump
