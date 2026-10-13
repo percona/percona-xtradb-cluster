@@ -820,30 +820,30 @@ fi
     cp -r "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" "$TARGETDIR/usr/local/minimal/$PRODUCT_FULL_NAME-minimal"
 
     # Emitted after link so lib/private holds every bundled host library.
-    # A copy is staged outside INSTALLDIR, which is deleted before the caller runs.
+    # A copy is staged in TARGETDIR/sbom, which survives the usr/ cleanup, so the caller can collect it.
     gen_tarball_sbom() {
         local dest=$1
         local label=$2
         [ "${SBOM:-0}" = "1" ] || return 0
         sh "$SOURCEDIR/build-ps/sbom/gen-sbom.sh" \
-            --pkg "percona-server" \
-            --version "${MYSQL_VERSION}${MYSQL_VERSION_EXTRA}" \
+            --pkg "percona-xtradb-cluster" \
+            --version "${MYSQL_VERSION}-${PERCONA_SERVER_EXTENSION}" \
             --root "$SOURCEDIR" \
             --pins "$SOURCEDIR/build-ps/sbom/submodule-pins.txt" \
             --artifact tarball \
             --scan-libs "${dest}/lib/private" \
             --dest "${dest}/sbom"
-        mkdir -p "${WORKDIR_ABS}/sbom"
+        mkdir -p "${TARGETDIR}/sbom"
         for _sf in "${dest}"/sbom/*; do
             [ -f "$_sf" ] || continue
-            cp "$_sf" "${WORKDIR_ABS}/sbom/${label}.$(basename "$_sf")"
+            cp "$_sf" "${TARGETDIR}/sbom/${label}.$(basename "$_sf")"
         done
     }
 
     # NORMAL TARBALL
     cd "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME"
     link
-    gen_tarball_sbom "$INSTALLDIR/usr/local/$PRODUCT_FULL" "$PRODUCT_FULL"
+    gen_tarball_sbom "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" "$PRODUCT_FULL_NAME"
 
     # MIN TARBALL
     if [[ $CMAKE_BUILD_TYPE != "Debug" ]]; then
@@ -852,7 +852,7 @@ fi
         rm -rf percona-xtradb-cluster-tests 2> /dev/null
         find . -type f -exec file '{}' \; | grep ': ELF ' | cut -d':' -f1 | xargs strip --strip-unneeded
         link
-        gen_tarball_sbom "$INSTALLDIR/usr/local/minimal/$PRODUCT_FULL-minimal" "$PRODUCT_FULL-minimal"
+        gen_tarball_sbom "$TARGETDIR/usr/local/minimal/$PRODUCT_FULL_NAME-minimal" "$PRODUCT_FULL_NAME-minimal"
     fi
 )
 
