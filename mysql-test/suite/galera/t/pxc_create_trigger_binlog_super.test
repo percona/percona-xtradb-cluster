@@ -69,7 +69,11 @@ CREATE DEFINER = 'other'@'%' TRIGGER t_any_definer_definer_no_trust AFTER DELETE
 
 --error ER_BINLOG_CREATE_ROUTINE_NEED_SUPER
 CREATE TRIGGER t_plain_no_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
---error ER_SPECIFIC_ACCESS_DENIED_ERROR
+
+# Both gates would reject this: the binlog gate (no SUPER, trust = 0) and the
+# DEFINER check (no SET_ANY_DEFINER). The binlog gate reports, because the
+# DEFINER pre-check runs later, just before TOI -- which is the order PS uses.
+--error ER_BINLOG_CREATE_ROUTINE_NEED_SUPER
 CREATE DEFINER = 'other'@'%' TRIGGER t_plain_definer_no_trust AFTER DELETE ON t FOR EACH ROW SET @x = OLD.id;
 
 --echo # 2c. SUPER only
