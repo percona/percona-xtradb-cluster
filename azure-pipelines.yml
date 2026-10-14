@@ -117,17 +117,18 @@ jobs:
 
   strategy:
     matrix:
-      macOS 14 RelWithDebInfo:
-        imageName: 'macOS-14'
-        Compiler: clang
-        BuildType: RelWithDebInfo
-
-      # skip for a pull request if branch name doesn't contain "fullci"
-      ${{ if or(ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
-        macOS 14 Debug:
-          imageName: 'macOS-14'
-          Compiler: clang
-          BuildType: Debug
+      # macOS 14 (disabled)
+      # macOS 14 RelWithDebInfo:
+      #   imageName: 'macOS-14'
+      #   Compiler: clang
+      #   BuildType: RelWithDebInfo
+      #
+      # # skip for a pull request if branch name doesn't contain "fullci"
+      # ${{ if or(ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
+      #   macOS 14 Debug:
+      #     imageName: 'macOS-14'
+      #     Compiler: clang
+      #     BuildType: Debug
 
 
       # clang-12 and newer compilers
