@@ -637,7 +637,13 @@ get_transfer()
             stagemsg+="-OpenSSL-Encrypted-4"
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
                 wsrep_log_debug "Decrypting with SSL. CERT: $ssl_cert, KEY: $ssl_key, CA: $ssl_ca"
-                tcmd="socat -u openssl-listen:${TSST_PORT},reuseaddr,cert=${ssl_cert},key=${ssl_key},cafile=${ssl_ca},verify=1${joiner_extra}${sockopt} stdio"
+                # PXC-3767 - IPv6 support in PXC (wsrep_sst_xtrabackup-v2)
+                # socat require pf=ip6 for openssl-listen to work with IPv6 addresses
+                local ipv6_listen_opt=""
+                if [[ "$WSREP_SST_OPT_HOST" =~ .*:.* ]]; then
+                    ipv6_listen_opt=",pf=ip6"
+                fi
+                tcmd="socat -u openssl-listen:${TSST_PORT},reuseaddr,${ipv6_listen_opt}cert=${ssl_cert},key=${ssl_key},cafile=${ssl_ca},verify=1${joiner_extra}${ipv6_listen_opt}${sockopt} stdio"
             else
                 wsrep_log_debug "Encrypting with SSL. CERT: $ssl_cert, KEY: $ssl_key, CA: $ssl_ca"
                 tcmd="socat ${socat_T} -u stdio openssl-connect:${REMOTEIP}:${TSST_PORT},cert=${ssl_cert},key=${ssl_key},cafile=${ssl_ca},verify=1${donor_extra}${sockopt}${socat_donor_connect_timeout}"
