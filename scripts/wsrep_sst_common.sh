@@ -573,9 +573,19 @@ function wait_for_mysqld_startup()
     local -i timeout
     timeout=$threshold
 
+    # Create temporary config file for mysqladmin (Triton compatibility)
+    # Note: This file will be cleaned up at the end of the function
+    local mysqladmin_cnf=$(mktemp)
+    cat > "$mysqladmin_cnf" <<EOF
+[mysqladmin]
+user=${sst_user}
+password="${sst_password}"
+EOF
+
     while [ true ]; do
         if ! ps --pid $mysqld_pid >/dev/null; then
             # If the process doesn't exist, then it shut down, so exit
+            rm -f "$mysqladmin_cnf" 2>/dev/null || true
             wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "Failed to start the $description."
             wsrep_log_error "Check the parameters and retry"
@@ -586,13 +596,9 @@ function wait_for_mysqld_startup()
         fi
 
         $mysqladmin_path \
-            --defaults-file=/dev/stdin \
+            --defaults-file="$mysqladmin_cnf" \
             --socket=$mysqld_socket \
-            ping &> /dev/null <<EOF
-[mysqladmin]
-user=${sst_user}
-password="${sst_password}"
-EOF
+            ping &> /dev/null
         errcode=$?
         [[ $errcode -eq 0 ]] && break
 
@@ -604,6 +610,7 @@ EOF
         sleep 1
         ((timeout--))
         if [[ $timeout -eq 0 ]]; then
+            rm -f "$mysqladmin_cnf" 2>/dev/null || true
             kill -9 $mysql_pid
             wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "Failed to start the $description. (timeout)"
@@ -615,6 +622,8 @@ EOF
         fi
     done
 
+    # Clean up temp file now that mysqld has started successfully
+    rm -f "$mysqladmin_cnf" 2>/dev/null || true
     return 0
 }
 
@@ -682,6 +691,12 @@ function run_post_processing_steps()
     local upgrade_tmpdir
     local mysql_upgrade_dir_path
     local use_mysql_upgrade_conf_suffix=""
+    
+    # Temporary files for Triton compatibility (must persist until cleanup)
+    local mysqld_init_file=""
+    local mysql_client_cnf=""
+    local mysql_reset_cnf=""
+    local mysql_shutdown_cnf=""
 
     local_version_str=$(expr match "$local_version" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
     donor_version_str=$(expr match "$donor_version" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
@@ -874,19 +889,23 @@ function run_post_processing_steps()
     local sst_password="aA!9$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)"
 
     local -i timeout_threshold
-    timeout_threshold=$(parse_cnf sst post-processing-timeout 300)
+    timeout_threshold=300
 
     #-----------------------------------------------------------------------
     # Reuse the SST User (use it to run mysql_upgrade)
     # Recreate with root permissions and a new password
     wsrep_log_debug "Starting the MySQL server used for post-processing"
     echo "---- Starting the MySQL server used for post-processing ----" >> ${mysqld_err_log}
-    cat <<EOF | $mysqld_path $mysqld_cmdline --init-file=/dev/stdin &>> ${mysqld_err_log} &
+    # Create temporary init file for mysqld (Triton compatibility - /dev/stdin not available)
+    # Note: This file must persist until mysqld has fully started and read it
+    mysqld_init_file=$(mktemp)
+    cat > "$mysqld_init_file" <<EOF
 SET sql_log_bin=OFF;
 DROP USER IF EXISTS '${sst_user}'@localhost;
 CREATE USER '${sst_user}'@localhost IDENTIFIED BY '${sst_password}';
 GRANT ALL ON *.* TO '${sst_user}'@localhost;
 EOF
+    $mysqld_path $mysqld_cmdline --init-file="$mysqld_init_file" &>> ${mysqld_err_log} &
     mysql_pid=$!
 
 
@@ -896,7 +915,11 @@ EOF
         "${mysqld_err_log}" "${sst_user}" "${sst_password}" \
         "mysql server that checks for async replication"
     errcode=$?
-    [[ $errcode -ne 0 ]] && return $errcode
+    if [[ $errcode -ne 0 ]]; then
+        # Clean up init file since mysqld failed to start (process is dead or was killed)
+        [[ -n "$mysqld_init_file" ]] && rm -f "$mysqld_init_file" 2>/dev/null || true
+        return $errcode
+    fi
     wsrep_log_debug "MySQL server($mysql_pid) started"
 
 
@@ -907,20 +930,25 @@ EOF
         wsrep_log_debug "Checking slave status"
 
         local slave_status=""
-        slave_status=$($mysql_client_path \
-                        --defaults-file=/dev/stdin \
-                        --socket=$upgrade_socket \
-                        --unbuffered --batch --silent --skip-column-names \
-                        -e "SHOW SLAVE STATUS;" \
-                        2> ${mysql_upgrade_dir_path}/show_slave_status.out <<EOF
+        # Create temporary config file for mysql client (Triton compatibility)
+        # Note: This file will be cleaned up at the end of the function
+        mysql_client_cnf=$(mktemp)
+        cat > "$mysql_client_cnf" <<EOF
 [client]
 user=${sst_user}
 password="${sst_password}"
 EOF
-)
-        errcode=$?
+        slave_status=$($mysql_client_path \
+                        --defaults-file="$mysql_client_cnf" \
+                        --socket=$upgrade_socket \
+                        --unbuffered --batch --silent --skip-column-names \
+                        -e "SHOW SLAVE STATUS;" \
+                        2> ${mysql_upgrade_dir_path}/show_slave_status.out)
+        local show_slave_errcode=$?
+        errcode=$show_slave_errcode
         if [[ $errcode -ne 0 ]]; then
             kill -9 $mysql_pid
+            rm -f "$mysql_client_cnf" "$mysqld_init_file" 2>/dev/null || true
             wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "Failed to execute mysql 'SHOW SLAVE STATUS'. Check the parameters and retry"
             wsrep_log_error "Line $LINENO errcode:${errcode}"
@@ -939,19 +967,24 @@ EOF
     if [[ $run_reset_slave == 'yes' ]]; then
         wsrep_log_debug "Resetting Async Slave"
 
-        $mysql_client_path \
-            --defaults-file=/dev/stdin \
-            --socket=$upgrade_socket \
-            --unbuffered --batch --silent \
-            -e "SET sql_log_bin=OFF; RESET SLAVE ALL;" \
-            &> ${mysql_upgrade_dir_path}/reset_slave.out <<EOF
+        # Create temporary config file for mysql client (Triton compatibility)
+        # Note: This file will be cleaned up at the end of the function
+        mysql_reset_cnf=$(mktemp)
+        cat > "$mysql_reset_cnf" <<EOF
 [client]
 user=${sst_user}
 password="${sst_password}"
 EOF
+        $mysql_client_path \
+            --defaults-file="$mysql_reset_cnf" \
+            --socket=$upgrade_socket \
+            --unbuffered --batch --silent \
+            -e "SET sql_log_bin=OFF; RESET SLAVE ALL;" \
+            &> ${mysql_upgrade_dir_path}/reset_slave.out
         errcode=$?
         if [[ $errcode -ne 0 ]]; then
             kill -9 $mysql_pid
+            rm -f "$mysql_reset_cnf" "$mysql_client_cnf" "$mysqld_init_file" 2>/dev/null || true
             wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "Failed to execute mysql 'RESET SLAVE ALL'. Check the parameters and retry"
             wsrep_log_error "Line $LINENO errcode:${errcode}"
@@ -969,21 +1002,26 @@ EOF
     #   LOCK the account to ensure that the user can't be used pass this
     #   point if the server fails to shutdown properly (or is killed).
     wsrep_log_debug "Shutting down the MySQL server"
-    $mysql_client_path \
-        --defaults-file=/dev/stdin \
-        --socket=$upgrade_socket \
-        --unbuffered --batch --silent \
-        -e "SET sql_log_bin=OFF; ALTER USER '${sst_user}'@localhost ACCOUNT LOCK; SHUTDOWN;" \
-        &> ${mysql_upgrade_dir_path}/upgrade_shutdown.out <<EOF
+    # Create temporary config file for mysql client (Triton compatibility)
+    # Note: This file will be cleaned up at the end of the function
+    mysql_shutdown_cnf=$(mktemp)
+    cat > "$mysql_shutdown_cnf" <<EOF
 [client]
 user=${sst_user}
 password="${sst_password}"
 EOF
+    $mysql_client_path \
+        --defaults-file="$mysql_shutdown_cnf" \
+        --socket=$upgrade_socket \
+        --unbuffered --batch --silent \
+        -e "SET sql_log_bin=OFF; ALTER USER '${sst_user}'@localhost ACCOUNT LOCK; SHUTDOWN;" \
+        &> ${mysql_upgrade_dir_path}/upgrade_shutdown.out
     errcode=$?
     if [[ $errcode -ne 0 ]]; then
         sleep 3
         kill -9 $mysql_pid
         echo "---- Killed the MySQL server used for post-processing ----" >> ${mysqld_err_log}
+        rm -f "$mysql_shutdown_cnf" "$mysql_reset_cnf" "$mysql_client_cnf" "$mysqld_init_file" 2>/dev/null || true
         wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "Failed to shutdown the MySQL instance started for upgrade."
         wsrep_log_error "Check the parameters and retry.  Killing the process."
@@ -995,13 +1033,24 @@ EOF
     fi
 
     wait_for_mysqld_shutdown $mysql_pid $timeout_threshold "MySQL server started for the upgrade process"
-    [[ $? -ne 0 ]] && return 1
+    local shutdown_errcode=$?
+    if [[ $shutdown_errcode -ne 0 ]]; then
+        rm -f "$mysql_shutdown_cnf" "$mysql_reset_cnf" "$mysql_client_cnf" "$mysqld_init_file" 2>/dev/null || true
+        return 1
+    fi
 
     wsrep_log_debug "MySQL server shut down"
     echo "---- Stopped the MySQL server used for post-processing ----" >> ${mysqld_err_log}
 
     #-----------------------------------------------------------------------
-    # cleanup
+    # cleanup: Remove all temporary config files now that mysqld has fully shut down
+    # Note: mysqld_init_file must persist until mysqld has read it during startup
+    # All other config files are only needed during their respective command executions
+    [[ -n "$mysql_shutdown_cnf" ]] && rm -f "$mysql_shutdown_cnf" 2>/dev/null || true
+    [[ -n "$mysql_reset_cnf" ]] && rm -f "$mysql_reset_cnf" 2>/dev/null || true
+    [[ -n "$mysql_client_cnf" ]] && rm -f "$mysql_client_cnf" 2>/dev/null || true
+    # mysqld_init_file can now be safely removed after mysqld has fully shut down
+    [[ -n "$mysqld_init_file" ]] && rm -f "$mysqld_init_file" 2>/dev/null || true
 
     return 0
 }
@@ -1027,8 +1076,15 @@ function exec_sql() {
     "${default_auth}"
   )
 
-  retoutput=$(mysql --defaults-file=<(echo "${defaults}") --unbuffered --batch --silent ${args} -e "$query")
+  # Create temporary config file for mysql client (Triton compatibility - process substitution not available)
+  # Note: This file will be cleaned up at the end of the function
+  local mysql_exec_cnf=$(mktemp)
+  echo "${defaults}" > "$mysql_exec_cnf"
+  retoutput=$(mysql --defaults-file="$mysql_exec_cnf" --unbuffered --batch --silent ${args} -e "$query")
   retvalue=$?
+  
+  # Clean up temp file after mysql command completes
+  rm -f "$mysql_exec_cnf" 2>/dev/null || true
 
   printf "%s" "${retoutput}"
   return $retvalue
