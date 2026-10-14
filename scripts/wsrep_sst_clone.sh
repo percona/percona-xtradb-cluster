@@ -358,7 +358,16 @@ setup_certificates_for_donor()
             fi
         fi
     else
-        CLIENT_SSL_OPTIONS+=" --ssl-mode=DISABLED"
+        # No explicit [client] SSL certificates were provided for the Donor ->
+        # Recipient control connection. Do NOT force --ssl-mode=DISABLED here:
+        # the Recipient instance is started with the Joiner's config file, so if
+        # the cluster has require_secure_transport=ON the Recipient rejects the
+        # plain (unencrypted) TCP connection and SST fails (PXC-5289).
+        # Use PREFERRED (the client default): TLS is used when the Recipient
+        # offers it (certificates are always present, either configured or
+        # auto-generated via auto_generate_certs), and it falls back to a plain
+        # connection when the Recipient has no TLS configured at all.
+        CLIENT_SSL_OPTIONS+=" --ssl-mode=PREFERRED"
     fi
     wsrep_log_debug "SSL Client settings on $role for connection CLIENT_SSL_OPTIONS=${CLIENT_SSL_OPTIONS}"
 }
