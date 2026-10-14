@@ -1,0 +1,34 @@
+!include ../galera_2nodes.cnf
+
+# Regression test for PXC-5289:
+# clone SST must work when the cluster enforces require_secure_transport=ON.
+#
+# galera_2nodes.cnf already configures server SSL certificates (ssl-ca/cert/key).
+# We deliberately do NOT add ssl_cert/ssl_key/ssl_ca to the [client] section, so
+# the Donor -> Recipient control connection in wsrep_sst_clone.sh takes the
+# "no client certificates" branch. That branch must not force --ssl-mode=DISABLED,
+# otherwise the Recipient (started with this very config, hence
+# require_secure_transport=ON) rejects the plain connection and SST fails.
+#
+# [client] ssl-mode=REQUIRED only affects the MTR test harness connections (which
+# otherwise connect over plain TCP and would be rejected by
+# require_secure_transport=ON). It does NOT affect the clone script's own
+# connections: wsrep_sst_clone.sh starts its mysql client with --no-defaults and
+# sets ssl-mode explicitly, so the tested code path is preserved.
+
+[mysqld]
+wsrep_sst_method=clone
+require_secure_transport=ON
+wsrep_debug=1
+
+[mysqld.1]
+wsrep_provider_options='base_port=@mysqld.1.#galera_port;gcache.size=1;pc.ignore_sb=true;@ENV.WSREP_PROVIDER_TIMEOUTS'
+
+[mysqld.2]
+wsrep_provider_options='base_port=@mysqld.2.#galera_port;gcache.size=1;pc.ignore_sb=true;@ENV.WSREP_PROVIDER_TIMEOUTS'
+
+[client]
+ssl-mode=REQUIRED
+
+[sst]
+wsrep-debug=true
