@@ -58,6 +58,13 @@ sfmt=""
 strmcmd=""
 tfmt=""
 tcmd=""
+# transfer-fifo-streams: number of parallel TCP streams for the main SST
+# data transfer. Default 1 (single TCP, current behaviour). When > 1, uses
+# xtrabackup --fifo-streams on the donor and a single xbstream --fifo-streams
+# on the joiner, with N socat sessions (encrypt=4 mTLS or plain TCP) acting
+# as the wire.
+transfer_fifo_streams=1
+SST_FIFO_DIR=""
 rebuild=0
 rebuildcmd=""
 payload=0
@@ -665,6 +672,7 @@ read_cnf()
 {
     sfmt=$(parse_cnf sst streamfmt "xbstream")
     tfmt=$(parse_cnf sst transferfmt "socat")
+    transfer_fifo_streams=$(parse_cnf sst transfer-fifo-streams 1)
     encrypt=$(parse_cnf sst encrypt 0)
     sockopt=$(parse_cnf sst sockopt "")
     ncsockopt=$(parse_cnf sst ncsockopt "")
@@ -672,6 +680,62 @@ read_cnf()
     ttime=$(parse_cnf sst time 0)
     scomp=$(parse_cnf sst compressor "")
     sdecomp=$(parse_cnf sst decompressor "")
+
+    # transfer-fifo-streams sanity (N>1).
+    #
+    # The multi-FIFO transport uses xtrabackup --fifo-streams + xbstream
+    # --fifo-streams fanned out over N parallel socat sessions. Three knobs
+    # are incompatible with that and we fatal-out rather than silently
+    # downgrade -- the user explicitly opted into parallel transport, so a
+    # silent fall-back to single-stream would mask their intent:
+    #
+    #  * transferfmt != socat:
+    #      netcat (transferfmt=nc) has no address chaining like socat's
+    #      OPEN:$FIFO,wronly. With nc the joiner would have to use a bash
+    #      `> $FIFO` redirection, which open(O_WRONLY)-blocks before nc
+    #      can bind LISTEN -- deadlock against xbstream's pending
+    #      O_RDONLY open. nc also can't terminate TLS, so the encrypt=4
+    #      flow is socat-only anyway.
+    #
+    #  * streamfmt != xbstream:
+    #      xtrabackup --fifo-streams only operates with --stream=xbstream.
+    #      The legacy --stream=tar mode is single-stdout-only and
+    #      xtrabackup itself rejects --fifo-streams=N>1 there.
+    #
+    #  * sst.compressor / sst.decompressor (wire-level compressors like
+    #    pigz, zstd -c):
+    #      Inserting a per-stream decompressor on the joiner side
+    #      (`socat ... stdio | $sdecomp > $FIFO`) is feasible but adds
+    #      bash plumbing we don't need in the first iteration. Users who
+    #      want on-wire compression have a drop-in workaround:
+    #          [sst] inno-backup-opts = --compress=zstd
+    #      That compresses inside xtrabackup before bytes hit the FIFOs,
+    #      so wire size shrinks without an extra filter between each FIFO
+    #      and its socat. Multi-FIFO is fully compatible with xtrabackup's
+    #      own --compress.
+    if [[ $transfer_fifo_streams -gt 1 ]]; then
+        if [[ $tfmt != "socat" ]]; then
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "transfer-fifo-streams > 1 requires transferfmt=socat"
+            wsrep_log_error "****************************************************** "
+            safe_exit 22
+        fi
+        if [[ $sfmt != "xbstream" ]]; then
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "transfer-fifo-streams > 1 requires streamfmt=xbstream"
+            wsrep_log_error "****************************************************** "
+            safe_exit 22
+        fi
+        if [[ -n "$scomp" || -n "$sdecomp" ]]; then
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "transfer-fifo-streams > 1 incompatible with sst compressor/decompressor."
+            wsrep_log_error "Use xtrabackup's own compression instead:"
+            wsrep_log_error "    [sst] inno-backup-opts = --compress=zstd"
+            wsrep_log_error "****************************************************** "
+            safe_exit 22
+        fi
+        wsrep_log_info "transfer-fifo-streams=${transfer_fifo_streams}: parallel TCP transport enabled"
+    fi
 
     # if wsrep_node_address is not set raise a warning
     local wsrep_node_address=$(parse_cnf mysqld wsrep-node-address "")
@@ -862,6 +926,47 @@ adjust_progress()
         wsrep_log_debug "Rate-limiting SST to $rlimit"
         pcmd+=" -L \$rlimit"
     fi
+}
+
+# make_fifo_workdir [make_fifos N]
+#
+# Creates a private tmpdir for SST multi-FIFO transport. Path is printed to
+# stdout; caller is expected to rm -rf on cleanup.
+#
+# Donor side: xtrabackup --fifo-streams creates the N FIFOs itself and refuses
+# to start if any already exist, so the donor calls this with just one arg
+# (mkdir only).
+#
+# Joiner side: xbstream --fifo-streams expects the FIFOs to be present on
+# startup and does not create them, so the joiner calls
+# make_fifo_workdir N "withfifos" to also mkfifo thread_0..thread_(N-1).
+make_fifo_workdir()
+{
+    local n=$1
+    local mode=${2:-}   # empty (mkdir only) | "withfifos" (mkdir + mkfifo*N)
+    local uuid role dir
+    role="${WSREP_SST_OPT_ROLE:-unknown}"
+    if [[ -r /proc/sys/kernel/random/uuid ]]; then
+        uuid=$(< /proc/sys/kernel/random/uuid)
+    else
+        uuid=$(mktemp -u XXXXXXXXXXXX)
+    fi
+    dir="/tmp/pxc-sst-fifo-${role}-${uuid}"
+    if ! mkdir -m 0700 "$dir"; then
+        wsrep_log_error "make_fifo_workdir: failed to create $dir"
+        safe_exit 32
+    fi
+    if [[ "$mode" == "withfifos" ]]; then
+        local i
+        for ((i = 0; i < n; i++)); do
+            if ! mkfifo "$dir/thread_$i"; then
+                rm -rf "$dir"
+                wsrep_log_error "make_fifo_workdir: mkfifo failed for thread_$i"
+                safe_exit 32
+            fi
+        done
+    fi
+    echo "$dir"
 }
 
 #
@@ -2074,6 +2179,72 @@ then
         if [ "$WSREP_SST_OPT_DEBUG" = "wsrep_sst_donor_skip" ]
         then
           RC=0
+        elif [[ $transfer_fifo_streams -gt 1 ]]; then
+          # ---- multi-FIFO transport path (parallel TCP) ----
+          # The cross-host model is identical to the single-stream case, just
+          # x N: N donor socats TCP-connect to N joiner listeners on
+          # consecutive ports starting at TSST_PORT. Local plumbing differs
+          # only because xtrabackup --fifo-streams creates the FIFOs itself
+          # (and refuses to start if they exist), while xbstream on the joiner
+          # does not.
+          wsrep_log_info "Donor: parallel SST transport with $transfer_fifo_streams TCP streams"
+          SST_FIFO_DIR=$(make_fifo_workdir "$transfer_fifo_streams")
+          # Align --parallel with --fifo-streams so xtrabackup spawns N
+          # data-copy threads, one per FIFO. Last --parallel wins on the
+          # command line, overriding anything inherited from
+          # sst.backup-threads / iopts.
+          INNOBACKUP_FIFO="$INNOBACKUP --parallel=$transfer_fifo_streams --fifo-streams=$transfer_fifo_streams --fifo-dir=$SST_FIFO_DIR --fifo-timeout=300"
+
+          # Build socat args. (Top-level body, no `local`.)
+          _socat_T=""
+          _socat_connect_timeout=""
+          if [[ ${WSREP_SST_IDLE_TIMEOUT:-0} -ne 0 ]]; then
+              _socat_T=" -T ${WSREP_SST_IDLE_TIMEOUT}"
+          fi
+          if [[ ${WSREP_SST_DONOR_TIMEOUT:-0} -ne 0 ]]; then
+              _socat_connect_timeout=",connect-timeout=${WSREP_SST_DONOR_TIMEOUT},retry=30,interval=1"
+          else
+              _socat_connect_timeout=",retry=30,interval=1"
+          fi
+
+          # Spawn N socat pipelines BEFORE xtrabackup. Each waits for its own
+          # FIFO to appear (xtrabackup creates them), then cat-pipes into a
+          # TCP-connect socat. No central polling loop; each stream is
+          # self-contained, mirroring the single-stream pipeline shape.
+          _stream_pids=()
+          for ((_i = 0; _i < transfer_fifo_streams; _i++)); do
+              _port=$((TSST_PORT + _i))
+              if [[ $encrypt -eq 4 ]]; then
+                  _stream_tcmd="socat ${_socat_T} -u stdio openssl-connect:${REMOTEIP}:${_port},cert=${ssl_cert},key=${ssl_key},cafile=${ssl_ca},verify=1${donor_extra}${sockopt}${_socat_connect_timeout}"
+              else
+                  _stream_tcmd="socat ${_socat_T} -u stdio TCP:${REMOTEIP}:${_port}${sockopt}${_socat_connect_timeout}"
+              fi
+              (
+                  _fifo="$SST_FIFO_DIR/thread_$_i"
+                  _deadline=$(( SECONDS + 300 ))
+                  while [[ ! -p "$_fifo" ]] && (( SECONDS < _deadline )); do
+                      sleep 0.1
+                  done
+                  if [[ ! -p "$_fifo" ]]; then
+                      wsrep_log_error "FIFO $_fifo did not appear within 300s"
+                      exit 1
+                  fi
+                  cat "$_fifo" | eval "$_stream_tcmd"
+              ) &
+              _stream_pids+=($!)
+          done
+
+          # Now run xtrabackup in the foreground (same shape as the legacy
+          # single-stream code). Its PIPESTATUS becomes our RC[0] just like
+          # the single-stream branch.
+          timeit "${stagemsg}-SST" "eval $INNOBACKUP_FIFO; RC=( \"\${PIPESTATUS[@]}\" )"
+
+          for _p in "${_stream_pids[@]}"; do
+              wait "$_p" || true
+          done
+          rm -rf "$SST_FIFO_DIR"
+          SST_FIFO_DIR=""
+          # ---- end multi-FIFO transport path ----
         else
           timeit "${stagemsg}-SST" "$INNOBACKUP | $tcmd; RC=( "\${PIPESTATUS[@]}" )"
         fi
@@ -2439,8 +2610,54 @@ then
         # work.
         SAFE_EXIT_CODE_OVERRIDE=
 
-        (recv_data_from_donor_to_joiner "$JOINER_SST_DIR" "${stagemsg}-SST" 0 0) &
-        jpid=$!
+        if [[ $transfer_fifo_streams -gt 1 ]]; then
+            # ---- multi-FIFO joiner path (parallel TCP) ----
+            wsrep_log_info "Joiner: parallel SST transport with $transfer_fifo_streams TCP streams"
+            # mkdir + mkfifo*N — xbstream expects existing FIFOs.
+            SST_FIFO_DIR=$(make_fifo_workdir "$transfer_fifo_streams" "withfifos")
+            (
+                cd "$JOINER_SST_DIR"
+                # Spawn N socat listeners. Each socat opens its TCP LISTEN
+                # address first (bind + listen happen immediately, accept
+                # blocks waiting for the donor), then opens OPEN:$FIFO,wronly
+                # *after* accept completes -- so the FIFO open rendezvous
+                # with xbstream's read side happens at a time when the TCP
+                # listener is already reachable. No bash redirection on the
+                # FIFO, no O_RDWR trick.
+                _socat_pids=()
+                for ((_i = 0; _i < transfer_fifo_streams; _i++)); do
+                    _port=$((TSST_PORT + _i))
+                    _fifo="$SST_FIFO_DIR/thread_$_i"
+                    if [[ $encrypt -eq 4 ]]; then
+                        _stream_tcmd="socat -u openssl-listen:${_port},reuseaddr,cert=${ssl_cert},key=${ssl_key},cafile=${ssl_ca},verify=1${joiner_extra}${sockopt} OPEN:${_fifo},wronly"
+                    elif [[ "$WSREP_SST_OPT_HOST" =~ .*:.* ]]; then
+                        _stream_tcmd="socat -u TCP6-LISTEN:${_port},reuseaddr${sockopt} OPEN:${_fifo},wronly"
+                    else
+                        _stream_tcmd="socat -u TCP-LISTEN:${_port},reuseaddr${sockopt} OPEN:${_fifo},wronly"
+                    fi
+                    ( eval "$_stream_tcmd" ) &
+                    _socat_pids+=($!)
+                done
+
+                # Run xbstream in the foreground (same shape as the legacy
+                # single-stream code's `socat | xbstream`). It opens FIFOs
+                # for read; each socat's pending O_WRONLY open rendezvous
+                # with it once the donor connects on the matching port.
+                xbcmd="${XTRABACKUP_80_PATH}/bin/xbstream -x $xbstream_opts --fifo-streams=$transfer_fifo_streams --fifo-dir=$SST_FIFO_DIR --fifo-timeout=300"
+                eval "$xbcmd"
+                rc_xb=$?
+                for _p in "${_socat_pids[@]}"; do
+                    wait "$_p" || true
+                done
+                rm -rf "$SST_FIFO_DIR"
+                exit $rc_xb
+            ) &
+            jpid=$!
+            # ---- end multi-FIFO joiner path ----
+        else
+            (recv_data_from_donor_to_joiner "$JOINER_SST_DIR" "${stagemsg}-SST" 0 0) &
+            jpid=$!
+        fi
         wsrep_log_info "Proceeding with SST........."
 
         wsrep_log_debug "Cleaning the existing datadir and innodb-data/log directories"

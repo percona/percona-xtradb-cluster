@@ -1,0 +1,25 @@
+#
+# Same SST flows as galera_sst_xtrabackup-v2.test, but with
+# [sst] transfer-fifo-streams=16 so the donor uses
+# `xtrabackup --fifo-streams=16` and the joiner runs ONE
+# `xbstream --fifo-streams=16` consuming 16 FIFOs fed by
+# 16 parallel socat sessions (TLS or plain TCP).
+#
+
+--source include/big_test.inc
+--source include/galera_cluster.inc
+
+--disable_query_log
+--connection node_1
+CALL mtr.add_suppression("Failed to remove page file");
+--connection node_2
+CALL mtr.add_suppression("Failed to remove page file");
+--enable_query_log
+
+--source suite/galera/include/galera_st_shutdown_slave.inc
+--source suite/galera/include/galera_st_clean_slave.inc
+
+--source suite/galera/include/galera_st_kill_slave.inc
+--source suite/galera/include/galera_st_kill_slave_ddl.inc
+
+--remove_file $MYSQL_TMP_DIR/galera_wsrep_recover.log
