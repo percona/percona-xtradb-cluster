@@ -1019,9 +1019,15 @@ then
     ib_home_dir=$(parse_cnf mysqld innodb-data-home-dir "")
     ib_log_dir=$(parse_cnf mysqld innodb-log-group-home-dir "")
     ib_undo_dir=$(parse_cnf mysqld innodb-undo-directory "")
+    # Session temp tablespaces live here. When it is configured outside the
+    # datadir, leftover temp_*.ibt files survive a crash and make the
+    # subsequent 'mysqld --initialize-insecure' below fail (it does not clean
+    # old temp tablespaces, unlike a normal start). So it must be cleaned too.
+    ib_tmp_dir=$(parse_cnf mysqld innodb-temp-tablespaces-dir "")
 
     cpat=$(parse_cnf sst cpat '.*\.pem$\|.*init\.ok$\|.*galera\.cache$\|.*sst_in_progress$\|.*gvwstate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$\|.*component_keyring_.*\.cnf$\|.*mysqld.my$')
-    find $ib_home_dir $ib_log_dir $ib_undo_dir $WSREP_SST_OPT_DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>/dev/null \+
+    dirs=$(printf "%s\n" "$ib_home_dir" "$ib_log_dir" "$ib_undo_dir" "$ib_tmp_dir" "$WSREP_SST_OPT_DATA" | sort -u)
+    find $dirs -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>/dev/null \+
 
     # Before starting let us be sure we remove Netcat given it is using same MySQL port
     # check if there is another netcat process on the IP port we need and try to kill it.
