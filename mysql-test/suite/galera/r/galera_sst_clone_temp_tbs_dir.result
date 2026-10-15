@@ -1,0 +1,8 @@
+CREATE TABLE t1 (f1 INT PRIMARY KEY) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1), (2), (3);
+INSERT INTO t1 VALUES (4), (5), (6);
+# Restarting node_2 - it must rejoin via SST despite the leftover
+# temp tablespace in innodb_temp_tablespaces_dir.
+# restart
+include/assert.inc [node_2 received all 6 rows of t1 via SST]
+DROP TABLE t1;

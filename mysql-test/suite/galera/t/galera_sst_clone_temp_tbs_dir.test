@@ -1,0 +1,15 @@
+#
+# Clone SST must initialize the datadir even when innodb_temp_tablespaces_dir is
+# outside the datadir and holds leftover temp_*.ibt files (as a crash would
+# leave behind).
+#
+# Without the fix in wsrep_sst_clone.sh this test fails: the clone SST
+# 'mysqld --initialize-insecure' aborts with "Tablespace already exists" on the
+# leftover temp_1.ibt, node_2 never rejoins, and the wait for a 2-node cluster
+# times out. See suite/galera/include/galera_sst_temp_tbs_dir.inc for details.
+#
+
+--source include/galera_cluster.inc
+
+--let $node_2_temp_tbs_dir= $MYSQL_TMP_DIR/clone_n2_temp_tbs
+--source suite/galera/include/galera_sst_temp_tbs_dir.inc
