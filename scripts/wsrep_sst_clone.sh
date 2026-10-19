@@ -1074,7 +1074,24 @@ then
       safe_exit 1 )
 
     # Move initialized data directory structure to real datadir and cleanup
-    mv -n "$tmp_datadir"/* "$WSREP_SST_OPT_DATA/"
+    # We stop if --initialize-insecure left nothing to move: without a bootstrap datadir
+    # the clone recipient instance cannot start.
+    if [ -z "$(find "$tmp_datadir" -mindepth 1 -maxdepth 1 -print -quit)" ]; then
+        wsrep_log_error "Initialized datadir $tmp_datadir is empty, aborting SST"
+        safe_exit 1
+    fi
+
+    # Move blank-init files in, but never clobber files preserved from the old datadir
+    for f in "$tmp_datadir"/* "$tmp_datadir"/.[!.]* "$tmp_datadir"/..?*; do
+        [ -e "$f" ] || [ -L "$f" ] || continue
+        dest="$WSREP_SST_OPT_DATA/${f##*/}"
+        if [ ! -e "$dest" ] && [ ! -L "$dest" ]; then
+            mv -- "$f" "$WSREP_SST_OPT_DATA/"
+        else
+            wsrep_log_info "Keeping preserved $dest"
+        fi
+    done
+
     wsrep_log_debug "-> REMOVE $tmp_datadir"
     rm -rf "$tmp_datadir"
 
