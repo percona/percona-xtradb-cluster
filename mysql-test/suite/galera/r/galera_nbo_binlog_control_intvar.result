@@ -1,0 +1,22 @@
+CREATE TABLE t1 (f1 INTEGER NOT NULL PRIMARY KEY) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1);
+#
+# Originate an NBO ALTER from a session with binary logging off, so the
+# write set carries a BINLOG_CONTROL Intvar event ahead of the statement.
+#
+SET SESSION sql_log_bin = OFF;
+SET SESSION wsrep_OSU_method = NBO;
+SET SESSION wsrep_OSU_method = DEFAULT;
+SET SESSION sql_log_bin = ON;
+SELECT COUNT(*) AS columns_on_node_1 FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = 'test' AND TABLE_NAME = 't1';
+columns_on_node_1
+61
+#
+# The applier node must have survived and applied the ALTER.
+#
+SELECT COUNT(*) AS columns_on_node_2 FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = 'test' AND TABLE_NAME = 't1';
+columns_on_node_2
+61
+DROP TABLE t1;
