@@ -1,0 +1,20 @@
+!include ../galera_2nodes.cnf
+
+[mysqld]
+wsrep_sst_method=clone
+wsrep_debug=1
+
+[mysqld.1]
+wsrep_provider_options='base_port=@mysqld.1.#galera_port;gcache.size=1;pc.ignore_sb=true;@ENV.WSREP_PROVIDER_TIMEOUTS'
+
+[mysqld.2]
+wsrep_provider_options='base_port=@mysqld.2.#galera_port;gcache.size=1;pc.ignore_sb=true;@ENV.WSREP_PROVIDER_TIMEOUTS'
+# Keep node_2's session temporary tablespaces OUTSIDE its datadir. The
+# directory is created by the companion -master.sh before the server starts
+# (InnoDB refuses to start if it does not exist). This is the configuration
+# that triggers the bug.
+innodb_temp_tablespaces_dir=@ENV.MYSQL_TMP_DIR/clone_n2_temp_tbs
+#!run-master-sh
+
+[sst]
+wsrep-debug=true
