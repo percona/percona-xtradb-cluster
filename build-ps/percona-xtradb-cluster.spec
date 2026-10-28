@@ -387,7 +387,9 @@ Requires:             percona-xtradb-cluster-server = %{version}-%{release}
 Requires:             percona-xtradb-cluster-client = %{version}-%{release}
 Requires:             percona-xtradb-cluster-devel = %{version}-%{release}
 Requires:             percona-xtradb-cluster-test = %{version}-%{release}
+%if 0%{?rhel} != 8
 Requires:             percona-xtradb-cluster-debuginfo = %{version}-%{release}
+%endif
 Requires:             percona-xtradb-cluster-garbd = %{version}-%{release}
 
 %description -n percona-xtradb-cluster-full
