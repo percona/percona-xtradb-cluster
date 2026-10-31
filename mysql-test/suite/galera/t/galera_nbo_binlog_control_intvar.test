@@ -1,0 +1,88 @@
+#
+# An Intvar event in an NBO write set must apply cleanly on the NBO worker.
+#
+# ==== Purpose ====
+#
+# Regression test for a crash found while validating PXC-5140.
+#
+# Relay_log_info does not initialise deferred_events_collecting (a plain bool at
+# sql/rpl_rli.h), and the NBO worker builds its own rli in
+# wsrep_relay_log_init() (sql/wsrep_high_priority_service.cc) -- which, unlike
+# Wsrep_high_priority_service's constructor, used to leave that member
+# indeterminate. wsrep_apply_events() applies against thd->wsrep_rli
+# (sql/wsrep_applier.cc), so the NBO worker's rli is the one in play, and
+# Intvar_log_event::do_apply_event() reads the flag before its type switch:
+#
+#     if (rli->deferred_events_collecting)
+#       return rli->deferred_events->add(this);
+#
+# A garbage non-zero byte therefore dereferenced a null deferred_events:
+#
+#     Signal SIGSEGV (Address not mapped to object) at address 0x4
+#      #8 Deferred_log_events::add          sql/rpl_utility.cc
+#      #9 Intvar_log_event::do_apply_event  sql/log_event.cc
+#      #11 wsrep_apply_events               sql/wsrep_applier.cc
+#      #13 Wsrep_applier_service::apply_nbo_begin(...)::<lambda()>
+#
+# ==== How the test gets an Intvar into an NBO write set ====
+#
+# wsrep_to_buf_helper() (sql/wsrep_mysqld.cc) emits a BINLOG_CONTROL Intvar
+# event whenever the originating session has binary logging off:
+#
+#     if ((thd->variables.option_bits & OPTION_BIN_LOG) == 0) {
+#       Intvar_log_event ev(thd, ..BINLOG_CONTROL_EVENT, 0);
+#
+# so SET sql_log_bin = OFF, combined with wsrep_OSU_method = NBO on an
+# NBO-eligible statement (ALTER TABLE / CREATE INDEX / DROP INDEX, see
+# wsrep_can_run_in_nbo()), puts one there.
+#
+# Because the trigger was an uninitialised byte the crash was probabilistic, so
+# the test issues a run of NBO ALTERs rather than one.
+#
+--source include/galera_cluster.inc
+
+--connection node_1
+CREATE TABLE t1 (f1 INTEGER NOT NULL PRIMARY KEY) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1);
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'test' AND TABLE_NAME = 't1'
+--source include/wait_condition.inc
+
+--echo #
+--echo # Originate an NBO ALTER from a session with binary logging off, so the
+--echo # write set carries a BINLOG_CONTROL Intvar event ahead of the statement.
+--echo #
+--connection node_1
+SET SESSION sql_log_bin = OFF;
+SET SESSION wsrep_OSU_method = NBO;
+
+# Each NBO operation builds a fresh rli, so whether the uninitialised
+# deferred_events_collecting byte reads non-zero varies run to run. Repeat to
+# make the crash likely rather than hoping for one unlucky allocation.
+--disable_query_log
+--let $i = 60
+while ($i)
+{
+  --eval ALTER TABLE t1 ADD COLUMN c$i INTEGER
+  --dec $i
+}
+--enable_query_log
+
+SET SESSION wsrep_OSU_method = DEFAULT;
+SET SESSION sql_log_bin = ON;
+
+SELECT COUNT(*) AS columns_on_node_1 FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = 'test' AND TABLE_NAME = 't1';
+
+--echo #
+--echo # The applier node must have survived and applied the ALTER.
+--echo #
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 61 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'test' AND TABLE_NAME = 't1'
+--source include/wait_condition.inc
+SELECT COUNT(*) AS columns_on_node_2 FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = 'test' AND TABLE_NAME = 't1';
+
+--connection node_1
+DROP TABLE t1;
