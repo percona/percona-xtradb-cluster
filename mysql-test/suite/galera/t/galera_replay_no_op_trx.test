@@ -1,0 +1,46 @@
+#
+# Replay of a local transaction that appended certification keys but made
+# no row changes (INSERT ... ON DUPLICATE KEY UPDATE with identical values).
+#
+# The transaction holds an InnoDB next-key lock on the duplicate unique key
+# record, so a remote INSERT into the gap before that record conflicts with
+# it in InnoDB, although the two write sets do not conflict in certification.
+# If the local transaction already has a higher seqno and waits for commit
+# order, the applier BF-aborts it and the transaction must be replayed.
+#
+# The replayed write set carries no row events. The replayer must still
+# go through commit ordering, otherwise Galera keeps the transaction in the
+# REPLAYING state and galera_release() reports
+# "Internal library error: unexpected trx release state".
+#
+# The scenario is in suite/galera/include/galera_replay_no_op_trx.inc and
+# runs once for each form of the ODKU update clause.
+#
+
+--source include/galera_cluster.inc
+--source include/have_debug_sync.inc
+--source suite/galera/include/galera_have_debug_sync.inc
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+SET SESSION wsrep_sync_wait = 0;
+
+--echo #
+--echo # 1. Deprecated VALUES() function in the update clause
+--echo #
+--let $odku_stmt = INSERT INTO t1 (k, v) VALUES (20, 100) ON DUPLICATE KEY UPDATE v = VALUES(v)
+--source suite/galera/include/galera_replay_no_op_trx.inc
+
+--echo #
+--echo # 2. Row alias in the update clause
+--echo #
+--let $odku_stmt = INSERT INTO t1 (k, v) VALUES (20, 100) AS new_row ON DUPLICATE KEY UPDATE v = new_row.v
+--source suite/galera/include/galera_replay_no_op_trx.inc
+
+# Galera must not report an unexpected release state for the replayed trx
+--let $assert_text = No "unexpected trx release state" error in the node_1 error log
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
+--let $assert_select = unexpected trx release state
+--let $assert_count = 0
+--source include/assert_grep.inc
+
+--disconnect node_1a
