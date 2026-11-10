@@ -1,0 +1,48 @@
+CREATE TABLE t1 (id BIGINT AUTO_INCREMENT PRIMARY KEY, k INT NOT NULL, v INT NOT NULL, UNIQUE KEY uk(k));
+INSERT INTO t1 (k, v) VALUES (10, 100), (20, 100);
+START TRANSACTION;
+INSERT INTO t1 (k, v) VALUES (20, 100) ON DUPLICATE KEY UPDATE v = VALUES(v);
+Warnings:
+Warning	1287	'VALUES function' is deprecated and will be removed in a future release. Please use an alias (INSERT INTO ... VALUES (...) AS alias) and replace VALUES(col) in the ON DUPLICATE KEY UPDATE clause with alias.col instead
+SET SESSION wsrep_sync_wait = 0;
+SET GLOBAL wsrep_provider_options = 'dbug=d,apply_monitor_slave_enter_sync';
+INSERT INTO t1 (k, v) VALUES (15, 1);
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'dbug=d,commit_monitor_master_enter_sync';
+COMMIT;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'dbug=d,abort_trx_end';
+SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_slave_enter_sync';
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=abort_trx_end';
+SET GLOBAL wsrep_provider_options = 'signal=commit_monitor_master_enter_sync';
+wsrep_local_replays
+1
+SELECT k, v FROM t1 ORDER BY k;
+k	v
+10	100
+15	1
+20	100
+INSERT INTO t1 (k, v) VALUES (30, 1);
+SELECT k, v FROM t1 ORDER BY k;
+k	v
+10	100
+15	1
+20	100
+30	1
+INSERT INTO t1 (k, v) VALUES (40, 1);
+SELECT k, v FROM t1 ORDER BY k;
+k	v
+10	100
+15	1
+20	100
+30	1
+40	1
+include/assert_grep.inc [No "unexpected trx release state" error in the node_1 error log]
+DROP TABLE t1;
