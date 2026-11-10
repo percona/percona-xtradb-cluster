@@ -25,6 +25,8 @@
 
 // MySQL variables funcs
 
+#include <string>
+
 #include "query_options.h"
 #include "set_var.h"
 class sys_var;
@@ -55,6 +57,24 @@ extern void wsrep_provider_init INIT_ARGS;
 extern bool wsrep_provider_options_check CHECK_ARGS;
 extern bool wsrep_provider_options_update UPDATE_ARGS;
 extern void wsrep_provider_options_init INIT_ARGS;
+/** Galera TLS settings, as reported by the provider. */
+struct Wsrep_ssl_settings {
+  bool enabled{false};  ///< socket.ssl
+  std::string key;      ///< socket.ssl_key
+  std::string ca;       ///< socket.ssl_ca
+  std::string cert;     ///< socket.ssl_cert
+};
+
+/**
+  Reload wsrep provider SSL context, equivalent of
+  SET GLOBAL wsrep_provider_options='socket.ssl_reload=1'.
+
+  @param[out] error     error description on failure
+  @param[out] settings  Galera TLS settings after the reload (on success)
+  @retval false  success
+  @retval true   failure
+*/
+extern bool wsrep_reload_ssl(std::string &error, Wsrep_ssl_settings &settings);
 
 extern bool wsrep_cluster_address_check CHECK_ARGS;
 extern bool wsrep_cluster_address_update UPDATE_ARGS;

@@ -112,6 +112,7 @@
 #ifdef WITH_WSREP
 #include "sql/dd/cache/dictionary_client.h"  // dd::cache::Dictionary_client
 #include "sql/dd/types/table.h"              // dd::Table
+#include "sql/wsrep_var.h"                   // wsrep_reload_ssl
 #endif                                       /* WITH_WSREP */
 
 bool Column_name_comparator::operator()(const String *lhs,
@@ -2245,7 +2246,39 @@ class Alter_instance_reload_tls : public Alter_instance {
       return true;
     }
 
-    bool res = false;
+    if (reload_mysql_ && reload_mysql_channel()) return true;
+
+#ifdef WITH_WSREP
+    if (reload_wsrep_ && reload_wsrep_channel()) return true;
+#endif /* WITH_WSREP */
+
+    my_ok(m_thd);
+    return false;
+  }
+  ~Alter_instance_reload_tls() override = default;
+
+  static bool register_callback(ssl_reload_callback_t c) {
+    auto it = std::find(callbacks_.begin(), callbacks_.end(), c);
+    if (it != callbacks_.end()) return false;
+    callbacks_.push_back(c);
+    return true;
+  }
+
+  static bool deregister_callback(ssl_reload_callback_t c) {
+    auto it = std::find(callbacks_.begin(), callbacks_.end(), c);
+    if (it == callbacks_.end()) return false;
+    callbacks_.erase(it);
+    return true;
+  }
+
+ protected:
+  /**
+    Reload the MySQL TLS channel selected by context_type_.
+
+    @retval false  success (possibly with warnings)
+    @retval true   failure, error reported
+  */
+  bool reload_mysql_channel() {
     enum enum_ssl_init_error error = SSL_INITERR_NOERROR;
     switch (context_type_) {
       case Ssl_acceptor_context_type::context_server_main:
@@ -2271,48 +2304,100 @@ class Alter_instance_reload_tls : public Alter_instance {
         LogErr(WARNING_LEVEL, ER_SSL_LIBRARY_ERROR, sslGetErrString(error));
       } else {
         my_error(ER_DA_SSL_LIBRARY_ERROR, MYF(0), error_text);
-        res = true;
+        return true;
       }
     }
 
-    if (!res) {
-      String specified_channel(channel_name_.str, channel_name_.length,
-                               system_charset_info);
-      if (!my_strcasecmp(system_charset_info, mysql_main_channel.c_str(),
-                         specified_channel.ptr())) {
-        for (auto const &cb : callbacks_) {
-          if (!cb(nullptr)) {
-            push_warning_printf(m_thd, Sql_condition::SL_WARNING,
-                                ER_DA_SSL_LIBRARY_ERROR,
-                                ER_THD(m_thd, ER_DA_SSL_LIBRARY_ERROR),
-                                "One of the TLS reload callbacks failed");
-            LogErr(WARNING_LEVEL, ER_SSL_LIBRARY_ERROR,
-                   "One of the TLS reload callbacks failed");
-          }
-        };
-      }
-
-      my_ok(m_thd);
+    if (context_type_ == Ssl_acceptor_context_type::context_server_main) {
+      for (auto const &cb : callbacks_) {
+        if (!cb(nullptr)) {
+          push_warning_printf(m_thd, Sql_condition::SL_WARNING,
+                              ER_DA_SSL_LIBRARY_ERROR,
+                              ER_THD(m_thd, ER_DA_SSL_LIBRARY_ERROR),
+                              "One of the TLS reload callbacks failed");
+          LogErr(WARNING_LEVEL, ER_SSL_LIBRARY_ERROR,
+                 "One of the TLS reload callbacks failed");
+        }
+      };
     }
-    return res;
-  }
-  ~Alter_instance_reload_tls() override = default;
-
-  static bool register_callback(ssl_reload_callback_t c) {
-    auto it = std::find(callbacks_.begin(), callbacks_.end(), c);
-    if (it != callbacks_.end()) return false;
-    callbacks_.push_back(c);
-    return true;
+    return false;
   }
 
-  static bool deregister_callback(ssl_reload_callback_t c) {
-    auto it = std::find(callbacks_.begin(), callbacks_.end(), c);
-    if (it == callbacks_.end()) return false;
-    callbacks_.erase(it);
-    return true;
+#ifdef WITH_WSREP
+  /** Push a warning to the client and write it to the error log. */
+  void push_wsrep_warning(const std::string &text) {
+    push_warning_printf(m_thd, Sql_condition::SL_WARNING,
+                        ER_DA_SSL_LIBRARY_ERROR,
+                        ER_THD(m_thd, ER_DA_SSL_LIBRARY_ERROR), text.c_str());
+    WSREP_WARN("%s", text.c_str());
   }
 
- protected:
+  /**
+    Reload the wsrep (Galera) TLS channel.
+
+    If reload_mysql_ is set, mysql_main has already been reloaded at this
+    point. A wsrep failure is still reported as an error, and the error text
+    says that the statement was partially applied.
+
+    @retval false  success (possibly with warnings)
+    @retval true   failure, error reported
+  */
+  bool reload_wsrep_channel() {
+    std::string error_text;
+    Wsrep_ssl_settings galera_ssl;
+    if (wsrep_reload_ssl(error_text, galera_ssl)) {
+      error_text =
+          (reload_mysql_ ? "TLS for channel mysql_main was reloaded, "
+                           "but reloading TLS for channel wsrep "
+                           "failed: "
+                         : "Failed to reload TLS for channel wsrep: ") +
+          error_text;
+      my_error(ER_DA_SSL_LIBRARY_ERROR, MYF(0), error_text.c_str());
+      return true;
+    }
+
+    if (!galera_ssl.enabled) {
+      push_wsrep_warning(
+          "Galera TLS is not enabled (socket.ssl is off), nothing was "
+          "reloaded for channel wsrep");
+      return false;
+    }
+
+    if (pxc_encrypt_cluster_traffic) warn_wsrep_ssl_paths_changed(galera_ssl);
+    return false;
+  }
+
+  /**
+    With pxc_encrypt_cluster_traffic=ON Galera gets ssl_key/ssl_ca/ssl_cert
+    when the provider is loaded and cannot change them at runtime. Warn if
+    the server options now point to other files than Galera uses.
+  */
+  void warn_wsrep_ssl_paths_changed(const Wsrep_ssl_settings &galera_ssl) {
+    OptionalString ca, cert, key;
+    server_main_callback.read_parameters(&ca, nullptr, nullptr, &cert, nullptr,
+                                         nullptr, &key, nullptr, nullptr,
+                                         nullptr, nullptr);
+    std::string changed;
+    auto check = [&changed](const char *name, const OptionalString &server,
+                            const std::string &galera) {
+      const char *server_path = server.c_str() ? server.c_str() : "";
+      if (galera == server_path) return;
+      if (!changed.empty()) changed += ", ";
+      changed += std::string(name) + "='" + server_path + "' (Galera uses '" +
+                 galera + "')";
+    };
+    check("ssl_ca", ca, galera_ssl.ca);
+    check("ssl_cert", cert, galera_ssl.cert);
+    check("ssl_key", key, galera_ssl.key);
+    if (changed.empty()) return;
+
+    push_wsrep_warning(
+        "Galera TLS was reloaded from the files it was started with, which "
+        "differ from the current server settings: " +
+        changed + ". A server restart is needed for Galera to use them");
+  }
+#endif /* WITH_WSREP */
+
   bool match_channel_name() {
     String specified_channel(channel_name_.str, channel_name_.length,
                              system_charset_info);
@@ -2321,6 +2406,15 @@ class Alter_instance_reload_tls : public Alter_instance {
     if (!my_strcasecmp(system_charset_info, mysql_main_channel.c_str(),
                        specified_channel.ptr())) {
       context_type_ = Ssl_acceptor_context_type::context_server_main;
+#ifdef WITH_WSREP
+      /*
+        mysql_main is also used by plain ALTER INSTANCE RELOAD TLS.
+        With pxc_encrypt_cluster_traffic=ON Galera SSL is configured from the
+        mysql_main SSL options, so if a wsrep provider is configured, reload
+        Galera SSL as well (as mysql_main_and_wsrep does).
+      */
+      reload_wsrep_ = pxc_encrypt_cluster_traffic && wsrep_provider_set;
+#endif /* WITH_WSREP */
       return true;
     }
     if (!my_strcasecmp(system_charset_info, mysql_admin_channel.c_str(),
@@ -2328,14 +2422,37 @@ class Alter_instance_reload_tls : public Alter_instance {
       context_type_ = Ssl_acceptor_context_type::context_server_admin;
       return true;
     }
+#ifdef WITH_WSREP
+    if (!my_strcasecmp(system_charset_info, wsrep_channel,
+                       specified_channel.ptr())) {
+      reload_mysql_ = false;
+      reload_wsrep_ = true;
+      return true;
+    }
+    if (!my_strcasecmp(system_charset_info, mysql_main_and_wsrep_channel,
+                       specified_channel.ptr())) {
+      context_type_ = Ssl_acceptor_context_type::context_server_main;
+      reload_wsrep_ = true;
+      return true;
+    }
+#endif /* WITH_WSREP */
 
     return false;
   }
 
  protected:
+#ifdef WITH_WSREP
+  static constexpr const char *wsrep_channel = "wsrep";
+  static constexpr const char *mysql_main_and_wsrep_channel =
+      "mysql_main_and_wsrep";
+#endif /* WITH_WSREP */
+
   LEX_CSTRING channel_name_;
   bool force_;
-  Ssl_acceptor_context_type context_type_;
+  Ssl_acceptor_context_type context_type_{
+      Ssl_acceptor_context_type::context_last};
+  bool reload_mysql_{true};
+  bool reload_wsrep_{false};
   static std::vector<ssl_reload_callback_t> callbacks_;
 };
 
