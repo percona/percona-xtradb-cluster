@@ -1,0 +1,21 @@
+CALL mtr.add_suppression("Galera TLS is not enabled");
+SELECT @@global.pxc_encrypt_cluster_traffic;
+@@global.pxc_encrypt_cluster_traffic
+0
+ALTER INSTANCE RELOAD TLS;
+ALTER INSTANCE RELOAD TLS FOR CHANNEL wsrep;
+Warnings:
+Warning	3888	Failed to set up SSL because of the following SSL library error: Galera TLS is not enabled (socket.ssl is off), nothing was reloaded for channel wsrep
+ALTER INSTANCE RELOAD TLS FOR CHANNEL wsrep NO ROLLBACK ON ERROR;
+Warnings:
+Warning	3888	Failed to set up SSL because of the following SSL library error: Galera TLS is not enabled (socket.ssl is off), nothing was reloaded for channel wsrep
+ALTER INSTANCE RELOAD TLS FOR CHANNEL mysql_main_and_wsrep;
+Warnings:
+Warning	3888	Failed to set up SSL because of the following SSL library error: Galera TLS is not enabled (socket.ssl is off), nothing was reloaded for channel wsrep
+include/assert_grep.inc [No Galera SSL reload failures when Galera SSL is disabled]
+SELECT VARIABLE_VALUE = 'Synced' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
+VARIABLE_VALUE = 'Synced'
+1
+SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+VARIABLE_VALUE = 2
+1
