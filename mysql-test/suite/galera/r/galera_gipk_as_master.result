@@ -1,0 +1,61 @@
+START REPLICA USER='root';
+Warnings:
+Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
+#
+# DDL originating on node_1 (GIPK ON)
+#
+CREATE TABLE t1 (id INT NOT NULL, c VARCHAR(100)) ENGINE=InnoDB;
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `my_row_id` bigint unsigned NOT NULL AUTO_INCREMENT /*!80023 INVISIBLE */,
+  `id` int NOT NULL,
+  `c` varchar(100) DEFAULT NULL,
+  PRIMARY KEY (`my_row_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+# --- node_2 (cluster applier, GIPK OFF) ---
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `my_row_id` bigint unsigned NOT NULL AUTO_INCREMENT /*!80023 INVISIBLE */,
+  `id` int NOT NULL,
+  `c` varchar(100) DEFAULT NULL,
+  PRIMARY KEY (`my_row_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+# --- node_3 (async replica of node_2) ---
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `my_row_id` bigint unsigned NOT NULL AUTO_INCREMENT /*!80023 INVISIBLE */,
+  `id` int NOT NULL,
+  `c` varchar(100) DEFAULT NULL,
+  PRIMARY KEY (`my_row_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+#
+# DDL originating on node_2 (GIPK OFF) - no leak into the async replica
+#
+CREATE TABLE t2 (id INT NOT NULL, c VARCHAR(100)) ENGINE=InnoDB;
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `id` int NOT NULL,
+  `c` varchar(100) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+# --- node_3 (async replica of node_2) ---
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `id` int NOT NULL,
+  `c` varchar(100) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+#
+# Direct evidence for the async-replication side: node_2's binary log must
+# NOT contain the session-variable SET the cluster injects (a plain SET is
+# not binlogged), and MUST contain the applied CREATE TABLE in expanded
+# form, so any downstream replica is self-describing.
+#
+NOT FOUND /sql_generate_invisible_primary_key/ in pxc5140_node2_binlog.sql
+FOUND /my_row_id/ in pxc5140_node2_binlog.sql
+DROP TABLE t1, t2;
+STOP REPLICA;
+RESET REPLICA ALL;
