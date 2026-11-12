@@ -98,7 +98,6 @@ extern bool wsrep_debug_update UPDATE_ARGS;
 extern bool wsrep_replicate_myisam_check CHECK_ARGS;
 
 extern bool pxc_strict_mode_check CHECK_ARGS;
-extern bool pxc_strict_mode_update UPDATE_ARGS;
 
 extern bool pxc_maint_mode_check CHECK_ARGS;
 extern bool pxc_maint_mode_update UPDATE_ARGS;
