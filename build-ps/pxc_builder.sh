@@ -138,16 +138,22 @@ get_sources(){
         rm -rf wsrep-lib || true
         rm -rf percona-xtradb-cluster-galera || true
         git submodule deinit -f . || true
-        git submodule init
-        git submodule update
-
-        for dir in 'wsrep-lib' 'percona-xtradb-cluster-galera'; do
-            cd $dir || exit
-            git submodule deinit -f . || true
-            git submodule init
-            git submodule update
-            cd ../ || exit
+        # never block on a credential prompt; retry transient GitHub failures
+        # and stop here instead of building with an empty submodule
+        export GIT_TERMINAL_PROMPT=0
+        submodules_ok=0
+        for attempt in 1 2 3; do
+            if git submodule update --init --recursive; then
+                submodules_ok=1
+                break
+            fi
+            echo "WARNING: git submodule update failed (attempt ${attempt}/3), retrying"
+            sleep $((attempt * 10))
         done
+        if [ ${submodules_ok} != 1 ]; then
+            echo "ERROR: could not fetch git submodules"
+            exit 1
+        fi
         sed -i "/^env = conf.Finish()/i conf.env.Append(CPPFLAGS = ' -DGALERA_LOG_H_ENABLE_CXX')" percona-xtradb-cluster-galera/SConstruct
     else
         cd percona-xtradb-cluster || exit
@@ -236,6 +242,7 @@ get_sources(){
     rsync -av ${WORKDIR}/percona-xtradb-cluster/wsrep-lib/ ${PXCDIR}/wsrep-lib --exclude .git
     rsync -av ${WORKDIR}/percona-xtradb-cluster/extra/coredumper/ ${PXCDIR}/extra/coredumper --exclude .git
     rsync -av ${WORKDIR}/percona-xtradb-cluster/extra/libkmip/ ${PXCDIR}/extra/libkmip --exclude .git
+    rsync -av ${WORKDIR}/percona-xtradb-cluster/extra/jwt-cpp/ ${PXCDIR}/extra/jwt-cpp --exclude .git
 
     sed -i 's:ROUTER_RUNTIMEDIR:/var/run/mysqlrouter/:g' ${PXCDIR}/packaging/rpm-common/*
     cd ${PXCDIR}/packaging/rpm-common || exit
@@ -1206,6 +1213,11 @@ build_tarball(){
     else
         bash -x ./build-ps/build-binary.sh --with-jemalloc=jemalloc/ -t $BIN_RELEASE $BUILD_ROOT
     fi
+    retval=$?
+    if [ $retval != 0 ]; then
+        echo "ERROR: build-binary.sh failed with exit code $retval"
+        exit 1
+    fi
 
     DIRNAME="tarball"
     if [[ ${DEBUG} == 1 ]]; then
@@ -1215,6 +1227,12 @@ build_tarball(){
     mkdir -p ${WORKDIR}/${DIRNAME}
     mkdir -p ${CURDIR}/${DIRNAME}
     rm -f $BUILD_NUMBER/percona-xtrabackup* || true
+    # the PXB tarballs copied into the target dir are removed above, so
+    # anything left here must come from build-binary.sh
+    if ! ls $BUILD_NUMBER/*.tar.gz >/dev/null 2>&1; then
+        echo "ERROR: no tarballs were built in $BUILD_NUMBER"
+        exit 1
+    fi
     cp  $BUILD_NUMBER/*.tar.gz ${WORKDIR}/../${DIRNAME}
     cp  $BUILD_NUMBER/*.tar.gz ${WORKDIR}/${DIRNAME}
     cp  $BUILD_NUMBER/*.tar.gz ${CURDIR}/${DIRNAME}

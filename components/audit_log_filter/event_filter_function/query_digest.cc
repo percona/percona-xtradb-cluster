@@ -60,8 +60,18 @@ std::string EventFilterFunctionQueryDigest::get_query_digest() const noexcept {
 
   CHARSET_INFO_h utf8 = charset_srv->get_utf8mb4();
 
+#ifdef WITH_WSREP
+  /* PXC: Cherrypicked commit from PS 26, to be removed once code is propagated
+     to PS 9.7. */
+  /*
+   * The "query_digest" THD attribute allocates a new string and stores it
+   * in the provided handle, it must not be pre-created to avoid a leak.
+   */
+  my_h_string digest = nullptr;
+#else
   my_h_string digest;
   string_factory_srv->create(&digest);
+#endif /* WITH_WSREP */
 
   MYSQL_THD thd;
   current_thd_srv->get(&thd);
@@ -69,8 +79,14 @@ std::string EventFilterFunctionQueryDigest::get_query_digest() const noexcept {
   char buff_digest[1024];
   std::string result;
 
+#ifdef WITH_WSREP
+  if (!thd_attrs_srv->get(thd, "query_digest",
+                          reinterpret_cast<void *>(&digest)) &&
+      digest != nullptr) {
+#else
   if (!thd_attrs_srv->get(thd, "query_digest",
                           reinterpret_cast<void *>(&digest))) {
+#endif /* WITH_WSREP */
     string_converter_srv->convert_to_buffer(digest, buff_digest,
                                             sizeof(buff_digest), utf8);
     result.append(buff_digest);

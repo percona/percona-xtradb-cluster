@@ -1,0 +1,68 @@
+#
+# 1. Baseline.
+#
+call mtr.add_suppression("Cannot set sql_require_primary_key=OFF while pxc_strict_mode is");
+call mtr.add_suppression("Setting sql_require_primary_key=ON because pxc_strict_mode is ENFORCING or MASTER");
+call mtr.add_suppression("Cannot set sql_require_primary_key=OFF while pxc_strict_mode is");
+call mtr.add_suppression("Setting sql_require_primary_key=ON because pxc_strict_mode is ENFORCING or MASTER");
+include/assert.inc [pxc_strict_mode is DISABLED]
+include/assert.inc [sql_require_primary_key global is OFF.]
+#
+# 2. Seed node_2 with a legacy primary-key-less system table and user data.
+#
+SET SESSION wsrep_on = OFF;
+CREATE TABLE mysql.firewall_whitelist (USERHOST VARCHAR(80) NOT NULL,
+RULE text NOT NULL) ENGINE=InnoDB;
+SET SESSION wsrep_on = ON;
+include/assert.inc [seeded mysql.firewall_whitelist has no primary key]
+CREATE TABLE t1 (id INT PRIMARY KEY, val VARCHAR(32)) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1, 'before'), (2, 'upgrade'), (3, 'data');
+SELECT * FROM t1 ORDER BY id;
+id	val
+1	before
+2	upgrade
+3	data
+#
+# 3. Regression guard: a client SET sql_require_primary_key=OFF is still
+#    blocked under ENFORCING.
+#
+SET GLOBAL pxc_strict_mode = 'ENFORCING';
+SET GLOBAL sql_require_primary_key = OFF;
+ERROR 42000: Variable 'sql_require_primary_key' can't be set to the value of 'OFF'
+SET SESSION sql_require_primary_key = OFF;
+ERROR 42000: Variable 'sql_require_primary_key' can't be set to the value of 'OFF'
+SET GLOBAL pxc_strict_mode = 'DISABLED';
+SET GLOBAL sql_require_primary_key = OFF;
+#
+# 4. Restart node_2 with --pxc_strict_mode=ENFORCING --upgrade=FORCE.
+#
+# restart:--pxc_strict_mode=ENFORCING --upgrade=FORCE
+#
+# 5. Post-upgrade checks.
+#
+include/assert.inc [node_2 is up and pxc_strict_mode is still ENFORCING]
+include/assert.inc [global sql_require_primary_key is ON under ENFORCING]
+include/assert.inc [mysql.firewall_whitelist gained its ID primary key]
+include/assert.inc [mysql.firewall_membership was created by the upgrade]
+include/assert.inc [mysql.firewall_membership got its composite primary key]
+include/assert.inc [mysql.general_log and mysql.slow_log survived without a primary key]
+SELECT * FROM t1 ORDER BY id;
+id	val
+1	before
+2	upgrade
+3	data
+#
+# 6. Cleanup.
+#
+SET SESSION wsrep_on = OFF;
+DROP TABLE mysql.firewall_whitelist;
+DROP TABLE mysql.firewall_group_allowlist;
+DROP TABLE mysql.firewall_groups;
+DROP TABLE mysql.firewall_membership;
+SET SESSION wsrep_on = ON;
+# restart
+SET GLOBAL pxc_strict_mode = DISABLED;
+SET GLOBAL sql_require_primary_key = OFF;
+DROP TABLE t1;
+SET GLOBAL pxc_strict_mode = DISABLED;
+SET GLOBAL sql_require_primary_key = OFF;

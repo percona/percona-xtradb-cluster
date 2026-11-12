@@ -1,0 +1,20 @@
+repl.force_sst_after_inconsistency enabled on node_2: 1
+# Shutting node_2 down cleanly so that IST is possible on rejoin
+DELETE FROM t1 WHERE f1 = 5;
+# Restarting node_2 standalone to diverge its dataset
+# restart
+DELETE FROM t1 WHERE f1 = 5;
+# Rejoining node_2 - IST apply is expected to fail
+include/wait_for_pattern_in_file.inc [Removed state file .* because the node left the cluster due to an inconsistency]
+# Verify grastate.dat was removed on the IST apply failure
+include/assert_grep.inc [node_2 asked the donor for IST]
+include/assert_grep.inc [the IST writeset could not be applied]
+include/assert_grep.inc [the failed IST apply was detected as an inconsistency]
+include/assert_grep.inc [grastate.dat was removed because of the inconsistency]
+node_1 wsrep_cluster_size after node_2 was evicted: 1
+# Stopping node_2 if it is still alive
+# Restarting node_2 - with no state file it must take a full SST
+# restart
+node_2 t1 after SST: 1:0,2:0,3:0,4:0,6:0,7:0,8:0
+node_1 t1 contents: 1:0,2:0,3:0,4:0,6:0,7:0,8:0
+datasets consistent: 1

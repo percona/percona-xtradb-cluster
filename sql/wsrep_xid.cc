@@ -18,6 +18,7 @@
 
 #include "wsrep_xid.h"
 #include "debug_sync.h"
+#include "my_byteorder.h"
 #include "mysql/components/services/log_builtins.h"
 #include "mysql/plugin.h"  // MYSQL_STORAGE_ENGINE_PLUGIN
 #include "service_wsrep.h"
@@ -37,18 +38,39 @@ void wsrep_xid_init(XID *xid, const wsrep::gtid &wsgtid) {
 
   memset(data, 0, XIDDATASIZE);
   memcpy(data, WSREP_XID_PREFIX, WSREP_XID_PREFIX_LEN);
+  data[WSREP_XID_VERSION_OFFSET] = WSREP_XID_VERSION_2;
   memcpy(data + WSREP_XID_UUID_OFFSET, wsgtid.id().data(), sizeof(wsrep::id));
   int8store(data + WSREP_XID_SEQNO_OFFSET, wsgtid.seqno().get());
 
   xid->set_data(data, XIDDATASIZE);
 }
 
+static unsigned char wsrep_xid_version(const XID *xid) {
+  return (xid->get_data() + WSREP_XID_VERSION_OFFSET)[0];
+}
+
 int wsrep_is_wsrep_xid(const void *xid_ptr) {
   const XID *xid = reinterpret_cast<const XID *>(xid_ptr);
-  return (xid->get_format_id() == 1 &&
-          xid->get_gtrid_length() == WSREP_XID_GTRID_LEN &&
-          xid->get_bqual_length() == 0 &&
-          !memcmp(xid->get_data(), WSREP_XID_PREFIX, WSREP_XID_PREFIX_LEN));
+  if (xid->get_format_id() != 1 ||
+      memcmp(xid->get_data(), WSREP_XID_PREFIX, WSREP_XID_PREFIX_LEN)) {
+    return false;
+  }
+
+  switch (wsrep_xid_version(xid)) {
+    case WSREP_XID_VERSION_1:
+    case WSREP_XID_VERSION_2:
+      return (xid->get_gtrid_length() == WSREP_XID_GTRID_LEN_V_1_2 &&
+              xid->get_bqual_length() == 0);
+    case WSREP_XID_VERSION_3:
+    case WSREP_XID_VERSION_4:
+      return (xid->get_gtrid_length() == WSREP_XID_GTRID_LEN_V_3_4_5 &&
+              xid->get_bqual_length() == 0);
+    case WSREP_XID_VERSION_5:
+      return (xid->get_gtrid_length() == WSREP_XID_GTRID_LEN_V_3_4_5 &&
+              xid->get_bqual_length() == WSREP_XID_BQUAL_LEN_V_5);
+    default:
+      return false;
+  }
 }
 
 const unsigned char *wsrep_xid_uuid(const xid_t *xid) {
@@ -69,7 +91,11 @@ const wsrep::id &wsrep_xid_uuid(const XID &xid) {
 long long wsrep_xid_seqno(const XID *xid) {
   long long ret = wsrep::seqno::undefined().get();
   if (wsrep_is_wsrep_xid(xid)) {
-    memcpy(&ret, xid->get_data() + WSREP_XID_SEQNO_OFFSET, sizeof(ret));
+    if (wsrep_xid_version(xid) == WSREP_XID_VERSION_1) {
+      memcpy(&ret, xid->get_data() + WSREP_XID_SEQNO_OFFSET, sizeof(ret));
+    } else {
+      ret = sint8korr(xid->get_data() + WSREP_XID_SEQNO_OFFSET);
+    }
   }
   return ret;
 }

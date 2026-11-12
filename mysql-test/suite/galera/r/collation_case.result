@@ -1,0 +1,58 @@
+SET GLOBAL wsrep_applier_threads = 2;
+SET SESSION wsrep_sync_wait = 0;
+#
+# Case 1: Create a table with a collation that does not ignore case
+#
+CREATE TABLE tcoll (string VARCHAR(16) CHARSET utf8mb4 COLLATE utf8mb4_0900_as_cs PRIMARY KEY, node INTEGER) ENGINE=InnoDB;
+SET SESSION wsrep_sync_wait = 0;
+SET GLOBAL DEBUG = "+d,sync.wsrep_apply_cb";
+INSERT INTO tcoll VALUES ('ABC', 2);
+SET DEBUG_SYNC = "now WAIT_FOR sync.wsrep_apply_cb_reached";
+SET GLOBAL wsrep_provider_options = 'dbug=d,commit_monitor_master_enter_sync';
+INSERT INTO tcoll VALUES ('abc', 1);
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=commit_monitor_master_enter_sync';
+SET GLOBAL DEBUG = "-d,sync.wsrep_apply_cb";
+SET DEBUG_SYNC = "now SIGNAL signal.wsrep_apply_cb";
+SET SESSION wsrep_sync_wait = DEFAULT;
+SELECT COUNT(*) AS expect_2 FROM tcoll;
+expect_2
+2
+SELECT COUNT(*) AS expect_2 FROM tcoll;
+expect_2
+2
+DROP TABLE tcoll;
+#
+# Case 2: reate a table with a collation that ignores case
+#
+CREATE TABLE tcoll (string VARCHAR(16) CHARSET utf8mb4 COLLATE utf8mb4_0900_as_ci PRIMARY KEY, node INTEGER) ENGINE=InnoDB;
+SET SESSION wsrep_sync_wait = 0;
+SET SESSION wsrep_retry_autocommit = 0;
+SET GLOBAL DEBUG = "+d,sync.wsrep_apply_cb";
+INSERT INTO tcoll VALUES ('ABC', 2);
+SET DEBUG_SYNC = "now WAIT_FOR sync.wsrep_apply_cb_reached";
+SET GLOBAL wsrep_provider_options = 'dbug=d,commit_monitor_master_enter_sync';
+INSERT INTO tcoll VALUES ('abc', 1);
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=commit_monitor_master_enter_sync';
+SET GLOBAL DEBUG = "-d,sync.wsrep_apply_cb";
+SET DEBUG_SYNC = "now SIGNAL signal.wsrep_apply_cb";
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+SET SESSION wsrep_retry_autocommit = DEFAULT;
+SET SESSION wsrep_sync_wait = DEFAULT;
+SELECT COUNT(*) AS expect_1 FROM tcoll;
+expect_1
+1
+SELECT COUNT(*) AS expect_1 FROM tcoll;
+expect_1
+1
+DROP TABLE tcoll;
+SET GLOBAL wsrep_applier_threads = DEFAULT;
+CREATE TABLE t1 (f1 INT PRIMARY KEY) ENGINE=InnoDB;
+SELECT * FROM t1;
+f1
+DROP TABLE t1;

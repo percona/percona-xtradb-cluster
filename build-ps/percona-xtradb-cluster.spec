@@ -394,8 +394,7 @@ Requires:             percona-xtradb-cluster-garbd = %{version}-%{release}
 
 %description -n percona-xtradb-cluster-full
 This is a meta-package which provides the full suite of Percona XtraDB
-Cluster 56 packages including the debuginfo (except on el8, where the
-debuginfo subpackage is not required). Recommended.
+Cluster packages including the debuginfo. Recommended.
 # ----------------------------------------------------------------------------
 
 %package -n percona-xtradb-cluster-server
@@ -1674,6 +1673,7 @@ fi
 %attr(755, root, root) %{_bindir}/mysqldumpslow
 %attr(755, root, root) %{_bindir}/mysqltest
 %attr(755, root, root) %{_bindir}/perror
+%attr(755, root, root) %{_bindir}/create_id_token
 %attr(755, root, root) %{_bindir}/mysql_migrate_keyring
 %attr(755, root, root) %{_bindir}/mysql_keyring_encryption_test
 #%attr(755, root, root) %{_bindir}/resolve_stack_dump

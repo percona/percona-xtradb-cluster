@@ -85,7 +85,8 @@ Format_description_log_event *wsrep_get_apply_format(THD *thd) {
  Eg. It may happen that source node issues some warnings because of executing
  user privileges, and then fail with error. On replica side it can fail without
  preceding warnings as we execute with root privileges */
-void wsrep_store_error(const THD *const thd, wsrep::mutable_buffer &dst) {
+void wsrep_store_error(const THD *const thd, wsrep::mutable_buffer &dst,
+                       bool include_msg) {
   Diagnostics_area::Sql_condition_iterator it =
       thd->get_stmt_da()->sql_conditions();
   const Sql_condition *cond;
@@ -100,16 +101,25 @@ void wsrep_store_error(const THD *const thd, wsrep::mutable_buffer &dst) {
 
   auto da = thd->get_stmt_da();
   if (da->cond_count() == 0 && da->is_set()) {
-    slider += snprintf(slider, buf_end - slider, " %s, Error_code: %d;",
-                       da->message_text(), da->mysql_errno());
+    if (include_msg)
+      slider += snprintf(slider, buf_end - slider, " %s, Error_code: %d;",
+                         da->message_text(), da->mysql_errno());
+    else
+      slider += snprintf(slider, buf_end - slider, " Error_code: %d;",
+                         da->mysql_errno());
   }
 
   for (cond = it++; cond && slider < buf_end; cond = it++) {
     uint const err_code = cond->mysql_errno();
-    const char *const err_str = cond->message_text();
 
-    slider += snprintf(slider, buf_end - slider, " %s, Error_code: %d;",
-                       err_str, err_code);
+    if (include_msg) {
+      const char *const err_str = cond->message_text();
+      slider += snprintf(slider, buf_end - slider, " %s, Error_code: %d;",
+                         err_str, err_code);
+    } else {
+      slider +=
+          snprintf(slider, buf_end - slider, " Error_code: %d;", err_code);
+    }
   }
 
   if (slider != dst.data()) {
