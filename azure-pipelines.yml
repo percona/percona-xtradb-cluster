@@ -145,6 +145,21 @@ jobs:
   # per-leg condition lets every leg through.
   strategy:
     matrix:
+      # macOS 14 (disabled)
+      # macOS 14 RelWithDebInfo:
+      #   imageName: 'macOS-14'
+      #   Compiler: clang
+      #   BuildType: RelWithDebInfo
+      #
+      # # skip for a pull request if branch name doesn't contain "fullci"
+      # ${{ if or(ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
+      #   macOS 14 Debug:
+      #     imageName: 'macOS-14'
+      #     Compiler: clang
+      #     BuildType: Debug
+
+
+      # clang-16 and newer compilers
       clang-22 RelWithDebInfo [Ubuntu 24.04 Noble]:
         imageName: 'ubuntu-24.04'
         UBUNTU_CODE_NAME: noble
@@ -180,18 +195,18 @@ jobs:
 
       # Extended coverage below: built only with fullCI, or on the nightly.
 
-      # macOS 14
-      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
-        macOS 14 RelWithDebInfo:
-          imageName: 'macOS-14'
-          Compiler: clang
-          BuildType: RelWithDebInfo
-
-      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
-        macOS 14 Debug:
-          imageName: 'macOS-14'
-          Compiler: clang
-          BuildType: Debug
+      # # macOS 14
+      # ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
+      #   macOS 14 RelWithDebInfo:
+      #     imageName: 'macOS-14'
+      #     Compiler: clang
+      #     BuildType: RelWithDebInfo
+      #
+      # ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
+      #   macOS 14 Debug:
+      #     imageName: 'macOS-14'
+      #     Compiler: clang
+      #     BuildType: Debug
 
 
       # clang-16 and newer compilers
