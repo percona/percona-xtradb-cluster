@@ -1,0 +1,81 @@
+################################################################################
+# PXC-5390: a node that boots in a _WITH_PRIMARY_KEY mode must apply primary-key-
+# less DDL replicated from a node that is not strict.
+#
+# At startup the server forces sql_require_primary_key ON before any applier
+# thread exists. The runtime-switch tests reach the applier with the variable
+# already set; this test restarts node_2 so that the applier starts from the
+# boot state.
+#
+# 1. Restart node_2 with --pxc_strict_mode=ENFORCING_WITH_PRIMARY_KEY.
+# 2. node_1 (DISABLED) creates and alters a table without a primary key.
+# 3. node_2 applies both statements and stays Synced.
+# 4. Cleanup.
+################################################################################
+
+--source include/galera_cluster.inc
+--source include/big_test.inc
+
+--connection node_1
+call mtr.add_suppression("Setting sql_require_primary_key=ON because pxc_strict_mode is");
+--let $assert_text = node_1 runs in DISABLED, with no primary-key policy
+--let $assert_cond = [ SELECT @@global.pxc_strict_mode = "DISABLED" AND @@global.sql_require_primary_key = 0 ]
+--source include/assert.inc
+
+--echo #
+--echo # 1. Restart node_2 in the new mode.
+--echo #
+
+--connection node_2
+call mtr.add_suppression("Setting sql_require_primary_key=ON because pxc_strict_mode is");
+--let $restart_parameters = restart:--pxc_strict_mode=ENFORCING_WITH_PRIMARY_KEY
+--source include/restart_mysqld.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+--let $assert_text = node_2 booted with the primary-key policy forced ON
+--let $assert_cond = [ SELECT @@global.sql_require_primary_key = 1 ]
+--source include/assert.inc
+
+--echo #
+--echo # 2. node_1 creates and alters a table without a primary key.
+--echo #
+
+--connection node_1
+CREATE TABLE t_boot_nopk (c1 INT) ENGINE = InnoDB;
+ALTER TABLE t_boot_nopk ADD COLUMN c2 INT;
+
+--echo #
+--echo # 3. node_2 applies both statements.
+--echo #
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 't_boot_nopk'
+--source include/wait_condition.inc
+--let $wait_condition = SELECT COUNT(*) = 2 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 't_boot_nopk'
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 'Synced' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment'
+--source include/wait_condition.inc
+
+--let $assert_text = node_2 still has the primary-key-less table, with both columns
+--let $assert_cond = [ SELECT COUNT(*) = 1 FROM information_schema.tables t WHERE t.table_schema = DATABASE() AND t.table_name = "t_boot_nopk" AND NOT EXISTS (SELECT 1 FROM information_schema.table_constraints c WHERE c.table_schema = t.table_schema AND c.table_name = t.table_name AND c.constraint_type = "PRIMARY KEY") ]
+--source include/assert.inc
+
+--echo #
+--echo # 4. Cleanup.
+--echo #
+
+--connection node_1
+DROP TABLE t_boot_nopk;
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 0 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 't_boot_nopk'
+--source include/wait_condition.inc
+
+--let $restart_parameters = restart
+--source include/restart_mysqld.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc

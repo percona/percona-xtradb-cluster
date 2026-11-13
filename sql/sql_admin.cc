@@ -1996,7 +1996,9 @@ static bool pxc_strict_mode_admin_check(THD *thd, Table_ref *tables) {
               table->db, table->table_name);
           break;
         case PXC_STRICT_MODE_ENFORCING:
+        case PXC_STRICT_MODE_ENFORCING_WITH_PRIMARY_KEY:
         case PXC_STRICT_MODE_MASTER:
+        case PXC_STRICT_MODE_MASTER_WITH_PRIMARY_KEY:
         default:
           block = true;
           WSREP_ERROR(

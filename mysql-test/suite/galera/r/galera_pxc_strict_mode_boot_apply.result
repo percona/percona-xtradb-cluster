@@ -1,0 +1,22 @@
+call mtr.add_suppression("Setting sql_require_primary_key=ON because pxc_strict_mode is");
+include/assert.inc [node_1 runs in DISABLED, with no primary-key policy]
+#
+# 1. Restart node_2 in the new mode.
+#
+call mtr.add_suppression("Setting sql_require_primary_key=ON because pxc_strict_mode is");
+# restart:--pxc_strict_mode=ENFORCING_WITH_PRIMARY_KEY
+include/assert.inc [node_2 booted with the primary-key policy forced ON]
+#
+# 2. node_1 creates and alters a table without a primary key.
+#
+CREATE TABLE t_boot_nopk (c1 INT) ENGINE = InnoDB;
+ALTER TABLE t_boot_nopk ADD COLUMN c2 INT;
+#
+# 3. node_2 applies both statements.
+#
+include/assert.inc [node_2 still has the primary-key-less table, with both columns]
+#
+# 4. Cleanup.
+#
+DROP TABLE t_boot_nopk;
+# restart

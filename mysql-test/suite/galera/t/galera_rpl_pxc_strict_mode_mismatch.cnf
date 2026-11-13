@@ -1,0 +1,5 @@
+!include ../galera_2nodes_as_slave.cnf
+
+[mysqld.2]
+
+[mysqld.3]
