@@ -885,7 +885,9 @@ bool wsrep_replicate_myisam_check(sys_var *, THD *thd, set_var *var) {
           " with pxc_strict_mode = PERMISSIVE");
       break;
     case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_ENFORCING_WITH_PRIMARY_KEY:
     case PXC_STRICT_MODE_MASTER:
+    case PXC_STRICT_MODE_MASTER_WITH_PRIMARY_KEY:
     default:
       block = true;
       WSREP_ERROR(
@@ -904,7 +906,7 @@ bool wsrep_replicate_myisam_check(sys_var *, THD *thd, set_var *var) {
   return block;
 }
 
-static const char *pxc_strict_mode_to_string(ulong value) {
+const char *pxc_strict_mode_to_string(ulong value) {
   switch (value) {
     case PXC_STRICT_MODE_DISABLED:
       return "DISABLED";
@@ -914,6 +916,10 @@ static const char *pxc_strict_mode_to_string(ulong value) {
       return "ENFORCING";
     case PXC_STRICT_MODE_MASTER:
       return "MASTER";
+    case PXC_STRICT_MODE_ENFORCING_WITH_PRIMARY_KEY:
+      return "ENFORCING_WITH_PRIMARY_KEY";
+    case PXC_STRICT_MODE_MASTER_WITH_PRIMARY_KEY:
+      return "MASTER_WITH_PRIMARY_KEY";
     default:
       return "NULL";
   }
@@ -1004,6 +1010,24 @@ bool pxc_strict_mode_check(sys_var *, THD *thd, set_var *var) {
   }
 
   return (block);
+}
+
+bool pxc_strict_mode_update(sys_var *, THD *, enum_var_type) {
+  /*
+    When pxc_strict_mode is one of the _WITH_PRIMARY_KEY modes, we set
+    sql_require_primary_key=ON.
+    Only global is set; existing sessions keep their session value
+    (new sessions inherit the updated global default).
+  */
+  if (pxc_strict_mode_requires_primary_key(pxc_strict_mode) &&
+      global_system_variables.sql_require_primary_key == false) {
+    global_system_variables.sql_require_primary_key = true;
+    WSREP_INFO(
+        "Setting sql_require_primary_key=ON because pxc_strict_mode is "
+        "being changed to %s.",
+        pxc_strict_mode_to_string(pxc_strict_mode));
+  }
+  return false;
 }
 
 static const char *pxc_maint_mode_to_string(ulong value) {
