@@ -28,6 +28,16 @@ ERROR HY000: pxc_strict_mode can be changed only if node is cluster-node
 select @@pxc_strict_mode;
 @@pxc_strict_mode
 DISABLED
+set global pxc_strict_mode = 'ENFORCING_WITH_PRIMARY_KEY';
+ERROR HY000: pxc_strict_mode can be changed only if node is cluster-node
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
+set global pxc_strict_mode = 'MASTER_WITH_PRIMARY_KEY';
+ERROR HY000: pxc_strict_mode can be changed only if node is cluster-node
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
 # try setting different invalid values.
 set global pxc_strict_mode = 'PERCONA';
 ERROR 42000: Variable 'pxc_strict_mode' can't be set to the value of 'PERCONA'

@@ -530,7 +530,9 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
                 first_table->db, first_table->table_name);
             break;
           case PXC_STRICT_MODE_ENFORCING:
+          case PXC_STRICT_MODE_ENFORCING_WITH_PRIMARY_KEY:
           case PXC_STRICT_MODE_MASTER:
+          case PXC_STRICT_MODE_MASTER_WITH_PRIMARY_KEY:
           default:
             block = true;
             WSREP_ERROR(
@@ -575,7 +577,9 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
                 first_table->db, first_table->table_name);
             break;
           case PXC_STRICT_MODE_ENFORCING:
+          case PXC_STRICT_MODE_ENFORCING_WITH_PRIMARY_KEY:
           case PXC_STRICT_MODE_MASTER:
+          case PXC_STRICT_MODE_MASTER_WITH_PRIMARY_KEY:
           default:
             block = true;
             WSREP_ERROR(
@@ -701,7 +705,9 @@ bool Sql_cmd_discard_import_tablespace::execute(THD *thd) {
           " with pxc_strict_mode = PERMISSIVE");
       break;
     case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_ENFORCING_WITH_PRIMARY_KEY:
     case PXC_STRICT_MODE_MASTER:
+    case PXC_STRICT_MODE_MASTER_WITH_PRIMARY_KEY:
     default:
       block = true;
       WSREP_ERROR(

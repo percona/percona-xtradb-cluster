@@ -260,7 +260,9 @@ bool Sql_cmd_create_table::execute(THD *thd) {
                               " with pxc_strict_mode = PERMISSIVE");
           break;
         case PXC_STRICT_MODE_ENFORCING:
+        case PXC_STRICT_MODE_ENFORCING_WITH_PRIMARY_KEY:
         case PXC_STRICT_MODE_MASTER:
+        case PXC_STRICT_MODE_MASTER_WITH_PRIMARY_KEY:
           block = true;
           WSREP_ERROR(
               "Percona-XtraDB-Cluster prohibits use of"

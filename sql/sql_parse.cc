@@ -1829,6 +1829,7 @@ static bool pxc_strict_mode_lock_check(THD *thd) {
   switch (pxc_strict_mode) {
     case PXC_STRICT_MODE_DISABLED:
     case PXC_STRICT_MODE_MASTER:
+    case PXC_STRICT_MODE_MASTER_WITH_PRIMARY_KEY:
       /* Do nothing */
       break;
     case PXC_STRICT_MODE_PERMISSIVE:
@@ -1842,6 +1843,7 @@ static bool pxc_strict_mode_lock_check(THD *thd) {
                           " with pxc_strict_mode = PERMISSIVE");
       break;
     case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_ENFORCING_WITH_PRIMARY_KEY:
     default:
       block = true;
       WSREP_ERROR(
@@ -1899,7 +1901,9 @@ static bool block_write_while_in_rolling_upgrade(THD *thd) {
                               "%s", msg);
           break;
         case PXC_STRICT_MODE_MASTER:
+        case PXC_STRICT_MODE_MASTER_WITH_PRIMARY_KEY:
         case PXC_STRICT_MODE_ENFORCING:
+        case PXC_STRICT_MODE_ENFORCING_WITH_PRIMARY_KEY:
         default:
           block = true;
           msg =

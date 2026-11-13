@@ -6276,7 +6276,9 @@ restart:
                               tbl->s->db.str, tbl->s->table_name.str);
           break;
         case PXC_STRICT_MODE_ENFORCING:
+        case PXC_STRICT_MODE_ENFORCING_WITH_PRIMARY_KEY:
         case PXC_STRICT_MODE_MASTER:
+        case PXC_STRICT_MODE_MASTER_WITH_PRIMARY_KEY:
         default:
           block = true;
           WSREP_ERROR(
@@ -6328,7 +6330,9 @@ restart:
                               tbl->s->db.str, tbl->s->table_name.str);
           break;
         case PXC_STRICT_MODE_ENFORCING:
+        case PXC_STRICT_MODE_ENFORCING_WITH_PRIMARY_KEY:
         case PXC_STRICT_MODE_MASTER:
+        case PXC_STRICT_MODE_MASTER_WITH_PRIMARY_KEY:
         default:
           block = true;
           WSREP_ERROR(
