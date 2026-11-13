@@ -1,0 +1,119 @@
+call mtr.add_suppression("Cannot set sql_require_primary_key=OFF while pxc_strict_mode is");
+call mtr.add_suppression("Replica SQL: Error .Unable to create or change a table without a primary key");
+call mtr.add_suppression("Setting sql_require_primary_key=ON because pxc_strict_mode is");
+call mtr.add_suppression("Cannot set sql_require_primary_key=OFF while pxc_strict_mode is");
+call mtr.add_suppression("Replica SQL: Error .Unable to create or change a table without a primary key");
+call mtr.add_suppression("Setting sql_require_primary_key=ON because pxc_strict_mode is");
+include/assert.inc [sql_require_primary_key global is OFF.]
+include/assert.inc [pxc_strict_mode is DISABLED]
+SET GLOBAL sql_require_primary_key = OFF;
+SET SESSION sql_require_primary_key = OFF;
+CREATE TABLE pxc_srp_b (c1 INT) ENGINE = InnoDB;
+DROP TABLE pxc_srp_b;
+SET GLOBAL sql_require_primary_key = ON;
+CREATE TABLE pxc_srp_b (c1 INT) ENGINE = InnoDB;
+DROP TABLE pxc_srp_b;
+SET GLOBAL sql_require_primary_key = OFF;
+SET SESSION sql_require_primary_key = ON;
+
+# 0. ENFORCING and MASTER do not touch sql_require_primary_key
+
+SET GLOBAL sql_require_primary_key = OFF;
+SET GLOBAL pxc_strict_mode = 'ENFORCING';
+include/assert.inc [ENFORCING leaves sql_require_primary_key OFF.]
+SET GLOBAL sql_require_primary_key = ON;
+SET GLOBAL sql_require_primary_key = OFF;
+SET SESSION sql_require_primary_key = OFF;
+CREATE TABLE pxc_srp_a (c1 INT) ENGINE = InnoDB;
+DROP TABLE pxc_srp_a;
+SET GLOBAL pxc_strict_mode = 'MASTER';
+include/assert.inc [MASTER leaves sql_require_primary_key OFF.]
+SET GLOBAL sql_require_primary_key = OFF;
+SET SESSION sql_require_primary_key = ON;
+SET GLOBAL pxc_strict_mode = 'DISABLED';
+
+# 1. Degrade ENFORCING_WITH_PRIMARY_KEY -> DISABLED does not change sql_require_primary_key
+
+SET GLOBAL pxc_strict_mode = 'ENFORCING_WITH_PRIMARY_KEY';
+SET GLOBAL pxc_strict_mode = 'DISABLED';
+include/assert.inc [sql_require_primary_key global stays ON after degrade to DISABLED.]
+SET GLOBAL sql_require_primary_key = ON;
+SET GLOBAL sql_require_primary_key = OFF;
+SET SESSION sql_require_primary_key = ON;
+SET SESSION sql_require_primary_key = OFF;
+CREATE TABLE pxc_srp_d (c1 INT) ENGINE = InnoDB;
+DROP TABLE pxc_srp_d;
+
+# 2. pxc_strict_mode=ENFORCING_WITH_PRIMARY_KEY sets global sql_require_primary_key ON
+
+SET GLOBAL pxc_strict_mode = 'ENFORCING_WITH_PRIMARY_KEY';
+include/assert.inc [sql_require_primary_key global is ON.]
+# sql_require_primary_key=OFF cannot be set OFF under ENFORCING_WITH_PRIMARY_KEY
+SET GLOBAL sql_require_primary_key = OFF;
+ERROR 42000: Variable 'sql_require_primary_key' can't be set to the value of 'OFF'
+SET SESSION sql_require_primary_key = OFF;
+ERROR 42000: Variable 'sql_require_primary_key' can't be set to the value of 'OFF'
+SET GLOBAL sql_require_primary_key = ON;
+SET SESSION sql_require_primary_key = ON;
+CREATE TABLE pxc_srp_b (c1 INT) ENGINE = InnoDB;
+ERROR HY000: Unable to create or change a table without a primary key, when the system variable 'sql_require_primary_key' is set. Add a primary key to the table or unset this variable to avoid this message. Note that tables without a primary key can cause performance problems in row-based replication, so please consult your DBA before changing this setting.
+
+# 3. Degrade ENFORCING_WITH_PRIMARY_KEY -> PERMISSIVE does not change sql_require_primary_key
+
+SET GLOBAL pxc_strict_mode = 'PERMISSIVE';
+include/assert.inc [sql_require_primary_key global still ON after PERMISSIVE degrade.]
+SET GLOBAL sql_require_primary_key = ON;
+SET GLOBAL sql_require_primary_key = OFF;
+SET SESSION sql_require_primary_key = ON;
+SET SESSION sql_require_primary_key = OFF;
+CREATE TABLE pxc_srp_d (c1 INT) ENGINE = InnoDB;
+DROP TABLE pxc_srp_d;
+
+# 4. pxc_strict_mode = MASTER_WITH_PRIMARY_KEY sets global sql_require_primary_key ON
+
+SET GLOBAL pxc_strict_mode = 'MASTER_WITH_PRIMARY_KEY';
+include/assert.inc [sql_require_primary_key is ON.]
+# sql_require_primary_key = OFF cannot be set OFF under MASTER_WITH_PRIMARY_KEY
+SET GLOBAL sql_require_primary_key = OFF;
+ERROR 42000: Variable 'sql_require_primary_key' can't be set to the value of 'OFF'
+SET SESSION sql_require_primary_key = OFF;
+ERROR 42000: Variable 'sql_require_primary_key' can't be set to the value of 'OFF'
+SET GLOBAL sql_require_primary_key = ON;
+SET SESSION sql_require_primary_key = ON;
+CREATE TABLE pxc_srp_b (c1 INT) ENGINE = InnoDB;
+ERROR HY000: Unable to create or change a table without a primary key, when the system variable 'sql_require_primary_key' is set. Add a primary key to the table or unset this variable to avoid this message. Note that tables without a primary key can cause performance problems in row-based replication, so please consult your DBA before changing this setting.
+
+# 5. ALTER DROP PRIMARY KEY under ENFORCING_WITH_PRIMARY_KEY
+
+SET GLOBAL pxc_strict_mode = 'DISABLED';
+CREATE TABLE pxc_srp_f (c1 INT PRIMARY KEY) ENGINE = InnoDB;
+SET GLOBAL pxc_strict_mode = 'ENFORCING_WITH_PRIMARY_KEY';
+ALTER TABLE pxc_srp_f DROP PRIMARY KEY;
+ERROR HY000: Unable to create or change a table without a primary key, when the system variable 'sql_require_primary_key' is set. Add a primary key to the table or unset this variable to avoid this message. Note that tables without a primary key can cause performance problems in row-based replication, so please consult your DBA before changing this setting.
+SET GLOBAL pxc_strict_mode = 'DISABLED';
+SET SESSION sql_require_primary_key = OFF;
+ALTER TABLE pxc_srp_f DROP PRIMARY KEY;
+DROP TABLE pxc_srp_f;
+
+# 6. restart node_2 with ENFORCING_WITH_PRIMARY_KEY and sql-require-primary-key = OFF
+
+# restart:--pxc_strict_mode=ENFORCING_WITH_PRIMARY_KEY --sql-require-primary-key=OFF
+include/assert.inc [pxc_strict_mode should be ENFORCING_WITH_PRIMARY_KEY after restart]
+include/assert.inc [global sql_require_primary_key should be ON, OFF value is ignored]
+include/assert.inc [session sql_require_primary_key should be ON]
+
+# 6b. restart node_2 with plain ENFORCING and sql-require-primary-key=OFF
+#     the OFF must be honoured - this is the startup forcing PXC-5341
+#     removed, and it must not come back with the new modes
+
+# restart:--pxc_strict_mode=ENFORCING --sql-require-primary-key=OFF
+include/assert.inc [pxc_strict_mode should be ENFORCING after restart]
+include/assert.inc [ENFORCING must leave the configured sql_require_primary_key=OFF alone]
+# restore node_2 default options from suite cnf
+# restart
+
+# 7. Cleanup.
+
+SET GLOBAL pxc_strict_mode = DISABLED;
+SET GLOBAL sql_require_primary_key = OFF;
+SET GLOBAL pxc_strict_mode = DISABLED;

@@ -428,6 +428,13 @@ static bool check_session_admin_no_super(sys_var *self, THD *thd,
   @param thd the session context
   @param setv the SET operations metadata
  */
+#ifdef WITH_WSREP
+static bool check_session_admin_and_sql_require_primary_key_on_check(sys_var *,
+                                                                     THD *,
+                                                                     set_var *);
+static bool sql_require_primary_key_on_update(sys_var *, THD *, enum_var_type);
+#endif /* WITH_WSREP */
+
 static bool check_session_admin(sys_var *self, THD *thd, set_var *setv) {
   Security_context *sctx = thd->security_context();
 
@@ -5438,6 +5445,7 @@ static bool check_transaction_isolation(sys_var *, THD *thd, set_var *var) {
     switch (pxc_strict_mode) {
       case PXC_STRICT_MODE_DISABLED:
       case PXC_STRICT_MODE_MASTER:
+      case PXC_STRICT_MODE_MASTER_WITH_PRIMARY_KEY:
         break;
       case PXC_STRICT_MODE_PERMISSIVE:
         WSREP_WARN(
@@ -5449,6 +5457,7 @@ static bool check_transaction_isolation(sys_var *, THD *thd, set_var *var) {
             " SERIALIZABLE isolation with pxc_strict_mode = PERMISSIVE");
         break;
       case PXC_STRICT_MODE_ENFORCING:
+      case PXC_STRICT_MODE_ENFORCING_WITH_PRIMARY_KEY:
         block = true;
         WSREP_ERROR(
             "Percona-XtraDB-Cluster doesn't recommend using"
@@ -6786,7 +6795,9 @@ static bool check_not_empty_set(sys_var *, THD *thd, set_var *var) {
                           " with pxc_strict_mode = PERMISSIVE");
       break;
     case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_ENFORCING_WITH_PRIMARY_KEY:
     case PXC_STRICT_MODE_MASTER:
+    case PXC_STRICT_MODE_MASTER_WITH_PRIMARY_KEY:
     default:
       block = true;
       WSREP_WARN(
@@ -7957,7 +7968,12 @@ static Sys_var_bool Sys_sql_require_primary_key{
     DEFAULT(false),
     NO_MUTEX_GUARD,
     IN_BINLOG,
+#ifdef WITH_WSREP
+    ON_CHECK(check_session_admin_and_sql_require_primary_key_on_check),
+    ON_UPDATE(sql_require_primary_key_on_update)};
+#else
     ON_CHECK(check_session_admin)};
+#endif
 
 static Sys_var_bool Sys_sql_generate_invisible_primary_key(
     "sql_generate_invisible_primary_key",
@@ -8214,6 +8230,47 @@ static Sys_var_charptr Sys_protocol_compression_algorithms(
 #include "wsrep_binlog.h"
 #include "wsrep_sst.h"
 #include "wsrep_var.h"
+
+static bool check_session_admin_and_sql_require_primary_key_on_check(
+    sys_var *self, THD *thd, set_var *var) {
+  if (check_session_admin(self, thd, var)) return true;
+  if (!pxc_strict_mode_requires_primary_key(pxc_strict_mode)) return false;
+  /*
+    Allow the server upgrade thread to bypass pxc_strict_mode when temporarily
+    disabling sql_require_primary_key for system tables without primary keys.
+    These are internal statements compiled into the server; rejecting them can
+    abort upgrades and prevent the node from starting (PXC-5296).
+  */
+  if (thd->is_server_upgrade_thread()) return false;
+  if (var->save_result.ulonglong_value == 0) {
+    WSREP_ERROR(
+        "Cannot set sql_require_primary_key=OFF while pxc_strict_mode is %s.",
+        pxc_strict_mode_to_string(pxc_strict_mode));
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), self->name.str, "OFF");
+    return true;
+  }
+  return false;
+}
+
+/*
+  PXC-5390: SET ... = DEFAULT never reaches an ON_CHECK - set_var::check()
+  returns early while set_var::value is NULL - so the check above cannot stop
+  it from putting sql_require_primary_key back to its compiled default of OFF
+  while a _WITH_PRIMARY_KEY mode is in force. Re-assert the value here, where
+  every successful assignment lands.
+*/
+static bool sql_require_primary_key_on_update(sys_var *, THD *thd,
+                                              enum_var_type type) {
+  if (!pxc_strict_mode_requires_primary_key(pxc_strict_mode)) return false;
+  if (thd->is_server_upgrade_thread()) return false;
+
+  if (type == OPT_GLOBAL) {
+    global_system_variables.sql_require_primary_key = true;
+  } else {
+    thd->variables.sql_require_primary_key = true;
+  }
+  return false;
+}
 
 static PolyLock_mutex PLock_wsrep_cluster_config(&LOCK_wsrep_cluster_config);
 static Sys_var_charptr Sys_wsrep_provider(
@@ -8596,14 +8653,15 @@ static Sys_var_uint Sys_wsrep_min_log_verbosity(
     VALID_RANGE(1, 3), DEFAULT(3), BLOCK_SIZE(1), NO_MUTEX_GUARD,
     NOT_IN_BINLOG);
 
-static const char *pxc_strict_modes[] = {"DISABLED", "PERMISSIVE", "ENFORCING",
-                                         "MASTER", NullS};
+static const char *pxc_strict_modes[] = {
+    "DISABLED", "PERMISSIVE", "ENFORCING", "MASTER",
+    "ENFORCING_WITH_PRIMARY_KEY", "MASTER_WITH_PRIMARY_KEY", NullS};
 static Sys_var_enum Sys_pxc_strict_mode(
     "pxc_strict_mode",
     "PXC strict mode help control behavior of experimental features",
     GLOBAL_VAR(pxc_strict_mode), CMD_LINE(OPT_ARG), pxc_strict_modes,
     DEFAULT(PXC_STRICT_MODE_ENFORCING), NO_MUTEX_GUARD, NOT_IN_BINLOG,
-    ON_CHECK(pxc_strict_mode_check), ON_UPDATE(0));
+    ON_CHECK(pxc_strict_mode_check), ON_UPDATE(pxc_strict_mode_update));
 
 static const char *pxc_maint_modes[] = {"DISABLED", "SHUTDOWN", "MAINTENANCE",
                                         NullS};

@@ -282,7 +282,9 @@ static bool check_insert_fields(THD *thd, Table_ref *table_list,
                             table_list->get_db_name(), table_list->get_table_name());
         break;
       case PXC_STRICT_MODE_ENFORCING:
+      case PXC_STRICT_MODE_ENFORCING_WITH_PRIMARY_KEY:
       case PXC_STRICT_MODE_MASTER:
+      case PXC_STRICT_MODE_MASTER_WITH_PRIMARY_KEY:
       default:
         block = true;
         WSREP_ERROR(

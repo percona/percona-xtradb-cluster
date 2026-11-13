@@ -349,6 +349,21 @@ DROP PREPARE stmt;
 
 -- bug#92988: Temporarily turn off sql_require_primary_key for the
 -- next 2 tables as this is not necessary as they do not replicate.
+--
+-- The _WITH_PRIMARY_KEY strict modes force sql_require_primary_key ON, so the
+-- mode has to be relaxed for the primary-key-less tables below. The other
+-- modes never touch the variable, so leave them alone: restoring the mode goes
+-- through pxc_strict_mode_check(), which can legitimately refuse a
+-- DISABLED -> strict transition (PXC-5390).
+SET @old_pxc_strict_mode = @@global.pxc_strict_mode;
+SET @pxc_relax_strict_mode =
+    (@old_pxc_strict_mode IN ('ENFORCING_WITH_PRIMARY_KEY',
+                              'MASTER_WITH_PRIMARY_KEY'));
+SET @cmd = "SET @@global.pxc_strict_mode = DISABLED";
+SET @str = IF(@pxc_relax_strict_mode, @cmd, "SET @dummy = 0");
+PREPARE stmt FROM @str;
+EXECUTE stmt;
+DROP PREPARE stmt;
 SET @old_sql_require_primary_key = @@session.sql_require_primary_key;
 SET @@session.sql_require_primary_key = 0;
 
@@ -359,6 +374,12 @@ CREATE TABLE IF NOT EXISTS general_log (event_time TIMESTAMP(6) NOT NULL DEFAULT
 CREATE TABLE IF NOT EXISTS slow_log (start_time TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6), user_host MEDIUMTEXT NOT NULL, query_time TIME(6) NOT NULL, lock_time TIME(6) NOT NULL, rows_sent INTEGER NOT NULL, rows_examined INTEGER NOT NULL, db VARCHAR(512) NOT NULL, last_insert_id INTEGER NOT NULL, insert_id INTEGER NOT NULL, server_id INTEGER UNSIGNED NOT NULL, sql_text MEDIUMBLOB NOT NULL, thread_id BIGINT UNSIGNED NOT NULL) engine=CSV CHARACTER SET utf8mb3 comment="Slow log";
 
 SET @@session.sql_require_primary_key = @old_sql_require_primary_key;
+-- Restore pxc_strict_mode saved above, under the same guard.
+SET @cmd = "SET @@global.pxc_strict_mode = @old_pxc_strict_mode";
+SET @str = IF(@pxc_relax_strict_mode, @cmd, "SET @dummy = 0");
+PREPARE stmt FROM @str;
+EXECUTE stmt;
+DROP PREPARE stmt;
 
 SET @cmd = "CREATE TABLE IF NOT EXISTS component ( component_id int unsigned NOT NULL AUTO_INCREMENT, component_group_id int unsigned NOT NULL, component_urn text NOT NULL, PRIMARY KEY (component_id)) engine=INNODB DEFAULT CHARSET=utf8mb3 COMMENT 'Components' ROW_FORMAT=DYNAMIC TABLESPACE=mysql";
 SET @str = CONCAT(@cmd, " ENCRYPTION='", @is_mysql_encrypted, "'");

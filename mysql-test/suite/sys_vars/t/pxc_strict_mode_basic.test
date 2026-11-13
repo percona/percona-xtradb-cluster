@@ -26,6 +26,12 @@ select @@pxc_strict_mode;
 --error ER_UNKNOWN_ERROR
 set global pxc_strict_mode = 'MASTER';
 select @@pxc_strict_mode;
+--error ER_UNKNOWN_ERROR
+set global pxc_strict_mode = 'ENFORCING_WITH_PRIMARY_KEY';
+select @@pxc_strict_mode;
+--error ER_UNKNOWN_ERROR
+set global pxc_strict_mode = 'MASTER_WITH_PRIMARY_KEY';
+select @@pxc_strict_mode;
 
 --echo # try setting different invalid values.
 --error ER_WRONG_VALUE_FOR_VAR

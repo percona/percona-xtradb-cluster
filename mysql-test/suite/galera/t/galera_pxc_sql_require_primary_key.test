@@ -1,0 +1,276 @@
+# This test proves that setting pxc_strict_mode to ENFORCING_WITH_PRIMARY_KEY
+# or MASTER_WITH_PRIMARY_KEY sets @@global sql_require_primary_key ON, and
+# tests a few related scenarios. Session values are not updated by
+# pxc_strict_mode.
+#
+# PXC-5390: only the _WITH_PRIMARY_KEY modes do this. Plain ENFORCING and
+# MASTER leave sql_require_primary_key alone, which section 0 guards - that is
+# the behavior PXC-5341 restored and it must not regress.
+#
+# 0. ENFORCING and MASTER do not touch sql_require_primary_key
+# 1. Degrade ENFORCING_WITH_PRIMARY_KEY -> DISABLED does not change it
+# 2. pxc_strict_mode=ENFORCING_WITH_PRIMARY_KEY sets global sql_require_primary_key ON
+# 3. Degrade ENFORCING_WITH_PRIMARY_KEY -> PERMISSIVE does not change it
+# 4. pxc_strict_mode=MASTER_WITH_PRIMARY_KEY sets global sql_require_primary_key ON
+# sql_require_primary_key=OFF cannot be set OFF under MASTER_WITH_PRIMARY_KEY
+# 5. ALTER DROP PRIMARY KEY under ENFORCING_WITH_PRIMARY_KEY
+# 6. restart node_2 with ENFORCING_WITH_PRIMARY_KEY and sql-require-primary-key=OFF
+# 6b. restart node_2 with plain ENFORCING - the OFF must be honoured
+# 7. Cleanup.
+
+--source include/galera_cluster.inc
+# Due to restart, lets make this test big-test.
+--source include/big_test.inc
+#--source include/force_restart.inc
+
+--connection node_1
+call mtr.add_suppression("Cannot set sql_require_primary_key=OFF while pxc_strict_mode is");
+call mtr.add_suppression("Replica SQL: Error .Unable to create or change a table without a primary key");
+call mtr.add_suppression("Setting sql_require_primary_key=ON because pxc_strict_mode is");
+--let $pxc_saved_1 = `SELECT @@global.pxc_strict_mode`
+
+--connection node_2
+call mtr.add_suppression("Cannot set sql_require_primary_key=OFF while pxc_strict_mode is");
+call mtr.add_suppression("Replica SQL: Error .Unable to create or change a table without a primary key");
+call mtr.add_suppression("Setting sql_require_primary_key=ON because pxc_strict_mode is");
+--let $pxc_saved_2 = `SELECT @@global.pxc_strict_mode`
+
+--let $assert_text = sql_require_primary_key global is OFF.
+--let $assert_cond = [ SELECT @@global.sql_require_primary_key = 0 ]
+--source include/assert.inc
+
+--let $pxc_strict_baseline = `SELECT @@global.pxc_strict_mode`
+--let $assert_text = pxc_strict_mode is DISABLED
+--let $assert_cond = "$pxc_strict_baseline" = "DISABLED"
+--source include/assert.inc
+
+## sql_require_primary_key behavior ##
+# Below command prove that even if GLOBAL sql_require_primary_key is set to ON
+# session variable value is not changed, allowing DDL without primary key to
+# run successfully.
+SET GLOBAL sql_require_primary_key = OFF;
+SET SESSION sql_require_primary_key = OFF;
+CREATE TABLE pxc_srp_b (c1 INT) ENGINE = InnoDB;
+DROP TABLE pxc_srp_b;
+
+# Though sql_require_primary_key is ON sesson values are not changed allowing
+# DDL without primary key to run successfully.
+SET GLOBAL sql_require_primary_key = ON;
+CREATE TABLE pxc_srp_b (c1 INT) ENGINE = InnoDB;
+DROP TABLE pxc_srp_b;
+SET GLOBAL sql_require_primary_key = OFF;
+SET SESSION sql_require_primary_key = ON;
+
+## NOTE-1: Upgrade pxc_strict_mode into a _WITH_PRIMARY_KEY mode forces @@global
+## sql_require_primary_key = ON existing @@sessions are not changed.
+## Refer above testing that confirms behavior is in synch with
+## sql_require_primary_key
+## NOTE-2: Degrading strict mode does not clear global sql_require_primary_key.
+
+--echo
+--echo # 0. ENFORCING and MASTER do not touch sql_require_primary_key
+--echo
+
+--connection node_1
+SET GLOBAL sql_require_primary_key = OFF;
+
+SET GLOBAL pxc_strict_mode = 'ENFORCING';
+--let $assert_text = ENFORCING leaves sql_require_primary_key OFF.
+--let $assert_cond = [ SELECT @@global.sql_require_primary_key = 0 ]
+--source include/assert.inc
+
+# and it stays settable, which is what the all-or-nothing coupling took away
+SET GLOBAL sql_require_primary_key = ON;
+SET GLOBAL sql_require_primary_key = OFF;
+SET SESSION sql_require_primary_key = OFF;
+CREATE TABLE pxc_srp_a (c1 INT) ENGINE = InnoDB;
+DROP TABLE pxc_srp_a;
+
+SET GLOBAL pxc_strict_mode = 'MASTER';
+--let $assert_text = MASTER leaves sql_require_primary_key OFF.
+--let $assert_cond = [ SELECT @@global.sql_require_primary_key = 0 ]
+--source include/assert.inc
+
+SET GLOBAL sql_require_primary_key = OFF;
+SET SESSION sql_require_primary_key = ON;
+SET GLOBAL pxc_strict_mode = 'DISABLED';
+
+--echo
+--echo # 1. Degrade ENFORCING_WITH_PRIMARY_KEY -> DISABLED does not change sql_require_primary_key
+--echo
+
+--connection node_1
+SET GLOBAL pxc_strict_mode = 'ENFORCING_WITH_PRIMARY_KEY';
+SET GLOBAL pxc_strict_mode = 'DISABLED';
+
+--let $assert_text = sql_require_primary_key global stays ON after degrade to DISABLED.
+--let $assert_cond = [ SELECT @@global.sql_require_primary_key = 1 ]
+--source include/assert.inc
+
+# sql_require_primary_key can be set to ON and OFF when pxc_strict_mode = DISABLED/PERMISSIVE
+# since pxc_strict_mode is not strict but customer may need the flag.
+SET GLOBAL sql_require_primary_key = ON;
+SET GLOBAL sql_require_primary_key = OFF;
+SET SESSION sql_require_primary_key = ON;
+SET SESSION sql_require_primary_key = OFF;
+
+CREATE TABLE pxc_srp_d (c1 INT) ENGINE = InnoDB;
+DROP TABLE pxc_srp_d;
+
+--echo
+--echo # 2. pxc_strict_mode=ENFORCING_WITH_PRIMARY_KEY sets global sql_require_primary_key ON
+--echo
+
+SET GLOBAL pxc_strict_mode = 'ENFORCING_WITH_PRIMARY_KEY';
+
+--let $assert_text = sql_require_primary_key global is ON.
+--let $assert_cond = [ SELECT @@global.sql_require_primary_key = 1 ]
+--source include/assert.inc
+
+--echo # sql_require_primary_key=OFF cannot be set OFF under ENFORCING_WITH_PRIMARY_KEY
+
+--error ER_WRONG_VALUE_FOR_VAR
+SET GLOBAL sql_require_primary_key = OFF;
+--error ER_WRONG_VALUE_FOR_VAR
+SET SESSION sql_require_primary_key = OFF;
+
+SET GLOBAL sql_require_primary_key = ON;
+SET SESSION sql_require_primary_key = ON;
+
+# NOTE: Old session can still execute below statements.
+--error ER_TABLE_WITHOUT_PK
+CREATE TABLE pxc_srp_b (c1 INT) ENGINE = InnoDB;
+
+--echo
+--echo # 3. Degrade ENFORCING_WITH_PRIMARY_KEY -> PERMISSIVE does not change sql_require_primary_key
+--echo
+
+SET GLOBAL pxc_strict_mode = 'PERMISSIVE';
+
+--let $assert_text = sql_require_primary_key global still ON after PERMISSIVE degrade.
+--let $assert_cond = [ SELECT @@global.sql_require_primary_key = 1 ]
+--source include/assert.inc
+
+# sql_require_primary_key can be set to ON and OFF when pxc_strict_mode = DISABLED/PERMISSIVE
+# since pxc_strict_mode is not strict but customer may need the flag.
+SET GLOBAL sql_require_primary_key = ON;
+SET GLOBAL sql_require_primary_key = OFF;
+SET SESSION sql_require_primary_key = ON;
+SET SESSION sql_require_primary_key = OFF;
+
+CREATE TABLE pxc_srp_d (c1 INT) ENGINE = InnoDB;
+DROP TABLE pxc_srp_d;
+
+--echo
+--echo # 4. pxc_strict_mode = MASTER_WITH_PRIMARY_KEY sets global sql_require_primary_key ON
+--echo
+
+SET GLOBAL pxc_strict_mode = 'MASTER_WITH_PRIMARY_KEY';
+
+--let $assert_text = sql_require_primary_key is ON.
+--let $assert_cond = [ SELECT @@global.sql_require_primary_key = 1 ]
+--source include/assert.inc
+
+--echo # sql_require_primary_key = OFF cannot be set OFF under MASTER_WITH_PRIMARY_KEY
+
+--error ER_WRONG_VALUE_FOR_VAR
+SET GLOBAL sql_require_primary_key = OFF;
+--error ER_WRONG_VALUE_FOR_VAR
+SET SESSION sql_require_primary_key = OFF;
+
+SET GLOBAL sql_require_primary_key = ON;
+SET SESSION sql_require_primary_key = ON;
+
+# NOTE: Old sessions can still execute below statements.
+--error ER_TABLE_WITHOUT_PK
+CREATE TABLE pxc_srp_b (c1 INT) ENGINE = InnoDB;
+
+--echo
+--echo # 5. ALTER DROP PRIMARY KEY under ENFORCING_WITH_PRIMARY_KEY
+--echo
+
+SET GLOBAL pxc_strict_mode = 'DISABLED';
+
+CREATE TABLE pxc_srp_f (c1 INT PRIMARY KEY) ENGINE = InnoDB;
+
+SET GLOBAL pxc_strict_mode = 'ENFORCING_WITH_PRIMARY_KEY';
+
+# A new connection, so the session value is inherited from the global the mode
+# just forced ON rather than from an explicit SET earlier in this test - under
+# the old session the ALTER would have failed in any mode, which proved nothing.
+--connect node_1_fresh, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1_fresh
+--error ER_TABLE_WITHOUT_PK
+ALTER TABLE pxc_srp_f DROP PRIMARY KEY;
+--disconnect node_1_fresh
+--connection node_1
+
+SET GLOBAL pxc_strict_mode = 'DISABLED';
+SET SESSION sql_require_primary_key = OFF;
+
+ALTER TABLE pxc_srp_f DROP PRIMARY KEY;
+DROP TABLE pxc_srp_f;
+
+--echo
+--echo # 6. restart node_2 with ENFORCING_WITH_PRIMARY_KEY and sql-require-primary-key = OFF
+--echo
+
+--connection node_2
+--let $restart_parameters = restart:--pxc_strict_mode=ENFORCING_WITH_PRIMARY_KEY --sql-require-primary-key=OFF
+--source include/restart_mysqld.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+--connection node_2
+--let $pxc_mode_boot = `SELECT @@global.pxc_strict_mode`
+--let $assert_text = pxc_strict_mode should be ENFORCING_WITH_PRIMARY_KEY after restart
+--let $assert_cond = "$pxc_mode_boot" = "ENFORCING_WITH_PRIMARY_KEY"
+--source include/assert.inc
+
+--let $assert_text = global sql_require_primary_key should be ON, OFF value is ignored
+--let $assert_cond = [ SELECT @@global.sql_require_primary_key = 1 ]
+--source include/assert.inc
+
+--let $assert_text = session sql_require_primary_key should be ON
+--let $assert_cond = [ SELECT @@session.sql_require_primary_key = 1 ]
+--source include/assert.inc
+
+--echo
+--echo # 6b. restart node_2 with plain ENFORCING and sql-require-primary-key=OFF
+--echo #     the OFF must be honoured - this is the startup forcing PXC-5341
+--echo #     removed, and it must not come back with the new modes
+--echo
+
+--let $restart_parameters = restart:--pxc_strict_mode=ENFORCING --sql-require-primary-key=OFF
+--source include/restart_mysqld.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+--let $pxc_mode_boot = `SELECT @@global.pxc_strict_mode`
+--let $assert_text = pxc_strict_mode should be ENFORCING after restart
+--let $assert_cond = "$pxc_mode_boot" = "ENFORCING"
+--source include/assert.inc
+
+--let $assert_text = ENFORCING must leave the configured sql_require_primary_key=OFF alone
+--let $assert_cond = [ SELECT @@global.sql_require_primary_key = 0 ]
+--source include/assert.inc
+
+--echo # restore node_2 default options from suite cnf
+--let $restart_parameters = restart
+--source include/restart_mysqld.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+--echo
+--echo # 7. Cleanup.
+--echo
+
+--connection node_1
+--eval SET GLOBAL pxc_strict_mode = $pxc_saved_1
+SET GLOBAL sql_require_primary_key = OFF;
+
+--connection node_2
+--eval SET GLOBAL pxc_strict_mode = $pxc_saved_2
