@@ -1,0 +1,44 @@
+CALL mtr.add_suppression("Setting parameter 'socket.ssl_reload' to '1' failed");
+CALL mtr.add_suppression("Set options returned");
+CALL mtr.add_suppression("SSL error: Unable to get certificate from 'no_such_cert[.]pem'");
+# restart
+ALTER INSTANCE RELOAD TLS;
+ALTER INSTANCE RELOAD TLS FOR CHANNEL wsrep;
+ALTER INSTANCE RELOAD TLS FOR CHANNEL mysql_main_and_wsrep;
+ALTER INSTANCE RELOAD TLS FOR CHANNEL WSREP;
+ALTER INSTANCE RELOAD TLS FOR CHANNEL wsrep_foo;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use
+ALTER INSTANCE RELOAD TLS;
+ALTER INSTANCE RELOAD TLS NO ROLLBACK ON ERROR;
+ALTER INSTANCE RELOAD TLS FOR CHANNEL mysql_main;
+ALTER INSTANCE RELOAD TLS FOR CHANNEL wsrep;
+ERROR HY000: Failed to set up SSL because of the following SSL library error: Failed to reload TLS for channel wsrep: reloading wsrep provider SSL context failed, see error log
+ALTER INSTANCE RELOAD TLS FOR CHANNEL wsrep NO ROLLBACK ON ERROR;
+ERROR HY000: Failed to set up SSL because of the following SSL library error: Failed to reload TLS for channel wsrep: reloading wsrep provider SSL context failed, see error log
+ALTER INSTANCE RELOAD TLS FOR CHANNEL mysql_main_and_wsrep;
+ERROR HY000: Failed to set up SSL because of the following SSL library error: TLS for channel mysql_main was reloaded, but reloading TLS for channel wsrep failed: reloading wsrep provider SSL context failed, see error log
+include/assert_grep.inc [Galera SSL reload failures are logged]
+SELECT VARIABLE_VALUE = 'Synced' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
+VARIABLE_VALUE = 'Synced'
+1
+SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+VARIABLE_VALUE = 2
+1
+SET @orig_ssl_cert = @@global.ssl_cert;
+SET GLOBAL ssl_cert = 'no_such_cert.pem';
+ALTER INSTANCE RELOAD TLS FOR CHANNEL mysql_main_and_wsrep;
+ERROR HY000: Failed to set up SSL because of the following SSL library error: Unable to get certificate
+SET GLOBAL ssl_cert = @orig_ssl_cert;
+include/assert_grep.inc [Galera SSL reload is not attempted when mysql_main fails]
+ALTER INSTANCE RELOAD TLS FOR CHANNEL mysql_main_and_wsrep;
+include/assert_grep.inc [No new Galera SSL reload failures]
+# restart
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1);
+SELECT COUNT(*) = 1 FROM t1;
+COUNT(*) = 1
+1
+DROP TABLE t1;
+ALTER INSTANCE RELOAD TLS FOR CHANNEL wsrep;
+# restart
+# restart

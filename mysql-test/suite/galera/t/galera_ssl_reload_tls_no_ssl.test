@@ -1,0 +1,32 @@
+#
+# Test ALTER INSTANCE RELOAD TLS when Galera SSL is not enabled
+# (socket.ssl is not set, pxc_encrypt_cluster_traffic=OFF).
+#
+# Galera ignores socket.ssl_reload when SSL is disabled, so the wsrep
+# channels succeed with a warning saying that nothing was reloaded, and
+# channel mysql_main (plain RELOAD TLS too) reloads mysql_main only.
+#
+
+--source include/galera_cluster.inc
+
+--connection node_1
+CALL mtr.add_suppression("Galera TLS is not enabled");
+
+SELECT @@global.pxc_encrypt_cluster_traffic;
+
+ALTER INSTANCE RELOAD TLS;
+
+# Galera TLS is off: warning, nothing reloaded for channel wsrep
+ALTER INSTANCE RELOAD TLS FOR CHANNEL wsrep;
+ALTER INSTANCE RELOAD TLS FOR CHANNEL wsrep NO ROLLBACK ON ERROR;
+ALTER INSTANCE RELOAD TLS FOR CHANNEL mysql_main_and_wsrep;
+
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
+--let $assert_select = Setting parameter 'socket.ssl_reload' to '1' failed
+--let $assert_only_after = CURRENT_TEST: galera.galera_ssl_reload_tls_no_ssl
+--let $assert_text = No Galera SSL reload failures when Galera SSL is disabled
+--let $assert_count = 0
+--source include/assert_grep.inc
+
+SELECT VARIABLE_VALUE = 'Synced' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
+SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
