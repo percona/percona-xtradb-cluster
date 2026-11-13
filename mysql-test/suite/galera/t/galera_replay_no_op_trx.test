@@ -1,0 +1,105 @@
+#
+# Replay of a local transaction that appended certification keys but made
+# no row changes (INSERT ... ON DUPLICATE KEY UPDATE with identical values).
+#
+# The transaction holds an InnoDB next-key lock on the duplicate unique key
+# record, so a remote INSERT into the gap before that record conflicts with
+# it in InnoDB, although the two write sets do not conflict in certification.
+# If the local transaction already has a higher seqno and waits for commit
+# order, the applier BF-aborts it and the transaction must be replayed.
+#
+# The replayed write set carries no row events. The replayer must still
+# go through commit ordering, otherwise Galera keeps the transaction in the
+# REPLAYING state and galera_release() reports
+# "Internal library error: unexpected trx release state".
+#
+
+--source include/galera_cluster.inc
+--source include/have_debug_sync.inc
+--source suite/galera/include/galera_have_debug_sync.inc
+
+--let $wsrep_local_replays_old = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+
+CREATE TABLE t1 (id BIGINT AUTO_INCREMENT PRIMARY KEY, k INT NOT NULL, v INT NOT NULL, UNIQUE KEY uk(k));
+INSERT INTO t1 (k, v) VALUES (10, 100), (20, 100);
+
+# Victim: no-op ODKU, locks uk(k=20) and the gap (10, 20)
+--connection node_1
+START TRANSACTION;
+INSERT INTO t1 (k, v) VALUES (20, 100) ON DUPLICATE KEY UPDATE v = VALUES(v);
+
+# Block the applier on node #1 before it applies the conflicting write set
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+SET SESSION wsrep_sync_wait = 0;
+--let $galera_sync_point = apply_monitor_slave_enter_sync
+--source include/galera_set_sync_point.inc
+
+# Conflicting transaction: inserts into the gap locked by the victim
+--connection node_2
+INSERT INTO t1 (k, v) VALUES (15, 1);
+
+--connection node_1a
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+# The victim gets a higher seqno; block it before the commit monitor
+--let $galera_sync_point = commit_monitor_master_enter_sync
+--source include/galera_set_sync_point.inc
+
+--connection node_1
+--send COMMIT
+
+--connection node_1a
+--let $galera_sync_point = apply_monitor_slave_enter_sync commit_monitor_master_enter_sync
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+# Let the applier proceed until it BF-aborts the victim
+--let $galera_sync_point = abort_trx_end
+--source include/galera_set_sync_point.inc
+--let $galera_sync_point = apply_monitor_slave_enter_sync
+--source include/galera_signal_sync_point.inc
+--let $galera_sync_point = abort_trx_end commit_monitor_master_enter_sync
+--source include/galera_wait_sync_point.inc
+
+# Let both transactions proceed; the victim is replayed
+--source include/galera_clear_sync_point.inc
+--let $galera_sync_point = abort_trx_end
+--source include/galera_signal_sync_point.inc
+--let $galera_sync_point = commit_monitor_master_enter_sync
+--source include/galera_signal_sync_point.inc
+
+# The replayed commit succeeds
+--connection node_1
+--reap
+
+--let $wsrep_local_replays_new = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--disable_query_log
+--eval SELECT $wsrep_local_replays_new - $wsrep_local_replays_old = 1 AS wsrep_local_replays
+--enable_query_log
+
+SELECT k, v FROM t1 ORDER BY k;
+
+# The node must still be able to commit, apply and replicate
+INSERT INTO t1 (k, v) VALUES (30, 1);
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 4 FROM t1
+--source include/wait_condition.inc
+SELECT k, v FROM t1 ORDER BY k;
+INSERT INTO t1 (k, v) VALUES (40, 1);
+
+--connection node_1
+--let $wait_condition = SELECT COUNT(*) = 5 FROM t1
+--source include/wait_condition.inc
+SELECT k, v FROM t1 ORDER BY k;
+
+# Galera must not report an unexpected release state for the replayed trx
+--let $assert_text = No "unexpected trx release state" error in the node_1 error log
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
+--let $assert_select = unexpected trx release state
+--let $assert_count = 0
+--source include/assert_grep.inc
+
+DROP TABLE t1;
+--disconnect node_1a

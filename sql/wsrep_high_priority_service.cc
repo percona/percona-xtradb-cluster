@@ -363,13 +363,19 @@ int Wsrep_high_priority_service::commit(const wsrep::ws_handle &ws_handle,
   if (!is_ordered) {
     m_thd->wsrep_cs().before_rollback();
     m_thd->wsrep_cs().after_rollback();
-  } else if (m_thd->wsrep_trx().state() == wsrep::transaction::s_executing) {
+  } else if (m_thd->wsrep_trx().state() == wsrep::transaction::s_executing ||
+             m_thd->wsrep_trx().state() == wsrep::transaction::s_replaying) {
     /*
       Wsrep commit was ordered but it did not go through commit time
       hooks and remains active. Cycle through commit hooks to release
       commit order and to make cleanup happen in after_applying() call.
 
-      This is a workaround for CTAS with empty result set.
+      This is a workaround for CTAS with empty result set, and for
+      write sets without row events, e.g. a replayed INSERT ... ON DUPLICATE
+      KEY UPDATE which did not change the row but appended certification
+      keys (see wsrep_compare_records()). Without it the replayed
+      transaction would never enter commit order and the provider would
+      keep it in the REPLAYING state.
     */
     WSREP_DEBUG("Commit not finished for applier %u", thd->thread_id());
     ret = ret || m_thd->wsrep_cs().before_commit() ||
