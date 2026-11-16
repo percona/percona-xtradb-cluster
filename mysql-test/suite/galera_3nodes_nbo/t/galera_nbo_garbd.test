@@ -1,0 +1,111 @@
+#
+# PXC-5300: NBO method gets completely stuck with an arbitrator (garbd)
+# presence.
+#
+# The NBO end barrier waited for an NBO-end message from every member of the
+# primary view, including garbd. As garbd does not apply write sets it never
+# sends one, so the DDL hung on all data nodes until garbd left the cluster.
+#
+# Shut down node #3 and use its ports to start garbd, so the cluster consists
+# of two data nodes and an arbitrator. Then run an NBO DDL and verify it
+# completes while garbd is still in the primary view. garbd is started with a
+# non-default --name: it is recognized by its stateless flag and empty incoming
+# address, not by its name.
+#
+
+--source include/galera_cluster.inc
+--source include/big_test.inc
+
+--echo Killing node #3 to free ports for garbd ...
+--let $galera_connection_name = node_3
+--let $galera_server_number = 3
+--source include/galera_connect.inc
+--source include/shutdown_mysqld.inc
+
+--connection node_1
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+--echo Starting garbd ...
+--exec $GALERA_GARBD --name my_arbitrator --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'evs.inactive_timeout=PT6S;base_port=$NODE_GALERAPORT_3' > $MYSQL_TMP_DIR/garbd.log 2>&1 &
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 3 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+CREATE TABLE t1 (id INT PRIMARY KEY, a INT NOT NULL) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1, 1), (2, 2);
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 2 FROM t1
+--source include/wait_condition.inc
+
+--connection node_1
+--let $nbo_conn_id = `SELECT CONNECTION_ID()`
+SET SESSION wsrep_OSU_method = NBO;
+--send ALTER TABLE t1 ALGORITHM=INPLACE, LOCK=SHARED, ADD KEY k_a (a)
+
+# Without the fix the ALTER never finishes while garbd is in the view.
+# Poll instead of using wait_condition.inc so that the test can still clean up
+# (stop garbd, which unblocks the DDL) and fail with a result mismatch.
+# Check that the ALTER statement of node_1 has ended, so that the poll cannot
+# succeed before the ALTER has even started.
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1a
+SET SESSION wsrep_sync_wait = 0;
+--let $nbo_done = 0
+--let $counter = 600
+while ($counter)
+{
+  --let $nbo_done = `SELECT COUNT(*) = 1 FROM performance_schema.events_statements_current s JOIN performance_schema.threads t USING (THREAD_ID) WHERE t.PROCESSLIST_ID = $nbo_conn_id AND s.SQL_TEXT LIKE 'ALTER TABLE t1%' AND s.END_EVENT_ID IS NOT NULL`
+  if ($nbo_done)
+  {
+    --let $counter = 0
+  }
+  if (!$nbo_done)
+  {
+    --sleep 0.1
+    --dec $counter
+  }
+}
+--echo NBO DDL completed with garbd in the cluster: $nbo_done
+
+--echo Killing garbd ...
+--exec pkill -o -f "garbd.*$NODE_GALERAPORT_3"
+
+--connection node_1
+--reap
+SET SESSION wsrep_OSU_method = TOI;
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+SHOW CREATE TABLE t1;
+
+--connection node_2
+SET SESSION wsrep_sync_wait = 15;
+SHOW CREATE TABLE t1;
+
+# The table must be usable cluster-wide once the NBO has ended.
+--connection node_1
+INSERT INTO t1 VALUES (3, 3);
+--connection node_2
+SELECT COUNT(*) FROM t1;
+
+DROP TABLE t1;
+
+--echo Restarting node #3 to satisfy MTR's end-of-test checks
+--connection node_3
+--source include/start_mysqld.inc
+--let $wait_condition = SELECT VARIABLE_VALUE = 3 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+--remove_file $MYSQL_TMP_DIR/garbd.log
+--disconnect node_1a
+
+--connection node_1
+CALL mtr.add_suppression("Protocol violation\. JOIN message sender 1\.0 \(.*\) is not in state transfer \(SYNCED\)");
+
+--connection node_2
+CALL mtr.add_suppression("Protocol violation\. JOIN message sender 1\.0 \(.*\) is not in state transfer \(SYNCED\)");
+
+--connection node_3
+CALL mtr.add_suppression("Protocol violation\. JOIN message sender 1\.0 \(.*\) is not in state transfer \(SYNCED\)");

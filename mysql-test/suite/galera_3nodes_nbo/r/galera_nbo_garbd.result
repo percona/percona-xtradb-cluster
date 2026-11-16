@@ -1,0 +1,37 @@
+Killing node #3 to free ports for garbd ...
+Starting garbd ...
+CREATE TABLE t1 (id INT PRIMARY KEY, a INT NOT NULL) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1, 1), (2, 2);
+SET SESSION wsrep_OSU_method = NBO;
+ALTER TABLE t1 ALGORITHM=INPLACE, LOCK=SHARED, ADD KEY k_a (a);
+SET SESSION wsrep_sync_wait = 0;
+NBO DDL completed with garbd in the cluster: 1
+Killing garbd ...
+SET SESSION wsrep_OSU_method = TOI;
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `id` int NOT NULL,
+  `a` int NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `k_a` (`a`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+SET SESSION wsrep_sync_wait = 15;
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `id` int NOT NULL,
+  `a` int NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `k_a` (`a`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+INSERT INTO t1 VALUES (3, 3);
+SELECT COUNT(*) FROM t1;
+COUNT(*)
+3
+DROP TABLE t1;
+Restarting node #3 to satisfy MTR's end-of-test checks
+# restart
+CALL mtr.add_suppression("Protocol violation\. JOIN message sender 1\.0 \(.*\) is not in state transfer \(SYNCED\)");
+CALL mtr.add_suppression("Protocol violation\. JOIN message sender 1\.0 \(.*\) is not in state transfer \(SYNCED\)");
+CALL mtr.add_suppression("Protocol violation\. JOIN message sender 1\.0 \(.*\) is not in state transfer \(SYNCED\)");
