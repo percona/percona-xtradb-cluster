@@ -1,0 +1,53 @@
+CALL mtr.add_suppression("Setting parameter 'socket.ssl_reload' to '1' failed");
+CALL mtr.add_suppression("Set options returned");
+CALL mtr.add_suppression("Galera TLS was reloaded from the files it was started with");
+# restart
+SELECT @@global.pxc_encrypt_cluster_traffic;
+@@global.pxc_encrypt_cluster_traffic
+1
+ALTER INSTANCE RELOAD TLS;
+ALTER INSTANCE RELOAD TLS NO ROLLBACK ON ERROR;
+ALTER INSTANCE RELOAD TLS FOR CHANNEL mysql_main;
+ALTER INSTANCE RELOAD TLS FOR CHANNEL wsrep;
+ALTER INSTANCE RELOAD TLS FOR CHANNEL mysql_main_and_wsrep;
+include/assert_grep.inc [No Galera SSL reload failures with valid files]
+SET @orig_ssl_cert = @@global.ssl_cert;
+SET GLOBAL ssl_cert = 'MYSQL_TEST_DIR/std_data/server-cert.pem';
+ALTER INSTANCE RELOAD TLS FOR CHANNEL wsrep;
+ERROR HY000: Failed to set up SSL because of the following SSL library error: Failed to reload TLS for channel wsrep: reloading wsrep provider SSL context failed, see error log
+ALTER INSTANCE RELOAD TLS;
+ERROR HY000: Failed to set up SSL because of the following SSL library error: TLS for channel mysql_main was reloaded, but reloading TLS for channel wsrep failed: reloading wsrep provider SSL context failed, see error log
+ALTER INSTANCE RELOAD TLS NO ROLLBACK ON ERROR;
+ERROR HY000: Failed to set up SSL because of the following SSL library error: TLS for channel mysql_main was reloaded, but reloading TLS for channel wsrep failed: reloading wsrep provider SSL context failed, see error log
+ALTER INSTANCE RELOAD TLS FOR CHANNEL mysql_main;
+ERROR HY000: Failed to set up SSL because of the following SSL library error: TLS for channel mysql_main was reloaded, but reloading TLS for channel wsrep failed: reloading wsrep provider SSL context failed, see error log
+include/assert_grep.inc [Channel mysql_main reloads Galera SSL]
+SELECT VARIABLE_VALUE = 'Synced' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
+VARIABLE_VALUE = 'Synced'
+1
+SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+VARIABLE_VALUE = 2
+1
+ALTER INSTANCE RELOAD TLS;
+Warnings:
+Warning	3888	Failed to set up SSL because of the following SSL library error: Galera TLS was reloaded from the files it was started with, which differ from the current server settings: ssl_cert='MYSQL_TEST_DIR/std_data/server-cert.pem' (Galera uses 'MYSQLTEST_VARDIR/tmp/galera_reload_enc_cert.pem'). A server restart is needed for Galera to use them
+ALTER INSTANCE RELOAD TLS FOR CHANNEL wsrep;
+Warnings:
+Warning	3888	Failed to set up SSL because of the following SSL library error: Galera TLS was reloaded from the files it was started with, which differ from the current server settings: ssl_cert='MYSQL_TEST_DIR/std_data/server-cert.pem' (Galera uses 'MYSQLTEST_VARDIR/tmp/galera_reload_enc_cert.pem'). A server restart is needed for Galera to use them
+include/assert_grep.inc [Path mismatch is written to the error log]
+SET GLOBAL ssl_cert = @orig_ssl_cert;
+ALTER INSTANCE RELOAD TLS;
+include/assert_grep.inc [No new path mismatch warnings]
+include/assert_grep.inc [No new Galera SSL reload failures]
+# restart
+SELECT @@global.wsrep_provider;
+@@global.wsrep_provider
+none
+ALTER INSTANCE RELOAD TLS;
+ALTER INSTANCE RELOAD TLS NO ROLLBACK ON ERROR;
+ALTER INSTANCE RELOAD TLS FOR CHANNEL mysql_main;
+ALTER INSTANCE RELOAD TLS FOR CHANNEL wsrep;
+ERROR HY000: Failed to set up SSL because of the following SSL library error: Failed to reload TLS for channel wsrep: wsrep provider is not loaded
+ALTER INSTANCE RELOAD TLS FOR CHANNEL mysql_main_and_wsrep;
+ERROR HY000: Failed to set up SSL because of the following SSL library error: TLS for channel mysql_main was reloaded, but reloading TLS for channel wsrep failed: wsrep provider is not loaded
+# restart

@@ -1,0 +1,4 @@
+!include ../galera_2nodes.cnf
+
+[mysqld]
+pxc-encrypt-cluster-traffic=ON

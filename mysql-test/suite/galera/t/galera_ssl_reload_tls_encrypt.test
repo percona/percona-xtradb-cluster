@@ -1,0 +1,168 @@
+#
+# Test ALTER INSTANCE RELOAD TLS with pxc_encrypt_cluster_traffic=ON.
+#
+# With pxc_encrypt_cluster_traffic=ON, Galera SSL (socket.ssl_ca,
+# socket.ssl_cert, socket.ssl_key) is configured from the server
+# ssl_ca/ssl_cert/ssl_key at startup. So channel mysql_main (both plain
+# ALTER INSTANCE RELOAD TLS and FOR CHANNEL mysql_main) works like
+# FOR CHANNEL mysql_main_and_wsrep when a wsrep provider is configured,
+# and reloads mysql_main only when wsrep_provider=none.
+#
+# Galera keeps the file paths from startup. To make only the Galera reload
+# fail, the test points the server ssl_cert at another valid certificate
+# and corrupts the file that Galera was started with.
+#
+
+--source include/galera_cluster.inc
+
+--let $ssl_ca = $MYSQLTEST_VARDIR/tmp/galera_reload_enc_ca.pem
+--let $ssl_cert = $MYSQLTEST_VARDIR/tmp/galera_reload_enc_cert.pem
+--let $ssl_key = $MYSQLTEST_VARDIR/tmp/galera_reload_enc_key.pem
+--let $error_log = $MYSQLTEST_VARDIR/log/mysqld.1.err
+
+--connection node_1
+CALL mtr.add_suppression("Setting parameter 'socket.ssl_reload' to '1' failed");
+CALL mtr.add_suppression("Set options returned");
+CALL mtr.add_suppression("Galera TLS was reloaded from the files it was started with");
+
+# 1. Restart node #1 with the SSL files placed in a writable location.
+#    Galera SSL is configured from them by pxc_encrypt_cluster_traffic.
+
+--copy_file $MYSQL_TEST_DIR/std_data/cacert.pem $ssl_ca
+--copy_file $MYSQL_TEST_DIR/std_data/server-cert.pem $ssl_cert
+--copy_file $MYSQL_TEST_DIR/std_data/server-key.pem $ssl_key
+
+--source include/shutdown_mysqld.inc
+--let $do_not_echo_parameters = 1
+--let $start_mysqld_params = --wsrep-cluster-address=gcomm://127.0.0.1:$NODE_GALERAPORT_2 --ssl-ca=$ssl_ca --ssl-cert=$ssl_cert --ssl-key=$ssl_key
+--source include/start_mysqld.inc
+--source include/wait_until_connected_again.inc
+--let $do_not_echo_parameters = 0
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 'Synced' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment'
+--source include/wait_condition.inc
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+SELECT @@global.pxc_encrypt_cluster_traffic;
+
+# 2. Valid SSL files: all forms succeed
+
+ALTER INSTANCE RELOAD TLS;
+ALTER INSTANCE RELOAD TLS NO ROLLBACK ON ERROR;
+ALTER INSTANCE RELOAD TLS FOR CHANNEL mysql_main;
+ALTER INSTANCE RELOAD TLS FOR CHANNEL wsrep;
+ALTER INSTANCE RELOAD TLS FOR CHANNEL mysql_main_and_wsrep;
+
+--let $assert_file = $error_log
+--let $assert_select = Setting parameter 'socket.ssl_reload' to '1' failed
+--let $assert_only_after = CURRENT_TEST: galera.galera_ssl_reload_tls_encrypt
+--let $assert_text = No Galera SSL reload failures with valid files
+--let $assert_count = 0
+--source include/assert_grep.inc
+
+# 3. Server ssl_cert points to a valid certificate, the file Galera was
+#    started with is corrupted: only the Galera reload fails.
+
+SET @orig_ssl_cert = @@global.ssl_cert;
+--replace_result $MYSQL_TEST_DIR MYSQL_TEST_DIR
+eval SET GLOBAL ssl_cert = '$MYSQL_TEST_DIR/std_data/server-cert.pem';
+
+--remove_file $ssl_cert
+--write_file $ssl_cert END_OF_FILE
+This is not a certificate
+END_OF_FILE
+
+# Explicit wsrep channel first: proves that Galera rejects the file.
+# A Galera failure after a successful mysql_main reload says so in the error.
+--error ER_DA_SSL_LIBRARY_ERROR
+ALTER INSTANCE RELOAD TLS FOR CHANNEL wsrep;
+
+# mysql_main channel (plain or explicit) reloads Galera SSL as well
+--error ER_DA_SSL_LIBRARY_ERROR
+ALTER INSTANCE RELOAD TLS;
+
+# NO ROLLBACK ON ERROR does not apply to wsrep
+--error ER_DA_SSL_LIBRARY_ERROR
+ALTER INSTANCE RELOAD TLS NO ROLLBACK ON ERROR;
+
+--error ER_DA_SSL_LIBRARY_ERROR
+ALTER INSTANCE RELOAD TLS FOR CHANNEL mysql_main;
+
+--let $assert_text = Channel mysql_main reloads Galera SSL
+--let $assert_count = 4
+--source include/assert_grep.inc
+
+# The node keeps working with the previous Galera SSL context
+SELECT VARIABLE_VALUE = 'Synced' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
+SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+
+# 4. Fix the file: plain RELOAD TLS succeeds again. Server ssl_cert still
+#    differs from the path Galera was started with, so a warning says that
+#    Galera reloaded its own files and needs a restart to use the new path.
+
+--remove_file $ssl_cert
+--copy_file $MYSQL_TEST_DIR/std_data/server-cert.pem $ssl_cert
+
+--replace_result $MYSQL_TEST_DIR MYSQL_TEST_DIR $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
+ALTER INSTANCE RELOAD TLS;
+--replace_result $MYSQL_TEST_DIR MYSQL_TEST_DIR $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
+ALTER INSTANCE RELOAD TLS FOR CHANNEL wsrep;
+
+--let $assert_text = Path mismatch is written to the error log
+--let $assert_select = Galera TLS was reloaded from the files it was started with
+--let $assert_count = 2
+--source include/assert_grep.inc
+
+# Paths match again: no warning
+SET GLOBAL ssl_cert = @orig_ssl_cert;
+ALTER INSTANCE RELOAD TLS;
+
+--let $assert_text = No new path mismatch warnings
+--source include/assert_grep.inc
+--let $assert_select = Setting parameter 'socket.ssl_reload' to '1' failed
+
+--let $assert_text = No new Galera SSL reload failures
+--let $assert_count = 4
+--source include/assert_grep.inc
+
+# 5. wsrep_provider=none: channel mysql_main reloads mysql_main only,
+#    the explicit wsrep channels fail
+
+--source include/shutdown_mysqld.inc
+--let $do_not_echo_parameters = 1
+--let $start_mysqld_params = --wsrep-provider=none --ssl-ca=$ssl_ca --ssl-cert=$ssl_cert --ssl-key=$ssl_key
+--source include/start_mysqld.inc
+--source include/wait_until_connected_again.inc
+--let $do_not_echo_parameters = 0
+
+SELECT @@global.wsrep_provider;
+
+ALTER INSTANCE RELOAD TLS;
+ALTER INSTANCE RELOAD TLS NO ROLLBACK ON ERROR;
+ALTER INSTANCE RELOAD TLS FOR CHANNEL mysql_main;
+
+--error ER_DA_SSL_LIBRARY_ERROR
+ALTER INSTANCE RELOAD TLS FOR CHANNEL wsrep;
+
+# mysql_main is reloaded, wsrep fails
+--error ER_DA_SSL_LIBRARY_ERROR
+ALTER INSTANCE RELOAD TLS FOR CHANNEL mysql_main_and_wsrep;
+
+# 6. Cleanup: restart node #1 with its original configuration
+
+--source include/shutdown_mysqld.inc
+--let $do_not_echo_parameters = 1
+--let $start_mysqld_params = --wsrep-cluster-address=gcomm://127.0.0.1:$NODE_GALERAPORT_2
+--source include/start_mysqld.inc
+--source include/wait_until_connected_again.inc
+--let $do_not_echo_parameters = 0
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 'Synced' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment'
+--source include/wait_condition.inc
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+--remove_file $ssl_ca
+--remove_file $ssl_cert
+--remove_file $ssl_key

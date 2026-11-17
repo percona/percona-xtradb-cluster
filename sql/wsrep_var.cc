@@ -17,6 +17,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <string_view>
 #include "my_dir.h"
 #include "mysql/components/services/log_builtins.h"
 #include "mysqld.h"
@@ -484,6 +485,86 @@ bool wsrep_provider_options_update(sys_var *, THD *, enum_var_type) {
     return true;
   }
   return refresh_provider_options();
+}
+
+static std::string_view trim_spaces(std::string_view s) {
+  while (!s.empty() && my_isspace(&my_charset_latin1, s.front()))
+    s.remove_prefix(1);
+  while (!s.empty() && my_isspace(&my_charset_latin1, s.back()))
+    s.remove_suffix(1);
+  return s;
+}
+
+/**
+  Find the value of option opt_name in a provider options string, which
+  Galera formats as "key1 = value1; key2 = value2; ".
+
+  @retval true   option found, value set
+  @retval false  option not found
+*/
+static bool find_provider_option(const char *opts, std::string_view opt_name,
+                                 std::string &value) {
+  if (opts == nullptr) return false;
+  std::string_view rest(opts);
+  while (!rest.empty()) {
+    const size_t end = rest.find(';');
+    const std::string_view item = rest.substr(0, end);
+    rest = (end == std::string_view::npos) ? std::string_view()
+                                           : rest.substr(end + 1);
+    const size_t eq = item.find('=');
+    if (eq == std::string_view::npos) continue;
+    if (trim_spaces(item.substr(0, eq)) != opt_name) continue;
+    value.assign(trim_spaces(item.substr(eq + 1)));
+    return true;
+  }
+  return false;
+}
+
+/** Galera accepts yes/no, true/false, on/off and 1/0 for boolean options. */
+static bool provider_option_is_true(const std::string &value) {
+  for (const char *t : {"yes", "true", "on", "1"})
+    if (!my_strcasecmp(&my_charset_latin1, value.c_str(), t)) return true;
+  return false;
+}
+
+static void read_provider_ssl_settings(Wsrep_ssl_settings &settings) {
+  std::string use_ssl;
+  settings.enabled =
+      find_provider_option(wsrep_provider_options, "socket.ssl", use_ssl) &&
+      provider_option_is_true(use_ssl);
+  find_provider_option(wsrep_provider_options, "socket.ssl_key", settings.key);
+  find_provider_option(wsrep_provider_options, "socket.ssl_ca", settings.ca);
+  find_provider_option(wsrep_provider_options, "socket.ssl_cert",
+                       settings.cert);
+}
+
+bool wsrep_reload_ssl(std::string &error, Wsrep_ssl_settings &settings) {
+  /* Same locking as SET GLOBAL wsrep_provider_options='socket.ssl_reload=1' */
+  mysql_mutex_lock(&LOCK_global_system_variables);
+
+  bool ret = false;
+  if (!wsrep_provider_set ||
+      !Wsrep_server_state::instance().is_provider_loaded()) {
+    error = "wsrep provider is not loaded";
+    ret = true;
+  } else {
+    enum wsrep::provider::status status =
+        Wsrep_server_state::instance().provider().options(
+            "socket.ssl_reload=1");
+    if (status) {
+      WSREP_ERROR("Set options returned %d", status);
+      error = "reloading wsrep provider SSL context failed, see error log";
+      ret = true;
+    }
+    if (refresh_provider_options() && !ret) {
+      error = "failed to refresh wsrep provider options";
+      ret = true;
+    }
+    if (!ret) read_provider_ssl_settings(settings);
+  }
+
+  mysql_mutex_unlock(&LOCK_global_system_variables);
+  return ret;
 }
 
 void wsrep_provider_options_init(const char *value) {
