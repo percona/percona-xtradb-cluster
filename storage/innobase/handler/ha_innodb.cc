@@ -6016,7 +6016,9 @@ static int innodb_init(void *p) {
             " with pxc_strict_mode = PERMISSIVE");
         break;
       case PXC_STRICT_MODE_ENFORCING:
+      case PXC_STRICT_MODE_ENFORCING_WITH_PRIMARY_KEY:
       case PXC_STRICT_MODE_MASTER:
+      case PXC_STRICT_MODE_MASTER_WITH_PRIMARY_KEY:
       default:
         WSREP_ERROR(
             "Percona-XtraDB-Cluster prohibits"

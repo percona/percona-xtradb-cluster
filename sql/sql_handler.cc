@@ -148,6 +148,7 @@ static bool pxc_strict_mode_check(THD *thd) {
   switch (pxc_strict_mode) {
     case PXC_STRICT_MODE_DISABLED:
     case PXC_STRICT_MODE_MASTER:
+    case PXC_STRICT_MODE_MASTER_WITH_PRIMARY_KEY:
       /* Do nothing */
       break;
     case PXC_STRICT_MODE_PERMISSIVE: {
@@ -160,6 +161,7 @@ static bool pxc_strict_mode_check(THD *thd) {
                           "%s", msg);
     } break;
     case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_ENFORCING_WITH_PRIMARY_KEY:
     default:
       const char *msg =
           "Percona-XtraDB-Cluster prohibits use of"

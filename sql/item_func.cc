@@ -5507,6 +5507,7 @@ longlong Item_func_get_lock::val_int() {
   switch (pxc_strict_mode) {
     case PXC_STRICT_MODE_DISABLED:
     case PXC_STRICT_MODE_MASTER:
+    case PXC_STRICT_MODE_MASTER_WITH_PRIMARY_KEY:
       /* Do nothing */
       break;
     case PXC_STRICT_MODE_PERMISSIVE:
@@ -5518,6 +5519,7 @@ longlong Item_func_get_lock::val_int() {
                           " GET_LOCK with pxc_strict_mode = PERMISSIVE");
       break;
     case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_ENFORCING_WITH_PRIMARY_KEY:
     default:
       block = true;
       WSREP_ERROR(
@@ -5644,6 +5646,7 @@ longlong Item_func_release_lock::val_int() {
   switch (pxc_strict_mode) {
     case PXC_STRICT_MODE_DISABLED:
     case PXC_STRICT_MODE_MASTER:
+    case PXC_STRICT_MODE_MASTER_WITH_PRIMARY_KEY:
       /* Do nothing */
       break;
     case PXC_STRICT_MODE_PERMISSIVE:
@@ -5655,6 +5658,7 @@ longlong Item_func_release_lock::val_int() {
                           " RELEASE_LOCK with pxc_strict_mode = PERMISSIVE");
       break;
     case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_ENFORCING_WITH_PRIMARY_KEY:
     default:
       block = true;
       WSREP_ERROR(

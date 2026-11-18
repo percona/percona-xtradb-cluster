@@ -143,13 +143,31 @@ extern const char *wsrep_fragment_units[];
 extern const char *wsrep_SR_store_types[];
 enum enum_wsrep_mode { WSREP_MODE_IGNORE_NATIVE_REPLICATION_FILTER_RULES = 0 };
 
+/*
+  The _WITH_PRIMARY_KEY variants are appended last on purpose: several checks
+  compare this enum ordinally (pxc_strict_mode >= PXC_STRICT_MODE_ENFORCING),
+  and appending keeps every one of those comparisons true for the new modes
+  without touching the existing values.
+*/
 enum enum_pxc_strict_modes {
   PXC_STRICT_MODE_DISABLED = 0,
   PXC_STRICT_MODE_PERMISSIVE,
   PXC_STRICT_MODE_ENFORCING,
-  PXC_STRICT_MODE_MASTER
+  PXC_STRICT_MODE_MASTER,
+  PXC_STRICT_MODE_ENFORCING_WITH_PRIMARY_KEY,
+  PXC_STRICT_MODE_MASTER_WITH_PRIMARY_KEY
 };
 extern ulong pxc_strict_mode;
+
+/*
+  PXC-5390: only these two modes tie sql_require_primary_key to
+  pxc_strict_mode. ENFORCING and MASTER deliberately leave it alone, which is
+  the behavior PXC-5341 restored.
+*/
+static inline bool pxc_strict_mode_requires_primary_key(ulong mode) {
+  return mode == PXC_STRICT_MODE_ENFORCING_WITH_PRIMARY_KEY ||
+         mode == PXC_STRICT_MODE_MASTER_WITH_PRIMARY_KEY;
+}
 
 enum enum_pxc_maint_modes {
   PXC_MAINT_MODE_DISABLED = 0,

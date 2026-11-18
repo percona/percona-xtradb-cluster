@@ -238,6 +238,22 @@ ALTER TABLE func
 
 SET @old_log_state = @@global.general_log;
 SET GLOBAL general_log = 'OFF';
+-- The log tables below have no primary key, so relax the primary-key policy
+-- for them (Refer bug#92988 in mysql_system_tables.sql).
+-- The _WITH_PRIMARY_KEY strict modes force sql_require_primary_key ON, so the
+-- mode has to be relaxed for the primary-key-less tables below. The other
+-- modes never touch the variable, so leave them alone: restoring the mode goes
+-- through pxc_strict_mode_check(), which can legitimately refuse a
+-- DISABLED -> strict transition (PXC-5390).
+SET @old_pxc_strict_mode = @@global.pxc_strict_mode;
+SET @pxc_relax_strict_mode =
+    (@old_pxc_strict_mode IN ('ENFORCING_WITH_PRIMARY_KEY',
+                              'MASTER_WITH_PRIMARY_KEY'));
+SET @cmd = "SET @@global.pxc_strict_mode = DISABLED";
+SET @str = IF(@pxc_relax_strict_mode, @cmd, "SET @dummy = 0");
+PREPARE stmt FROM @str;
+EXECUTE stmt;
+DROP PREPARE stmt;
 SET @old_sql_require_primary_key = @@session.sql_require_primary_key;
 SET @@session.sql_require_primary_key = 0;
 ALTER TABLE general_log
@@ -272,6 +288,12 @@ ALTER TABLE slow_log
 SET GLOBAL slow_query_log = @old_log_state;
 
 SET @@session.sql_require_primary_key = @old_sql_require_primary_key;
+-- Restore pxc_strict_mode saved above, under the same guard.
+SET @cmd = "SET @@global.pxc_strict_mode = @old_pxc_strict_mode";
+SET @str = IF(@pxc_relax_strict_mode, @cmd, "SET @dummy = 0");
+PREPARE stmt FROM @str;
+EXECUTE stmt;
+DROP PREPARE stmt;
 ALTER TABLE plugin
   MODIFY name varchar(64) DEFAULT '' NOT NULL,
   MODIFY dl varchar(128) DEFAULT '' NOT NULL,

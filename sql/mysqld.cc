@@ -7298,7 +7298,9 @@ int init_common_variables() {
             " with pxc_strict_mode = PERMISSIVE");
         break;
       case PXC_STRICT_MODE_ENFORCING:
+      case PXC_STRICT_MODE_ENFORCING_WITH_PRIMARY_KEY:
       case PXC_STRICT_MODE_MASTER:
+      case PXC_STRICT_MODE_MASTER_WITH_PRIMARY_KEY:
       default:
         WSREP_FATAL(
             "Percona-XtraDB-Cluster prohibits use of MyISAM"
@@ -7316,7 +7318,9 @@ int init_common_variables() {
       case PXC_STRICT_MODE_DISABLED:
       case PXC_STRICT_MODE_PERMISSIVE:
       case PXC_STRICT_MODE_ENFORCING:
+      case PXC_STRICT_MODE_ENFORCING_WITH_PRIMARY_KEY:
       case PXC_STRICT_MODE_MASTER:
+      case PXC_STRICT_MODE_MASTER_WITH_PRIMARY_KEY:
       default:
         WSREP_FATAL(
             "Percona-XtraDB-Cluster prohibits setting"
@@ -7337,7 +7341,9 @@ int init_common_variables() {
             " to TABLE with pxc_strict_mode = PERMISSIVE");
         break;
       case PXC_STRICT_MODE_ENFORCING:
+      case PXC_STRICT_MODE_ENFORCING_WITH_PRIMARY_KEY:
       case PXC_STRICT_MODE_MASTER:
+      case PXC_STRICT_MODE_MASTER_WITH_PRIMARY_KEY:
       default:
         WSREP_FATAL(
             "Percona-XtraDB-Cluster prohibits setting log_output"
@@ -7374,6 +7380,15 @@ int init_common_variables() {
   Since the loader is not yet loaded flow relies on the wsrep_on to filter
   WSREP statements. */
   global_system_variables.wsrep_on = true;
+
+  if (wsrep_provider_loaded && !opt_initialize &&
+      pxc_strict_mode_requires_primary_key(pxc_strict_mode) &&
+      !global_system_variables.sql_require_primary_key) {
+    WSREP_WARN(
+        "Setting sql_require_primary_key=ON because pxc_strict_mode is %s.",
+        pxc_strict_mode_to_string(pxc_strict_mode));
+    global_system_variables.sql_require_primary_key = true;
+  }
 
   if (wsrep_setup_allowed_sst_methods()) return 1;
 
