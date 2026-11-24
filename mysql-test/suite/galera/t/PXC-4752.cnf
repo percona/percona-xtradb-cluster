@@ -1,0 +1,4 @@
+!include ../galera_2nodes.cnf
+
+[mysqld.2]
+wsrep_applier_threads=4

@@ -1,0 +1,136 @@
+#
+# PXC-4752 - inaccurate wsrep_local_recv_queue in multiple applier threads
+#
+# wsrep_local_recv_queue is documented as "the number of write sets waiting to
+# be applied". It used to be reported straight from the occupancy of the GCS
+# receive FIFO, so a write set that an applier thread had already dequeued but
+# had not finished applying was counted nowhere. The reported value was short
+# by the number of busy applier threads, and was plainly 0 whenever the backlog
+# was smaller than wsrep_applier_threads.
+#
+# The test parks applier threads inside wsrep_apply_cb, which proves the write
+# sets have been dequeued from the FIFO and proves they have not been applied,
+# then checks that they are still reported by wsrep_local_recv_queue.
+#
+# The assertions are wait_condition on the TOTAL, so the test does not depend on
+# how the received write sets happen to be split between "held by an applier
+# thread" and "still in the FIFO" - only the sum matters, and the sum is what
+# the fix corrects.
+#
+# They assert ">=" rather than "=" because while the appliers are parked the
+# queue cannot drain, so any unrelated action that happens to reach node 2's
+# receive FIFO (a commit cut, for instance) would push the value past an exact
+# match for good. ">=" is still a real regression test: before the fix these
+# reported 0 and 3. The exact "= 0" assertion in step 3, once the appliers have
+# been released, is the guard against the in-flight counter leaking.
+#
+
+--source include/galera_cluster.inc
+--source include/have_debug.inc
+--source include/have_debug_sync.inc
+
+--connection node_1
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM information_schema.tables WHERE table_schema = 'test' AND table_name = 't1'
+--source include/wait_condition.inc
+
+SELECT @@wsrep_applier_threads;
+
+# Observer connection - must not wait for the deliberately stalled appliers.
+--connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--connection node_2a
+SET SESSION wsrep_sync_wait = 0;
+
+--connection node_2
+SET SESSION wsrep_sync_wait = 0;
+SET GLOBAL DEBUG = "d,sync.wsrep_apply_cb";
+
+--echo #
+--echo # 1. A single write set held inside an applier thread.
+--echo #    It has been received and is provably not applied yet, so it must be
+--echo #    reported even though the GCS receive FIFO is empty.
+--echo #
+--connection node_1
+INSERT INTO t1 VALUES (1);
+
+--connection node_2a
+SET SESSION DEBUG_SYNC = "now WAIT_FOR sync.wsrep_apply_cb_reached";
+
+--let $wait_condition = SELECT VARIABLE_VALUE >= 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_recv_queue'
+--source include/wait_condition.inc
+--let $recv_queue_ok = query_get_value(SELECT VARIABLE_VALUE >= 1 AS ok FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_recv_queue', ok, 1)
+--echo wsrep_local_recv_queue >= 1 : $recv_queue_ok
+
+--echo #
+--echo # 2. Six more write sets. Every applier thread is now busy, so the rest
+--echo #    pile up in the FIFO. All seven have been received and none applied.
+--echo #
+--connection node_1
+INSERT INTO t1 VALUES (2);
+INSERT INTO t1 VALUES (3);
+INSERT INTO t1 VALUES (4);
+INSERT INTO t1 VALUES (5);
+INSERT INTO t1 VALUES (6);
+INSERT INTO t1 VALUES (7);
+
+--connection node_2a
+--let $wait_condition = SELECT VARIABLE_VALUE >= 7 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_recv_queue'
+--source include/wait_condition.inc
+--let $recv_queue_ok = query_get_value(SELECT VARIABLE_VALUE >= 7 AS ok FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_recv_queue', ok, 1)
+--echo wsrep_local_recv_queue >= 7 : $recv_queue_ok
+
+--echo # The high watermark is derived from the same accounting, so it must have
+--echo # recorded at least this backlog too. Asserted as >= to stay independent
+--echo # of any queueing that happened while the cluster was starting up.
+--let $wait_condition = SELECT VARIABLE_VALUE >= 7 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_recv_queue_max'
+--source include/wait_condition.inc
+--let $recv_queue_max_ok = query_get_value(SELECT VARIABLE_VALUE >= 7 AS ok FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_recv_queue_max', ok, 1)
+--echo wsrep_local_recv_queue_max >= 7 : $recv_queue_max_ok
+
+--echo # FLUSH STATUS resets the watermarks to the current length. Nothing can
+--echo # drain while the appliers are parked, so the low watermark, which was 0,
+--echo # must now be at least 7.
+--echo # wsrep_on=OFF keeps FLUSH STATUS out of TOI, which would otherwise wait
+--echo # behind the parked appliers. The provider statistics are still reset,
+--echo # because refresh_status() checks the global wsrep_on, not the session one.
+SET SESSION wsrep_on = OFF;
+FLUSH NO_WRITE_TO_BINLOG STATUS;
+SET SESSION wsrep_on = ON;
+--let $recv_queue_min_ok = query_get_value(SELECT VARIABLE_VALUE >= 7 AS ok FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_recv_queue_min', ok, 1)
+--echo wsrep_local_recv_queue_min >= 7 after FLUSH STATUS : $recv_queue_min_ok
+
+--echo #
+--echo # 3. Release the appliers. Everything applies and the queue drains back
+--echo #    to zero - this is the guard against the in-flight counter leaking.
+--echo #
+--connection node_2
+SET GLOBAL DEBUG = "";
+
+--connection node_2a
+SET DEBUG_SYNC = "now SIGNAL signal.wsrep_apply_cb";
+
+--let $wait_condition = SELECT COUNT(*) = 7 FROM t1
+--source include/wait_condition.inc
+SELECT COUNT(*) AS rows_applied FROM t1;
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 0 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_recv_queue'
+--source include/wait_condition.inc
+--let $recv_queue = query_get_value(SHOW GLOBAL STATUS LIKE 'wsrep_local_recv_queue', Value, 1)
+--echo wsrep_local_recv_queue = $recv_queue
+
+--echo # The low watermark follows the drain down to zero.
+--let $wait_condition = SELECT VARIABLE_VALUE = 0 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_recv_queue_min'
+--source include/wait_condition.inc
+--let $recv_queue_min = query_get_value(SHOW GLOBAL STATUS LIKE 'wsrep_local_recv_queue_min', Value, 1)
+--echo wsrep_local_recv_queue_min = $recv_queue_min
+
+--connection node_2
+SET DEBUG_SYNC = "reset";
+SET SESSION wsrep_sync_wait = DEFAULT;
+
+--disconnect node_2a
+
+--connection node_1
+DROP TABLE t1;

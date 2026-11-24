@@ -40,6 +40,7 @@ SELECT * FROM t1;
 # Build up slave queue:
 # - first 8 events will be picked by slave threads
 # - 2 more events will be waiting in slave queue
+# wsrep_local_recv_queue counts both (PXC-4752), so all 10 events are reported.
 LOCK TABLES t1 WRITE;
 --connection node_1
 UPDATE t1 SET f2 = 1 WHERE f1 = 1;
@@ -58,7 +59,7 @@ SELECT * FROM t1;
 --connection node_2
 # make sure all events landed to slave queue
 SET wsrep_on=OFF;
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_recv_queue';
+--let $wait_condition = SELECT VARIABLE_VALUE >= 10 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_recv_queue';
 --source include/wait_condition.inc
 --echo node_2
 SELECT * FROM t1;
@@ -119,7 +120,8 @@ SET wsrep_on=ON;
 
 # Build up slave queue:
 # - first 8 events will be picked by slave threads
-# - one more event will be waiting in slave queue
+# - 2 more events will be waiting in slave queue
+# wsrep_local_recv_queue counts both (PXC-4752), so all 10 events are reported.
 LOCK TABLES t1 READ;
 
 --connection node_1
@@ -154,7 +156,7 @@ UPDATE t1 SET f2 = 1 WHERE f1 = 8;
 --connection node_2
 # make sure all events landed to slave queue
 SET wsrep_on=OFF;
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_recv_queue';
+--let $wait_condition = SELECT VARIABLE_VALUE >= 10 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_recv_queue';
 --source include/wait_condition.inc
 SET wsrep_on=ON;
 UNLOCK TABLES;
