@@ -1,7 +1,6 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 
-from SimpleHTTPServer import SimpleHTTPRequestHandler
-import BaseHTTPServer
+from http.server import SimpleHTTPRequestHandler, BaseHTTPRequestHandler, HTTPServer 
 import MySQLdb
 import MySQLdb.cursors
 import optparse
@@ -25,7 +24,7 @@ class opts:
     # Overriding the connect timeout so that status check doesn't hang
     c_timeout              = 10
 
-class clustercheck(BaseHTTPServer.BaseHTTPRequestHandler):
+class clustercheck(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.do_GET()
 
@@ -52,25 +51,24 @@ class clustercheck(BaseHTTPServer.BaseHTTPRequestHandler):
             else:
                 res = ''
 
-
             if len(res) == 0:
                 self.send_response(503)
                 self.send_header("Content-type", "text/html")
                 self.end_headers()
-                self.wfile.write("Percona XtraDB Cluster Node state could not be retrieved.")
+                self.wfile.write(str.encode("Percona XtraDB Cluster Node state could not be retrieved."))
 
             elif res[0]['Value'] == '4' or (int(opts.available_when_donor) == 1 and res[0]['Value'] == '2'):
                 opts.last_query_result = res[0]['Value']
                 self.send_response(200)
                 self.send_header("Content-type", "text/html")
                 self.end_headers()
-                self.wfile.write("Percona XtraDB Cluster Node is synced.")
+                self.wfile.write(str.encode("Percona XtraDB Cluster Node is synced."))
             else:
                 opts.last_query_result = res[0]['Value']
                 self.send_response(503)
                 self.send_header("Content-type", "text/html")
                 self.end_headers()
-                self.wfile.write("Percona XtraDB Cluster Node is not synced.")
+                self.wfile.write(str.encode("Percona XtraDB Cluster Node is not synced."))
 
             if conn:
                 conn.close()
@@ -81,12 +79,12 @@ class clustercheck(BaseHTTPServer.BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header("Content-type", "text/html")
                 self.end_headers()
-                self.wfile.write("CACHED: Percona XtraDB Cluster Node is synced.")
+                self.wfile.write(str.encode("CACHED: Percona XtraDB Cluster Node is synced."))
             else:
                 self.send_response(503)
                 self.send_header("Content-type", "text/html")
                 self.end_headers()
-                self.wfile.write("CACHED: Percona XtraDB Cluster Node is not synced.")
+                self.wfile.write(str.encode("CACHED: Percona XtraDB Cluster Node is not synced."))
 
 """
 Usage:
@@ -107,6 +105,6 @@ if __name__ == '__main__':
     opts.cnf_file =   options.cnf
     opts.cache_time = options.cache
 
-    server_class = BaseHTTPServer.HTTPServer
+    server_class = HTTPServer
     httpd = server_class(('',int(options.port)),clustercheck)
     httpd.serve_forever()
