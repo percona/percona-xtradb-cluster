@@ -1,0 +1,47 @@
+#
+# PXC-5300: the cluster recognizes the arbitrator (garbd) by the GCS
+# stateless flag and an empty incoming address, and does not wait for it to
+# end NBO operations. A data node must never look the same, so it refuses to
+# start with gcs.stateless=yes and no incoming address. With an incoming
+# address a stateless data node (never chosen as donor) is allowed.
+#
+
+--source include/galera_cluster.inc
+
+--connection node_2
+--source include/shutdown_mysqld.inc
+
+--connection node_1
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+--echo # gcs.stateless=yes without incoming address: startup must fail.
+--let $MYSQLD_LOG = $MYSQL_TMP_DIR/pxc_5300_stateless_data_node.log
+--error 1
+--exec $MYSQLD --defaults-file=$MYSQLTEST_VARDIR/my.cnf --defaults-group-suffix=.2 --wsrep-provider-options='base_port=$NODE_GALERAPORT_2;gcs.stateless=yes' --wsrep-node-incoming-address=AUTO --bind-address=127.0.0.1 --log-error=$MYSQLD_LOG > /dev/null 2>&1
+
+--let $assert_text = Startup refused for gcs.stateless=yes without incoming address
+--let $assert_file = $MYSQLD_LOG
+--let $assert_select = gcs.stateless is set and the node has no address for incoming client connections
+--let $assert_count = 1
+--source include/assert_grep.inc
+--remove_file $MYSQLD_LOG
+
+--echo # gcs.stateless=yes with incoming address: node starts and joins.
+--connection node_2
+--let $restart_parameters = "restart: --wsrep_provider_options='base_port=$NODE_GALERAPORT_2;gcs.stateless=yes'"
+--source include/start_mysqld.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+--let $wait_condition = SELECT VARIABLE_VALUE = 'Synced' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment'
+--source include/wait_condition.inc
+SELECT @@wsrep_provider_options LIKE '%gcs.stateless = yes%' AS stateless_data_node;
+
+--echo # Restore the default configuration.
+--let $restart_parameters = "restart"
+--source include/restart_mysqld.inc
+
+--connection node_1
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
