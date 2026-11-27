@@ -170,13 +170,13 @@ INSERT INTO t1 VALUES (2, STRING_TO_VECTOR('[0,0]'));
 ERROR HY000: Column 'v' has a vector value its vector index cannot use.
 SHOW WARNINGS;
 Level	Code	Message
-Error	7043	Column 'v' has a vector value its vector index cannot use.
+Error	7044	Column 'v' has a vector value its vector index cannot use.
 # UPDATE of an existing row.
 UPDATE t1 SET v = STRING_TO_VECTOR('[0,0]') WHERE id = 1;
 ERROR HY000: Column 'v' has a vector value its vector index cannot use.
 SHOW WARNINGS;
 Level	Code	Message
-Error	7043	Column 'v' has a vector value its vector index cannot use.
+Error	7044	Column 'v' has a vector value its vector index cannot use.
 SELECT id, VECTOR_TO_STRING(v) FROM t1 ORDER BY id;
 id	VECTOR_TO_STRING(v)
 1	[1.00000e+00,0.00000e+00]
@@ -196,13 +196,13 @@ ALGORITHM=INPLACE;
 ERROR HY000: Column 'v' has a vector value its vector index cannot use.
 SHOW WARNINGS;
 Level	Code	Message
-Error	7043	Column 'v' has a vector value its vector index cannot use.
+Error	7044	Column 'v' has a vector value its vector index cannot use.
 ALTER TABLE t1 ADD VECTOR INDEX vk (v) TYPE hnsw (M = 4, metric = cosine),
 ALGORITHM=COPY;
 ERROR HY000: Column 'v' has a vector value its vector index cannot use.
 SHOW WARNINGS;
 Level	Code	Message
-Error	7043	Column 'v' has a vector value its vector index cannot use.
+Error	7044	Column 'v' has a vector value its vector index cannot use.
 # The failed ALTERs left the table as it was.
 SHOW CREATE TABLE t1;
 Table	Create Table

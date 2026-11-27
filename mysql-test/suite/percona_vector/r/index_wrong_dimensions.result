@@ -20,7 +20,7 @@ ERROR HY000: Column 'v' has a vector without the 4 dimensions its vector index n
 # That is the only condition: no generic engine error under it.
 SHOW WARNINGS;
 Level	Code	Message
-Error	7040	Column 'v' has a vector without the 4 dimensions its vector index needs.
+Error	7041	Column 'v' has a vector without the 4 dimensions its vector index needs.
 # IGNORE does not skip the row. The refusal is not an ignorable
 # error, because ALTER's copy treats every ignorable error as a
 # duplicate key.
@@ -65,7 +65,7 @@ UPDATE t SET v = STRING_TO_VECTOR('[1,2]') WHERE id = 1;
 ERROR HY000: Column 'v' has a vector without the 4 dimensions its vector index needs.
 SHOW WARNINGS;
 Level	Code	Message
-Error	7040	Column 'v' has a vector without the 4 dimensions its vector index needs.
+Error	7041	Column 'v' has a vector without the 4 dimensions its vector index needs.
 INSERT INTO t (id, v) VALUES (1, STRING_TO_VECTOR('[1,2]'))
 ON DUPLICATE KEY UPDATE v = VALUES(v);
 ERROR HY000: Column 'v' has a vector without the 4 dimensions its vector index needs.
@@ -119,7 +119,7 @@ ALTER TABLE t ADD VECTOR KEY vk (v) TYPE hnsw (M = 8), ALGORITHM=COPY;
 ERROR HY000: Column 'v' has a vector without the 4 dimensions its vector index needs.
 SHOW WARNINGS;
 Level	Code	Message
-Error	7040	Column 'v' has a vector without the 4 dimensions its vector index needs.
+Error	7041	Column 'v' has a vector without the 4 dimensions its vector index needs.
 # Fixing the row is enough.
 UPDATE t SET v = STRING_TO_VECTOR('[1,2,3,0]') WHERE id = 2;
 ALTER TABLE t ADD VECTOR KEY vk (v) TYPE hnsw (M = 8), ALGORITHM=INPLACE;
