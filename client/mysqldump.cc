@@ -1349,20 +1349,6 @@ static int get_options(int *argc, char ***argv) {
   exclude_user = new std::forward_list<string>();
   include_user =
       new collation_unordered_set<string>(charset_info, PSI_NOT_INSTRUMENTED);
-<<<<<<< HEAD
-  
-  /*
-    Dictionary names are UTF-8 (see skip_compressed_columns()), and the
-    server compares them with utf8mb4_general_ci. charset_info does not
-    follow --default-character-set yet here.
-  */
-  processed_compression_dictionaries = new collation_unordered_set<string>(
-      &my_charset_utf8mb4_general_ci, PSI_NOT_INSTRUMENTED);
-||||||| 91438a0430f
-  
-  processed_compression_dictionaries =
-      new collation_unordered_set<string>(charset_info, PSI_NOT_INSTRUMENTED);
-=======
 
   /*
     Dictionary names are UTF-8 (see skip_compressed_columns()), and the
@@ -1371,7 +1357,6 @@ static int get_options(int *argc, char ***argv) {
   */
   processed_compression_dictionaries = new collation_unordered_set<string>(
       &my_charset_utf8mb4_general_ci, PSI_NOT_INSTRUMENTED);
->>>>>>> ps/release-9.7.4-4
 
   /* Don't copy internal log tables */
   ignore_table->insert("mysql.apply_status");
