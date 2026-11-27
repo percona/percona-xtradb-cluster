@@ -14,10 +14,10 @@ Got expected error: No database selected (code 1046)
 
 0 rows affected
 Got expected error: PROCEDURE test.MYSQLX_GET_PREPARED_STATEMENT_ID does not exist (code 1305)
-Got expected error: Can't initialize function 'mysqlx_get_prepared_statement_id'; Function expect only one numeric argument (code 1123)
-Got expected error: Can't initialize function 'mysqlx_get_prepared_statement_id'; Function expect only one numeric argument (code 1123)
-Got expected error: Can't initialize function 'mysqlx_get_prepared_statement_id'; Function expect only one numeric argument (code 1123)
-Got expected error: Can't initialize function 'mysqlx_get_prepared_statement_id'; Function expect only one numeric argument (code 1123)
+Got expected error: Can't initialize function 'mysqlx_get_prepared_statement_id'; Function expects only one numeric argument (code 1123)
+Got expected error: Can't initialize function 'mysqlx_get_prepared_statement_id'; Function expects only one numeric argument (code 1123)
+Got expected error: Can't initialize function 'mysqlx_get_prepared_statement_id'; Function expects only one numeric argument (code 1123)
+Got expected error: Can't initialize function 'mysqlx_get_prepared_statement_id'; Function expects only one numeric argument (code 1123)
 
 0 rows affected
 begin
