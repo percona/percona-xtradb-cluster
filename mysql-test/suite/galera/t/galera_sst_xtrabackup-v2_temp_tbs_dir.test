@@ -1,0 +1,17 @@
+#
+# Regression guard for xtrabackup-v2 SST:
+# xtrabackup-v2 SST must keep working when innodb_temp_tablespaces_dir is outside
+# the datadir and holds leftover temp_*.ibt files.
+#
+# xtrabackup-v2 SST is NOT affected by this bug - it restores a physical backup
+# with the xtrabackup binary and never runs 'mysqld --initialize', so the leftover
+# temp tablespaces are harmlessly removed by the normal post-SST start. This test
+# therefore passes with or without the wsrep_sst_clone.sh fix; it exists to catch
+# a future regression should this SST path ever start initializing a datadir.
+# See suite/galera/include/galera_sst_temp_tbs_dir.inc for details.
+#
+
+--source include/galera_cluster.inc
+
+--let $node_2_temp_tbs_dir= $MYSQL_TMP_DIR/pxb_n2_temp_tbs
+--source suite/galera/include/galera_sst_temp_tbs_dir.inc
