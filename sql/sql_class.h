@@ -52,6 +52,8 @@
 #include <stack>
 #include <string>
 #include <unordered_map>
+#include <utility>  // move
+#include <vector>   // vector
 
 #include "dur_prop.h"  // durability_properties
 #include "lex_string.h"
@@ -1386,11 +1388,11 @@ class THD : public MDL_context_owner,
   */
   collation_unordered_map<std::string, unique_ptr_with_deleter<user_var_entry>>
       user_vars{system_charset_info, key_memory_user_var_entry};
-  struct rand_struct rand;                      // used for authentication
-  struct System_variables variables;            // Changeable local variables
-  struct System_status_var status_var;          // Per thread statistic vars
-  struct rand_struct slog_rand;                 // used for random slow log
-                                                // filtering
+  struct rand_struct rand;              // used for authentication
+  struct System_variables variables;    // Changeable local variables
+  struct System_status_var status_var;  // Per thread statistic vars
+  struct rand_struct slog_rand;         // used for random slow log
+                                        // filtering
   struct System_status_var
       *copy_status_var_ptr;  // A copy of the statistic vars asof the start of
                              // the query
@@ -3217,7 +3219,6 @@ class THD : public MDL_context_owner,
   /** number of name_const() substitutions, see sp_head.cc:subst_spvars() */
   uint query_name_consts;
 
-
   /*
     Used to update global user stats.  The global user stats are updated
     occasionally with the 'diff' variables.  After the update, the 'diff'
@@ -4520,6 +4521,8 @@ class THD : public MDL_context_owner,
     SE_GTID_RESET_LOG,
     /** Explicit request for SE to persist GTID for current transaction. */
     SE_GTID_PERSIST_EXPLICIT,
+    /** GTID table persistence was requested for current ownership. */
+    SE_GTID_TABLE_PERSIST_REQUESTED,
     /** Max element holding the biset size. */
     SE_GTID_MAX
   };
@@ -4592,6 +4595,20 @@ class THD : public MDL_context_owner,
     return !xid_state->has_state(XID_STATE::XA_NOTR);
   }
 
+  /// Mark GTID table persistence as requested for the currently owned GTID.
+  ///
+  /// This follows GTID ownership lifetime, not the shorter internal
+  /// storage-engine transaction used while accessing mysql.gtid_executed.
+  void set_gtid_table_persist_requested() {
+    m_se_gtid_flags.set(SE_GTID_TABLE_PERSIST_REQUESTED);
+  }
+
+  /// @return true if GTID table persistence was already requested for the
+  ///         currently owned GTID.
+  bool gtid_table_persist_requested() const {
+    return m_se_gtid_flags[SE_GTID_TABLE_PERSIST_REQUESTED];
+  }
+
 #ifdef HAVE_GTID_NEXT_LIST
   /**
     If this thread owns a set of GTIDs (i.e., GTID_NEXT_LIST != NULL),
@@ -4625,6 +4642,7 @@ class THD : public MDL_context_owner,
     }
     owned_gtid.clear();
     owned_tsid.clear();
+    m_se_gtid_flags.reset(SE_GTID_TABLE_PERSIST_REQUESTED);
     owned_gtid.dbug_print(nullptr, "set owned_gtid in clear_owned_gtids");
   }
 
@@ -4651,6 +4669,9 @@ class THD : public MDL_context_owner,
   /// Callback functions that determine if GTID rollback shall be skipped.
   std::list<std::function<bool(const THD &)>> m_skip_gtid_rollback_checkers;
 
+  /// Actions to execute before owned GTID state is externalized.
+  std::vector<std::function<void(bool)>> m_actions_before_gtid_state_update;
+
  public:
   /// Invoke the callback functions that determine if GTID rollback shall be
   /// skipped, and return true as soon as one of them returns true; otherwise
@@ -4670,6 +4691,23 @@ class THD : public MDL_context_owner,
     auto it = std::prev(m_skip_gtid_rollback_checkers.end());
     return Scope_guard{
         [this, it] { this->m_skip_gtid_rollback_checkers.erase(it); }};
+  }
+
+  /// Register an action that will run before this THD externalizes its owned
+  /// GTID state.
+  ///
+  /// @param f Action to execute. The action argument is true when GTID state
+  ///          is committed and false when GTID state is rolled back.
+  void register_action_before_gtid_state_update(std::function<void(bool)> f) {
+    m_actions_before_gtid_state_update.push_back(std::move(f));
+  }
+
+  /// Execute and remove registered before-GTID-state-update actions.
+  ///
+  /// @param is_commit Whether GTID state is committed.
+  void call_actions_before_gtid_state_update(bool is_commit) {
+    for (auto &action : m_actions_before_gtid_state_update) action(is_commit);
+    m_actions_before_gtid_state_update.clear();
   }
 
   /*

@@ -113,6 +113,7 @@ MACRO(GET_PACKAGE_FILE_NAME Var)
     SET(PRODUCT_TAG)
   ENDIF()
 
+<<<<<<< HEAD
   IF(WITH_NDB)
     SET(package_name "mysql${PRODUCT_TAG}-${MYSQL_CLUSTER_VERSION}-${SYSTEM_NAME_AND_PROCESSOR}")
   ELSE()
@@ -125,6 +126,15 @@ MACRO(GET_PACKAGE_FILE_NAME Var)
       SET(package_name "percona-server${PRODUCT_TAG}-${VERSION}-${SYSTEM_NAME_AND_PROCESSOR}")
     ENDIF()
   ENDIF()
+||||||| 91438a0430f
+  IF(WITH_NDB)
+    SET(package_name "mysql${PRODUCT_TAG}-${MYSQL_CLUSTER_VERSION}-${SYSTEM_NAME_AND_PROCESSOR}")
+  ELSE()
+    SET(package_name "percona-server${PRODUCT_TAG}-${VERSION}-${SYSTEM_NAME_AND_PROCESSOR}")
+  ENDIF()
+=======
+  SET(package_name "percona-server${PRODUCT_TAG}-${MYSQL_PACKAGE_VERSION_WITH_EXTRA}-${SYSTEM_NAME_AND_PROCESSOR}")
+>>>>>>> ps/release-9.7.4-4
 
   MESSAGE(STATUS "Packaging as: ${package_name}")
 
@@ -142,9 +152,15 @@ IF(NOT CPACK_PACKAGE_FILE_NAME)
 ENDIF()
 
 IF(NOT CPACK_SOURCE_PACKAGE_FILE_NAME)
+<<<<<<< HEAD
   SET(CPACK_SOURCE_PACKAGE_FILE_NAME "Percona-XtraDB-Cluster-${VERSION}")
+||||||| 91438a0430f
+  SET(CPACK_SOURCE_PACKAGE_FILE_NAME "percona-server-${VERSION}")
+=======
+  SET(CPACK_SOURCE_PACKAGE_FILE_NAME "percona-server-${MYSQL_PACKAGE_VERSION_WITH_EXTRA}")
+>>>>>>> ps/release-9.7.4-4
   IF(WITH_NDB)
-    SET(CPACK_SOURCE_PACKAGE_FILE_NAME "percona-server-mysql-cluster-gpl-${MYSQL_CLUSTER_VERSION}")
+    SET(CPACK_SOURCE_PACKAGE_FILE_NAME "percona-server-mysql-cluster-gpl-${MYSQL_PACKAGE_VERSION_WITH_EXTRA}")
     MESSAGE(STATUS "Percona Server MySQL Cluster package name: ${CPACK_SOURCE_PACKAGE_FILE_NAME}")
   ELSE()
   ENDIF()

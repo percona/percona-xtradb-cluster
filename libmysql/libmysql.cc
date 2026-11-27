@@ -898,6 +898,67 @@ const char *STDCALL mysql_get_server_info(MYSQL *mysql) {
   return ((char *)mysql->server_version);
 }
 
+/**
+  Return the full version of the connected server, including the update
+  component.
+
+  On the first call for a command-ready connection, this function issues
+  SELECT VERSION_WITH_UPDATE() and caches the result. Later calls return
+  the cached value without issuing another query. The legacy handshake
+  and mysql_get_server_info() continue to expose the three-part version.
+
+  The full version is kept separately because the handshake must preserve
+  the three-part server_version for compatibility with older clients. The
+  cache is cleared after a successful connection handshake so reconnects
+  refresh the value.
+
+  @param mysql  Connected MYSQL handle in the command-ready state.
+
+  @return A pointer to the cached full version string, or nullptr if the
+          handle is not command-ready, the server does not support
+          VERSION_WITH_UPDATE(), or the value cannot be obtained. The
+          returned pointer remains valid until the handle reconnects or
+          is closed.
+*/
+const char *STDCALL mysql_get_server_info_with_version_update(MYSQL *mysql) {
+  static constexpr char version_with_update_query[] =
+      "SELECT VERSION_WITH_UPDATE()";
+
+  if (mysql == nullptr || mysql->extension == nullptr ||
+      mysql->status != MYSQL_STATUS_READY) {
+    return nullptr;
+  }
+
+  MYSQL_EXTENSION *extension = static_cast<MYSQL_EXTENSION *>(mysql->extension);
+  if (extension->server_version_with_update != nullptr)
+    return extension->server_version_with_update;
+
+  if (mysql_real_query(mysql, version_with_update_query,
+                       sizeof(version_with_update_query) - 1)) {
+    return nullptr;
+  }
+
+  MYSQL_RES *result = mysql_store_result(mysql);
+  if (result == nullptr) return nullptr;
+
+  extension = static_cast<MYSQL_EXTENSION *>(mysql->extension);
+  if (extension == nullptr) {
+    mysql_free_result(result);
+    return nullptr;
+  }
+  MYSQL_ROW row = mysql_fetch_row(result);
+  unsigned long *lengths = mysql_fetch_lengths(result);
+  if (row != nullptr && row[0] != nullptr && lengths != nullptr) {
+    my_free(extension->server_version_with_update);
+    extension->server_version_with_update =
+        my_strndup(key_memory_MYSQL, row[0], lengths[0], MYF(0));
+    if (extension->server_version_with_update == nullptr)
+      set_mysql_error(mysql, CR_OUT_OF_MEMORY, unknown_sqlstate);
+  }
+  mysql_free_result(result);
+  return extension->server_version_with_update;
+}
+
 const char *STDCALL mysql_get_host_info(MYSQL *mysql) {
   return (mysql->host_info);
 }
@@ -907,6 +968,10 @@ uint STDCALL mysql_get_proto_info(MYSQL *mysql) {
 }
 
 const char *STDCALL mysql_get_client_info(void) { return MYSQL_SERVER_VERSION; }
+
+const char *STDCALL mysql_get_client_info_with_version_update(void) {
+  return MYSQL_SERVER_VERSION_WITH_UPDATE;
+}
 
 ulong STDCALL mysql_get_client_version(void) { return MYSQL_VERSION_ID; }
 
@@ -1094,14 +1159,15 @@ namespace {
     mean "big enough"
 
   RETURN VALUES
-    ~0          The escaped string did not fit in the to buffer
+    ~0          The escaped string did not fit in the to buffer, or a backtick-
+                quoted identifier contained an invalid multibyte character
     >=0         The length of the escaped string
 */
 
 size_t escape_quotes_for_mysql(CHARSET_INFO *charset_info, char *to,
                                size_t to_length, const char *from,
                                size_t length, char quote) {
-  const char *to_start = to;
+  char *to_start = to;
   const char *end = nullptr;
   const char *to_end = to_start + (to_length ? to_length - 1 : 2 * length);
   bool overflow = false;
@@ -1117,11 +1183,11 @@ size_t escape_quotes_for_mysql(CHARSET_INFO *charset_info, char *to,
       from--;
       continue;
     }
-    /*
-      We don't have the same issue here with a non-multi-byte character being
-      turned into a multi-byte character by the addition of an escaping
-      character, because we are only escaping the ' character with itself.
-     */
+    if (quote == '`' && use_mb_flag &&
+        my_ismb1st(charset_info, static_cast<unsigned char>(*from))) {
+      *to_start = 0;
+      return static_cast<size_t>(-1);
+    }
     if (*from == quote) {
       if (to + 2 > to_end) {
         overflow = true;
@@ -1138,7 +1204,8 @@ size_t escape_quotes_for_mysql(CHARSET_INFO *charset_info, char *to,
     }
   }
   *to = 0;
-  return overflow ? (ulong)~0 : (ulong)(to - to_start);
+  return overflow ? static_cast<size_t>(-1)
+                  : static_cast<size_t>(to - to_start);
 }
 }  // namespace
 
@@ -1151,6 +1218,7 @@ size_t escape_quotes_for_mysql(CHARSET_INFO *charset_info, char *to,
   binary data.
 
   This function should be used for escaping identifiers and string parameters.
+  Backtick-quoted identifiers with invalid multibyte characters are rejected.
 
   @param [in] mysql   MySQL connection structure.
   @param [out] to     Escaped string output buffer.
@@ -1163,15 +1231,24 @@ size_t escape_quotes_for_mysql(CHARSET_INFO *charset_info, char *to,
   @return Result value.
     @retval != (ulong)-1 Succeeded. Number of bytes written to the output
                          buffer without the '\0' character.
-    @retval (ulong)-1    Failed.
+    @retval (ulong)-1    Failed. Use mysql_error() to get error message.
 */
 
 ulong STDCALL mysql_real_escape_string_quote(MYSQL *mysql, char *to,
                                              const char *from, ulong length,
                                              char quote) {
-  if (quote == '`' || mysql->server_status & SERVER_STATUS_NO_BACKSLASH_ESCAPES)
-    return (uint)escape_quotes_for_mysql(mysql->charset, to, 0, from, length,
-                                         quote);
+  if (quote == '`' ||
+      mysql->server_status & SERVER_STATUS_NO_BACKSLASH_ESCAPES) {
+    const size_t escaped_length =
+        escape_quotes_for_mysql(mysql->charset, to, 0, from, length, quote);
+    if (escaped_length == static_cast<size_t>(-1)) {
+      set_mysql_extended_error(
+          mysql, CR_UNKNOWN_ERROR, unknown_sqlstate,
+          "Cannot escape an invalid multibyte character in an identifier");
+      return static_cast<ulong>(-1);
+    }
+    return static_cast<ulong>(escaped_length);
+  }
   return (uint)escape_string_for_mysql(mysql->charset, to, 0, from, length);
 }
 
@@ -2848,9 +2925,16 @@ bool STDCALL mysql_stmt_send_long_data(MYSQL_STMT *stmt, uint param_number,
   and no-conversion fetching.
 */
 
-static void read_binary_time(MYSQL_TIME *tm, uchar **pos) {
+static bool read_binary_time(MYSQL_TIME *tm, uchar **pos) {
   /* net_field_length will set pos to the first byte of data */
-  const uint length = net_field_length(pos);
+  uint length = net_field_length(pos);
+  DBUG_EXECUTE_IF("simulate_malformed_binary_time_length", { length = 1; });
+
+  if (!(length == 0 || length == 8 || length == 12)) {
+    set_zero_time(tm, MYSQL_TIMESTAMP_TIME);
+    *pos += length;
+    return true;
+  }
 
   if (length) {
     uchar *to = *pos;
@@ -2872,10 +2956,20 @@ static void read_binary_time(MYSQL_TIME *tm, uchar **pos) {
     *pos += length;
   } else
     set_zero_time(tm, MYSQL_TIMESTAMP_TIME);
+
+  return false;
 }
 
-static void read_binary_datetime(MYSQL_TIME *tm, uchar **pos) {
-  const uint length = net_field_length(pos);
+static bool read_binary_datetime(MYSQL_TIME *tm, uchar **pos) {
+  uint length = net_field_length(pos);
+
+  DBUG_EXECUTE_IF("simulate_malformed_binary_datetime_length", { length = 1; });
+
+  if (!(length == 0 || length == 4 || length == 7 || length == 11)) {
+    set_zero_time(tm, MYSQL_TIMESTAMP_DATETIME);
+    *pos += length;
+    return true;
+  }
 
   if (length) {
     uchar *to = *pos;
@@ -2897,10 +2991,20 @@ static void read_binary_datetime(MYSQL_TIME *tm, uchar **pos) {
     *pos += length;
   } else
     set_zero_time(tm, MYSQL_TIMESTAMP_DATETIME);
+
+  return false;
 }
 
-static void read_binary_date(MYSQL_TIME *tm, uchar **pos) {
-  const uint length = net_field_length(pos);
+static bool read_binary_date(MYSQL_TIME *tm, uchar **pos) {
+  uint length = net_field_length(pos);
+
+  DBUG_EXECUTE_IF("simulate_malformed_binary_date_length", { length = 1; });
+
+  if (!(length == 0 || length == 4)) {
+    set_zero_time(tm, MYSQL_TIMESTAMP_DATE);
+    *pos += length;
+    return true;
+  }
 
   if (length) {
     uchar *to = *pos;
@@ -2916,6 +3020,8 @@ static void read_binary_date(MYSQL_TIME *tm, uchar **pos) {
     *pos += length;
   } else
     set_zero_time(tm, MYSQL_TIMESTAMP_DATE);
+
+  return false;
 }
 
 /*
@@ -3427,14 +3533,20 @@ static void fetch_result_with_conversion(MYSQL_BIND *param, MYSQL_FIELD *field,
     case MYSQL_TYPE_DATE: {
       MYSQL_TIME tm;
 
-      read_binary_date(&tm, row);
+      if (read_binary_date(&tm, row)) {
+        *param->error = true;
+        break;
+      }
       fetch_datetime_with_conversion(param, field, &tm);
       break;
     }
     case MYSQL_TYPE_TIME: {
       MYSQL_TIME tm;
 
-      read_binary_time(&tm, row);
+      if (read_binary_time(&tm, row)) {
+        *param->error = true;
+        break;
+      }
       fetch_datetime_with_conversion(param, field, &tm);
       break;
     }
@@ -3442,7 +3554,10 @@ static void fetch_result_with_conversion(MYSQL_BIND *param, MYSQL_FIELD *field,
     case MYSQL_TYPE_TIMESTAMP: {
       MYSQL_TIME tm;
 
-      read_binary_datetime(&tm, row);
+      if (read_binary_datetime(&tm, row)) {
+        *param->error = true;
+        break;
+      }
       fetch_datetime_with_conversion(param, field, &tm);
       break;
     }
@@ -3532,21 +3647,21 @@ static void fetch_result_time(MYSQL_BIND *param,
                               MYSQL_FIELD *field [[maybe_unused]],
                               uchar **row) {
   auto *tm = (MYSQL_TIME *)param->buffer;
-  read_binary_time(tm, row);
+  *param->error = read_binary_time(tm, row);
 }
 
 static void fetch_result_date(MYSQL_BIND *param,
                               MYSQL_FIELD *field [[maybe_unused]],
                               uchar **row) {
   auto *tm = (MYSQL_TIME *)param->buffer;
-  read_binary_date(tm, row);
+  *param->error = read_binary_date(tm, row);
 }
 
 static void fetch_result_datetime(MYSQL_BIND *param,
                                   MYSQL_FIELD *field [[maybe_unused]],
                                   uchar **row) {
   auto *tm = (MYSQL_TIME *)param->buffer;
-  read_binary_datetime(tm, row);
+  *param->error = read_binary_datetime(tm, row);
 }
 
 static void fetch_result_bin(MYSQL_BIND *param,

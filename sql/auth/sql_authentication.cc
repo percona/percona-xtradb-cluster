@@ -2720,7 +2720,7 @@ static bool parse_com_change_user_packet(THD *thd, MPVIO_EXT *mpvio,
   /* Safe because there is always a trailing \0 at the end of the packet */
   char *passwd = strend(user) + 1;
   size_t user_len = passwd - user - 1;
-  char *db = passwd;
+  char *db;
   char db_buff[NAME_LEN + 1];           // buffer to store db in utf8
   char user_buff[USERNAME_LENGTH + 1];  // buffer to store user in utf8
   uint dummy_errors;
@@ -2739,7 +2739,14 @@ static bool parse_com_change_user_packet(THD *thd, MPVIO_EXT *mpvio,
   */
   const size_t passwd_len = (uchar)(*passwd++);
 
-  db += passwd_len + 1;
+  /* The authentication response must be followed by the database name. */
+  DBUG_EXECUTE_IF("change_user_auth_response_too_short",
+                  end = passwd + passwd_len;);
+  if (passwd_len >= static_cast<size_t>(end - passwd)) {
+    my_error(ER_UNKNOWN_COM_ERROR, MYF(0));
+    return true;
+  }
+  db = passwd + passwd_len;
   /*
     Database name is always NUL-terminated, so in case of empty database
     the packet must contain at least the trailing '\0'.
@@ -2749,11 +2756,18 @@ static bool parse_com_change_user_packet(THD *thd, MPVIO_EXT *mpvio,
     return true;
   }
 
-  size_t db_len = strlen(db);
+  DBUG_EXECUTE_IF("change_user_db_not_terminated", end = db + strlen(db););
 
-  char *ptr = db + db_len + 1;
+  char *db_end = (char *)memchr(db, '\0', end - db);
+  if (db_end == nullptr) {
+    my_error(ER_UNKNOWN_COM_ERROR, MYF(0));
+    return true;
+  }
+  size_t db_len = db_end - db;
 
-  if (ptr + 1 < end) {
+  char *ptr = db_end + 1;
+
+  if (end - ptr >= 2) {
     if (mpvio->charset_adapter->init_client_charset(uint2korr(ptr)))
       return true;
     // skip over the charset's 2 bytes
@@ -2803,16 +2817,25 @@ static bool parse_com_change_user_packet(THD *thd, MPVIO_EXT *mpvio,
 
   const char *client_plugin;
   client_plugin = ptr;
-  /*
-    ptr needs to be updated to point to correct position so that
-    connection attributes are read properly.
-  */
-  ptr = ptr + strlen(client_plugin) + 1;
-
   if (client_plugin >= end) {
     my_error(ER_UNKNOWN_COM_ERROR, MYF(0));
     return true;
   }
+
+  DBUG_EXECUTE_IF("change_user_plugin_not_terminated",
+                  end = ptr + strlen(ptr););
+
+  const char *plugin_end =
+      (const char *)memchr(client_plugin, '\0', end - client_plugin);
+  if (plugin_end == nullptr) {
+    my_error(ER_UNKNOWN_COM_ERROR, MYF(0));
+    return true;
+  }
+  /*
+    ptr needs to be updated to point to correct position so that
+    connection attributes are read properly.
+  */
+  ptr = const_cast<char *>(plugin_end) + 1;
 
   if (ptr > end) {
     my_error(ER_UNKNOWN_COM_ERROR, MYF(0));
@@ -3128,9 +3151,10 @@ skip_to_ssl:
       SSL context is kept till the end of function
     */
     {
-      const bool admin_ctx = thd->is_admin_connection() && g_admin_ssl_configured;
+      const bool admin_ctx =
+          thd->is_admin_connection() && g_admin_ssl_configured;
       Lock_and_access_ssl_acceptor_context context(admin_ctx ? mysql_admin
-                                                            : mysql_main);
+                                                             : mysql_main);
 
       /* Do the SSL layering. */
       if (!context.have_ssl()) return packet_error;
@@ -4070,6 +4094,7 @@ static void check_and_update_password_lock_state(MPVIO_EXT &mpvio, THD *thd,
   }
 }
 
+<<<<<<< HEAD
 #ifdef WITH_WSREP
 /* PXC: Cherrypicked PS-11593 fix from PS 9.7, to be removed once it is in a
    PS 9.7 release. */
@@ -4199,10 +4224,26 @@ static bool apply_external_roles(THD *thd, const char *plugin_roles_list,
 }
 #else
 static void apply_external_roles(THD *thd, const char *plugin_roles_list,
+||||||| 91438a0430f
+static void apply_external_roles(THD *thd, const char *plugin_roles_list,
+=======
+/**
+  Grant and revoke the external roles reported by the authentication plugin.
+
+  @param[in] thd               Thread context
+  @param[in] plugin_roles_list comma separated roles reported by the plugin
+  @param[in] acl_user          the authenticated user
+
+  @retval false roles applied, or nothing to do
+  @retval true  the ACL cache lock could not be acquired; an error has been
+                raised and the caller must fail the authentication
+*/
+static bool apply_external_roles(THD *thd, const char *plugin_roles_list,
+>>>>>>> ps/release-9.7.4-4
                                  const ACL_USER *acl_user) {
   // shall be always correct, we are passing a table
   assert(plugin_roles_list != nullptr);
-  if (acl_user->user == nullptr) return;
+  if (acl_user->user == nullptr) return false;
   std::vector<std::string> plugin_roles;
   if (plugin_roles_list[0] != '\0')
     boost::algorithm::split(plugin_roles, plugin_roles_list,
@@ -4212,19 +4253,57 @@ static void apply_external_roles(THD *thd, const char *plugin_roles_list,
   const name_and_host_t user(std::string(acl_user->user),
                              std::string(acl_user->host.get_host()));
 
+  {
+    Acl_cache_lock_guard acl_cache_lock(thd, Acl_cache_lock_mode::READ_MODE);
+    bool locked = acl_cache_lock.lock();
+    DBUG_EXECUTE_IF("fail_acl_external_roles_read_lock", {
+      if (locked) {
+        acl_cache_lock.unlock();
+        // Acl_cache_lock_guard::lock() calls my_error() on failure.
+        // Emulate it here so the diagnostics area is populated.
+        my_error(ER_CANNOT_LOCK_USER_MANAGEMENT_CACHES, MYF(0));
+        locked = false;
+      }
+    });
+    if (!locked) return true;
+    DBUG_EXECUTE_IF("acl_external_roles_log_lock_mode", {
+      LogErr(INFORMATION_LEVEL, ER_LOG_PRINTF_MSG,
+             thd->mdl_context.owns_equal_or_stronger_lock(MDL_key::ACL_CACHE,
+                                                          "", "", MDL_EXCLUSIVE)
+                 ? "PS-11593 external roles probe lock mode: EXCLUSIVE"
+                 : "PS-11593 external roles probe lock mode: SHARED");
+    });
+    if (plugin_roles.empty() &&
+        g_external_roles.find(user) == g_external_roles.end())
+      return false;
+  }  // the READ lock is released here, it is never upgraded
+
   // Adding or removing external roles requires locking
   Acl_cache_lock_guard acl_cache_lock_guard(thd,
                                             Acl_cache_lock_mode::WRITE_MODE);
-  acl_cache_lock_guard.lock();
+  bool write_locked = acl_cache_lock_guard.lock();
+  DBUG_EXECUTE_IF("fail_acl_external_roles_write_lock", {
+    if (write_locked) {
+      acl_cache_lock_guard.unlock();
+      // Acl_cache_lock_guard::lock() calls my_error() on failure.
+      // Emulate it here so the diagnostics area is populated.
+      my_error(ER_CANNOT_LOCK_USER_MANAGEMENT_CACHES, MYF(0));
+      write_locked = false;
+    }
+  });
+  if (!write_locked) return true;
+  // The lookup is repeated: no lock was held between the two acquisitions, so
+  // the container may have changed in between.
   const auto user_roles_it = g_external_roles.find(user);
   // we proceed only if some roles for the user either were added
   // in the past or are being added
-  if (user_roles_it == g_external_roles.end() && plugin_roles.empty()) return;
+  if (user_roles_it == g_external_roles.end() && plugin_roles.empty())
+    return false;
 
   // we need a pointer to the really cached user
   ACL_USER *cached_acl_user =
       find_acl_user(acl_user->host.get_host(), acl_user->user, true);
-  if (cached_acl_user == nullptr) return;
+  if (cached_acl_user == nullptr) return false;
 
   // if no roles added so far, add all roles returned by the plugin that exist
   if (user_roles_it == g_external_roles.end()) {
@@ -4270,6 +4349,8 @@ static void apply_external_roles(THD *thd, const char *plugin_roles_list,
     else
       std::swap(user_roles_it->second, new_user_roles);
   }
+
+  return false;
 }
 #endif /* WITH_WSREP */
 
@@ -4585,6 +4666,7 @@ int acl_authenticate(THD *thd, enum_server_command command) {
       sctx->set_master_access(acl_user->access, *(mpvio.restrictions));
       assign_priv_user_host(sctx, const_cast<ACL_USER *>(acl_user));
 
+<<<<<<< HEAD
 #ifdef WITH_WSREP
       // A failed ACL cache lock has already raised an error; the login must
       // fail here rather than reach my_ok() with an error in the DA.
@@ -4593,6 +4675,14 @@ int acl_authenticate(THD *thd, enum_server_command command) {
 #else
       apply_external_roles(thd, mpvio.auth_info.external_roles, acl_user);
 #endif /* WITH_WSREP */
+||||||| 91438a0430f
+      apply_external_roles(thd, mpvio.auth_info.external_roles, acl_user);
+=======
+      // A failed ACL cache lock has already raised an error; the login must
+      // fail here rather than reach my_ok() with an error in the DA.
+      if (apply_external_roles(thd, mpvio.auth_info.external_roles, acl_user))
+        goto end;
+>>>>>>> ps/release-9.7.4-4
 
       /* Assign default role */
       {
@@ -4798,7 +4888,7 @@ int acl_authenticate(THD *thd, enum_server_command command) {
   ret = 0;
 end:
   if (mpvio.restrictions) mpvio.restrictions->~Restrictions();
-  /* Ready to handle queries */
+    /* Ready to handle queries */
 #ifdef HAVE_PSI_THREAD_INTERFACE
   LEX_CSTRING main_sctx_user = thd->m_main_security_ctx.user();
   LEX_CSTRING main_sctx_host_or_ip = thd->m_main_security_ctx.host_or_ip();
@@ -4972,12 +5062,7 @@ bool init_rsa_keys(void) {
           g_caching_sha2_rsa_keys->read_rsa_keys());
 }
 
-static MYSQL_PLUGIN plugin_info_ptr;
-
-static int init_sha256_password_handler(MYSQL_PLUGIN plugin_ref) {
-  plugin_info_ptr = plugin_ref;
-  return 0;
-}
+static int init_sha256_password_handler(MYSQL_PLUGIN) { return 0; }
 
 /**
   Compare a clear text password with a stored hash

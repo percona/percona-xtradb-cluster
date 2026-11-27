@@ -957,8 +957,10 @@ static unique_ptr<Json_object> ExplainQueryPlan(
 
     if (dml_obj->add_alias("inputs", std::move(children))) return nullptr;
 
+    // Use the base table that is inserted into: when the insert target is a
+    // view, the first table of the statement is the view, which has no TABLE.
     if (AddTableInfoToObject(dml_obj.get(),
-                             query_plan->get_lex()->query_tables[0].table)) {
+                             query_plan->get_lex()->insert_table_leaf->table)) {
       return nullptr;
     }
 
@@ -1308,6 +1310,17 @@ static unique_ptr<Json_object> SetObjectMembers(
                                     path->full_text_search().ref,
                                     /*ranges=*/nullptr, nullptr,
                                     /*reverse=*/false, nullptr, obj);
+      break;
+    }
+    case AccessPath::VECTOR_SEARCH: {
+      const TABLE &table = *path->vector_search().table;
+      assert(table.file->pushed_idx_cond == nullptr);
+      const KEY &key = table.key_info[path->vector_search().ref->key];
+      error |=
+          SetIndexInfoInObject(&description, path, "vector_search", "Vector",
+                               table, key, "search", path->vector_search().ref,
+                               /*ranges=*/nullptr, nullptr,
+                               /*reverse=*/false, nullptr, obj);
       break;
     }
     case AccessPath::CONST_TABLE: {

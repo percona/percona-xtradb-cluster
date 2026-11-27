@@ -367,7 +367,7 @@ int start_io(connection_t *connection, PTP_CALLBACK_INSTANCE instance) {
 }
 
 int login(connection_t *connection, PTP_CALLBACK_INSTANCE instance) {
-  if (threadpool_add_connection(connection->thd) == 0 &&
+  if (threadpool_add_connection(connection->thd, connection->logged_in) == 0 &&
       init_io(connection, connection->thd) == 0 &&
       start_io(connection, instance) == 0) {
     return 0;
@@ -409,7 +409,7 @@ void destroy_connection(connection_t *connection,
   }
 
   if (connection->thd) {
-    threadpool_remove_connection(connection->thd);
+    threadpool_remove_connection(connection->thd, connection->logged_in);
   }
 
   DestroyThreadpoolEnvironment(&connection->callback_environ);
@@ -460,9 +460,9 @@ bool tp_init(void) {
     }
   }
 
-    /*
-      Control stack size (OS must be Win7 or later, plus corresponding SDK)
-    */
+  /*
+    Control stack size (OS must be Win7 or later, plus corresponding SDK)
+  */
 #if _MSC_VER >= 1600
   if (SetThreadpoolStackInformation) {
     TP_POOL_STACK_INFORMATION stackinfo;
@@ -613,7 +613,7 @@ bool Thread_pool_connection_handler::add_connection(
   if (!con) {
     tp_log_warning("Allocation failed",
                    "Thread_pool_connection_handler::add_connection");
-    threadpool_remove_connection(thd);
+    threadpool_remove_connection(thd, false);
     return true;
   }
 

@@ -471,6 +471,9 @@ extern char *srv_log_group_home_dir;
 /** Enable or Disable Encrypt of REDO tablespace. */
 extern bool srv_redo_log_encrypt;
 
+/** Whether the redo block at the recovered LSN was encrypted on disk. */
+extern bool srv_recovered_redo_block_was_encrypted;
+
 /* Maximum number of redo files of a cloned DB. */
 constexpr size_t SRV_N_LOG_FILES_CLONE_MAX = 1000;
 
@@ -750,6 +753,10 @@ If innodb_fast_shutdown=2, shutdown will effectively 'crash' InnoDB
 (but lose no committed transactions). */
 extern ulong srv_fast_shutdown;
 extern bool srv_innodb_status;
+
+/** Upper bound in bytes on memory held by HNSW vector index graphs across
+all tables and indexes; 0 means no limit. */
+extern unsigned long long srv_hnsw_max_memory;
 
 extern unsigned long long srv_stats_transient_sample_pages;
 extern bool srv_stats_persistent;
@@ -1253,8 +1260,7 @@ void srv_master_thread_disabled_debug_update(THD *thd, SYS_VAR *var,
 innodb_temp_tablespace_encrypt is TRUE
 @param[in]	enable	true to enable encryption, false to disable
 @return DB_SUCCESS on success, DB_ERROR on failure */
-[[nodiscard]]
-dberr_t srv_temp_encryption_update(bool enable);
+[[nodiscard]] dberr_t srv_temp_encryption_update(bool enable);
 
 /** Status variables to be passed to MySQL */
 struct export_var_t {
@@ -1365,6 +1371,7 @@ struct export_var_t {
   // Percona-added status variables
   ulint innodb_checkpoint_age;
   ulint innodb_checkpoint_max_age;
+  uint64_t innodb_hnsw_memory_used; /*!< Vec_arena::global_bytes() */
   ulint innodb_ibuf_free_list;
   ulint innodb_ibuf_segment_size;
   lsn_t innodb_lsn_current;

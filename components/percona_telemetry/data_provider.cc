@@ -185,9 +185,18 @@ bool DataProvider::do_query(const std::string &query, QueryResult *result,
     is safe, because internally it checks if provided pointer is valid
   */
   std::shared_ptr<MYSQL_H> mysql_h_close_guard(
+<<<<<<< HEAD
     &mysql_h, [&srv = command_factory_service_](MYSQL_H *ptr) {
       srv.close(*ptr);
     });
+||||||| 91438a0430f
+      &mysql_h, [&srv = command_factory_service_](MYSQL_H *ptr) {
+        srv.close(*ptr);
+      });
+=======
+      &mysql_h,
+      [&srv = command_factory_service_](MYSQL_H *ptr) { srv.close(*ptr); });
+>>>>>>> ps/release-9.7.4-4
 
   mysql_service_status_t sstatus = command_factory_service_.init(&mysql_h);
 

@@ -35,10 +35,10 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "ddl0impl-loader.h"
 #include "handler0alter.h"
 #include "os0thread-create.h"
+#include "sync0debug.h"
 #include "ut0stage.h"
 
-#include "sql/table.h"
-#include "sql_class.h"
+class THD;
 
 namespace ddl {
 
@@ -270,7 +270,11 @@ Loader::~Loader() noexcept {
 
     for (auto &builder : m_builders) {
       auto stage = builder->stage();
-      ut_a(stage != nullptr);
+      /* A builder gets its stage when the scan sets it up, in index
+      order. When an earlier one refuses there, such as a vector index
+      with innodb_hnsw_max_memory already reached, the scan returns
+      before the later builders are set up, and they never start. */
+      ut_ad(stage != nullptr || builder->get_state() == Builder::State::INIT);
       if (stage) {
         alter_stages.push_back(stage);
       }
@@ -321,7 +325,11 @@ dberr_t Loader::load() noexcept {
       Runnable runnable{PSI_NOT_INSTRUMENTED, seqnum};
 #endif /* UNIV_PFS_THREAD */
 
-      current_thd = nullptr;
+      if (runnable.setup_thd(m_ctx.thd()) != DB_SUCCESS) {
+        m_taskq->thread_create_failed();
+        m_taskq->signal();
+        return DB_OUT_OF_MEMORY;
+      }
 
       const auto err = runnable(&Task_queue::execute, m_taskq);
 

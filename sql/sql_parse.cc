@@ -2051,19 +2051,15 @@ gr_incoming_connection_cb get_gr_incoming_connection() {
  * @param fd Connection file descriptor
  * @param ssl_ctx Connection SSL Context
  *
- * @return int 1 in case of error delegating the connection.
- *             0, otherwise.
+ * @return the result of handing the connection to Group Replication
  */
-int call_gr_incoming_connection_cb(THD *thd, int fd, SSL *ssl_ctx) {
-  int error_return = 1;
+Gr_incoming_connection_status call_gr_incoming_connection_cb(THD *thd, int fd,
+                                                             SSL *ssl_ctx) {
+  auto gr_connection_callback = get_gr_incoming_connection();
+  if (gr_connection_callback == nullptr)
+    return Gr_incoming_connection_status::ERROR;
 
-  if (gr_incoming_connection_cb gr_connection_callback =
-          get_gr_incoming_connection();
-      gr_connection_callback) {
-    error_return = gr_connection_callback(thd, fd, ssl_ctx);
-  }
-
-  return error_return;
+  return gr_connection_callback(thd, fd, ssl_ctx);
 }
 
 /**
@@ -2372,14 +2368,22 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
         break;
       }
 
-      if (!error && call_gr_incoming_connection_cb(
-                        thd, thd->active_vio->mysql_socket.fd,
-                        thd->active_vio->ssl_arg
-                            ? static_cast<SSL *>(thd->active_vio->ssl_arg)
-                            : nullptr)) {
-        my_error(ER_UNKNOWN_COM_ERROR, MYF(0));
-        error = true;
-        break;
+      if (!error) {
+        const Gr_incoming_connection_status handoff_result =
+            call_gr_incoming_connection_cb(
+                thd, thd->active_vio->mysql_socket.fd,
+                thd->active_vio->ssl_arg
+                    ? static_cast<SSL *>(thd->active_vio->ssl_arg)
+                    : nullptr);
+        if (handoff_result != Gr_incoming_connection_status::ACCEPTED) {
+          if (handoff_result == Gr_incoming_connection_status::BUSY) {
+            my_error(ER_GRP_RPL_CONNECTION_HANDOFF_BUSY, MYF(0));
+          } else {
+            my_error(ER_UNKNOWN_COM_ERROR, MYF(0));
+          }
+          error = true;
+          break;
+        }
       }
 
       my_ok(thd);
@@ -4066,7 +4070,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
     Disable binlog so that the BEGIN is not logged in binlog.
    */
   if (lex->create_info && lex->create_info->m_transactional_ddl &&
-      !thd->slave_thread) {
+      !(thd->slave_thread || thd->is_binlog_applier())) {
     const Disable_binlog_guard binlog_guard(thd);
     if (trans_begin(thd, MYSQL_START_TRANS_OPT_READ_WRITE)) return true;
   }
@@ -6471,6 +6475,8 @@ void THD::reset_for_next_command() {
   DBUG_TRACE;
   assert(!thd->sp_runtime_ctx); /* not for substatements of routines */
   assert(!thd->in_sub_stmt);
+  // Before-GTID actions are statement-local and must be consumed before reuse.
+  assert(thd->m_actions_before_gtid_state_update.empty());
   thd->reset_item_list();
   /*
     Those two lines below are theoretically unneeded as
@@ -6879,8 +6885,8 @@ bool Alter_info::add_field(
     const char *change, List<String> *interval_list, const CHARSET_INFO *cs,
     bool has_explicit_collation, uint uint_geom_type,
     const LEX_CSTRING *zip_dict, Value_generator *gcol_info,
-    Value_generator *default_val_expr, LEX_CSTRING masking_policy, const char *opt_after,
-    std::optional<gis::srid_t> srid,
+    Value_generator *default_val_expr, LEX_CSTRING masking_policy,
+    const char *opt_after, std::optional<gis::srid_t> srid,
     Sql_check_constraint_spec_list *col_check_const_spec_list,
     dd::Column::enum_hidden_type hidden, bool is_array) {
   const uint8 datetime_precision = decimals ? atoi(decimals) : 0;
@@ -7060,6 +7066,40 @@ void add_to_list(SQL_I_List<ORDER> &list, ORDER *order) {
 }
 
 /**
+  Maximum number of reparses of CTE definitions allowed while parsing a single
+  statement.
+
+  Multi-reference CTE definitions need fresh parse tree nodes for each
+  reference. If such definitions are deeply nested, the total reparse work may
+  grow much faster than the statement text. Keep parsing bounded by rejecting
+  statements that need more than this many reparse invocations.
+*/
+static constexpr uint kMaxCommonTableExprReparses = 1024;
+
+/**
+  Maximum cumulative length of CTE definitions reparsed while parsing a single
+  statement.
+
+  This allows the maximum reparse count for small definitions, while reducing
+  the permitted reparse count for larger definitions.
+*/
+static constexpr size_t kMaxCommonTableExprReparseBytes = 64 * 1024 * 1024;
+
+static bool add_common_table_expr_reparse_cost(THD *thd, size_t text_length) {
+  LEX *const lex = thd->lex;
+  if (lex->reparse_common_table_expr_count >= kMaxCommonTableExprReparses ||
+      text_length > kMaxCommonTableExprReparseBytes -
+                        lex->reparse_common_table_expr_bytes) {
+    my_error(ER_CTE_EXPANSION_LIMIT_EXCEEDED, MYF(0));
+    return true;
+  }
+
+  ++lex->reparse_common_table_expr_count;
+  lex->reparse_common_table_expr_bytes += text_length;
+  return false;
+}
+
+/**
   Produces a PT_subquery object from a subquery's text.
   @param thd      Thread handler
   @param text     Subquery's text
@@ -7072,6 +7112,10 @@ void add_to_list(SQL_I_List<ORDER> &list, ORDER *order) {
 static bool reparse_common_table_expr(THD *thd, const char *text,
                                       size_t text_length, uint text_offset,
                                       PT_subquery **node) {
+  if (add_common_table_expr_reparse_cost(thd, text_length)) {
+    return true;
+  }
+
   Common_table_expr_parser_state parser_state;
   parser_state.init(thd, text, text_length);
 
@@ -7605,11 +7649,10 @@ Table_ref *Query_block::add_table_to_list(
     // threads since this is expected by the mysql_upgrade utility.
     if (!(lex->sql_command == SQLCOM_CREATE_VIEW &&
           dd::get_dictionary()->is_system_view_name(
-              lex->query_tables->db, lex->query_tables->table_name))
-&& !(dd::get_dictionary()->is_system_view_name(
-              lex->query_tables->db, lex->query_tables->table_name)
- && DBUG_EVALUATE_IF("skip_dd_table_access_check", true, false))
-        ) {
+              lex->query_tables->db, lex->query_tables->table_name)) &&
+        !(dd::get_dictionary()->is_system_view_name(
+              lex->query_tables->db, lex->query_tables->table_name) &&
+          DBUG_EVALUATE_IF("skip_dd_table_access_check", true, false))) {
       my_error(ER_NO_SYSTEM_TABLE_ACCESS, MYF(0),
                ER_THD_NONCONST(thd, dictionary->table_type_error_code(
                                         ptr->db, ptr->table_name)),

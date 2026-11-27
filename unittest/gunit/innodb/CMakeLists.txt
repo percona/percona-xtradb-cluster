@@ -52,6 +52,7 @@ SET(TESTS
   mem0mem
   os0file
   os0thread-create
+  rem0rec
   srv0conc
   sync0rw
   ut0bitset
@@ -63,6 +64,10 @@ SET(TESTS
   ut0object_cache
   ut0rbt
   ut0rnd
+  ut0stateful_latching_rules
+  vec0arena
+  vec0aux
+  vec0vec
 )
 
 # Treat warnings as errors on MSVC for InnoDB's unittests

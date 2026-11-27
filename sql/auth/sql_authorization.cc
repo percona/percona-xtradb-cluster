@@ -4898,7 +4898,8 @@ void get_privilege_access_maps(
   // get user function privileges
   get_sp_access_map(acl_user, func_map, func_priv_hash.get(), effective_grants);
   // get library privileges
-  get_sp_access_map(acl_user, lib_map, library_priv_hash.get(), effective_grants);
+  get_sp_access_map(acl_user, lib_map, library_priv_hash.get(),
+                    effective_grants);
   // get dynamic privileges
   get_dynamic_privileges(acl_user, dynamic_acl);
   /* Find out the existing restrictions of the current user. */

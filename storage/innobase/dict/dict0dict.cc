@@ -59,6 +59,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "mysqld.h"  // system_charset_info
 #include "que0types.h"
 #include "row0sel.h"
+#include "vec0aux.h"
 #endif /* !UNIV_HOTBACKUP */
 
 #if defined UNIV_HOTBACKUP && defined UNIV_DEBUG
@@ -217,6 +218,9 @@ static dict_index_t *dict_index_build_internal_non_clust(
 static dict_index_t *dict_index_build_internal_fts(
     dict_table_t *table,  /*!< in: table */
     dict_index_t *index); /*!< in: user representation of an FTS index */
+
+static dict_index_t *dict_index_build_internal_vec(dict_table_t *table,
+                                                   dict_index_t *index);
 
 /** Removes an index from the dictionary cache. */
 static void dict_index_remove_from_cache_low(
@@ -1177,6 +1181,21 @@ void dict_table_add_to_cache(dict_table_t *table, bool can_be_evicted) {
   ut_ad(dict_lru_validate());
   ut_ad(dict_sys_mutex_own());
 
+  /* DICT_TF2_HAS_VEC_AUX_COL and vec_aux_col are two halves of one fact:
+  the table has the hidden percona_vec_aux_id column, and it sits at that
+  ordinal. vec_add_aux_id_column sets both, and every path that builds a
+  dict_table_t with the column is supposed to call it - dd_fill_dict_table
+  when a table is opened, prepare_inplace_alter_table_dict when one is
+  rebuilt. Check the pair here, where a table enters the cache, because
+  neither half is checkable at first use: an unset ordinal asserts deep
+  in the vector code, and a table whose dd::Table carries the column
+  while its dict_table_t does not describes one more column than the
+  tablespace holds. In a release build both are silent. */
+  ut_ad(DICT_TF2_FLAG_IS_SET(table, DICT_TF2_HAS_VEC_AUX_COL) ==
+        (table->vec_aux_col != ULINT_UNDEFINED));
+  ut_ad(!DICT_TF2_FLAG_IS_SET(table, DICT_TF2_HAS_VEC_AUX_COL) ||
+        !strcmp(table->get_col_name(table->vec_aux_col), VEC_AUX_ID_COL_NAME));
+
   table->cached = true;
 
   const auto name_hash_value = ut::hash_string(table->name.m_name);
@@ -2109,6 +2128,79 @@ void get_permissible_max_size(const dict_table_t *table,
   }
 }
 
+/** Legacy version of get_field_max_size() which doesn't include the fix for
+Bug#39129182 to keep its original behaviour for LTS releases. This function
+is only used in DDL, to judge if the new shape of the table is acceptable.
+It should not be used in B-tree navigation to decide if X-latch should be
+taken, as this could lead to the deadlock reported in the mentioned bug
+@param[in]      table         innodb table definition cache
+@param[in]      index         index
+@param[in]      field         field
+@param[in,out]  rec_max_size  max record size calculated till now. It
+                              will be increased with the length needed
+                              for this field */
+static void legacy_get_field_max_size(const dict_table_t *table,
+                                      const dict_index_t *index,
+                                      const dict_field_t *field,
+                                      size_t &rec_max_size) {
+  const bool comp = dict_table_is_comp(table);
+  const dict_col_t *col = field->col;
+  ulint field_max_size;
+  ulint field_ext_max_size;
+  /* In dtuple_convert_big_rec(), variable-length columns
+  that are longer than BTR_EXTERN_LOCAL_STORED_MAX_SIZE
+  may be chosen for external storage.
+  Fixed-length columns, and all columns of secondary
+  index records are always stored inline. */
+  /* Determine the maximum length of the index field.
+  The field_ext_max_size should be computed as the worst
+  case in rec_get_converted_size_comp() for
+  REC_STATUS_ORDINARY records. */
+  field_max_size = col->get_fixed_size(comp);
+  if (field_max_size && field->fixed_len != 0) {
+    /* dict_index_add_col() should guarantee this */
+    ut_ad(!field->prefix_len || field->fixed_len == field->prefix_len);
+    /* Fixed lengths are not encoded in ROW_FORMAT=COMPACT. */
+    field_ext_max_size = 0;
+    rec_max_size += field_max_size;
+    return;
+  }
+  field_max_size = col->get_max_size();
+  field_ext_max_size = field_max_size < 256 ? 1 : 2;
+  if (field->prefix_len) {
+    if (field->prefix_len < field_max_size) {
+      field_max_size = field->prefix_len;
+    }
+  } else if (field_max_size > BTR_EXTERN_LOCAL_STORED_MAX_SIZE &&
+             index->is_clustered()) {
+    if (dict_table_has_atomic_blobs(table)) {
+      /* In the worst case, we have a locally stored column of
+      BTR_EXTERN_LOCAL_STORED_MAX_SIZE bytes. The length can be stored in one
+      byte. If the column were stored externally, the lengths in the clustered
+      index page would be BTR_EXTERN_FIELD_REF_SIZE and 2. */
+      field_max_size = BTR_EXTERN_LOCAL_STORED_MAX_SIZE;
+      field_ext_max_size = 1;
+    } else {
+      /* In this case, externally stored fields would have 768 byte prefix
+      stored in-line followed by fields reference. */
+      size_t local_stored_length =
+          BTR_EXTERN_FIELD_REF_SIZE + DICT_ANTELOPE_MAX_INDEX_COL_LEN;
+      if (field_max_size > local_stored_length) {
+        field_max_size = local_stored_length;
+        /* Prefix length will be stored in 2 bytes. */
+        field_ext_max_size = 2;
+      }
+    }
+  }
+  if (comp) {
+    /* Add the extra size for ROW_FORMAT=COMPACT.
+    For ROW_FORMAT=REDUNDANT, these bytes were
+    added to rec_max_size before this loop. */
+    rec_max_size += field_ext_max_size;
+  }
+  rec_max_size += field_max_size;
+}
+
 void get_field_max_size(const dict_table_t *table, const dict_index_t *index,
                         const dict_field_t *field, size_t &rec_max_size) {
   /* Determine the maximum length of the index field. In case ROW_FORMAT is
@@ -2168,7 +2260,7 @@ void get_field_max_size(const dict_table_t *table, const dict_index_t *index,
     }
   } else if (!always_inlined &&
              field_max_size > BTR_EXTERN_LOCAL_STORED_MAX_SIZE &&
-             index->is_clustered()) {
+             DATA_BIG_COL(col) && index->is_clustered()) {
     /* In dtuple_convert_big_rec(), a "big" variable-length column that is
     longer than BTR_EXTERN_LOCAL_STORED_MAX_SIZE and is not used for navigation
     may be chosen for external storage. */
@@ -2208,6 +2300,76 @@ void get_field_max_size(const dict_table_t *table, const dict_index_t *index,
   rec_max_size += field_max_size;
 }
 
+/** Legacy version of dict_index_validate_max_rec_size() which uses
+legacy_get_field_max_size() instead of get_field_max_size(), which doesn't
+include the fix for Bug#39129182 to keep its original behaviour for LTS
+releases. This function is only used in DDL, to judge if the new shape of the
+table is acceptable. It should not be used in B-tree navigation to decide if
+X-latch should be taken, as this could lead to the deadlock reported in the
+mentioned bug.
+@param[in]  table        innodb table definition cache
+@param[in]  index        index
+@param[in]  page_rec_max maximum size of possible record on leaf page
+@param[in]  page_ptr_max maximum size of possible record on non-leaf page
+@return true if max record size exceeds the limit, false otherwise. */
+static bool legacy_dict_index_validate_max_rec_size(const dict_table_t *table,
+                                                    const dict_index_t *index,
+                                                    const size_t page_rec_max,
+                                                    const size_t page_ptr_max) {
+  size_t rec_max_size;
+  const bool comp = dict_table_is_comp(table);
+
+  const page_size_t page_size(dict_table_page_size(table));
+  if (page_size.is_compressed() &&
+      page_size.physical() < univ_page_size.physical()) {
+    /* On a compressed page, there is a two-byte entry in the dense page
+    directory for every record. But there is no record header. */
+    rec_max_size = 2;
+  } else {
+    /* Each record has a header. */
+    rec_max_size = comp ? REC_N_NEW_EXTRA_BYTES : REC_N_OLD_EXTRA_BYTES;
+  }
+
+  if (comp) {
+    /* Include the "null" flags in the maximum possible record size. */
+    rec_max_size += UT_BITS_IN_BYTES(index->n_nullable);
+  } else {
+    /* For each column, include a 2-byte offset and a "null" flag.  The 1-byte
+    format is only used in short records that do not contain externally stored
+    columns. Such records could never exceed the page limit, even when using
+    the 2-byte format. */
+    rec_max_size += 2 * index->n_fields;
+  }
+
+  /* Each record would have version stored in 1 byte */
+  if (index->has_row_versions()) {
+    rec_max_size += 1;
+  }
+
+  /* Compute the maximum possible record size. */
+  for (size_t i = 0; i < index->n_fields; i++) {
+    const dict_field_t *field = index->get_field(i);
+    legacy_get_field_max_size(table, index, field, rec_max_size);
+
+    /* Check the size limit on leaf pages. */
+    if (rec_max_size >= page_rec_max) {
+      return true;
+    }
+
+    /* Check the size limit on non-leaf pages. Records stored in non-leaf
+    B-tree pages consist of the unique columns of the record (the key columns
+    of the B-tree) and a node pointer field. When we have processed the unique
+    columns, rec_max_size equals the size of the node pointer record minus the
+    node pointer column. */
+    if (i + 1 == dict_index_get_n_unique_in_tree_nonleaf(index) &&
+        rec_max_size + REC_NODE_PTR_SIZE >= page_ptr_max) {
+      return (true);
+    }
+  }
+
+  return (false);
+}
+
 /** A B-tree page should accommodate at least two records. This function finds
 out if this is violated for records of maximum possible length of this index.
 @param[in]   table         table
@@ -2215,9 +2377,8 @@ out if this is violated for records of maximum possible length of this index.
 @return true if the index record could become too big */
 static bool dict_index_too_big_for_tree(const dict_table_t *table,
                                         const dict_index_t *new_index) {
-  /* FTS index consists of auxiliary tables, they shall be excluded from index
-  row size check */
-  if (new_index->type & DICT_FTS) {
+  /* FTS and vector indexes use auxiliary tables, not a standard B-tree */
+  if (new_index->type & (DICT_FTS | DICT_VECTOR)) {
     return (false);
   }
 
@@ -2229,10 +2390,8 @@ static bool dict_index_too_big_for_tree(const dict_table_t *table,
   size_t page_ptr_max;
   get_permissible_max_size(table, new_index, page_rec_max, page_ptr_max);
 
-  size_t rec_max_size;
-  bool res = dict_index_validate_max_rec_size(table, new_index, page_rec_max,
-                                              page_ptr_max, rec_max_size);
-  return (res);
+  return legacy_dict_index_validate_max_rec_size(table, new_index, page_rec_max,
+                                                 page_ptr_max);
 }
 
 bool dict_index_validate_max_rec_size(const dict_table_t *table,
@@ -2446,6 +2605,8 @@ dberr_t dict_index_add_to_cache_w_vcol(dict_table_t *table, dict_index_t *index,
 
   if (index->type == DICT_FTS) {
     new_index = dict_index_build_internal_fts(table, index);
+  } else if (dict_index_is_vector(index)) {
+    new_index = dict_index_build_internal_vec(table, index);
   } else if (index->is_clustered()) {
     new_index = dict_index_build_internal_clust(table, index);
   } else {
@@ -3284,6 +3445,36 @@ static dict_index_t *dict_index_build_internal_fts(
 
   return (new_index);
 }
+
+static dict_index_t *dict_index_build_internal_vec(
+    dict_table_t *table, /*!< in: table */
+    dict_index_t *index) /*!< in: user representation of a vector index */
+{
+  ut_ad(table && index);
+  ut_ad(dict_index_is_vector(index));
+  ut_ad(!dict_sys_mutex_own());
+  ut_ad(table->magic_n == DICT_TABLE_MAGIC_N);
+
+  /* Create a new index */
+  auto new_index =
+      dict_mem_index_create(table->name.m_name, index->name, index->space,
+                            index->type, index->n_fields);
+
+  /* Copy other relevant data from the old index struct to the new
+  struct: it inherits the values */
+
+  new_index->n_user_defined_cols = index->n_fields;
+
+  new_index->id = index->id;
+
+  /* Copy fields from index to new_index */
+  dict_index_copy(new_index, index, table, 0, index->n_fields);
+
+  new_index->n_uniq = 0;
+  new_index->cached = true;
+
+  return (new_index);
+}
 /*====================== FOREIGN KEY PROCESSING ========================*/
 
 /** Checks if a table is referenced by foreign keys.
@@ -3371,7 +3562,8 @@ NOT NULL */
 
   while (index != nullptr) {
     if (types_idx != index && !(index->type & DICT_FTS) &&
-        !dict_index_is_spatial(index) && !index->to_be_dropped &&
+        !(index->type & DICT_VECTOR) && !dict_index_is_spatial(index) &&
+        !index->to_be_dropped &&
         (!(index->uncommitted &&
            ((index->online_status == ONLINE_INDEX_ABORTED_DROPPED) ||
             (index->online_status == ONLINE_INDEX_ABORTED)))) &&
@@ -3438,24 +3630,11 @@ static void dict_foreign_error_report(
   mutex_exit(&dict_foreign_err_mutex);
 }
 
-/** Adds a foreign key constraint object to the dictionary cache. May free
- the object if there already is an object with the same identifier in.
- At least one of the foreign table and the referenced table must already
- be in the dictionary cache!
- @return DB_SUCCESS or error code */
 dberr_t dict_foreign_add_to_cache(dict_foreign_t *foreign,
-                                  /*!< in, own: foreign key constraint */
-                                  const char **col_names,
-                                  /*!< in: column names, or NULL to use
-                                  foreign->foreign_table->col_names */
-                                  bool check_charsets,
-                                  /*!< in: whether to check charset
-                                  compatibility */
+                                  const char **col_names, bool check_charsets,
                                   bool can_free_fk,
-                                  /*!< in: whether free existing FK */
-                                  dict_err_ignore_t ignore_err)
-/*!< in: error to be ignored */
-{
+                                  dict_err_ignore_t ignore_err,
+                                  bool skip_referenced) {
   dict_table_t *for_table;
   dict_table_t *ref_table;
   dict_foreign_t *for_in_cache = nullptr;
@@ -3490,7 +3669,13 @@ dberr_t dict_foreign_add_to_cache(dict_foreign_t *foreign,
     for_in_cache = foreign;
   }
 
-  if (ref_table && !for_in_cache->referenced_table) {
+  /* When skip_referenced is true (COPY ALTER temp table), we must not
+  touch ref_table's referenced_set or eviction state.  ref_table may be
+  half-initialised by a concurrent dd_open_table_one (added to the cache
+  but FK not yet loaded).  FK checks still work because
+  row_ins_check_foreign_constraints opens the referenced table on-demand
+  when referenced_table is nullptr. */
+  if (ref_table && !for_in_cache->referenced_table && !skip_referenced) {
     index = dict_foreign_find_index(
         ref_table, nullptr, for_in_cache->referenced_col_names,
         for_in_cache->n_fields, for_in_cache->foreign_index, check_charsets,
@@ -3569,7 +3754,7 @@ dberr_t dict_foreign_add_to_cache(dict_foreign_t *foreign,
   /* We need to move the table to the non-LRU end of the table LRU
   list. Otherwise it will be evicted from the cache. */
 
-  if (ref_table != nullptr) {
+  if (ref_table != nullptr && !skip_referenced) {
     dict_table_prevent_eviction(ref_table);
   }
 
@@ -3649,6 +3834,7 @@ bool dict_index_check_search_tuple(
   ut_ad(index->page >= FSP_FIRST_INODE_PAGE_NO);
   ut_ad(dtuple_check_typed(tuple));
   ut_ad(!(index->type & DICT_FTS));
+  ut_ad(!(index->type & DICT_VECTOR));
   return true;
 }
 #endif /* UNIV_DEBUG */
@@ -3929,6 +4115,7 @@ void dict_persist_init() {
       ut::new_withkey<Persisters>(UT_NEW_THIS_FILE_PSI_KEY);
   dict_persist->persisters->add(PM_INDEX_CORRUPTED);
   dict_persist->persisters->add(PM_TABLE_AUTO_INC);
+  dict_persist->persisters->add(PM_TABLE_VEC_IDX_ID);
 
 #ifndef UNIV_HOTBACKUP
   dict_persist_update_log_margin();
@@ -3969,6 +4156,13 @@ static void dict_init_dynamic_metadata(dict_table_t *table,
 
   if (table->autoinc_persisted != 0) {
     metadata->set_autoinc(table->autoinc_persisted);
+  }
+
+  /* The hidden vec_idx_id counter of vector-indexed tables.
+  Nonzero only when the table ever consumed one, so ordinary tables
+  never carry the entry. */
+  if (table->vec_aux_autoinc_persisted.load() != 0) {
+    metadata->set_vec_next_id(table->vec_aux_autoinc_persisted.load());
   }
 
   /* Will initialize other metadata here */
@@ -4016,6 +4210,15 @@ static bool dict_table_apply_dynamic_metadata(
           << "). The index should have been dropped"
           << " or couldn't be loaded.";
     }
+  }
+
+  /* The vector next id only grows for a table id, and no DDL lowers it, so
+  it does not depend on the version: take the larger value. */
+  const uint64_t vec_next_id = metadata->get_vec_next_id();
+  if (vec_next_id > table->vec_aux_autoinc_persisted.load()) {
+    table->vec_aux_autoinc_next_id.store(vec_next_id);
+    table->vec_aux_autoinc_persisted.store(vec_next_id);
+    get_dirty = true;
   }
 
   /* FIXME: Move this to the beginning of this function once corrupted
@@ -4312,15 +4515,27 @@ back to mysql.innodb_dynamic_metadata. Update LSN limit, which is used
 to stop user threads when redo log is running out of space and they
 do not hold latches (log.free_check_limit_lsn). */
 static void dict_persist_update_log_margin() {
-  /* Below variables basically considers only the AUTO_INCREMENT counter
-  and a small margin for corrupted indexes. */
+  /* Below variables basically considers only the AUTO_INCREMENT counter,
+  the hidden vec_idx_id counter, and a small margin for
+  corrupted indexes. */
+
+  /* Worst case bytes for one PM_TABLE_VEC_IDX_ID entry, matching
+  VecIdxIdPersister::get_write_size(): 1 type byte + max 11 bytes of
+  much-compressed u64. A table can be dirty for its AUTO_INCREMENT
+  counter and its vec_idx_id counter at the same time, and
+  Persisters::write() then serializes both entries into the same
+  dynamic metadata record, so this must be added on top of the
+  AUTO_INCREMENT-only estimate below rather than assumed to overlap. */
+  static constexpr uint32_t log_margin_per_table_vec_idx_id = 12;
 
   /* Every table will generate less than 80 bytes without
-  considering page split */
-  static constexpr uint32_t log_margin_per_table_no_split = 80;
+  considering page split, plus the vec_idx_id entry above. */
+  static constexpr uint32_t log_margin_per_table_no_split =
+      80 + log_margin_per_table_vec_idx_id;
 
   /* Every table metadata log may roughly consume such many bytes. */
-  static constexpr uint32_t record_size_per_table = 50;
+  static constexpr uint32_t record_size_per_table =
+      50 + log_margin_per_table_vec_idx_id;
 
   /* How many tables may generate one page split */
   static const uint32_t tables_per_split =
@@ -5663,8 +5878,11 @@ ulint CorruptedIndexPersister::read(PersistentTableMetadata &metadata,
 void CorruptedIndexPersister::aggregate(
     PersistentTableMetadata &metadata,
     const PersistentTableMetadata &new_entry) const {
+  const corrupted_ids_t &known = metadata.get_corrupted_indexes();
   for (auto id : new_entry.get_corrupted_indexes()) {
-    metadata.add_corrupted_index(id);
+    if (std::find(known.begin(), known.end(), id) == known.end()) {
+      metadata.add_corrupted_index(id);
+    }
   }
 }
 
@@ -5733,6 +5951,65 @@ void AutoIncPersister::aggregate(
   }
 }
 
+ulint VecIdxIdPersister::write(const PersistentTableMetadata &metadata,
+                               byte *buffer, ulint size) const {
+  ulint length = 0;
+  const uint64_t value = metadata.get_vec_next_id();
+
+  /* Zero means "never used" - write nothing, exactly like a table
+  without an autoinc column writes no PM_TABLE_AUTO_INC payload worth
+  keeping. Skipping the entry entirely keeps ordinary tables' metadata
+  rows free of the Percona type byte. */
+  if (value == 0) {
+    return (0);
+  }
+
+  mach_write_to_1(buffer, static_cast<byte>(PM_TABLE_VEC_IDX_ID));
+  ++length;
+  ++buffer;
+
+  ulint len = mach_u64_write_much_compressed(buffer, value);
+  length += len;
+  buffer += len;
+
+  ut_ad(length <= size);
+  return (length);
+}
+
+ulint VecIdxIdPersister::read(PersistentTableMetadata &metadata,
+                              const byte *buffer, ulint size,
+                              bool *corrupt) const {
+  *corrupt = false;
+
+  const byte *start = buffer;
+  const auto value = mach_parse_u64_much_compressed(&start, buffer + size);
+
+  if (start == nullptr) {
+    /* Just incomplete data, not corrupted */
+    return (0);
+  }
+
+  metadata.set_vec_next_id(value);
+
+  const ulint consumed = start - buffer;
+  ut_ad(consumed <= size);
+  return (consumed);
+}
+
+void VecIdxIdPersister::aggregate(
+    PersistentTableMetadata &metadata,
+    const PersistentTableMetadata &new_entry) const {
+  /* DEVIATION FROM AutoIncPersister: the vec counter is monotonic for
+  the whole lifetime of a table_id - legitimate resets ride table_id
+  reassignment (TRUNCATE, IMPORT, rebuilds), never a version bump on
+  the same table. A newer-version redo entry written by ANOTHER
+  persister (e.g. autoinc after an INSTANT DDL) carries vec == 0;
+  taking it version-authoritatively would wipe the counter on crash
+  recovery. Always keep the maximum, and leave the shared version
+  field to the persisters whose semantics depend on it. */
+  metadata.set_vec_next_id_if_bigger(new_entry.get_vec_next_id());
+}
+
 /** Destructor */
 Persisters::~Persisters() {
   persisters_t::iterator iter;
@@ -5776,6 +6053,9 @@ Persister *Persisters::add(persistent_type_t type) {
     case PM_TABLE_AUTO_INC:
       persister = ut::new_withkey<AutoIncPersister>(UT_NEW_THIS_FILE_PSI_KEY);
       break;
+    case PM_TABLE_VEC_IDX_ID:
+      persister = ut::new_withkey<VecIdxIdPersister>(UT_NEW_THIS_FILE_PSI_KEY);
+      break;
     default:
       ut_d(ut_error);
       ut_o(break);
@@ -5805,14 +6085,16 @@ void Persisters::remove(persistent_type_t type) {
 size_t Persisters::write(PersistentTableMetadata &metadata, byte *buffer) {
   size_t size = 0;
   byte *pos = buffer;
-  persistent_type_t type;
 
-  for (type = static_cast<persistent_type_t>(PM_SMALLEST_TYPE + 1);
-       type < PM_BIGGEST_TYPE;
-       type = static_cast<persistent_type_t>(type + 1)) {
+  /* Iterate the REGISTERED persisters rather than the numeric type
+  range: the type space is sparse since Percona's PM_TABLE_VEC_IDX_ID
+  sits at 200, far from upstream's dense low values. The map is
+  ordered by type, so the serialization order (1, 2, 200) stays
+  deterministic. */
+  for (const auto &entry : m_persisters) {
     ut_ad(size <= REC_MAX_DATA_SIZE);
 
-    Persister *persister = get(type);
+    Persister *persister = entry.second;
     ulint consumed = persister->write(metadata, pos, REC_MAX_DATA_SIZE - size);
 
     pos += consumed;
@@ -5820,6 +6102,13 @@ size_t Persisters::write(PersistentTableMetadata &metadata, byte *buffer) {
   }
 
   return (size);
+}
+
+void Persisters::aggregate(PersistentTableMetadata &metadata,
+                           const PersistentTableMetadata &new_entry) const {
+  for (const auto &entry : m_persisters) {
+    entry.second->aggregate(metadata, new_entry);
+  }
 }
 
 void dict_sdi_close_table(dict_table_t *table) {

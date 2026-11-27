@@ -213,6 +213,10 @@ struct row_log_t {
   /** Mapping of old column numbers to new ones, or NULL if !table */
   const ulint *col_map;
 
+  /** Whether mapped old columns have a charset/collation change whose existing
+  value bytes can be reused, or NULL if !table */
+  const bool *col_has_compatible_charset_change;
+
   /** Error that occurred during online table rebuild */
   dberr_t error;
 
@@ -1611,7 +1615,7 @@ void row_log_table_blob_alloc(
         table. */
         *error = DB_CORRUPTION;
         ut_d(ut_error);
-        ut_o(return (nullptr));
+        ut_o(return nullptr);
       }
     }
 
@@ -1619,8 +1623,28 @@ void row_log_table_blob_alloc(
     const dict_col_t *new_col = log->table->get_col(col_no);
     ut_ad(new_col->mtype == col->mtype);
 
-    /* Assert that prtype matches except for nullability. */
-    ut_ad(!((new_col->prtype ^ col->prtype) & ~DATA_NOT_NULL));
+    const uint32_t prtype_diff = new_col->prtype ^ col->prtype;
+    const uint32_t non_nullability_diff = prtype_diff & ~DATA_NOT_NULL;
+
+    if (non_nullability_diff != 0) {
+      /* A compatible charset change can alter only the charset/collation part
+      of prtype in addition to nullability. The value bytes have already been
+      proved compatible while preparing the ALTER. */
+      constexpr uint32_t charset_coll_mask =
+          static_cast<uint32_t>(CHAR_COLL_MASK) << 16;
+      const uint32_t unexpected_changes =
+          non_nullability_diff & ~charset_coll_mask;
+      const bool expected_change =
+          log->col_has_compatible_charset_change[dict_col_get_no(col)] &&
+          unexpected_changes == 0;
+
+      ut_ad(expected_change);
+      if (!expected_change) {
+        *error = DB_CORRUPTION;
+        return nullptr;
+      }
+    }
+
     ut_ad(!((new_col->prtype ^ dfield_get_type(dfield)->prtype) &
             ~DATA_NOT_NULL));
 
@@ -1631,7 +1655,7 @@ void row_log_table_blob_alloc(
     if ((new_col->prtype & DATA_NOT_NULL) && dfield_is_null(dfield)) {
       /* We got a NULL value for a NOT NULL column. */
       *error = DB_INVALID_NULL;
-      return (nullptr);
+      return nullptr;
     }
 
     /* Adjust the DATA_NOT_NULL flag in the parsed row. */
@@ -1686,6 +1710,21 @@ It is then unmarked. Otherwise, the entry is just inserted to the index.
   return (err);
 }
 
+/** No vector index reaches the row log: the only ALTER that may run with
+LOCK=NONE is the one dropping the last vector index, and the table it
+rebuilds has none. Applying the log knows B-trees and FTS, not a graph, so a
+vector index here fails the ALTER instead of being skipped or treated as a
+B-tree: debug stops, release logs it and returns an error.
+@param[in]  index  the vector index found in the rebuilt table
+@return DB_INDEX_CORRUPT */
+static dberr_t row_log_refuse_vector_index(const dict_index_t *index) {
+  ut_d(ut_error);
+  ib::error(ER_IB_MSG_456) << "Vector index " << index->name << " of table "
+                           << index->table->name
+                           << " reached the online ALTER log; the ALTER fails.";
+  return DB_INDEX_CORRUPT;
+}
+
 /** Replays an insert operation on a table that was rebuilt.
  @return DB_SUCCESS or error code */
 [[nodiscard]] static dberr_t row_log_table_apply_insert_low(
@@ -1734,6 +1773,11 @@ It is then unmarked. Otherwise, the entry is just inserted to the index.
     n_index++;
     index = index->next();
     if (!index) {
+      break;
+    }
+
+    if (index->is_vector()) {
+      error = row_log_refuse_vector_index(index);
       break;
     }
 
@@ -1936,6 +1980,11 @@ flag_ok:
   }
 
   while ((index = index->next()) != nullptr) {
+    if (index->is_vector()) {
+      error = row_log_refuse_vector_index(index);
+      break;
+    }
+
     if (index->type & DICT_FTS) {
       continue;
     }
@@ -2371,9 +2420,9 @@ flag_ok:
   /** It allows to create tuple with virtual column information. */
   dtuple_t *entry = row_build_index_entry_low(row, nullptr, index, heap,
                                               ROW_BUILD_FOR_INSERT);
-  upd_t *update = row_upd_build_difference_binary(index, entry, pcur.get_rec(),
-                                                  cur_offsets, false, nullptr,
-                                                  heap, dup->m_table, thr->prebuilt, &error);
+  upd_t *update = row_upd_build_difference_binary(
+      index, entry, pcur.get_rec(), cur_offsets, false, nullptr, heap,
+      dup->m_table, thr->prebuilt, &error);
   if (error != DB_SUCCESS) {
     goto func_exit;
   }
@@ -2456,6 +2505,11 @@ flag_ok:
   while ((index = index->next()) != nullptr) {
     n_index++;
     if (error != DB_SUCCESS) {
+      break;
+    }
+
+    if (index->is_vector()) {
+      error = row_log_refuse_vector_index(index);
       break;
     }
 
@@ -3284,6 +3338,7 @@ dberr_t row_log_table_apply(que_thr_t *thr, dict_table_t *old_table,
 
 bool row_log_allocate(dict_index_t *index, dict_table_t *table, bool same_pk,
                       const dtuple_t *add_cols, const ulint *col_map,
+                      const bool *col_has_compatible_charset_change,
                       const char *path) {
   row_log_t *log;
   DBUG_TRACE;
@@ -3293,6 +3348,7 @@ bool row_log_allocate(dict_index_t *index, dict_table_t *table, bool same_pk,
   ut_ad(!table || index->table != table);
   ut_ad(same_pk || table);
   ut_ad(!table || col_map);
+  ut_ad(!table || col_has_compatible_charset_change);
   ut_ad(!add_cols || col_map);
   ut_ad(rw_lock_own(dict_index_get_lock(index), RW_LOCK_X));
 
@@ -3309,6 +3365,7 @@ bool row_log_allocate(dict_index_t *index, dict_table_t *table, bool same_pk,
   log->same_pk = same_pk;
   log->add_cols = add_cols;
   log->col_map = col_map;
+  log->col_has_compatible_charset_change = col_has_compatible_charset_change;
   log->error = DB_SUCCESS;
   log->max_trx = 0;
   log->tail.blocks = log->tail.bytes = 0;

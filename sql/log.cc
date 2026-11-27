@@ -593,8 +593,8 @@ bool File_query_log::open() {
 
   {
     char log_creation_time[iso8601_size];
-    Mysql_timestamp_imp::make_iso8601_timestamp(log_creation_time, my_micro_time(),
-                           iso8601_sysvar_logtimestamps);
+    Mysql_timestamp_imp::make_iso8601_timestamp(
+        log_creation_time, my_micro_time(), iso8601_sysvar_logtimestamps);
 
     char *end;
     const size_t len =
@@ -734,7 +734,10 @@ bool File_query_log::write_slow(THD *thd, ulonglong current_utime,
                                 ulonglong query_utime, ulonglong lock_utime,
                                 bool is_command, const char *sql_text,
                                 size_t sql_text_len) {
-  char buff[80], *end;
+  // Allow for all three SET fields, their 64-bit values, and the terminator.
+  char buff[sizeof(",last_insert_id=,insert_id=,timestamp=;\n") +
+            3 * MY_INT64_NUM_DECIMAL_DIGITS];
+  char *end;
   char query_time_buff[22 + 7], lock_time_buff[22 + 7];
   size_t buff_len;
   end = buff;
@@ -993,6 +996,14 @@ bool File_query_log::write_slow(THD *thd, ulonglong current_utime,
           end, -10);
     }
   }
+
+  DBUG_EXECUTE_IF("slow_log_large_insert_ids", {
+    end = buff;
+    end = my_stpcpy(end, ",last_insert_id=");
+    end = longlong10_to_str(LLONG_MIN, end, -10);
+    end = my_stpcpy(end, ",insert_id=");
+    end = longlong10_to_str(LLONG_MIN, end, -10);
+  });
 
   /*
     The timestamp used to only be set when the query had checked the
@@ -1993,7 +2004,8 @@ static void copy_global_to_session(THD *thd, ulong flag, const Val *val) {
                     std::is_unsigned<Val>::value,
                 "Check value type passed to copy_global_to_session template");
 
-  const ptrdiff_t offset = ((const char *)val - (const char *)&global_system_variables);
+  const ptrdiff_t offset =
+      ((const char *)val - (const char *)&global_system_variables);
   if (opt_slow_query_log_use_global_control & (1ULL << flag))
     *(Val *)((char *)&thd->variables + offset) = *val;
 }
@@ -2027,11 +2039,15 @@ bool log_slow_applicable(THD *thd, int sp_sql_command) {
        opt_log_queries_not_using_indexes &&
        !(sql_command_flags[thd->lex->sql_command] & CF_STATUS_COMMAND));
   const bool log_this_query =
-      ((thd->server_status & SERVER_QUERY_WAS_SLOW) || warn_no_index || warn_failed_query) &&
+      ((thd->server_status & SERVER_QUERY_WAS_SLOW) || warn_no_index ||
+       warn_failed_query) &&
       (thd->get_examined_row_count() >= thd->variables.min_examined_row_limit);
 
   // The docs say slow queries must be counted even when the log is off.
-  if (log_this_query) thd->status_var.long_query_count++;
+  if (log_this_query) {
+    thd->status_var.long_query_count++;
+    global_aggregated_stats.get_shard(thd->thread_id()).long_query_count++;
+  }
 
   /*
     Do not log administrative statements unless the appropriate option is
@@ -2104,7 +2120,7 @@ bool log_slow_applicable(THD *thd, int sp_sql_command) {
     }
 
     const bool suppress_logging =
-      log_throttle_qni.log(thd, warn_no_index && warn_failed_query);
+        log_throttle_qni.log(thd, warn_no_index && warn_failed_query);
 
     if (!suppress_logging && log_this_query) return true;
   }

@@ -16,6 +16,7 @@
 #include "components/audit_log_filter/log_record_formatter/base.h"
 
 #include "components/audit_log_filter/sys_vars.h"
+#include "my_dbug.h"
 
 #include <mysql/components/services/defs/event_tracking_authentication_defs.h>
 #include <mysql/components/services/defs/event_tracking_command_defs.h>
@@ -33,6 +34,7 @@
 #include <cassert>
 #include <iomanip>
 #include <iostream>
+#include <new>
 #include <unordered_map>
 
 namespace audit_log_filter::log_record_formatter {
@@ -67,6 +69,8 @@ const std::string_view kAuditConnectionTypeNameSock{"Socket"};
 const std::string_view kAuditConnectionTypeNamePipe{"Named pipe"};
 const std::string_view kAuditConnectionTypeNameSsl{"SSL"};
 const std::string_view kAuditConnectionTypeNameShared{"Shared memory"};
+const std::string_view kAuditConnectionTypeNameInternal{"Internal"};
+const std::string_view kAuditConnectionTypeNamePlugin{"Plugin"};
 
 const std::string_view kAuditEventNameAccessRead{"TableRead"};
 const std::string_view kAuditEventNameAccessInsert{"TableInsert"};
@@ -108,59 +112,67 @@ const std::string_view kAuditNameUnknown{"unknown"};
 }  // namespace
 
 std::string LogRecordFormatterBase::make_record_id(
-    const std::chrono::system_clock::time_point time_point) const noexcept {
+    const std::chrono::system_clock::time_point time_point) const {
   std::stringstream id;
+  id.exceptions(std::ios::badbit | std::ios::failbit);
   id << (SysVars::get_next_record_id() + 1) << "_"
      << make_timestamp(time_point);
 
   return id.str();
 }
 
+void LogRecordFormatterBase::set_pending_bookmark(
+    uint64_t id, const std::string &timestamp) const {
+  m_pending_bookmark.emplace(id, timestamp);
+}
+
+void LogRecordFormatterBase::publish_pending_bookmark() {
+  if (m_pending_bookmark.has_value()) {
+    SysVars::update_log_bookmark(m_pending_bookmark->first,
+                                 std::move(m_pending_bookmark->second));
+    m_pending_bookmark.reset();
+  }
+}
+
 uint64_t LogRecordFormatterBase::make_record_id() const noexcept {
   return SysVars::get_next_record_id();
 }
 
-std::string LogRecordFormatterBase::make_escaped_string(
-    const char *in) const noexcept {
-  std::string out;
-  if (in != nullptr) {
-    const auto &escape_rules = get_escape_rules();
+const std::string &LogRecordFormatterBase::query_output(
+    const ExtendedInfo &extra) noexcept {
+  // notify_event rejects unprepared records; remain safe for other callers
+  // without ever falling back to unconverted query bytes.
+  static const std::string empty;
+  return extra.query_output ? extra.query_output->query : empty;
+}
 
-    for (const char *ptr = in; *ptr != '\0'; ++ptr) {
-      const auto it = escape_rules.find(*ptr);
-      if (it == escape_rules.end()) {
-        out.append(ptr, 1);
-      } else {
-        out.append(it->second);
-      }
-    }
-  }
+const std::string &LogRecordFormatterBase::rewritten_query_output(
+    const ExtendedInfo &extra) noexcept {
+  static const std::string empty;
+  return extra.query_output ? extra.query_output->rewritten_query : empty;
+}
+
+std::string LogRecordFormatterBase::make_escaped_string(const char *in) const {
+  std::string out;
+  if (in != nullptr) append_escaped(out, in);
 
   return out;
 }
 
 std::string LogRecordFormatterBase::make_escaped_string(
-    const std::string &in) const noexcept {
+    const std::string &in) const {
   const mysql_cstring_with_length wrapper{in.data(), in.size()};
   return make_escaped_string(&wrapper);
 }
 
 std::string LogRecordFormatterBase::make_escaped_string(
-    const mysql_cstring_with_length *in) const noexcept {
+    const mysql_cstring_with_length *in) const {
   std::string out;
 
   if (in != nullptr && in->str != nullptr && in->length != 0) {
-    const auto &escape_rules = get_escape_rules();
-
-    for (const char *ptr = in->str, *en = in->str + in->length; ptr < en;
-         ++ptr) {
-      const auto it = escape_rules.find(*ptr);
-      if (it == escape_rules.end()) {
-        out.append(ptr, 1);
-      } else {
-        out.append(it->second);
-      }
-    }
+    DBUG_EXECUTE_IF("audit_log_filter_escape_bad_alloc",
+                    { throw std::bad_alloc(); });
+    append_escaped(out, {in->str, in->length});
   }
 
   return out;
@@ -389,6 +401,10 @@ std::string_view LogRecordFormatterBase::connection_type_name_to_string(
       return kAuditConnectionTypeNameSsl;
     case 5:
       return kAuditConnectionTypeNameShared;
+    case 6:
+      return kAuditConnectionTypeNameInternal;
+    case 7:
+      return kAuditConnectionTypeNamePlugin;
     default:
       assert(false);
   }
@@ -397,7 +413,7 @@ std::string_view LogRecordFormatterBase::connection_type_name_to_string(
 }
 
 AuditRecordString LogRecordFormatterBase::apply(
-    const AuditRecordUnknown &audit_record [[maybe_unused]]) const noexcept {
+    const AuditRecordUnknown &audit_record [[maybe_unused]]) const {
   // Should not happen
   assert(false);
   return "";
@@ -415,8 +431,7 @@ std::string LogRecordFormatterBaseXml::get_record_separator() const noexcept {
   return "";
 }
 
-const EscapeRulesContainer &LogRecordFormatterBaseXml::get_escape_rules()
-    const noexcept {
+const EscapeRulesContainer &LogRecordFormatterBaseXml::get_escape_rules() {
   // Although most control sequences aren't supported in XML 1.0, we are better
   // off printing them anyway instead of the original control characters
   static const EscapeRulesContainer escape_rules = {
@@ -433,8 +448,22 @@ const EscapeRulesContainer &LogRecordFormatterBaseXml::get_escape_rules()
   return escape_rules;
 }
 
+void LogRecordFormatterBaseXml::append_escaped(std::string &out,
+                                               std::string_view in) const {
+  const auto &escape_rules = get_escape_rules();
+
+  for (const char c : in) {
+    const auto it = escape_rules.find(c);
+    if (it == escape_rules.end()) {
+      out.push_back(c);
+    } else {
+      out.append(it->second);
+    }
+  }
+}
+
 std::string LogRecordFormatterBaseXml::make_timestamp(
-    const std::chrono::system_clock::time_point time_point) const noexcept {
+    const std::chrono::system_clock::time_point time_point) const {
   std::time_t t = std::chrono::system_clock::to_time_t(time_point);
   std::tm tm;
   static constexpr std::size_t max_buffer_size{32};

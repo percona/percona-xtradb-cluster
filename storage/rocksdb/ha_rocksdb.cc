@@ -63,11 +63,11 @@
 #include "sql/table.h"
 
 /* RocksDB includes */
+#include "env/composite_env_wrapper.h"
 #include "monitoring/histogram.h"
 #include "rocksdb/compaction_filter.h"
 #include "rocksdb/convenience.h"
 #include "rocksdb/env.h"
-#include "env/composite_env_wrapper.h"
 #include "rocksdb/memory_allocator.h"
 #include "rocksdb/perf_level.h"
 #include "rocksdb/persistent_cache.h"
@@ -77,12 +77,12 @@
 #include "rocksdb/thread_status.h"
 #include "rocksdb/trace_reader_writer.h"
 #include "rocksdb/utilities/checkpoint.h"
-#include "utilities/fault_injection_fs.h"
 #include "rocksdb/utilities/memory_util.h"
 #include "rocksdb/utilities/options_util.h"
 #include "rocksdb/utilities/sim_cache.h"
 #include "rocksdb/utilities/write_batch_with_index.h"
 #include "util/stop_watch.h"
+#include "utilities/fault_injection_fs.h"
 
 /* MyRocks includes */
 #include "./event_listener.h"
@@ -1216,7 +1216,6 @@ static TYPELIB index_type_typelib = {array_elements(index_type_names) - 1,
                                      "index_type_typelib", index_type_names,
                                      nullptr};
 
-
 // TODO: 0 means don't wait at all, and we don't support it yet?
 static MYSQL_THDVAR_ULONG(lock_wait_timeout,
                           PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_HINTUPDATEABLE,
@@ -2063,7 +2062,8 @@ static MYSQL_SYSVAR_UINT64_T(block_size, rocksdb_tbl_options->block_size,
                              PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
                              "BlockBasedTableOptions::block_size for RocksDB",
                              nullptr, nullptr, rocksdb_tbl_options->block_size,
-                             /* min */ 1024L, /* max */ std::numeric_limits<uint32_t>::max(), 0);
+                             /* min */ 1024L,
+                             /* max */ std::numeric_limits<uint32_t>::max(), 0);
 
 static MYSQL_SYSVAR_BOOL(charge_memory, rocksdb_charge_memory,
                          PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
@@ -2183,6 +2183,22 @@ static MYSQL_THDVAR_UINT(force_index_records_in_range,
                          "when FORCE INDEX is used.",
                          nullptr, nullptr, 0,
                          /* min */ 0, /* max */ INT_MAX, 0);
+
+// PS-10110: hard cap on rocksdb_records_in_range_dive_threshold, so this
+// hintable, session-settable variable cannot turn every records_in_range()
+// call into an effectively unbounded scan of the index.
+static constexpr uint64_t RDB_RECORDS_IN_RANGE_DIVE_MAX_ROWS = 1000000;
+
+static MYSQL_THDVAR_UINT(
+    records_in_range_dive_threshold,
+    PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_HINTUPDATEABLE,
+    "If the row estimate for records_in_range() is below this value, refine "
+    "it by scanning the index range, reading at most this many keys. RocksDB "
+    "size approximations work at data block granularity and may return 0 for "
+    "narrow ranges that contain many rows. Set to 0 to disable the "
+    "refinement.",
+    nullptr, nullptr, 100,
+    /* min */ 0, /* max */ RDB_RECORDS_IN_RANGE_DIVE_MAX_ROWS, 0);
 
 static MYSQL_SYSVAR_UINT(
     debug_optimizer_n_rows, rocksdb_debug_optimizer_n_rows,
@@ -2832,6 +2848,7 @@ static struct SYS_VAR *rocksdb_system_variables[] = {
 
     MYSQL_SYSVAR(records_in_range),
     MYSQL_SYSVAR(force_index_records_in_range),
+    MYSQL_SYSVAR(records_in_range_dive_threshold),
     MYSQL_SYSVAR(debug_optimizer_n_rows),
     MYSQL_SYSVAR(force_compute_memtable_stats),
     MYSQL_SYSVAR(force_compute_memtable_stats_cachetime),
@@ -3023,10 +3040,8 @@ static int rocksdb_compact_column_family(THD *const thd,
  * be used as a rocksdb transaction name
  */
 static std::string rdb_xid_to_string(const XID &src) {
-  assert(src.get_gtrid_length() >= 0 &&
-         src.get_gtrid_length() <= MAXGTRIDSIZE);
-  assert(src.get_bqual_length() >= 0 &&
-         src.get_bqual_length() <= MAXBQUALSIZE);
+  assert(src.get_gtrid_length() >= 0 && src.get_gtrid_length() <= MAXGTRIDSIZE);
+  assert(src.get_bqual_length() >= 0 && src.get_bqual_length() <= MAXBQUALSIZE);
 
   std::string buf;
   buf.reserve(RDB_XIDHDR_LEN + src.get_gtrid_length() + src.get_bqual_length());
@@ -5026,9 +5041,7 @@ class Rdb_writebatch_impl : public Rdb_transaction {
     return m_batch->NewIteratorWithBase(it);
   }
 
-  bool is_tx_started() const override {
-    return (m_batch != nullptr);
-  }
+  bool is_tx_started() const override { return (m_batch != nullptr); }
 
   void start_tx() override {
     reset();
@@ -6418,8 +6431,8 @@ static int rocksdb_init_internal(void *const p) {
 
   if (rdb_has_rocksdb_corruption()) {
     LogPluginErrMsg(ERROR_LEVEL, 0,
-        "There was corruption detected in the RocksDB data files. "
-        "Check error log emitted earlier for more details.");
+                    "There was corruption detected in the RocksDB data files. "
+                    "Check error log emitted earlier for more details.");
     if (rocksdb_allow_to_start_after_corruption) {
       LogPluginErrMsg(INFORMATION_LEVEL, 0,
                       "Set rocksdb_allow_to_start_after_corruption=0 to "
@@ -6506,9 +6519,8 @@ static int rocksdb_init_internal(void *const p) {
       MY_MUTEX_INIT_FAST);
   Rdb_transaction::init_mutex();
 
-  DBUG_EXECUTE_IF("rocksdb_init_failure_mutexes_initialized", {
-    DBUG_RETURN(HA_EXIT_FAILURE);
-  });
+  DBUG_EXECUTE_IF("rocksdb_init_failure_mutexes_initialized",
+                  { DBUG_RETURN(HA_EXIT_FAILURE); });
 
   rocksdb_hton->state = SHOW_OPTION_YES;
   rocksdb_hton->create = rocksdb_create_handler;
@@ -6622,9 +6634,8 @@ static int rocksdb_init_internal(void *const p) {
     }
   }
 
-  DBUG_EXECUTE_IF("rocksdb_init_failure_reads", {
-    DBUG_RETURN(HA_EXIT_FAILURE);
-  });
+  DBUG_EXECUTE_IF("rocksdb_init_failure_reads",
+                  { DBUG_RETURN(HA_EXIT_FAILURE); });
 
   if (rocksdb_db_options->allow_mmap_writes &&
       rocksdb_db_options->use_direct_io_for_flush_and_compaction) {
@@ -6806,8 +6817,7 @@ static int rocksdb_init_internal(void *const p) {
       DBUG_RETURN(HA_EXIT_FAILURE);
     }
     if (!strlen(rocksdb_persistent_cache_path)) {
-      LogPluginErrMsg(ERROR_LEVEL, 0,
-                      "Specify rocksdb_persistent_cache_path");
+      LogPluginErrMsg(ERROR_LEVEL, 0, "Specify rocksdb_persistent_cache_path");
       DBUG_RETURN(HA_EXIT_FAILURE);
     }
 
@@ -6828,9 +6838,8 @@ static int rocksdb_init_internal(void *const p) {
     DBUG_RETURN(HA_EXIT_FAILURE);
   }
 
-  DBUG_EXECUTE_IF("rocksdb_init_failure_cache", {
-    DBUG_RETURN(HA_EXIT_FAILURE);
-  });
+  DBUG_EXECUTE_IF("rocksdb_init_failure_cache",
+                  { DBUG_RETURN(HA_EXIT_FAILURE); });
 
   std::unique_ptr<Rdb_cf_options> cf_options_map(new Rdb_cf_options());
   if (!cf_options_map->init(*rocksdb_tbl_options, properties_collector_factory,
@@ -6840,9 +6849,8 @@ static int rocksdb_init_internal(void *const p) {
     DBUG_RETURN(HA_EXIT_FAILURE);
   }
 
-  DBUG_EXECUTE_IF("rocksdb_init_failure_cf_options", {
-    DBUG_RETURN(HA_EXIT_FAILURE);
-  });
+  DBUG_EXECUTE_IF("rocksdb_init_failure_cf_options",
+                  { DBUG_RETURN(HA_EXIT_FAILURE); });
 
   /*
     If there are no column families, we're creating the new database.
@@ -7955,8 +7963,8 @@ int ha_rocksdb::alloc_key_buffers(const TABLE &table_arg,
   const auto m_pack_buffer_offset = buf_size;
   buf_size += max_packed_sk_len;
 
-  buffers.reset(static_cast<uchar *>(
-      my_malloc(PSI_NOT_INSTRUMENTED, buf_size, MYF(0))));
+  buffers.reset(
+      static_cast<uchar *>(my_malloc(PSI_NOT_INSTRUMENTED, buf_size, MYF(0))));
   if (buffers == nullptr) {
     free_key_buffers();
 
@@ -9843,7 +9851,7 @@ int ha_rocksdb::index_read_map(uchar *const buf, const uchar *const key,
                                key_part_map keypart_map,
                                enum ha_rkey_function find_flag) {
   DBUG_ENTER_FUNC();
-  ha_statistic_increment(&System_status_var::ha_read_key_count);
+  HA_STATISTIC_INCREMENT(ha_read_key_count);
 
   int rc = index_read_intern(buf, key, keypart_map, find_flag);
 
@@ -10131,8 +10139,8 @@ int ha_rocksdb::get_row_by_rowid(uchar *const buf, const char *const rowid,
       m_pk_descr->get_keyno() == m_dupp_errkey) {
     assert(m_lock_rows == RDB_LOCK_WRITE);
     assert(m_dup_key_tuple.length() == key_slice.size());
-    assert(
-        memcmp(m_dup_key_tuple.ptr(), key_slice.data(), key_slice.size()) == 0);
+    assert(memcmp(m_dup_key_tuple.ptr(), key_slice.data(), key_slice.size()) ==
+           0);
 
     // We have stored the record with duplicate key in
     // m_dup_key_retrieved_record during write_row already, so just move it
@@ -10248,7 +10256,7 @@ int ha_rocksdb::index_next(uchar *const buf) {
 
   check_build_decoder();
 
-  ha_statistic_increment(&System_status_var::ha_read_next_count);
+  HA_STATISTIC_INCREMENT(ha_read_next_count);
   DBUG_RETURN(index_next_with_direction_intern(buf, true, false));
 }
 
@@ -10283,7 +10291,7 @@ int ha_rocksdb::index_prev(uchar *const buf) {
 
   check_build_decoder();
 
-  ha_statistic_increment(&System_status_var::ha_read_prev_count);
+  HA_STATISTIC_INCREMENT(ha_read_prev_count);
   DBUG_RETURN(index_next_with_direction_intern(buf, false, false));
 }
 
@@ -10453,7 +10461,7 @@ int ha_rocksdb::index_first(uchar *const buf) {
 
   check_build_decoder();
 
-  ha_statistic_increment(&System_status_var::ha_read_first_count);
+  HA_STATISTIC_INCREMENT(ha_read_first_count);
   DBUG_RETURN(index_read_intern(buf, true /* first */));
 }
 
@@ -10467,7 +10475,7 @@ int ha_rocksdb::index_last(uchar *const buf) {
 
   check_build_decoder();
 
-  ha_statistic_increment(&System_status_var::ha_read_last_count);
+  HA_STATISTIC_INCREMENT(ha_read_last_count);
   DBUG_RETURN(index_read_intern(buf, false /* first */));
 }
 
@@ -10743,7 +10751,7 @@ int ha_rocksdb::write_row(uchar *const buf) {
   assert(buf == table->record[0]);
   assert(m_lock_rows == RDB_LOCK_WRITE);
 
-  ha_statistic_increment(&System_status_var::ha_write_count);
+  HA_STATISTIC_INCREMENT(ha_write_count);
   /*
     Note: "buf == table->record[0]" is copied from innodb. I am not aware of
     any use cases where this condition is not true.
@@ -10971,9 +10979,9 @@ int ha_rocksdb::acquire_prefix_lock(const Rdb_key_def &kd, Rdb_transaction *tx,
     HA_EXIT_SUCCESS  OK
     other            HA_ERR error code (can be SE-specific)
 */
-int ha_rocksdb::check_and_lock_sk(
-    const uint key_id, const struct update_row_info &row_info,
-    bool *const found) {
+int ha_rocksdb::check_and_lock_sk(const uint key_id,
+                                  const struct update_row_info &row_info,
+                                  bool *const found) {
   assert(
       (row_info.old_data == table->record[1] &&
        row_info.new_data == table->record[0]) ||
@@ -11083,8 +11091,8 @@ int ha_rocksdb::check_and_lock_sk(
     The bloom filter may need to be disabled for this lookup.
   */
   assert(!m_key_descr_arr[key_id]->is_partial_index());
-  Rdb_iterator_base iter(ha_thd(), *m_key_descr_arr[key_id],
-                         *m_pk_descr, m_tbl_def);
+  Rdb_iterator_base iter(ha_thd(), *m_key_descr_arr[key_id], *m_pk_descr,
+                         m_tbl_def);
 
   /*
     If all_parts_used is true, then PK uniqueness check/lock would already
@@ -11114,8 +11122,7 @@ int ha_rocksdb::check_and_lock_sk(
     const rocksdb::Slice &rkey = all_parts_used ? new_slice : iter.key();
     uint pk_size =
         kd.get_primary_key_tuple(*m_pk_descr, &rkey, m_pk_packed_tuple);
-    DBUG_EXECUTE_IF(
-        "simulate_corrupt_data_update",
+    DBUG_EXECUTE_IF("simulate_corrupt_data_update",
                     { pk_size = RDB_INVALID_KEY_LEN; });
     if (pk_size == RDB_INVALID_KEY_LEN) {
       rc = handle_rocksdb_corrupt_data_error();
@@ -11825,7 +11832,7 @@ int ha_rocksdb::rnd_next(uchar *const buf) {
   check_build_decoder();
 
   int rc;
-  ha_statistic_increment(&System_status_var::ha_read_rnd_next_count);
+  HA_STATISTIC_INCREMENT(ha_read_rnd_next_count);
 
   /*
     Since order does not matter, the scan will occur go with natural index
@@ -11896,9 +11903,8 @@ int ha_rocksdb::index_init(uint idx, bool sorted) {
         new Rdb_iterator_partial(thd, *m_key_descr_arr[active_index_pos()],
                                  *m_pk_descr, m_tbl_def, table, dd_table));
   } else {
-    m_iterator.reset(new Rdb_iterator_base(thd,
-                                           *m_key_descr_arr[active_index_pos()],
-                                           *m_pk_descr, m_tbl_def));
+    m_iterator.reset(new Rdb_iterator_base(
+        thd, *m_key_descr_arr[active_index_pos()], *m_pk_descr, m_tbl_def));
   }
 
   // If m_lock_rows is not RDB_LOCK_NONE then we will be doing a get_for_update
@@ -11995,7 +12001,7 @@ int ha_rocksdb::delete_row(const uchar *const buf) {
 
   assert(buf == table->record[0] || buf == table->record[1]);
 
-  ha_statistic_increment(&System_status_var::ha_delete_count);
+  HA_STATISTIC_INCREMENT(ha_delete_count);
   set_last_rowkey(buf);
 
   rocksdb::Slice key_slice(m_last_rowkey.ptr(), m_last_rowkey.length());
@@ -12336,7 +12342,7 @@ int ha_rocksdb::rnd_pos(uchar *const buf, uchar *const pos) {
   int rc;
   size_t len;
 
-  ha_statistic_increment(&System_status_var::ha_read_rnd_count);
+  HA_STATISTIC_INCREMENT(ha_read_rnd_count);
   len = m_pk_descr->key_length(table,
                                rocksdb::Slice((const char *)pos, ref_length));
   if (len == size_t(-1)) {
@@ -12403,7 +12409,7 @@ int ha_rocksdb::update_row(const uchar *const old_data, uchar *const new_data) {
   */
   assert(new_data == table->record[0]);
 
-  ha_statistic_increment(&System_status_var::ha_update_count);
+  HA_STATISTIC_INCREMENT(ha_update_count);
   const int rv = update_write_row(old_data, new_data);
 
   if (rv == 0) {
@@ -13279,6 +13285,117 @@ ha_rows ha_rocksdb::records_in_range(uint inx, key_range *const min_key,
   DBUG_RETURN(ret);
 }
 
+// PS-10110: total tombstone/MVCC-skip budget for the whole dive, not
+// per-call: RocksDB's max_skippable_internal_keys resets every Next(),
+// so scaling it by max_rows alone bounds one call, not the dive. Capped
+// at RDB_RECORDS_IN_RANGE_DIVE_MAX_ROWS regardless of session threshold.
+//
+// Known limitation: since the cap is fixed but max_rows is not, the
+// per-call share (total_skip_budget / max_rows below) shrinks as
+// max_rows grows past ~125000, reaching 1 at the sysvar's max. A single
+// tombstone/old version can then abort the dive (Status::Incomplete()),
+// so raising the threshold that far can make the refinement less likely
+// to complete, not more - on data under heavy delete/update churn, not
+// at the default. A real fix needs the dive to track its own cumulative
+// skip count across Next() calls (e.g. via RocksDB's PerfContext), not
+// derive a per-call average up front; left as a follow-up.
+static constexpr uint64_t RDB_RECORDS_IN_RANGE_DIVE_SKIPPED_KEYS_PER_ROW = 8;
+
+/*
+  PS-10110: Count keys in [start, end), reading at most max_rows keys
+  (0 < max_rows <= RDB_RECORDS_IN_RANGE_DIVE_MAX_ROWS). Sets *capped if
+  max_rows was reached. Key-only scan (no value unpack).
+
+  Reads the base DB directly, not the current transaction's snapshot or
+  write batch (same as the GetApproximate*() estimates this refines): a
+  transaction that just wrote into the range may still see it as empty
+  here. The count is exact over the base DB state, not over what the
+  statement itself would read.
+
+  Sets *dive_ok = false (count and *capped must be ignored) if killed, or on
+  a non-ok iterator status - in practice only Status::Incomplete() from
+  max_skippable_internal_keys, since a real I/O error/corruption instead
+  aborts the server (rdb_handle_io_error(), same as any other RocksDB
+  read here) unless rocksdb_io_error_action = IGNORE_ERROR.
+*/
+static uint64_t rdb_index_dive_in_range(THD *const thd, const Rdb_key_def &kd,
+                                        const rocksdb::Slice &start,
+                                        const rocksdb::Slice &end,
+                                        uint64_t max_rows, bool *capped,
+                                        bool *dive_ok) {
+  // Relied on below: total_skip_budget / max_rows must not be 0 (RocksDB
+  // reads that as "unlimited"). The caller passes the sysvar-clamped
+  // records_in_range_dive_threshold, so this always holds today.
+  assert(max_rows > 0);
+  assert(max_rows <= RDB_RECORDS_IN_RANGE_DIVE_MAX_ROWS);
+
+  rocksdb::ReadOptions read_opts;
+  // The range may cross prefix-extractor prefixes, so a total-order seek
+  // is required for correctness.
+  read_opts.total_order_seek = true;
+  read_opts.fill_cache = !THDVAR(thd, skip_fill_cache);
+  const uint64_t total_skip_budget = std::min<uint64_t>(
+      max_rows * RDB_RECORDS_IN_RANGE_DIVE_SKIPPED_KEYS_PER_ROW,
+      RDB_RECORDS_IN_RANGE_DIVE_MAX_ROWS);
+  // Floor division keeps per-call * max_rows within total_skip_budget
+  // (ceiling could nearly double it). Never 0: max_rows <=
+  // RDB_RECORDS_IN_RANGE_DIVE_MAX_ROWS (asserted above), so
+  // total_skip_budget is always >= max_rows.
+  read_opts.max_skippable_internal_keys = total_skip_budget / max_rows;
+  // Hard stop at range end, honoring the same enable_iterate_bounds escape
+  // hatch setup_iterator_bounds() uses elsewhere: the explicit key
+  // comparison in the loop below is what actually enforces the bound, so
+  // this is an optimization, not a correctness dependency. Reverse CF
+  // swaps upper/lower bound.
+  if (THDVAR(thd, enable_iterate_bounds)) {
+    if (kd.m_is_reverse_cf) {
+      read_opts.iterate_lower_bound = &end;
+    } else {
+      read_opts.iterate_upper_bound = &end;
+    }
+  }
+
+  *capped = false;
+  *dive_ok = true;
+  DBUG_EXECUTE_IF("myrocks_records_in_range_dive_fail", {
+    *dive_ok = false;
+    return 0;
+  });
+  if (thd->killed) {
+    *dive_ok = false;
+    return 0;
+  }
+
+  const std::unique_ptr<rocksdb::Iterator> it(
+      rdb->NewIterator(read_opts, kd.get_cf()));
+
+  uint64_t count = 0;
+  rocksdb_smart_seek(kd.m_is_reverse_cf, it.get(), start);
+  while (is_valid_iterator(it.get())) {
+    if (thd->killed) {
+      *dive_ok = false;
+      break;
+    }
+    // Exclusive upper bound; bytewise compare works for both CF directions.
+    if (it->key().compare(end) >= 0) break;
+    if (++count >= max_rows) {
+      *capped = true;
+      break;
+    }
+    rocksdb_smart_next(kd.m_is_reverse_cf, it.get());
+  }
+  if (*dive_ok && !it->status().ok()) {
+    // Status::Incomplete() isn't escalated by is_valid_iterator(), so
+    // check it here too.
+    *dive_ok = false;
+  }
+  // *capped is only set right after count reaches max_rows above, so the
+  // two must agree here: callers rely on this to treat *capped as
+  // exactly equivalent to "count == max_rows", not just "count is high".
+  assert(!*capped || count == max_rows);
+  return count;
+}
+
 void ha_rocksdb::records_in_range_internal(uint inx, key_range *const min_key,
                                            key_range *const max_key,
                                            int64 disk_size, int64 rows,
@@ -13342,6 +13459,41 @@ void ha_rocksdb::records_in_range_internal(uint inx, key_range *const min_key,
   rdb->GetApproximateMemTableStats(kd.get_cf(), r, &memTableCount, &sz);
   *row_count += memTableCount;
   *total_size += sz;
+  // Memtable sampling is randomized and not reproducible run to run; let
+  // tests pin the pre-dive estimate so the dive below engages
+  // deterministically.
+  DBUG_EXECUTE_IF("myrocks_zero_records_in_range_estimate",
+                  { *row_count = 0; });
+
+  /*
+    PS-10110: the coarse estimates above can return 0 for a narrow range
+    that actually contains many rows, floored to 1 and fed to the
+    optimizer, causing poor join orders. Refine small estimates with a
+    bounded index dive: exact count below the threshold, a lower bound of
+    the threshold above it. Skip partial indexes (raw iterator would miss
+    unmaterialized rows) and TTL indexes (raw iterator would count expired
+    rows as live). The dive refines *row_count only; *total_size is left
+    at the coarse pre-dive value (the only current caller ignores it).
+  */
+  const uint64_t dive_threshold =
+      THDVAR(ha_thd(), records_in_range_dive_threshold);
+  if (dive_threshold > 0 && *row_count < dive_threshold &&
+      rocksdb_debug_optimizer_n_rows == 0 && !kd.is_partial_index() &&
+      !kd.has_ttl()) {
+    bool capped = false;
+    bool dive_ok = false;
+    const uint64_t dive_count = rdb_index_dive_in_range(
+        ha_thd(), kd, slice1, slice2, dive_threshold, &capped, &dive_ok);
+    if (dive_ok) {
+      // capped implies dive_count == dive_threshold already (asserted
+      // inside rdb_index_dive_in_range()), so using dive_count directly
+      // also covers the capped, lower-bound case.
+      assert(!capped || dive_count == dive_threshold);
+      *row_count = dive_count;
+    }
+    // If dive_ok is false, keep the pre-dive estimate rather than trust a
+    // partial scan.
+  }
   DBUG_VOID_RETURN;
 }
 

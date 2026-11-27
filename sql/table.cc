@@ -2107,7 +2107,6 @@ static int open_binary_frm(THD *thd, TABLE_SHARE *share,
   assert(share->fields >= frm_context->stored_fields);
   assert(share->reclength >= share->stored_rec_length);
 
-
   /* Use share mem root for zip dict name and data */
   for (uint i2 = 0; i2 < share->fields; ++i2) {
     Field *field = share->field[i2];
@@ -6170,7 +6169,7 @@ bool TABLE::add_tmp_key(Field_map *key_parts, bool invisible,
     s->max_key_length = std::max(s->max_key_length, key_len);
     s->key_parts += key_part_count;
     assert(s->keys < s->max_tmp_keys);
-    sprintf(s->key_names[s->keys].name, "<auto_key%d>", s->temp_table_key_id++);
+    sprintf(s->key_names[s->keys].name, "<auto_key%d>", s->keys);
     s->keys++;
   }
 
@@ -6270,7 +6269,14 @@ void TABLE::move_tmp_key(int old_idx, bool modify_share) {
     const int new_idx = s->first_unused_tmp_key++;
     s->key_info[new_idx] = s->key_info[old_idx];
     TRASH(pointer_cast<void *>(s->key_info + old_idx), sizeof(KEY));
-    s->key_names[new_idx] = s->key_names[old_idx];
+    /*
+      Regenerate the key name from the new slot index instead of carrying
+      over the old name. add_tmp_key() names a new key after its slot, so a
+      later query block adding a key at old_idx would otherwise create a
+      duplicate name, which breaks name-based index lookup in the storage
+      engine when the temporary table is instantiated on disk.
+    */
+    sprintf(s->key_names[new_idx].name, "<auto_key%d>", new_idx);
     TRASH(pointer_cast<void *>(s->key_names + old_idx), sizeof(Key_name));
     s->key_info[new_idx].name = s->key_names[new_idx].name;
   }
