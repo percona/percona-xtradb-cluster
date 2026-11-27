@@ -31,25 +31,15 @@
 --source ../inc/audit_comp_install.inc
 
 CALL mtr.add_suppression("Option --authentication-policy is set to an invalid value");
-<<<<<<< HEAD
-CALL mtr.add_suppression("Aborting");
-||||||| 91438a0430f
-=======
 # The rejected configuration is the point of the test, so the abort that
 # follows it is expected too.  This does not weaken the assertion below:
 # that only looks for "mysqld got signal".
 CALL mtr.add_suppression("\\[MY-010119\\] \\[Server\\] Aborting");
->>>>>>> ps/release-9.7.4-4
 
 --echo ### Shutdown
 --source include/shutdown_mysqld.inc
 
 --echo ### Start with invalid option
-<<<<<<< HEAD
---let $restart_parameters=--authentication-policy=mysql_native_password --loose-mysql_native_password=OFF
-||||||| 91438a0430f
---let $restart_parameters=--authentication-policy=mysql_native_password --mysql_native_password=OFF
-=======
 # The policy names a plugin that does not exist, so authentication_policy::init()
 # rejects it and the server aborts.  Do not spell the rejected configuration with
 # a server variable (this used to pass --mysql_native_password=OFF): a variable
@@ -57,7 +47,6 @@ CALL mtr.add_suppression("\\[MY-010119\\] \\[Server\\] Aborting");
 # option parsing instead, long before the component is loaded, and never logs the
 # message waited for below.
 --let $restart_parameters=--authentication-policy=no_such_auth_plugin
->>>>>>> ps/release-9.7.4-4
 --source include/start_mysqld_expecting_crash.inc
 
 --echo ### Waiting for the error message to occur
