@@ -26,7 +26,7 @@
 #
 
 SET(SHARED_LIB_MAJOR_VERSION "24")
-SET(SHARED_LIB_MINOR_VERSION "1")
+SET(SHARED_LIB_MINOR_VERSION "2")
 SET(PROTOCOL_VERSION "10")
 
 # Generate "something" to trigger cmake rerun when MYSQL_VERSION changes
@@ -48,6 +48,18 @@ MACRO(MYSQL_GET_CONFIG_VALUE keyword var)
  ENDIF()
 ENDMACRO()
 
+# Version components feed numeric comparisons and persisted version IDs.
+# Keep the source metadata canonical: zero-padded values like 04 or 00 are
+# rejected instead of being silently normalized.
+MACRO(MYSQL_VALIDATE_VERSION_COMPONENT var label)
+  IF(NOT "${${var}}" MATCHES "^(0|[1-9][0-9]*)$")
+    MESSAGE(FATAL_ERROR "${label} must be a whole number without leading zeroes.")
+  ENDIF()
+ENDMACRO()
+
+MACRO(MYSQL_VALIDATE_MYSQL_VERSION)
+  MYSQL_VALIDATE_VERSION_COMPONENT(UPDATE_VERSION "MYSQL_VERSION_UPDATE")
+ENDMACRO()
 
 # Read mysql version for configure script
 
@@ -55,6 +67,11 @@ MACRO(GET_MYSQL_VERSION)
   MYSQL_GET_CONFIG_VALUE("MYSQL_VERSION_MAJOR" MAJOR_VERSION)
   MYSQL_GET_CONFIG_VALUE("MYSQL_VERSION_MINOR" MINOR_VERSION)
   MYSQL_GET_CONFIG_VALUE("MYSQL_VERSION_PATCH" PATCH_VERSION)
+  MYSQL_GET_CONFIG_VALUE("MYSQL_VERSION_UPDATE" UPDATE_VERSION)
+  # An empty update component denotes the normal .0 release.
+  IF("${UPDATE_VERSION}" STREQUAL "")
+    SET(UPDATE_VERSION 0)
+  ENDIF()
   MYSQL_GET_CONFIG_VALUE("MYSQL_VERSION_EXTRA" EXTRA_VERSION)
 
   IF(NOT DEFINED MAJOR_VERSION OR
@@ -74,6 +91,8 @@ MACRO(GET_MYSQL_VERSION)
     MESSAGE(FATAL_ERROR "MYSQL_VERSION_MATURITY can be set to INNOVATION or LTS.")
   ENDIF()
 
+  MYSQL_VALIDATE_MYSQL_VERSION()
+
   # Versions like 8.0.x, 8.4.x, and x.7.y (x > 8) should be LTS
   IF ((MAJOR_VERSION EQUAL "8" AND MINOR_VERSION EQUAL "0" AND PATCH_VERSION GREATER "34") OR
       (MAJOR_VERSION EQUAL "8" AND MINOR_VERSION EQUAL "4") OR
@@ -91,15 +110,26 @@ MACRO(GET_MYSQL_VERSION)
     SET(MYSQL_VERSION_MATURITY_IS_LTS 0)
   ENDIF()
 
-  SET(VERSION
-    "${MAJOR_VERSION}.${MINOR_VERSION}.${PATCH_VERSION}${EXTRA_VERSION}")
+  SET(MYSQL_THREE_PART_VERSION
+    "${MAJOR_VERSION}.${MINOR_VERSION}.${PATCH_VERSION}")
+  SET(VERSION "${MYSQL_THREE_PART_VERSION}${EXTRA_VERSION}")
+  SET(MYSQL_VERSION_WITH_UPDATE
+    "${MYSQL_THREE_PART_VERSION}.${UPDATE_VERSION}${EXTRA_VERSION}")
+  SET(MYSQL_PACKAGE_VERSION "${MYSQL_THREE_PART_VERSION}")
+  # Server and Cluster share UPDATE_VERSION; default release names stay at
+  # three parts, while nonzero updates add a fourth component.
+  IF(NOT "${UPDATE_VERSION}" STREQUAL "0")
+    SET(MYSQL_PACKAGE_VERSION "${MYSQL_PACKAGE_VERSION}.${UPDATE_VERSION}")
+  ENDIF()
+  SET(MYSQL_PACKAGE_EXTRA_VERSION "${EXTRA_VERSION}")
   MESSAGE(STATUS "MySQL ${VERSION}")
+  MESSAGE(STATUS "MySQL full version ${MYSQL_VERSION_WITH_UPDATE}")
   SET(MYSQL_BASE_VERSION
     "${MAJOR_VERSION}.${MINOR_VERSION}" CACHE INTERNAL "MySQL Base version")
   SET(MYSQL_NO_DASH_VERSION
-    "${MAJOR_VERSION}.${MINOR_VERSION}.${PATCH_VERSION}")
+    "${MYSQL_THREE_PART_VERSION}")
+  # Preserve the existing RPM Release suffix policy separately from archive names.
   STRING(REGEX REPLACE "^-" "." MYSQL_VERSION_EXTRA_DOT "${EXTRA_VERSION}")
-  SET(VERSION_SRC "${VERSION}")
 
   MATH(EXPR MYSQL_VERSION_ID
     "10000*${MAJOR_VERSION} + 100*${MINOR_VERSION} + ${PATCH_VERSION}")
@@ -138,7 +168,7 @@ MACRO(GET_MYSQL_VERSION)
     # This might be used when MySQL Cluster is still released as DMR
     # while MySQL Server is already GA.
     SET(MYSQL_CLUSTER_VERSION
-      "${MAJOR_VERSION}.${MINOR_VERSION}.${PATCH_VERSION}")
+      "${MYSQL_THREE_PART_VERSION}")
     IF(DEFINED CLUSTER_EXTRA_VERSION)
       # Using specific MySQL Cluster extra version
       SET(MYSQL_CLUSTER_VERSION
@@ -154,11 +184,34 @@ MACRO(GET_MYSQL_VERSION)
   IF(WITH_NDB)
     MESSAGE(STATUS "MySQL Cluster version: ${MYSQL_CLUSTER_VERSION}")
 
-    SET(VERSION_SRC "${MYSQL_CLUSTER_VERSION}")
+    # Different numeric versions would require a separate Cluster update version.
+    FOREACH(_cluster_version_component MAJOR MINOR PATCH)
+      IF(DEFINED CLUSTER_${_cluster_version_component}_VERSION AND
+         NOT "${CLUSTER_${_cluster_version_component}_VERSION}" STREQUAL
+             "${${_cluster_version_component}_VERSION}")
+        MESSAGE(FATAL_ERROR
+          "MYSQL_CLUSTER_VERSION_${_cluster_version_component} must match "
+          "MYSQL_VERSION_${_cluster_version_component} because Server and "
+          "Cluster share MYSQL_VERSION_UPDATE.")
+      ENDIF()
+    ENDFOREACH()
+
+    # Explicit Cluster components select the Cluster suffix, which may be empty.
+    IF(DEFINED CLUSTER_EXTRA_VERSION OR
+       (DEFINED CLUSTER_MAJOR_VERSION AND
+        DEFINED CLUSTER_MINOR_VERSION AND
+        DEFINED CLUSTER_PATCH_VERSION))
+      SET(MYSQL_PACKAGE_EXTRA_VERSION "${CLUSTER_EXTRA_VERSION}")
+    ENDIF()
 
     # Set suffix to indicate that this is MySQL Server built for MySQL Cluster
     SET(MYSQL_SERVER_SUFFIX "-cluster")
   ENDIF()
+
+  SET(MYSQL_PACKAGE_VERSION_WITH_EXTRA
+    "${MYSQL_PACKAGE_VERSION}${MYSQL_PACKAGE_EXTRA_VERSION}")
+  SET(VERSION_SRC "${MYSQL_PACKAGE_VERSION_WITH_EXTRA}")
+  SET(CPACK_PACKAGE_VERSION ${MYSQL_PACKAGE_VERSION})
 ENDMACRO()
 
 # Get mysql version and other interesting variables

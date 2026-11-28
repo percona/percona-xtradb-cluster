@@ -358,7 +358,16 @@ setup_certificates_for_donor()
             fi
         fi
     else
-        CLIENT_SSL_OPTIONS+=" --ssl-mode=DISABLED"
+        # No explicit [client] SSL certificates were provided for the Donor ->
+        # Recipient control connection. Do NOT force --ssl-mode=DISABLED here:
+        # the Recipient instance is started with the Joiner's config file, so if
+        # the cluster has require_secure_transport=ON the Recipient rejects the
+        # plain (unencrypted) TCP connection and SST fails (PXC-5289).
+        # Use PREFERRED (the client default): TLS is used when the Recipient
+        # offers it (certificates are always present, either configured or
+        # auto-generated via auto_generate_certs), and it falls back to a plain
+        # connection when the Recipient has no TLS configured at all.
+        CLIENT_SSL_OPTIONS+=" --ssl-mode=PREFERRED"
     fi
     wsrep_log_debug "SSL Client settings on $role for connection CLIENT_SSL_OPTIONS=${CLIENT_SSL_OPTIONS}"
 }
@@ -1019,9 +1028,15 @@ then
     ib_home_dir=$(parse_cnf mysqld innodb-data-home-dir "")
     ib_log_dir=$(parse_cnf mysqld innodb-log-group-home-dir "")
     ib_undo_dir=$(parse_cnf mysqld innodb-undo-directory "")
+    # Session temp tablespaces live here. When it is configured outside the
+    # datadir, leftover temp_*.ibt files survive a crash and make the
+    # subsequent 'mysqld --initialize-insecure' below fail (it does not clean
+    # old temp tablespaces, unlike a normal start). So it must be cleaned too.
+    ib_tmp_dir=$(parse_cnf mysqld innodb-temp-tablespaces-dir "")
 
     cpat=$(parse_cnf sst cpat '.*\.pem$\|.*init\.ok$\|.*galera\.cache$\|.*sst_in_progress$\|.*gvwstate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$\|.*component_keyring_.*\.cnf$\|.*mysqld.my$')
-    find $ib_home_dir $ib_log_dir $ib_undo_dir $WSREP_SST_OPT_DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>/dev/null \+
+    dirs=$(printf "%s\n" "$ib_home_dir" "$ib_log_dir" "$ib_undo_dir" "$ib_tmp_dir" "$WSREP_SST_OPT_DATA" | sort -u)
+    find $dirs -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>/dev/null \+
 
     # Before starting let us be sure we remove Netcat given it is using same MySQL port
     # check if there is another netcat process on the IP port we need and try to kill it.
@@ -1065,7 +1080,24 @@ then
       safe_exit 1 )
 
     # Move initialized data directory structure to real datadir and cleanup
-    mv -n "$tmp_datadir"/* "$WSREP_SST_OPT_DATA/"
+    # We stop if --initialize-insecure left nothing to move: without a bootstrap datadir
+    # the clone recipient instance cannot start.
+    if [ -z "$(find "$tmp_datadir" -mindepth 1 -maxdepth 1 -print -quit)" ]; then
+        wsrep_log_error "Initialized datadir $tmp_datadir is empty, aborting SST"
+        safe_exit 1
+    fi
+
+    # Move blank-init files in, but never clobber files preserved from the old datadir
+    for f in "$tmp_datadir"/* "$tmp_datadir"/.[!.]* "$tmp_datadir"/..?*; do
+        [ -e "$f" ] || [ -L "$f" ] || continue
+        dest="$WSREP_SST_OPT_DATA/${f##*/}"
+        if [ ! -e "$dest" ] && [ ! -L "$dest" ]; then
+            mv -- "$f" "$WSREP_SST_OPT_DATA/"
+        else
+            wsrep_log_info "Keeping preserved $dest"
+        fi
+    done
+
     wsrep_log_debug "-> REMOVE $tmp_datadir"
     rm -rf "$tmp_datadir"
 

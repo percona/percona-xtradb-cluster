@@ -2287,7 +2287,8 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
     }
 
     /* trying to change the password of the utility user? */
-    if (acl_is_utility_user(acl_user->user, acl_user->host.get_host(), nullptr)) {
+    if (acl_is_utility_user(acl_user->user, acl_user->host.get_host(),
+                            nullptr)) {
       my_error(ER_PASSWORD_NO_MATCH, MYF(0));
       return true;
     }

@@ -41,6 +41,11 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "row0pread-adapter.h"
 #include "row0pread-histogram.h"
 #include "trx0trx.h"
+#include "vec0aux.h"
+
+/** One open streaming ANN scan; defined in vec0hnsw.cc. Held here by
+pointer only, so this header does not pull in the graph. */
+struct vec_search_t;
 
 #ifdef WITH_WSREP
 #include <wsrep_mysqld.h>
@@ -198,6 +203,23 @@ class ha_innobase : public handler {
 
   int ft_read(uchar *buf) override;
 
+ protected:
+  int vec_init() override;
+  int vec_read_first(Item *item, uchar *buf, ha_rows limit) override;
+  int vec_read_next(uchar *buf) override;
+
+ private:
+  /** JT_VECTOR read-path state: one open streaming scan of the graph.
+
+  The scan is the whole of it. It carries the traversal's visited set and
+  unexplored frontier, so continuing costs nothing extra and a candidate
+  can never repeat - there is no batch to buffer, no read position, and no
+  set of already-returned labels to exclude. Opened by vec_read_first and
+  released by index_end, which is where the iterator's destructor lands. */
+  vec_search_t *m_vec_search = nullptr;
+  std::string m_vec_query;
+
+ public:
   void position(const uchar *record) override;
 
   int info(uint) override;
@@ -436,7 +458,6 @@ class ha_innobase : public handler {
                                   bool commit, const dd::Table *old_dd_tab,
                                   dd::Table *new_dd_tab) override;
   /** @} */
-
 
   using Reader = Parallel_reader_adapter;
 
@@ -795,7 +816,7 @@ class ha_innobase : public handler {
   uchar *m_upd_buf;
 
   /** the size of upd_buf in bytes */
-  ulint m_upd_buf_size;
+  size_t m_upd_buf_size;
 
   /** Flags that specify the handler instance (table) capability. */
   Table_flags m_int_table_flags;
@@ -1507,10 +1528,9 @@ will be closed before the index creation/drop.
 @param[in,out]	share		share structure where index translation table
                                 will be constructed in.
 @return true if index translation table built successfully */
-[[nodiscard]]
-bool innobase_build_index_translation(const TABLE *table,
-                                      dict_table_t *ib_table,
-                                      INNOBASE_SHARE *share);
+[[nodiscard]] bool innobase_build_index_translation(const TABLE *table,
+                                                    dict_table_t *ib_table,
+                                                    INNOBASE_SHARE *share);
 
 uint innodb_force_index_records_in_range(THD *thd);
 uint innodb_records_in_range(THD *thd);

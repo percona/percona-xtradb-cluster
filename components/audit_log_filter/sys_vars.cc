@@ -18,7 +18,7 @@
 #include "components/audit_log_filter/audit_log_filter.h"
 #include "components/audit_log_filter/audit_log_reader.h"
 
-#define ALLOW_COMPONENT_INCLUDE // for my_io.h and plugin.h
+#define ALLOW_COMPONENT_INCLUDE  // for my_io.h and plugin.h
 #include "sql/mysqld.h"
 #include "sql/sql_class.h"
 #include "sql/sql_error.h"
@@ -108,6 +108,7 @@ std::atomic<uint64_t> event_max_drop_size{0};
 std::atomic<uint64_t> current_log_size{0};
 std::atomic<uint64_t> total_log_size{0};
 std::atomic<uint64_t> direct_writes{0};
+std::atomic<uint64_t> regex_match_errors{0};
 
 int show_events_total(THD *, SHOW_VAR *var, char *buff) {
   var->type = SHOW_LONG;
@@ -181,6 +182,14 @@ int show_direct_writes(THD *, SHOW_VAR *var, char *buff) {
   return 0;
 }
 
+int show_regex_match_errors(THD *, SHOW_VAR *var, char *buff) {
+  var->type = SHOW_LONG;
+  var->value = buff;
+  auto *value = reinterpret_cast<uint64_t *>(buff);
+  *value = regex_match_errors.load(std::memory_order_relaxed);
+  return 0;
+}
+
 SHOW_VAR status_vars[] = {
     {"Audit_log_filter_events", reinterpret_cast<char *>(&show_events_total),
      SHOW_FUNC, SHOW_SCOPE_GLOBAL},
@@ -205,6 +214,9 @@ SHOW_VAR status_vars[] = {
      SHOW_SCOPE_GLOBAL},
     {"Audit_log_filter_direct_writes",
      reinterpret_cast<char *>(&show_direct_writes), SHOW_FUNC,
+     SHOW_SCOPE_GLOBAL},
+    {"Audit_log_filter_regex_match_errors",
+     reinterpret_cast<char *>(&show_regex_match_errors), SHOW_FUNC,
      SHOW_SCOPE_GLOBAL},
     {nullptr, nullptr, SHOW_UNDEF, SHOW_SCOPE_UNDEF}};
 
@@ -725,13 +737,14 @@ SysVarListType sys_vars = {
     /*
      * The audit_log_filter.read_buffer_size variable defines buffer size for
      * reading from the audit log file, in bytes. The audit_log_read() function
-     * reads no more than this many bytes. Log file reading is supported only
-     * for JSON log format.
+     * uses this as its target batch size. A single larger record is returned
+     * whole in its own batch. Log file reading supports JSON and JSONL.
      */
     {{"read_buffer_size",
       PLUGIN_VAR_LONG | PLUGIN_VAR_UNSIGNED | PLUGIN_VAR_RQCMDARG,
-      "The buffer size for reading from the audit log file, in bytes.", nullptr,
-      nullptr, static_cast<void *>(&check_read_buffer_size),
+      "The target batch size for reading the audit log, in bytes. A single "
+      "larger record is returned whole.",
+      nullptr, nullptr, static_cast<void *>(&check_read_buffer_size),
       static_cast<void *>(&read_buffer_size)},
      false}};
 
@@ -1049,10 +1062,9 @@ ulong SysVars::get_read_buffer_size(MYSQL_THD thd [[maybe_unused]]) noexcept {
   return read_buffer_size;
 }
 
-void SysVars::update_log_bookmark(uint64_t id,
-                                  const std::string &timestamp) noexcept {
+void SysVars::update_log_bookmark(uint64_t id, std::string timestamp) noexcept {
   log_bookmark.id = id;
-  log_bookmark.timestamp = timestamp;
+  log_bookmark.timestamp = std::move(timestamp);
 }
 
 LogBookmark SysVars::get_log_bookmark() noexcept { return log_bookmark; }
@@ -1200,6 +1212,10 @@ void SysVars::update_total_log_size(uint64_t size) noexcept {
 
 void SysVars::inc_direct_writes() noexcept {
   direct_writes.fetch_add(1, std::memory_order_relaxed);
+}
+
+void SysVars::inc_regex_match_errors() noexcept {
+  regex_match_errors.fetch_add(1, std::memory_order_relaxed);
 }
 
 #ifndef NDEBUG

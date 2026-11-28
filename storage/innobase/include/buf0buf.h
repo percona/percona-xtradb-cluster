@@ -383,9 +383,9 @@ static inline byte *buf_frame_copy(byte *buf, const buf_frame_t *frame);
 
 #ifndef UNIV_HOTBACKUP
 /** This is the general function used to get optimistic access to a database
-page.
+page. The caller must keep the block buffer-fixed for the whole call.
 @param[in]      rw_latch        RW_S_LATCH, RW_X_LATCH
-@param[in,out]  block           Guessed block
+@param[in,out]  block           Guessed block, buffer-fixed by the caller
 @param[in]      modify_clock    Modify clock value
 @param[in]      fetch_mode      Fetch mode
 @param[in]      file            File name
@@ -943,15 +943,12 @@ void buf_page_force_evict(const page_id_t &page_id,
                           const page_size_t &page_size,
                           const bool dirty_is_ok = true) noexcept;
 
-/** Free a stale page. Caller must be holding the hash_lock in S mode if
-hash_lock parameter is not nullptr. The hash lock will be released upon return
-always. Caller must hold the LRU mutex if and only if the hash_lock parameter
-is nullptr. Upon unsuccessful page free the LRU mutex will not be released if
-hash_lock is nullptr.
+/** Free a stale page found under the page hash S latch. The caller must hold
+hash_lock in S mode. This overload never accepts nullptr for hash_lock. The hash
+lock will be released before this function returns.
 @param[in,out]  buf_pool   Buffer pool the page belongs to.
 @param[in,out]  bpage      Page to free.
-@param[in,out]  hash_lock  Hash lock covering the fetch from the hash table if
-latched in S mode. nullptr otherwise.
+@param[in]      hash_lock  Hash lock for bpage->id, held in S mode.
 @return true if page was freed. */
 bool buf_page_free_stale(buf_pool_t *buf_pool, buf_page_t *bpage,
                          rw_lock_t *hash_lock) noexcept;
@@ -1773,8 +1770,8 @@ struct alignas(alignof(uint64_t)) btr_search_prefix_info_t {
   }
 };
 
-/** The buffer control block structure */
-struct buf_block_t {
+/** The data fields of the buffer control block structure, see buf_block_t. */
+struct buf_block_fields_t {
   /** @name General fields */
   /** @{ */
 
@@ -1961,6 +1958,37 @@ struct buf_block_t {
   pool mutex), io_fix, buf_fix_count, and accessed; we introduce this
   new mutex in InnoDB-5.1 to relieve contention on the buffer pool mutex */
   BPageMutex mutex;
+};
+
+/** Padding of buf_block_t, see buf_block_t. It is empty when no padding is
+needed, because an array of size zero is not valid C++. */
+template <size_t N>
+struct buf_block_padding_t {
+  byte m_bytes[N];
+};
+
+template <>
+struct buf_block_padding_t<0> {};
+
+/** The buffer control block structure.
+
+Blocks are stored in an array at the page-aligned start of each buffer pool
+chunk. When sizeof(buf_block_t) is a multiple of 128 bytes, all blocks have the
+same layout with regard to cache lines and to the 128-byte pairs of cache lines
+fetched by the x86 adjacent-line prefetcher. Otherwise, for some blocks,
+page.m_space and page.m_version, which buf_page_t::was_stale() reads on every
+page lookup, would share the cache line, or the pair of cache lines, with the
+lock word of buf_block_t::lock, which is modified on every latch acquisition
+and release. The size of the data fields depends on the build configuration
+(mutex type, PFS instrumentation, debug), so the padding is computed from it. */
+struct buf_block_t : buf_block_fields_t {
+  /** Size of the padding to a multiple of 128 bytes, see above. */
+  static constexpr size_t PADDING_SIZE =
+      ut_calc_align(sizeof(buf_block_fields_t), 128) -
+      sizeof(buf_block_fields_t);
+
+  /** Padding to a multiple of 128 bytes, see above. */
+  [[no_unique_address]] buf_block_padding_t<PADDING_SIZE> m_padding;
 
   /** Get the modified clock (version) value.
   @param[in] single_threaded    Thread can only be written to or read by a
@@ -2048,6 +2076,19 @@ struct buf_block_t {
   }
 
   [[nodiscard]] bool is_memory() const noexcept { return page.is_memory(); }
+};
+
+/* New data fields go to buf_block_fields_t, so that the padding covers them. */
+static_assert(sizeof(buf_block_t) % 128 == 0,
+              "sizeof(buf_block_t) must be a multiple of 128 bytes");
+
+/** Node getter for the buf_pool_t::unzip_LRU list. UT_LIST_BASE_NODE_T can not
+be used for it, because unzip_LRU is a member of the base class of buf_block_t.
+*/
+struct UT_LIST_NODE_GETTER(buf_block_t, unzip_LRU) {
+  static const ut_list_node<buf_block_t> &get_node(const buf_block_t &block) {
+    return block.unzip_LRU;
+  }
 };
 
 inline bool buf_block_t::is_root() const {
@@ -2602,7 +2643,7 @@ struct buf_pool_t {
 
   /** Base node of the unzip_LRU list. The list is protected by the
   LRU_list_mutex. */
-  UT_LIST_BASE_NODE_T(buf_block_t, unzip_LRU) unzip_LRU;
+  UT_LIST_BASE_NODE_T_EXTERN(buf_block_t, unzip_LRU) unzip_LRU;
 
   /** @} */
   /** @name Buddy allocator fields

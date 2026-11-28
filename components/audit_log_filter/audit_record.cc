@@ -486,6 +486,7 @@ void update_connection_type_pseudo_to_numeric(std::string &type) {
       connection_type_pseudo{
           {"::undefined", "0"},  {"::tcp/ip", "1"}, {"::socket", "2"},
           {"::named_pipe", "3"}, {"::ssl", "4"},    {"::shared_memory", "5"},
+          {"::internal", "6"},   {"::plugin", "7"},
       };
 
   const auto it = connection_type_pseudo.find(type);
@@ -495,7 +496,7 @@ void update_connection_type_pseudo_to_numeric(std::string &type) {
 }
 
 bool is_valid_connection_type_value(std::string_view value) {
-  return value.size() == 1 && value[0] >= '0' && value[0] <= '5';
+  return value.size() == 1 && value[0] >= '0' && value[0] <= '7';
 }
 
 AuditRecordFieldsList get_audit_record_fields(
@@ -512,8 +513,9 @@ AuditRecordFieldsList get_audit_record_fields(
       {"general_user.length", static_cast<uint64_t>(extra.user.length())},
       {"general_command.str", extra.command},
       {"general_command.length", static_cast<uint64_t>(extra.command.length())},
-      {"general_query.str", extra.query},
-      {"general_query.length", static_cast<uint64_t>(extra.query.length())},
+      {"general_query.str", extra.query.value_or("")},
+      {"general_query.length",
+       static_cast<uint64_t>(extra.query ? extra.query->length() : 0)},
       {"general_host.str", extra.host},
       {"general_host.length", static_cast<uint64_t>(extra.host.length())},
       {"general_sql_command.str", extra.sql_command},
@@ -560,8 +562,9 @@ AuditRecordFieldsList get_audit_record_fields(
   return {
       {"connection_id", static_cast<uint64_t>(event->connection_id)},
       {"sql_command_id", static_cast<int64_t>(extra.sql_command_id)},
-      {"query.str", extra.query},
-      {"query.length", static_cast<uint64_t>(extra.query.length())},
+      {"query.str", extra.query.value_or("")},
+      {"query.length",
+       static_cast<uint64_t>(extra.query ? extra.query->length() : 0)},
       {"table_database.str", mysql_cstring_to_string(&event->table_database)},
       {"table_database.length",
        mysql_cstring_len_to_uint64(&event->table_database)},

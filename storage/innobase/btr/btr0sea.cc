@@ -928,6 +928,18 @@ bool btr_search_guess_on_hash(const dtuple_t *tuple, ulint mode,
     return false;
   }
 
+  if (block->page.was_stale()) {
+    /* DISCARD TABLESPACE leaves stale pages in the buffer pool until lazy
+    eviction. IMPORT TABLESPACE reuses the space ID, so the AHI fast path can
+    reach such a page. Treat it as a miss and use normal B-tree traversal to
+    read the current tablespace generation. */
+    if (!has_search_latch) {
+      btr_leaf_page_release(block, latch_mode, mtr);
+    }
+
+    return false;
+  }
+
   ut_ad(page_rec_is_user_rec(rec));
 
   btr_cur_position(index, (rec_t *)rec, block, cursor);
@@ -1271,9 +1283,9 @@ void btr_search_drop_page_hash_when_freed(const page_id_t &page_id,
   ut_d(export_vars.innodb_ahi_drop_lookups++);
 
   /* Sleep 10ms */
-  DBUG_EXECUTE_IF(
-      "simulate_long_ahi",
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));;);
+  DBUG_EXECUTE_IF("simulate_long_ahi",
+                  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                  ;);
 
   mtr_start(&mtr);
 

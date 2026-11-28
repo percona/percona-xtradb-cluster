@@ -685,14 +685,26 @@ void MetadataRecover::store() {
 
   for (auto meta : m_tables) {
     table_id_t table_id = meta.first;
-    PersistentTableMetadata *metadata = meta.second;
+    const PersistentTableMetadata *recovered = meta.second;
     byte buffer[REC_MAX_DATA_SIZE];
     size_t size;
 
-    size = dict_persist->persisters->write(*metadata, buffer);
+    /* Redo records are partial: each holds one kind of metadata. Fold them
+    into the buffered row, each kind by its own rule, instead of replacing
+    the row with them. */
+    uint64_t version = 0;
+    const std::vector<byte> buffered = table_buffer->get(table_id, &version);
+    PersistentTableMetadata metadata(table_id, version);
+    if (!buffered.empty()) {
+      dict_table_read_dynamic_metadata(buffered.data(), buffered.size(),
+                                       &metadata);
+    }
+    dict_persist->persisters->aggregate(metadata, *recovered);
+
+    size = dict_persist->persisters->write(metadata, buffer);
 
     dberr_t error =
-        table_buffer->replace(table_id, metadata->get_version(), buffer, size);
+        table_buffer->replace(table_id, metadata.get_version(), buffer, size);
     if (error != DB_SUCCESS) {
       ut_d(ut_error);
     }
@@ -2726,9 +2738,9 @@ void recv_recover_page_func(
 @param[out]     page_no         page number
 @param[out]     body            start of log record body
 @return length of the record, or 0 if the record was not complete */
-ulint recv_parse_log_rec(mlog_id_t *type, const byte *ptr,
-                         const byte *end_ptr, space_id_t *space_id,
-                         page_no_t *page_no, const byte **body) {
+ulint recv_parse_log_rec(mlog_id_t *type, const byte *ptr, const byte *end_ptr,
+                         space_id_t *space_id, page_no_t *page_no,
+                         const byte **body) {
   const byte *new_ptr;
 
   *body = nullptr;
@@ -3561,7 +3573,7 @@ static lsn_t recv_read_log_seg(log_t &log, byte *buf, lsn_t start_lsn,
 
     dberr_t err = log_data_blocks_read(file_handle, source_offset, len, buf);
 
-    if (err == DB_UNSUPPORTED) {
+    if (err == DB_IO_DECRYPT_FAIL) {
       /* The log block may be encrypted, read and update the log_sys */
       err = log_encryption_read(log);
       if (err != DB_SUCCESS) {
@@ -3574,6 +3586,7 @@ static lsn_t recv_read_log_seg(log_t &log, byte *buf, lsn_t start_lsn,
         case DB_SUCCESS:
           break;
 
+        case DB_IO_DECRYPT_FAIL:
         case DB_UNSUPPORTED:
           ib::error(ER_IB_MSG_CANT_DECRYPT_REDO_LOG, ulonglong{source_offset},
                     file_handle.file_path().c_str());

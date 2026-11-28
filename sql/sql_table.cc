@@ -2990,6 +2990,7 @@ static bool drop_base_table(THD *thd, const Drop_tables_ctx &drop_ctx,
                             Foreign_key_parents_invalidator *fk_invalidator,
                             std::vector<MDL_ticket *> *safe_to_release_mdl,
                             MEM_ROOT *foreach_table_root) {
+  THD_STAGE_INFO(thd, stage_dropping_table);
   char path[FN_REFLEN + 1];
 
   /* Check that we have an exclusive lock on the table to be dropped. */
@@ -3271,7 +3272,7 @@ static bool drop_base_table(THD *thd, const Drop_tables_ctx &drop_ctx,
   result |= mark_referencing_views_invalid(thd, table,
                                            (drop_ctx.drop_database && atomic),
                                            !atomic, foreach_table_root);
-
+  THD_STAGE_INFO(thd, stage_after_drop);
   return result;
 }
 
@@ -5175,6 +5176,10 @@ static bool prepare_key_column(THD *thd, HA_CREATE_INFO *create_info,
       errmsg = "Defining a virtual generated column as primary key";
       functional_index_error_handler.force_error_code(
           ER_FUNCTIONAL_INDEX_PRIMARY_KEY);
+    } else if (key->type == KEYTYPE_VECTOR) {
+      errmsg = "Vector index on virtual generated column";
+      functional_index_error_handler.force_error_code(
+          ER_VECTOR_FUNCTIONAL_INDEX);
     }
 
     if (errmsg) {
@@ -5200,8 +5205,8 @@ static bool prepare_key_column(THD *thd, HA_CREATE_INFO *create_info,
     return true;
   }
 
-  // VECTOR columns cannot be used as keys
-  if (sql_field->sql_type == MYSQL_TYPE_VECTOR) {
+  if (sql_field->sql_type == MYSQL_TYPE_VECTOR &&
+      ((key_info->flags & HA_VECTOR) == 0)) {
     my_error(ER_NON_SCALAR_USED_AS_KEY, MYF(0), column->get_field_name());
     return true;
   }
@@ -5252,6 +5257,20 @@ static bool prepare_key_column(THD *thd, HA_CREATE_INFO *create_info,
       data prefix, ignoring column->length).
     */
     column_length = is_blob(sql_field->sql_type);
+  } else if (key->type == KEYTYPE_VECTOR) {
+    // VECTOR indexes are only allowed on VECTOR columns.
+    if (sql_field->sql_type != MYSQL_TYPE_VECTOR || sql_field->is_nullable) {
+      my_error(ER_INDEX_MUST_HAVE_COMPATIBLE_COLUMN, MYF(0), "VECTOR",
+               "VECTOR NOT NULL");
+      return true;
+    }
+    // Vector indexes do not support prefixes. Normal key length doesn't apply
+    // for them either.
+    // Ideally, we should use 0 both as key and key part length for such keys,
+    // but, unfortunately, this makes InnoDB unhappy.
+    // So we use dummy value of 1 instead, similarly to how it is done for
+    // FULLTEXT keys over BLOB columns.
+    column_length = 1;
   } else {
     switch (sql_field->sql_type) {
       case MYSQL_TYPE_GEOMETRY:
@@ -5458,6 +5477,7 @@ static bool prepare_key_column(THD *thd, HA_CREATE_INFO *create_info,
     }  // is_blob
     // Catch invalid use of partial keys
     else if (sql_field->sql_type != MYSQL_TYPE_GEOMETRY &&
+             key->type != KEYTYPE_VECTOR &&
              // is the key partial?
              column_length != key_part_length &&
              // is prefix length bigger than field length?
@@ -5494,7 +5514,7 @@ static bool prepare_key_column(THD *thd, HA_CREATE_INFO *create_info,
   }
 
   if (key_part_length > file->max_key_part_length(create_info) &&
-      key->type != KEYTYPE_FULLTEXT) {
+      key->type != KEYTYPE_FULLTEXT && key->type != KEYTYPE_VECTOR) {
     key_part_length = file->max_key_part_length(create_info);
     if (key->type & KEYTYPE_MULTIPLE) {
       /* not a critical problem */
@@ -5553,7 +5573,7 @@ static bool prepare_key_column(THD *thd, HA_CREATE_INFO *create_info,
     Check if the key segment is partial, set the key flag
     accordingly. Note that fulltext indexes ignores prefixes.
   */
-  if (key->type != KEYTYPE_FULLTEXT &&
+  if (key->type != KEYTYPE_FULLTEXT && key->type != KEYTYPE_VECTOR &&
       key_part_length != sql_field->key_length()) {
     key_info->flags |= HA_KEY_HAS_PART_KEY_SEG;
     key_part_info->key_part_flag |= HA_PART_KEY_SEG;
@@ -5858,7 +5878,7 @@ static bool prepare_self_ref_fk_parent_key(
   for (const KEY *key = key_info_buffer; key < key_info_buffer + key_count;
        key++) {
     // We can't use FULLTEXT or SPATIAL indexes.
-    if (key->flags & (HA_FULLTEXT | HA_SPATIAL)) continue;
+    if (key->flags & (HA_FULLTEXT | HA_SPATIAL | HA_VECTOR)) continue;
 
     if (hton->foreign_keys_flags &
         HTON_FKS_NEED_DIFFERENT_PARENT_AND_SUPPORTING_KEYS) {
@@ -6061,7 +6081,7 @@ static const KEY *find_fk_supporting_key(handlerton *hton,
   for (const KEY *key = key_info_buffer; key < key_info_buffer + key_count;
        key++) {
     // We can't use FULLTEXT or SPATIAL indexes.
-    if (key->flags & (HA_FULLTEXT | HA_SPATIAL)) continue;
+    if (key->flags & (HA_FULLTEXT | HA_SPATIAL | HA_VECTOR)) continue;
 
     if (key->algorithm == HA_KEY_ALG_HASH) {
       if (hton->foreign_keys_flags & HTON_FKS_WITH_SUPPORTING_HASH_KEYS) {
@@ -7698,6 +7718,21 @@ static bool prepare_key(
     return true;
   if (key_info->comment.length > 0) key_info->flags |= HA_USES_COMMENT;
 
+  if (key->type == KEYTYPE_VECTOR) {
+    assert(key->key_create_info.vector_index_type.str != nullptr);
+    key_info->vector_index_type = key->key_create_info.vector_index_type;
+    if (!key->key_create_info.vector_index_params.empty())
+      key_info->vector_index_params = key->key_create_info.vector_index_params;
+    /*
+      Let the SE check the index and store every parameter it builds the
+      index with, defaults included, so that the index never depends on a
+      compiled-in default once it exists.
+    */
+    if (auto prepare = file->ht->prepare_vector_index_params;
+        prepare != nullptr && prepare(thd->mem_root, *key, key_info))
+      return true;
+  }
+
   key_info->engine_attribute = key->key_create_info.m_engine_attribute;
   if (key_info->engine_attribute.length > 0)
     key_info->flags |= HA_INDEX_USES_ENGINE_ATTRIBUTE;
@@ -7710,6 +7745,26 @@ static bool prepare_key(
 #endif /* NDEBUG */
   switch (static_cast<int>(key->type)) {
     case KEYTYPE_MULTIPLE:
+      break;
+    case KEYTYPE_VECTOR:
+      if (!(file->ha_table_flags() & HA_CAN_VECTOR)) {
+        my_error(ER_TABLE_CANT_HANDLE_INDEX, MYF(0), "vector");
+        return true;
+      }
+      if (key->columns.size() != 1) {
+        my_error(ER_TOO_MANY_KEY_PARTS, MYF(0), 1);
+        return true;
+      }
+      if (!key->key_create_info.is_visible) {
+        my_error(ER_NOT_SUPPORTED_YET, MYF(0), "invisible vector indexes");
+        return true;
+      }
+      if (key->key_create_info.block_size != 0) {
+        my_error(ER_NOT_SUPPORTED_YET, MYF(0),
+                 "KEY_BLOCK_SIZE for vector indexes");
+        return true;
+      }
+      key_info->flags |= HA_VECTOR;
       break;
     case KEYTYPE_FULLTEXT:
       if (!(file->ha_table_flags() & HA_CAN_FULLTEXT)) {
@@ -7768,6 +7823,9 @@ static bool prepare_key(
   } else if (key_info->flags & HA_FULLTEXT) {
     assert(!key->key_create_info.is_algorithm_explicit);
     key_info->algorithm = HA_KEY_ALG_FULLTEXT;
+  } else if (key_info->flags & HA_VECTOR) {
+    assert(!key->key_create_info.is_algorithm_explicit);
+    key_info->algorithm = HA_KEY_ALG_VECTOR;
   } else {
     if (key->key_create_info.is_algorithm_explicit) {
       if (key->key_create_info.algorithm != HA_KEY_ALG_RTREE) {
@@ -8669,6 +8727,7 @@ bool mysql_prepare_create_table(
 
   uint key_number = 0;
   bool primary_key = false;
+  uint vector_key_number = 0;
 
   // First prepare non-foreign keys so that they are ready when
   // we prepare foreign keys.
@@ -8683,6 +8742,15 @@ bool mysql_prepare_create_table(
         return true;
       }
       primary_key = true;
+    }
+
+    if (key->type == KEYTYPE_VECTOR) {
+      if (vector_key_number != 0U) {
+        my_error(ER_NOT_SUPPORTED_YET, MYF(0),
+                 "multiple vector indexes on a single table");
+        return true;
+      }
+      ++vector_key_number;
     }
 
     if (key->type != KEYTYPE_FOREIGN) {
@@ -8748,6 +8816,96 @@ bool mysql_prepare_create_table(
 
   /* Sort keys in optimized order */
   std::sort(*key_info_buffer, *key_info_buffer + *key_count, sort_keys());
+
+  // We allow VECTOR indexes only on tables with BIGINT UNSIGNED PKs.
+  // After sorting, key_info_buffer[0] is the PK or a promoted UNIQUE NOT
+  // NULL key. If neither exists, reject.
+  if (vector_key_number != 0) {
+    if (*key_count == 0 || !((*key_info_buffer)[0].flags & HA_NOSAME) ||
+        ((*key_info_buffer)[0].flags & HA_NULL_PART_KEY)) {
+      my_error(ER_NOT_SUPPORTED_YET, MYF(0),
+               "vector indexes on tables lacking a BIGINT UNSIGNED single "
+               "column primary key");
+      return true;
+    }
+
+    /* No CASCADE referential action on a vector-indexed child table.
+
+    Cascaded DML runs inside the engine, through the row0ins FK cascade
+    nodes, and never reaches the handler hooks that maintain the vector
+    index. ON DELETE CASCADE happens to be harmless - a DELETE writes
+    nothing to the aux table by design, so a cascaded one lands in the
+    same state as an ordinary one. ON UPDATE CASCADE is not: when the
+    cascaded column is part of the child's primary key, the aux row's
+    base_pk still points at the old key and the row silently drops out
+    of ANN results. It cannot return a WRONG row - the label check
+    rejects any row that took over the old key - but it does go missing.
+
+    Refusing both is broader than the defect. Narrowing it to
+    ON UPDATE CASCADE where the foreign key overlaps the primary key
+    would be accurate, and is worth doing once cascades are supported
+    properly. Supporting them means what FTS does in
+    row_ins_foreign_check_on_constraint():
+    a per-foreign-key predicate, a hook in the ON UPDATE CASCADE branch,
+    and - the part that makes it engine work rather than a handler tweak
+    - deferring the aux write onto a queue drained at commit, because
+    the cascade has no access to the sub-transaction our aux writes
+    ride. */
+    bool any_cascading_fk = false;
+    for (size_t i = 0; i < alter_info->key_list.size() && !any_cascading_fk;
+         i++) {
+      const Key_spec *key = alter_info->key_list[i];
+      if (key->type != KEYTYPE_FOREIGN) continue;
+      const Foreign_key_spec *fk = down_cast<const Foreign_key_spec *>(key);
+      if (fk->delete_opt == FK_OPTION_CASCADE ||
+          fk->update_opt == FK_OPTION_CASCADE) {
+        any_cascading_fk = true;
+      }
+    }
+    for (uint i = 0; i < existing_fks_count && !any_cascading_fk; i++) {
+      if (existing_fks[i].delete_opt == FK_OPTION_CASCADE ||
+          existing_fks[i].update_opt == FK_OPTION_CASCADE) {
+        any_cascading_fk = true;
+      }
+    }
+    if (any_cascading_fk) {
+      my_error(ER_NOT_SUPPORTED_YET, MYF(0),
+               "vector indexes on tables with a CASCADE foreign key");
+      return true;
+    }
+
+    const KEY &primary_info = (*key_info_buffer)[0];
+
+    if (primary_info.actual_key_parts > 1) {
+      my_error(ER_NOT_SUPPORTED_YET, MYF(0),
+               "vector indexes on tables lacking a BIGINT UNSIGNED single "
+               "column primary key");
+      return true;
+    }
+
+    for (it.rewind(), field_no = 0; (sql_field = it++); field_no++) {
+      if (field_no >= primary_info.key_part[0].fieldnr) break;
+    }
+    assert(sql_field);
+    if (sql_field->sql_type != MYSQL_TYPE_LONGLONG || !sql_field->is_unsigned) {
+      my_error(ER_NOT_SUPPORTED_YET, MYF(0),
+               "vector indexes on tables lacking a BIGINT UNSIGNED single "
+               "column primary key");
+      return true;
+    }
+
+    if (is_partitioned) {
+      my_error(ER_NOT_SUPPORTED_YET, MYF(0),
+               "vector indexes on partitioned tables");
+      return true;
+    }
+
+    if (create_info->options & HA_LEX_CREATE_TMP_TABLE) {
+      my_error(ER_NOT_SUPPORTED_YET, MYF(0),
+               "vector indexes on temporary tables");
+      return true;
+    }
+  }
 
   /*
     Normal keys are done, now prepare foreign keys.
@@ -11612,7 +11770,10 @@ static bool alter_table_drop_histograms(THD *thd, Table_ref *table,
       res = histograms::drop_all_histograms(thd, *table, *original_table_def,
                                             results);
     else
-      res = histograms::drop_histograms(thd, *table, columns, results);
+      // Column names come from the ALTER TABLE definition (dictionary), and may
+      // refer to columns being dropped, so they must not be resolved/rejected.
+      res = histograms::drop_histograms(
+          thd, *table, columns, /*reject_unresolved_columns=*/false, results);
 
     DBUG_EXECUTE_IF("fail_after_drop_histograms", {
       my_error(ER_UNABLE_TO_DROP_COLUMN_STATISTICS, MYF(0), "dummy_column",
@@ -13090,6 +13251,18 @@ static bool has_index_def_changed(Alter_inplace_info *ha_alter_info,
     return true;
 
   /*
+    A vector index is built with its parameters (M, metric, ...), so a new
+    value for any of them means the index has to be rebuilt. The SE owns
+    the parameters, so it compares them.
+  */
+  if (table_key->flags & HA_VECTOR) {
+    const handlerton *hton = table_key->table->s->db_type();
+    if (hton->compare_vector_index_params != nullptr &&
+        hton->compare_vector_index_params(*table_key, *new_key))
+      return true;
+  }
+
+  /*
     If an index comment is added/dropped/changed, then mark it for a
     fast/INPLACE alteration.
   */
@@ -13836,6 +14009,108 @@ static void set_column_static_defaults(TABLE *altered_table,
 }
 
 /**
+  Set the fields in an array to point to a new record buffer.
+
+  @param ptr      Array of fields to update, terminated by nullptr.
+  @param new_buf  New record buffer.
+  @param old_buf  Current record buffer.
+*/
+void set_field_ptr(Field **ptr, const uchar *new_buf, const uchar *old_buf) {
+  const ptrdiff_t diff = new_buf - old_buf;
+  DBUG_TRACE;
+
+  do {
+    (*ptr)->move_field_offset(diff);
+  } while (*(++ptr));
+}
+
+/**
+  Verify that all rows in a table satisfy another table's CHECK constraints.
+
+  @param table       Table containing the rows to verify.
+  @param check_table Table whose CHECK constraints are evaluated.
+
+  @return Operation status
+    @retval true   A row violates a CHECK constraint or a handler error occurs.
+    @retval false  All rows satisfy the enforced CHECK constraints.
+*/
+bool verify_data_with_check_constraints(TABLE *table, TABLE *check_table) {
+  handler *file;
+  int error;
+  uchar *old_rec;
+  DBUG_TRACE;
+  assert(table && table->file && check_table);
+
+  if (check_table->table_check_constraint_list == nullptr) return false;
+
+  bool has_enforced_check_constraint = false;
+  for (auto &table_cc : *check_table->table_check_constraint_list) {
+    if (table_cc.is_enforced()) {
+      has_enforced_check_constraint = true;
+      break;
+    }
+  }
+
+  if (!has_enforced_check_constraint) return false;
+
+  /* CHECK constraints can refer to any column in the row being scanned. */
+  table->use_all_columns();
+
+  file = table->file;
+  old_rec = check_table->record[0];
+  check_table->record[0] = table->record[0];
+  set_field_ptr(check_table->field, table->record[0], old_rec);
+
+  if ((error = file->ha_rnd_init(true))) {
+    file->print_error(error, MYF(0));
+    goto err;
+  }
+
+  do {
+    if ((error = file->ha_rnd_next(table->record[0]))) {
+      if (error == HA_ERR_RECORD_DELETED) continue;
+      if (error == HA_ERR_END_OF_FILE)
+        error = 0;
+      else
+        file->print_error(error, MYF(0));
+      break;
+    }
+
+    if (invoke_table_check_constraints(current_thd, check_table)) {
+      error = 1;
+      break;
+    }
+  } while (true);
+
+  (void)file->ha_rnd_end();
+err:
+  set_field_ptr(check_table->field, old_rec, table->record[0]);
+  check_table->record[0] = old_rec;
+  return error != 0;
+}
+
+/**
+  Compare generated-column expressions from different table definitions.
+
+  The Item trees of two opened tables refer to different Field instances, so
+  Item::eq() cannot be used for this metadata comparison. print_expr() emits
+  a canonical expression without database or table qualifiers.
+*/
+static bool generated_column_expressions_are_equal(
+    THD *thd, const Field *field, const Create_field *new_field) {
+  assert(field->is_gcol() && new_field->is_gcol());
+
+  String field_expression;
+  String new_field_expression;
+  field->gcol_info->print_expr(thd, &field_expression);
+  new_field->gcol_info->print_expr(thd, &new_field_expression);
+
+  return field_expression.length() == new_field_expression.length() &&
+         memcmp(field_expression.ptr(), new_field_expression.ptr(),
+                field_expression.length()) == 0;
+}
+
+/**
   Compare two tables to see if their metadata are compatible.
   One table specified by a TABLE instance, the other using Alter_info
   and HA_CREATE_INFO.
@@ -13907,6 +14182,13 @@ bool mysql_compare_tables(THD *thd, TABLE *table, Alter_info *alter_info,
       return false;
     }
 
+    /* Generated column expressions must match to preserve their values and
+       index keys when the underlying tables are exchanged. */
+    if (tmp_new_field->is_gcol() != field->is_gcol() ||
+        (field->is_gcol() &&
+         !generated_column_expressions_are_equal(thd, field, tmp_new_field)))
+      return false;
+
     /* Check that NULL behavior is the same. */
     if ((tmp_new_field->flags & NOT_NULL_FLAG) !=
         field->is_flag_set(NOT_NULL_FLAG))
@@ -13948,6 +14230,13 @@ bool mysql_compare_tables(THD *thd, TABLE *table, Alter_info *alter_info,
          (new_key->flags & HA_KEYFLAG_MASK)) ||
         (table_key->user_defined_key_parts != new_key->user_defined_key_parts))
       return false;
+
+    /*
+      A partitioned table cannot have a vector index, so two vector keys
+      never meet here. If they ever do, their parameters must be compared
+      too, as has_index_def_changed() does.
+    */
+    assert(!(table_key->flags & HA_VECTOR));
 
     /* Check that the key parts remain compatible. */
     KEY_PART_INFO *table_part;
@@ -16255,13 +16544,27 @@ bool prepare_fields_and_keys(THD *thd, const dd::Table *src_table, TABLE *table,
       const Create_field *cfield;
       field_it.rewind();
       while ((cfield = field_it++)) {
+        bool matches_key_part = false;
         if (cfield->change) {
           if (!my_strcasecmp(system_charset_info, key_part_name,
                              cfield->change))
-            break;
+            matches_key_part = true;
         } else if (!my_strcasecmp(system_charset_info, key_part_name,
                                   cfield->field_name))
-          break;
+          matches_key_part = true;
+
+        if (!matches_key_part) continue;
+
+        /*
+          A user column can have the same name as the hidden column backing
+          a functional index. Keep searching until we find the hidden
+          Create_field that corresponds to the existing functional key part.
+        */
+        if (key_part->field->is_field_for_functional_index() &&
+            !is_field_for_functional_index(cfield))
+          continue;
+
+        break;
       }
       if (!cfield) {
         /*
@@ -16295,8 +16598,8 @@ bool prepare_fields_and_keys(THD *thd, const dd::Table *src_table, TABLE *table,
          */
         if (!Field::type_can_have_key_part(cfield->field->type()) ||
             !Field::type_can_have_key_part(cfield->sql_type) ||
-            /* spatial keys can't have sub-key length */
-            (key_info->flags & HA_SPATIAL) ||
+            /* spatial and vector keys can't have sub-key length */
+            (key_info->flags & (HA_SPATIAL | HA_VECTOR)) ||
             (cfield->field->field_length == key_part_length &&
              key_part->field->type() != MYSQL_TYPE_BLOB) ||
             (cfield->max_display_width_in_codepoints() &&
@@ -16322,8 +16625,10 @@ bool prepare_fields_and_keys(THD *thd, const dd::Table *src_table, TABLE *table,
                      ? ORDER_NOT_RELEVANT
                      : ORDER_ASC);
       if (key_part->field->is_field_for_functional_index()) {
+        assert(cfield->gcol_info != nullptr);
+        assert(cfield->gcol_info->expr_item != nullptr);
         key_parts.push_back(new (thd->mem_root) Key_part_spec(
-            cfield->field_name, key_part->field->gcol_info->expr_item, order));
+            cfield->field_name, cfield->gcol_info->expr_item, order));
       } else {
         key_parts.push_back(new (thd->mem_root) Key_part_spec(
             to_lex_cstring(cfield->field_name), key_part_length, order));
@@ -16393,6 +16698,11 @@ bool prepare_fields_and_keys(THD *thd, const dd::Table *src_table, TABLE *table,
       if (key_info->flags & HA_USES_COMMENT)
         key_create_info.comment = key_info->comment;
 
+      if (key_info->vector_index_type.str != nullptr)
+        key_create_info.vector_index_type = key_info->vector_index_type;
+      if (!key_info->vector_index_params.empty())
+        key_create_info.vector_index_params = key_info->vector_index_params;
+
       if (key_info->engine_attribute.str != nullptr)
         key_create_info.m_engine_attribute = key_info->engine_attribute;
 
@@ -16422,6 +16732,8 @@ bool prepare_fields_and_keys(THD *thd, const dd::Table *src_table, TABLE *table,
           key_type = KEYTYPE_UNIQUE;
       } else if (key_info->flags & HA_FULLTEXT)
         key_type = KEYTYPE_FULLTEXT;
+      else if (key_info->flags & HA_VECTOR)
+        key_type = KEYTYPE_VECTOR;
       else
         key_type = KEYTYPE_MULTIPLE;
 

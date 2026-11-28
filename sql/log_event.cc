@@ -85,7 +85,6 @@
 #include "sql/raii/thread_stage_guard.h"  // NAMED_THD_STAGE_GUARD
 #include "sql/rpl_handler.h"              // RUN_HOOK
 #include "sql/rpl_tblmap.h"
-#include "sql/sql_show_processlist.h"  // pfs_processlist_enabled
 #include "sql/system_variables.h"
 #include "sql/tc_log.h"
 #include "sql/xa/sql_cmd_xa.h"  // Sql_cmd_xa_*
@@ -366,6 +365,10 @@ static const char *HA_ERR(int i) {
       return "HA_ERR_NO_WAIT_LOCK";
     case HA_ERR_FTS_TOO_MANY_NESTED_EXP:
       return "HA_ERR_FTS_TOO_MANY_NESTED_EXP";
+    case HA_ERR_VECTOR_WRONG_DIMENSIONS:
+      return "HA_ERR_VECTOR_WRONG_DIMENSIONS";
+    case HA_ERR_VECTOR_WRONG_VALUE:
+      return "HA_ERR_VECTOR_WRONG_VALUE";
   }
   return "No Error!";
 }
@@ -1170,38 +1173,37 @@ bool Log_event::need_checksum() {
             static_cast<enum_binlog_checksum_alg>(binlog_checksum_options)
             : mysql::binlog::event::BINLOG_CHECKSUM_ALG_OFF;
 
-  assert(
-      !ret ||
-      ((common_footer->checksum_alg ==
-            static_cast<enum_binlog_checksum_alg>(binlog_checksum_options) ||
-        /*
-           Stop event closes the relay-log and its checksum alg
-           preference is set by the caller can be different
-           from the server's binlog_checksum_options.
-        */
-        get_type_code() == mysql::binlog::event::STOP_EVENT ||
-        /*
-           Rotate:s can be checksummed regardless of the server's
-           binlog_checksum_options. That applies to both
-           the local RL's Rotate and the master's Rotate
-           which IO thread instantiates via queue_binlog_ver_3_event.
-        */
-        get_type_code() == mysql::binlog::event::ROTATE_EVENT ||
-        /*
-           The previous event has its checksum option defined
-           according to the format description event.
-        */
-        get_type_code() == mysql::binlog::event::PREVIOUS_GTIDS_LOG_EVENT ||
-        /* FD is always checksummed */
-        get_type_code() == mysql::binlog::event::FORMAT_DESCRIPTION_EVENT ||
-        /*
-           View_change_log_event is queued into relay log by the
-           local member, which may have a different checksum algorithm
-           than the one of the event source.
-        */
-        get_type_code() == mysql::binlog::event::VIEW_CHANGE_EVENT) &&
-       common_footer->checksum_alg !=
-           mysql::binlog::event::BINLOG_CHECKSUM_ALG_OFF));
+  assert(!ret ||
+         ((common_footer->checksum_alg ==
+               static_cast<enum_binlog_checksum_alg>(binlog_checksum_options) ||
+           /*
+              Stop event closes the relay-log and its checksum alg
+              preference is set by the caller can be different
+              from the server's binlog_checksum_options.
+           */
+           get_type_code() == mysql::binlog::event::STOP_EVENT ||
+           /*
+              Rotate:s can be checksummed regardless of the server's
+              binlog_checksum_options. That applies to both
+              the local RL's Rotate and the master's Rotate
+              which IO thread instantiates via queue_binlog_ver_3_event.
+           */
+           get_type_code() == mysql::binlog::event::ROTATE_EVENT ||
+           /*
+              The previous event has its checksum option defined
+              according to the format description event.
+           */
+           get_type_code() == mysql::binlog::event::PREVIOUS_GTIDS_LOG_EVENT ||
+           /* FD is always checksummed */
+           get_type_code() == mysql::binlog::event::FORMAT_DESCRIPTION_EVENT ||
+           /*
+              View_change_log_event is queued into relay log by the
+              local member, which may have a different checksum algorithm
+              than the one of the event source.
+           */
+           get_type_code() == mysql::binlog::event::VIEW_CHANGE_EVENT) &&
+          common_footer->checksum_alg !=
+              mysql::binlog::event::BINLOG_CHECKSUM_ALG_OFF));
 
   assert(common_footer->checksum_alg !=
          mysql::binlog::event::BINLOG_CHECKSUM_ALG_UNDEF);
@@ -1547,8 +1549,8 @@ static void my_b_write_bit(IO_CACHE *file, const uchar *ptr, uint nbits) {
   my_b_printf(file, "b'");
   for (bitnum = skip_bits; bitnum < nbits8; bitnum++) {
     const int is_set = (ptr[(bitnum) / 8] >> (7 - bitnum % 8)) & 0x01;
-    [[maybe_unused]]
-    int write_res = my_b_write(file, (const uchar *)(is_set ? "1" : "0"), 1);
+    [[maybe_unused]] int write_res =
+        my_b_write(file, (const uchar *)(is_set ? "1" : "0"), 1);
     assert(write_res == 0);
   }
   my_b_printf(file, "'");
@@ -2186,6 +2188,22 @@ size_t Rows_log_event::print_verbose_one_row(
   const uchar *value0 = value;
   char typestr[64] = "";
 
+  const auto remaining_bytes = [&]() -> size_t {
+    return value <= m_rows_end ? static_cast<size_t>(m_rows_end - value) : 0;
+  };
+  const auto has_remaining = [&](size_t bytes) -> bool {
+    return value <= m_rows_end && bytes <= remaining_bytes();
+  };
+  const auto print_truncated_row_metadata = [&](const char *metadata_name,
+                                                size_t metadata_size) {
+    my_b_printf(file,
+                "***Corrupted replication event was detected: "
+                "%s size is set to %u, but there are only %u bytes "
+                "left of the event. Not printing the value***\n",
+                metadata_name, (uint)metadata_size, (uint)remaining_bytes());
+    return 0;
+  };
+
   // Read value_options if this is AI for PARTIAL_UPDATE_ROWS_EVENT
   ulonglong value_options = 0;
   Bit_reader partial_bits;
@@ -2199,8 +2217,12 @@ size_t Rows_log_event::print_verbose_one_row(
       return 0;
     }
     if ((value_options & PARTIAL_JSON_UPDATES) != 0) {
+      const size_t partial_bits_size = (td->json_column_count() + 7) / 8;
+      if (!has_remaining(partial_bits_size))
+        return print_truncated_row_metadata("partial update bitmap",
+                                            partial_bits_size);
       partial_bits.set_ptr(value);
-      value += (td->json_column_count() + 7) / 8;
+      value += partial_bits_size;
     }
   }
 
@@ -2209,8 +2231,11 @@ size_t Rows_log_event::print_verbose_one_row(
     master columns. Master writes one bit for each column in the
     image.
   */
+  const size_t null_bits_size = (bitmap_bits_set(cols_bitmap) + 7) / 8;
+  if (!has_remaining(null_bits_size))
+    return print_truncated_row_metadata("NULL bitmap", null_bits_size);
   Bit_reader null_bits(value);
-  value += (bitmap_bits_set(cols_bitmap) + 7) / 8;
+  value += null_bits_size;
 
   my_b_printf(file, "%s", prefix);
 
@@ -2233,14 +2258,24 @@ size_t Rows_log_event::print_verbose_one_row(
 
     my_b_printf(file, "###   @%d=", static_cast<int>(i + 1));
     if (!is_null) {
-      size_t fsize =
-          td->calc_field_size((uint)i, pointer_cast<const uchar *>(value));
-      if (fsize > (size_t)(m_rows_end - value)) {
+      if (value > m_rows_end) {
         my_b_printf(file,
                     "***Corrupted replication event was detected: "
                     "field size is set to %u, but there are only %u bytes "
                     "left of the event. Not printing the value***\n",
-                    (uint)fsize, (uint)(m_rows_end - value));
+                    0U, 0U);
+        return 0;
+      }
+      const size_t remaining = m_rows_end - value;
+      uint32 fsize = 0;
+      if (td->calc_field_size_checked(
+              (uint)i, pointer_cast<const uchar *>(value), remaining, &fsize) !=
+          CALC_FIELD_SIZE_OK) {
+        my_b_printf(file,
+                    "***Corrupted replication event was detected: "
+                    "field data is truncated; there are only %u bytes "
+                    "left of the event. Not printing the value***\n",
+                    (uint)remaining);
         return 0;
       }
     }
@@ -4194,8 +4229,8 @@ void Query_log_event::print_query_header(
   end = my_stpcpy(end, print_event_info->delimiter);
   *end++ = '\n';
   assert(end < buff + sizeof(buff));
-  [[maybe_unused]]
-  int write_res = my_b_write(file, (uchar *)buff, (uint)(end - buff));
+  [[maybe_unused]] int write_res =
+      my_b_write(file, (uchar *)buff, (uint)(end - buff));
   assert(write_res == 0);
   if (!print_event_info->require_row_format &&
       (!print_event_info->thread_id_printed ||
@@ -4375,8 +4410,8 @@ void Query_log_event::print(FILE *, PRINT_EVENT_INFO *print_event_info) const {
   DBUG_EXECUTE_IF("simulate_file_write_error",
                   { head->write_pos = head->write_end - 500; });
   print_query_header(head, print_event_info);
-  [[maybe_unused]]
-  int write_res = my_b_write(head, pointer_cast<const uchar *>(query), q_len);
+  [[maybe_unused]] int write_res =
+      my_b_write(head, pointer_cast<const uchar *>(query), q_len);
   assert(write_res == 0);
   my_b_printf(head, "\n%s\n", print_event_info->delimiter);
 }
@@ -5243,19 +5278,11 @@ end:
   /* Mark the statement completed. */
   MYSQL_END_STATEMENT(thd->m_statement_psi, thd->get_stmt_da());
 
-  /* Maintain compatibility with the legacy processlist. */
-  if (pfs_processlist_enabled) thd->reset_query_for_display();
+  thd->reset_query_for_display();
 
   thd->reset_rewritten_query();
   thd->m_statement_psi = nullptr;
   thd->m_digest = nullptr;
-
-  /*
-    Prevent rewritten query from getting "stuck" in SHOW PROCESSLIST,
-    and performance_schema.threads.
-  */
-  thd->reset_rewritten_query();
-  thd->reset_query_for_display();
 
   /*
     As a disk space optimization, future masters will not log an event for
@@ -5716,9 +5743,8 @@ void Rotate_log_event::print(FILE *, PRINT_EVENT_INFO *print_event_info) const {
   print_header(head, print_event_info, false);
   my_b_printf(head, "\tRotate to ");
   if (new_log_ident) {
-    [[maybe_unused]]
-    int write_res = my_b_write(head, pointer_cast<const uchar *>(new_log_ident),
-                               (uint)ident_len);
+    [[maybe_unused]] int write_res = my_b_write(
+        head, pointer_cast<const uchar *>(new_log_ident), (uint)ident_len);
     assert(write_res == 0);
   }
   my_b_printf(head, "  pos: %s\n", llstr(pos, buf));
@@ -6309,7 +6335,11 @@ bool Xid_log_event::do_commit(THD *thd_arg) {
   /*
     Increment the global status commit count variable
   */
-  if (!error) thd_arg->status_var.com_stat[SQLCOM_COMMIT]++;
+  if (!error) {
+    thd_arg->status_var.com_stat[SQLCOM_COMMIT]++;
+    global_aggregated_stats.get_shard(thd_arg->thread_id())
+        .com_stat[SQLCOM_COMMIT]++;
+  }
 
   return error;
 }
@@ -6864,25 +6894,170 @@ bool User_var_log_event::write(Basic_ostream *ostream) {
 */
 
 #ifndef MYSQL_SERVER
+static size_t my_strmov_quoted_user_var_name(char *buffer,
+                                             const char *identifier,
+                                             size_t length) {
+  char *pos = buffer;
+
+  *pos++ = '\'';
+  for (size_t i = 0; i < length; i++) {
+    switch (identifier[i]) {
+      case '\0':
+        *pos++ = '\\';
+        *pos++ = '0';
+        break;
+      case '\'':
+        *pos++ = '\\';
+        *pos++ = '\'';
+        break;
+      case '\\':
+        *pos++ = '\\';
+        *pos++ = '\\';
+        break;
+      case '\n':
+        *pos++ = '\\';
+        *pos++ = 'n';
+        break;
+      case '\r':
+        *pos++ = '\\';
+        *pos++ = 'r';
+        break;
+      case '\t':
+        *pos++ = '\\';
+        *pos++ = 't';
+        break;
+      case '\b':
+        *pos++ = '\\';
+        *pos++ = 'b';
+        break;
+      case '\032':
+        *pos++ = '\\';
+        *pos++ = 'Z';
+        break;
+      default:
+        *pos++ = identifier[i];
+        break;
+    }
+  }
+  *pos++ = '\'';
+  return pos - buffer;
+}
+
+static void print_set_session_charset(IO_CACHE *file,
+                                      PRINT_EVENT_INFO *print_event_info,
+                                      const char *charset) {
+  const char *charset_p = charset;  // Avoid type-punning warning.
+  CHARSET_INFO *cs_info = get_charset(uint2korr(charset_p), MYF(MY_WME));
+  if (cs_info) {
+    /* for mysql client */
+    my_b_printf(file, "/*!\\C %s */%s\n", cs_info->csname,
+                print_event_info->delimiter);
+  }
+  my_b_printf(file,
+              "SET "
+              "@@session.character_set_client=%d,"
+              "@@session.collation_connection=%d,"
+              "@@session.collation_server=%d"
+              "%s\n",
+              uint2korr(charset_p), uint2korr(charset + 2),
+              uint2korr(charset + 4), print_event_info->delimiter);
+}
+
 void User_var_log_event::print(FILE *,
                                PRINT_EVENT_INFO *print_event_info) const {
   IO_CACHE *const head = &print_event_info->head_cache;
-  char quoted_id[1 + NAME_LEN * 2 + 2];  // quoted length of the identifier
-  char name_id[NAME_LEN + 1];
-  size_t quoted_len = 0;
 
   if (!print_event_info->short_form) {
     print_header(head, print_event_info, false);
     my_b_printf(head, "\tUser_var\n");
   }
-  my_stpcpy(name_id, name);
-  name_id[name_len] = '\0';
-  my_b_printf(head, "SET @");
-  quoted_len =
-      my_strmov_quoted_identifier((char *)quoted_id, (const char *)name_id);
+  char quoted_id[1 + NAME_LEN * 2 + 2];  // quoted length of the identifier
+  const bool has_nul =
+      std::find(name, name + name_len, '\0') != name + name_len;
+  const bool preserve_value_collation = !is_null && type != STRING_RESULT;
+  const bool saved_sql_mode_inited = print_event_info->sql_mode_inited;
+  const sql_mode_t saved_sql_mode = print_event_info->sql_mode;
+  const bool saved_charset_inited = print_event_info->charset_inited;
+  char saved_charset[sizeof(print_event_info->charset)];
+  char user_var_charset[sizeof(print_event_info->charset)];
+  CHARSET_INFO *value_collation = nullptr;
+  bool invalid_value_collation = false;
+  size_t quoted_len;
+
+  if (saved_charset_inited)
+    memcpy(saved_charset, print_event_info->charset, sizeof(saved_charset));
+  /*
+    The user-variable name must be parsed under a safe client charset, but
+    numeric values get their stored collation from collation_connection.
+    Preserve the collation logged in the USER_VAR_EVENT for those values.
+  */
+  if (preserve_value_collation) {
+    value_collation = get_charset(charset_number, MYF(0));
+    invalid_value_collation =
+        value_collation == nullptr || value_collation->number > 0xffff;
+  }
+  const uint value_collation_number =
+      value_collation != nullptr && !invalid_value_collation
+          ? value_collation->number
+          : my_charset_utf8mb3_general_ci.number;
+  int2store(user_var_charset, my_charset_utf8mb3_general_ci.number);
+  int2store(user_var_charset + 2, value_collation_number);
+  int2store(user_var_charset + 4, my_charset_utf8mb3_general_ci.number);
+  const bool switch_charset =
+      !saved_charset_inited ||
+      memcmp(saved_charset, user_var_charset, sizeof(user_var_charset));
+
+  if (switch_charset) {
+    print_set_session_charset(head, print_event_info, user_var_charset);
+    memcpy(print_event_info->charset, user_var_charset,
+           sizeof(user_var_charset));
+    print_event_info->charset_inited = true;
+  }
+  if (has_nul) {
+    my_b_printf(head, "SET @@session.sql_mode=0%s\n",
+                print_event_info->delimiter);
+    quoted_len = my_strmov_quoted_user_var_name(quoted_id, name, name_len);
+  } else {
+    quoted_len = my_strmov_quoted_identifier(quoted_id, name, name_len);
+  }
   quoted_id[quoted_len] = '\0';
-  [[maybe_unused]]
-  int write_res = my_b_write(head, (uchar *)quoted_id, quoted_len);
+  const auto restore_sql_mode = [&]() {
+    if (!has_nul) return;
+    if (saved_sql_mode_inited) {
+      /*
+        Keep the handling of old, removed SQL_MODE bits consistent with
+        Query_log_event::print().
+      */
+      const char *mask = "";
+      if (saved_sql_mode & 0x1003ff00) mask = "/*!80005 &~0x1003ff00*/";
+      my_b_printf(head, "SET @@session.sql_mode=%lu%s%s\n",
+                  static_cast<ulong>(saved_sql_mode), mask,
+                  print_event_info->delimiter);
+    } else {
+      print_event_info->sql_mode_inited = false;
+    }
+  };
+  const auto restore_charset = [&]() {
+    if (!switch_charset) return;
+    if (saved_charset_inited) {
+      print_set_session_charset(head, print_event_info, saved_charset);
+      memcpy(print_event_info->charset, saved_charset, sizeof(saved_charset));
+      print_event_info->charset_inited = true;
+    } else {
+      print_event_info->charset_inited = false;
+    }
+  };
+  const auto restore_state = [&]() {
+    restore_sql_mode();
+    restore_charset();
+  };
+  const auto print_invalid_value = [&]() {
+    my_b_printf(head, ":=???%s\n", print_event_info->delimiter);
+  };
+
+  my_b_printf(head, "SET @");
+  [[maybe_unused]] int write_res =
+      my_b_write(head, (uchar *)quoted_id, quoted_len);
   assert(write_res == 0);
 
   if (is_null) {
@@ -6890,6 +7065,10 @@ void User_var_log_event::print(FILE *,
   } else {
     switch (type) {
       case REAL_RESULT:
+        if (invalid_value_collation) {
+          print_invalid_value();
+          break;
+        }
         double real_val;
         char real_buf[FMT_G_BUFSIZE(14)];
         real_val = float8get(val);
@@ -6897,6 +7076,10 @@ void User_var_log_event::print(FILE *,
         my_b_printf(head, ":=%s%s\n", real_buf, print_event_info->delimiter);
         break;
       case INT_RESULT:
+        if (invalid_value_collation) {
+          print_invalid_value();
+          break;
+        }
         char int_buf[22];
         longlong10_to_str(
             uint8korr(val), int_buf,
@@ -6904,6 +7087,10 @@ void User_var_log_event::print(FILE *,
         my_b_printf(head, ":=%s%s\n", int_buf, print_event_info->delimiter);
         break;
       case DECIMAL_RESULT: {
+        if (invalid_value_collation) {
+          print_invalid_value();
+          break;
+        }
         char str_buf[DECIMAL_MAX_STR_LENGTH + 1];
         int str_len = sizeof(str_buf);
         const int precision = (int)val[0];
@@ -6938,7 +7125,10 @@ void User_var_log_event::print(FILE *,
 
         hex_str = (char *)my_malloc(key_memory_log_event, 2 * val_len + 1 + 2,
                                     MYF(MY_WME));  // 2 hex digits / byte
-        if (!hex_str) return;
+        if (!hex_str) {
+          restore_state();
+          return;
+        }
         str_to_hex(hex_str, val, val_len);
         /*
           For proper behaviour when mysqlbinlog|mysql, we need to explicitly
@@ -6961,9 +7151,11 @@ void User_var_log_event::print(FILE *,
       case ROW_RESULT:
       default:
         assert(false);
+        restore_state();
         return;
     }
   }
+  restore_state();
 }
 #endif
 
@@ -8080,16 +8272,16 @@ Rows_log_event::Rows_log_event(
                     /* Check extra data has expected value */
                     check_extra_row_ndb_info(m_extra_row_info.get_ndb_info()););
 
-  /*
-     m_cols and m_cols_ai are of the type MY_BITMAP, which are members of
-     class Rows_log_event, and are used while applying the row events on
-     the slave.
-     The bitmap integer is initialized by copying the contents of the
-     vector column_before_image for m_cols.bitamp, and vector
-     column_after_image for m_cols_ai.bitmap. m_cols_ai is only initialized
-     for UPDATE_ROWS_EVENTS, else it is equal to the before image.
-  */
-  /* if bitmap_init fails, is_valid will be set to false */
+    /*
+       m_cols and m_cols_ai are of the type MY_BITMAP, which are members of
+       class Rows_log_event, and are used while applying the row events on
+       the slave.
+       The bitmap integer is initialized by copying the contents of the
+       vector column_before_image for m_cols.bitamp, and vector
+       column_after_image for m_cols_ai.bitmap. m_cols_ai is only initialized
+       for UPDATE_ROWS_EVENTS, else it is equal to the before image.
+    */
+    /* if bitmap_init fails, is_valid will be set to false */
 #if defined(__GNUC__) && (__GNUC__ >= 14)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
@@ -10380,9 +10572,11 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli) {
         break;
 
       case ROW_LOOKUP_NOT_NEEDED:
-        assert(get_general_type_code() == mysql::binlog::event::WRITE_ROWS_EVENT ||
-               get_general_type_code() == mysql::binlog::event::DELETE_ROWS_EVENT ||
-               get_general_type_code() == mysql::binlog::event::UPDATE_ROWS_EVENT);
+        assert(
+            get_general_type_code() == mysql::binlog::event::WRITE_ROWS_EVENT ||
+            get_general_type_code() ==
+                mysql::binlog::event::DELETE_ROWS_EVENT ||
+            get_general_type_code() == mysql::binlog::event::UPDATE_ROWS_EVENT);
 
         /* No need to scan for rows, just apply it */
         do_apply_row_ptr = &Rows_log_event::do_apply_row;
@@ -15020,6 +15214,12 @@ size_t my_strmov_quoted_identifier(THD *thd, char *buffer,
 size_t my_strmov_quoted_identifier(char *buffer, const char *identifier) {
   const int q = '`';
   return my_strmov_quoted_identifier_helper(q, buffer, identifier, 0);
+}
+
+size_t my_strmov_quoted_identifier(char *buffer, const char *identifier,
+                                   size_t length) {
+  const int q = '`';
+  return my_strmov_quoted_identifier_helper(q, buffer, identifier, length);
 }
 
 #endif

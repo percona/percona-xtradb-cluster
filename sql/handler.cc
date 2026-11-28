@@ -121,7 +121,7 @@
 #include "sql/sql_select.h"  // actual_key_parts
 #include "sql/sql_table.h"   // build_table_filename
 #include "sql/sql_zip_dict.h"
-#include "sql/strfunc.h"     // strnncmp_nopads
+#include "sql/strfunc.h"  // strnncmp_nopads
 #include "sql/system_variables.h"
 #include "sql/table.h"
 #include "sql/tc_log.h"
@@ -767,6 +767,10 @@ int ha_init_errors(void) {
   SETMSG(HA_ERR_TOO_LONG_PATH, ER_DEFAULT(ER_TABLE_NAME_CAUSES_TOO_LONG_PATH));
   SETMSG(HA_ERR_FTS_TOO_MANY_NESTED_EXP,
          "Too many nested sub-expressions in a full-text search");
+  SETMSG(HA_ERR_VECTOR_WRONG_DIMENSIONS,
+         "A vector does not have the dimensions its vector index needs");
+  SETMSG(HA_ERR_VECTOR_WRONG_VALUE,
+         "A vector value is not usable by its vector index");
   /* Register the error messages for use with my_error(). */
   return my_error_register(get_handler_errmsg, HA_ERR_FIRST, HA_ERR_LAST);
 }
@@ -2836,7 +2840,8 @@ static int ha_clone_consistent_snapshot(THD *thd) {
 
   {
     Find_thd_with_id find_thd_with_id(id, true);
-    from_thd_ptr = Global_THD_manager::get_instance()->find_thd(&find_thd_with_id);
+    from_thd_ptr =
+        Global_THD_manager::get_instance()->find_thd(&find_thd_with_id);
 
     if (!from_thd_ptr) {
       my_error(ER_NO_SUCH_THREAD, MYF(0), id);
@@ -3273,8 +3278,15 @@ err:
 }
 
 void handler::ha_statistic_increment(
-    ulonglong System_status_var::*offset) const {
-  if (table && table->in_use) (table->in_use->status_var.*offset)++;
+    ulonglong System_status_var::*offset,
+    std::atomic_uint64_t aggregated_stats_buffer::*agg_counter) const {
+  if (table && table->in_use) {
+    THD *thd = table->in_use;
+    assert(!thd->status_var_aggregated);
+    (thd->status_var.*offset)++;
+    global_aggregated_stats.get_shard(thd->thread_id())
+        .inc_counter(agg_counter);
+  }
 }
 
 THD *handler::ha_thd() const {
@@ -3630,6 +3642,48 @@ int handler::ha_ft_read(uchar *buf) {
   m_update_generated_read_fields = table->has_gcol();
 
   result = ft_read(buf);
+  if (!result && m_update_generated_read_fields) {
+    result = update_generated_read_fields(buf, table);
+    m_update_generated_read_fields = false;
+  }
+  table->set_row_status_from_handler(result);
+  return result;
+}
+
+int handler::ha_vec_init() {
+  DBUG_TRACE;
+  assert(table_share->tmp_table != NO_TMP_TABLE || m_lock_type != F_UNLCK);
+  assert(inited == INDEX);
+
+  return vec_init();
+}
+
+int handler::ha_vec_read_first(Item *item, uchar *buf, ha_rows limit) {
+  DBUG_TRACE;
+  assert(table_share->tmp_table != NO_TMP_TABLE || m_lock_type != F_UNLCK);
+  assert(inited == INDEX);
+
+  // Set status for the need to update generated fields
+  m_update_generated_read_fields = table->has_gcol();
+
+  int result = vec_read_first(item, buf, limit);
+  if (!result && m_update_generated_read_fields) {
+    result = update_generated_read_fields(buf, table);
+    m_update_generated_read_fields = false;
+  }
+  table->set_row_status_from_handler(result);
+  return result;
+}
+
+int handler::ha_vec_read_next(uchar *buf) {
+  DBUG_TRACE;
+  assert(table_share->tmp_table != NO_TMP_TABLE || m_lock_type != F_UNLCK);
+  assert(inited == INDEX);
+
+  // Set status for the need to update generated fields
+  m_update_generated_read_fields = table->has_gcol();
+
+  int result = vec_read_next(buf);
   if (!result && m_update_generated_read_fields) {
     result = update_generated_read_fields(buf, table);
     m_update_generated_read_fields = false;
@@ -4014,9 +4068,9 @@ bool handler::is_using_full_key(key_part_map keypart_map,
          (keypart_map == ((key_part_map(1) << actual_key_parts) - 1));
 }
 
-bool handler::is_using_full_unique_key(uint index, key_part_map keypart_map,
-                                       enum ha_rkey_function find_flag) const
-    noexcept {
+bool handler::is_using_full_unique_key(
+    uint index, key_part_map keypart_map,
+    enum ha_rkey_function find_flag) const noexcept {
   return (
       is_using_full_key(keypart_map, table->key_info[index].actual_key_parts) &&
       find_flag == HA_READ_KEY_EXACT &&
@@ -4225,7 +4279,7 @@ int handler::ha_read_first_row(uchar *buf, uint primary_key) {
   int error;
   DBUG_TRACE;
 
-  ha_statistic_increment(&System_status_var::ha_read_first_count);
+  HA_STATISTIC_INCREMENT(ha_read_first_count);
 
   /*
     If there is very few deleted rows in the table, find the first row by
@@ -4879,6 +4933,40 @@ bool handler::is_fatal_error(int error) {
     - table->s->path
     - table->alias
 */
+void my_error_vector_wrong_dimensions(const TABLE *table, myf errflag) {
+  /* A table has at most one vector index, so the column and the
+  dimensions it needs come from the definition, not from the row. */
+  for (uint k = 0; k < table->s->keys; k++) {
+    const KEY &key = table->key_info[k];
+    if (!(key.flags & HA_VECTOR)) continue;
+    /* The table's own field: KEY_PART_INFO::field is a key-image copy,
+    whose length is not the column's. */
+    const Field *field = table->field[key.key_part[0].fieldnr - 1];
+    assert(field->type() == MYSQL_TYPE_VECTOR);
+    my_error(ER_VECTOR_INDEX_WRONG_DIMENSIONS, errflag, field->field_name,
+             down_cast<const Field_vector *>(field)->get_max_dimensions());
+    return;
+  }
+  my_error(ER_GET_ERRNO, errflag, HA_ERR_VECTOR_WRONG_DIMENSIONS,
+           table->file->table_type());
+}
+
+void my_error_vector_wrong_value(const TABLE *table, myf errflag) {
+  /* A table has at most one vector index; the column comes from the
+  definition. The precise reason (e.g. a zero vector under cosine) is
+  not carried on the error code. */
+  for (uint k = 0; k < table->s->keys; k++) {
+    const KEY &key = table->key_info[k];
+    if (!(key.flags & HA_VECTOR)) continue;
+    const Field *field = table->field[key.key_part[0].fieldnr - 1];
+    assert(field->type() == MYSQL_TYPE_VECTOR);
+    my_error(ER_VECTOR_INDEX_WRONG_VALUE, errflag, field->field_name);
+    return;
+  }
+  my_error(ER_GET_ERRNO, errflag, HA_ERR_VECTOR_WRONG_VALUE,
+           table->file->table_type());
+}
+
 void handler::print_error(int error, myf errflag) {
   THD *thd = current_thd;
   Foreign_key_error_handler foreign_key_error_handler(thd, this);
@@ -4908,6 +4996,18 @@ void handler::print_error(int error, myf errflag) {
       break;
     case HA_ERR_WRONG_MRG_TABLE_DEF:
       textno = ER_WRONG_MRG_TABLE;
+      break;
+    case HA_ERR_VECTOR_WRONG_DIMENSIONS:
+      if (table != nullptr) {
+        my_error_vector_wrong_dimensions(table, errflag);
+        return;
+      }
+      break;
+    case HA_ERR_VECTOR_WRONG_VALUE:
+      if (table != nullptr) {
+        my_error_vector_wrong_value(table, errflag);
+        return;
+      }
       break;
     case HA_ERR_FOUND_DUPP_KEY: {
       const uint key_nr = table ? get_dup_key(error) : -1;
@@ -7397,6 +7497,8 @@ int DsMrr_impl::dsmrr_init(RANGE_SEQ_IF *seq_funcs, void *seq_init_param,
   if (is_mrr_assoc) {
     assert(!thd->status_var_aggregated);
     table->in_use->status_var.ha_multi_range_read_init_count++;
+    global_aggregated_stats.get_shard(thd->thread_id())
+        .ha_multi_range_read_init_count++;
   }
 
   rowids_buf_end = buf->buffer_end;
@@ -8375,8 +8477,17 @@ static inline void move_key_field_offsets(const key_range *range,
   @retval  1 if the key is outside the range
 */
 int handler::compare_key_in_buffer(const uchar *buf) const {
-  assert(end_range != nullptr &&
-         (m_record_buffer == nullptr || !m_record_buffer->is_out_of_range()));
+  assert(end_range != nullptr);
+  assert(m_record_buffer == nullptr || !m_record_buffer->is_out_of_range());
+
+  if ((table->key_info[active_index].flags & HA_MULTI_VALUED_KEY) &&
+      table->key_read) {
+    // For multi-valued indexes, key_cmp() needs the virtual column backing the
+    // index. It is not available in the record buffer during index-only scans,
+    // so let the SQL layer do the end-range filtering. Returning -1 makes the
+    // ascending scan treat the key as being within the range.
+    return -1;
+  }
 
   // Make the fields in the key point into the buffer instead of record[0].
   const ptrdiff_t diff = buf - table->record[0];
@@ -8791,7 +8902,7 @@ int handler::ha_external_lock(THD *thd, int lock_type) {
   /* SQL HANDLER call locks/unlock while scanning (RND/INDEX). */
   assert(inited == NONE || table->open_by_handler);
 
-  ha_statistic_increment(&System_status_var::ha_external_lock_count);
+  HA_STATISTIC_INCREMENT(ha_external_lock_count);
 
   MYSQL_TABLE_LOCK_WAIT(PSI_TABLE_EXTERNAL_LOCK, lock_type,
                         { error = external_lock(thd, lock_type); })
@@ -8871,8 +8982,7 @@ int handler::ha_write_row(uchar *buf) {
 
   DBUG_TRACE;
   DEBUG_SYNC(ha_thd(), "start_ha_write_row");
-  DBUG_EXECUTE_IF("inject_error_ha_write_row",
-                  return HA_ERR_INTERNAL_ERROR;);
+  DBUG_EXECUTE_IF("inject_error_ha_write_row", return HA_ERR_INTERNAL_ERROR;);
   DBUG_EXECUTE_IF("simulate_storage_engine_out_of_memory",
                   return HA_ERR_SE_OUT_OF_MEMORY;);
   mark_trx_read_write();
@@ -9233,9 +9343,8 @@ static void copy_blob_data(const TABLE *table, const MY_BITMAP *const fields,
   }
 }
 
-bool handler::is_using_prohibited_gap_locks(TABLE *table,
-                                            bool using_full_primary_key) const
-    noexcept {
+bool handler::is_using_prohibited_gap_locks(
+    TABLE *table, bool using_full_primary_key) const noexcept {
   const THD *thd = table->in_use;
   const thr_lock_type lock_type = table->reginfo.lock_type;
 

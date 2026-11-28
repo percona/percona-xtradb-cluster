@@ -1,0 +1,33 @@
+# Sanity check: the cluster enforces secure transport
+SELECT @@global.require_secure_transport AS require_secure_transport;
+require_secure_transport
+1
+# Create data on node_1 before node_2 leaves the cluster
+CREATE TABLE t1 (f1 INT PRIMARY KEY) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1), (2), (3), (4), (5);
+# Shut node_2 down and wipe its data directory to force a full (clone) SST
+# Cleaning node_2 var directory ...
+# Add more rows while node_2 is away, so the SST has to transfer them
+INSERT INTO t1 VALUES (6), (7), (8), (9), (10);
+# Restart node_2 - this triggers a clone SST from node_1
+# restart
+# node_2 must have received the full data set via clone SST
+SELECT COUNT(*) AS count_on_node_2 FROM t1;
+count_on_node_2
+10
+SELECT * FROM t1 ORDER BY f1;
+f1
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+SELECT COUNT(*) AS count_on_node_1 FROM t1;
+count_on_node_1
+10
+DROP TABLE t1;

@@ -120,6 +120,8 @@ SET(TESTS
   filesort_buffer
   filesort_compare
   filesort_mergechunk
+  hnsw
+  hnsw_concurrency
   inplace_vector
   integer_digits
   intrusive_list_iterator
@@ -383,6 +385,12 @@ SET(SQL_GUNIT_LIB_SOURCE
   ${CMAKE_SOURCE_DIR}/sql/locks/shared_spin_lock.cc
   )
 
+# Fused multiply-add would make DISTANCE() differ between SIMD tiers. It is
+# disabled here as in the server build (sql/CMakeLists.txt), so the unit tests
+# exercise exactly the code the server runs.
+ADD_CXX_COMPILE_FLAGS_TO_FILES(-ffp-contract=off
+  FILES ${CMAKE_SOURCE_DIR}/vector-common/vector_distance.cc)
+
 ADD_LIBRARY(sqlgunitlib STATIC ${SQL_GUNIT_LIB_SOURCE})
 ADD_DEPENDENCIES(sqlgunitlib GenError)
 SET_TARGET_PROPERTIES(sqlgunitlib
@@ -396,7 +404,7 @@ MYSQL_ADD_EXECUTABLE(merge_small_tests-t ${ALL_SMALL_TESTS}
   ENABLE_EXPORTS
   EXCLUDE_FROM_GCOV
   LINK_LIBRARIES sqlgunitlib gunit_small extra::rapidjson extra::boost
-    library_mysys
+    extra::unordered_dense library_mysys
   )
 IF(TARGET merge_small_tests-t)
   DOWNGRADE_STRINGOP_WARNINGS(merge_small_tests-t)
@@ -422,19 +430,32 @@ FOREACH(test ${TESTS})
     COMPILE_DEFINITIONS ${DISABLE_PSI_DEFINITIONS}
     ENABLE_EXPORTS
     EXCLUDE_FROM_ALL
-    LINK_LIBRARIES sqlgunitlib gunit_small extra::boost library_mysys
+    LINK_LIBRARIES sqlgunitlib gunit_small extra::boost extra::unordered_dense
+      library_mysys
     SKIP_INSTALL
     ADD_GCOV_TEST ${test}
   )
 ENDFOREACH()
 
-# vector_distance per-tier benchmark — all SIMD tiers × 6 sizes × euclidean/cosine/dot_product.
+# vector_distance per-tier benchmark — all SIMD tiers × 12 sizes × all metrics.
 # Unavailable tiers (wrong ISA or CPU) are skipped at runtime via GTEST_SKIP().
 MYSQL_ADD_EXECUTABLE(vector_distance_benchmark-t vector_distance_benchmark-t.cc
   COMPILE_DEFINITIONS ${DISABLE_PSI_DEFINITIONS}
   ENABLE_EXPORTS
   EXCLUDE_FROM_ALL
   LINK_LIBRARIES sqlgunitlib gunit_small extra::boost
+  SKIP_INSTALL
+)
+
+# HNSW recall / memory / throughput benchmark over a synthetic vector set.
+# Deliberately NOT in the TESTS list above: that list is merged into
+# merge_small_tests-t, which ctest runs, and this builds a 20k-node index.
+# See the file header for how to build and run it.
+MYSQL_ADD_EXECUTABLE(hnsw_bench-t hnsw_bench-t.cc
+  COMPILE_DEFINITIONS ${DISABLE_PSI_DEFINITIONS}
+  ENABLE_EXPORTS
+  EXCLUDE_FROM_ALL
+  LINK_LIBRARIES sqlgunitlib gunit_small extra::boost extra::unordered_dense
   SKIP_INSTALL
 )
 
@@ -548,3 +569,21 @@ ADD_SUBDIRECTORY(libs/sets)
 ADD_SUBDIRECTORY(libs/strconv)
 ADD_SUBDIRECTORY(libs/utils)
 ADD_SUBDIRECTORY(libs/uuids)
+
+IF(WITH_COMPONENT_AUDIT_LOG_FILTER)
+  MYSQL_ADD_EXECUTABLE(audit_json_handler-t
+    audit_json_handler-t.cc
+    ../../components/audit_log_filter/json_reader/audit_json_handler.cc
+    ../../components/audit_log_filter/audit_psi_info.cc
+    ADD_TEST audit_json_handler
+    LINK_LIBRARIES gunit_small
+  )
+  MYSQL_ADD_EXECUTABLE(audit_query_charset-t
+    audit_query_charset-t.cc
+    ../../components/audit_log_filter/charset_conversion.cc
+    ../../components/audit_log_filter/query_output.cc
+    ADD_TEST audit_query_charset
+    LINK_LIBRARIES gunit_small
+  )
+  ADD_SUBDIRECTORY(components/audit_log_filter)
+ENDIF()

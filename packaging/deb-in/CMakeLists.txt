@@ -65,10 +65,10 @@ ELSE()
   SET (DEB_ZLIB_OPTION "system")
 ENDIF()
 
+SET (DEB_BASE_VERSION ${MYSQL_PACKAGE_VERSION_WITH_EXTRA})
 IF (WITH_NDB)
   SET (DEB_BASE_PRODUCT "cluster-")
   SET (DEB_BASE_PRODUCTC "Cluster ")
-  SET (DEB_BASE_VERSION ${MYSQL_CLUSTER_VERSION})
   SET (DEB_CONTROL_SERVER_CONFLICT_NDB "mysql-community-server, mysql-commercial-server")
   SET (DEB_CONTROL_CLIENT_CONFLICT_NDB "mysql-community-client, mysql-commercial-client")
   SET (DEB_NOMEB "1")
@@ -77,7 +77,6 @@ IF (WITH_NDB)
 ELSE()
   SET (DEB_BASE_PRODUCT "")
   SET (DEB_BASE_PRODUCTC "")
-  SET (DEB_BASE_VERSION ${VERSION})
   SET (DEB_CONTROL_SERVER_CONFLICT_NDB "mysql-cluster-community-server, mysql-cluster-commercial-server")
   SET (DEB_CONTROL_CLIENT_CONFLICT_NDB "mysql-cluster-community-client, mysql-cluster-commercial-client")
 ENDIF()
@@ -90,6 +89,7 @@ IF (NOT DEFINED DEB_CHANGELOG_TIMESTAMP)
   )
   SET (DEB_CHANGELOG_TIMESTAMP ${DEB_CHANGELOG_TIMESTAMP} CACHE STRING "")
 ENDIF()
+
 # Commercial or community
 IF (DEB_PRODUCT STREQUAL "commercial")
   SET (DEB_CMAKE_EXTRAS "${DEB_CMAKE_EXTRAS} -DWITH_MLE=ON")
@@ -114,7 +114,6 @@ usr/lib/mysql/plugin/authentication_openid_connect.so
 usr/lib/mysql/plugin/authentication_ldap_sasl.so
 usr/lib/mysql/plugin/authentication_ldap_simple.so
 usr/lib/mysql/plugin/authentication_pam.so
-usr/lib/mysql/plugin/authentication_webauthn.so
 usr/lib/mysql/plugin/component_enterprise_encryption.so
 usr/lib/mysql/plugin/component_keyring_encrypted_file.so
 usr/lib/mysql/plugin/component_keyring_hashicorp.so

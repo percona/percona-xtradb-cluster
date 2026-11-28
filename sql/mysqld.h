@@ -596,6 +596,7 @@ extern PSI_socket_key key_socket_client_connection;
   Hint: grep PSI_stage_info | sort -u
 */
 extern PSI_stage_info stage_after_create;
+extern PSI_stage_info stage_after_drop;
 extern PSI_stage_info stage_alter_inplace_prepare;
 extern PSI_stage_info stage_alter_inplace;
 extern PSI_stage_info stage_alter_inplace_commit;
@@ -613,6 +614,7 @@ extern PSI_stage_info stage_creating_tmp_table;
 extern PSI_stage_info stage_deleting_from_main_table;
 extern PSI_stage_info stage_deleting_from_reference_tables;
 extern PSI_stage_info stage_discard_or_import_tablespace;
+extern PSI_stage_info stage_dropping_table;
 extern PSI_stage_info stage_end;
 extern PSI_stage_info stage_executing;
 extern PSI_stage_info stage_execution_of_init_command;
@@ -781,8 +783,20 @@ extern size_t mysql_data_home_len;
 extern const char *mysql_real_data_home_ptr;
 extern MYSQL_PLUGIN_IMPORT char *mysql_data_home;
 extern "C" MYSQL_PLUGIN_IMPORT char server_version[SERVER_VERSION_LENGTH];
+extern char server_version_with_update[SERVER_VERSION_LENGTH];
 extern "C" MYSQL_PLUGIN_IMPORT char
     server_version_suffix[SERVER_VERSION_LENGTH];
+/**
+  Get the current value of @@version or @@version_with_update, which include
+  @@version_suffix, copied to the THD mem_root.
+
+  @param thd          Thread handle
+  @param with_update  true for @@version_with_update, false for @@version
+
+  @returns the version string, or the startup value (server_version or
+           server_version_with_update) if it cannot be read or copied
+*/
+LEX_CSTRING get_server_version(THD *thd, bool with_update);
 extern MYSQL_PLUGIN_IMPORT char mysql_real_data_home[];
 extern char mysql_unpacked_real_data_home[];
 extern MYSQL_PLUGIN_IMPORT struct System_variables global_system_variables;

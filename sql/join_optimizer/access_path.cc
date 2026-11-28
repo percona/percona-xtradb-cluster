@@ -176,6 +176,11 @@ AccessPath *NewDeleteRowsAccessPath(THD *thd, AccessPath *child,
   path->delete_rows().child = child;
   path->delete_rows().tables_to_delete_from = delete_tables;
   path->delete_rows().immediate_tables = immediate_tables;
+  // The old optimizer always uses nested loop joins for DELETE, so default to
+  // calling handler::position() for all tables. The hypergraph optimizer
+  // overwrites this map during finalization, and excludes the tables which have
+  // row IDs stored in the hash join buffer.
+  path->delete_rows().tables_to_get_rowid_for = ~table_map{0};
   return path;
 }
 
@@ -188,6 +193,11 @@ AccessPath *NewUpdateRowsAccessPath(THD *thd, AccessPath *child,
   path->update_rows().child = child;
   path->update_rows().tables_to_update = update_tables;
   path->update_rows().immediate_tables = immediate_tables;
+  // The old optimizer always uses nested loop joins for UPDATE, so default to
+  // calling handler::position() for all tables. The hypergraph optimizer
+  // overwrites this map during finalization, and excludes the tables which have
+  // row IDs stored in the hash join buffer.
+  path->update_rows().tables_to_get_rowid_for = ~table_map{0};
   return path;
 }
 
@@ -281,6 +291,8 @@ TABLE *GetBasicTable(const AccessPath *path) {
       return path->pushed_join_ref().table;
     case AccessPath::FULL_TEXT_SEARCH:
       return path->full_text_search().table;
+    case AccessPath::VECTOR_SEARCH:
+      return path->vector_search().table;
     case AccessPath::CONST_TABLE:
       return path->const_table().table;
     case AccessPath::MRR:
@@ -337,6 +349,8 @@ std::string_view AccessPathTypeName(AccessPath::Type type) {
       return "PUSHED_JOIN_REF";
     case AccessPath::FULL_TEXT_SEARCH:
       return "FULL_TEXT_SEARCH";
+    case AccessPath::VECTOR_SEARCH:
+      return "VECTOR_SEARCH";
     case AccessPath::CONST_TABLE:
       return "CONST_TABLE";
     case AccessPath::MRR:
@@ -496,6 +510,7 @@ bool ShouldEnableBatchMode(AccessPath *path) {
     case AccessPath::REF_OR_NULL:
     case AccessPath::PUSHED_JOIN_REF:
     case AccessPath::FULL_TEXT_SEARCH:
+    case AccessPath::VECTOR_SEARCH:
     case AccessPath::DYNAMIC_INDEX_RANGE_SCAN:
       return true;
     case AccessPath::FILTER:
@@ -791,6 +806,13 @@ unique_ptr_destroy_only<RowIterator> CreateIteratorFromAccessPath(
         iterator = NewIterator<FullTextSearchIterator>(
             thd, mem_root, param.table, param.ref, param.ft_func,
             param.use_order, param.use_limit, examined_rows);
+        break;
+      }
+      case AccessPath::VECTOR_SEARCH: {
+        const auto &param = path->vector_search();
+        iterator = NewIterator<VectorSearchIterator>(
+            thd, mem_root, param.table, param.ref, param.item, param.limit,
+            examined_rows);
         break;
       }
       case AccessPath::CONST_TABLE: {
@@ -1499,7 +1521,8 @@ unique_ptr_destroy_only<RowIterator> CreateIteratorFromAccessPath(
         }
         iterator = NewIterator<DeleteRowsIterator>(
             thd, mem_root, std::move(job.children[0]), join,
-            param.tables_to_delete_from, param.immediate_tables);
+            param.tables_to_delete_from, param.immediate_tables,
+            param.tables_to_get_rowid_for);
         break;
       }
       case AccessPath::UPDATE_ROWS: {

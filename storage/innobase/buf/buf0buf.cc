@@ -1648,6 +1648,13 @@ static void buf_pool_free() {
   buf_flush_list_added.reset(nullptr);
 }
 
+#ifdef UNIV_DEBUG
+/** Whether io_fix_latching_rules_exit_check consults the io_fix latching rules
+at exit. Set from the ib_io_fix_rules_check_at_exit debug keyword when the
+buffer pool is created, as DBUG is shut down before exit() runs. */
+static bool check_io_fix_latching_rules_at_exit = false;
+#endif /* UNIV_DEBUG */
+
 /** Creates the buffer pool.
 @param[in]  total_size    Size of the total pool in bytes.
 @param[in]  populate	  Virtual page preallocation
@@ -1672,6 +1679,11 @@ dberr_t buf_pool_init(ulint total_size, bool populate, ulint n_instances) {
   buf_pool_should_madvise = innobase_should_madvise_buf_pool();
 
   buf_pool_resizing = false;
+
+#ifdef UNIV_DEBUG
+  DBUG_EXECUTE_IF("ib_io_fix_rules_check_at_exit",
+                  check_io_fix_latching_rules_at_exit = true;);
+#endif /* UNIV_DEBUG */
 
   buf_pool_ptr = (buf_pool_t *)ut::zalloc_withkey(
       UT_NEW_THIS_FILE_PSI_KEY, n_instances * sizeof *buf_pool_ptr);
@@ -3519,7 +3531,16 @@ buf_page_t *buf_page_get_zip(const page_id_t &page_id,
     bpage = buf_page_hash_get_s_locked(buf_pool, page_id, &hash_lock);
     if (bpage) {
       ut_ad(!buf_pool_watch_is_sentinel(buf_pool, bpage));
-      ut_ad(!bpage->was_stale());
+      if (bpage->was_stale()) {
+        if (!buf_page_free_stale(buf_pool, bpage, hash_lock)) {
+          /* The stale page is IO-fixed. Back off before retrying so the
+           pending IO can finish without a tight CPU loop. */
+          std::this_thread::sleep_for(std::chrono::microseconds(100));
+        }
+        /* buf_page_free_stale() released the hash lock. Repeat the lookup until
+        the stale page is gone or replaced with a usable page. */
+        continue;
+      }
       break;
     }
 
@@ -4746,22 +4767,24 @@ bool buf_page_optimistic_get(ulint rw_latch, buf_block_t *block,
   ut_ad(rw_latch == RW_S_LATCH || rw_latch == RW_X_LATCH ||
         rw_latch == RW_NO_LATCH);
 
-  buf_page_mutex_enter(block);
+  /* The block mutex is not needed here, because the caller keeps the block
+  buffer-fixed. Eviction and relocation require buf_fix_count == 0, so the
+  state cannot leave BUF_BLOCK_FILE_PAGE and they cannot modify modify_clock.
+  The remaining modify_clock writers hold X-latch on the block, which the
+  mutex never excluded: this check is only a hint, and modify_clock is
+  re-checked below after acquiring the page latch. */
+  ut_ad(block->page.buf_fix_count > 0);
 
   if (UNIV_UNLIKELY(block->modify_clock != modify_clock ||
                     (buf_block_get_state(block) != BUF_BLOCK_FILE_PAGE))) {
-    buf_page_mutex_exit(block);
-
     return (false);
   }
 
   buf_block_buf_fix_inc(block, ut::Location{file, line});
 
-  /* Grab the access time while we have the mutex to potentially
-  avoid the need to acquire the mutex the second time (below). */
+  /* Read the access time without the mutex, to potentially avoid the need
+  to acquire it (below). */
   auto access_time = buf_page_is_accessed(&block->page);
-
-  buf_page_mutex_exit(block);
 
   ut_ad(!ibuf_inside(mtr) ||
         ibuf_page(block->page.id, block->page.size, UT_LOCATION_HERE, nullptr));
@@ -5196,7 +5219,15 @@ buf_page_t *buf_page_init_for_read(ulint mode, const page_id_t &page_id,
 
   hash_lock = buf_page_hash_lock_get(buf_pool, page_id);
 
+  DEBUG_SYNC_C("buf_page_init_for_read_before_hash_lock");
+
   rw_lock_x_lock(hash_lock, UT_LOCATION_HERE);
+
+  /* We do not hold the LRU list mutex, so a concurrent buffer pool resize
+  may have rehashed page_hash and remapped this page id to a different shard
+  latch between computing hash_lock and latching it; re-confirm and re-latch
+  the correct shard. */
+  hash_lock = buf_page_hash_lock_x_confirm(hash_lock, buf_pool, page_id);
 
   buf_page_t *watch_page;
 
@@ -5281,6 +5312,8 @@ buf_page_t *buf_page_init_for_read(ulint mode, const page_id_t &page_id,
     DBUG_EXECUTE_IF(
         "buf_page_init_for_read_delay_lru_add",
         std::this_thread::sleep_for(std::chrono::microseconds(100)););
+
+    DEBUG_SYNC_C("buf_page_init_for_read_before_lru_add");
 
     mutex_enter(&buf_pool->LRU_list_mutex);
 
@@ -5951,7 +5984,18 @@ the numbers on edges.
 |           |  ---------0-------->  | BUF_IO_PIN |
 +-----------+  <--------0---------  +------------+
 */
-using Buf_io_fix_latching_rules = ut::Stateful_latching_rules<buf_io_fix, 3>;
+using Buf_io_fix_latching_rules =
+    ut::Stateful_latching_rules<buf_io_fix, 3, 4, 6>;
+/* When the server exits without shutting InnoDB down, exit() runs the static
+destructors while background threads such as ib_buf_dump can still check io_fix
+transitions against the rules, so destroying them must leave them intact. */
+static_assert(std::is_trivially_destructible_v<Buf_io_fix_latching_rules>);
+/** Consults buf_io_fix_latching_rules from a static destructor, the way a
+background thread does when it outlives exit(). It is declared before the rules,
+so it runs after their destructor would have freed any memory they own. */
+static struct Io_fix_latching_rules_exit_check {
+  ~Io_fix_latching_rules_exit_check();
+} io_fix_latching_rules_exit_check;
 Buf_io_fix_latching_rules buf_io_fix_latching_rules{
     {BUF_IO_NONE, BUF_IO_READ, BUF_IO_WRITE, BUF_IO_PIN},
     {
@@ -5963,6 +6007,20 @@ Buf_io_fix_latching_rules buf_io_fix_latching_rules{
         {BUF_IO_PIN, {0}, BUF_IO_NONE},
     },
 };
+
+Io_fix_latching_rules_exit_check::~Io_fix_latching_rules_exit_check() {
+  if (!check_io_fix_latching_rules_at_exit) {
+    return;
+  }
+  Buf_io_fix_latching_rules::latches_set_t all_latches;
+  all_latches.set();
+  buf_io_fix_latching_rules.on_transition(BUF_IO_NONE, BUF_IO_READ,
+                                          all_latches);
+  buf_io_fix_latching_rules.assert_latches_let_distinguish(all_latches,
+                                                           {BUF_IO_READ});
+  fprintf(stderr, "InnoDB: io_fix latching rules checked at exit\n");
+}
+
 /** The purpose of this class is to hide the knowledge that
 Buf_io_fix_latching_rules even exists from users of buf_page_t class, while also
 avoiding having to tediously repeat yourself in each place where buf_page_t's

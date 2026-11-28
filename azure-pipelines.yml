@@ -18,9 +18,57 @@ parameters:
   type: boolean
   default: false
 
+# Queue-time parameter that narrows a run to a single toolchain, so a compiler-
+# or platform-specific fix can be verified without paying for the whole matrix
+# (a macOS-only breakage, for instance, needs two legs, not 30).
+#
+#   default   the historical behaviour: the five default configs, extended to
+#             all 30 by fullCI or by the nightly schedule.
+#   all       the same as fullCI.
+#   gcc       every gcc config and nothing else.
+#   clang     every Linux clang config and nothing else.
+#   macos     the two macOS configs and nothing else (disabled in PXC: the two
+#             macOS legs are commented out, so this target builds nothing).
+#   gcc-N     that gcc alone (both build types, plus INVERTED where it has one).
+#   clang-N   that Linux clang alone, same rule.
+#
+# macOS is deliberately left without per-version values: it is pinned to one
+# image, so 'macos' already names a single toolchain.
+#
+# Like fullCI it is settable through the REST API:
+#
+#   "templateParameters": { "targets": "clang-16" }
+#
+# and it shows up as a drop-down in the Run pipeline dialog. fullCI wins over
+# it, so a full run stays a full run whatever this is set to.
+- name: targets
+  displayName: 'Targets to build'
+  type: string
+  default: default
+  values:
+  - default
+  - all
+  - gcc
+  - clang
+  - macos
+  - gcc-16
+  - gcc-15
+  - gcc-14
+  - gcc-13
+  - gcc-12
+  - gcc-11
+  - clang-23
+  - clang-22
+  - clang-21
+  - clang-20
+  - clang-19
+  - clang-18
+  - clang-17
+  - clang-16
+
 schedules:
-- cron: "0 2 * * *"
-  displayName: Daily 2:00 AM UTC build
+- cron: "30 18 * * *"
+  displayName: Daily 6:30 PM UTC build
   branches:
     include:
     - 9.7
@@ -31,7 +79,7 @@ pr:
   drafts: false
   branches:
     include:
-    - '*'
+    - '9.7'
   paths:
     exclude:
     - doc
@@ -126,6 +174,13 @@ jobs:
   #             fullCI parameter is set (how GitHub Actions asks for a full run)
   #             or on the nightly schedule.
   #
+  # Every leg also carries the family it belongs to (gcc, clang or macos) and,
+  # off macOS, its compiler version, so the targets parameter can cut the run
+  # down to one toolchain: 'clang' builds every Linux clang config, 'clang-16'
+  # only that compiler's two legs, 'macos' only the two macOS ones. A family or
+  # a version takes its default-tier legs along, since a toolchain is only
+  # worth testing whole.
+  #
   # The guards are compile-time insertions, so on a default run the extra legs
   # are never generated: no agents, and no skipped entries in the run summary.
   #
@@ -145,81 +200,87 @@ jobs:
   # per-leg condition lets every leg through.
   strategy:
     matrix:
-      # macOS 14 (disabled)
-      # macOS 14 RelWithDebInfo:
-      #   imageName: 'macOS-14'
-      #   Compiler: clang
-      #   BuildType: RelWithDebInfo
-      #
-      # # skip for a pull request if branch name doesn't contain "fullci"
-      # ${{ if or(ne(variables['Build.Reason'], 'PullRequest'), contains(variables['Build.SourceBranchName'], 'fullci')) }}:
-      #   macOS 14 Debug:
-      #     imageName: 'macOS-14'
-      #     Compiler: clang
-      #     BuildType: Debug
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'default', 'all', 'clang', 'clang-23')) }}:
+        clang-23 RelWithDebInfo [Ubuntu 24.04 Noble]:
+          imageName: 'ubuntu-24.04'
+          UBUNTU_CODE_NAME: noble
+          Compiler: clang
+          CompilerVer: 23
+          BuildType: RelWithDebInfo
 
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'default', 'all', 'clang', 'clang-23')) }}:
+        clang-23 Debug [Ubuntu 24.04 Noble]:
+          imageName: 'ubuntu-24.04'
+          UBUNTU_CODE_NAME: noble
+          Compiler: clang
+          CompilerVer: 23
+          BuildType: Debug
 
-      # clang-16 and newer compilers
-      clang-22 RelWithDebInfo [Ubuntu 24.04 Noble]:
-        imageName: 'ubuntu-24.04'
-        UBUNTU_CODE_NAME: noble
-        Compiler: clang
-        CompilerVer: 22
-        BuildType: RelWithDebInfo
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'default', 'all', 'gcc', 'gcc-16')) }}:
+        gcc-16 RelWithDebInfo [Ubuntu 24.04 Noble]:
+          imageName: 'ubuntu-24.04'
+          Compiler: gcc
+          CompilerVer: 16
+          BuildType: RelWithDebInfo
 
-      clang-22 Debug [Ubuntu 24.04 Noble]:
-        imageName: 'ubuntu-24.04'
-        UBUNTU_CODE_NAME: noble
-        Compiler: clang
-        CompilerVer: 22
-        BuildType: Debug
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'default', 'all', 'gcc', 'gcc-16')) }}:
+        gcc-16 Debug [Ubuntu 24.04 Noble]:
+          imageName: 'ubuntu-24.04'
+          Compiler: gcc
+          CompilerVer: 16
+          BuildType: Debug
 
-      gcc-16 RelWithDebInfo [Ubuntu 24.04 Noble]:
-        imageName: 'ubuntu-24.04'
-        Compiler: gcc
-        CompilerVer: 16
-        BuildType: RelWithDebInfo
-
-      gcc-16 Debug [Ubuntu 24.04 Noble]:
-        imageName: 'ubuntu-24.04'
-        Compiler: gcc
-        CompilerVer: 16
-        BuildType: Debug
-
-      gcc-16 Debug INVERTED [Ubuntu 24.04 Noble]:
-        imageName: 'ubuntu-24.04'
-        Compiler: gcc
-        CompilerVer: 16
-        BuildType: Debug
-        BUILD_PARAMS_TYPE: inverted
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'default', 'all', 'gcc', 'gcc-16')) }}:
+        gcc-16 Debug INVERTED [Ubuntu 24.04 Noble]:
+          imageName: 'ubuntu-24.04'
+          Compiler: gcc
+          CompilerVer: 16
+          BuildType: Debug
+          BUILD_PARAMS_TYPE: inverted
 
       # Extended coverage below: built only with fullCI, or on the nightly.
 
-      # # macOS 14
-      # ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
-      #   macOS 14 RelWithDebInfo:
-      #     imageName: 'macOS-14'
+      # macOS 15 (disabled)
+      # ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'macos')) }}:
+      #   macOS 15 RelWithDebInfo:
+      #     imageName: 'macOS-15'
       #     Compiler: clang
       #     BuildType: RelWithDebInfo
       #
-      # ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
-      #   macOS 14 Debug:
-      #     imageName: 'macOS-14'
+      # ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'macos')) }}:
+      #   macOS 15 Debug:
+      #     imageName: 'macOS-15'
       #     Compiler: clang
       #     BuildType: Debug
 
 
       # clang-16 and newer compilers
-      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
-        clang-22 RelWithDebInfo INVERTED [Ubuntu 24.04 Noble]:
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'clang', 'clang-23')) }}:
+        clang-23 RelWithDebInfo INVERTED [Ubuntu 24.04 Noble]:
+          imageName: 'ubuntu-24.04'
+          UBUNTU_CODE_NAME: noble
+          Compiler: clang
+          CompilerVer: 23
+          BuildType: RelWithDebInfo
+          BUILD_PARAMS_TYPE: inverted
+
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'clang', 'clang-22')) }}:
+        clang-22 RelWithDebInfo [Ubuntu 24.04 Noble]:
           imageName: 'ubuntu-24.04'
           UBUNTU_CODE_NAME: noble
           Compiler: clang
           CompilerVer: 22
           BuildType: RelWithDebInfo
-          BUILD_PARAMS_TYPE: inverted
 
-      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'clang', 'clang-22')) }}:
+        clang-22 Debug [Ubuntu 24.04 Noble]:
+          imageName: 'ubuntu-24.04'
+          UBUNTU_CODE_NAME: noble
+          Compiler: clang
+          CompilerVer: 22
+          BuildType: Debug
+
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'clang', 'clang-21')) }}:
         clang-21 RelWithDebInfo [Ubuntu 24.04 Noble]:
           imageName: 'ubuntu-24.04'
           UBUNTU_CODE_NAME: noble
@@ -227,7 +288,7 @@ jobs:
           CompilerVer: 21
           BuildType: RelWithDebInfo
 
-      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'clang', 'clang-21')) }}:
         clang-21 Debug [Ubuntu 24.04 Noble]:
           imageName: 'ubuntu-24.04'
           UBUNTU_CODE_NAME: noble
@@ -235,7 +296,7 @@ jobs:
           CompilerVer: 21
           BuildType: Debug
 
-      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'clang', 'clang-20')) }}:
         clang-20 RelWithDebInfo [Ubuntu 24.04 Noble]:
           imageName: 'ubuntu-24.04'
           UBUNTU_CODE_NAME: noble
@@ -243,7 +304,7 @@ jobs:
           CompilerVer: 20
           BuildType: RelWithDebInfo
 
-      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'clang', 'clang-20')) }}:
         clang-20 Debug [Ubuntu 24.04 Noble]:
           imageName: 'ubuntu-24.04'
           UBUNTU_CODE_NAME: noble
@@ -251,7 +312,7 @@ jobs:
           CompilerVer: 20
           BuildType: Debug
 
-      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'clang', 'clang-19')) }}:
         clang-19 RelWithDebInfo [Ubuntu 24.04 Noble]:
           imageName: 'ubuntu-24.04'
           UBUNTU_CODE_NAME: noble
@@ -259,7 +320,7 @@ jobs:
           CompilerVer: 19
           BuildType: RelWithDebInfo
 
-      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'clang', 'clang-19')) }}:
         clang-19 Debug [Ubuntu 24.04 Noble]:
           imageName: 'ubuntu-24.04'
           UBUNTU_CODE_NAME: noble
@@ -267,7 +328,7 @@ jobs:
           CompilerVer: 19
           BuildType: Debug
 
-      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'clang', 'clang-18')) }}:
         clang-18 RelWithDebInfo [Ubuntu 24.04 Noble]:
           imageName: 'ubuntu-24.04'
           UBUNTU_CODE_NAME: noble
@@ -275,7 +336,7 @@ jobs:
           CompilerVer: 18
           BuildType: RelWithDebInfo
 
-      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'clang', 'clang-18')) }}:
         clang-18 Debug [Ubuntu 24.04 Noble]:
           imageName: 'ubuntu-24.04'
           UBUNTU_CODE_NAME: noble
@@ -283,28 +344,28 @@ jobs:
           CompilerVer: 18
           BuildType: Debug
 
-      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'clang', 'clang-17')) }}:
         clang-17 RelWithDebInfo [Ubuntu 22.04 Jammy]:
           imageName: 'ubuntu-22.04'
           Compiler: clang
           CompilerVer: 17
           BuildType: RelWithDebInfo
 
-      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'clang', 'clang-17')) }}:
         clang-17 Debug [Ubuntu 22.04 Jammy]:
           imageName: 'ubuntu-22.04'
           Compiler: clang
           CompilerVer: 17
           BuildType: Debug
 
-      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'clang', 'clang-16')) }}:
         clang-16 RelWithDebInfo [Ubuntu 22.04 Jammy]:
           imageName: 'ubuntu-22.04'
           Compiler: clang
           CompilerVer: 16
           BuildType: RelWithDebInfo
 
-      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'clang', 'clang-16')) }}:
         clang-16 Debug [Ubuntu 22.04 Jammy]:
           imageName: 'ubuntu-22.04'
           Compiler: clang
@@ -314,70 +375,70 @@ jobs:
 
       # gcc-11 and newer compilers
       # (gcc-16 RelWithDebInfo and gcc-16 Debug are default configs, listed above)
-      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'gcc', 'gcc-15')) }}:
         gcc-15 RelWithDebInfo [Ubuntu 24.04 Noble]:
           imageName: 'ubuntu-24.04'
           Compiler: gcc
           CompilerVer: 15
           BuildType: RelWithDebInfo
 
-      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'gcc', 'gcc-15')) }}:
         gcc-15 Debug [Ubuntu 24.04 Noble]:
           imageName: 'ubuntu-24.04'
           Compiler: gcc
           CompilerVer: 15
           BuildType: Debug
 
-      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'gcc', 'gcc-14')) }}:
         gcc-14 RelWithDebInfo [Ubuntu 22.04 Jammy]:
           imageName: 'ubuntu-22.04'
           Compiler: gcc
           CompilerVer: 14
           BuildType: RelWithDebInfo
 
-      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'gcc', 'gcc-14')) }}:
         gcc-14 Debug [Ubuntu 22.04 Jammy]:
           imageName: 'ubuntu-22.04'
           Compiler: gcc
           CompilerVer: 14
           BuildType: Debug
 
-      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'gcc', 'gcc-13')) }}:
         gcc-13 RelWithDebInfo [Ubuntu 22.04 Jammy]:
           imageName: 'ubuntu-22.04'
           Compiler: gcc
           CompilerVer: 13
           BuildType: RelWithDebInfo
 
-      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'gcc', 'gcc-13')) }}:
         gcc-13 Debug [Ubuntu 22.04 Jammy]:
           imageName: 'ubuntu-22.04'
           Compiler: gcc
           CompilerVer: 13
           BuildType: Debug
 
-      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'gcc', 'gcc-12')) }}:
         gcc-12 RelWithDebInfo [Ubuntu 22.04 Jammy]:
           imageName: 'ubuntu-22.04'
           Compiler: gcc
           CompilerVer: 12
           BuildType: RelWithDebInfo
 
-      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'gcc', 'gcc-12')) }}:
         gcc-12 Debug [Ubuntu 22.04 Jammy]:
           imageName: 'ubuntu-22.04'
           Compiler: gcc
           CompilerVer: 12
           BuildType: Debug
 
-      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'gcc', 'gcc-11')) }}:
         gcc-11 RelWithDebInfo [Ubuntu 22.04 Jammy]:
           imageName: 'ubuntu-22.04'
           Compiler: gcc
           CompilerVer: 11
           BuildType: RelWithDebInfo
 
-      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule')) }}:
+      ${{ if or(parameters.fullCI, eq(variables['Build.Reason'], 'Schedule'), in(parameters.targets, 'all', 'gcc', 'gcc-11')) }}:
         gcc-11 Debug [Ubuntu 22.04 Jammy]:
           imageName: 'ubuntu-22.04'
           Compiler: gcc
@@ -466,9 +527,24 @@ jobs:
           REAL_COMPILER_VER=`$SELECTED_CC --version | head -1 | awk '{print $4}'`
         fi
       else
+        # The macOS agents are Intel, and Homebrew no longer publishes Intel
+        # bottles for ccache: brew would build it from source together with
+        # llvm and rust, which alone overruns the job timeout. Take ccache's
+        # own universal binary instead.
+        CCACHE_VER=4.14.1
+        CCACHE_SHA256=c279fa81e2e806b4d9e64d4a06cb569a84ef54151feef796e5d4f4e95a464563
+        CCACHE_TGZ=$(Agent.TempDirectory)/ccache-$CCACHE_VER-darwin.tar.gz
+        curl -fsSL -o $CCACHE_TGZ https://github.com/ccache/ccache/releases/download/v$CCACHE_VER/ccache-$CCACHE_VER-darwin.tar.gz || exit 1
+        echo "$CCACHE_SHA256  $CCACHE_TGZ" | shasum -a 256 -c || exit 1
+        tar xzf $CCACHE_TGZ -C $(Agent.ToolsDirectory) || exit 1
+        echo "##vso[task.prependpath]$(Agent.ToolsDirectory)/ccache-$CCACHE_VER-darwin"
+
+        # Formulae already on the image are kept as they are: with no Intel
+        # bottle for the new version, an upgrade (openssl@3, for one) would be
+        # another source build.
         brew update
-        brew install ccache protobuf@21 lz4 openssl@3 bison
-        brew link --force protobuf@21
+        HOMEBREW_NO_INSTALL_UPGRADE=1 brew install protobuf@21 lz4 openssl@3 bison || exit 1
+        brew link --force protobuf@21 || exit 1
       fi
 
       UPDATE_TIME=$SECONDS
